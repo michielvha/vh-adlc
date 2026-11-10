@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "A review at 422e79a stayed pending and unstored (gpt-6.1-sol reported MODEL: unknown); its findings are applied and the owner answered Q19. A new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "Two reviews with a named model (422e79a, 869b5fe) stayed pending and unstored because the reviewer reported MODEL: unknown; their findings are applied and the owner answered Q19 to Q22. A new spec review with the host default model is due. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every maintenance sweep and onboarding leaves a repository with each GitHub security setting its plan offers for free turned on, without duplicating Renovate's pull requests, and reports what it changed."
 covers:
@@ -12,6 +12,8 @@ covers:
   - plugins/vh-adlc/scripts/maintenance/collect.ts
   - plugins/vh-adlc/scripts/maintenance/settings.ts
   - plugins/vh-adlc/scripts/maintenance/types.ts
+  - plugins/vh-adlc/scripts/maintenance/report.ts
+  - plugins/vh-adlc/scripts/maintenance/cli.ts
   - plugins/vh-adlc/references/security-settings.md
   - plugins/vh-adlc/references/maintenance.md
   - plugins/vh-adlc/references/maintenance-settings.md
@@ -63,8 +65,8 @@ security-updates rule. CodeQL and Scorecard come from its reusable workflows, so
 turns on CodeQL default setup. Implementation waits for docs#30 to merge, then moves both docs pins
 with a plugin minor version bump.
 
-These owner decisions widen the authority table, which today lets vh-adlc change only
-merged-branch deletion, with the owner's yes.
+These owner decisions widen the authority table. Today the only repository setting vh-adlc
+changes is merged-branch deletion, with authorization.
 
 Proof is planned, not observed: Bun tests against a fake `gh` for each repository shape, and a live
 sweep of bg-remove. No live run shows a sweep enabling alerts and collecting them in the same run.
@@ -152,6 +154,12 @@ Owner decisions on 2026-11-10:
   private or internal repository's code scanning counts as unavailable for the plan only when an
   admin read of `security_and_analysis` shows neither `advanced_security` nor `code_security`
   enabled. Without that evidence the surface stays incomplete.
+- Q20 to Q22, raised by a pending review at `869b5fe` that was not stored, answered on 2026-11-10
+  with every recommended option: a failed detection lookup leaves security updates off with
+  `renovate-detection-failed` or `dependabot-detection-failed` (Q20); the sweep report renders the
+  helper's output in its own section through a new report input (Q21); and the owner's acceptance
+  of this feature is the standing agreement the onboarding guide asks for, with docs#30 naming both
+  Dependabot config file names since `4b2198d` (Q22).
 
 ## Scope
 
@@ -167,7 +175,7 @@ In scope:
   their code scanning surface the same way.
 - A per-repository keep-off list in `.vh-adlc/maintenance.yaml`.
 - Running the helper in every maintenance sweep before collection and during onboarding, with the
-  outcome in the sweep report or the onboarding report.
+  outcome in the sweep report, rendered from the helper's JSON, or the onboarding report.
 - Moving the `AGENTS.md` pin and the plugin pin in `plugins/vh-adlc/knowledge.md` to the revision
   where vhco-pro/docs#30 merged, with a plugin minor version bump in both `plugin.json` files.
 - The authority row, maintenance skill step, onboarding text, reference pages and user-guide section
@@ -235,7 +243,7 @@ Each entry has one state:
 | --- | --- |
 | `already-on` | Read as on before any write; reason `renovate-overlap` when it is Dependabot security updates and Renovate is present, or `owner-choice-conflict` when the keep-off list names it |
 | `enabled` | Off before, written, and read back as on |
-| `left-off` | Deliberately not enabled; reason `renovate-present`, `renovate-unknown`, `renovate-detection-failed` or `owner-choice` |
+| `left-off` | Deliberately not enabled; reason `renovate-present`, `renovate-unknown`, `renovate-detection-failed`, `dependabot-detection-failed` or `owner-choice` |
 | `unavailable` | Not free for this repository; reason `not-free-on-private` or `archived` |
 | `not-changed` | Off and free, but not written or not read back as on; reason `check-only`, `alerts-off` or `api-error` with the HTTP status |
 | `unknown` | Not read; reason `needs-admin`, or `api-error` with the HTTP status or error when a read failed |
@@ -273,8 +281,10 @@ reason of the first rule below that applies to it:
    has no `code_scanning` entry, as on a public repository.
 3. Not admin (`needs-admin`): when `permissions.admin` is false, the helper makes no admin-only read
    and no write, and every remaining entry is `unknown`.
-4. Failed read (`api-error`): a read that fails, other than the 404 that means off, makes the entry
-   `unknown` with the status or error, and the helper makes no write for it.
+4. Failed read (`api-error`): a read of a setting's own state that fails, other than the 404 that
+   means off, makes the entry `unknown` with the status or error, and the helper makes no write for
+   it. Renovate and Dependabot detection lookups are not reads of a setting's state; rule 6 handles
+   their failures.
 5. Keep-off list (`owner-choice` or `owner-choice-conflict`): a setting listed for the target
    repository under `security_settings_keep_off` is never written. It is `left-off` with
    `owner-choice`, or `already-on` with `owner-choice-conflict` when the read shows it on. The
@@ -303,14 +313,18 @@ authored by `app/renovate`; or an open issue authored by `app/renovate` whose ti
 Dependabot is configured when `.github/dependabot.yml` or `.github/dependabot.yaml` exists on the
 default branch.
 
-For `dependabot_security_updates`:
+Renovate has no signal only when every Renovate lookup succeeded and none matched. Any failed
+Renovate lookup with no match elsewhere counts as failed, as does a failed Dependabot config lookup.
 
-| Renovate | Dependabot | Entry |
-| --- | --- | --- |
-| present | any | `left-off` with `renovate-present`, or `already-on` with `renovate-overlap` |
-| no signal | configured | written, then `enabled` or `already-on` |
-| no signal | not configured | `left-off` with `renovate-unknown` |
-| lookup failed with no match | any | `left-off` with `renovate-detection-failed` and the error |
+For `dependabot_security_updates`, with no write in any row except the second:
+
+| Renovate | Dependabot | When off | When on |
+| --- | --- | --- | --- |
+| present | any | `left-off` with `renovate-present` | `already-on` with `renovate-overlap` |
+| no signal | configured | written, then `enabled` | `already-on` |
+| no signal | not configured | `left-off` with `renovate-unknown` | `already-on` |
+| a lookup failed, no match | any | `left-off` with `renovate-detection-failed` and the error | `already-on` |
+| no signal | lookup failed | `left-off` with `dependabot-detection-failed` and the error | `already-on` |
 
 The `renovate-unknown` row means a new repository the Renovate App covers gets no duplicate pull
 requests before its first Renovate pull request (Q6). docs#30 states the same rule since `89d567a`
@@ -339,18 +353,26 @@ text. Unknown setting names and duplicate repositories fail visibly, as for the 
 ### Procedure changes
 
 - `references/security-settings.md` (new) documents the commands, states, reasons, the endpoint
-  responses that mean on and off, detection rules, keep-off list, precedence and authority. For which features a repository should have, it links to
-  `conventions/repository-security.md` at the pinned docs revision instead of restating it.
+  responses that mean on and off, detection rules, keep-off list, precedence and authority. For
+  which features a repository should have, it links to `conventions/repository-security.md` at the
+  pinned docs revision instead of restating it.
 - The maintenance skill gets a step before collection: run `apply` for each repository in scope, or
   `check` when the current request forbids live or remote changes, then collect, so alerts enabled in
   this run are collected in the same run. When alerts were enabled in this run, the report says the
-  alert list may still be filling. The helper's owner decisions list goes into the report's owner
-  decisions.
-- `references/maintenance.md` adds the `## Repository security settings` section to the sweep report,
-  taken from the helper's Markdown output.
+  alert list may still be filling. The step saves each repository's JSON output and passes the
+  files to the report.
+- The maintenance CLI's report command gains `--security-settings FILE`, repeatable, taking the
+  helper's JSON output, and `renderReport` in `scripts/maintenance/report.ts` gains a matching input.
+  The saved report then has a `## Repository security settings` section after `## Security alerts`:
+  one table per repository, rendered by the same function as the helper's Markdown, and one
+  "Owner decisions" list across all repositories. Without the option the section says the helper
+  did not run. `references/maintenance.md` documents the section.
 - `references/authority.md` gets a row: a maintenance sweep or onboarding may enable these settings
   on a repository in its scope with `apply`. A current request that forbids live or remote changes
-  wins, and the procedure then runs `check`. Nothing grants turning a setting off.
+  wins, and the procedure then runs `check`. Nothing grants turning a setting off. The owner's
+  acceptance of this feature is the standing agreement that `guides/onboard-a-repository.md` in
+  vhco-pro/docs asks for before turning these settings on, and
+  `references/security-settings.md` says so.
 - `references/loop.md:70-73` and `references/lifecycle.md:64` add that onboarding runs `apply` and
   reports its output beside the merged-branch deletion check. Like that check, it is a repository
   change, not a commit, and never holds up the onboarding commit.
@@ -359,21 +381,28 @@ text. Unknown setting names and duplicate repositories fail visibly, as for the 
 
 ## Acceptance Criteria
 
-- [ ] AC-01: After `apply` on a repository where the caller is admin and Dependabot alerts are off,
+Each criterion covers the entries no earlier rule under "Rules applied before any write" decides,
+with every read and write succeeding, unless it names another case.
+
+- [ ] AC-01: After `apply` on an unarchived repository where the caller is admin, Dependabot alerts are
+      off and the keep-off list does not name them,
       `GET repos/{r}/vulnerability-alerts` returns 204 and the output lists `dependabot_alerts` as
       `enabled`.
 - [ ] AC-02: After `apply` on a repository with any documented Renovate config location, an
       `app/renovate` pull request, or an open `app/renovate` Dependency Dashboard issue, Dependabot
       security updates are still off and listed as `left-off` with reason `renovate-present` and the
       matched path, pull request or issue.
-- [ ] AC-03: After `apply` on a repository with a `.github/dependabot.yml` or
-      `.github/dependabot.yaml` and no Renovate signal, where the caller is admin, Dependabot security
+- [ ] AC-03: After `apply` on an unarchived repository with a `.github/dependabot.yml` or
+      `.github/dependabot.yaml` and no Renovate signal, where the caller is admin, alerts read back on
+      and the keep-off list does not name security updates, Dependabot security
       updates are on and listed as `enabled`. With neither file and no Renovate signal, they stay off
       and are listed as `left-off` with reason `renovate-unknown`.
-- [ ] AC-04: After `apply` on a public repository where the caller is admin, secret scanning and push
-      protection are each listed as `enabled` or `already-on`, and no call to any `code-scanning`
+- [ ] AC-04: After `apply` on an unarchived public repository where the caller is admin and the
+      keep-off list names neither, secret scanning and push protection are each listed as `enabled`
+      or `already-on`, and no call to any `code-scanning`
       endpoint was made.
-- [ ] AC-05: After `apply` on a private or internal repository where every setting starts off,
+- [ ] AC-05: After `apply` on an unarchived private or internal repository where the caller is admin
+      and every setting starts off,
       `dependabot_alerts` is read back on and listed as `enabled`, no write call was made for secret
       scanning or push protection, and those two entries are `unavailable` with reason
       `not-free-on-private`. When `security_and_analysis` is null, the `code_scanning` entry is
@@ -383,13 +412,16 @@ text. Unknown setting names and duplicate repositories fail visibly, as for the 
 - [ ] AC-06: When the caller is not admin on an unarchived public repository, `apply` makes no write
       call and no admin-only read, lists every entry as `unknown` with reason `needs-admin`, and
       exits 1. `check` never makes a write
-      call; it lists every off and free setting as `not-changed` with reason `check-only`, and exits
-      1 when there is at least one.
+      call; it lists every off and free setting that rules 1 to 7 do not decide as `not-changed` with
+      reason `check-only`, and exits 1 when there is at least one.
 - [ ] AC-07: `apply` never makes a write call that turns a setting off. After an `apply` that left no
       entry `not-changed` or `unknown`, a second `apply` on the same repository makes no write call
       and lists every setting as `already-on`, `left-off` or `unavailable`.
-- [ ] AC-08: When every Renovate detection lookup fails, Dependabot security updates stay off and are
-      listed as `left-off` with reason `renovate-detection-failed` and the error.
+- [ ] AC-08: When any Renovate detection lookup fails and no other lookup matches, Dependabot security
+      updates that are off stay off and are listed as `left-off` with reason
+      `renovate-detection-failed` and the error. When every Renovate lookup succeeds without a match
+      and the Dependabot config lookup fails, they stay off and are listed as `left-off` with reason
+      `dependabot-detection-failed` and the error.
 - [ ] AC-09: When one write fails, that setting is `not-changed` with reason `api-error` and the HTTP
       status, the remaining settings are still processed, and `apply` exits 1.
 - [ ] AC-10: `--format markdown` prints a `## Repository security settings` section with one row per
@@ -401,7 +433,9 @@ text. Unknown setting names and duplicate repositories fail visibly, as for the 
       maintenance skill and `docs/user-guides/workflows.md` state: sweeps run `apply` before
       collection, or `check` under a restricting request; onboarding runs `apply`; the Renovate and
       Dependabot rules; the private, archived and keep-off rules; that `renovate-overlap` goes to the
-      owner; the precedence order; and that no setting is ever turned off.
+      owner; the precedence order; that no setting is ever turned off; and, in the authority row and
+      `references/security-settings.md`, that the owner's acceptance of this feature is the agreement
+      the onboarding guide asks for.
       `references/security-settings.md` links to `conventions/repository-security.md` at the plugin
       pin, and that revision contains the page.
 - [ ] AC-12: After a maintenance sweep of `michielvha/bg-remove`, its saved report has a
@@ -442,6 +476,11 @@ text. Unknown setting names and duplicate repositories fail visibly, as for the 
 - [ ] AC-21: When a sweep starts on a repository with Dependabot alerts off, `apply` runs before the
       collector, and the collector then lists the repository's open Dependabot alerts with the
       Dependabot surface complete.
+- [ ] AC-22: A sweep report saved with `--security-settings` files has a
+      `## Repository security settings` section after `## Security alerts`, with one table per
+      repository whose rows match that repository's JSON entries, and an "Owner decisions" list
+      holding exactly the entries with `renovate-overlap` or `owner-choice-conflict` across all files.
+      Without the option, the section says the helper did not run.
 
 ## Test Plan
 
@@ -452,7 +491,7 @@ text. Unknown setting names and duplicate repositories fail visibly, as for the 
 | AC-05 | Same suite, fixtures: private repository, internal repository and archived public repository, each with every setting off. `security_and_analysis` is null in the private and internal fixtures, and a third private fixture shows `code_security` enabled. Pass: the private and internal runs record writes only to `vulnerability-alerts` and `automated-security-fixes`, `dependabot_alerts` is read back and `enabled`, and secret scanning, push protection and `code_scanning` are `unavailable` with `not-free-on-private`; the third has no `code_scanning` entry; the archived run records no writes and every entry is `unavailable` with `archived`. |
 | AC-06 | Same suite, unarchived public fixture with `permissions.admin: false` run with `apply`, and the first fixture run with `check`. Pass: zero write calls in both and no admin-only read in the first; entries `unknown` with `needs-admin`, or `not-changed` with `check-only`; exit code 1. |
 | AC-07 | Same suite: a second `apply` on the first fixture's resulting state, after a first run with no `not-changed` or `unknown` entry, records no writes and reports only `already-on`, `left-off` or `unavailable`. Across every fixture, no recorded write has a body or endpoint that disables a setting. |
-| AC-08 | Same suite, fixture where every detection call fails. Pass: no write to `automated-security-fixes`, entry `left-off` with `renovate-detection-failed` and the error. |
+| AC-08 | Same suite, public admin fixtures with security updates off and `.github/dependabot.yml`: every Renovate lookup fails; only the `renovate.json` lookup fails and the others match nothing; every Renovate lookup succeeds without a match and the `.github/dependabot.yml` lookup fails. Pass: no write to `automated-security-fixes` in any; the first two give `left-off` with `renovate-detection-failed` and the error, the third `left-off` with `dependabot-detection-failed` and the error. |
 | AC-09 | Same suite, fixture where the `PATCH repos/{r}` write returns 422. Pass: secret scanning entries `not-changed` with `api-error` and 422, other settings still `enabled`, exit code 1. |
 | AC-10 | Same suite: run the first fixture and the AC-14 fixture with both formats. Pass: the Markdown section has one row per JSON entry with the same state and reason, and its owner decisions list holds exactly the JSON entries with `renovate-overlap` or `owner-choice-conflict`, or "None." |
 | AC-11, AC-20 | The reviewer reads the eight files, `AGENTS.md`, `plugins/vh-adlc/knowledge.md` and both `plugin.json` files at the implementation commit, confirms each listed rule is stated, the merged-branch deletion rule is unchanged, both pins name the docs#30 merge revision and both versions match a minor bump, then runs `vh-adlc knowledge --page conventions/repository-security.md` with the new plugin pin. Pass: the page resolves. |
@@ -463,6 +502,7 @@ text. Unknown setting names and duplicate repositories fail visibly, as for the 
 | AC-17 | `bun test tests/vh-adlc/security-settings`, fixture: public repository with push protection on and a keep-off row for it. Pass: no write recorded for it, entry `already-on` with `owner-choice-conflict`, listed in the Markdown owner decisions. |
 | AC-18 | Same suite, public admin fixtures with `.github/dependabot.yml` and no Renovate: `GET automated-security-fixes` returns 500, once without and once with a keep-off row for it; `GET vulnerability-alerts` returns 404; `GET automated-security-fixes` returns 200 with `{"enabled":false,"paused":false}`. Pass: the 500 runs give that entry `unknown` with `api-error` and 500, no write to it, other settings processed, exit code 1; the 404 run writes alerts and reports `enabled`; the 200 run writes security updates and reports `enabled`. |
 | AC-19 | Same suite, fixtures: archived private repository run by a non-admin; private admin repository with a keep-off row for secret scanning; private non-admin repository; `check` on a public admin repository with alerts off, `dependabot.yml` and no Renovate. Pass: every entry `unavailable` with `archived` and no admin-only read, exit code 0; secret scanning `unavailable` with `not-free-on-private`; secret scanning and push protection `unavailable` with `not-free-on-private`, alerts, security updates and `code_scanning` `unknown` with `needs-admin`; security updates `not-changed` with `check-only`. |
+| AC-22 | `bun test tests/vh-adlc/maintenance`: render a report with two `--security-settings` files, one holding a `renovate-overlap` entry, and one without the option. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the owner decisions list holds exactly the `renovate-overlap` entry, and the second report says the helper did not run. |
 | AC-16 | `bun test tests/vh-adlc/maintenance` with collector fixtures for a private admin repository with `security_and_analysis` null whose code scanning read returns 403, and one returning 404. Pass: the surface is `complete-unavailable` with `not-free-on-private` and the status. Fixtures with the same 403 on a public repository, on a private repository read without admin, and on a private repository with `code_security` enabled stay incomplete. |
 | AC-21 | `bun test tests/vh-adlc/maintenance` with one fake `gh` state shared by the helper and the collector: public admin repository, alerts off, three open Dependabot alerts that the alerts endpoint returns only once alerts are on. Run `apply`, then the collector. Pass: the collection lists the three alerts and the Dependabot surface is complete. |
 
