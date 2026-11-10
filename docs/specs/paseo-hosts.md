@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-7 findings applied; a new spec review is needed."
+status_description: "R-8 findings applied; a new spec review is needed."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
 covers:
@@ -25,15 +25,15 @@ Rebuild the working Paseo server onboarding and desktop-app linking tool as a Go
 
 The owner runs Paseo daemons on Linux servers and uses them from the Paseo desktop app on a Mac and a Windows PC. A local Bash tool did this for a real server and the Mac on 2026-11-10, but it is untracked, untested and names the owner's machines.
 
-This feature rebuilds it as a Go CLI in a new `paseo-hosts` plugin in the vhco-tools marketplace, like remote-gui, except that the first run on a machine downloads two Go libraries through Go's module proxy, checked against `go.sum`, and the pinned Paseo CLI from npm. Asked to add a server, the skill runs `onboard` and `link`. `onboard` installs a password-protected daemon reachable only over SSH, relay off; `--publish` opts in to a tailnet-only HTTPS route. `link` gives a macOS or Windows desktop a key that opens only the daemon tunnel and adds the server to its Paseo app with no manual step. `unlink` takes one desktop off a server; `--server-only` revokes one that is gone. `remove` unlinks every desktop and deletes the daemon service, its config and the local password, keeping Paseo state and workspace unless `--purge`; `--skip-server` handles a dead server. `status` prints fixed fields. Settings come from environment variables and flags; plaintext passwords stay on the operator host and in each app.
+This feature rebuilds it as a Go CLI in a new vhco-tools plugin, `paseo-hosts`, like remote-gui, except that the first run on a machine downloads two Go libraries through Go's module proxy, checked against `go.sum`, and the pinned Paseo CLI from npm. Asked to add a server, the skill runs `onboard` and `link`. `onboard` installs a password-protected daemon reachable only over SSH, relay off; `--publish` opts in to a tailnet-only HTTPS route. `link` gives a macOS or Windows desktop a key that opens only the daemon tunnel and adds the server to its Paseo app with no manual step. `unlink` takes one desktop off a server; `--server-only` revokes one that is gone. `remove` unlinks every desktop and deletes the daemon service, its config and the local password, keeping Paseo state and workspace unless `--purge`; `--skip-server` handles a dead server. `status` prints fixed fields. Settings come from environment variables and flags; plaintext passwords stay on the operator host and in apps.
 
-Excluded: phones, the web UI, the Linux app, relay pairing, agent CLI installs and the operator's own daemon. New servers use port 6767; existing registry files keep theirs.
+Excluded: phones, the web UI, the Linux app, relay pairing, agent CLI installs and the operator's own daemon. New servers use port 6767.
 
-Side effects: `link`, `unlink` and `remove` restart the desktop app twice (not `link --no-app` or `unlink --server-only`), briefly open its debugging port on loopback, and keep a backup of its host list, which holds passwords, in the registry directory. A rejected change restores the old list. Windows needs OpenSSH Server and a signed-in user.
+Side effects: `link`, `unlink` and `remove` restart the desktop app twice (not `link --no-app` or `unlink --server-only`). With default app settings each quit stops the desktop's own built-in daemon and its agents and may install a downloaded update. The run briefly opens the debugging port on loopback and keeps a backup of the host list, passwords included, in the registry directory; a rejected change restores it. Windows needs OpenSSH Server and a signed-in user.
 
-Planned checks: Go tests against SSH and DevTools stand-ins, CI lint and race checks, an installed-copy build in CI, and a manual run on a server, Mac, Windows PC and fresh agent session. The Windows scripts run under `pwsh` on Linux; Windows itself is proven only by the manual run. Nothing is implemented. R-1's blocking gaps are fixed; R-2 to R-7 found none.
+Planned checks: Go tests against SSH and DevTools stand-ins, CI lint and race checks, an installed-copy build in CI, and a manual run on a server, Mac, Windows PC and fresh agent session. Windows scripts run under `pwsh` on Linux; Windows itself is proven only manually. Nothing is implemented. R-1's blocking gaps are fixed; R-2 to R-8 found none.
 
-Acceptance authorizes implementing on a feature branch through the vh-adlc gates; finishing waits on the logger PR being merged and tagged. Opening a PR, merging, merging the logger PR and touching real servers or desktops in tests need separate approval.
+Acceptance authorizes implementing on a feature branch through the vh-adlc gates; finishing waits on the logger PR being merged and tagged. Opening or merging PRs, including the logger's, and touching real machines in tests need separate approval.
 
 ### Background
 
@@ -191,6 +191,8 @@ The app accepts hosts only from its own UI or its local storage, so `link` write
 
 For the live rollback check, a binary built with the `paseotest` tag and run with `PASEO_HOSTS_TEST_REJECT_ENTRY=1` adds a key the app's schema rejects to the entry before step 3 writes it, so the app drops the registry and step 4 rolls back. Release builds do not contain this code.
 
+Every graceful quit in steps 2 and 5, and the macOS `SIGTERM` fallback, runs the app's `before-quit` path. With the default settings `manageBuiltInDaemon: true` and `keepRunningAfterQuit: false` (`dist/settings/desktop-settings.js:18-19`), that path stops the desktop's own built-in daemon and the agents in it, and it installs a downloaded app update before exiting (`main.js:844-852` in app 0.15.3). The CLI does not change those settings.
+
 The client app stores the password in its own local storage, as it does for a host added by hand. The operator host keeps the only other copy, and the server keeps only the hash.
 
 ### unlink and remove
@@ -213,7 +215,7 @@ After a successful `unlink`, `unlink --server-only` or `remove`, the CLI also de
 
 ### Skill
 
-`SKILL.md` triggers on requests to add, onboard, link, unlink, remove, check or list Paseo servers. It uses `PASEO_HOSTS_DIR` or its default, which `onboard` creates, and asks the owner for a client alias only when `PASEO_HOSTS_CLIENT` is unset and the request names none. It runs `onboard` and then `link`, tells the owner before `link`, `unlink` or `remove` that the desktop app will restart twice, confirms `unlink` and `remove` with the owner first, and reports the CLI's checks from `--json`. It never prints, reads into the conversation or pastes a password, and runs `password` only into a pipe.
+`SKILL.md` triggers on requests to add, onboard, link, unlink, remove, check or list Paseo servers. It uses `PASEO_HOSTS_DIR` or its default, which `onboard` creates, and asks the owner for a client alias only when `PASEO_HOSTS_CLIENT` is unset and the request names none. It runs `onboard` and then `link`, tells the owner before `link`, `unlink` or `remove` that the desktop app will restart twice and, with default app settings, stop the desktop's built-in daemon and its agents and may install a downloaded update, confirms `unlink` and `remove` with the owner first, and reports the CLI's checks from `--json`. It never prints, reads into the conversation or pastes a password, and runs `password` only into a pipe.
 
 ### Delivery
 
