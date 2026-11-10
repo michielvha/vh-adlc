@@ -277,6 +277,7 @@ None.
 | 2026-11-10 | R-5 | spec | `8f9aba05ac58d02989b483293064597bf17cff4c` | unknown | procedural | One should-fix factual finding and one factual nit, none blocking; model identity not attested. |
 | 2026-11-10 | R-6 | spec | `7cf545ffec4c3eb8c9edf5290fc6223cd917d7f0` | unknown | procedural | Three should-fix factual findings and one factual nit, none blocking; model identity not attested. |
 | 2026-11-10 | R-7 | spec | `038146bca5d105691d47219cb16f8efaacb4eb2a` | claude-opus-4.8 | procedural | One should-fix factual finding and one factual nit, none blocking; model reported by the reviewer, not requested. |
+| 2026-11-10 | R-8 | spec | `c1ae6fe96c0d3ce22320142d6b553268e84c33aa` | unknown | procedural | One should-fix factual finding, not blocking; model identity not attested. |
 
 ### R-1
 
@@ -578,3 +579,12 @@ SEVERITY: nit
 WHERE: Design, Desktop app entry step 5
 EVIDENCE: Step 5 says "Chromium commits localStorage to disk up to 5 seconds late (`local_storage_impl.cc`, `kCommitDefaultDelaySecs`)". Five seconds is only the minimum delay. In chromium/chromium storage_area_impl.cc, `ComputeCommitDelay` returns `std::max(default_commit_delay_, std::max(commit_rate_limiter_.ComputeDelayNeeded(elapsed_time), ...))`. The commit rate limiter is built with `kMaxCommitsPerHour = 60` (local_storage_impl.cc:53) over `base::Hours(1)` (storage_area_impl.cc:79), with float `samples_ / rate_`. So once the app has made one commit after relaunch, the next commit can wait until about 60 seconds after the storage area opened. Only a graceful shutdown flushes pending writes (`LocalStorageImpl::ShutDown`, "Flush any uncommitted data", `ScheduleImmediateCommit`). The 8 second wait does not guarantee the write is on disk. A force-stop at 20 seconds can drop it, although step 6 would then catch the lost entry on the success path.
 PROPOSAL: Fix the rationale: say that the graceful quit is what persists the write, and that the wait only covers the default delay. State that a link or unlink that needed a force-stop fails unless step 6, or a re-read after relaunch, confirms the result.
+
+### R-8
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (Side effects); Design, Desktop app entry steps 2 and 5; Design, Skill
+EVIDENCE: Line 32 lists the side effects of restarting the desktop app twice: the debugging port and the host list backup. Line 216 has the skill tell the owner only that the app "will restart twice". Neither section says what a graceful quit does inside the app. In app 0.15.3, main.js:844-852 wires `before-quit` to `stopDesktopManagedDaemonOnQuitIfNeeded` with `stopDaemon: () => stopDesktopDaemonViaCli("quit")`. In dist/daemon/quit-lifecycle.js, `shouldStopDesktopManagedDaemonOnQuit` returns `!settings.daemon.keepRunningAfterQuit`. dist/settings/desktop-settings.js:18-19 sets the defaults to `manageBuiltInDaemon: true` and `keepRunningAfterQuit: false`. The same before-quit path calls `installAppUpdateOnQuit` before `app.exit(0)`. The quits in step 5 (AppleScript on macOS, `window.close()` and then `app.quit` on Windows through main.js:876-879) and the macOS SIGTERM fallback, which `registerExternalQuitSignals` turns into `app.quit()`, all take this path. So with default settings, every `link`, `unlink` and `remove` stops the Mac's or Windows PC's own built-in Paseo daemon, and any agents running in it, up to twice per client. A pending app update can also be installed during the CLI's restart. The owner is not told about either.
+PROPOSAL: Add to the Owner summary side effects, the Desktop app entry design and the skill's pre-run warning that, under default app settings, the restart stops the client's built-in daemon and its running agents and may apply a downloaded app update. Do this at least by stating the consequence. Alternatively, have the probe report when the app manages a running built-in daemon.
