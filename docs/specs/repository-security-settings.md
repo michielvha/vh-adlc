@@ -617,6 +617,7 @@ None.
 | 2026-11-10 | R-3 | spec | `44aea8d` | unknown | procedural | 7 findings: 4 should-fix, 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-4 | spec | `5528322` | unknown | procedural | 7 findings: 5 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-5 | spec | `2198c88` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-6 | spec | `4cf4ae6` | unknown | procedural | 8 findings: 5 should-fix, 3 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -886,6 +887,64 @@ SEVERITY: nit
 WHERE: Design (Rules applied before any write, rules 5, 6 and 9) and AC-07
 EVIDENCE: Rule 5 makes a keep-off `dependabot_alerts` entry `left-off` with `owner-choice` and never writes it. For `dependabot_security_updates` in the "no signal | configured | When off" row, rule 6 falls through, and rule 9 then gives `not-changed` with `alerts-off`. The exit code is 1 whenever any entry is `not-changed`. So a Dependabot repository whose owner keeps alerts off shows a `not-changed` row and exits 1 in every `apply` run because of a recorded owner choice. AC-07's clean first run can never happen there.
 PROPOSAL: When the keep-off list names `dependabot_alerts`, make security updates `left-off` with `owner-choice` or another named reason. Otherwise, state that the permanent exit 1 is intended.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Procedure changes) and AC-11
+EVIDENCE: `plugins/vh-adlc/references/maintenance.md:218-219` at 4cf4ae6 reads "Report helpers never push, merge shared main or mutate GitHub. The one exception is the branch helper's `apply` and `after-merge`, which delete branches and may enable automatic branch deletion". `maintenance.md:55` reads "Record operation intent before committing or mutating remotely, then observed receipt." The design has every sweep run the security-settings helper in `apply`, which writes GitHub settings inside a recorded run. The Design lists no change to either sentence, and the run journal records no intent or receipt for those writes. AC-11 lists what `references/maintenance.md` must state, but it does not require the "one exception" sentence to change. So once every box is ticked, the page can still say the branch helper is the only helper that mutates GitHub, and its journal rule stays unmet or unaddressed.
+PROPOSAL: Add the security-settings helper to the exception sentence in `references/maintenance.md`. State how its `apply` writes satisfy the intent-then-receipt journal rule, for example by recording intent before the helper runs and its saved JSON as the receipt, or state that they are exempt. Add both points to AC-11.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary), goal frontmatter
+EVIDENCE: The Owner summary says "In a repository whose committed `.vh-adlc/maintenance.yaml` opts in with `security_settings: apply`, it turns these on when off". The goal says "Every maintenance sweep and onboarding of an opted-in repository". The Design has the skill run the helper "for each repository in scope" in the mode `security-settings-mode` prints. That mode comes from the consumer's committed settings. The authority row allows `apply` "on a repository in its scope only when the consumer's committed settings adopt `security_settings: apply`". So one consumer's opt-in also writes settings on every related repository in `repositories`, and those repositories never opt in themselves. The summary reads as if each repository opts in for itself.
+PROPOSAL: Say in the Owner summary and the goal that the sweeping consumer's committed opt-in applies the settings to every repository in that sweep's scope, and that the keep-off list is how one of them is excluded.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-07), Design (state table, exit code) and Test Plan (AC-07)
+EVIDENCE: AC-07 says "After an `apply` that left no entry `not-changed` or `unknown`, a second `apply` on the same repository makes no write call". A failed Renovate or Dependabot detection lookup gives `left-off` with `renovate-detection-failed` or `dependabot-detection-failed` (AC-08). It is neither `not-changed` nor `unknown`, so the first run exits 0 and counts as clean. If the lookups succeed on the second run and find no Renovate signal and a `.github/dependabot.yml`, the "no signal | configured | When off" row writes `automated-security-fixes`, which contradicts AC-07. The AC-07 proof uses only the first fixture, so it never exercises this case.
+PROPOSAL: Exclude the two detection-failed reasons from AC-07's clean-first-run condition, or count them toward exit 1. Add an AC-07 fixture whose first run has a failed detection lookup.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Rules applied before any write, rule 5) and Acceptance Criteria (AC-15, AC-19)
+EVIDENCE: GitHub's "Enabling push protection for your repository" page (docs.github.com, read 2026-11-10) says: "4. If you have not already enabled Secret Protection, to the right of 'Secret Protection', click Enable. 5. ... to the right of 'Push protection', click Enable." So push protection depends on secret scanning. Rule 5 handles that kind of dependency only for `dependabot_alerts` and security updates (Q32). A keep-off row that names `secret_scanning` but not `secret_scanning_push_protection` makes `apply` PATCH push protection alone while secret scanning is off. The document does not say what happens then. It could be a permanent `not-changed` with exit 1 in every run, as R-5 F-04 found for alerts, or GitHub could turn on the kept-off secret scanning. No criterion or fixture covers this case.
+PROPOSAL: Extend rule 5 so a keep-off row for `secret_scanning` also leaves push protection `left-off` with `owner-choice` when it is off, the same way Q32 handles alerts. Add a fixture to AC-19.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Collector, Procedure changes) and Acceptance Criteria (AC-21, AC-22, AC-23)
+EVIDENCE: `collect` and `report` gain a repeatable `--security-settings FILE` that takes "the helper's JSON". The skill says "A helper failure or exit 1 never blocks collection". The document does not say what either command does with a file that is empty, malformed, truncated after a helper crash, names a repository outside the sweep's scope, repeats a repository, or comes from an earlier run. Nothing binds the file to the current run or records where the skill saves it. The maintenance helpers otherwise fail visibly on bad input (`settings.ts:12-14`, `cli.ts:50-52`). So a bad file either makes `collect` fail, which would block collection, or is accepted silently. A stale file that lists `dependabot_alerts` as `enabled` would mark a complete surface `alerts-enabled-this-run`.
+PROPOSAL: Specify validation for both inputs: the expected repository in scope, one file per repository, a schema check, and binding to the current run. Say whether an invalid file fails the command or is reported as "helper did not run". Say which files the skill passes after a helper failure, and add one fixture to AC-23.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background, owner decisions)
+EVIDENCE: The Q22 bullet still says "the owner's acceptance of this feature is the standing agreement the onboarding guide asks for". Q25 and the Design's authority row now say "That adoption [of `security_settings: apply`] is the owner's agreement that `guides/onboard-a-repository.md` ... asks for". The Q25 bullet says it "narrows Q3 and the sweep default" but does not say it replaces Q22.
+PROPOSAL: Add to the Q25 bullet, or to Q22, that adopting `security_settings: apply` replaced feature acceptance as the agreement the onboarding guide asks for.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: The Background says merged-branch deletion is written "only with the owner's yes" and cites `plugins/vh-adlc/references/authority.md:32`. That row reads "The owner's yes to enabling it for that repository with `auto-delete --enable`, a request that already asks for it, or an approved plan digest that includes it". R-1 F-10 corrected the same wording in the Owner summary but not here.
+PROPOSAL: Write "only with the owner's authorization: a yes, a request that asks for it, or an approved plan digest".
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Reads and writes, state table)
+EVIDENCE: The REST description defines `check-automated-security-fixes` with a required `paused` boolean, "Whether Dependabot security updates are paused for the repository". The design reads only `enabled`, so `{"enabled":true,"paused":true}` is reported as `already-on` with exit 0. In a Dependabot-only repository no fix pull requests are then opened, and the sweep report gives no sign of it.
+PROPOSAL: Show `paused` in the security-updates entry, for example as an `already-on` reason, or record that paused is treated as on.
 
 ## Sources
 
