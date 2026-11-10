@@ -58,6 +58,7 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Documentation or a convention | Edit the authoritative requested artifact using the resolved engineering rules, check the result and report it. No feature spec is needed solely to store prose. |
 | Host cleanup, or a session blocked by a full `/tmp` | Use `skills/vh-adlc-clean/SKILL.md`. It needs no feature document; `--compose` and `--kind` only on the user's request. |
 | Dependency or security sweep | Use `skills/vh-adlc-maintenance/SKILL.md` for inventory, evidence, durable reporting and selected follow-up; publish reports only through its exact current/adopted authority. |
+| Merge an approved PR, or remove stale merged branches | Merge only under the exact approval in `references/authority.md`, then run `after-merge` from `references/branches.md`. Stale-branch cleanup uses that guide's plan and digest-approved apply; inside a sweep it is part of `skills/vh-adlc-maintenance/SKILL.md`. |
 | Bounded maintenance | Follow the maintenance procedure below if the public contract is preserved and local instructions allow it. |
 | New capability or wider behavior change | Locate any existing feature and use the existing spec/tasks/implement/review procedures and binary gates. No unaccepted implementation. |
 | Bootstrap or onboarding | Read the applicable engineering guide; apply it within the selected task's authority. Creating application behavior still uses the feature procedure. |

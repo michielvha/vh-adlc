@@ -138,6 +138,21 @@ operations still require their own authority. See the
 [canonical procedure](../../plugins/vh-adlc/references/maintenance.md) and
 [tested compatibility](../reference/compatibility.md#dependency-and-security-maintenance).
 
+## Stale branches
+
+A merged PR branch is removed as part of the merge. When you approve a merge, the
+agent runs `after-merge` for that PR. It removes the remote branch, its tracking ref
+and the local branch, as long as their tips are inside the merged PR head. That also
+covers squash merges, which plain `git branch -d` refuses.
+
+Every maintenance sweep also lists stale branches left by earlier merges and shows
+a plan with a digest. Ask `Use vh-adlc-maintenance to sweep and remove stale branches`
+to apply that plan in the same run. The plan also proposes turning on GitHub's
+automatic head-branch deletion. Open PR branches, protected branches, unmerged work
+and branches in use by a worktree are kept, each with its reason. Clean worktrees
+are removed only when you ask for worktree cleanup. See the
+[branch hygiene guide](../../plugins/vh-adlc/references/branches.md).
+
 ## Host cleanup
 
 Ask `Use vh-adlc-clean to free space`. The operation runs `vh-adlc clean --dry-run`,
