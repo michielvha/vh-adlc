@@ -271,7 +271,8 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
   - Evidence: `bun test tests/paseo-hosts` fails with exit 127, `scripts/paseo-hosts.sh: No such file or directory`, as intended until T3.
 - [x] T3 `scripts/paseo-hosts.sh` - the wrapper builds into `PASEO_HOSTS_CACHE/builds` with `GOTOOLCHAIN=local` and `-mod=readonly`; `bun test tests/paseo-hosts` passes (AC-14)
   - Evidence: `bun test tests/paseo-hosts` failed before (wrapper missing) and passes after: the copied wrapper builds with an empty temporary `GOMODCACHE`, `GOFLAGS` and `GOPROXY` unset, and the logger zip lands in that cache. The test now puts the `go env GOROOT` toolchain first on `PATH`, since `GOTOOLCHAIN=local` otherwise picks an older `go` on this host. `shellcheck` is not installed here, so the wrapper is not linted.
-- [ ] T4 `internal/report/report_test.go` - reporter tests for every outcome on a terminal and a pipe, each `NO_COLOR` value, `--plain`, `--json` fields and exit codes; fail because the package is empty (AC-11)
+- [x] T4 `internal/report/report_test.go` - reporter tests for every outcome on a terminal and a pipe, each `NO_COLOR` value, `--plain`, `--json` fields and exit codes; fail because the package is empty (AC-11)
+  - Evidence: `go test ./internal/report` fails with `no non-test Go files in .../internal/report`, as intended until T5.
 - [ ] T5 `internal/report/report.go`, `cmd/paseo-hosts/main.go` - labelled lines on standard error, JSON on standard output, exit codes 0 to 4, and the logger initialised on standard error; T4 passes (AC-11)
 - [ ] T6 `internal/registry/registry_test.go` - parse the local tool's format, apply the defaults for missing keys, and reject a command substitution line without running it; fails (AC-09, AC-03)
 - [ ] T7 `internal/registry/registry.go` - the parser and writer with modes 700 and 600; T6 passes (AC-09, AC-03, AC-01)
