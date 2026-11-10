@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Spec review R-4 at 5528322 returned 7 findings, none blocking. Its factual corrections are applied; Q28 to Q30 wait for the owner, then a new review. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "Q28 to Q30 from spec review R-4 answered with every recommendation; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every maintenance sweep and onboarding of an opted-in repository turns on Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -71,7 +71,7 @@ These owner decisions widen the authority table. Today the only repository setti
 changes is merged-branch deletion, with authorization.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-4 found nothing blocking; R-4's questions Q28 to Q30 are open. Acceptance
+Reviews R-1 to R-4 found nothing blocking, and the owner answered their questions. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
 or onboarding need separate approval.
@@ -166,6 +166,12 @@ Owner decisions on 2026-11-10:
   settings, and every other consumer gets `check` (Q25, which narrows Q3 and the sweep default);
   `read_only`, `draft_only`, `no_push` and `no_filesystem` select `check` (Q26); and a criterion
   proves sweeps do not request the new page (Q27).
+- Q28 to Q30, from spec review R-4, answered on 2026-11-10 with every recommended option: tests
+  prove the opt-in is read only from committed, linked settings, and the committed-settings key list
+  accepts both new keys so a standing publication grant survives; the missing `security_policy` key
+  stays a separate issue (Q28); rule 6 decides only the rows that do not write (Q29); and the
+  helper-failure rule is proved by the skill text, with the Bun test claiming only collector
+  behaviour (Q30).
 
 ## Scope
 
@@ -302,7 +308,9 @@ the first rule below that applies to it:
    repository under `security_settings_keep_off` is never written. It is `left-off` with
    `owner-choice`, or `already-on` with `owner-choice-conflict` when the read shows it on. The
    listed reason appears in the output.
-6. Renovate and Dependabot rules, below, for `dependabot_security_updates`.
+6. Renovate and Dependabot rules, below, for `dependabot_security_updates`. They decide the entry
+   only for rows that do not write; the "no signal, configured, off" row falls through to rules 7
+   to 10.
 7. Already on: an entry read as on is `already-on`.
 8. Check mode (`check-only`): under `check`, an off and free entry is `not-changed`. This includes
    security updates the Renovate and Dependabot rules would enable, even while alerts are off.
@@ -378,7 +386,11 @@ text. Unknown setting names and duplicate repositories fail visibly, as for the 
 
 They also gain `security_settings`, `apply` or `check`, default `check`. Like the other standing
 grants, it is read only from the consumer's committed default branch
-(`plugins/vh-adlc/references/maintenance-settings.md:51-57`).
+(`plugins/vh-adlc/references/maintenance-settings.md:51-57`). `resolveStanding` checks committed
+settings against a fixed key list (`plugins/vh-adlc/scripts/maintenance/authority.ts:100`) and
+returns `invalid` for any other key, so that list gains `security_settings` and
+`security_settings_keep_off`; otherwise committing either would void the consumer's standing
+publication grant.
 
 ### Procedure changes
 
@@ -474,7 +486,7 @@ with every read and write succeeding, unless it names another case.
       owner; the precedence order; the `not-free-on-private` and `alerts-enabled-this-run`
       collector rules, in `references/maintenance.md` and `references/maintenance-settings.md`
       without the old "only a configured exact match" wording; that a helper failure never blocks
-      collection; that no setting is
+      collection, stated in the maintenance skill's step; that no setting is
       ever turned off; and, in the authority row and `references/security-settings.md`, that adopting
       `security_settings: apply` is the agreement the onboarding guide asks for.
       `references/security-settings.md` links to `conventions/repository-security.md` at the plugin
@@ -526,13 +538,17 @@ with every read and write succeeding, unless it names another case.
       a "helper did not run" row for each repository without one, and an "Owner decisions" list
       holding exactly the entries with `renovate-overlap` or `owner-choice-conflict` across all files.
 - [ ] AC-23: When the helper's `repos/{r}` read fails, every writable entry is `unknown` with reason
-      `api-error` and the status, no other read or write is made, and the helper exits 1. In a sweep,
-      a helper failure or exit 1 for one repository does not stop collection for any repository.
+      `api-error` and the status, no other read or write is made, and the helper exits 1. The
+      collector covers every repository in scope when given helper files for only some of them.
 - [ ] AC-24: `security-settings-mode` prints `check` when the recorded request has `read_only`,
       `draft_only`, `no_push` or `no_filesystem`, or when the committed settings do not adopt
       `security_settings: apply`; otherwise it prints `apply`, also with no recorded request. A
       request with only `no_commit` gets `apply` when the settings adopt it. A `security_settings`
-      value other than `apply` or `check` fails visibly.
+      value other than `apply` or `check` fails visibly. A value of `apply` present only in the
+      working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link gives
+      `check`.
+- [ ] AC-25: A consumer whose committed settings hold `security_settings` and
+      `security_settings_keep_off` keeps an adopted standing report-publication grant.
 
 ## Test Plan
 
@@ -555,8 +571,9 @@ with every read and write succeeding, unless it names another case.
 | AC-18 | Same suite, public admin fixtures with `.github/dependabot.yml` and no Renovate: `GET automated-security-fixes` returns 500, once without and once with a keep-off row for it; `GET vulnerability-alerts` returns 404; `GET automated-security-fixes` returns 200 with `{"enabled":false,"paused":false}`. Pass: the 500 runs give that entry `unknown` with `api-error` and 500, no write to it, other settings processed, exit code 1; the 404 run writes alerts and reports `enabled`; the 200 run writes security updates and reports `enabled`. |
 | AC-19 | Same suite, fixtures: archived private repository run by a non-admin; private admin repository with a keep-off row for secret scanning; private non-admin repository; `check` on a public admin repository with alerts off, `dependabot.yml` and no Renovate. Pass: every entry `unavailable` with `archived` and no admin-only read, exit code 0; secret scanning `unavailable` with `not-free-on-private`; secret scanning and push protection `unavailable` with `not-free-on-private`, alerts, security updates and `code_scanning` `unknown` with `needs-admin`; security updates `not-changed` with `check-only`. |
 | AC-22 | `bun test tests/vh-adlc/maintenance`: render a report for three repositories in scope with two `--security-settings` files, one holding a `renovate-overlap` entry. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the third repository has a "helper did not run" row, and the owner decisions list holds exactly the `renovate-overlap` entry. |
-| AC-23 | `bun test tests/vh-adlc/security-settings`, fixture where `repos/{r}` returns 500, and `bun test tests/vh-adlc/maintenance` with a two-repository sweep fixture where the helper exits 1 for the first. Pass: four `unknown` entries with `api-error` and 500, no other recorded call, exit code 1; the collection still covers both repositories. |
-| AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings adopting `apply` and no request; with settings that do not adopt it and no request; and with `security_settings: maybe`. Pass: `check` for the first four, `apply` for `no_commit`, `apply` then `check` for the next two, and a visible failure naming the field for the last. |
+| AC-23 | `bun test tests/vh-adlc/security-settings`, fixture where `repos/{r}` returns 500, and `bun test tests/vh-adlc/maintenance` with a two-repository collector fixture given a helper file for the second repository only. Pass: four `unknown` entries with `api-error` and 500, no other recorded call, exit code 1; the collection covers both repositories. |
+| AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings adopting `apply` and no request; with settings that do not adopt it and no request; and with `security_settings: maybe`. Pass: `check` for the first four, `apply` for `no_commit`, `apply` then `check` for the next two, and a visible failure naming the field for the last. Further fixtures where `apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link: each gives `check`. |
+| AC-25 | `bun test tests/vh-adlc/maintenance`: `resolveStanding` on committed settings with an adopted publication grant plus `security_settings: apply` and one `security_settings_keep_off` row. Pass: the grant resolves as adopted, not `invalid`. |
 | AC-16 | `bun test tests/vh-adlc/maintenance` with collector fixtures for a private admin repository with `security_and_analysis` null whose code scanning read returns 403, and one returning 404. Pass: the surface is `complete-unavailable` with `not-free-on-private` and the status. Fixtures with the same 403 on a public repository, on a private repository read without admin, and on a private repository with `code_security` enabled stay incomplete. |
 | AC-21 | `bun test tests/vh-adlc/maintenance` with one fake `gh` state shared by the helper and the collector: public admin repository, alerts off, three open Dependabot alerts that the alerts endpoint returns only once alerts are on; a second fixture whose endpoint returns an empty list on the first read after the write; a third with alerts already on. Run `apply`, then the collector with the helper's JSON. Pass: the first keeps three alerts and the second none, both with the surface incomplete, `alerts-enabled-this-run` and a null count, and `security-reconcile` accepts both inventories; the third is complete. |
 
@@ -566,44 +583,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q28: How should the tests prove the opt-in is read only from committed settings?
-
-From R-4 F-02: the AC-24 proof cannot tell committed settings from the working tree, and `resolveStanding` rejects any committed key outside a fixed list (`plugins/vh-adlc/scripts/maintenance/authority.ts:100`), which lacks both new keys, so committing either would void a consumer's standing publication grant.
-
-**Recommendation:** A. The opt-in cannot be forged by an uncommitted edit, and adopting it costs no other grant.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. AC-24 adds cases where `apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link, each giving `check`; the known-key list gains `security_settings` and `security_settings_keep_off`, with a criterion that committed settings holding both keep an adopted publication grant. The missing `security_policy` key stays a separate issue** | Tested standing semantics and no lost grants | More fixtures and one more criterion |
-| **B. Also add the missing `security_policy` key in this feature** | Fixes the earlier regression too | Widens scope beyond this feature |
-
-**Why this is yours:** It sets the proof for a standing grant and whether to fix a neighbouring bug here.
-
-### Q29: How does rule 6 hand off the row that writes?
-
-From R-4 F-06: read strictly, rule 6 decides every security-updates entry, so rules 8 to 10 would never apply to it.
-
-**Recommendation:** A. The numbered order then reads exactly as intended.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Rule 6 decides the entry only for rows that do not write; the "no signal, configured, off" row falls through to rules 7 to 10** | One reading of the order | A sentence in the Design |
-| **B. Move the write outcomes into the rule 6 table** | One table holds every outcome | A larger table that repeats rules 8 to 10 |
-
-**Why this is yours:** It decides how the precedence order is written.
-
-### Q30: How is "a helper failure never blocks collection" proved?
-
-From R-4 F-07: the sweep runs the helper through the skill's procedure, so a Bun test can only observe the collector.
-
-**Recommendation:** A. Each check claims only what it can observe.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. AC-11 adds that the maintenance skill step says a helper failure never blocks collection; the AC-23 Bun pass condition claims only that the collector covers every repository given files for some** | Honest proof split between text and code | None beyond rewording |
-| **B. Add a maintenance script that runs the helper for every repository** | An executable proof | New code beyond this feature's design |
-
-**Why this is yours:** It decides whether to add code for proof.
+None.
 
 ## Review Log
 
