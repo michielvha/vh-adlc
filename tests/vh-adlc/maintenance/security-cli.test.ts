@@ -151,3 +151,42 @@ test("actual packet history resolution approval is specific to conflict digests 
   markdown=prior([priorA,priorB]);f.write(".tools/conflicts.md",markdown);packet.history[0].sha256=digest(markdown);packet.history_resolutions[0].prior_digests=[priorA.digest,priorB.digest];d.outcome="unknown";f.write(".tools/resolve.json",JSON.stringify(packet));
   await expect(main(["security-reconcile",...args,"--input",join(f.root,".tools/resolve.json")])).rejects.toThrow();
 });
+
+async function checkoutDraft(f:ReturnType<typeof setup>){
+  const args=["--repo",f.root,"--run-id",f.run.header.run_id];
+  const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")]));
+  f.write(".tools/security.json",JSON.stringify(result));f.write(".tools/request.json",JSON.stringify({authorized_sweep:true}));
+  const saved=reportResult(await main(["report",...args,"--inventory",join(f.root,".tools/inventory.json"),"--default-commit",f.run.header.source_commit,"--default-branch","main","--request",join(f.root,".tools/request.json"),"--security",join(f.root,".tools/security.json")]));
+  expect(saved.path.startsWith(join(f.root,f.config.history_dir)+"/")).toBe(true);
+  return{args,result,saved};
+}
+test("resume revalidates a saved uncommitted report as a checkout draft",async()=>{
+  const f=setup(),{args}=await checkoutDraft(f);
+  await main(["resume",...args]);
+});
+test("a checkout draft chains a later reconciliation onto its saved revision and resume revalidates each append",async()=>{
+  const f=setup(),{args,saved}=await checkoutDraft(f),first=readFileSync(saved.path,"utf8"),[applied]=readSecurityRevisions(first);
+  const nextTime=new Date(Date.parse(f.inventory.collected_at)+1000).toISOString();
+  f.write(".tools/inventory2.json",JSON.stringify({...f.inventory,collected_at:nextTime}));
+  f.write(".tools/packet2.json",JSON.stringify({...f.packet,inventory:{path:"inventory2.json",sha256:digest(readFileSync(join(f.root,".tools/inventory2.json")))},analysis:{...f.packet.analysis,evaluated_at:nextTime,collection_revision:2}}));
+  const next=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet2.json")]));
+  expect(next.revision).toMatchObject({snapshot_revision:2,previous_snapshot_digest:applied.digest});
+  expect(next.revision.snapshot.input.history_provenance).toEqual([applied.digest]);
+  f.write(".tools/security2.json",JSON.stringify(next));
+  f.write(".tools/update.json",JSON.stringify({expected_digest:digest(first),step_id:randomUUID(),at:nextTime,append:"Second reconciliation recorded.",security:join(f.root,".tools/security2.json")}));
+  const appended=record(await main(["append",...args,"--update",join(f.root,".tools/update.json")]));
+  expect(record(await main(["append",...args,"--update",join(f.root,".tools/update.json")])).digest).toBe(appended.digest);
+  expect(selectSecurityChain(readSecurityRevisions(readFileSync(saved.path,"utf8"))).latest!.digest).toBe(next.revision.digest);
+  await main(["resume",...args]);
+});
+test("uncommitted history is labelled local and a failed resume names its security cause",async()=>{
+  const f=setup(),other={schema_version:1,run_id:randomUUID(),created_at:"2026-11-01T00:00:00Z",observations:[]};
+  f.write(f.config.history_dir+"/other.md",'```maintenance-observation-v1\n'+JSON.stringify(other)+'\n```\n');
+  const {args,result}=await checkoutDraft(f);
+  expect(result.revision.snapshot.input.history_provenance).toEqual([`local:${f.config.history_dir}/other.md:${digest(readFileSync(join(f.root,f.config.history_dir,"other.md")))}`]);
+  await main(["resume",...args]);
+  f.write("policy.md","Changed policy.\n");
+  const cli=join(import.meta.dir,"../../../plugins/vh-adlc/scripts/maintenance/cli.ts"),run=Bun.spawnSync([process.execPath,cli,"resume",...args],{stdout:"pipe",stderr:"pipe"});
+  expect(run.exitCode).toBe(1);
+  expect(run.stderr.toString()).toContain("maintenance security verification failed: security reconciliation result changed or falsely reconciled");
+});

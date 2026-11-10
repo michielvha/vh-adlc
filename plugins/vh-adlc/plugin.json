@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "vh-adlc",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "Shared lifecycle, dependency/security maintenance and article/promotion drafting and documentation impact, with project-specific rules and independent review.",
   "author": {
     "name": "Michiel VH"
