@@ -275,30 +275,23 @@ func (r *runtime) stop() {
 	})
 }
 
-// closeReusable lets Chromium save a reusable profile before the display
-// stops: the native Exit request within two seconds, then SIGTERM to Chromium
-// alone for up to one second, then SIGKILL. It fits the guard's five-second
-// supervisor deadline on expiry.
+// closeReusable ends Chromium on a reusable profile before the display stops,
+// without sending any key: SIGTERM to Chromium alone, SIGKILL after two
+// seconds if it is still running. The handoff keeps its keyboard Exit.
 func (r *runtime) closeReusable() {
 	chrome := r.chrome
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if r.quitBrowser(ctx) == nil {
-		select {
-		case <-chrome.done:
-			return
-		case <-ctx.Done():
-		}
-	}
-	for _, step := range []syscall.Signal{syscall.SIGTERM, syscall.SIGKILL} {
+	for _, step := range []struct {
+		signal syscall.Signal
+		wait   time.Duration
+	}{{syscall.SIGTERM, 2 * time.Second}, {syscall.SIGKILL, time.Second}} {
 		if !state.Alive(chrome.identity) {
 			return
 		}
-		_ = state.Signal(chrome.identity, step)
+		_ = state.Signal(chrome.identity, step.signal)
 		select {
 		case <-chrome.done:
 			return
-		case <-time.After(time.Second):
+		case <-time.After(step.wait):
 		}
 	}
 }
