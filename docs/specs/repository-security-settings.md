@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-27 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "R-28 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every full authorized maintenance sweep and onboarding by a consumer that opts in turns on, in each repository its committed settings name and except what its keep-off list names, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -74,7 +74,7 @@ then moves both docs pins with a minor version bump.
 This widens the authority table; today vh-adlc changes only merged-branch deletion.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-27 found nothing blocking; later findings were folded under the owner's
+Reviews R-1 to R-28 found nothing blocking; later findings were folded under the owner's
 standing instruction to take each recommendation. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
@@ -265,6 +265,8 @@ Owner decisions on 2026-11-10:
   committed settings are unlinked or absent, `check` reads keep-off rows from the working tree, as
   on a binding failure, with an AC-17 fixture; the authority row scopes its `check` triggers to
   maintenance runs; an eleventh `apply` fixture uses a broken run chain.
+- Q76, from spec review R-28, taken with the reviewer's proposal under that instruction: the AC-17
+  fallback fixtures keep the row only in the working tree and cover each unlinked or absent path.
 
 ## Scope
 
@@ -858,7 +860,7 @@ with every read and write succeeding, unless it names another case.
 | AC-13 | Same suite, fixture where the alerts write returns 403. Pass: no `automated-security-fixes` write recorded, entry `not-changed` with `alerts-off`, exit code 1. |
 | AC-14 | Same suite, fixture with a Renovate config file and security updates already on. Pass: no write recorded, entry `already-on` with `renovate-overlap`, and the Markdown output lists it under owner decisions. |
 | AC-15 | Same suite, public admin fixture with secret scanning off and a `.vh-adlc/maintenance.yaml` keep-off row for it, and one naming an unknown setting. Pass: no secret scanning write, entry `left-off` with `owner-choice` and the configured reason; the second run fails and names the field. |
-| AC-17 | `bun test tests/vh-adlc/security-settings`, fixture: public repository with push protection on and a keep-off row for it. Pass: no write recorded for it, entry `already-on` with `owner-choice-conflict`, listed in the Markdown owner decisions. A second fixture runs `check` with a resolved binding whose `AGENTS.md` does not link the settings and a working-tree keep-off row for push protection, which reads as on; it passes on the same outcome. |
+| AC-17 | `bun test tests/vh-adlc/security-settings`, fixture: public repository with push protection on and a keep-off row for it. Pass: no write recorded for it, entry `already-on` with `owner-choice-conflict`, listed in the Markdown owner decisions. Three more fixtures run `check` with a resolved binding and a keep-off row for push protection, which reads as on, only in the working tree's settings: one whose committed `AGENTS.md` does not link the settings, one with no committed `AGENTS.md` or settings file, and one whose `AGENTS.md` links a settings file that was never committed. Each passes on the same outcome. |
 | AC-18 | Same suite, public admin fixtures with `.github/dependabot.yml` and no Renovate: `GET automated-security-fixes` returns 500, once without and once with a keep-off row for it; `GET vulnerability-alerts` returns 404; `GET automated-security-fixes` returns 200 with `{"enabled":false,"paused":false}`. Pass: the 500 runs give that entry `unknown` with `api-error` and 500, no write to it, other settings processed, exit code 1; the 404 run writes alerts and reports `enabled`; the 200 run writes security updates and reports `enabled`. |
 | AC-19 | Same suite, fixtures: archived private repository run by a non-admin; private admin repository with a keep-off row for secret scanning; private non-admin repository; `check` on a public admin repository with alerts off, `dependabot.yml` and no Renovate. Pass: every entry `unavailable` with `archived` and no admin-only read, exit code 0; secret scanning `unavailable` with `not-free-on-private`; secret scanning and push protection `unavailable` with `not-free-on-private`, alerts, security updates and `code_scanning` `unknown` with `needs-admin`; security updates `not-changed` with `check-only`. A further `apply` fixture: public admin repository with `dependabot.yml`, no Renovate, alerts and security updates off, and a keep-off row for `dependabot_alerts`. Pass: both `left-off` with `owner-choice`, no write recorded, exit code 0. Another `apply` fixture: public admin repository, secret scanning and push protection off, a keep-off row for `secret_scanning` only. Pass: both `left-off` with `owner-choice`, no `PATCH repos/{r}` recorded. |
 | AC-22 | `bun test tests/vh-adlc/maintenance`: render a report for four repositories in scope with three `--security-settings` files, holding a `renovate-overlap`, a `paused` and an `owner-choice-conflict` entry in different repositories. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the fourth repository has a "helper did not run" row, and the owner decisions list holds exactly those three entries. A second report rendered with no `--security-settings` flag. Pass: the section is present with a "helper did not run" row for each repository in scope. In the first report, where one file's mode is `check`, the section names the `security_settings: apply` opt-in. A third report whose files are all in `apply` has no opt-in line. A report with no files names the opt-in, since no repository is known to be in `apply`. A report whose accepted files are all in `apply` plus one rejected file from another run claiming `check` has no opt-in line. A report whose given files are all rejected and claim `apply` names the opt-in. |
