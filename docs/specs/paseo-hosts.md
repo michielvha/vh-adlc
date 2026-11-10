@@ -289,7 +289,8 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
   - Evidence: `go test ./internal/runtime` fails with `no non-test Go files in .../internal/runtime`, as intended until T12.
 - [x] T12 `internal/runtime/runtime.go` - the local runtime and `hashDaemonPassword` call; T11 passes (AC-01, AC-08, AC-10)
   - Evidence: `go test ./internal/runtime` failed before (no non-test Go files) and `go test -race ./internal/runtime` passes after; the module verification passes. The real `npm install` of `@getpaseo/cli` is not run in tests, which use the stand-in `npm`.
-- [ ] T13 `internal/onboard/onboard_test.go` - the AC-01 to AC-03 rows of the Test Plan; fail (AC-01, AC-02, AC-03)
+- [x] T13 `internal/onboard/onboard_test.go` - the AC-01 to AC-03 rows of the Test Plan; fail (AC-01, AC-02, AC-03)
+  - Evidence: `go test ./internal/onboard` fails with `no non-test Go files in .../internal/onboard`, as intended until T14.
 - [ ] T14 `internal/onboard/onboard.go`, `internal/onboard/snippets/*.sh` - preflight, password, install, exposure, registry and verification with 503 retry; T13 passes (AC-01, AC-02, AC-03)
 - [ ] T15 `internal/link/link_test.go`, `internal/snippets/ps1_syntax_test.go` - the AC-04 and AC-15 rows for both platforms, the client probe with exit 4, and the PowerShell 7 syntax ban; fail (AC-04, AC-15)
 - [ ] T16 `internal/link/link.go`, `internal/link/snippets/*.sh`, `internal/link/snippets/*.ps1` - probe, client record, key, key line, host keys, alias block and tunnel checks; T15 passes (AC-04, AC-15)
