@@ -665,6 +665,7 @@ None.
 | 2026-11-10 | R-5 | spec | `2198c88` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-6 | spec | `4cf4ae6` | unknown | procedural | 8 findings: 5 should-fix, 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-7 | spec | `b5612ad` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
+| 2026-11-10 | R-8 | spec | `ec05a26` | unknown | procedural | 3 findings: 3 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1015,6 +1016,29 @@ SEVERITY: nit
 WHERE: Context (Owner summary)
 EVIDENCE: The summary says "Its owner decisions list names Dependabot security updates left on beside Renovate, and keep-off settings found on." Q36, the Helper section and AC-10 and AC-22 also send entries with reason `paused` to that list. The summary does not mention paused security updates.
 PROPOSAL: Add paused Dependabot security updates to the summary's description of the owner decisions list.
+
+### R-8
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Helper exit code, Renovate and Dependabot detection table) and Context (Background, Q33 bullet)
+EVIDENCE: The Background says "a failed detection makes the helper exit 1 (Q33)". The Design sets exit 1 only when an entry is `not-changed` or `unknown`, or has reason `renovate-detection-failed` or `dependabot-detection-failed`. Those two reasons appear only in the "When off" column. The "a lookup failed, no match | any" row gives `already-on` with no reason in its "When on" cell. So when security updates are already on and a Renovate lookup fails, the helper exits 0. If Renovate is in fact present, no `renovate-overlap` entry reaches the owner decisions list for that sweep. The same happens when a keep-off row decides the entry.
+PROPOSAL: Either reword the Q33 bullet to say that only an entry with a detection-failed reason makes the helper exit 1, or give the "When on" cell of the failed-lookup row its own reason and exit 1. If you take the second option, place that reason in the Q37 order.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Rules applied before any write)
+EVIDENCE: The new paragraph "An entry has one reason. Security updates read as on with `paused` true take reason `paused` ..." sits at column 0 between item "7. Already on" and item "8. Check mode". That ends the first ordered list, and "8." then starts a second list. AC-19 refers to "the numbered order under 'Rules applied before any write'", and that order is now split around a paragraph that changes how rules 6 and 7 assign reasons.
+PROPOSAL: Indent the paragraph under rule 7, or move it after rule 10 so that rules 1 to 10 stay one list.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan (AC-22)
+EVIDENCE: AC-22 requires an "Owner decisions" list across all files that holds "exactly the entries with `renovate-overlap`, `owner-choice-conflict` or `paused`". The AC-22 proof renders a report with only one `renovate-overlap` entry. AC-17 and AC-26 check `owner-choice-conflict` and `paused` only in the helper's own Markdown. The report's cross-repository list is a separate aggregation in `renderReport`. If that aggregation filtered out `paused` or `owner-choice-conflict`, AC-22 would still pass.
+PROPOSAL: Add a `paused` entry and an `owner-choice-conflict` entry to the AC-22 fixture files, placed in different repositories, and expect all three entries in the report's owner decisions list.
 
 ## Sources
 
