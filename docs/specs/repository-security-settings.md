@@ -865,6 +865,7 @@ None.
 | 2026-11-10 | R-20 | spec | `8675000` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-21 | spec | `48bd339` | unknown | procedural | 2 findings: 2 should-fix, none blocking; model identity not attested |
 | 2026-11-10 | R-22 | spec | `db12716` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-23 | spec | `dccdfb2` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1588,6 +1589,29 @@ SEVERITY: nit
 WHERE: Design (Procedure changes: coverage handoff)
 EVIDENCE: The Design (line 572) says the skill records a coverage handoff "whose `assignment_handoff` names the next maintenance sweep and whose `next_action` is to collect the surface again". A coverage handoff is parsed by `followUp` (`plugins/vh-adlc/scripts/maintenance/security.ts:53-56`). That function requires exactly the keys `reference`, `owner`, `assignment_handoff` and `next_action`, and `reference` must be non-empty text (`v.text(f.reference)`). The handoff list is also scoped by `repository` and `surface` (`plugins/vh-adlc/scripts/maintenance/security-io.ts:75`). The Design does not say what `reference` the skill records, or that `owner` is null. No reference page documents the handoff shape: a grep for `assignment_handoff` and `coverage_handoffs` in `plugins/vh-adlc/references/*.md` returns nothing. A skill text that follows the Design as written would produce a handoff that fails validation.
 PROPOSAL: State the complete handoff the skill records, for example `reference` set to the run ID or report path, `owner` null, `assignment_handoff` naming the next maintenance sweep and `next_action` to collect the surface again. Also state that it goes in `coverage_handoffs` with the repository and surface `dependabot`.
+
+### R-23
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Helper; Procedure changes: mode command and skill step), Acceptance Criteria (AC-24) and Test Plan (AC-24)
+EVIDENCE: The Design (line 331) says that with `--run-id`, `apply` "also reads that run's recorded request and scope and refuses every write". The listed refusal causes are request flags, missing `authorized_sweep` and a pull-request scope. `security-settings-mode` (lines 553-562) checks the same three, plus committed adoption and committed `repositories` (line 556). Neither command checks that `--repository` is in the run's recorded scope. A run's scope can be narrower than the committed list, because `start --repository X` records `scope.repositories: [X]` (`plugins/vh-adlc/scripts/maintenance/cli.ts:68`). The skill step (line 582) and the authority row (line 609) limit writes to "a repository in its scope". Nothing in the helper enforces that, so the limit rests on the skill alone, which Q55 and Q60 set out to avoid. `collect` and `report` reject a helper file that "names a repository outside the scope" (line 494), and `portableObservations` requires the inventory scope to equal the run's scope (`plugins/vh-adlc/scripts/maintenance/report.ts:90-91`). So an alerts write to the origin during a run narrowed to another repository would leave no receipt in the report and no `alerts-enabled-this-run` surface. No AC-24 fixture covers a target outside the run's scope.
+PROPOSAL: When `--run-id` is given, have `security-settings-mode` and the helper's `apply` return `check` with a named mode reason (for example `not-in-run-scope`) for a target outside the run's recorded `scope.repositories`, placed in the ordered reason list. Add an AC-24 fixture with a run started with `--repository` for one repository and `apply` targeting the origin. It passes when no write is recorded and that reason is printed.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria (AC-11) and Test Plan (AC-21)
+EVIDENCE: The R-22 fold (Q70) states the full handoff in the Design (lines 574-578): it goes in `coverage_handoffs` with the repository, surface `dependabot`, `reference` set to the run ID, `owner` null, `assignment_handoff` naming the next sweep, and `next_action` to collect the surface again. These are the four keys `followUp` requires, and `reference` must be non-empty text (`plugins/vh-adlc/scripts/maintenance/security.ts:53-56`). AC-11 (line 699) only requires the skill to state "that an `alerts-enabled-this-run` surface gets a coverage handoff naming the next sweep". The AC-21 proof leaves the skill's instruction to "the AC-11 reviewer read". A skill text that names only the next sweep would pass AC-11 but still produce a handoff that fails validation, which is the problem R-22 F-03 raised.
+PROPOSAL: Reword the AC-11 clause so the maintenance skill states the complete handoff the Design gives: `coverage_handoffs`, the repository, surface `dependabot`, `reference` set to the run ID, `owner` null, `assignment_handoff` naming the next sweep, and `next_action`.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan (AC-21)
+EVIDENCE: The AC-21 proof (line 832) now has four fixtures, but its pass condition still says "`security-reconcile` accepts both inventories, reporting `coverage handoff pending` for the surface without a handoff and no such gap with one whose `assignment_handoff` names the next sweep". The phrase dates from 5e4f15b, when the row had two fixtures. The fourth fixture was added in 0aea08b. AC-21 says "The same holds when the file shows `dependabot_alerts` as `not-changed` with `api-error` after a write", which includes the reconcile behaviour. The proof does not say which inventories go to `security-reconcile`, or whether the fourth fixture's inventory is reconciled with and without a handoff. A passing subset never upgrades a composite criterion.
+PROPOSAL: Say that `security-reconcile` runs on the first, second and fourth inventories, each once without a handoff and once with the handoff the Design specifies. Each passes when it reports `coverage handoff pending` only in the run without a handoff.
 
 ## Sources
 
