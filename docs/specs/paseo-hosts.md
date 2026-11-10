@@ -272,6 +272,7 @@ None.
 | 2026-11-10 | R-2 | spec | `ca547a83a2d5768315eee7e0c33961c072c7fb29` | unknown | procedural | Six should-fix findings (five factual, one judgement) and two nits, none blocking; model identity not attested. |
 | 2026-11-10 | R-3 | spec | `8e5c51499cf9073e6507099d1c694f5ae61d0667` | unknown | procedural | Five should-fix findings (three factual, two judgement) and three nits, none blocking; model identity not attested. |
 | 2026-11-10 | R-4 | spec | `c648b53d1d17d5c1f6c4026bbec735c0373df0ad` | claude-opus-4.8 | procedural | Three should-fix factual findings and three nits (two factual, one judgement), none blocking; model reported by the reviewer, not requested. |
+| 2026-11-10 | R-5 | spec | `8f9aba05ac58d02989b483293064597bf17cff4c` | unknown | procedural | One should-fix factual finding and one factual nit, none blocking; model identity not attested. |
 
 ### R-1
 
@@ -511,3 +512,19 @@ SEVERITY: nit
 WHERE: Context, Owner summary
 EVIDENCE: The summary does not mention three decisions taken after R-3 and recorded on line 77: `remove --skip-server` for a server that is gone, Windows snippets tested under a real `pwsh` with Windows otherwise proven only by the manual run, and the fixed `status` fields. Line 32 says "`link`, `unlink` and `remove` restart the desktop app twice". Under line 175, `link --no-app` leaves the app alone, and `unlink --server-only` (line 202) does not contact the client.
 PROPOSAL: Add the three R-3 decisions to the summary, and say that `link --no-app` and `unlink --server-only` do not restart the app.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope; Design; Acceptance Criteria AC-09
+EVIDENCE: Scope (line 87) lists "`verify`, `status`, `list` and `password <alias>` for onboarded servers". AC-09 (line 230) requires local-tool registry files to "work unchanged with `verify`, `status`, `list`, `link`, `unlink` and `remove`", and the AC-09 proof (line 249) runs `verify` and `list` against a local-tool fixture. The Design defines `status` (line 177) and the `password` output rule (line 165). It does not say what `verify` checks, whether it changes anything, or which exit code it returns on a failed check. It also does not say what `list` prints. The local tool's `verify` ran only the authentication checks over `PASEO_URL` (paseo-host:89-102, :554). As written, an implementation review cannot decide what "works" means for these two commands.
+PROPOSAL: Give `verify` and `list` a short Design entry. For example, `verify <alias>` runs onboard step 6 (plus HTTPS health when published) without changes and exits 1 on a failed check, and `list` prints each registry alias with its `PASEO_SSH` and `PASEO_URL`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, AC-07
+EVIDENCE: AC-07 (line 228) is composite. It includes these clauses: `unlink --server-only` "for a client whose key line has no `paseo-hosts:<client>` comment ... exits 1 and changes nothing"; `remove --skip-server` "with no client recorded or named ... exits 3 unless `--no-clients` is given"; and "no app backup in `PASEO_HOSTS_DIR` holds the server's entry", which line 210 extends to the local tool's `mac-app-registry.backup.json`. The AC-07 row (line 247) and manual step 7 (line 257) cover none of these three clauses. Under the standard, a passing subset never upgrades a composite criterion, so AC-07 would be reviewed as `untested` even when the code is correct.
+PROPOSAL: Add these three assertions to the existing `internal/remove` cases in the AC-07 row. They need no new test file or CI step.
