@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Spec review R-7 at b5612ad returned 3 findings, none blocking. Its factual correction is applied; Q37 and Q38 wait for the owner, then a new review. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "Q37 and Q38 from spec review R-7 answered with every recommendation; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every maintenance sweep and onboarding by a consumer that opts in turns on, in each repository of its scope, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -73,7 +73,7 @@ These owner decisions widen the authority table. Today the only repository setti
 changes is merged-branch deletion, with authorization.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-7 found nothing blocking; R-7's questions Q37 and Q38 are open. Acceptance
+Reviews R-1 to R-7 found nothing blocking, and the owner answered their questions. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
 or onboarding need separate approval.
@@ -185,6 +185,9 @@ Owner decisions on 2026-11-10:
   protection `left-off` (Q34); `collect` and `report` accept only valid helper files bound to the
   current run and show any other as "helper did not run" (Q35); and paused security updates are
   `already-on` with reason `paused`, listed for the owner (Q36).
+- Q37 and Q38, from spec review R-7, answered on 2026-11-10 with every recommended option: an entry
+  has one reason, with `owner-choice-conflict` before `paused` before `renovate-overlap` (Q37); and
+  a restricted onboarding request selects `check` as a sweep does (Q38).
 
 ## Scope
 
@@ -332,6 +335,10 @@ the first rule below that applies to it:
    only for rows that do not write; the "no signal, configured, off" row falls through to rules 7
    to 10.
 7. Already on: an entry read as on is `already-on`.
+
+An entry has one reason. Security updates read as on with `paused` true take reason `paused` in
+rule 6's "When on" cells and in rule 7, in place of `renovate-overlap` or no reason. Rule 5's
+`owner-choice-conflict` comes first, since rule 5 decides the entry before rule 6.
 8. Check mode (`check-only`): under `check`, an off and free entry is `not-changed`. This includes
    security updates the Renovate and Dependabot rules would enable, even while alerts are off.
 9. Alerts off (`alerts-off`): under `apply`, security updates are `not-changed` when alerts are not
@@ -363,7 +370,7 @@ For `dependabot_security_updates`, with no write in any row except the second:
 
 | Renovate | Dependabot | When off | When on |
 | --- | --- | --- | --- |
-| present | any | `left-off` with `renovate-present` | `already-on` with `renovate-overlap` |
+| present | any | `left-off` with `renovate-present` | `already-on` with `paused` when paused, else `renovate-overlap` |
 | no signal | configured | written, then `enabled` | `already-on` |
 | no signal | not configured | `left-off` with `renovate-unknown` | `already-on` |
 | a lookup failed, no match | any | `left-off` with `renovate-detection-failed` and the error | `already-on` |
@@ -436,7 +443,9 @@ for adopting either.
   (`plugins/vh-adlc/scripts/maintenance/authority.ts:13`), or when the committed settings do not
   adopt `security_settings: apply`. Otherwise it is `apply`. `no_commit` alone does not select
   `check`, because a settings change is not a commit. Onboarding has no recorded maintenance
-  request, so it runs the command without one and the committed settings alone decide.
+  request, so it runs the command without one and the committed settings alone decide, except
+  that an onboarding request that is read-only or draft-only, or forbids pushing or filesystem
+  writes, selects `check` without calling the command, as in a sweep.
 - The maintenance skill gets a step before collection: for each repository in scope, run the helper
   in that mode with the run ID, save its JSON, then collect with those files. A helper failure or exit 1 never
   blocks collection. Under `check`, the report says how to opt in. A request that forbids
@@ -521,7 +530,8 @@ with every read and write succeeding, unless it names another case.
       `references/maintenance-settings.md`, `references/loop.md`, `references/lifecycle.md`, the
       maintenance skill and `docs/user-guides/workflows.md` state: sweeps and onboarding run the
       helper before collection in the mode `security-settings-mode` prints; the `security_settings`
-      opt-in and the flags that select `check`; the Renovate and Dependabot rules; the private,
+      opt-in and the flags that select `check`, in sweeps and, in `references/loop.md` and
+      `references/lifecycle.md`, in onboarding; the Renovate and Dependabot rules; the private,
       archived and keep-off rules; that `renovate-overlap`, `owner-choice-conflict` and `paused` go to the
       owner; the precedence order; the `not-free-on-private` and `alerts-enabled-this-run`
       collector rules, in `references/maintenance.md` and `references/maintenance-settings.md`
@@ -603,6 +613,10 @@ with every read and write succeeding, unless it names another case.
       chat and no JSON saved.
 - [ ] AC-25: A consumer whose committed settings hold `security_settings` and
       `security_settings_keep_off` keeps an adopted standing report-publication grant.
+- [ ] AC-26: Under `apply`, security updates read as `{"enabled":true,"paused":true}` are
+      `already-on` with reason `paused`, with or without a Renovate signal, unless the keep-off list
+      names them, which gives `owner-choice-conflict`. No write is made, the helper exits 0 when no
+      other entry fails, and the Markdown owner decisions list names the entry.
 
 ## Test Plan
 
@@ -627,6 +641,7 @@ with every read and write succeeding, unless it names another case.
 | AC-22 | `bun test tests/vh-adlc/maintenance`: render a report for three repositories in scope with two `--security-settings` files, one holding a `renovate-overlap` entry. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the third repository has a "helper did not run" row, and the owner decisions list holds exactly the `renovate-overlap` entry. |
 | AC-23 | `bun test tests/vh-adlc/security-settings`, fixture where `repos/{r}` returns 500, and `bun test tests/vh-adlc/maintenance` with a two-repository collector fixture given a helper file for the second repository only. Pass: four `unknown` entries with `api-error` and 500, no other recorded call, exit code 1; the collection covers both repositories. Further `collect` and `report` fixtures each add one bad file listing `dependabot_alerts` as `enabled`: malformed JSON, an out-of-scope repository, a second file for the same repository, and another run ID. Pass: both commands exit 0, no surface gets `alerts-enabled-this-run` from the bad file, and the report shows "helper did not run" with the reason. |
 | AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings adopting `apply` and no request; with settings that do not adopt it and no request; and with `security_settings: maybe`. Pass: `check` for the first four, `apply` for `no_commit`, `apply` then `check` for the next two, and a visible failure naming the field for the last. Further fixtures where `apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link: each gives `check`. The reviewer also reads the maintenance skill step at the implementation commit and confirms the `no_filesystem` rule is stated. |
+| AC-26 | `bun test tests/vh-adlc/security-settings`, public admin fixtures with alerts on and `automated-security-fixes` returning `{"enabled":true,"paused":true}`: one with `dependabot.yml` and no Renovate, one with `renovate.json`, one with a keep-off row for security updates. Pass: `paused`, `paused`, then `owner-choice-conflict`, all `already-on`; no `PUT automated-security-fixes` recorded; exit code 0; each appears in the Markdown owner decisions list. |
 | AC-25 | `bun test tests/vh-adlc/maintenance`: `resolveStanding` on committed settings with an adopted publication grant plus `security_settings: apply` and one `security_settings_keep_off` row. Pass: the grant resolves as adopted, not `invalid`. |
 | AC-16 | `bun test tests/vh-adlc/maintenance` with collector fixtures for a private admin repository with `security_and_analysis` null whose code scanning read returns 403, and one returning 404. Pass: the surface is `complete-unavailable` with `not-free-on-private` and the status. Fixtures with the same 403 on a public repository, on a private repository read without admin, and on a private repository with `code_security` enabled stay incomplete. |
 | AC-21 | `bun test tests/vh-adlc/maintenance` with one fake `gh` state shared by the helper and the collector: public admin repository, alerts off, three open Dependabot alerts that the alerts endpoint returns only once alerts are on; a second fixture whose endpoint returns an empty list on the first read after the write; a third with alerts already on. Run `apply`, then the collector with the helper's JSON. Pass: the first keeps three alerts and the second none, both with the surface incomplete, `alerts-enabled-this-run` and a null count, and `security-reconcile` accepts both inventories; the third is complete. |
@@ -637,31 +652,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q37: Where does `paused` sit in the rule order?
-
-From R-7 F-01: Q36 added reason `paused`, but no numbered rule produces it, and the order against `renovate-overlap` and `owner-choice-conflict` is unstated, so it could go unimplemented with every box ticked.
-
-**Recommendation:** A. A recorded owner choice comes first, and a pause matters more than overlap, since a paused setting opens no competing pull requests.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. One reason per entry. Rule 5 keeps `owner-choice-conflict`; otherwise rule 6's "When on" cells and rule 7 give `paused` when security updates read `paused` true, before `renovate-overlap`. New AC-26 with a `{"enabled":true,"paused":true}` fixture, alone and beside Renovate: `already-on` with `paused`, no write, exit 0, listed under Owner decisions** | A defined, tested outcome | One criterion |
-| **B. `renovate-overlap` before `paused`** | Renovate overlap stays the headline | A pause hidden behind overlap |
-
-**Why this is yours:** It decides which signal the owner sees first.
-
-### Q38: Does a restricted onboarding request still write settings?
-
-From R-7 F-02: onboarding calls `security-settings-mode` with no recorded request, so a read-only or no-change onboarding in a consumer that already adopted `apply` would still write settings.
-
-**Recommendation:** A. Restrictions mean the same in onboarding as in a sweep (Q26).
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Onboarding selects `check` without calling `security-settings-mode` when its current request is read-only, draft-only, or forbids pushing or filesystem writes; AC-11 requires `references/loop.md` and `references/lifecycle.md` to say so** | One meaning for restrictions everywhere | A sentence in two references |
-| **B. Onboarding always uses `check`; only sweeps apply** | Simplest, never writes during onboarding | Settings wait for the first sweep |
-
-**Why this is yours:** It decides whether onboarding may write settings.
+None.
 
 ## Review Log
 
