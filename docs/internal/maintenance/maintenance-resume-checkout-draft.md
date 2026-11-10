@@ -10,7 +10,7 @@ Task base: `334c361a4071d2de2a44ffd9f58a9c8b962c66f8` (origin/main after PR #69)
 
 Affected paths: `plugins/vh-adlc/scripts/maintenance/security-io.ts`, `plugins/vh-adlc/scripts/maintenance/cli.ts`, `tests/vh-adlc/maintenance/security-cli.test.ts`, `plugins/vh-adlc/references/maintenance.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, and this record.
 
-Verification inputs: The affected paths, the rest of `plugins/vh-adlc/scripts/maintenance/`, `tests/vh-adlc/`, `.github/workflows/ci.yml`, and engineering conventions at `f781ee7b0404e80194aa568af3284888cc222017`.
+Verification inputs: The affected paths, the rest of `plugins/vh-adlc/scripts/maintenance/`, `tests/vh-adlc/`, `.github/workflows/ci.yml`, and engineering conventions at `a4e3d592e2ebb17295e0adf37747878f0c207b93`.
 
 Proposed change: This takes the narrower option from the issue, so the receipt format stays as it is. When `security-reconcile` reads history, the file at the run's recorded report path counts as the run's own report, provided its observation block names the run. It adds no file provenance and does not suppress a byte-identical supplied copy. During verification it contributes only revisions numbered below the claimed revision, so appends made after the claim are ignored. When none of its revisions remain, its open alerts are still imported as unresolved observations, referenced by path rather than by the digest an append replaces. Any other file that names the run keeps its provenance and all its revisions. Supplied packet copies are digest-pinned and stay unfiltered, so forged successors in them still produce gaps. Identical same-run revisions from the report and a copy count once. Uncommitted history entries are labelled `local:<path>:<digest>`. The CLI wraps the security verification in `resume`, `report --security` and typed `append` and prints `maintenance security verification failed: <cause>`. It shows the cause only for the helpers' own plain errors; system and parser errors print a fixed phrase. Both plugin manifests move to 0.15.1, as the package check requires.
 
@@ -18,7 +18,7 @@ Required checks: Observe the issue's reproduction failing at the task base and p
 
 ## Evidence
 
-Conventions: vhco-pro/docs@f781ee7b0404e80194aa568af3284888cc222017 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md. Knowledge resolution returned answered with no findings.
+Conventions: vhco-pro/docs@a4e3d592e2ebb17295e0adf37747878f0c207b93 (repository pin, AGENTS.md, after PR #69); prose edited with guides/humanize-prose.md. Knowledge resolution returned answered with no findings. The repair was first written against the earlier pin `f781ee7b0404e80194aa568af3284888cc222017`. Between the two pins, coding.md, feature-documents.md and humanize-prose.md are unchanged. The new pin's AGENTS.md adds a required read of conventions/terminal-output.md for command-line output. That page was read. Existing tools adopt it only through explicit repository changes, and it requires preserving existing command, stream and exit-code contracts. The new `maintenance security verification failed: <cause>` message is plain text on stderr with exit code 1 and the existing `maintenance` prefix, so it keeps those contracts and the standard requires no further change.
 
 The work is in a fresh clone at `/home/m/code/vh-adlc-issue68` on branch `fix/maintenance-resume-checkout-draft`. The shared checkout at `/home/m/code/vh-adlc` is on an unrelated feature branch with uncommitted files, and it was left untouched.
 
@@ -33,6 +33,8 @@ R-1 response. F-01 is fixed: while the own report has no revision below the clai
 R-2 response. F-01 is fixed: identical same-run revisions now count once only when the run's own report supplies that revision, as the Definition says. Duplicates elsewhere still produce a fork gap, as at the task base. The new test `two history copies of a run's revision outside its report still count as a fork` failed at `b8f0f89` (log `/tmp/vh-adlc-issue68-red3.log`) and passes now. `tests/vh-adlc/maintenance` passes 237 of 237. `bun test tests/vh-adlc --timeout 60000` passes 1294 of 1295 (log `/tmp/vh-adlc-issue68-full3.log`), and the one failure is again the host-binary fixtures test. The CI documentation-impact typecheck passes and `git diff --check` is clean.
 
 Rebase. The owner asked to merge the repair. Meanwhile origin/main gained PR #69 and plugin version 0.15.0, so the branch was rebased onto `334c361` and the manifests set to 0.15.1. The diff of the scripts, references and tests is identical to the reviewed `00cf14e` diff. After the rebase, `bun test tests/vh-adlc --timeout 60000` passes 1304 of 1305 (log `/tmp/vh-adlc-issue68-full4.log`). The one failure is the host-binary fixtures test. The CI documentation-impact typecheck passes and `git diff --check` is clean.
+
+R-4 response. F-01 is fixed: the Definition and the conventions line now name the repository pin `a4e3d59`, and the terminal-output read is recorded above. Only this record changed.
 
 ## Reviews
 
@@ -76,6 +78,19 @@ Model: claude-opus-4.8 (reported by the reviewer; no model was requested)
 Isolation: procedural
 
 NO FINDINGS
+
+### R-4
+
+Target: `e970c7e` on `fix/maintenance-resume-checkout-draft`
+Model: claude-opus-4.8 (reported by the reviewer; no model was requested)
+Isolation: procedural
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: docs/internal/maintenance/maintenance-resume-checkout-draft.md:13 (Definition, "Verification inputs") and :21 (Evidence, "Conventions")
+EVIDENCE: At e970c7e the record names `f781ee7b0404e80194aa568af3284888cc222017` as the engineering conventions revision. Line 21 calls it the "(repository pin, AGENTS.md)". PR #69 (commit eae566b) moved the pin, so `git show e970c7e:AGENTS.md` line 4 now pins `vhco-pro/docs/blob/a4e3d592e2ebb17295e0adf37747878f0c207b93`. The rebased Definition therefore names a revision other than the repository pin. I compared the two revisions in ~/.cache/vh-adlc/docs. conventions/coding.md, conventions/feature-documents.md and guides/humanize-prose.md are identical. AGENTS.md differs: at a4e3d59 it adds a required route, "For command-line output or terminal interaction, read the required terminal output standard (conventions/terminal-output.md)". This change adds a CLI stderr message (`maintenance security verification failed: <cause>` in cli.ts). The record does not show that this standard was read or ruled out. I read conventions/terminal-output.md at a4e3d59. It says existing tools adopt the standard "through explicit repository changes" and must keep their existing stream contracts. The new message keeps the existing `maintenance ...` stderr contract, so I found no code defect. Only the record's conventions baseline and its pin claim are stale. Everything else checks out. The rebased scripts, references and tests diff (`git diff origin/main e970c7e`) equals the reviewed `git diff 07217be 00cf14e` except for blob IDs and the maintenance.md hunk offset (339 to 362). PR #69 changed no files under scripts/maintenance or tests/vh-adlc/maintenance. `bun test tests/vh-adlc/maintenance --timeout 60000` passed 237 of 237. `bun test tests/vh-adlc --timeout 60000` passed 1304 of 1305. The one failure, tests/vh-adlc/fixtures.test.ts, was the host-binary digest rejection, and it fails the same way in a clone at 334c361. With the target test file at 334c361, 5 of the 6 new tests fail, the reproduction among them with `security reconciliation result changed or falsely reconciled`. The sixth, the R-2 fork guard, passes at the base as intended. The docs-impact typecheck, a strict `tsc` of scripts/maintenance/cli.ts and `git diff --check origin/main e970c7e` passed, and `git status --short` stayed empty.
+PROPOSAL: Update the Definition's Verification inputs and the Evidence conventions line to the repository pin a4e3d592e2ebb17295e0adf37747878f0c207b93. Record that the AGENTS.md terminal-output route was read and does not apply, because the existing stderr contract is kept. Then get a fresh review of that commit.
 
 ## State
 
