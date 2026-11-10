@@ -881,6 +881,7 @@ None.
 | 2026-11-10 | R-22 | spec | `db12716` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-23 | spec | `dccdfb2` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-24 | spec | `9e3883b` | claude-opus-4.8 | procedural | 2 findings: 1 should-fix, 1 nit, none blocking |
+| 2026-11-10 | R-25 | spec | `ef3ebb6` | unknown | procedural | 2 findings: 2 should-fix, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1643,6 +1644,22 @@ SEVERITY: nit
 WHERE: Design (Helper) and Acceptance Criteria (AC-24)
 EVIDENCE: The Design (lines 334-338) says that when `apply` gets `--run-id`, "it also reads that run's recorded request and scope and refuses every write". It says what happens when the settings binding fails ("fails visibly when that binding does not resolve", line 329), but not when the run cannot be read. `readRun` throws for a missing run, an identity mismatch or a broken event chain (`plugins/vh-adlc/scripts/maintenance/journal.ts:171-185`). `security-settings-mode` has this covered because every nonzero exit leads to `check`. Nothing says the helper's `apply` must make no write when its `--run-id` cannot be read, and no AC-24 fixture tests that case. An implementation that treats an unreadable run as "no run", and so applies on the committed settings alone, would pass every listed fixture. The restriction would then rest on the skill again, which Q55 and Q60 set out to avoid.
 PROPOSAL: State that `apply` with a `--run-id` it cannot read makes no write and either fails visibly or reports its entries as `check` would, with a named reason. Add one AC-24 helper fixture with a run ID that does not exist.
+
+### R-25
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-11) and Design (Procedure changes)
+EVIDENCE: `plugins/vh-adlc/references/maintenance.md:218-219` reads "Report helpers never push, merge shared main or mutate GitHub. The one exception is the branch helper's `apply` and `after-merge`". The Design (line 603) says "That sentence gains the security-settings helper's `apply`". R-6 F-01 added a matching AC-11 clause, which now reads (lines 701-703): "that the security-settings helper's `apply` is an exception to "Report helpers never ... mutate GitHub", with the recorded run as intent and the JSON saved in the run's private journal directory as receipt". That clause names no page. Since Q58, AC-11 says (lines 687-688): "A clause that names no page needs to appear only in `references/security-settings.md`". So an implementation that states the exception only in the new page passes AC-11 while `references/maintenance.md` still names the branch helper as "The one exception". The fold of R-6 F-01 no longer holds. The same applies to the Design line 617, "`references/maintenance.md` documents the section", which no criterion requires. It also applies to the skill step that runs the helper and passes `--security-settings` and `--applied-repository` to `collect` and `report` (lines 590-593), which the unqualified clause "Sweeps and onboarding run the helper before collection" does not tie to the skill.
+PROPOSAL: Make the exception clause name `references/maintenance.md`, so its "one exception" sentence must list the security-settings helper's `apply`. Also require `references/maintenance.md` to document the new report section, and the maintenance skill's step to run the helper and pass its files to `collect` and `report`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-24) and Test Plan (AC-24)
+EVIDENCE: The Design says the helper's `apply` "fails visibly when that binding does not resolve" (line 332). The R-24 fold (Q72) adds: "When `apply` cannot read its `--run-id` (missing, mismatched or broken run), it makes no write and exits nonzero naming the run" (lines 341-342). AC-24 (lines 805-810) states only that `apply` makes no write when the bound committed settings do not adopt `apply` or do not name the target, or when the run's recorded request or scope selects `check`. It says nothing about an unreadable run or a failed binding. The Test Plan's eighth helper fixture (line 842) tests the unreadable run, but no criterion text carries it. No fixture runs the helper's `apply` with a failed binding: the `--default-commit` mismatch fixture runs only the mode command and the helper's `check`. If an implementation treats an unreadable run as "no run", or falls back to the working-tree settings when the binding fails and then writes, it meets every criterion as worded. The opt-in would again rest on the skill alone, which Q55, Q60 and Q72 set out to avoid.
+PROPOSAL: Add to AC-24 that the helper's `apply` makes no write and exits nonzero naming the cause when its binding does not resolve, when the committed settings are invalid, or when its `--run-id` cannot be read. Add a helper `apply` fixture whose `--default-commit` differs from `origin/<branch>`. It passes when no write is recorded and the exit is nonzero.
 
 ## Sources
 
