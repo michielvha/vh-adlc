@@ -776,3 +776,27 @@ func TestProfileBrowserStopDoesNotWaitForForwardRemoval(t *testing.T) {
 		})
 	}
 }
+
+func TestRefusedFirstStartLeavesNoProfile(t *testing.T) {
+	f := newProfileFixture(t)
+	fakeOwnerAPI(t, f.fake, "owner@example.test")
+	t.Setenv("REMOTE_GUI_CHROMIUM", filepath.Join(f.fake, "absent-chromium"))
+	refused(t, f, f.config(t, "fresh", "--transport", "tailscale"), "chromium-version-unavailable")
+	if _, err := os.Lstat(filepath.Join(f.profiles, "fresh")); !os.IsNotExist(err) {
+		t.Fatal("a refused first start left a profile directory")
+	}
+	if listed, err := profile.List(f.profiles); err != nil || len(listed) != 0 {
+		t.Fatalf("a refused first start left a profile: %+v %v", listed, err)
+	}
+	t.Setenv("REMOTE_GUI_CHROMIUM", filepath.Join(f.fake, "chromium"))
+	v, err := Start(f.config(t, "fresh"))
+	if err != nil {
+		t.Fatalf("a later start on another transport kind was refused: %v", err)
+	}
+	if m, e := profile.ReadMeta(f.profiles, "fresh"); e != nil || m.Transport != "loopback" || m.OwnerLogin != "" {
+		t.Fatalf("profile not bound to the start that succeeded: %+v %v", m, e)
+	}
+	if _, err = Stop(f.home, v.ID); err != nil {
+		t.Fatal(err)
+	}
+}
