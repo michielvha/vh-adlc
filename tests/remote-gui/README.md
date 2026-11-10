@@ -25,7 +25,7 @@ Run the GUI component crash and expiry checks from the plugin module with the sa
 REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser ./internal/xclip -count=1
 ```
 
-The `internal/xclip` tests start their own Xvfb display and check the clipboard helper: Unicode and 64 KiB round trips, oversized and INCR replies, and clearing CLIPBOARD, PRIMARY and `CUT_BUFFER0`. The browser package adds real handoff checks that the remote clipboard is empty before the agent's browser starts. These checks kill only recorded process identities through pidfds. They verify closed viewer sockets, dead owned processes and private-session descendants, and deleted profiles. Loss of the guard exercises the documented next-lifecycle cleanup path.
+The `internal/xclip` tests start their own Xvfb display and check the clipboard helper: Unicode and 64 KiB round trips, oversized and INCR replies, and clearing CLIPBOARD, PRIMARY and `CUT_BUFFER0`. The browser package adds real handoff checks that the remote clipboard is empty after the handoff to agent mode; `TestFailedClipboardClearBlocksAgentLaunch` proves the clear happens before the agent's browser starts. These checks kill only recorded process identities through pidfds. They verify closed viewer sockets, dead owned processes and private-session descendants, and deleted profiles. Loss of the guard exercises the documented next-lifecycle cleanup path.
 
 Ubuntu CI runs the real browser lifecycle and noVNC fixtures with the runner's sandboxed Google Chrome, distribution GUI tools and the locked Playwright core package. Browser tests remain opt-in locally. The runtime itself never installs these tools.
 

@@ -434,6 +434,11 @@ func TestRealHandoffClearsTheRemoteClipboard(t *testing.T) {
 	go func() {
 		var err error
 		view, err = session.Handoff(s.home, s.id, "agent")
+		// A fresh human browser occasionally misses the native Exit menu, which the
+		// product reports as a retryable close failure; retry that once.
+		if err != nil && strings.Contains(err.Error(), "browser-close-needs-owner") {
+			view, err = session.Handoff(s.home, s.id, "agent")
+		}
 		done <- err
 	}()
 	statuses := map[int]int{}
