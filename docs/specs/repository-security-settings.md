@@ -593,6 +593,7 @@ None.
 | 2026-11-10 | R-2 | spec | `812a0aa` | claude-opus-4.8 | procedural | 7 findings: 5 should-fix, 2 nits, none blocking |
 | 2026-11-10 | R-3 | spec | `44aea8d` | unknown | procedural | 7 findings: 4 should-fix, 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-4 | spec | `5528322` | unknown | procedural | 7 findings: 5 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-5 | spec | `2198c88` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -832,6 +833,36 @@ SEVERITY: nit
 WHERE: AC-23 and Test Plan (AC-23)
 EVIDENCE: AC-23 requires that "In a sweep, a helper failure or exit 1 for one repository does not stop collection for any repository". The sweep runs the helper through the maintenance skill's agent procedure. No maintenance script runs the helper. So the proof, `bun test tests/vh-adlc/maintenance` with "a two-repository sweep fixture where the helper exits 1 for the first", can only run `collect` on prepared files. It would pass whatever the skill text says.
 PROPOSAL: Add a check that the maintenance skill step says a helper failure never blocks collection. Alternatively, reword the bun test's pass condition so it claims only the collector behaviour it observes.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Procedure changes), AC-24 and Test Plan (AC-24)
+EVIDENCE: `plugins/vh-adlc/scripts/maintenance/cli.ts:66-67`: `start` returns `{ persisted: false, mode: "chat-only", reason: "current request forbids filesystem writes" }` when `request.no_filesystem === true` and creates no run. `plugins/vh-adlc/references/maintenance.md:39-41` says "If all filesystem writes are forbidden, return chat-only findings with no journal". This means a `no_filesystem` sweep never has a recorded request. AC-24 says `security-settings-mode` prints `apply` "also with no recorded request", so a consumer that adopts `security_settings: apply` gets `apply` in a `no_filesystem` sweep, which contradicts Q26. The skill step "run the helper in that mode, save its JSON, then collect with those files" is also a filesystem write that `no_filesystem` forbids. The AC-24 proof's "request with ... `no_filesystem`" case cannot arise from a real recorded run.
+PROPOSAL: Have `security-settings-mode` take the current request directly, or have the skill select `check` without calling it when the current request forbids filesystem writes. Under `no_filesystem`, say that the helper's output stays in chat with no saved JSON. Add an AC-24 case for a `no_filesystem` sweep that has no recorded run.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Settings, Procedure changes), AC-11 and covers
+EVIDENCE: `plugins/vh-adlc/scripts/maintenance/settings.ts:12-14` fails with "settings contains unsupported fields" for any unlisted key, and `loadSettings` runs before every maintenance CLI operation (`cli.ts:57`). The precedent for `security_policy` is `references/maintenance-settings.md:97`, which says "Older readers reject this new key: follow the documented rollback preflight before dependent use." `docs/reference/compatibility.md:96-97` says "older helpers reject a newly adopted `security_policy` key and require the documented settings rollback handoff". The document adds `security_settings` and `security_settings_keep_off` with a minor version bump. Neither the Design nor AC-11 requires that note, and `docs/reference/compatibility.md` is not in `covers`. A consumer that adopts either key breaks every maintenance command on a host still running an older plugin.
+PROPOSAL: Require the older-reader note for both keys in `references/maintenance-settings.md` and `docs/reference/compatibility.md`, naming the new plugin version as the minimum. Add `docs/reference/compatibility.md` to `covers` and to AC-11.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Order of work)
+EVIDENCE: The document says "Both move to the revision where docs#30 merged ... so every consumer resolves the page", then says "a consumer whose own older pin lacks it still sweeps normally". `plugins/vh-adlc/knowledge.md:7-9` says `vh-adlc knowledge` decides whether the repository's own pin or the plugin pin applies. I ran `vh-adlc knowledge --repo /tmp/vh-adlc-sec-20261110 --plugin-pin a4e3d592e2ebb17295e0adf37747878f0c207b93 --page conventions/repository-security.md`, which resolved through the repository pin (`AGENTS.md`) and returned `missing-page`. A consumer whose own pin predates the merge does not resolve the page.
+PROPOSAL: Say that consumers without their own pin, or with a pin at or after the docs#30 merge, resolve the page.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Rules applied before any write, rules 5, 6 and 9) and AC-07
+EVIDENCE: Rule 5 makes a keep-off `dependabot_alerts` entry `left-off` with `owner-choice` and never writes it. For `dependabot_security_updates` in the "no signal | configured | When off" row, rule 6 falls through, and rule 9 then gives `not-changed` with `alerts-off`. The exit code is 1 whenever any entry is `not-changed`. So a Dependabot repository whose owner keeps alerts off shows a `not-changed` row and exits 1 in every `apply` run because of a recorded owner choice. AC-07's clean first run can never happen there.
+PROPOSAL: When the keep-off list names `dependabot_alerts`, make security updates `left-off` with `owner-choice` or another named reason. Otherwise, state that the permanent exit 1 is intended.
 
 ## Sources
 
