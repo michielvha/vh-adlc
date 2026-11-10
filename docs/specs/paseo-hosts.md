@@ -31,7 +31,7 @@ Excluded: phones, the web UI, the Linux app, relay pairing, agent CLI installs a
 
 Side effects: `link`, `unlink` and `remove` restart the desktop app twice (not `link --no-app` or `unlink --server-only`), briefly open its debugging port on loopback, and keep a backup of its host list, which holds passwords, in the registry directory. A rejected change restores the old list. Windows needs OpenSSH Server and a signed-in user.
 
-Planned checks: Go tests against SSH and DevTools stand-ins, CI lint and race checks, an installed-copy build in CI, and a manual run on a server, Mac, Windows PC and fresh agent session. The Windows scripts run under `pwsh` on Linux; Windows itself is proven only by the manual run. Nothing is implemented. R-1's blocking gaps are fixed; R-2 to R-6 found none, and their findings are applied.
+Planned checks: Go tests against SSH and DevTools stand-ins, CI lint and race checks, an installed-copy build in CI, and a manual run on a server, Mac, Windows PC and fresh agent session. The Windows scripts run under `pwsh` on Linux; Windows itself is proven only by the manual run. Nothing is implemented. R-1's blocking gaps are fixed; R-2 to R-6 found none.
 
 Acceptance authorizes implementing on a feature branch through the vh-adlc gates; finishing waits on the logger PR being merged and tagged. Opening a PR, merging, merging the logger PR and touching real servers or desktops in tests need separate approval.
 
