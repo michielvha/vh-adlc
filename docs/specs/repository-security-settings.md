@@ -738,6 +738,7 @@ None.
 | 2026-11-10 | R-9 | spec | `c1a8587` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-10 | spec | `0c85c0b` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-11 | spec | `b0a2159` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
+| 2026-11-10 | R-12 | spec | `12be951` | unknown | procedural | 4 findings: 1 should-fix, 3 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1187,6 +1188,36 @@ SEVERITY: nit
 WHERE: Design (Rules applied before any write, rule 2 and the closing paragraph)
 EVIDENCE: Rule 2 makes private secret scanning and push protection "`unavailable` unless the admin read shows them on", and it comes before rule 3 (`needs-admin`). For a private repository read without admin, no admin read exists, and AC-19's proof expects "secret scanning and push protection `unavailable` with `not-free-on-private`" there. GitHub returns `security_and_analysis` only to admins, so the helper did not see whether those features are on. The closing paragraph still says "Rules 1 to 4 need no reading of the setting, or report that the read failed, so no entry claims a state the helper could not see." For `code_scanning`, rule 2 requires admin evidence (Q19), so the two paid features are treated differently.
 PROPOSAL: Reword the closing sentence so it says that rule 2 infers `unavailable` from visibility alone when no admin read exists. Alternatively, make non-admin private secret scanning entries `unknown` with `needs-admin`, as `code_scanning` is.
+
+### R-12
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Collector, Procedure changes: maintenance skill step) and AC-21, AC-23
+EVIDENCE: The `alerts-enabled-this-run` rule depends on the helper's saved JSON reaching `collect`. Design: "When a file lists `dependabot_alerts` as `enabled` for a repository, the collector records that repository's Dependabot surface as incomplete". Any file that is missing, malformed or truncated "is ignored for collection and shown in the report as 'helper did not run'", and "A helper failure or exit 1 never blocks collection". Background: on bg-remove, `GET dependabot/alerts` listed 47 alerts "about 20 seconds later" after the PUT. Suppose `apply` succeeds on `PUT vulnerability-alerts` and then the helper crashes, or its stdout is not saved as valid JSON. The collector then reads the now-enabled alerts endpoint and gets an empty or partial list. Through `alertSurface` (`plugins/vh-adlc/scripts/maintenance/collect.ts:108-115`), it records the surface `complete` with that count, and `security-reconcile` raises no coverage gap for a complete surface (`plugins/vh-adlc/scripts/maintenance/security.ts:143`). R-6 F-05 and Q35 decided how a bad file is shown. They did not decide the coverage of a surface whose write may have happened without a receipt. AC-23 checks only that a bad file "changes no surface".
+PROPOSAL: When the run's mode for a repository was `apply` and no valid helper file exists for it, have `collect` record that repository's Dependabot surface as incomplete, for example with reason `helper-receipt-missing`, or have the skill pass the mode to `collect`. Add an AC-23 fixture where the alerts write happened and the helper file is missing.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Helper, Settings, Procedure changes: mode function) and AC-24
+EVIDENCE: The Design reads the opt-in and keep-off rows "bound as `resolveStanding` binds them (`plugins/vh-adlc/scripts/maintenance/authority.ts:88-92`)" and "Like the other standing grants" (`plugins/vh-adlc/references/maintenance-settings.md:51-57`). That page defines the chain as "`AGENTS.md` links to `.vh-adlc/maintenance.yaml`; its `project_procedure` names the declaration file". `resolveStanding` returns `unadopted` at `authority.ts:103` (`if (settings.project_procedure === undefined) return result;`) before it reads any other key. If the mode function reuses the Standing status, a consumer that commits `security_settings: apply` but has no publication declaration always gets `check`. The AC-24 fixtures do not say whether `project_procedure` is present.
+PROPOSAL: State that the opt-in needs only the committed `AGENTS.md` link to a valid committed `.vh-adlc/maintenance.yaml`, with no `project_procedure` or publication declaration. Add an AC-24 fixture that adopts `apply` without `project_procedure`.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Procedure changes) and AC-11
+EVIDENCE: `plugins/vh-adlc/references/maintenance-settings.md:103-123` has the operations table ("| Operation | Inputs and result |"), with one row per maintenance CLI operation and its flags, for example "`collect` | Optional `--repository`, `--pull`, `--terminal`" and "`report` | `--run-id --inventory --default-commit`, ...". The Design adds a `security-settings-mode` operation, `--security-settings` and `--run-id` to `collect`, and `--security-settings` to `report`. Neither the Design nor AC-11 says that this table gains the new row and flags. AC-11 lists only the policy statements that `references/maintenance-settings.md` must carry.
+PROPOSAL: Add to the Procedure changes and to AC-11 that the operations table in `references/maintenance-settings.md` lists `security-settings-mode` with its flags, and the new `collect` and `report` flags.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: The summary says that, with the committed opt-in, "it turns these on when off in every repository the sweep covers, except what the keep-off list names." The run's scope comes from the working tree's `repositories` (`plugins/vh-adlc/scripts/maintenance/cli.ts:68`). The Design (Settings, Q48) says "A repository in the working tree's scope that the committed settings do not name gets `check`", with reason `not-in-committed-scope`. The summary leaves out that limit.
+PROPOSAL: Reword the sentence to say it turns them on in every repository the sweep covers that the committed settings name, apart from the origin repository, which always counts as named, and except what the keep-off list names.
 
 ## Sources
 
