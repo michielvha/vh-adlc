@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Spec review R-8 at ec05a26 returned 3 nits, none blocking. Its factual correction is applied; Q39 and Q40 wait for the owner, then a new review. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "Q39 and Q40 from spec review R-8 answered with every recommendation; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every maintenance sweep and onboarding by a consumer that opts in turns on, in each repository of its scope, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -73,7 +73,7 @@ These owner decisions widen the authority table. Today the only repository setti
 changes is merged-branch deletion, with authorization.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-8 found nothing blocking; R-8's questions Q39 and Q40 are open. Acceptance
+Reviews R-1 to R-8 found nothing blocking, and the owner answered their questions. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
 or onboarding need separate approval.
@@ -180,14 +180,19 @@ Owner decisions on 2026-11-10:
   settings keys carry the older-reader note `security_policy` has, naming the minimum plugin version
   (Q31); and a keep-off row for Dependabot alerts also leaves security updates `left-off` with
   `owner-choice` (Q32).
-- Q33 to Q36, from spec review R-6, answered on 2026-11-10 with every recommended option: a failed
-  detection makes the helper exit 1 (Q33); a keep-off row for secret scanning also leaves push
+- Q33 to Q36, from spec review R-6, answered on 2026-11-10 with every recommended option: an entry
+  with a detection-failed reason makes the helper exit 1, while one already on stays `already-on`
+  with exit 0 (Q33, as Q39 words it); a keep-off row for secret scanning also leaves push
   protection `left-off` (Q34); `collect` and `report` accept only valid helper files bound to the
   current run and show any other as "helper did not run" (Q35); and paused security updates are
   `already-on` with reason `paused`, listed for the owner (Q36).
 - Q37 and Q38, from spec review R-7, answered on 2026-11-10 with every recommended option: an entry
   has one reason, with `owner-choice-conflict` before `paused` before `renovate-overlap` (Q37); and
   a restricted onboarding request selects `check` as a sweep does (Q38).
+- Q39 and Q40, from spec review R-8, answered on 2026-11-10 with every recommended option: the Q33
+  bullet is reworded, not the design (Q39); and the report test covers all three owner-decision
+  reasons (Q40). The owner also said, on 2026-11-10, to take the recommended option for every later
+  review question without asking again.
 
 ## Scope
 
@@ -638,7 +643,7 @@ with every read and write succeeding, unless it names another case.
 | AC-17 | `bun test tests/vh-adlc/security-settings`, fixture: public repository with push protection on and a keep-off row for it. Pass: no write recorded for it, entry `already-on` with `owner-choice-conflict`, listed in the Markdown owner decisions. |
 | AC-18 | Same suite, public admin fixtures with `.github/dependabot.yml` and no Renovate: `GET automated-security-fixes` returns 500, once without and once with a keep-off row for it; `GET vulnerability-alerts` returns 404; `GET automated-security-fixes` returns 200 with `{"enabled":false,"paused":false}`. Pass: the 500 runs give that entry `unknown` with `api-error` and 500, no write to it, other settings processed, exit code 1; the 404 run writes alerts and reports `enabled`; the 200 run writes security updates and reports `enabled`. |
 | AC-19 | Same suite, fixtures: archived private repository run by a non-admin; private admin repository with a keep-off row for secret scanning; private non-admin repository; `check` on a public admin repository with alerts off, `dependabot.yml` and no Renovate. Pass: every entry `unavailable` with `archived` and no admin-only read, exit code 0; secret scanning `unavailable` with `not-free-on-private`; secret scanning and push protection `unavailable` with `not-free-on-private`, alerts, security updates and `code_scanning` `unknown` with `needs-admin`; security updates `not-changed` with `check-only`. A further `apply` fixture: public admin repository with `dependabot.yml`, no Renovate, alerts and security updates off, and a keep-off row for `dependabot_alerts`. Pass: both `left-off` with `owner-choice`, no write recorded, exit code 0. Another `apply` fixture: public admin repository, secret scanning and push protection off, a keep-off row for `secret_scanning` only. Pass: both `left-off` with `owner-choice`, no `PATCH repos/{r}` recorded. |
-| AC-22 | `bun test tests/vh-adlc/maintenance`: render a report for three repositories in scope with two `--security-settings` files, one holding a `renovate-overlap` entry. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the third repository has a "helper did not run" row, and the owner decisions list holds exactly the `renovate-overlap` entry. |
+| AC-22 | `bun test tests/vh-adlc/maintenance`: render a report for four repositories in scope with three `--security-settings` files, holding a `renovate-overlap`, a `paused` and an `owner-choice-conflict` entry in different repositories. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the fourth repository has a "helper did not run" row, and the owner decisions list holds exactly those three entries. |
 | AC-23 | `bun test tests/vh-adlc/security-settings`, fixture where `repos/{r}` returns 500, and `bun test tests/vh-adlc/maintenance` with a two-repository collector fixture given a helper file for the second repository only. Pass: four `unknown` entries with `api-error` and 500, no other recorded call, exit code 1; the collection covers both repositories. Further `collect` and `report` fixtures each add one bad file listing `dependabot_alerts` as `enabled`: malformed JSON, an out-of-scope repository, a second file for the same repository, and another run ID. Pass: both commands exit 0, no surface gets `alerts-enabled-this-run` from the bad file, and the report shows "helper did not run" with the reason. |
 | AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings adopting `apply` and no request; with settings that do not adopt it and no request; and with `security_settings: maybe`. Pass: `check` for the first four, `apply` for `no_commit`, `apply` then `check` for the next two, and a visible failure naming the field for the last. Further fixtures where `apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link: each gives `check`. The reviewer also reads the maintenance skill step at the implementation commit and confirms the `no_filesystem` rule is stated. |
 | AC-26 | `bun test tests/vh-adlc/security-settings`, public admin fixtures with alerts on and `automated-security-fixes` returning `{"enabled":true,"paused":true}`: one with `dependabot.yml` and no Renovate, one with `renovate.json`, one with a keep-off row for security updates. Pass: `paused`, `paused`, then `owner-choice-conflict`, all `already-on`; no `PUT automated-security-fixes` recorded; exit code 0; each appears in the Markdown owner decisions list. |
@@ -652,31 +657,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q39: Does a failed detection lookup make the run fail when security updates are already on?
-
-From R-8 F-01: the detection-failed reasons exist only in the "When off" column, so when security updates are already on, a failed lookup gives `already-on` and exit 0, while the Q33 bullet says any failed detection exits 1.
-
-**Recommendation:** A. With the setting already on, nothing waited on the lookup, and the next sweep repeats it.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Reword the Q33 bullet: only an entry with a detection-failed reason makes the helper exit 1; an entry already on stays `already-on` with exit 0** | No change to the design | A missed `renovate-overlap` for that one sweep |
-| **B. The "When on" cell of the failed-lookup rows gets reason `detection-failed`, placed after `paused` and before `renovate-overlap` in the Q37 order, with exit 1** | Every failed lookup shows | A new reason and more exit 1 runs |
-
-**Why this is yours:** It sets what counts as a failed run.
-
-### Q40: Does the report test cover every owner-decision reason?
-
-From R-8 F-03: the AC-22 fixture holds only a `renovate-overlap` entry, so the report's cross-repository list could drop `paused` or `owner-choice-conflict` and still pass.
-
-**Recommendation:** A. The test then proves the whole list.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. The AC-22 fixtures add a `paused` and an `owner-choice-conflict` entry in different repositories, and the pass expects all three in the report's list** | Full proof of the aggregation | Two more fixture entries |
-| **B. Keep the single entry** | Smaller test | The aggregation is only partly proved |
-
-**Why this is yours:** It sets how much proof the report needs.
+None.
 
 ## Review Log
 
