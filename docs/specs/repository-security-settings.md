@@ -561,6 +561,7 @@ None.
 | 2026-11-10 | R-1 | spec | `1a93d2f` | claude-opus-4.8 | procedural | 12 findings: 8 should-fix, 4 nits, none blocking |
 | 2026-11-10 | R-2 | spec | `812a0aa` | claude-opus-4.8 | procedural | 7 findings: 5 should-fix, 2 nits, none blocking |
 | 2026-11-10 | R-3 | spec | `44aea8d` | unknown | procedural | 7 findings: 4 should-fix, 3 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-4 | spec | `5528322` | unknown | procedural | 7 findings: 5 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -749,6 +750,57 @@ SEVERITY: nit
 WHERE: Design (Order of work), AC-11 and Test Plan (AC-11, AC-20)
 EVIDENCE: The design depends on "Sweeps and onboarding do not request the page through `vh-adlc knowledge`, so a consumer whose own older pin lacks it still sweeps normally". `references/loop.md:59-61` and `:75-76` say an operation stops on `missing-page`. `vh-adlc knowledge --page conventions/repository-security.md` at `a4e3d592` returned `missing-page` with exit 5. No criterion or Test Plan row checks that the maintenance skill's and onboarding's `knowledge` page lists leave this page out.
 PROPOSAL: Add to AC-11 and its proof that the maintenance skill and the onboarding `knowledge` requests do not list `conventions/repository-security.md`, so a consumer pinned before docs#30 still sweeps.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary, Owner decisions Q25), Scope, Design (Procedure changes) and AC-24
+EVIDENCE: Q25 records the owner's decision as "settings are written only in consumers that adopt `security_settings: apply` in their committed settings, and every other consumer gets `check`". The Owner summary says it turns settings on "In a repository whose committed `.vh-adlc/maintenance.yaml` opts in", and checks "elsewhere". Scope says "with `apply` only where the consumer opted in". The Design mode function, the authority row and AC-24 add a second path: `apply` also applies when "the current request asks to apply". No recorded owner decision covers that path. It is also undefined. `ReportRequest` has no such field (`plugins/vh-adlc/scripts/maintenance/authority.ts:13`), and `parseReportRequest` fails on any unknown key with "invalid current request" (`authority.ts:116`). Onboarding runs inside spec, tasks, implement or ship (`plugins/vh-adlc/references/loop.md:66-73`). It has no recorded maintenance request, so it is unclear what `security-settings-mode` reads there.
+PROPOSAL: Either drop the current-request path so the Design, authority row and AC-24 match Q25, or raise it as an Open Question and update the summary and Scope to match the answer. If the path stays, name the recorded request field and say what input `security-settings-mode` takes during onboarding.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Settings, Procedure changes) and AC-24, Test Plan (AC-24)
+EVIDENCE: The Design says `security_settings` "is read only from the consumer's committed default branch" through the chain in `references/maintenance-settings.md:51-57`. The AC-24 proof only varies whether "settings adopt `apply`". It has no case where the working tree adopts `apply` but the committed default branch does not, or where `AGENTS.md` does not link the settings file. An implementation that reads the value through `loadSettings` from the working tree (`settings.ts:61-67`) would pass. Separately, `resolveStanding` checks committed settings against a fixed key list (`authority.ts:100`). That list lacks `security_settings` and `security_settings_keep_off` and returns `invalid` for any other key. A consumer that commits either key would therefore lose its standing report-publication grant. The list already lacks `security_policy`, which `settings.ts:69` accepts, so this regression has happened before. No criterion covers it.
+PROPOSAL: Add AC-24 cases where the value is uncommitted, on an unmerged branch, or not linked from `AGENTS.md`, and expect `check` in each. Add a criterion and test that a consumer whose committed settings contain both new keys keeps an adopted publication grant.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Collector) and AC-21, Test Plan (AC-21), covers
+EVIDENCE: The Design records the Dependabot surface "as incomplete with reason `alerts-enabled-this-run` and the count it read". `plugins/vh-adlc/scripts/maintenance/security-io.ts:43` throws "security inventory incomplete total must be null" for any surface that is not complete and has a non-null count. `references/maintenance.md:77-78` says "unknown totals are null". As designed, that repository's security reconciliation would fail. `security-io.ts` is not in `covers`, and the AC-21 proof checks only the collector output, never `security-reconcile`.
+PROPOSAL: Record the incomplete surface with a null count and keep the alerts it read, or change `security-io.ts` and add it to covers. Extend AC-21 so the sweep's security reconciliation accepts the collected inventory.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Collector, Procedure changes) and AC-11
+EVIDENCE: `references/maintenance-settings.md:46-48` says "Only the exact declared surface/status and matching message receive `complete-unavailable`" and "A bare 403/404 is unknown". `references/maintenance.md:78` says "Only the configured exact status/literal-message/evidence match is complete-unavailable". The new collector rule makes a private admin repository's code scanning surface `complete-unavailable` without an expectation (AC-16). The Design plans to edit only `references/maintenance.md:80`. AC-11 lists `maintenance-settings.md` but does not require either page to state the `not-free-on-private` collector rule or `alerts-enabled-this-run`. Once every box is ticked, both pages would still contradict the collector.
+PROPOSAL: Add both collector rules to the list of rules AC-11 requires, and name `maintenance-settings.md:46-48` and `maintenance.md:78-80` as text that changes.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter (goal), plan introduction and Context (Owner summary)
+EVIDENCE: The goal promises "each GitHub security setting its plan offers for free turned on", and the introduction says the same of "the GitHub security settings a repository's plan includes at no cost". On the public repository bg-remove, `gh api repos/michielvha/bg-remove/private-vulnerability-reporting` returned `{"enabled":false}`. That free setting is not in Scope. Code scanning default setup is also free on public repositories and is deliberately never enabled (Out of scope). With every criterion ticked, the AC-12 repository would still have free settings off.
+PROPOSAL: Narrow the goal and introduction to the settings `conventions/repository-security.md` lists for the repository's visibility. Alternatively, raise private vulnerability reporting as an Open Question.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Rules applied before any write, Renovate and Dependabot detection) and AC-19
+EVIDENCE: Each entry takes "the state and reason of the first rule below that applies to it". Rule 6 ("Renovate and Dependabot rules ... for `dependabot_security_updates`") applies to that entry in every case. Its "no signal | configured | When off" cell is "written, then `enabled`", which is an action, not a final state. Read strictly, rules 8 to 10 (`check-only`, `alerts-off`, `api-error` on write) would never decide security updates. Only the wording of rule 8 implies otherwise. AC-19 tests "the first that applies".
+PROPOSAL: Say that rule 6 decides the entry only for the rows that do not write, and that the writing row falls through to rules 7 to 10.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-23 and Test Plan (AC-23)
+EVIDENCE: AC-23 requires that "In a sweep, a helper failure or exit 1 for one repository does not stop collection for any repository". The sweep runs the helper through the maintenance skill's agent procedure. No maintenance script runs the helper. So the proof, `bun test tests/vh-adlc/maintenance` with "a two-repository sweep fixture where the helper exits 1 for the first", can only run `collect` on prepared files. It would pass whatever the skill text says.
+PROPOSAL: Add a check that the maintenance skill step says a helper failure never blocks collection. Alternatively, reword the bun test's pass condition so it claims only the collector behaviour it observes.
 
 ## Sources
 
