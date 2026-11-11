@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised after R-46; awaiting re-review."
+status: planned
+status_description: "Accepted by the owner after a clean R-47; ready for tasks on feat/blog-visual-reading."
 issue: null
 goal: "Long-form articles reach the owner with a checked visual reading pass, and the editor reviews presentation as well as prose."
 covers:
@@ -288,6 +288,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-11 | R-45 | spec | `026b1d5` | unknown | procedural | Changes requested: replace the image-verdict regex allowlist with labelled repair entries, stray backtick |
 | 2026-11-11 | R-46 | spec | `8598997` | claude-opus-4.8 | procedural | 2 should-fix, 1 nit: label case and Markdown, label overlap, splitter defined once; fixed |
 | 2026-11-11 | R-47 | spec | `0ad847c` | unknown | procedural | No findings |
+| 2026-11-11 | R-47 | spec | `0ad847c` | n/a | n/a | accepted by owner |
 
 ### R-1
 

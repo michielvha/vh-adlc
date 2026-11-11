@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised after R-36; awaiting re-review."
+status: planned
+status_description: "Accepted by the owner after a clean R-37; ready for tasks on feat/seo-agent."
 issue: null
 goal: "An adopter can run a free-first website SEO assessment through vh-adlc that spends paid API units only when allowed and within a limit, and leaves exports usable after access ends."
 covers:
@@ -310,6 +310,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-11 | R-35 | spec | `4c7ba61` | unknown | procedural | 2 should-fix: Codex's /proc/self/exe exec, login-shell gettext recursion; fixed |
 | 2026-11-11 | R-36 | spec | `3cf1213` | unknown | procedural | 1 should-fix, 1 nit: HOME scan fails on Codex's own plugin sync, vfork child and snapshot wording; fixed |
 | 2026-11-11 | R-37 | spec | `70a09ac` | unknown | procedural | No findings |
+| 2026-11-11 | R-37 | spec | `70a09ac` | n/a | n/a | accepted by owner |
 
 ### R-1
 
