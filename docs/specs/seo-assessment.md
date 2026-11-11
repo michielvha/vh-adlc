@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by the owner after a clean R-37; ready for tasks on feat/seo-agent."
+status: in-progress
+status_description: "Claimed on feat/seo-agent; implementing the tasks test-first."
+branch: feat/seo-agent
 issue: null
 goal: "An adopter can run a free-first website SEO assessment through vh-adlc that spends paid API units only when allowed and within a limit, and leaves exports usable after access ends."
 covers:
