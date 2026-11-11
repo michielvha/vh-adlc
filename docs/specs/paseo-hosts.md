@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementation started on feat/paseo-hosts."
+status: draft
+status_description: "Revising the client key line after implementation review R-10 found that it allows remote forwards."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 branch: feat/paseo-hosts
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
