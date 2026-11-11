@@ -32,7 +32,7 @@ Excluded: phones, the web UI, the Linux app, relay pairing, agent CLI installs a
 
 Side effects: `link`, `unlink` and `remove` restart the desktop app twice, which stops its built-in daemon and may install a downloaded update. The run briefly opens a loopback debugging port and keeps a host-list backup, passwords included, in the registry directory. Windows needs OpenSSH Server and a signed-in user.
 
-What changed: T1 to T31 are built and passed a live run on a server, the Mac and the Windows PC. Implementation review R-10 then found that the client key still allowed `ssh -R`, so a client could open ports on the server, for example the daemon port while the daemon is down, and catch other clients' passwords. The key line now adds `permitlisten="127.0.0.1:1"`: no ordinary user can bind port 1, so every remote forward fails and the tunnel still works. Where a server lowers the privileged port range, a client could at most listen on loopback port 1. Running `link` again rewrites existing key lines. `--help --json` now prints one JSON object, and colour needs a real terminal.
+What changed: T1 to T31 are built and passed a live run on a server, the Mac and the Windows PC. Implementation review R-10 then found that the client key still allowed `ssh -R`, so a client could open ports on the server, for example the daemon port while the daemon is down, and catch other clients' passwords. The fix adds `permitlisten="127.0.0.1:1"` to the key line: no ordinary user can bind port 1, so every TCP remote forward will fail and the tunnel will still work. Where a server lowers the privileged port range, a client could at most listen on loopback port 1. Spec review R-11 showed that a Unix socket remote forward still gets through, and Q1 decides what to do about it. Running `link` again will rewrite existing key lines. `--help --json` will print one JSON object, and colour will need a real terminal.
 
 Planned checks: Go tests against stand-ins, a key-line test against a real local `sshd` that skips without one, CI lint and race checks, an installed-copy build, and a manual run on the server and both desktops. The next implementation reviewer may inspect those machines read-only.
 
@@ -338,7 +338,38 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
 
 ## Open Questions
 
-None.
+### Q1: How should client keys be kept from opening Unix socket remote forwards?
+
+**Recommendation:** A. A client that has the password already controls the server through the daemon's agents, so the gap only matters for a key stolen without the password, and B changes sshd for every key of the server user.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. State it as a known limit** | No root change on servers. AC-04 says every TCP remote forward is refused and names the Unix socket case. | A stolen client key alone can still create a Unix socket at an unused path the server user can write, where a program such as tmux may later connect. |
+| **B. sshd drop-in through `sudo -n`** | `onboard` writes `Match User <user>` with `AllowStreamLocalForwarding local` to `/etc/ssh/sshd_config.d/` and reloads sshd; `remove` deletes it. Every remote forward is refused. | Needs passwordless sudo on each server, more code and tests, and blocks Unix socket remote forwards for every key of that user, including the operator's own, such as gpg-agent forwarding. |
+
+**Why this is yours:** it trades a narrow security gap against a server-wide sshd change and a new root requirement.
+
+### Q2: Should CI run the key-line test against a real `sshd`?
+
+**Recommendation:** A. You asked to keep tests out of CI, and the test runs on the operator host and in every implementation review.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Local only** | No CI change. The test skips where `sshd` is missing, which includes the `ubuntu-latest` runner. | A change that breaks the key line passes CI until someone runs the tests on a machine with `sshd`. |
+| **B. Install `openssh-server` in the `paseo-hosts` CI job** | Every push proves the key line. | An apt step in each run, against your earlier preference. |
+
+**Why this is yours:** it weighs CI coverage against your rule to keep CI lean.
+
+### Q3: How should the next implementation review establish the live parts of AC-01 to AC-07?
+
+**Recommendation:** A. The live runs already work unattended, and only an observed run lets the complete gate pass without residuals.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. The reviewer runs manual steps 1 to 7** | The reviewer runs them on the server and both desktops, including the `paseotest` rollback and `remove`, then onboards the server and links both desktops again. Every criterion can come back `met`. | About 15 minutes, a new password for the server, and several app restarts on both desktops. |
+| **B. Read-only observation plus residuals** | No change to the machines during review. | AC-02, AC-03, AC-06 and AC-07 close on the implementer's recorded runs, each with a residual linked to https://github.com/michielvha/vh-adlc/issues/71 that you approve. |
+
+**Why this is yours:** it trades disruption of working machines against independent proof.
 
 ## Review Log
 
