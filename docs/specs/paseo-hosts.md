@@ -366,6 +366,7 @@ None.
 | 2026-11-11 | R-13 | spec | `ff0b45686b127b816fe19c08ddb0bef4a14b7a32` | unknown | procedural | Two should-fix factual findings (the daemon-port test case passes for the wrong reason, no migration note for existing key lines) and one factual nit, none blocking; model identity not attested. |
 | 2026-11-11 | R-14 | spec | `889e786b7eedddb9a28cc4ea6686d07cd85201ab` | unknown | procedural | One should-fix factual finding (AC-12 cannot be met before the PR), one factual nit and one judgement nit (minimum OpenSSH version), none blocking; model identity not attested. |
 | 2026-11-11 | R-15 | spec | `6f76bd03fb3eb67333078ab200d764abf386d1c6` | claude-opus-4.8 | procedural | Two factual nits and one judgement nit (a re-link on a pre-7.8 server breaks the working tunnel), none blocking; model reported by the reviewer, not requested. |
+| 2026-11-11 | R-16 | spec | `d70c77e50e3d4acfe7895aa9755ccceb0fc88904` | unknown | procedural | Two factual nits (the key file backup covers only the latest run; the summary's tunnel-only wording), none blocking; model identity not attested. |
 
 ### R-1
 
@@ -938,3 +939,19 @@ SEVERITY: nit
 WHERE: Tasks, T37 (line 343)
 EVIDENCE: Line 272 says that only paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-hosts/`, so `README.md` in T37 reads as the repository root README, as it does in T25 (line 322). The root README has no server requirements. The plugin's own list is under `## Requirements` in `plugins/paseo-hosts/README.md:33-37`. Also, `skills/paseo-hosts/SKILL.md` has no requirements list (its headings are Add a server, Take a client or server away, Check and list, Passwords). T37's done condition is "a grep for `7.8` finds it in each", and the file it checks depends on which README the reader picks.
 PROPOSAL: Name `plugins/paseo-hosts/README.md` in T37, and say that the skill gains a short server requirements line.
+
+### R-16
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design, link step 2 (line 176); Context, Owner summary (line 35); Tasks, T36 (line 342)
+EVIDENCE: Line 176 says that on a pre-7.8 server, after a re-link breaks a working tunnel, "restoring `authorized_keys.bak-paseo-hosts` or running `unlink` recovers". The summary says the tunnel is "recovered from the key file backup". `internal/link/snippets/authorize.sh:11` runs `cp -p "$f" "$f.bak-paseo-hosts"` on every link, and `internal/remove/snippets/keys.sh:27` does the same on every deletion, so the backup only holds the state from just before the latest run. I ran authorize.sh twice under a scratch HOME on an `authorized_keys` holding lines for clients a and b, first for a and then for b. The backup then held the line that a's run had just written, not a's original line. T36 re-links both desktops on every server one after the other. On a pre-7.8 server, restoring the backup after both runs gets back only the second client's working line, and the first client stays broken. `unlink` deletes the broken line along with the client's app entry and alias block. It does not bring the tunnel back. I confirmed the premise from source: OpenSSH 7.7 `auth-options.c:471-473` fails with "unknown key option", and 7.6 jumps to `bad_option`, so both reject the whole key.
+PROPOSAL: Say that the backup covers only the most recent `link` or `unlink` on that server, so the owner must restore it after each re-link, or recover by putting the old line back by hand. Say that `unlink` removes the client and does not restore its tunnel.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (line 29)
+EVIDENCE: R-14 F-02 asked that line 29 stop saying the key opens only the daemon tunnel. The text at e937e21 read "a key that opens the daemon tunnel and, apart from the Unix socket limit below, nothing else". The R-15 edit at d70c77e put back "`link` gives a macOS or Windows desktop a tunnel-only key", and the limit now appears only six sentences later, on line 35. My local unprivileged sshd (OpenSSH 10.0p2) used the planned key line `restrict,port-forwarding,permitopen="127.0.0.1:47711",permitlisten="127.0.0.1:1",command="/bin/false"`. With it, `-W` to the daemon port returned `HTTP/1.0 200 OK`. A shell command exited 1, `-W` to another port failed, and both TCP `-R` cases failed with "the request was denied", the daemon-port case after its listener stopped. But `ssh -N -o ExitOnForwardFailure=yes -R <dir>/r.sock:...` stayed up until `timeout` ended it (exit 124) and left `srw------- r.sock`.
+PROPOSAL: Put back the R-14 wording on line 29, or add "apart from the Unix socket limit below" after "tunnel-only key".
