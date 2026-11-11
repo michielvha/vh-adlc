@@ -78,6 +78,14 @@ reported outside it. New material can develop rough notes into prose, while
 revisions retain sound existing passages. The handoff groups substantive
 exceptions instead of asking the owner to approve every copy repair.
 
+Long-form drafts include a visual reading pass, including founder and opinion
+articles. The writer places relevant illustrations, product images or exact
+attributed author quotes and checks the rendered page on desktop and phone in
+its supported themes. The independent editor reviews those placements and their
+provenance. Images must show what the passage discusses, and pull quotes must
+highlight important points distinct from those in the current article batch.
+Missing assets or rendered checks remain explicit handoff limits.
+
 Promotion copy points to the verified canonical article URL. Unpublished or
 older article content keeps the bundle pending. Release-day launch copy may be
 prepared in advance when requested, with the release dependency recorded outside
