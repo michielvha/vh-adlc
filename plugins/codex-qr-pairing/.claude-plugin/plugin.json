@@ -1,0 +1,6 @@
+{
+  "name": "codex-qr-pairing",
+  "version": "0.1.0",
+  "description": "Generate a fresh QR code for pairing with the current Codex host.",
+  "author": { "name": "Michiel VH" }
+}

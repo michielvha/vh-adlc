@@ -4,7 +4,19 @@ Every operation follows the same frame. The steps below are the plugin's procedu
 apply live in `vhco-pro/docs` at the resolved revision, and an operation cites the page it took each
 rule from.
 
+`skills/vh-adlc-clean/SKILL.md` skips steps 1 and 2 altogether; audit's offline bootstrap below still
+uses the verified binary and knowledge. Clean calls `vh-adlc` from `PATH` without the installer, so that
+its allow rule matches, and it skips `knowledge`, because `clean` and `env` read no conventions. The
+binary it runs is therefore not checked against the lock.
+
 ## 1. Get the binary
+
+Audit entry overrides this section's online bootstrap, including when selected through lifecycle
+intake. Use `scripts/audit/bootstrap.ts --offline` as the audit skill specifies: cached verified binary,
+validated settings metadata, then cache-only knowledge for its normalized `knowledge_pages`. Missing
+prerequisites stop audit work with an explicit setup handoff. Never invoke the online installer first.
+The metadata read is the narrow exception to knowledge-first order. Explicit setup may obtain the
+binary and complete pinned pages separately; other operations keep the ordinary procedure below.
 
 The plugin directory is the one that holds `skills/`: two levels above the skill's own directory, which
 the host names when it loads the skill. Resolve a symlinked skill directory to its real location first.
@@ -33,7 +45,7 @@ Call `knowledge` first, with every docs page the operation will read:
 ```
 
 State the result in one line that also names the prose guide, for example
-`Conventions: vhco-pro/docs@e4d58d2 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md`.
+`Conventions: vhco-pro/docs@0e52f51 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md`.
 Every report opens with this line, after the `deterministic checks unavailable` line when there is one,
 including a report that stops at a gate or waits for the owner. Every call below passes the same
 `--repo` and `--plugin-pin`, written out on each call. The binary needs every word as its own argument:
@@ -49,12 +61,27 @@ Stop and report when the result is `invalid-pin`, `missing-page` (recommend the 
 fewer pages to see which ones resolve, and do not read any page from that revision.
 
 When `source` is `plugin`, the repository has no pin yet. `vh-adlc-investigate`, `vh-adlc-resume` and
-`vh-adlc-review` add none: they work with the plugin pin and report the missing pin, and onboarding waits
+`vh-adlc-review` and `vh-adlc-docs-impact` add none: they work with the plugin pin and report the missing pin, and onboarding waits
 for the next operation that writes. A review that committed onboarding first would move its own target.
 `vh-adlc-spec`, `vh-adlc-tasks`, `vh-adlc-implement` and `vh-adlc-ship` call `knowledge` again with the
 same pages plus `guides/onboard-a-repository.md`, and read it. Their first change then adds the pinned
 `AGENTS.md` and its bridges as that guide describes, merged into any local instructions, in its own
 commit. Local instructions win over the central pages; report every conflict between them.
+Onboarding also checks GitHub's automatic deletion of merged PR branches with `auto-delete` from
+`references/branches.md` and reports the setting. When it is off, ask the owner whether to turn it
+on; enable it only after they say yes. The setting is a repository change, not a commit, so it never
+holds up the onboarding commit.
+Beside that check, onboarding runs the security-settings helper from
+`references/security-settings.md` in the mode `security-settings-mode` prints, and reports its
+output. That is also a repository change that never holds up the onboarding commit. Onboarding has no
+maintenance request, so the committed settings alone decide; it usually runs in `check`, because its
+own commit is what links the settings. A request that is read-only or draft-only, or forbids
+pushing or filesystem writes, selects `check` without calling the command. A nonzero
+`security-settings-mode` exit, whatever its cause, leads to `check` with mode reason
+`committed-settings-unresolved` and the cause, never to `apply`. Under `check`, report the states,
+say how to opt in with `security_settings: apply`, and record the onboarding guide's security
+checklist item as pending the owner's choice. Never run the guide's manual commands or the helper's
+`apply` on an in-session yes.
 
 Every page the loop needs is requested on every call, so a pin older than the plugin's pages stops with
 `missing-page`: always include `conventions/feature-documents.md` and `guides/humanize-prose.md`.
@@ -100,3 +127,12 @@ Code, commands and file contents stay exact, in code spans.
 
 End every operation by reporting what changed, what was verified, every binary result acted on, and what
 is left.
+
+Name every issue, pull request, commit, release or workflow run in a report, question or summary by
+its full URL, such as `https://github.com/OWNER/REPO/pull/8`, never as a bare `#8` or `OWNER/REPO#8`.
+The same holds in documents, commit messages and PR and issue bodies you write. Quoted records stay
+as returned.
+
+When reporting finished spec work to the owner or requesting spec acceptance, including through resume,
+present the owner-facing summary from `skills/vh-adlc-spec/SKILL.md` in the conversation before the
+acceptance question. Keep the full document and review status available as supporting detail.

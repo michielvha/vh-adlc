@@ -17,9 +17,13 @@ const SCHEDULE: Record<number, string[]> = {
   4: ["investigate", "spec", "resume"],
   5: ["tasks", "implement"],
   6: ["review"],
-  7: ["ship"],
+  7: ["ship", "triage", "maintenance", "audit", "projects"],
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
+const CONTENT_OPERATIONS = ["blog", "docs-impact"];
+// Host operations call the vh-adlc binary on PATH, unverified and without
+// knowledge, as references/loop.md's exception allows.
+const HOST_OPERATIONS = ["clean"];
 
 function selectedPhase(): number {
   const raw = process.env.VH_ADLC_PHASE;
@@ -54,6 +58,7 @@ const CANARY_PAGES = [
   "conventions/coding.md",
   "conventions/delivery.md",
   "conventions/documentation.md",
+  "conventions/documentation-impact.md",
   "conventions/feature-documents.md",
   "conventions/go.md",
   "guides/feature-document-template.md",
@@ -195,7 +200,7 @@ describe("manifest and marketplace", () => {
     expect(existsSync(join(PKG, ".codex-plugin"))).toBe(false);
   });
 
-  test("the marketplace lists vh-adlc and leaves github-app-registration unchanged", () => {
+  test("the marketplace lists vh-adlc and leaves github-app-registration's entry unchanged", () => {
     const now = JSON.parse(read(join(ROOT, ".claude-plugin", "marketplace.json")));
     expect(now.name).toBe("vhco-tools");
     const entry = now.plugins.find((p: { name: string }) => p.name === "vh-adlc");
@@ -205,8 +210,15 @@ describe("manifest and marketplace", () => {
     const before = JSON.parse(base.out).plugins.find((p: { name: string }) => p.name === "github-app-registration");
     const after = now.plugins.find((p: { name: string }) => p.name === "github-app-registration");
     expect(after).toEqual(before);
-    const app = git("diff", "--quiet", "origin/main", "--", "plugins/github-app-registration");
-    expect(app.ok).toBe(true);
+  });
+
+  test("a github-app-registration change comes with a version change", () => {
+    const dir = "plugins/github-app-registration";
+    if (git("diff", "--quiet", "origin/main", "--", dir).ok) return;
+    const base = git("show", `origin/main:${dir}/.claude-plugin/plugin.json`);
+    expect(base.ok).toBe(true);
+    const now = JSON.parse(read(join(ROOT, dir, ".claude-plugin", "plugin.json")));
+    expect(now.version).not.toBe(JSON.parse(base.out).version);
   });
 
   test("a package change comes with a version change", () => {
@@ -221,9 +233,17 @@ describe("manifest and marketplace", () => {
 });
 
 describe("skills", () => {
-  test("every skill directory is one of the seven operations", () => {
+  test("every skill is the entry, a gated operation, a declared content operation or a host operation", () => {
+
     const dirs = existsSync(join(PKG, "skills")) ? readdirSync(join(PKG, "skills")).sort() : [];
-    for (const d of dirs) expect(ALL_OPERATIONS.map((op) => `vh-adlc-${op}`)).toContain(d);
+    expect(dirs).toContain("vh-adlc");
+    for (const d of dirs) expect(["vh-adlc",...[...ALL_OPERATIONS, ...CONTENT_OPERATIONS, ...HOST_OPERATIONS].map((op) => `vh-adlc-${op}`)]).toContain(d);
+    for (const op of CONTENT_OPERATIONS) {
+      expect(dirs).toContain(`vh-adlc-${op}`);
+      const fm = frontmatter(read(skillPath(op)));
+      expect(fm?.name).toBe(`vh-adlc-${op}`);
+      expect(fm).not.toHaveProperty("model");
+    }
   });
 
   for (const op of SCHEDULED) {
@@ -253,6 +273,48 @@ describe("skills", () => {
       }
     });
   }
+});
+
+describe("host operations", () => {
+  for (const op of HOST_OPERATIONS) {
+    test(`vh-adlc-${op} exists, and its name equals its directory`, () => {
+      expect(existsSync(skillPath(op))).toBe(true);
+      const fm = frontmatter(read(skillPath(op)));
+      expect(fm?.name).toBe(`vh-adlc-${op}`);
+      expect(typeof fm?.description).toBe("string");
+      expect(fm).not.toHaveProperty("model");
+    });
+  }
+
+  test("vh-adlc-clean plans first, adds the heavy flags only on request and stays inside the binary", () => {
+    const text = read(skillPath("clean"));
+    expect(text).toContain("vh-adlc clean --dry-run");
+    expect(text).toContain("references/clean.md");
+    expect(text).not.toContain("ensure-vh-adlc.sh");
+    expect(text).not.toContain("vh-adlc knowledge");
+    expect(text).toMatch(/`--compose`[^.]*`--kind`[^.]*only when the user asks/);
+    expect(text).toMatch(/[Nn]ever (run|use)[^.]*`rm`[^.]*`docker rm`[^.]*`pkill`/);
+  });
+
+  test("references/clean.md gives the procedure, the report fields and both allow rules", () => {
+    const text = read(join(PKG, "references", "clean.md"));
+    for (const field of ["`dry_run`", "`removed`", "`kept`", "`needs_flag`", "`unmerged`", "`freed_bytes`", "`unmatched`"]) expect(text).toContain(field);
+    for (const code of ["`pid-namespace`", "`manifest-unmerged`", "`engine-unreachable`", "`kind-unavailable`", "`usage`"]) expect(text).toContain(code);
+    expect(text).toContain('"permissions": {"allow": ["Bash(vh-adlc clean *)"]}');
+    expect(text).toContain('prefix_rule(pattern=["vh-adlc", "clean"], decision="allow")');
+    expect(text).toMatch(/in a terminal/);
+    expect(text).toMatch(/one line/);
+  });
+
+  test("the loop, the authority table and lifecycle intake name the clean operation", () => {
+    const loop = read(join(PKG, "references", "loop.md"));
+    expect(loop).toContain("skills/vh-adlc-clean/SKILL.md");
+    expect(loop).toMatch(/steps 1 and 2/);
+    const authority = read(join(PKG, "references", "authority.md"));
+    expect(authority).toContain("`/tmp` entries and the project's temp root");
+    expect(authority).toMatch(/`--compose`[^|]*`--kind`/);
+    expect(read(join(PKG, "references", "lifecycle.md"))).toContain("skills/vh-adlc-clean/SKILL.md");
+  });
 });
 
 describe("reviewer agent", () => {
@@ -412,10 +474,19 @@ describe("README", () => {
     test.todo("install, update, uninstall and support matrix: pending until phase 7");
     return;
   }
-  test("documents install, update, uninstall and a support matrix", () => {
+  test("links to installation, plugin management and a support matrix", () => {
     const readme = read(join(ROOT, "README.md"));
-    for (const heading of ["Install", "Update", "Uninstall", "Support matrix"]) {
-      expect(readme).toMatch(new RegExp(`^#+ .*${heading}`, "mi"));
+    const guides = [
+      { path: "docs/get-started/installation.md", headings: ["Install"] },
+      { path: "docs/user-guides/managing-plugins.md", headings: ["Update", "Uninstall"] },
+      { path: "docs/reference/compatibility.md", headings: ["Support matrix"] },
+    ];
+    for (const { path, headings } of guides) {
+      expect(readme).toContain(`](${path})`);
+      const guide = read(join(ROOT, path));
+      for (const heading of headings) {
+        expect(guide).toMatch(new RegExp(`^#+ .*${heading}`, "mi"));
+      }
     }
   });
 });

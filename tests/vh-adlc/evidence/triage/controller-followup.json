@@ -1,0 +1,96 @@
+{
+  "component": "a28ebbf4d6f1796434bca1407542aedf255f5908",
+  "adapter": "3b62ee4868a3eed12f8fcecd4542429f8e036b3e",
+  "kind": "intermediate managed-controller correction proof",
+  "plugin_suite": {
+    "pass": 360,
+    "fail": 0,
+    "assertions": 1388,
+    "log": "/tmp/shared-triage-r16-corrections-full-gate.log"
+  },
+  "trials": [
+    {
+      "host": "claude",
+      "component_commit": "a28ebbf4d6f1796434bca1407542aedf255f5908",
+      "component_unchanged": true,
+      "exit": 0,
+      "stage": "finished",
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "fake_effects": [
+        {
+          "method": "POST",
+          "endpoint": "repos/example/project/issues/1/comments"
+        },
+        {
+          "method": "PATCH",
+          "endpoint": "repos/example/project/issues/1"
+        }
+      ],
+      "completed": [
+        "explain",
+        "close"
+      ],
+      "plugin_hash": "e453dc53f962798abda199e6637c43eb74d0ed7f13aa77f1ccd27f3050c923f9",
+      "source_commit": "698499aacd506d7a475f24467f2d5651e7993ab9",
+      "process_cleanup": {
+        "exit_code": 0,
+        "timed_out": false,
+        "reaped": true,
+        "signals": [
+          {
+            "signal": "SIGTERM",
+            "accepted": false
+          }
+        ]
+      },
+      "raw_root": "/tmp/triage-controller-e2e-claude-38x5T6"
+    },
+    {
+      "host": "codex",
+      "component_commit": "a28ebbf4d6f1796434bca1407542aedf255f5908",
+      "component_unchanged": true,
+      "exit": 0,
+      "stage": "finished",
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "fake_effects": [
+        {
+          "method": "POST",
+          "endpoint": "repos/example/project/issues/1/comments"
+        },
+        {
+          "method": "PATCH",
+          "endpoint": "repos/example/project/issues/1"
+        }
+      ],
+      "completed": [
+        "explain",
+        "close"
+      ],
+      "plugin_hash": "e453dc53f962798abda199e6637c43eb74d0ed7f13aa77f1ccd27f3050c923f9",
+      "source_commit": "56cb30cf6c514edd36ee51067b77a347f9f783bd",
+      "process_cleanup": {
+        "exit_code": 0,
+        "timed_out": false,
+        "reaped": true,
+        "signals": [
+          {
+            "signal": "SIGTERM",
+            "accepted": false
+          }
+        ]
+      },
+      "raw_root": "/tmp/triage-controller-e2e-codex-luejjm"
+    }
+  ],
+  "limitations": [
+    "No current crash-recovery or named-check/removal acceptance yet",
+    "Private legacy/shared and GUI acceptance still required",
+    "Harness real_tracker_calls field is a constant, excluded from observed proof until T32 fixes it"
+  ]
+}

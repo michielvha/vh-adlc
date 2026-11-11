@@ -1,0 +1,1 @@
+{"schema_version":1,"command":"settings read","result":"answered","knowledge":null,"data":{"value":{"labels":[],"limit":0,"map":{},"nested":{"a":[1,"two"],"b":true},"owner":null,"since":"2026-11-02","z":"yes"}},"findings":[]}

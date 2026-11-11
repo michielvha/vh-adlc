@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "vh-adlc",
-  "version": "0.2.0",
-  "description": "The vh-adlc development loop: specify, decompose, implement, review, ship and resume a feature, with every status change decided by the vh-adlc binary. Runs only when invoked.",
+  "version": "0.16.1",
+  "description": "Shared lifecycle, dependency/security maintenance and article/promotion drafting and documentation impact, with project-specific rules and independent review.",
   "author": {
     "name": "Michiel VH"
   },

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/michielvha/vh-adlc/internal/rules"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Baseline returns the normative baseline of a document: each normative

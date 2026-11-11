@@ -1,0 +1,32 @@
+{
+  "kind": "frozen-native-matrix-provenance",
+  "sourceCommit": "0dc03caf1654713c54e5f27d790bc9914cd3bd64",
+  "packageHash": "19941ba2018b0a774004ecf5559da68eab3bc86ebbb21fb8170a30aff0f5c44e",
+  "graderHash": "d06cafc6298bb95c7add0f6cb4cd4e4bd68f61eb7d694ac3c840496a9e8bad00",
+  "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+  "selectedTrials": 57,
+  "diagnosticComparisonTrials": 12,
+  "allFreshTrials": 68,
+  "retainedFailures": 4,
+  "verifiedReviewerReceipts": 21,
+  "fullReports": [
+    {
+      "file": "all-regraded.json",
+      "sha256": "d28d60a288f825276797658995d0cea99a595a57e3c5b2f140cab7e1d7e31c39"
+    },
+    {
+      "file": "selected-regraded.json",
+      "sha256": "afb2afd402f5eae689052e31eca97287803d0ac30d4b9b793bdcdec073072d59"
+    },
+    {
+      "file": "comparison-regraded.json",
+      "sha256": "ddd37528562280cfc0c32151afd5f9d2028d790bbd985db464d2b2726260613c"
+    },
+    {
+      "file": "failures-regraded.json",
+      "sha256": "bd4d45b50000915d1f788292ad661fc0c276c3a1a9f5ecfdcff8691b3f7e1e96"
+    }
+  ],
+  "layout": "<private-root>/runs/<index source>/{events.jsonl,before.json,after.json,result.json}; reviewer sessions stay in each run profile",
+  "limitation": "Indexes locate evidence and do not replace independently regrading the original private native logs, fixtures and reviewer receipts. Desktop and other hosts remain unverified."
+}

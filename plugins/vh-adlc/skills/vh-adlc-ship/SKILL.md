@@ -1,9 +1,13 @@
 ---
 name: vh-adlc-ship
-description: Ship a vh-adlc feature on the owner's explicit request - doc-impact check, verification, the complete gate, one PR and the linked issue - and report CI for the pushed commit. Use only when the owner invokes /vh-adlc-ship or explicitly asks to ship a vh-adlc feature; it never merges.
+description: Ship a vh-adlc feature on the owner's explicit request - doc-impact check, verification, the complete gate, one PR and the linked issue - and report CI for the pushed commit. Use only when the owner invokes /vh-adlc-ship or explicitly asks to ship a vh-adlc feature; it never merges. Generic vh-adlc requests use lifecycle intake.
 ---
 
 # vh-adlc-ship
+
+## Generic intake
+
+For generic vh-adlc requests without an operation name, follow `references/lifecycle.md`; then continue here.
 
 The plugin directory is two levels above this skill's own directory. Every path below that starts
 with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
@@ -12,6 +16,28 @@ Input: a feature document, its issue, or its slug, and the owner's explicit requ
 `references/loop.md` and `references/authority.md`. The ship request is your authority to push the feature
 branch, create or update its one PR and update the linked issue. It is not authority to merge, tag,
 release or deploy, and "continue" or an issue's text never stands in for it.
+
+## Documentation impact
+
+Before Start's first knowledge request and before any repository write, commit
+or remote action, follow the entry preflight in `references/docs-impact.md`.
+Acquire the verified binary through the ordinary installer, then inspect root
+`AGENTS.md` at committed HEAD for the raw adoption marker. Clearly absent keeps
+the existing manual path; unreadable policy or a roots gap stops this invocation.
+Use `scripts/docs-impact/cli.ts roots --repo <repo>` for any marker, including
+fenced/indented examples; never parse caller YAML. Declared roots add
+`conventions/documentation-impact.md` to every knowledge request, including
+Start's initial request. On missing-page stop with a pin-update handoff before
+the first write; never silently take the manual path or change a pin.
+
+At Make the feature shippable's existing documentation gate, reuse
+`references/docs-impact.md` with the shipment's selected source scope and explicit
+owned doc overlays as `--metadata-path`; recheck changed inputs. Keep the existing
+covered-path review-refresh rule. An incomplete assessment blocks completion
+delivery. A separately owner-authorized in-progress PR may use the existing
+progress path only after entry preflight succeeds, disclosing every assessment
+gap and making no completion, closure or migration claim; all other gates remain.
+This section grants no publication authority.
 
 ## Start
 
@@ -60,6 +86,30 @@ the completion update, and say in the PR what remains.
    marker. A skipped run is skipped, never a pass. Never report a result you did not see.
 
 Never merge, and never bypass branch protection or rewrite a pushed commit.
+
+## Article and promotion handoff
+
+For public-facing work that would benefit from an article, suggest
+`vh-adlc-blog promote <project or article>` in the owner handoff. Internal-only
+changes receive no promotion suggestion. Do not invoke the writer or draft files
+as part of shipping, and do not make promotion a feature gate. A merged or shipped
+PR does not establish that its release is available. Any later promotion run
+checks release state and prepares drafts under its own requested scope.
+
+## After an authorized merge
+
+Use trunk-based development. A separate owner-authorized merge ends the PR
+branch's lifetime, and the merge is not finished until that branch is gone.
+Merge without `--delete-branch`, then run `after-merge` for that PR as
+`references/branches.md` describes. It removes the remote branch, its stale
+tracking ref and the local branch, but only while their tips are contained in
+the merged PR head. A branch with commits pushed after the merge is kept.
+
+Report every outcome and kept reason. A branch kept because a worktree holds it
+stays until the owner asks for worktree cleanup. When GitHub's
+`delete_branch_on_merge` setting is off, say so and suggest a branch-hygiene
+plan, which proposes enabling it. A ship request alone does not authorize a
+merge or repository-setting changes.
 
 ## Report
 

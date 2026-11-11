@@ -1,0 +1,48 @@
+{
+  "scope": "Trusted collection only; analysis not run. Raw private source, tracker payload, history and profiles stay outside the repository.",
+  "adapter_commit": "4532b929286c1af9df5cfac3b37fddec6004a4a9",
+  "snapshot_sha256": "4a3c5b0a122693e3b2cd1d7ff6939d8f343da054407b0d0b47610aa12f55e689",
+  "collection_trace_sha256": "e367835f55c9d1f9fcf80c942e04e0418d1d60e0dd57207280a1d8a3b54b484d",
+  "coverage": [
+    {
+      "collection": "issues",
+      "scope": "all-states",
+      "pages": 10,
+      "complete": true
+    },
+    {
+      "collection": "pulls",
+      "scope": "all-closed-pulls",
+      "pages": 6,
+      "complete": true
+    },
+    {
+      "collection": "comments:13",
+      "scope": "13",
+      "pages": 1,
+      "complete": true
+    },
+    {
+      "collection": "comments:332",
+      "scope": "332",
+      "pages": 1,
+      "complete": true
+    },
+    {
+      "collection": "comments:751",
+      "scope": "751",
+      "pages": 1,
+      "complete": true
+    },
+    {
+      "collection": "plans",
+      "scope": "docs/internal",
+      "pages": 0,
+      "complete": true
+    }
+  ],
+  "http_methods": [
+    "GET"
+  ],
+  "checkout_index_unchanged": true
+}

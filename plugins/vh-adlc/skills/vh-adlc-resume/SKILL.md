@@ -1,9 +1,13 @@
 ---
 name: vh-adlc-resume
-description: Reconstruct where a vh-adlc feature stands from its issue, document or branch, report it, and continue the next safe step the vh-adlc binary names. Use only when the owner invokes /vh-adlc-resume or asks to resume or continue a vh-adlc feature.
+description: Reconstruct where a vh-adlc feature stands from its issue, document or branch, report it, and continue the next safe step the vh-adlc binary names. Use only when the owner invokes /vh-adlc-resume or asks to resume or continue a vh-adlc feature. Generic vh-adlc requests use lifecycle intake.
 ---
 
 # vh-adlc-resume
+
+## Generic intake
+
+For generic vh-adlc requests without an operation name, follow `references/lifecycle.md`; then continue here.
 
 The plugin directory is two levels above this skill's own directory. Every path below that starts
 with `references/` or `scripts/`, and `knowledge.md`, is in that directory.

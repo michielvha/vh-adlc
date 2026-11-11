@@ -1,0 +1,24 @@
+{
+  "kind": "shipping-ci-fixture-portability",
+  "date": "2026-10-22",
+  "failingCommit": "48770ab5d98894bd77bb534bc4345d697889e9d9",
+  "ciJob": "https://github.com/michielvha/vh-adlc/actions/runs/39811593053/job/119939009817",
+  "observedCI": {
+    "testsPassed": 174,
+    "testsFailed": 1,
+    "failure": "CI repair must preserve permissions and restore the intended check command"
+  },
+  "reproduction": "env PATH=/usr/bin:/bin /opt/homebrew/bin/bun test tests/vh-adlc/maintenance-variants.test.ts --test-name-pattern CI repair",
+  "regression": "A new system-PATH subprocess assertion observed FAIL: workflow checkout instead of the seeded FAIL: workflow check command before correction. The optional rg executable was not available in that environment.",
+  "correction": "The fixture workflow checker now uses standard grep -qF for the same three checks; it requires checkout, the intended validation command and read-only permissions.",
+  "verification": {
+    "focusedTestsPassed": 2,
+    "systemPathRegressionPassed": true,
+    "fullTestsPassed": 175,
+    "assertions": 498,
+    "nativeTrialsRegraded": 58,
+    "nativeReviewerReceipts": 21,
+    "productionPackageUnchanged": "4ba35c567832c1b80333094f8360a6e1ecba9734e0b680a41f379371dc48d207"
+  },
+  "limitation": "This corrects evaluator fixture portability. It changes neither production instructions nor the accepted native CLI host claim. The original failed CI run remains visible; no check was waived."
+}

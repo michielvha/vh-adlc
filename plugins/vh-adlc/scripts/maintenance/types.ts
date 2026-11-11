@@ -1,0 +1,37 @@
+export type RelatedRepository = { repository: string; role: "synced" | "independent"; sync_workflow?: string };
+export type Dashboard = { repository: string; issue?: number; title?: string };
+export type SurfaceExpectation = {
+  repository: string;
+  surface: "code_scanning";
+  status: number;
+  message_contains: string;
+  reason: string;
+  evidence: string;
+};
+export const WRITABLE_SECURITY_SETTINGS = ["dependabot_alerts", "dependabot_security_updates", "secret_scanning", "secret_scanning_push_protection"] as const;
+export type WritableSecuritySetting = typeof WRITABLE_SECURITY_SETTINGS[number];
+export type SecurityKeepOff = { repository: string; settings: WritableSecuritySetting[]; reason: string };
+export type Settings = {
+  schema_version: 1;
+  root: string;
+  configured: boolean;
+  settings_path: string;
+  repository: string;
+  hostname: string;
+  repositories: RelatedRepository[];
+  discovery_organizations: string[];
+  excluded_repositories: string[];
+  bot_authors: string[];
+  bot_inventory_terms: string[];
+  dashboards: Dashboard[];
+  generated_mirrors: string[];
+  source_references: string[];
+  backlog_references: string[];
+  report_dir: string;
+  history_dir: string;
+  project_procedure?: string;
+  security_policy?: string;
+  surface_expectations: SurfaceExpectation[];
+  security_settings?: "apply" | "check";
+  security_settings_keep_off?: SecurityKeepOff[];
+};

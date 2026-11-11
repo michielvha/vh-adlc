@@ -1,0 +1,663 @@
+{
+  "schema_version": 1,
+  "status": "intermediate local candidate; not migration readiness or authenticated closure provenance",
+  "component_commit": "ae833c1dbee1c37cd309324785f4e94b8b5eeb50",
+  "adapter_commit": "52ebfdd149d74231399266f71f9eaf3b5aea5c01",
+  "plugin_hash": "bf3db07db3a884b702fdc8e33e3ef89cd236623386e657cdab8cd76740120f6e",
+  "plugin_suite": {
+    "pass": 340,
+    "fail": 0,
+    "assertions": 1269,
+    "log": "/tmp/shared-triage-r14-route-suite.log"
+  },
+  "native_trials": [
+    {
+      "component_commit": "ae833c1dbee1c37cd309324785f4e94b8b5eeb50",
+      "source_commit": "581526609f0bd3720af10a0c9f05ffd84fa51fa5",
+      "plugin_hash": "bf3db07db3a884b702fdc8e33e3ef89cd236623386e657cdab8cd76740120f6e",
+      "driver_hash": "76e81c23012020c97e15cf2ff9b654732179541eedf6769541e986ce8547e81f",
+      "kind": "native-read-only-boundary",
+      "duration_ms": 157857,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "name": "legacy",
+      "dataset": "synthetic source/tracker/history with selected frozen workflow",
+      "models": [
+        "claude-fable-5-1"
+      ],
+      "project_command_sha256": "a0ecdbcb65d7bbbc827e1b50e8c9e56716f552d085f2f38697b39b38e6faab34",
+      "legacy_baseline": true,
+      "installed_plugin": false,
+      "report_sha256": "0acd8409a3fe18ed796e4207cb2e667d31e0c5c374abb32218b57acb445c0c6a",
+      "native_transcript_sha256": "04d69574c80f3bf5e130431fda6c87b5a750faac7f452de1071e1f4f9fb97d54",
+      "boundary_trace_sha256": "3e26cadc1cb541163003e4347c4a396f3b202dc04cd059e9e979a68f03bb43c4",
+      "negative_probe_routes": [
+        "egress",
+        "environment",
+        "file",
+        "helper",
+        "keyring",
+        "mutation",
+        "socket",
+        "tools"
+      ],
+      "analysis_github_calls": 0,
+      "executed_actions": 0,
+      "replacement_plugin_reads": 0
+    },
+    {
+      "component_commit": "ae833c1dbee1c37cd309324785f4e94b8b5eeb50",
+      "source_commit": "f920da939dd55332cbfdde4d0c7ad86114b21e45",
+      "plugin_hash": "bf3db07db3a884b702fdc8e33e3ef89cd236623386e657cdab8cd76740120f6e",
+      "driver_hash": "76e81c23012020c97e15cf2ff9b654732179541eedf6769541e986ce8547e81f",
+      "kind": "native-read-only-boundary",
+      "duration_ms": 388512,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "name": "shared",
+      "dataset": "synthetic source/tracker/history with selected frozen workflow",
+      "models": [
+        "claude-fable-5-1"
+      ],
+      "project_command_sha256": "6adc966878c0a3da6a7d8ae5e43191d06ae03743ff4fbb51c1210b85bb306320",
+      "legacy_baseline": false,
+      "installed_plugin": true,
+      "report_sha256": "3a4fad2f12d8470fbf50fc8692de654c3f79464ce7a8d94ddc1ecb1c9bce3168",
+      "native_transcript_sha256": "a8602c4333de8150fb56ce075cf256325b4cd7371419ef6139c19188321b6ef1",
+      "boundary_trace_sha256": "4ff6b5f922fa8f6ba11b47465985d3f750172a69f6faa844e25d6189fcd63964",
+      "negative_probe_routes": [
+        "egress",
+        "environment",
+        "file",
+        "helper",
+        "keyring",
+        "mutation",
+        "socket",
+        "tools"
+      ],
+      "analysis_github_calls": 0,
+      "executed_actions": 0,
+      "completeness": {
+        "inventory": true,
+        "verification": true,
+        "missing": []
+      },
+      "rows": [
+        {
+          "number": 50,
+          "state": "resolved",
+          "ownership": "eligible",
+          "disposition": "close-candidate",
+          "close_executable": true,
+          "index_requested": false
+        },
+        {
+          "number": 63,
+          "state": "open",
+          "ownership": "eligible",
+          "disposition": "ready",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 68,
+          "state": "partial",
+          "ownership": "eligible",
+          "disposition": "ready",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 69,
+          "state": "blocked",
+          "ownership": "eligible",
+          "disposition": "blocked",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 70,
+          "state": "duplicate",
+          "ownership": "eligible",
+          "disposition": "close-candidate",
+          "close_executable": true,
+          "index_requested": false
+        },
+        {
+          "number": 71,
+          "state": "open",
+          "ownership": "eligible",
+          "disposition": "ready",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 13,
+          "state": "unverified",
+          "ownership": "index",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 395,
+          "state": "unverified",
+          "ownership": "index",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 999,
+          "state": "unverified",
+          "ownership": "index",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 332,
+          "state": "unverified",
+          "ownership": "protected",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 334,
+          "state": "unverified",
+          "ownership": "protected",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 81,
+          "state": "unverified",
+          "ownership": "protected",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 82,
+          "state": "unverified",
+          "ownership": "protected",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 83,
+          "state": "unverified",
+          "ownership": "protected",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        }
+      ],
+      "ready_ranking": [
+        63,
+        68,
+        71
+      ]
+    },
+    {
+      "component_commit": "ae833c1dbee1c37cd309324785f4e94b8b5eeb50",
+      "source_commit": "f920da939dd55332cbfdde4d0c7ad86114b21e45",
+      "plugin_hash": "bf3db07db3a884b702fdc8e33e3ef89cd236623386e657cdab8cd76740120f6e",
+      "driver_hash": "76e81c23012020c97e15cf2ff9b654732179541eedf6769541e986ce8547e81f",
+      "kind": "native-read-only-boundary",
+      "duration_ms": 519630,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "name": "index",
+      "dataset": "synthetic source/tracker/history with selected frozen workflow",
+      "models": [
+        "claude-fable-5-1"
+      ],
+      "project_command_sha256": "6adc966878c0a3da6a7d8ae5e43191d06ae03743ff4fbb51c1210b85bb306320",
+      "legacy_baseline": false,
+      "installed_plugin": true,
+      "report_sha256": "e95a2a0ae2b7df39941156cbf0181a9cc21c0f21f6433ba5245e523e3b2e8ef3",
+      "native_transcript_sha256": "0b2f5fc753a68cb8b378fe10797b5bf61f5c35986ac64bc81a490a0789fff699",
+      "boundary_trace_sha256": "8ba6c3fe6506aa78e7273384b3b1a2c321677c69f0861ebc1cf2952bdc7bd1b0",
+      "negative_probe_routes": [
+        "egress",
+        "environment",
+        "file",
+        "helper",
+        "keyring",
+        "mutation",
+        "socket",
+        "tools"
+      ],
+      "analysis_github_calls": 0,
+      "executed_actions": 0,
+      "completeness": {
+        "inventory": true,
+        "verification": true,
+        "missing": []
+      },
+      "rows": [
+        {
+          "number": 50,
+          "state": "resolved",
+          "ownership": "eligible",
+          "disposition": "close-candidate",
+          "close_executable": true,
+          "index_requested": false
+        },
+        {
+          "number": 63,
+          "state": "open",
+          "ownership": "eligible",
+          "disposition": "ready",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 68,
+          "state": "partial",
+          "ownership": "eligible",
+          "disposition": "ready",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 69,
+          "state": "blocked",
+          "ownership": "eligible",
+          "disposition": "blocked",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 70,
+          "state": "duplicate",
+          "ownership": "eligible",
+          "disposition": "close-candidate",
+          "close_executable": true,
+          "index_requested": false
+        },
+        {
+          "number": 71,
+          "state": "open",
+          "ownership": "eligible",
+          "disposition": "ready",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 13,
+          "state": "resolved",
+          "ownership": "index",
+          "disposition": "close-candidate",
+          "close_executable": true,
+          "index_requested": true
+        },
+        {
+          "number": 395,
+          "state": "unverified",
+          "ownership": "index",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 999,
+          "state": "resolved",
+          "ownership": "index",
+          "disposition": "close-candidate",
+          "close_executable": true,
+          "index_requested": true
+        },
+        {
+          "number": 332,
+          "state": "unverified",
+          "ownership": "protected",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 334,
+          "state": "unverified",
+          "ownership": "protected",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 81,
+          "state": "unverified",
+          "ownership": "protected",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 82,
+          "state": "unverified",
+          "ownership": "protected",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        },
+        {
+          "number": 83,
+          "state": "unverified",
+          "ownership": "protected",
+          "disposition": "excluded",
+          "close_executable": false,
+          "index_requested": false
+        }
+      ],
+      "ready_ranking": [
+        63,
+        68,
+        71
+      ]
+    },
+    {
+      "component_commit": "ae833c1dbee1c37cd309324785f4e94b8b5eeb50",
+      "source_commit": "52ebfdd149d74231399266f71f9eaf3b5aea5c01",
+      "plugin_hash": "bf3db07db3a884b702fdc8e33e3ef89cd236623386e657cdab8cd76740120f6e",
+      "driver_hash": "76e81c23012020c97e15cf2ff9b654732179541eedf6769541e986ce8547e81f",
+      "kind": "native-read-only-boundary",
+      "duration_ms": 417848,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "name": "private",
+      "dataset": "private source/tracker; raw findings excluded",
+      "models": [
+        "claude-fable-5-1"
+      ],
+      "project_command_sha256": "6adc966878c0a3da6a7d8ae5e43191d06ae03743ff4fbb51c1210b85bb306320",
+      "legacy_baseline": false,
+      "installed_plugin": true,
+      "report_sha256": "f52f5a9964c8bead89e433564795617ec7c9b23dbe4be0b182575da7e3d74789",
+      "native_transcript_sha256": "75ee9a1258ca5ac69744cc056311ddc07cf34283ede1eed844a2ab6ab0ee69b7",
+      "boundary_trace_sha256": "c2e978463bdfe47e19d13f597341ba0b1c10f3da498b2dd60a9f16eafec348b3",
+      "negative_probe_routes": [
+        "egress",
+        "environment",
+        "file",
+        "helper",
+        "keyring",
+        "mutation",
+        "socket",
+        "tools"
+      ],
+      "analysis_github_calls": 0,
+      "executed_actions": 0,
+      "completeness": {
+        "inventory": true,
+        "verification": true,
+        "missing": []
+      }
+    }
+  ],
+  "existing_routes": [
+    {
+      "id": "L01",
+      "component_commit": "ae833c1dbee1c37cd309324785f4e94b8b5eeb50",
+      "plugin_hash": "bf3db07db3a884b702fdc8e33e3ef89cd236623386e657cdab8cd76740120f6e",
+      "host": "codex-cli 0.163.0",
+      "surface": "native-cli-diagnostic",
+      "durationMs": 49771,
+      "exitCode": 0,
+      "timeout": false,
+      "status": "pass",
+      "checks": [
+        {
+          "name": "only permitted files changed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "unrelated index entries preserved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "publication and refs respected",
+          "pass": true
+        },
+        {
+          "name": "no unauthorized publication command attempted",
+          "pass": true
+        },
+        {
+          "name": "supported tag answer",
+          "pass": true
+        },
+        {
+          "name": "installed candidate unchanged",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "L02",
+      "component_commit": "ae833c1dbee1c37cd309324785f4e94b8b5eeb50",
+      "plugin_hash": "bf3db07db3a884b702fdc8e33e3ef89cd236623386e657cdab8cd76740120f6e",
+      "host": "codex-cli 0.163.0",
+      "surface": "native-cli-diagnostic",
+      "durationMs": 112175,
+      "exitCode": 0,
+      "timeout": false,
+      "status": "pass",
+      "checks": [
+        {
+          "name": "only permitted files changed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "unrelated index entries preserved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "publication and refs respected",
+          "pass": true
+        },
+        {
+          "name": "no unauthorized publication command attempted",
+          "pass": true
+        },
+        {
+          "name": "README actually corrected",
+          "pass": true
+        },
+        {
+          "name": "README correction checked against actual tag output",
+          "pass": true
+        },
+        {
+          "name": "installed candidate unchanged",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "L05",
+      "component_commit": "ae833c1dbee1c37cd309324785f4e94b8b5eeb50",
+      "plugin_hash": "bf3db07db3a884b702fdc8e33e3ef89cd236623386e657cdab8cd76740120f6e",
+      "host": "codex-cli 0.163.0",
+      "surface": "native-cli-diagnostic",
+      "durationMs": 107659,
+      "exitCode": 0,
+      "timeout": false,
+      "status": "pass",
+      "checks": [
+        {
+          "name": "only permitted files changed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "unrelated index entries preserved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "publication and refs respected",
+          "pass": true
+        },
+        {
+          "name": "no unauthorized publication command attempted",
+          "pass": true
+        },
+        {
+          "name": "draft produced without acceptance bypass",
+          "pass": true
+        },
+        {
+          "name": "installed candidate unchanged",
+          "pass": true
+        }
+      ]
+    },
+    {
+      "id": "L16-public",
+      "component_commit": "ae833c1dbee1c37cd309324785f4e94b8b5eeb50",
+      "plugin_hash": "bf3db07db3a884b702fdc8e33e3ef89cd236623386e657cdab8cd76740120f6e",
+      "host": "codex-cli 0.163.0",
+      "surface": "native-cli-diagnostic",
+      "durationMs": 184841,
+      "exitCode": 0,
+      "timeout": false,
+      "status": "pass",
+      "checks": [
+        {
+          "name": "only permitted files changed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "unrelated index entries preserved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "publication and refs respected",
+          "pass": true
+        },
+        {
+          "name": "no unauthorized publication command attempted",
+          "pass": true
+        },
+        {
+          "name": "dependent change escalated to draft or focused decision",
+          "pass": true
+        },
+        {
+          "name": "installed candidate unchanged",
+          "pass": true
+        }
+      ]
+    }
+  ],
+  "private_preservation": {
+    "source_commit": "52ebfdd149d74231399266f71f9eaf3b5aea5c01",
+    "complete_checkout_and_index_unchanged": true,
+    "tracker_collections_equal": true,
+    "coverage_complete": true,
+    "collector_get_only": true,
+    "before_snapshot_sha256": "63bc06791bd9ff4ab88818c8c3a526178f48eeb805ac2a8ddca77f8fdfba3bf1",
+    "after_snapshot_sha256": "8f96ea6697b73529451784eb9c49e19b3bfb7e3502f1488279e93fdd4c79d35e"
+  },
+  "analysis_parity": {
+    "component": "ae833c1dbee1c37cd309324785f4e94b8b5eeb50",
+    "dataset": "synthetic product, tracker and history; selected frozen workflow only",
+    "identical_snapshot_except_source_commit": true,
+    "source_difference_paths": [
+      ".claude/commands/triage.md",
+      "agents/issue-triage.md"
+    ],
+    "ready_ranking": [
+      63,
+      68,
+      71
+    ],
+    "all_configured_and_derived_protection_retained": true,
+    "intentional_differences": [
+      {
+        "id": "all-writes-approved",
+        "observed": "Both native analysis environments deny all writes. Shared report requires exact batch approval; legacy report describes its own approval points.",
+        "limits": "No legacy pre-approval comment/label write was executed; the read-only override prevents that. New execution approval is exercised separately against fake APIs."
+      },
+      {
+        "id": "unbounded-pagination",
+        "observed": "Both analyses received the same complete 301-merged-PR fixture; current collector pagination checks execute beyond the legacy caps.",
+        "limits": "The legacy gh collection commands and their 300-PR cap were not executed in this read-only analysis environment."
+      },
+      {
+        "id": "incomplete-blocks-all-closures",
+        "observed": "Shared incomplete-collection and verification-failure tests block every executable closure. Earlier failed native runs also exhibited the report-wide block.",
+        "limits": "The frozen legacy workflow has no shared close_executable schema; no legacy mutation is inferred from those tests."
+      },
+      {
+        "id": "current-index-request",
+        "observed": "Legacy surfaces #13 from the historical owner comment; shared excludes #13/#395/#999 without a current request.",
+        "check": true,
+        "limits": "The separate explicit request case must also be checked before calling the exception proven."
+      },
+      {
+        "id": "all-modes-save-report",
+        "observed": "The packaged report helper saves each mode in offline tests; both native sweep reports are external files.",
+        "limits": "These native runs are sweep mode; they do not establish native next/close invocation."
+      },
+      {
+        "id": "report-commit-opt-in",
+        "observed": "Legacy report names its automatic report commit. Shared output is saved uncommitted; disposable report-commit and rollback tests preserve unrelated staging.",
+        "check": true,
+        "limits": "Legacy report commit is described, not executed, because this trial must preserve its checkout."
+      },
+      {
+        "id": "scope-safe-history",
+        "observed": "Legacy calls eleven previously unlisted issues newly arrived despite unknown old coverage; shared compares common IDs, reports #50 changed and infers no additions/removals.",
+        "check": true,
+        "limits": "The interpretation is bounded to this actual synthetic historical report."
+      }
+    ],
+    "legacy_report_sha256": "0acd8409a3fe18ed796e4207cb2e667d31e0c5c374abb32218b57acb445c0c6a",
+    "shared_report_sha256": "3a4fad2f12d8470fbf50fc8692de654c3f79464ce7a8d94ddc1ecb1c9bce3168",
+    "verdict": "Observed analysis parity for the six normal work items, all exclusions and ready ordering. Seven difference IDs mapped with their actual proof limits; this is not a claim that every legacy collection/write/commit path ran."
+  },
+  "normal_cache_forgery_reproduction": {
+    "dataset": "synthetic disposable Git repository; no credentials or tracker",
+    "claimed_command_executed": false,
+    "cache_records_fabricated_directly": true,
+    "report_state": "resolved",
+    "report_close_executable": true,
+    "actions_planned": 0,
+    "github_calls": 0
+  },
+  "remaining": [
+    "Owner Q2 receipt trust decision and R-14 F-03/F-04 provenance fixes",
+    "Fresh frozen paired review after remaining fixes",
+    "Final component native proof after remaining changes",
+    "Required Codex desktop and VS Code Local GUI trials",
+    "Legacy write/collection/commit paths were not executed by read-only parity analysis"
+  ],
+  "publication": "No feature-code push, PR, merge or release authorized or performed"
+}

@@ -1,0 +1,258 @@
+{
+  "kind": "native-cli-lifecycle-matrix",
+  "pass": true,
+  "packageHash": "19941ba2018b0a774004ecf5559da68eab3bc86ebbb21fb8170a30aff0f5c44e",
+  "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+  "trialCount": 57,
+  "minimumTrialCount": 57,
+  "coverage": [
+    {
+      "case": "L01",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L02",
+      "required": 3,
+      "observed": 3,
+      "pass": true
+    },
+    {
+      "case": "L03",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L04",
+      "required": 3,
+      "observed": 3,
+      "pass": true
+    },
+    {
+      "case": "L05",
+      "required": 3,
+      "observed": 3,
+      "pass": true
+    },
+    {
+      "case": "L06",
+      "required": 3,
+      "observed": 3,
+      "pass": true
+    },
+    {
+      "case": "L06-dependency",
+      "required": 3,
+      "observed": 3,
+      "pass": true
+    },
+    {
+      "case": "L06-ci",
+      "required": 3,
+      "observed": 3,
+      "pass": true
+    },
+    {
+      "case": "L07",
+      "required": 3,
+      "observed": 3,
+      "pass": true
+    },
+    {
+      "case": "L08-held",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L08-released",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L09-onboard",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L09-bootstrap",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L10",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L11-ship",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L12-missing",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L12-conflict",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L12-live",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L13",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L14",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L15",
+      "required": 3,
+      "observed": 3,
+      "pass": true
+    },
+    {
+      "case": "L16-public",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L16-permissions",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L16-data",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L16-release",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L17-findings",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L17-missing",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L17-check-failure",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L18-source",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L18-outcome",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L18-contract",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L18-scope",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L18-proposal",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L18-checks",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L18-bookkeeping",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L19-active",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "L19-complete",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "R01",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "R02",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "R03",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    },
+    {
+      "case": "R04",
+      "required": 1,
+      "observed": 1,
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "limitation": "Native CLI evidence only. This does not establish desktop GUI discovery/invocation or feature completion; other hosts remain unverified."
+}

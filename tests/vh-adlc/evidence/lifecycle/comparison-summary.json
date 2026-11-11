@@ -1,0 +1,86 @@
+{
+  "kind": "entry-comparison-summary",
+  "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+  "outcomes": [
+    {
+      "candidate": "final-comparison-baseline",
+      "packageHash": "b1167f58fdba02b6b37cabb5e0413685b9c8f8206cc1d3a9018a2e9f90e06b81",
+      "cases": [
+        {
+          "case": "L01",
+          "status": "pass",
+          "rawEventsHash": "63cdaf8b6ee21038c26b91b2738e4dba15713367c263dcd9b0cf7775c020da39"
+        },
+        {
+          "case": "L02",
+          "status": "pass",
+          "rawEventsHash": "e334aa25b3970f609d9caa099f89ebda23d975c4fcce090c99cff704a8003de9"
+        },
+        {
+          "case": "L04",
+          "status": "pass",
+          "rawEventsHash": "c06e9723694f0e7656cdbcb297e2dfae294e311ec2e92f6e5a6e12d527d0e862"
+        },
+        {
+          "case": "L05",
+          "status": "fail",
+          "rawEventsHash": "85f23879c2acdc4aedc05f2aa4d2be151f9aa003ba23ae6179816a83a55e3f68"
+        }
+      ]
+    },
+    {
+      "candidate": "final-comparison-common",
+      "packageHash": "19941ba2018b0a774004ecf5559da68eab3bc86ebbb21fb8170a30aff0f5c44e",
+      "cases": [
+        {
+          "case": "L01",
+          "status": "pass",
+          "rawEventsHash": "544e20671ecb9f3a806afaf3560384f90cb7f8c531092e9625b4d2faadb8fd95"
+        },
+        {
+          "case": "L02",
+          "status": "pass",
+          "rawEventsHash": "79e9128ccdccf8988720dd3714e2b3655876a2eaf6123a1873262101b459c713"
+        },
+        {
+          "case": "L04",
+          "status": "pass",
+          "rawEventsHash": "7f05c0209e41428592eb0edb375acbf0c7cf0a3928661ea1a414ba83f62c36b5"
+        },
+        {
+          "case": "L05",
+          "status": "pass",
+          "rawEventsHash": "37ed1afa90971da7919987f745ddd77e96a4ba95855238623d43aee800d876fd"
+        }
+      ]
+    },
+    {
+      "candidate": "final-comparison-thin",
+      "packageHash": "89016e25c6f5897fe120eb859f7b623b10858ae6bedf0cbe3f5bfa09cd60af0d",
+      "cases": [
+        {
+          "case": "L01",
+          "status": "pass",
+          "rawEventsHash": "35cb13e745d05fe508ce0befc1db603807f7e3bafa19e747c9debcf2808b55c3"
+        },
+        {
+          "case": "L02",
+          "status": "pass",
+          "rawEventsHash": "c0a1da7b4fdbaeaa48a183785bf7ef6185cdadeceafae12c8079b8b0fe48cb2d"
+        },
+        {
+          "case": "L04",
+          "status": "pass",
+          "rawEventsHash": "1c9c230cf28fe318d77a2e8c29adfd234215de4f7a48396b632f6d55b2bbe358"
+        },
+        {
+          "case": "L05",
+          "status": "pass",
+          "rawEventsHash": "887ae1552bf5fb984bf3ec4376869cb4694160dd080c1a5aefd1521f772ab041"
+        }
+      ]
+    }
+  ],
+  "conclusion": "The compact existing entry and the thin entry both pass all four cases. The baseline fails the publication boundary. Keep the seven-skill entry; the extra skill shows no benefit.",
+  "limitation": "Twelve diagnostic comparisons; the selected package needs its separate full matrix. Native default model was not overridden and its identity is not host-attested."
+}

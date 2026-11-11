@@ -179,6 +179,20 @@ describe("valid sources", () => {
 });
 
 describe("rejected sources", () => {
+  test.each([false, true])("offline ignores unverified PATH without probing it; verified cache: %s", warm => {
+    const f = fixture();
+    if (warm) expect(run(f).code).toBe(0);
+    const before = snapshot(f.home), marker = join(f.dir, "unverified-path-ran");
+    const bin = onPath(f, fakeBinary(VERSION, marker, "# unverified\n"));
+    const r = run(f, ["--offline"], [bin]);
+    expect(r.code).toBe(warm ? 0 : 1);
+    expect(r.out).toBe(warm ? cached(f) : "");
+    expect(r.err).toContain("unverified");
+    expect(existsSync(marker)).toBe(false);
+    const after = snapshot(f.home);
+    expect(after).toEqual(before);
+  });
+
   test("ignores another version on PATH with a diagnostic", () => {
     const f = fixture();
     const bin = onPath(f, fakeBinary("1.0.0", join(f.dir, "path-ran")));
@@ -290,4 +304,10 @@ test("installs the released binary from the real lock", () => {
   expect(sha256(readFileSync(path))).toBe(lock.assets[platform()].binary_sha256);
   const v = Bun.spawnSync([path, "--version"], { stdout: "pipe" });
   expect(v.stdout.toString()).toBe(`vh-adlc ${lock.version}\n`);
+  // The settings loaders send YAML to this command, so the locked release must have it.
+  const yaml = "# Settings a person edits.\nschema_version: 1\nsource_roots:\n  - src\n";
+  const read = Bun.spawnSync([path, "settings", "read", "--stdin"], { stdin: Buffer.from(yaml), stdout: "pipe", stderr: "pipe" });
+  const report = JSON.parse(read.stdout.toString() || "{}");
+  expect({ exit: read.exitCode, result: report.result, value: report.data?.value })
+    .toEqual({ exit: 0, result: "answered", value: { schema_version: 1, source_roots: ["src"] } });
 }, 120_000);

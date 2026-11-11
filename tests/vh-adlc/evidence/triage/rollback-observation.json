@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "baseline": "129581f6dbe4df71200af8f67d7bc017d35e89ad",
+  "adapter": "4532b929286c1af9df5cfac3b37fddec6004a4a9",
+  "rollback": true,
+  "reapply": true,
+  "index_preserved": true,
+  "rollback_index_bytes_preserved": true,
+  "report_index": "docs/internal/status/README.md",
+  "only_allowed_runtime_paths": [
+    "AGENTS.md",
+    "agents/issue-triage.md",
+    ".claude/commands/triage.md",
+    ".vh-adlc/triage.json"
+  ],
+  "component_commit": "f1f1810fc24f2f6e586676a931cca30d7c78cddb",
+  "plugin_hash": "567d1ed810e77d60feba42fa30e56241001664dc180d7ca9cd1da03d0a8cfd62",
+  "artifact_sha256": "8c48f87e9f0ac122500b58b9642df356de484127613094b38108d44b6aeb7809",
+  "history_comparison": {
+    "status": "overlap-only",
+    "previous_run_id": "legacy:2026-09-26-issue-triage",
+    "scope": "unknown legacy scope; no inferred additions/removals"
+  },
+  "scope": "Disposable local clone only; original Stackweaver migration checkout remained clean."
+}
