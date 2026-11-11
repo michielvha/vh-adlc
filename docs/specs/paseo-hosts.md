@@ -357,6 +357,7 @@ None.
 | 2026-11-10 | R-9 | spec | `b3e5b4ce742b346b17d45cb0d2fbc30017d5ae39` | n/a | n/a | accepted by owner |
 | 2026-11-11 | R-10 | implementation | `70566773176866fdb4ce7ab48076d093f8aec87f` | unknown | procedural | One blocking factual finding (client keys can open remote forwards) and two nits; AC-04 not met, six live-only criteria not verified, AC-12 untested, seven met; model identity not attested. |
 | 2026-11-11 | R-11 | spec | `e312b04259376552e59fdf0d2749259bdd247a2f` | claude-opus-4.8 | procedural | One blocking factual finding (Unix socket remote forwards still open), two should-fix judgement findings and one factual nit; model reported by the reviewer, not requested. |
+| 2026-11-11 | R-12 | spec | `586a3f15f625d380f663dad948cdb81aabaa067c` | unknown | procedural | Two should-fix factual findings (the CI runner has sshd, no tasks for the revision), two factual nits and one judgement nit, none blocking; model identity not attested. |
 
 ### R-1
 
@@ -823,3 +824,40 @@ SEVERITY: nit
 WHERE: Context, Owner summary (line 35)
 EVIDENCE: The summary says "`--help --json` now prints one JSON object, and colour needs a real terminal". At e312b04, `plugins/paseo-hosts/cmd/paseo-hosts/main.go:11` still treats any character device as a terminal (`info.Mode()&os.ModeCharDevice != 0`), and `internal/link/snippets/authorize.sh:14` still writes the key line without `permitlisten`. These are planned changes, not built ones. The standard asks the summary to distinguish planned work from observed proof.
 PROPOSAL: Write the revised behaviours as planned ("will print", "the fix adds") until the tasks that implement them are done.
+
+### R-12
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-04 row (line 253); Context, Owner summary (line 37)
+EVIDENCE: The AC-04 row says the real-sshd test "skips with a message when `sshd` is not installed, as on the `ubuntu-latest` runner", and the summary says "(skipped in CI)". The Q2 answer was based on that claim. The runner readme (Ubuntu2404-Readme.md, image 20261101.360.1) lists only the apt packages that the toolset installs. It does not list the base image's packages. bundlewrap/bundlewrap `.github/workflows/tests.yml` runs on `ubuntu-latest`, installs no openssh-server (no apt step), and runs `ssh -o StrictHostKeyChecking=no localhost id`. Run 42346569359 (2026-11-07) concluded `success`. So `sshd` is installed on that runner. The `paseo-hosts` job (`.github/workflows/ci.yml:132-133`) runs on `ubuntu-latest`, so a test that skips only when `sshd` is missing will run in CI. That contradicts the document and the owner's "local only" choice.
+PROPOSAL: Say that the test runs in CI because the runner has `sshd`, and confirm this on the first push. If the owner still wants it local only, make it skip when `CI` is set. In either case, correct the AC-04 row and the summary.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks
+EVIDENCE: The revision adds `permitlisten="127.0.0.1:1"` to the key line (line 176), a real-sshd test (line 253), `ssh -N -R` in manual step 4 (line 265), and `--help --json` and terminal detection changes (line 35). No task covers any of them. T1 to T31 are ticked, and T32 (line 338) covers only the marketplace install. At 586a3f1, `plugins/paseo-hosts/internal/link/snippets/authorize.sh:14` still writes the line without `permitlisten`, and no Go file mentions `sshd` or `permitlisten`. T27 and T28 stay ticked with live evidence gathered under the old key line. vh-adlc-spec SKILL.md:101 says "Keep checked tasks and add new task IDs for changed requirements". After `planned`, `tasks_populated` already holds, so the binary's next step is `implement`, and no `tasks` step adds them later.
+PROPOSAL: Before acceptance, add new task IDs for the failing real-sshd test, the authorize.sh and stand-in changes, the `--help --json` and terminal fixes, and a re-run of the live steps under the new key line.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, link step 2 (line 176); Acceptance Criteria AC-04 (line 233); Context, Owner summary (line 35)
+EVIDENCE: I ran an unprivileged local sshd (OpenSSH 10.0p2) with the Design key line and `net.ipv4.ip_unprivileged_port_start = 1024`. sshd denied `-R 127.0.0.1:47555`, `-R 47556`, `-R 0`, `-R 47557`, `-R [::1]:1` and `-R *:1` at the permission check. For `-R 127.0.0.1:1` and `-R localhost:1`, the request passed the check and failed only at `bind [127.0.0.1]:1: Permission denied` (sshd log). So the forward to port 1 is refused only because the bind fails. When the server user can bind port 1 (root, CAP_NET_BIND_SERVICE, or a lowered `ip_unprivileged_port_start`, as container setups often use), that forward succeeds, and AC-04's "every TCP remote forward" is false. The e312b04 summary named this caveat ("Where a server lowers the privileged port range..."). 586a3f1 removed it and now says "which no ordinary user can bind", and preflight does not check for it.
+PROPOSAL: Restore the caveat in the summary and the Design as part of the known limit. Alternatively, have preflight report a server user that can bind port 1.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan, AC-04 row (line 253) and manual step 4 (line 265)
+EVIDENCE: Both proofs say only "`ssh -N -R` ... fail" and do not give the listen spec. A Unix socket remote forward is a documented success under the known limit. In my local sshd run, `ssh -N -o ExitOnForwardFailure=yes -R <dir>/r.sock:127.0.0.1:47301` stayed connected until `timeout` killed it (exit 124) and created `srw------- r.sock`. A reviewer or implementer could therefore run a form that does not match the "every TCP remote forward" wording of AC-04.
+PROPOSAL: Name a TCP listen address in both proofs, for example `-R 127.0.0.1:<free port>:127.0.0.1:<daemon port>`, and the daemon port itself.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 30, 35, 37)
+EVIDENCE: The summary justifies the known limit with "anyone who also has the password already controls the server". It leaves out the cost that Q1 gave the owner: "A stolen client key alone can still create a Unix socket at an unused path ... where a program such as tmux may later connect". A client linked with `--no-app` holds the key without the password by design (Design link step 5). The revision also removed "keeping Paseo state unless `--purge`", an owner decision that Design line 214 keeps. Finally, the summary says the reviewer "will run that procedure itself", but the Test Plan (line 267) limits the reviewer to steps 1 to 7.
+PROPOSAL: State the cost of the limit for a key without the password, including `--no-app` clients. Restore the `--purge` default, and say "manual steps 1 to 7".
