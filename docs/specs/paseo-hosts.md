@@ -355,6 +355,7 @@ None.
 | 2026-11-10 | R-9 | spec | `b3e5b4ce742b346b17d45cb0d2fbc30017d5ae39` | unknown | procedural | No findings; model identity not attested. |
 | 2026-11-10 | R-9 | spec | `b3e5b4ce742b346b17d45cb0d2fbc30017d5ae39` | n/a | n/a | accepted by owner |
 | 2026-11-11 | R-10 | implementation | `70566773176866fdb4ce7ab48076d093f8aec87f` | unknown | procedural | One blocking factual finding (client keys can open remote forwards) and two nits; AC-04 not met, six live-only criteria not verified, AC-12 untested, seven met; model identity not attested. |
+| 2026-11-11 | R-11 | spec | `e312b04259376552e59fdf0d2749259bdd247a2f` | claude-opus-4.8 | procedural | One blocking factual finding (Unix socket remote forwards still open), two should-fix judgement findings and one factual nit; model reported by the reviewer, not requested. |
 
 ### R-1
 
@@ -791,3 +792,33 @@ SEVERITY: nit
 WHERE: plugins/paseo-hosts/internal/report, terminal detection
 EVIDENCE: Reading the code at 7056677, the terminal check treats any character device as a terminal, so output redirected to /dev/null counts as a terminal. Nothing a user can see is affected, but it is not a true isatty check.
 PROPOSAL: Use a real terminal check such as golang.org/x/term IsTerminal, or an ioctl-based check.
+
+### R-11
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, link step 2 (line 175); Context, Owner summary (line 35); Acceptance Criteria AC-04 (line 232)
+EVIDENCE: I started an unprivileged local sshd (OpenSSH 10.0p2, default AllowStreamLocalForwarding) with exactly the Design key line `restrict,port-forwarding,permitopen="127.0.0.1:47101",permitlisten="127.0.0.1:1",command="/bin/false"`. `ssh -W 127.0.0.1:47101` returned `HTTP/1.0 200 OK`, a shell command exited 1, and `ssh -W 127.0.0.1:47122` failed. `ssh -N -o ExitOnForwardFailure=yes -R 127.0.0.1:47555:127.0.0.1:47101` failed with `remote port forwarding failed for listen port 47555`. But `ssh -N -o ExitOnForwardFailure=yes -R <dir>/remote.sock:127.0.0.1:47101` stayed connected until `timeout` killed it (exit 124). The server side then had `srw------- remote.sock`, and `curl --unix-socket <dir>/remote.sock http://x/` returned the client's page (`hi`). permitlisten only limits TCP listeners, and `port-forwarding` also enables Unix socket remote forwards. So a client key can still make listening sockets wherever the server user can write. The Owner summary's "every remote forward fails" is false, and an implementation that follows Design exactly fails AC-04's "refused ... every remote forward". A local Unix socket forward (`ssh -W <path>`) was denied (`request to connect to path ... was denied`), so only the remote side is open.
+PROPOSAL: Raise an open question on how to block Unix socket remote forwards. No authorized_keys option covers them, so the choices are a server-side sshd setting (for example `AllowStreamLocalForwarding local` in a `Match` block, which needs root) or accepting a residual that AC-04 and the summary then state honestly. Add a streamlocal `-R` case to the real-sshd test and to manual step 4.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-04 row (line 252) and the introduction (line 247)
+EVIDENCE: The new real-sshd test "skips with a message when `sshd` is not installed". The `paseo-hosts` CI job (`.github/workflows/ci.yml:132-155` at e312b04) runs on `ubuntu-latest` and installs nothing. The runner image readme (`Ubuntu2404-Readme.md`, image 20261101.360.1) lists `openssh-client`, `ssh` and `sshpass` but no `openssh-server`. So in CI the only test that proves the R-10 F-01 fix always skips. A regression in authorize.sh would pass CI, and the fix would rest only on local runs and the manual step.
+PROPOSAL: Add a step that installs `openssh-server` in the `paseo-hosts` job, or make the test fail instead of skip when `CI` is set. Say in the Test Plan and the Owner summary that CI runs it.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, implementation reviewer paragraph (line 266); Context, Owner summary
+EVIDENCE: R-10 returned AC-01, AC-02, AC-03, AC-05, AC-06 and AC-07 as `not verified` because their live parts were only recorded, not observed. The new paragraph lets the next reviewer only read state over SSH and "runs no `paseo-hosts` command that writes". Read-only observation can show the unit, config, key line text, process list and host list, which covers parts of AC-01, AC-04 and AC-05. It cannot show that `onboard` rejects a password-less connection (AC-02), that a re-run keeps state (AC-03), that a rejected entry is rolled back (AC-06), or what `remove` leaves behind (AC-07). Each of those needs a writing command. `impl_review_clean` requires every criterion to be `met` or residualised. So the complete gate, which the summary says will open the PR, would stall at the next review the same way it did at R-10.
+PROPOSAL: Choose a path and state it: let the implementation reviewer run the named manual steps (including the `paseotest` rollback and a `remove` on the test server), or ask the owner as an open question to accept residuals for the live parts of these criteria.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (line 35)
+EVIDENCE: The summary says "`--help --json` now prints one JSON object, and colour needs a real terminal". At e312b04, `plugins/paseo-hosts/cmd/paseo-hosts/main.go:11` still treats any character device as a terminal (`info.Mode()&os.ModeCharDevice != 0`), and `internal/link/snippets/authorize.sh:14` still writes the key line without `permitlisten`. These are planned changes, not built ones. The standard asks the summary to distinguish planned work from observed proof.
+PROPOSAL: Write the revised behaviours as planned ("will print", "the fix adds") until the tasks that implement them are done.
