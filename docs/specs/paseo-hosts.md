@@ -393,6 +393,7 @@ None.
 | 2026-11-11 | R-22 | implementation | `75f133019ee3927b4b563121903ff9caa843b754` | claude-opus-4.8 | procedural | Fourteen criteria met, AC-12 not verified (needs the merge, issue #77); one should-fix factual finding (the pseudo-terminal test fails on macOS) and one factual nit (the owner summary is out of date); model reported by the reviewer, not requested. |
 | 2026-11-11 | R-23 | implementation | `d4155d62af70742f8d271e4bde7138e6459b379f` | unknown | procedural | One blocking factual finding (a lost page after the reload skips the restore) and two should-fix factual findings (a pending app update races the relaunch; the macOS debug launch needs a settle time); AC-05 and AC-06 not met, AC-12 not verified, twelve met; model identity not attested. |
 | 2026-11-11 | R-24 | spec | `f9405ec9afecea149a0f74bd3e4cb188a0e8f5e9` | unknown | procedural | Four should-fix findings (two factual: the restart count and the tasks' files; two judgement: unbounded AC-06 recovery and no executed update check) and two nits, none blocking; model identity not attested. |
+| 2026-11-11 | R-25 | spec | `a6a741c6d00d784fda40f3ebd24a597e978d92e8` | unknown | procedural | Four should-fix findings (three factual: the debug instance after a rollback check, a stand-in installer shorter than the wait floor, uncovered AC-06 and AC-16 clauses; one judgement: nothing protects or restores from the backup file) and two nits, none blocking; model identity not attested. |
 
 ### R-1
 
@@ -1359,3 +1360,47 @@ SEVERITY: nit
 WHERE: Context, Owner summary
 EVIDENCE: Line 33 says "review R-23 found the app session unreliable on Paseo 0.15.4. On Windows, an update installed on quit left the app stopped". R-23 records that the Windows app was 0.15.3 and was installing 0.15.4 ("The relaunched 0.15.3 instance logged last at 15:51:46"). The summary also does not say that the AC-05 and AC-06 text changed: AC-05 gained the update clause, and AC-06 now judges the host list "after the app's next start" and names the lost window and deleted restore cases. These are material changes to the accepted proof bar.
 PROPOSAL: Say that the Windows app was updating from 0.15.3 to 0.15.4, and add one sentence on how AC-05 and AC-06 were reworded.
+
+### R-25
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry, steps 5 and 6; Test Plan, AC-05, AC-06 and AC-16 row
+EVIDENCE: Step 5 (line 191) ends a rollback this way: "After a rollback, debug-launch the app once more, open a new forward to its debugging port and read the registry; if it does not hold the backed-up value, restore it and repeat this step once." Step 6 (line 192) then says only "Relaunch the app without the debugging port and wait until its main process runs." No sentence says that the debug instance used for the check is quit and waited for before step 6, or that its forward is closed. On Windows that quit uses `window.close()` through the open forward. The current macOS launch runs `open -a "$app"` (internal/clientapp/snippets/launch.sh:6), which only activates an app that is already running. The fake app also ignores a launch while it runs (fakedevtools_test.go:142, `if !a.running`). So an implementation that follows the text literally leaves the debugging port open after every confirmed rollback, which contradicts AC-06's "runs without a debugging port". The Design also does not say whether the paths that end in the AC-16 exit still finish with the step 6 relaunch without a debugging port. The new Test Plan cases assert only "a non-zero exit and the restored registry after the restart" and do not assert that the debugging port is gone.
+PROPOSAL: In step 5, state that a confirmed check ends with a graceful quit, then the forward is closed and the CLI quits and waits before step 6. State that every rollback path, including the AC-16 exits, ends with step 6 or with the app stopped and says which. Add "no app process has a debugging port" to the assertions of the new rollback cases.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-05, AC-06 and AC-16 row; Tasks, T41
+EVIDENCE: Design line 194 says quit and wait lasts "until at least 3 seconds have passed and no app update installer runs". The planned test "runs a stand-in process whose arguments contain `sh.paseo.desktop.ShipIt` for 2 seconds ... and asserts that the quit returns after the first ends". A 2 second stand-in ends before the 3 second floor. An implementation that adds the floor but never looks for ShipIt therefore passes the test. T41's "fails first, then passes" holds against today's stop.sh, which returns as soon as the main process is gone (stop.sh:13-20), but it says nothing about installer detection. Neither the Test Plan nor T41 says that the test shortens the 3 second floor, as T17 did for the 8, 20 and 30 second waits.
+PROPOSAL: Run the ShipIt stand-in for longer than the floor, for example 5 seconds, or have the test shorten the floor. Assert that the quit returns no earlier than the moment the stand-in ends.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-05, AC-06 and AC-16 row
+EVIDENCE: AC-06 promises recovery when the window "stops answering after a reload up to twice", and Design line 198 bounds this at "at most twice in one command". The planned cases make the page stop answering "once after a reload" and "after every reload". No case loses the window exactly twice, so an off-by-one in that bound passes every planned test. AC-16 also requires that "when the app had no host list, the message says so", and AC-16 names `link`, `unlink` and `remove`. The two AC-16 cases ("make every restore fail and make the page stop answering after every reload") assert only "a message naming the backup file". No case starts from an app without `@paseo:daemon-registry`, and none runs the rollback through `unlink`. A passing subset does not meet a composite criterion, so an implementation review would have no check for these clauses.
+PROPOSAL: Add a case where the window stops answering after two reloads and the restore is confirmed. Add an AC-16 case where the app had no host list, asserting the message and that no backup file is written. Add one AC-16 case driven through `unlink`, or limit AC-16 to the commands the Test Plan covers.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry step 3 and step 5; Design, Skill; Tasks, T43
+EVIDENCE: AC-16 leaves the owner with an app that lost its hosts and a file that "holds the host list the app had before the command". Nothing restores from that file: no command, no README procedure and no skill instruction. T43 asks only that the README and skill say "a failed restore names the backup file". Step 3 (line 189) also overwrites `app-registry-<client>.backup.json` on every run where the key exists (clientapp.go:246-250, `if ok { a.backup(...) }`). Step 5 itself tells the owner to re-run after a force-stop. A re-run against an app that now holds a partial list or `[]` replaces the only copy of the previous hosts. If the key was deleted, the first re-run keeps the file, but the next `link` to that client overwrites it with the one-entry list. Hosts added by hand, whose passwords the operator host does not hold, are then lost. The owner set the rule after R-2 that every path runs unattended.
+PROPOSAL: Raise an open question. Option A: the CLI refuses to overwrite a backup left by an unconfirmed restore until the owner clears it, or it keeps timestamped backups. Option B: the skill tells the agent to stop and report after an AC-16 exit, and the README describes how to restore. The answer should be reflected in AC-16 or a new criterion.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Desktop app entry, step 5 and quit and wait
+EVIDENCE: Step 5 still says that after a force-stop "a rollback exits 1 and reports that the app may not have saved the change, so a re-run repeats it". That sentence was written before the new check after a rollback, which confirms the restore after a restart or ends in the AC-16 message naming the backup file. The Design does not say which message wins when a rollback was force-stopped. If the check confirms the restore, "may not have saved" is false. If it does not, the AC-16 message is required instead. The same gap applies to the quit and wait timeout (line 194), which "exits 1 without starting the app and says to run it again" even when it happens during a rollback whose restore was never confirmed.
+PROPOSAL: Limit the force-stop sentence to `unlink` changes that were kept. State that a rollback, whatever the reason for its exit, gives the confirmed-restore message or the AC-16 message.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Acceptance Criteria, AC-06; Test Plan, manual step 5; Tasks, T44
+EVIDENCE: AC-06 judges the host list "after the app's next start" but does not say which start: the CLI's check after the rollback, the step 6 relaunch, or a later start by the owner. Manual step 5 and T44 require a read of "the restarted app's `@paseo:daemon-registry`" while the app runs without a debugging port. They do not say how to read it, for example by parsing the app's localStorage leveldb as R-23 did, or by a separate debug launch, which would itself be another restart.
+PROPOSAL: Name the start in AC-06, for example "after the relaunch that ends the command". In manual step 5, give the read method and the wait before it.
