@@ -61,6 +61,14 @@ func TestOnlyATerminalCountsAsATerminal(t *testing.T) {
 	if isTerminal(file) {
 		t.Error("a regular file counts as a terminal")
 	}
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = r.Close(); _ = w.Close() }()
+	if isTerminal(w) {
+		t.Error("a pipe counts as a terminal")
+	}
 	ptmx, err := os.OpenFile("/dev/ptmx", os.O_RDWR, 0)
 	if err != nil {
 		t.Skipf("no pseudo-terminal: %v", err)
