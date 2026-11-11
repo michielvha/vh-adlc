@@ -365,6 +365,7 @@ None.
 | 2026-11-11 | R-12 | spec | `586a3f15f625d380f663dad948cdb81aabaa067c` | unknown | procedural | Two should-fix factual findings (the CI runner has sshd, no tasks for the revision), two factual nits and one judgement nit, none blocking; model identity not attested. |
 | 2026-11-11 | R-13 | spec | `ff0b45686b127b816fe19c08ddb0bef4a14b7a32` | unknown | procedural | Two should-fix factual findings (the daemon-port test case passes for the wrong reason, no migration note for existing key lines) and one factual nit, none blocking; model identity not attested. |
 | 2026-11-11 | R-14 | spec | `889e786b7eedddb9a28cc4ea6686d07cd85201ab` | unknown | procedural | One should-fix factual finding (AC-12 cannot be met before the PR), one factual nit and one judgement nit (minimum OpenSSH version), none blocking; model identity not attested. |
+| 2026-11-11 | R-15 | spec | `6f76bd03fb3eb67333078ab200d764abf386d1c6` | claude-opus-4.8 | procedural | Two factual nits and one judgement nit (a re-link on a pre-7.8 server breaks the working tunnel), none blocking; model reported by the reviewer, not requested. |
 
 ### R-1
 
@@ -914,3 +915,26 @@ SEVERITY: nit
 WHERE: Design, link step 2 (line 175) and onboard step 1 (line 162)
 EVIDENCE: The OpenSSH release notes (openssh.com/releasenotes.html, "Changes since OpenSSH 7.7") add the `permitlisten=` authorized_keys option in 7.8. Before this revision the key line needed only `restrict`, which came in 7.2. A server whose sshd predates 7.8, such as Ubuntu 18.04 with 7.6, does not know the new option. Neither the document nor preflight states a minimum sshd version, so on such a server `link` writes the key line, the client record, `known_hosts` and the alias block, and then fails only at the step 4 tunnel check.
 PROPOSAL: State that servers need OpenSSH 7.8 or later, and have onboard preflight report an older sshd. Otherwise, name the version as a known limit next to the Unix socket one.
+
+### R-15
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 35 and 37) and the owner decisions paragraph (line 80)
+EVIDENCE: The decisions paragraph at line 80 records owner choices only up to R-3 and the module proxy choice. The owner's 2026-11-11 answers to Q1 to Q5 appear only as plain facts in the summary and Design. Those answers are: the Unix socket limit is accepted, no CI step is added, the implementation reviewer runs steps 1 to 7, AC-12 carries residual #77, and OpenSSH 7.8 is a prerequisite with no version check. Line 35 says "The marketplace install (AC-12) is checked after the merge, as residual https://github.com/michielvha/vh-adlc/issues/77" and does not say that the owner decided it. feature-documents.md says "A residual needs the owner's decision" and asks the summary to cover owner decisions. As a result, a reader of the document cannot tell that the residual or the known limit was approved.
+PROPOSAL: Add one sentence to the decisions paragraph, and a short clause in the summary, saying that on 2026-11-11 the owner chose these five answers, including the AC-12 residual tracked in #77.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, link step 2 (line 176); Tasks, T36 (line 342)
+EVIDENCE: Step 2 removes every existing line for the key, then appends the new line with `permitlisten`. Line 176 says that on a server older than 7.8 "`link` writes the client's files and key line, then fails at the step 4 tunnel check", and no step restores the old line. I ran a local unprivileged sshd (OpenSSH 10.0p2) with an option value the server cannot parse (`permitlisten="none"`). The log showed `bad key options: invalid permission port`, and the key was refused (`Permission denied (publickey...)`). So sshd rejects the whole key when it cannot use a key option. On a pre-7.8 server, then, re-running `link` for a client that already works replaces that client's working line with one sshd rejects, and the desktop app loses its tunnel to that server. The summary and T36 both tell the owner to run `link` again on every server to close TCP remote forwards. The Q5 cost the owner accepted mentioned only a failed new link.
+PROPOSAL: State in link step 2 that on a pre-7.8 server a re-link also breaks the client's existing tunnel there. Name the recovery: restore `authorized_keys.bak-paseo-hosts` or unlink. Alternatively, have T36 confirm each server's sshd version before re-linking.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T37 (line 343)
+EVIDENCE: Line 272 says that only paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-hosts/`, so `README.md` in T37 reads as the repository root README, as it does in T25 (line 322). The root README has no server requirements. The plugin's own list is under `## Requirements` in `plugins/paseo-hosts/README.md:33-37`. Also, `skills/paseo-hosts/SKILL.md` has no requirements list (its headings are Add a server, Take a client or server away, Check and list, Passwords). T37's done condition is "a grep for `7.8` finds it in each", and the file it checks depends on which README the reader picks.
+PROPOSAL: Name `plugins/paseo-hosts/README.md` in T37, and say that the skill gains a short server requirements line.
