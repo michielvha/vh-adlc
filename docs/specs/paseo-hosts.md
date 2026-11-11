@@ -362,6 +362,7 @@ None.
 | 2026-11-11 | R-10 | implementation | `70566773176866fdb4ce7ab48076d093f8aec87f` | unknown | procedural | One blocking factual finding (client keys can open remote forwards) and two nits; AC-04 not met, six live-only criteria not verified, AC-12 untested, seven met; model identity not attested. |
 | 2026-11-11 | R-11 | spec | `e312b04259376552e59fdf0d2749259bdd247a2f` | claude-opus-4.8 | procedural | One blocking factual finding (Unix socket remote forwards still open), two should-fix judgement findings and one factual nit; model reported by the reviewer, not requested. |
 | 2026-11-11 | R-12 | spec | `586a3f15f625d380f663dad948cdb81aabaa067c` | unknown | procedural | Two should-fix factual findings (the CI runner has sshd, no tasks for the revision), two factual nits and one judgement nit, none blocking; model identity not attested. |
+| 2026-11-11 | R-13 | spec | `ff0b45686b127b816fe19c08ddb0bef4a14b7a32` | unknown | procedural | Two should-fix factual findings (the daemon-port test case passes for the wrong reason, no migration note for existing key lines) and one factual nit, none blocking; model identity not attested. |
 
 ### R-1
 
@@ -865,3 +866,26 @@ SEVERITY: nit
 WHERE: Context, Owner summary (lines 30, 35, 37)
 EVIDENCE: The summary justifies the known limit with "anyone who also has the password already controls the server". It leaves out the cost that Q1 gave the owner: "A stolen client key alone can still create a Unix socket at an unused path ... where a program such as tmux may later connect". A client linked with `--no-app` holds the key without the password by design (Design link step 5). The revision also removed "keeping Paseo state unless `--purge`", an owner decision that Design line 214 keeps. Finally, the summary says the reviewer "will run that procedure itself", but the Test Plan (line 267) limits the reviewer to steps 1 to 7.
 PROPOSAL: State the cost of the limit for a key without the password, including `--no-app` clients. Restore the `--purge` default, and say "manual steps 1 to 7".
+
+### R-13
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-04 row (line 253); Tasks, T33 (line 338)
+EVIDENCE: The AC-04 row starts a test HTTP server on the daemon port and says that `-R 127.0.0.1:<daemon port>:127.0.0.1:<daemon port>` must fail. It does not say to stop that server first. T33 says the test "fails on the two `-R` cases with the current key line". I ran an unprivileged local sshd (OpenSSH 10.0p2, `sshd -d`) with the current key line `restrict,port-forwarding,permitopen="127.0.0.1:47611",command="/bin/false"`, which has no `permitlisten`, and an HTTP server on 127.0.0.1:47611. `ssh -N -o ExitOnForwardFailure=yes -R 127.0.0.1:47611:127.0.0.1:47611` exited 255 with `remote port forwarding failed for listen port 47611`. The sshd log gave the reason as `bind [127.0.0.1]:47611: Address already in use`, not a permission denial. With the HTTP server stopped, the same command stayed connected until `timeout` ended it (exit 124), so the forward succeeded. With `permitlisten="127.0.0.1:1"` added, both forms were denied at the permission check. So while the test server is up, the daemon-port case passes with or without the fix, and T33's done condition cannot hold for that case. R-10's attack needs the daemon to be down, and the test as written never covers that state.
+PROPOSAL: In the AC-04 row and T33, require the test to stop the HTTP server before the daemon-port `-R` case, or to use an unoccupied port as the daemon port for that case. Then both `-R` cases fail with the current key line for the right reason.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (line 35); Design, link step 2 (line 176); Tasks, T36 (line 341)
+EVIDENCE: At 586a3f1 the summary said "Running `link` again will rewrite existing key lines." ff0b456 removed that sentence and put nothing in its place. Design step 2 says only that an older line "still matches the removal rules below". The local tool wrote the same line without `permitlisten` (`~/code/paseo-hosts/paseo-host:371`, `restrict,port-forwarding,permitopen="127.0.0.1:%s",command="/bin/false"`), and so does the plugin up to now (`authorize.sh:14`). The T27 evidence (lines 332 and 333) shows that the Mac and win-main also connect to fedora-43. T36 re-links only "both desktops", which in this document means arch-1. Every key line that already exists, on fedora-43 or any other server, still allows TCP remote forwards, including on the daemon port. That stays true until someone runs `link` again for that client and server, and the document does not tell the owner. The standard asks the summary to cover migration or recovery where it matters.
+PROPOSAL: Restore the migration note in the summary and in Design link step 2: key lines written before this change keep allowing TCP remote forwards until `link` runs again for each client and server. Also either widen T36 to every server in the registry, or name the remaining servers as an owner follow-up.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (line 37); Test Plan, AC-04 row (line 253)
+EVIDENCE: R-12 F-01 found that the `ubuntu-latest` runner has `sshd`, and it proposed saying that the test therefore runs in CI and confirming this on the first push. The revision instead says "wherever one is installed (no CI step is added for it)" and "skips with a message when `sshd` is not installed, and no CI step is added to install it". Those statements are accurate. Neither one says whether the `paseo-hosts` CI job is expected to run the test or skip it. The owner answered Q2 on the earlier claim that CI skips it, and the summary still does not say whether CI covers the R-10 fix.
+PROPOSAL: Add one clause to the summary and the AC-04 row saying that the runner is expected to have `sshd`, so the test should run in CI, and that the first push confirms whether it ran or skipped.
