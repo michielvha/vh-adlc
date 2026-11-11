@@ -187,7 +187,7 @@ func sshMain(args []string) int {
 	}
 	switch {
 	case a.L != "":
-		return forward(dir, a.L)
+		return forward(dir, key, a.L)
 	case a.W != "":
 		return tunnel(dir, key, a.W)
 	case key != nil && key.command != "":
@@ -353,21 +353,29 @@ func clientConnect(dest string) (string, *keyLine, int) {
 	return "", nil, fail(255, "%s@%s: Permission denied (publickey).", cfg["user"], hostname)
 }
 
-func tunnel(dir string, key *keyLine, target string) int {
+// opens reports whether key lets a client open target, and whether the
+// fake daemon answers there.
+func opens(dir string, key *keyLine, target string) (allowed, daemon bool) {
+	allowed = true
 	if key != nil {
-		allowed := !key.restrict || key.portForwarding
+		allowed = !key.restrict || key.portForwarding
 		if allowed && len(key.permitOpen) > 0 {
 			allowed = false
 			for _, p := range key.permitOpen {
 				allowed = allowed || p == target
 			}
 		}
-		if !allowed {
-			return fail(255, "channel 0: open failed: administratively prohibited: open failed\nstdio forwarding failed")
-		}
 	}
 	host, port, _ := net.SplitHostPort(target)
-	if (host != "127.0.0.1" && host != "localhost") || port != activePort(dir) {
+	return allowed, (host == "127.0.0.1" || host == "localhost") && port == activePort(dir)
+}
+
+func tunnel(dir string, key *keyLine, target string) int {
+	allowed, daemon := opens(dir, key, target)
+	if !allowed {
+		return fail(255, "channel 0: open failed: administratively prohibited: open failed\nstdio forwarding failed")
+	}
+	if !daemon {
 		return fail(255, "channel 0: open failed: connect failed: Connection refused\nstdio forwarding failed")
 	}
 	r := bufio.NewReader(os.Stdin)
@@ -424,13 +432,16 @@ func runPwsh(dir string) int {
 	return exitCode(cmd.Run())
 }
 
-// forward serves -L by proxying to the fake app's DevTools listener for
-// the remote port.
-func forward(dir, spec string) int {
+// forward serves -L. A client key reaches the fake daemon on the server;
+// otherwise it proxies to the fake app's DevTools listener for the remote
+// port.
+func forward(dir string, key *keyLine, spec string) int {
 	parts := strings.Split(spec, ":")
 	if len(parts) != 4 {
 		return fail(255, "testenv: unsupported forward %q", spec)
 	}
+	target := net.JoinHostPort(parts[2], parts[3])
+	allowed, daemon := opens(dir, key, target)
 	ln, err := net.Listen("tcp", parts[0]+":"+parts[1])
 	if err != nil {
 		return fail(255, "bind [%s]:%s: Address already in use", parts[0], parts[1])
@@ -442,6 +453,13 @@ func forward(dir, spec string) int {
 		}
 		go func() {
 			defer func() { _ = c.Close() }()
+			if key != nil {
+				if allowed && daemon {
+					_, _ = bufio.NewReader(c).ReadString('\n')
+					_, _ = io.WriteString(c, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"status\":\"ok\"}\n")
+				}
+				return
+			}
 			addr, err := appRequest(dir, http.MethodGet, "/devtools?port="+url.QueryEscape(parts[3]), nil)
 			if err != nil {
 				return
