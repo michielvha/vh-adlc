@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by the owner after a clean R-47; ready for tasks on feat/blog-visual-reading."
+status: in-progress
+status_description: "Claimed on feat/blog-visual-reading; implementing the tasks test-first."
+branch: feat/blog-visual-reading
 issue: null
 goal: "Long-form articles reach the owner with a checked visual reading pass, and the editor reviews presentation as well as prose."
 covers:
