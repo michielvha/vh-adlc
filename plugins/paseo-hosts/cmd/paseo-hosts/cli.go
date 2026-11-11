@@ -257,11 +257,12 @@ func run(args []string, _ io.Reader, stdout, stderr io.Writer, terminal bool) in
 	if len(rest) > 0 {
 		name, rest = rest[0], rest[1:]
 	}
-	rep := report.New(report.Options{Command: name, Stdout: stdout, Stderr: stderr, JSON: jsonOut, Plain: plain, Terminal: terminal})
+	ro := report.Options{Command: name, Stdout: stdout, Stderr: stderr, JSON: jsonOut, Plain: plain, Terminal: terminal}
 	if name == "help" || (name == "" && help) {
-		_, _ = fmt.Fprint(stdout, usage)
-		return report.ExitOK
+		ro.Command = "help"
+		return showHelp(ro, usage)
 	}
+	rep := report.New(ro)
 	cmd, ok := commands[name]
 	if !ok {
 		_, _ = fmt.Fprint(stderr, usage)
@@ -278,15 +279,14 @@ func run(args []string, _ io.Reader, stdout, stderr io.Writer, terminal bool) in
 		cmd.flags(fs, o)
 	}
 	if help {
-		printHelp(stdout, cmd, fs)
-		return report.ExitOK
+		return showHelp(ro, helpText(cmd, fs))
 	}
 	positional, err := parse(fs, rest)
 	if err == nil && len(positional) != cmd.args {
 		err = fmt.Errorf("want %d argument(s), got %d", cmd.args, len(positional))
 	}
 	if err != nil {
-		printHelp(stderr, cmd, fs)
+		_, _ = fmt.Fprint(stderr, helpText(cmd, fs))
 		return rep.Finish(report.Errorf(report.ExitUsage, "%s: %v", name, err), nil)
 	}
 	if cmd.args == 1 {
@@ -323,16 +323,27 @@ func parse(fs *flag.FlagSet, args []string) ([]string, error) {
 	}
 }
 
-func printHelp(w io.Writer, cmd command, fs *flag.FlagSet) {
-	_, _ = fmt.Fprintf(w, "Usage:\n  paseo-hosts %s [--json] [--plain]\n", cmd.synopsis)
+// showHelp prints help text, or with --json one result object holding it.
+func showHelp(o report.Options, text string) int {
+	if !o.JSON {
+		_, _ = fmt.Fprint(o.Stdout, text)
+		return report.ExitOK
+	}
+	return report.New(o).Finish(nil, map[string]any{"usage": text})
+}
+
+func helpText(cmd command, fs *flag.FlagSet) string {
+	var b strings.Builder
+	_, _ = fmt.Fprintf(&b, "Usage:\n  paseo-hosts %s [--json] [--plain]\n", cmd.synopsis)
 	first := true
 	fs.VisitAll(func(f *flag.Flag) {
 		if first {
-			_, _ = fmt.Fprint(w, "\nFlags:\n")
+			b.WriteString("\nFlags:\n")
 			first = false
 		}
-		_, _ = fmt.Fprintf(w, "  --%-14s %s\n", f.Name, f.Usage)
+		_, _ = fmt.Fprintf(&b, "  --%-14s %s\n", f.Name, f.Usage)
 	})
+	return b.String()
 }
 
 func desktopApp(ctx context.Context, o *options) (*clientapp.App, error) {
