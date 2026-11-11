@@ -99,7 +99,7 @@ func fromClient(t *testing.T, client, command string) string {
 func assertSSHAccess(t *testing.T, w *world, client *testenv.Host) {
 	t.Helper()
 	lines := keyLines(t, w.srv, client.Name)
-	if len(lines) != 1 || !strings.HasPrefix(lines[0], `restrict,port-forwarding,permitopen="127.0.0.1:6767",command="/bin/false" ssh-ed25519 `) {
+	if len(lines) != 1 || !strings.HasPrefix(lines[0], `restrict,port-forwarding,permitopen="127.0.0.1:6767",permitlisten="127.0.0.1:1",command="/bin/false" ssh-ed25519 `) {
 		t.Fatalf("authorized_keys lines for %s: %q", client.Name, lines)
 	}
 	if !strings.Contains(w.srv.Read(".ssh/authorized_keys"), "owner@laptop") {

@@ -255,10 +255,12 @@ func sshConfigBlock(home, dest string) map[string]string {
 
 type keyLine struct {
 	restrict, portForwarding bool
-	permitOpen               []string
+	permitOpen, permitListen []string
 	command                  string
 }
 
+// parseKeyOptions returns nil for an option it does not know, because sshd
+// refuses the whole key when it cannot use one of its options.
 func parseKeyOptions(opts string) *keyLine {
 	k := &keyLine{}
 	var parts []string
@@ -287,8 +289,12 @@ func parseKeyOptions(opts string) *keyLine {
 			k.portForwarding = true
 		case "permitopen":
 			k.permitOpen = append(k.permitOpen, val)
+		case "permitlisten":
+			k.permitListen = append(k.permitListen, val)
 		case "command":
 			k.command = val
+		default:
+			return nil
 		}
 	}
 	return k
@@ -346,7 +352,9 @@ func clientConnect(dest string) (string, *keyLine, int) {
 				if i == 1 {
 					return dir, &keyLine{}, 0
 				}
-				return dir, parseKeyOptions(strings.Join(f[:i-1], " ")), 0
+				if key := parseKeyOptions(strings.Join(f[:i-1], " ")); key != nil {
+					return dir, key, 0
+				}
 			}
 		}
 	}
