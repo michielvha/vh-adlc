@@ -16,6 +16,8 @@ Terms:
 
 ## Add a server
 
+A server needs Linux with OpenSSH 7.8 or later; the plugin `README.md` lists the rest.
+
 1. Take the server's SSH alias from the request. Take the client's SSH alias from the request; when it names none and `PASEO_HOSTS_CLIENT` is unset, ask the owner for it.
 2. Run `onboard <alias> --json`. Add `--publish` only when the owner asks for phone or browser access over the tailnet.
 3. Before `link`, tell the owner that the Paseo desktop app on the client will quit and restart twice. With the app's default settings each quit also stops the desktop's built-in daemon and the agents running in it, and may install a downloaded app update.

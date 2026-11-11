@@ -33,7 +33,7 @@ In Codex desktop, add `michielvha/vh-adlc` as a marketplace and select `paseo-ho
 ## Requirements
 
 - Operator host: the Go version in `go.mod`, Node and npm, and `ssh` with a working alias for every server and client. The CLI installs the pinned `@getpaseo/cli` into `runtime/<version>/` under `PASEO_HOSTS_CACHE` the first time a command needs it, and uses it to hash passwords and verify servers.
-- Server: Linux with Node, npm, Git, user lingering for systemd user units and the agent CLIs on `PATH`. Tailscale is needed only for `--publish`.
+- Server: Linux with OpenSSH 7.8 or later, Node, npm, Git, user lingering for systemd user units and the agent CLIs on `PATH`. Tailscale is needed only for `--publish`.
 - Client: macOS, or Windows with OpenSSH Server. For the app step, the Paseo desktop app installed and, on Windows, the user signed in to a desktop session.
 
 ## Commands
@@ -51,7 +51,7 @@ paseo-hosts password <alias>
 
 `onboard` installs the pinned daemon as the `paseo.service` user unit on loopback with the relay off, creates or reuses the password, stores only its bcrypt hash on the server and checks that a connection without the password is refused. Without `--publish` it deletes Serve routes to the daemon port; with it, it adds one tailnet-only HTTPS route. Running it again keeps the password, port and recorded clients.
 
-`link` gives the client a dedicated key that the server accepts only for a forward to the daemon port, pins the server's host key, writes a `paseo-<alias>` SSH alias block, and adds the server to the client's desktop app as a Remote SSH host. `--no-app` stops after the SSH access.
+`link` gives the client a dedicated key that the server accepts for a forward to the daemon port, pins the server's host key, writes a `paseo-<alias>` SSH alias block, and adds the server to the client's desktop app as a Remote SSH host. `--no-app` stops after the SSH access. The key refuses shells, forwards to other ports and TCP remote forwards, with one known limit: no key option stops a Unix socket remote forward (`ssh -R <path>:...`), so the key can still create a socket at an unused path the server user can write. Key lines written before the key carried `permitlisten` stay open to TCP remote forwards until `link` runs again for that client.
 
 `unlink` takes one client off a server. `--server-only` does not contact the client and deletes only its key line and registry record. `remove` unlinks every recorded client, then deletes the server's daemon service, Serve route, runtime and config, and the registry entry. It keeps the rest of the server's Paseo state and workspace unless `--purge` is given. `--skip-server` is for a server that is gone.
 
