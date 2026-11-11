@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after R-4; awaiting re-review."
+status_description: "Revised after R-5; awaiting re-review."
 issue: null
 goal: "Long-form articles reach the owner with a checked visual reading pass, and the editor reviews presentation as well as prose."
 covers:
@@ -200,8 +200,8 @@ Both package manifests move to 0.17.0, the version PR #75 already carries. `test
 | AC-03 | `visual-new` run: hash every `png`, `jpg`, `jpeg`, `gif`, `webp`, `avif` and `svg` file in the fixture after the run and assert each matches a supplied asset; check each added quote verbatim against the notes file and that its markup names the author from the notes. |
 | AC-04 | Native `visual-presentation` scenario on an existing article with a protected span: diff shows added treatment markup and every original prose line unchanged. Native `visual-revision` (wording-only) and `visual-review` (review-only) scenarios each start from a long-form article with one treatment and a known gap: a run of over 1,000 words without a break. In the first, the article's image, figure and quote markup is byte-identical before and after the run; the second changes no file; both handoffs name that gap. |
 | AC-05 | Native `visual-illustration` scenario: notes calling for a conceptual illustration of a workflow, with image permission in the request and no supplied asset for it. Assert a new image file in the destination whose caption or alt text says it is an illustration, with alt text and a caption. In `visual-new`, `visual-presentation` and `visual-illustration`, assert every added image has alt text and a caption. |
-| AC-06 | `tests/vh-adlc/blog.test.ts` asserts the heading and five items in `references/blog.md`. It locates two spans: the skill entry's paragraph that dispatches the editor, and the editor agent's paragraph that says what it reads, each found as the paragraph containing "Presentation inputs". It asserts both spans name "Presentation inputs" and neither names any item: "placement", "asset path", "provenance", "quote sources", "quote inventory" or "rendered evidence". |
-| AC-07 | Native `visual-editor` scenario with two editor dispatches. The first candidate is 1,200 words whose only treatment, after the last paragraph, is a real PNG showing a launch dialog, captioned and described as a plan review. The second is 2,500 words whose only treatment, after its second paragraph, is a pull quote repeating the meaning of a quote in the supplied batch inventory, followed by unbroken prose. Assert `Needs revision` from each: the first names the image mismatch and the closing placement, the second names the repeated quote and locates the unbroken run. The image repair must describe the image as a launch dialog, not a plan review, and fails if it calls the image unverified. The assertion is valid only because no text the editor can read names or hints at a launch dialog: the PNG's file name, alt text, caption, description and the other fixture files avoid it, and the expected words live only in the runner's assertion code, which is not copied into any directory the agent can read. |
+| AC-06 | `tests/vh-adlc/blog.test.ts` asserts the heading and five items in `references/blog.md`. It locates two spans: the skill entry's paragraph that dispatches the editor, and the editor agent's paragraph that says what it reads, each found as the paragraph containing "Presentation inputs". It asserts both spans name "Presentation inputs" and that neither matches, case-insensitively, "placement", "file path", "asset path", "provenance", "quote source", "quote inventory" or "rendered evidence". |
+| AC-07 | Native `visual-editor` scenario with two editor dispatches. The first candidate is 1,200 words whose only treatment, after the last paragraph, is a real PNG showing a launch dialog, captioned and described as a plan review. The second is 2,500 words whose only treatment, after its second paragraph, is a pull quote repeating the meaning of a quote in the supplied batch inventory, followed by unbroken prose. The repeated quote shares no run of six or more consecutive words with the batch quote. Assert `Needs revision` from each, with each named problem on its `Presentation repairs` line: the first names the image mismatch and the closing placement, the second names the repeated quote and locates the unbroken run. The image repair must describe the image as a launch dialog, not a plan review, and fails if it calls the image unverified. The PNG's file name, alt text, caption, description and the other fixture files avoid "launch", "dialog" and "modal". The runner checks the raw events and fails the scenario unless all of these hold: the editor's dispatch text contains none of those words; the editor read none of `run.ts`, `driver.ts` or any file under `docs/specs/`; and the editor's own events show it opened the PNG. |
 | AC-08 | Native `visual-editor-pass` scenario: clean candidate with desktop evidence only. Assert `Pass`, the named phone check and its presence in the handoff. The `visual-new` handoff contains the unverified statement and no rendered-review claim. `blog.test.ts` asserts the editor's unviewable-image fallback text. |
 | AC-09 | `blog.test.ts` assertions for each named statement and term, including the threshold in the user guide and each of the editor's nine flags in its agent text, and for the pointer in `docs/specs/blog-authoring.md`; `tests/vh-adlc/check.test.ts` for the version; `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 bun test tests/vh-adlc --timeout 60000` locally; `gh pr checks 75` on the head. |
 
@@ -221,6 +221,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-11 | R-2 | spec | `dbb0485` | claude-opus-4.8 | procedural | Changes needed: 6 should-fix, 6 nits; no blocking finding. |
 | 2026-11-11 | R-3 | spec | `aba495b` | claude-opus-4.8 | procedural | Changes needed: 2 should-fix, 3 nits; no blocking finding. |
 | 2026-11-11 | R-4 | spec | `9c146a3` | unknown | procedural | Changes needed: 1 should-fix, 4 nits; no blocking finding. |
+| 2026-11-11 | R-5 | spec | `30f552b` | claude-opus-4.8 | procedural | Changes needed: 1 should-fix, 2 nits; no blocking finding. |
 
 ### R-1
 
@@ -459,6 +460,29 @@ SEVERITY: nit
 WHERE: Design "Editor", Acceptance Criteria, Test Plan
 EVIDENCE: The editor flag list at lines 147-155 names nine checks. AC-07 (line 190) and its proof cover four of them: the missing body treatment, sustained runs, irrelevant images and repeated quotes. No criterion or proof has the editor flag an invalid no-visual exception, an illustration presented as product UI, illegible image text, missing alt text or captions, an unsupported screenshot or chart, or an inexact or unattributed quote. AC-05 (line 188) and AC-03 (line 186) cover only the writer side of some of these. An editor whose text omits those flags still ticks every box.
 PROPOSAL: Add the untested flags to the AC-09 static assertions on the editor text, or add fixture cases to `visual-editor`. Otherwise mark them as guidance outside the criteria.
+
+### R-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-07
+EVIDENCE: The AC-07 proof at docs/specs/blog-visual-reading.md:204 says the assertion "is valid only because no text the editor can read names or hints at a launch dialog". It controls only fixture text and keeps the runner's assertion code out of readable directories. The editor's main input is not a fixture. The parent session writes the dispatch, and it carries the presentation inputs, including "each asset's file path, description and provenance" (line 132). Line 123 tells the writer to open each image before selecting it. In the existing runner, the parent session composes the editor dispatch ("Dispatch the packaged shared independent prose editor", tests/vh-adlc/blog/run.ts at bda1a87, `editor` prompt). So a parent that opens the PNG can write "launch dialog" into the dispatch, and an editor that never views the image can repeat it. The condition is also impossible as written. run.ts:11 resolves the repository checkout, and line 75 runs `codex exec ... -C project` with no read restriction, so the agent can read run.ts in the checkout and this document, which names the launch dialog at line 190. No step in the proof checks that the condition held in a given run.
+PROPOSAL: Make the condition a runner check on the raw events. Fail the scenario if the editor's dispatch text names or hints at a launch dialog, or if the editor read run.ts, driver.ts or docs/specs. Also require evidence in the editor's own events that it opened the PNG.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-07
+EVIDENCE: AC-07 at line 190 requires the editor to name all four problems "under `Presentation repairs`", and requires the quote to repeat a batch quote's meaning "in new words". The proof at line 204 only checks that each dispatch "names" its two problems, without saying which return line. It describes the quote only as "repeating the meaning of a quote in the supplied batch inventory". An editor could name a problem under `Exceptions` or `Copy repairs`, or the fixture could repeat the quote word for word, and the proof would still pass. The same-meaning check from Design line 125 would then never be tested.
+PROPOSAL: Assert that each named problem appears on the `Presentation repairs` line. State that the fixture's repeated quote shares no sentence-length wording with the batch quote.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-06
+EVIDENCE: The Design item at line 132 reads "each asset's file path, description and provenance". The AC-06 proof at line 203 forbids "asset path", and that string does not appear in the item's wording. A restatement such as "each asset's file path and description" contains none of the forbidden strings and passes. That leaves part of R-1 F-06 and R-2 F-11 open.
+PROPOSAL: Match the forbidden terms to the Design's item wording, for example "file path" and "description" or a pattern covering "asset's file path". Alternatively, reword the item so that "asset path" is its exact term.
 
 ## Sources
 
