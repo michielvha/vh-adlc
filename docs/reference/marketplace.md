@@ -10,7 +10,8 @@ want separately.
 
 | Plugin | Purpose | Availability |
 | --- | --- | --- |
-| `vh-adlc` | Lifecycle intake, maintenance, and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
+| `vh-adlc` | Lifecycle intake, persistent codebase audit, dependency/security maintenance, article/promotion drafts and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
+| `remote-gui` | Private tailnet links, human-controlled sign-in and confirmed hand-back to an agent. | Codex and Claude catalogs; Linux amd64 runtime. See [setup and remote activation](../../plugins/remote-gui/README.md). Native-host and second-device acceptance remain separate checks. |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes, with Claude Remote Control phone notifications. | Codex and Claude catalogs; source lives in [auth-refresh](https://github.com/michielvha/auth-refresh). |
 | `github-app-registration` | Register a GitHub App through its manifest flow, save credentials locally with mode 0600, and export them to project files. | Claude catalog. The scripts require [Bun](https://bun.sh). |
 | `codex-qr-pairing` | Generate a fresh QR code for pairing with this Codex host. | Codex and Claude catalogs. Requires a signed-in Codex host with Remote Control running and `qrencode`. |
@@ -18,6 +19,31 @@ want separately.
 The [Codex catalog](../../.agents/plugins/marketplace.json) and
 [Claude catalog](../../.claude-plugin/marketplace.json) define package sources.
 Both pin auth-refresh to the same component commit.
+
+## Persistent audit
+
+`vh-adlc-audit` is included from plugin 0.8.0. It keeps persistent findings, re-verification and
+selected repairs portable while consumers retain their ledgers and operating rules. Actual Codex
+and Claude CLI marketplace fresh installs, upgrades from 0.7.0 and reinstalls passed at published
+source `afb0c4b84ad0c013614f404bcfea7d12ee9eca78` before Stackweaver adoption. A new adopter must
+verify its own installed version, project policy and migration preflight. Configure `.vh-adlc/audit.yaml`
+using the [audit settings reference](../../plugins/vh-adlc/references/audit-settings.md). See the [audit workflow](../user-guides/workflows.md#persistent-codebase-audit)
+and [acceptance limits](compatibility.md#persistent-codebase-audit).
+
+## Shared maintenance
+
+The `vh-adlc-maintenance` operation is included in vh-adlc from plugin 0.6.0;
+it is not a separate marketplace plugin. Update the client installation and
+verify its version and operation discovery before replacing a local entry.
+Project-specific maintenance policy and scope remain in the consuming repository.
+See [maintenance workflow](../user-guides/workflows.md#dependency-and-security-maintenance).
+
+For a migration, validate an exact candidate in isolated profiles first, then
+repeat installation and installed-helper checks against the published marketplace.
+A local catalog or copied skill is insufficient for consumer cutover. The packaged
+adoption preflight checks the exact shared/consumer targets, version, payload,
+native-host receipts and paired review. It treats receipts as operator attestations;
+it neither publishes the feature nor authorizes a consumer merge.
 
 ## codex-qr-pairing
 
@@ -74,3 +100,13 @@ existing one.
 
 Read the [registration workflow](../../plugins/github-app-registration/skills/github-app-registration/SKILL.md)
 for configuration, credential storage, and export options.
+
+## Documentation impact setup after installation
+
+The portable docs-impact checker uses the installed vh-adlc payload, Bun, Git,
+Bash and its locked verified binary. Follow [standalone setup](../get-started/installation.md#standalone-documentation-checking)
+after a fresh install or upgrade; checking never downloads missing prerequisites.
+A consumer compatibility wrapper can use `VH_ADLC_PLUGIN_ROOT` exported before
+sessions start. Point it to the actual installed plugin directory and refresh it
+when the installer changes the location. A local source copy is not marketplace
+installation evidence.

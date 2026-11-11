@@ -14,7 +14,7 @@ import (
 
 	"github.com/michielvha/vh-adlc/internal/report"
 	"github.com/michielvha/vh-adlc/internal/rules"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // sectionOpenQuestions is the schema-1 section the no_open_questions

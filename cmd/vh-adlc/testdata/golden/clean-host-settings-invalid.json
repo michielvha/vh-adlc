@@ -1,0 +1,1 @@
+{"schema_version":1,"command":"clean","result":"fail","knowledge":null,"data":null,"findings":[{"code":"host-settings-invalid","message":"host.yaml: temp_base is not absolute","path":"","line":0}]}

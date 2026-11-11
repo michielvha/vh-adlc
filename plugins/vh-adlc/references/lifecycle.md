@@ -15,11 +15,21 @@ invoking investigation never becomes permission to implement a repair.
 1. Identify the requested result and inspect the current repository or artifact.
    Separate the outcome, the actions authorized in the owner's request, and the
    existing task's actual state. A question may need only an answer.
-2. Inspect local instructions and Git state where relevant. Resolve engineering
-   knowledge through the existing installer and `vh-adlc knowledge` procedure.
-   Request the applicable prose/documentation, coding, language or delivery
-   pages, read the returned pages, and report the revision. Local repository
-   instructions still apply. A cached page is not a framework task record.
+2. Identify persistent audit intent before its installer or knowledge call. Inspect only the request,
+   local instructions and read-only repository evidence needed to choose the route. For audit, use
+   `scripts/audit/bootstrap.ts --offline` from the audit skill: verified cached binary, validated settings
+   metadata, then offline knowledge for the exact normalized `knowledge_pages`. Missing prerequisites
+   get the setup/onboarding handoff; never fall back online. If audit intent is ambiguous, defer bootstrap
+   and resolve that scope first. Configuration alone does not choose audit. Clear non-audit requests
+   use the ordinary installer and knowledge procedure. Read all resolved pinned pages and report the
+   revision; local instructions still apply. A cached page is not a framework task record.
+   For a documentation-impact request, or a feature request continuing through implement/ship,
+   apply the entry preflight in `references/docs-impact.md` before the first knowledge request or
+   repository write. Inspect root `AGENTS.md` at committed HEAD for the raw marker first. Clearly
+   absent keeps the existing manual path; otherwise ordinary binary setup precedes the offline
+   central roots parser. Declared roots add the documentation-impact convention to the full page
+   list, including the first call; roots gaps and missing-page stop with the prescribed handoff.
+   Plain documentation editing keeps its artifact-editing route.
 3. Select the procedure below. State it briefly, then do the authorized work.
    Do not ask the owner to choose a skill name. Ask only a missing scope or
    authority question that changes the result, continuing independent reads.
@@ -39,22 +49,36 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Requested result | Procedure |
 | --- | --- |
 | Answer or advice | Inspect the relevant source and answer with its practical limits. No saved artifact unless requested. |
+| Cross-repository GitHub Projects coordination | Use `skills/vh-adlc-projects/SKILL.md` for inventory and approved issue membership/single-select updates; board state never grants repository or live authority. |
 | Backlog triage | Use `skills/vh-adlc-triage/SKILL.md` to verify scope, rank ready work and save a report; GitHub writes require exact triage approval; every published verdict and local assessment patch also needs current proof in the confined controller from [the boundary guide](triage-boundary.md). |
+| Persistent codebase audit or selected audit-finding repair | Use `skills/vh-adlc-audit/SKILL.md` for the named mode/ledger/source scope; status reads history, reverify/full proposes before selection, and selected fixes use `audit-record.md` and independent audit review. |
 | Diagnosis or findings | Use `skills/vh-adlc-investigate/SKILL.md` with the selected investigation intent. Reproduce the issue and respect report-only limits. |
 | Article authoring, revision or promotion drafts | Use `skills/vh-adlc-blog/SKILL.md`; promotion mode prepares article-linked social copy only on request. Writing an article needs no software feature document. A request for implementing a blog or changing application behavior stays in the feature procedure. |
+| Review documentation affected by a code change | Use `skills/vh-adlc-docs-impact/SKILL.md`, for example “which docs need updating for this patch?”. A mixed feature-code request retains its underlying feature procedure and integrated docs check. |
 | Documentation or a convention | Edit the authoritative requested artifact using the resolved engineering rules, check the result and report it. No feature spec is needed solely to store prose. |
+| Host cleanup, or a session blocked by a full `/tmp` | Use `skills/vh-adlc-clean/SKILL.md`. It needs no feature document; `--compose` and `--kind` only on the user's request. |
+| Dependency or security sweep | Use `skills/vh-adlc-maintenance/SKILL.md` for inventory, evidence, durable reporting and selected follow-up; publish reports only through its exact current/adopted authority. |
+| Merge an approved PR, or remove stale merged branches | Merge only under the exact approval in `references/authority.md`, then run `after-merge` from `references/branches.md`. Stale-branch cleanup uses that guide's plan and digest-approved apply; inside a sweep it is part of `skills/vh-adlc-maintenance/SKILL.md`. |
 | Bounded maintenance | Follow the maintenance procedure below if the public contract is preserved and local instructions allow it. |
 | New capability or wider behavior change | Locate any existing feature and use the existing spec/tasks/implement/review procedures and binary gates. No unaccepted implementation. |
-| Bootstrap or onboarding | Read the applicable engineering guide; apply it within the selected task's authority. Creating application behavior still uses the feature procedure. |
+| Bootstrap or onboarding | Read the applicable engineering guide; apply it within the selected task's authority. Check GitHub's automatic merged-branch deletion with `auto-delete` from `references/branches.md` and offer to enable it when it is off. Beside it, run the helper from `references/security-settings.md` in the mode `security-settings-mode` prints; neither holds up the onboarding commit. A read-only, draft-only, no-push or no-filesystem request selects `check` without the command, and a nonzero exit of the command leads to `check` with `committed-settings-unresolved` and the cause, never `apply`. Under `check`, report the states, say how to opt in with `security_settings: apply`, record the guide's security checklist item as pending the owner's choice, and never run the guide's manual commands or `apply` on an in-session yes. Creating application behavior still uses the feature procedure. |
 | Verification or review | Observe the requested checks. For feature review, dispatch the canonical independent feature reviewer at an exact commit. |
-| Resume | Reconstruct the artifact, Git history and owner handoff. Features use their existing resume operation; maintenance uses its record and review target; docs use the requested artifact and remaining authorized edit. |
-| Ship or a live operation | Require an explicit request and a supported procedure. Existing feature shipping uses its original preflight. Exact batch approval permits only the triage actions in `references/triage.md`, subject to its enforced proof requirement for every published verdict and local assessment patch; other non-feature publishing or live-operation gaps remain unsupported. |
+| Resume | Reconstruct the artifact, Git history and owner handoff. Features use their existing resume operation; maintenance resumes a sweep from its run report/journal or an authored repair from its record and single/paired review target; docs use the requested artifact and remaining authorized edit. |
+| Ship or a live operation | Require an explicit request and a supported procedure. Existing feature shipping uses its original preflight. Exact batch approval permits only the triage actions in `references/triage.md`, subject to its enforced proof requirement for every published verdict and local assessment patch; the maintenance operation supports only its scoped report-publication and explicitly selected consumer-delivery procedure; the audit [selected-batch route](audit.md) permits only its scoped live/remote effects under exact current permission or an adopted declaration plus all retained gates; other non-feature publishing or live-operation gaps remain unsupported. |
 
 The paths in this table are relative to the plugin root. A generic request to
 diagnose and fix can finish diagnosis, then enter maintenance or feature work
 within the original authority. A report-only request stops after its findings.
 An unresolved mixed request gets a focused scope question before dependent
 runtime edits. Do not classify YAML or a small diff as documentation by filename.
+
+Audit routing requires persistent source-audit intent: a named audit mode, maintaining/reverifying
+the findings ledger, an explicit full persistent source audit or selected audit-finding repair.
+Explicit audit without settings gets its onboarding handoff; configuration alone never changes
+another route. Dependency/bot/advisory security sweeps stay maintenance, one-off failure diagnosis
+stays investigation and backlog ranking stays triage, even with audit settings. Ambiguous "audit security"
+or "audit the code for security issues" needs one focused persistent/full/dependency/diagnosis scope
+question before dependent work. Never silently invoke full mode. Continue independent reads while waiting.
 
 For an explicitly requested change that needs the feature procedure, continue
 with its spec operation: locate the existing document or draft the requested
@@ -92,6 +116,15 @@ stored-data formats/migrations, or tagging/release/deployment policy use the
 feature route. If eligibility is uncertain, resolve that question before the
 dependent change. Explicit repository requirements for a feature spec take
 precedence; report that concrete requirement rather than overriding it.
+
+For selected audit work, [audit.md](audit.md) makes the restoration distinction explicit: repairing
+an already documented intended behavior, permission or data invariant may use bounded maintenance
+without introducing a new boundary or promise. New semantics/boundary/format/migration/delivery policy
+needs a separate feature, accepted spec and separate PR; the owner merges that feature. Keep the
+routed members visible and require explicit reselection before reducing an audit batch; a planning
+answer grants no in-batch exception. Local visible-restoration judgment/owner-merge stops remain.
+The audit record/reviewer checks every selected disposition and
+the full carried publication scope; ordinary maintenance review alone does not establish those facts.
 
 A clearly requested eligible maintenance task authorizes its scoped local
 edits, checks, record and commits. It authorizes no push, PR, merge or live
@@ -133,3 +166,25 @@ changed definition and re-review stale work; do not repeat a completed repair
 or publish it merely because the owner said continue. Preserve earlier reviews
 as history. Maintenance completion is a framework check, not a feature-gate
 status, and must never be reported as `vh-adlc gate complete`.
+
+
+## Consumer dependency batches
+
+The shared maintenance operation keeps pure selected bot aggregation on the consumer's existing
+combined-PR/check/approval/release flow. Authored dependency, source, build/config and CI repairs use
+the bounded-maintenance checks and independent review above before publication. Mechanical manager
+normalization for unchanged selected bot inputs remains aggregation; intentional new constraints,
+manual edits and unexplained changes do not.
+
+A selected consumer procedure can keep an authored task's Definition/evidence outside the dependency
+squash on a dedicated local primary evidence ref. Use maintenance-record.md and maintenance-review.md
+with both source_target and record_target. The post-aggregation task base, relevant verification inputs,
+exact source/Definition comparison and renewed review after changes still apply. Record placement
+never grants publication or removes review. Ordinary repairs keep their existing one-target contract.
+The authority guide's five declared maintenance location roles permit only scoped ordinary creation
+and non-forced cleanup; unrelated worktrees and evidence remain preserved.
+
+Audit resumes from its private snapshot/report/journal and actual owned branch/record using
+`audit.md`. Its two declared audit roles are separate from dependency/report-publication grants.
+Selected live/remote audit effects need current exact permission or the adopted audit declaration
+plus its retained gates. Reverify/full has no standing remote delivery permission.

@@ -33,14 +33,23 @@ jobs:
       - name: Install and probe the Linux verification boundary
         run: |
           sudo apt-get update
-          sudo apt-get install -y bubblewrap util-linux apparmor-profiles
-          sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          sudo apt-get install -y bubblewrap util-linux apparmor
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
           bwrap --unshare-all --ro-bind / / -- /usr/bin/true
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.4
+      - name: Prepare the locked YAML reader
+        run: bash plugins/vh-adlc/scripts/ensure-vh-adlc.sh
+      - name: Typecheck documentation impact
+        run: |
+          bun run --cwd plugins/vh-adlc/scripts/docs-impact typecheck
       - name: Check the vh-adlc package
-        run: bun test tests/vh-adlc
+        run: bun test tests/vh-adlc --timeout 60000
 
   checker-macos:
     runs-on: macos-latest
@@ -49,11 +58,20 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.4
       # Managed verification and effect recovery require Linux/Bubblewrap/flock.
       # Ubuntu runs every test; macOS checks the portable feature and report inputs.
+      - name: Prepare the locked YAML reader
+        run: bash plugins/vh-adlc/scripts/ensure-vh-adlc.sh
+      - name: Typecheck portable documentation impact
+        run: |
+          bun run --cwd plugins/vh-adlc/scripts/docs-impact typecheck
       - name: Check portable vh-adlc behavior
         run: >-
           bun test tests/vh-adlc/*.test.ts
@@ -63,12 +81,58 @@ jobs:
           tests/vh-adlc/triage/migration.test.ts
           tests/vh-adlc/triage/owned-process.test.ts
           tests/vh-adlc/triage/settings.test.ts
+          tests/vh-adlc/maintenance/*.test.ts
+          tests/vh-adlc/audit/*.test.ts
+          tests/vh-adlc/docs-impact/*.test.ts
           --timeout 60000
+
+  remote-gui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: plugins/remote-gui/go.mod
+          cache: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - name: Check the remote-gui module
+        working-directory: plugins/remote-gui
+        run: |
+          go build ./cmd/remote-gui
+          go test -race ./...
+          go vet ./...
+          go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 config verify
+          go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0 run
+          go mod tidy -diff
+      - name: Check the independently installed package
+        run: bun test tests/remote-gui
+      - name: Prepare real browser verification
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth x11vnc novnc websockify
+          bun install --cwd tests/remote-gui --frozen-lockfile --ignore-scripts
+          test -x /usr/bin/google-chrome
+      - name: Verify browser phases and session continuity
+        env:
+          REMOTE_GUI_BROWSER_E2E: '1'
+          REMOTE_GUI_VIEWER_E2E: '1'
+          REMOTE_GUI_CHROMIUM: /usr/bin/google-chrome
+          REMOTE_GUI_PLAYWRIGHT_MODULE: ${{ github.workspace }}/tests/remote-gui/node_modules/playwright-core
+          REMOTE_GUI_TEST_BINARY: ${{ github.workspace }}/plugins/remote-gui/remote-gui
+        run: |
+          cd plugins/remote-gui
+          go test -race ./internal/browser -count=1
+          cd ../..
+          bun test tests/remote-gui/browser.e2e.test.ts
 
   # Tags main, and a branch whose open PR has the release:preview label at this
   # commit. Every other run only calculates the version.
   version:
-    needs: [verify, checker, checker-macos]
+    needs: [verify, checker, checker-macos, remote-gui]
     permissions:
       contents: read
       pull-requests: read

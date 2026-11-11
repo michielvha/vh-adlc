@@ -27,6 +27,11 @@
         "sha": "3695e2c73df68d1b3bad8e21dbb204e431adcd3d"
       },
       "description": "Check and restore local SSO identities with isolated account lanes and Claude phone notifications."
+    },
+    {
+      "name": "remote-gui",
+      "source": "./plugins/remote-gui",
+      "description": "Share task-local apps over the tailnet and hand a fresh browser to the human."
     }
   ]
 }

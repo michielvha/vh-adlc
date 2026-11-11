@@ -1,0 +1,16 @@
+{
+  "kind": "immutable-public-historical-test-runtime",
+  "source_commit": "5ed104cd14ace9ffab4174543b8e53ee75d9e2b6",
+  "source_paths": [
+    "plugins/vh-adlc"
+  ],
+  "command": [
+    "git",
+    "archive",
+    "5ed104cd14ace9ffab4174543b8e53ee75d9e2b6",
+    "plugins/vh-adlc"
+  ],
+  "archive_sha256": "c59304903157b516bad49e531c405941561ee76cefe2b44fc434d30b9910350e",
+  "archive_bytes": 225876,
+  "purpose": "Execute the actual historical JSON journal producer across YAML cutover; never install or invoke its agent workflow."
+}

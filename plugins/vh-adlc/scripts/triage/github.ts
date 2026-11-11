@@ -3,53 +3,14 @@ import { normalizeIssue, normalizeComment, normalizeLabel } from "./collect";
 import { MutationFailure } from "./execute";
 import type { Settings } from "./types";
 
-export function parsePage(raw: string, expected: { hostname: string; endpoint: string; page: number; repositoryId?: number; onNext?: (url: string) => void }): { items: unknown[]; next: number | null } {
-  const split = raw.search(/\r?\n\r?\n/);
-  if (split < 0) throw new Error("missing-response-headers");
-  const headers = raw.slice(0, split), body = raw.slice(split).replace(/^\r?\n\r?\n/, "");
-  if (!/^HTTP\/[\d.]+ 200(?:\s|$)/.test(headers)) throw new Error("failed-http-status");
-  let items: unknown;
-  try { items = JSON.parse(body); } catch { throw new Error("invalid-response-json"); }
-  if (!Array.isArray(items)) throw new Error("expected-response-list");
-  const links = [...headers.matchAll(/^link:\s*(.+)$/gim)].map((match) => match[1]).join(", ");
-  const nextLinks: string[] = [];
-  for (const part of links ? links.split(/,\s*(?=<)/) : []) {
-    const parsed = part.trim().match(/^<([^>]+)>;\s*rel="([^"]+)"$/i);
-    if (!parsed) throw new Error("invalid-pagination-link");
-    if (parsed[2].toLowerCase().split(/\s+/).includes("next")) nextLinks.push(parsed[1]);
-  }
-  if (nextLinks.length > 1) throw new Error("ambiguous-next-page");
-  if (!nextLinks.length) return { items, next: null };
-  const apiHost = expected.hostname === "github.com" ? "api.github.com" : expected.hostname;
-  const base = new URL(`https://${apiHost}/${expected.endpoint}`), next = new URL(nextLinks[0]);
-  const acceptedPaths = [base.pathname.toLowerCase()];
-  const suffix = base.pathname.match(/^\/repos\/[^/]+\/[^/]+(\/.*)$/)?.[1];
-  if (suffix && Number.isSafeInteger(expected.repositoryId) && expected.repositoryId! > 0) acceptedPaths.push(`/repositories/${expected.repositoryId}${suffix}`.toLowerCase());
-  if (expected.hostname !== "github.com") acceptedPaths.push(...acceptedPaths.map(path => `/api/v3${path}`));
-  if (next.protocol !== "https:" || next.hostname !== apiHost || next.username || next.password || next.port || next.hash ||
-      !acceptedPaths.includes(next.pathname.toLowerCase())) throw new Error("next-page-target-changed");
-  const keys = new Set([...base.searchParams.keys(), ...next.searchParams.keys()]);
-  keys.delete("page");
-  for (const cursor of ["after", "before"]) {
-    keys.delete(cursor);
-    const values = next.searchParams.getAll(cursor);
-    if (values.length > 1 || values.some(value => !value || value.length > 4096 || /[\x00-\x20\x7f]/.test(value))) throw new Error("invalid-next-cursor");
-  }
-  if (next.searchParams.has("after") && next.searchParams.has("before")) throw new Error("ambiguous-next-cursor");
-  for (const key of keys) if (JSON.stringify(base.searchParams.getAll(key)) !== JSON.stringify(next.searchParams.getAll(key))) throw new Error("next-page-scope-changed");
-  const value = next.searchParams.get("page");
-  const cursorBased=next.searchParams.has("after")||next.searchParams.has("before");
-  if (next.searchParams.getAll("page").length>1 || value!==null && (!/^[1-9]\d*$/.test(value)||!Number.isSafeInteger(Number(value))) ||
-    !cursorBased && (value===null || Number(value)!==expected.page+1)) throw new Error("invalid-next-page");
-  expected.onNext?.(next.href);
-  return { items, next: expected.page + 1 };
-}
+import { ghRead, parsePage } from "../github-read";
+export { parsePage } from "../github-read";
 
 export function githubReader(config: Settings): Reader {
   let repositoryId: number | null = null;
   const chains = new Map<string, Map<number, string>>();
   return { async identity(){
-    const result=Bun.spawnSync(["gh","api","--hostname",config.hostname,"--method","GET","user","--jq",".login"],{env:{...process.env,GH_PROMPT_DISABLED:"1"},stdout:"pipe",stderr:"pipe",timeout:60_000});
+    const result=ghRead(config.hostname, "user", { projection: ".login" });
     const login=result.stdout.toString().trim();if(result.exitCode!==0||!/^[a-z0-9][a-z0-9-]*(?:\[bot\])?$/i.test(login))throw Error("github-actor-unavailable");return login;
   },async page(request: ReadRequest, page: number) {
     if (!Number.isSafeInteger(page) || page < 1) throw new Error("invalid-page");
@@ -62,9 +23,7 @@ export function githubReader(config: Settings): Reader {
     else if (request.kind === "events" && Number.isSafeInteger(request.issue) && request.issue! > 0) endpoint=`${base}/issues/${request.issue}/events?per_page=100`;
     else throw new Error("unsupported-read-request");
     if (repositoryId === null) {
-      const identity = Bun.spawnSync(["gh", "api", "--hostname", config.hostname, "--method", "GET", base, "--jq", ".id"], {
-        env: { ...process.env, GH_PROMPT_DISABLED: "1" }, stdout: "pipe", stderr: "pipe", timeout: 60_000,
-      });
+      const identity = ghRead(config.hostname, base, { projection: ".id" });
       const value = identity.stdout.toString().trim();
       if (identity.exitCode !== 0 || !/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value))) throw new Error("github-repository-identity-unavailable");
       repositoryId = Number(value);
@@ -72,9 +31,7 @@ export function githubReader(config: Settings): Reader {
     if (page === 1) chains.set(endpoint, new Map([[1, `${endpoint}&page=1`]]));
     const chain = chains.get(endpoint), target = chain?.get(page);
     if (!chain || !target) throw new Error("unvalidated-next-page");
-    const result = Bun.spawnSync(["gh", "api", "--hostname", config.hostname, "--method", "GET", "--include", target], {
-      env: { ...process.env, GH_PROMPT_DISABLED: "1" }, stdout: "pipe", stderr: "pipe", timeout: 60_000,
-    });
+    const result = ghRead(config.hostname, target);
     if (result.exitCode !== 0) throw new Error("github-read-failed");
     return parsePage(result.stdout.toString(), { hostname: config.hostname, endpoint, page, repositoryId, onNext(url) {
       if ([...chain.values()].includes(url)) throw new Error("repeated-next-url");

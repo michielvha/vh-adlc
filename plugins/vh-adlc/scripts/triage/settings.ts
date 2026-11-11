@@ -1,6 +1,7 @@
-import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { Settings } from "./types";
+import { settingsFile } from "../settings-file";
 import {createHash} from "node:crypto";
 
 function fail(field: string): never { throw new Error(`invalid triage settings: ${field}`); }
@@ -58,7 +59,7 @@ export function resolveInside(root: string, path: string): string {
   return completed;
 }
 
-function origin(root: string): { repository: string; hostname: string } {
+export function origin(root: string): { repository: string; hostname: string } {
   let remote = git(root, "remote", "get-url", "origin");
   const scp = remote.match(/^git@([A-Za-z0-9.-]+):([^?#]+)$/);
   if (scp) remote = `ssh://git@${scp[1]}/${scp[2]}`;
@@ -73,13 +74,8 @@ function origin(root: string): { repository: string; hostname: string } {
 
 export function loadSettings(root: string, options: { settingsPath?: string } = {}): Settings {
   root = realpathSync(root);
-  const identity = origin(root), path = resolveInside(root, options.settingsPath ?? ".vh-adlc/triage.json");
-  let input: Record<string, unknown> = {}, configured = false;
-  if (existsSync(path)) {
-    let data: unknown;
-    try { data = JSON.parse(readFileSync(path, "utf8")); } catch { fail("settings must be readable JSON"); }
-    input = object(data, "settings must be an object"); configured = true;
-  } else if (options.settingsPath !== undefined) fail("requested settings file is missing");
+  const identity = origin(root), file = settingsFile({ root, name: "triage", settingsPath: options.settingsPath, inside: path => resolveInside(root, path), fail });
+  const input = object(file.value, "settings must be an object"), configured = file.configured;
   keys(input, ["schema_version", "repository", "hostname", "source_roots", "generated_mirrors", "plan_roots", "plan_fields",
     "report_dir", "protected_ids", "index_ids", "index_rules", "bot_authors", "owned_labels", "label_map",
     "priority_order", "milestone_order", "stale_days", "page_budget","workstreams"], "settings");
@@ -103,7 +99,7 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
     if(!parsed.plan_roots.length&&!parsed.reference_files.length)fail("workstream requires a declared source");return parsed;
   });
   const config: Settings = {
-    schema_version: 1, root, configured, settings_path: relative(root, path).split(sep).join("/"), ...identity,
+    schema_version: 1, root, configured, settings_path: file.path, ...identity,
     source_roots: strings(input.source_roots, ["."], "source_roots"), generated_mirrors: strings(input.generated_mirrors, [], "generated_mirrors"),
     plan_roots: strings(input.plan_roots, [], "plan_roots"), plan_fields,
     report_dir: input.report_dir === undefined ? ".vh-adlc/reports/triage" : string(input.report_dir, "report_dir"),
