@@ -123,7 +123,7 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	rep.Pass("Passed: %s is %s, %d host key(s) for %s", o.Client, client.Kind, len(hostKeys), entry.SSH)
+	rep.Pass("%s is %s, %d host key(s) for %s", o.Client, client.Kind, len(hostKeys), entry.SSH)
 
 	if !entry.HasClient(o.Client) {
 		entry.AddClient(o.Client)
@@ -147,7 +147,7 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	}); err != nil {
 		return nil, remoteError("authorizing the client key", err)
 	}
-	rep.Pass("Passed: tunnel-only key line for %s on %s", o.Client, o.Alias)
+	rep.Pass("tunnel-only key line for %s on %s", o.Client, o.Alias)
 
 	name := SSHAlias(o.Alias)
 	if _, err := client.Run(ctx, clientSSHScript, clientSSHPS, remote.Vars{
@@ -161,16 +161,16 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	}); err != nil {
 		return nil, remoteError("writing the alias block", err)
 	}
-	rep.Pass("Passed: alias %s on %s", name, o.Client)
+	rep.Pass("alias %s on %s", name, o.Client)
 
 	if _, err := client.Run(ctx, tunnelScript, tunnelPS, remote.Vars{"name": name, "port": strconv.Itoa(entry.ListenPort)}); err != nil {
 		return nil, remoteError("checking the tunnel", err)
 	}
-	rep.Pass("Passed: the tunnel answers and a shell command is refused")
+	rep.Pass("the tunnel answers and a shell command is refused")
 
 	res := &Result{Alias: o.Alias, Client: o.Client, Platform: client.Kind, SSHAlias: name}
 	if o.NoApp {
-		rep.Skip("Skipped: desktop app (--no-app)")
+		rep.Skip("desktop app (--no-app)")
 		return res, nil
 	}
 	if err := o.App(ctx, client, entry, password); err != nil {

@@ -1,9 +1,9 @@
 package onboard_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -34,12 +34,16 @@ func setup(t *testing.T) (*testenv.Env, *testenv.Host, config.Config) {
 	return e, srv, cfg
 }
 
-func run(o onboard.Options) (*onboard.Result, error) {
+func run(t *testing.T, o onboard.Options) (*onboard.Result, error) {
+	t.Helper()
 	if o.Alias == "" {
 		o.Alias = "srv"
 	}
-	o.Report = report.New(report.Options{Command: "onboard", Stdout: io.Discard, Stderr: io.Discard})
-	return onboard.Run(context.Background(), o)
+	var out bytes.Buffer
+	o.Report = report.New(report.Options{Command: "onboard", Stdout: &out, Stderr: &out})
+	res, err := onboard.Run(context.Background(), o)
+	testenv.CheckReport(t, out.String())
+	return res, err
 }
 
 func stateConfig(t *testing.T, srv *testenv.Host) map[string]any {
@@ -69,7 +73,7 @@ func TestOnboardInstallsAnSSHOnlyDaemon(t *testing.T) {
 	e, srv, cfg := setup(t)
 	srv.Mark("serve.json", `{"TCP":{"8956":{"HTTPS":true},"443":{"HTTPS":true}},"Web":{"srv.tail.test:8956":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:6767"}}},"srv.tail.test:443":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:3000"}}}}}`)
 	srv.Mark("daemon-503", "2")
-	res, err := run(onboard.Options{Config: cfg})
+	res, err := run(t, onboard.Options{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +126,7 @@ func TestOnboardInstallsAnSSHOnlyDaemon(t *testing.T) {
 		t.Fatalf("registry %+v", entry)
 	}
 
-	res, err = run(onboard.Options{Config: cfg})
+	res, err = run(t, onboard.Options{Config: cfg})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,14 +142,14 @@ func TestOnboardInstallsAnSSHOnlyDaemon(t *testing.T) {
 
 func TestPublishAddsOneRouteAndARerunRemovesIt(t *testing.T) {
 	e, srv, cfg := setup(t)
-	res, err := run(onboard.Options{Config: cfg, Publish: true})
+	res, err := run(t, onboard.Options{Config: cfg, Publish: true})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if res.URL != "wss://srv.tail.test:8956" || res.Exposure != "tailnet" {
 		t.Fatalf("result %+v", res)
 	}
-	if _, err := run(onboard.Options{Config: cfg, Publish: true}); err != nil {
+	if _, err := run(t, onboard.Options{Config: cfg, Publish: true}); err != nil {
 		t.Fatal(err)
 	}
 	if s := serveJSON(srv); strings.Count(s, "127.0.0.1:6767") != 1 || !strings.Contains(s, `"srv.tail.test:8956"`) {
@@ -158,7 +162,7 @@ func TestPublishAddsOneRouteAndARerunRemovesIt(t *testing.T) {
 	if !health {
 		t.Fatal("no HTTPS health check from the operator host")
 	}
-	if _, err := run(onboard.Options{Config: cfg}); err != nil {
+	if _, err := run(t, onboard.Options{Config: cfg}); err != nil {
 		t.Fatal(err)
 	}
 	if s := serveJSON(srv); strings.Contains(s, "127.0.0.1:6767") {
@@ -170,7 +174,7 @@ func TestPublishAddsOneRouteAndARerunRemovesIt(t *testing.T) {
 	}
 
 	srv.Mark("serve.json", `{"TCP":{"8956":{"HTTPS":true}},"Web":{"srv.tail.test:8956":{"Handlers":{"/":{"Proxy":"http://127.0.0.1:3000"}}}}}`)
-	if _, err := run(onboard.Options{Config: cfg, Publish: true}); report.Code(err) != report.ExitFailed || !strings.Contains(err.Error(), "8956") {
+	if _, err := run(t, onboard.Options{Config: cfg, Publish: true}); report.Code(err) != report.ExitFailed || !strings.Contains(err.Error(), "8956") {
 		t.Fatalf("a Serve port used by another route must fail, got %v", err)
 	}
 }
@@ -200,7 +204,7 @@ func TestRerunKeepsALocalToolRegistry(t *testing.T) {
 	if err := os.WriteFile(pwFile, []byte("local-tool-password\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	res, err := run(onboard.Options{Config: cfg, ClientHost: "srv.example.test"})
+	res, err := run(t, onboard.Options{Config: cfg, ClientHost: "srv.example.test"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,7 +227,7 @@ func TestRerunKeepsALocalToolRegistry(t *testing.T) {
 
 	before, _ := os.ReadFile(registry.EnvPath(cfg.Dir, "srv"))
 	calls := len(e.Calls())
-	_, err = run(onboard.Options{Config: cfg, ListenPortFlag: 7000})
+	_, err = run(t, onboard.Options{Config: cfg, ListenPortFlag: 7000})
 	if report.Code(err) != report.ExitUsage {
 		t.Fatalf("a different --listen-port must exit 2, got %v", err)
 	}
@@ -236,7 +240,7 @@ func TestRerunKeepsALocalToolRegistry(t *testing.T) {
 func TestVerificationFailsWhenTheDaemonAcceptsNoPassword(t *testing.T) {
 	_, srv, cfg := setup(t)
 	srv.Mark("daemon-accepts-anyone", "")
-	_, err := run(onboard.Options{Config: cfg})
+	_, err := run(t, onboard.Options{Config: cfg})
 	if report.Code(err) != report.ExitFailed || !strings.Contains(err.Error(), "without a password") {
 		t.Fatalf("want a failed check, got %v", err)
 	}

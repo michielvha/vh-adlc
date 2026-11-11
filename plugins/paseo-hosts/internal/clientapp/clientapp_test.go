@@ -98,6 +98,7 @@ func (w *world) check(t *testing.T) {
 	if strings.Contains(w.out.String(), w.pw) {
 		t.Fatal("the output holds the password")
 	}
+	testenv.CheckReport(t, w.out.String())
 	for _, c := range w.e.Calls() {
 		if strings.Contains(strings.Join(c.Args, " "), w.pw) {
 			t.Fatalf("the password is in the arguments of %s", c.Name)

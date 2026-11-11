@@ -116,7 +116,7 @@ func (a *App) Add(ctx context.Context, c link.Client, e *registry.Entry, passwor
 	}); err != nil {
 		return remoteError("checking the app's tunnel", err)
 	}
-	a.Report.Pass("Passed: the Paseo app on %s lists %s and opened its tunnel", c.Alias, e.Alias)
+	a.Report.Pass("the Paseo app on %s lists %s and opened its tunnel", c.Alias, e.Alias)
 	return nil
 }
 
@@ -138,7 +138,7 @@ func (a *App) Delete(ctx context.Context, c link.Client, alias, serverID string)
 	if err != nil {
 		return err
 	}
-	a.Report.Pass("Passed: the Paseo app on %s no longer lists %s", c.Alias, alias)
+	a.Report.Pass("the Paseo app on %s no longer lists %s", c.Alias, alias)
 	return nil
 }
 
@@ -208,7 +208,7 @@ func (a *App) session(ctx context.Context, c link.Client, ch change) error {
 	launchErr := a.launch(ctx, c, "")
 	forced := stopped == "KILL"
 	if forced {
-		a.Report.Partial("Partial: the app on %s did not quit within %v and was force-stopped", c.Alias, QuitTimeout)
+		a.Report.Partial("the app on %s did not quit within %v and was force-stopped", c.Alias, QuitTimeout)
 	}
 	switch {
 	case writeErr != nil && forced:
@@ -281,7 +281,7 @@ func (a *App) write(ctx context.Context, addr string, c link.Client, ch change) 
 		return lastWrite, err
 	}
 	if hosts, perr := parseRegistry(cur, curOK); perr == nil && ch.kept(prev, hosts) {
-		a.Report.Pass("Passed: the app on %s kept the change after a reload", c.Alias)
+		a.Report.Pass("the app on %s kept the change after a reload", c.Alias)
 		return lastWrite, nil
 	}
 	if ok {

@@ -126,7 +126,7 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	if o.Publish && !slices.Contains(routes, route{servePort, daemonTarget}) {
 		add = strconv.Itoa(servePort)
 	}
-	rep.Pass("Passed: %s has Node, npm, Git, lingering and agents %s", o.Alias, agents)
+	rep.Pass("%s has Node, npm, Git, lingering and agents %s", o.Alias, agents)
 
 	if err := registry.EnsureDir(cfg.Dir); err != nil {
 		return nil, err
@@ -136,7 +136,7 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 		return nil, err
 	}
 	if created {
-		rep.Pass("Passed: created the password in %s", registry.PasswordPath(cfg.Dir, o.Alias))
+		rep.Pass("created the password in %s", registry.PasswordPath(cfg.Dir, o.Alias))
 	}
 	rt, err := runtime.Ensure(ctx, cfg.Cache, cfg.Version)
 	if err != nil {
@@ -161,7 +161,7 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	}); err != nil {
 		return nil, remoteError("install", err)
 	}
-	rep.Pass("Passed: paseo.service answers on 127.0.0.1:%d", listenPort)
+	rep.Pass("paseo.service answers on 127.0.0.1:%d", listenPort)
 
 	if len(remove) > 0 || add != "" {
 		if _, err := remote.Bash(ctx, o.Alias, exposureScript, remote.Vars{
@@ -173,7 +173,7 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 		}
 	}
 	for _, p := range remove {
-		rep.Pass("Passed: removed the Serve route on port %s", p)
+		rep.Pass("removed the Serve route on port %s", p)
 	}
 
 	if !existing {
@@ -208,13 +208,13 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	if err := entry.Save(cfg.Dir); err != nil {
 		return nil, err
 	}
-	rep.Pass("Passed: wrote %s", registry.EnvPath(cfg.Dir, o.Alias))
+	rep.Pass("wrote %s", registry.EnvPath(cfg.Dir, o.Alias))
 
 	if err := Verify(ctx, rt, entry, password, rep); err != nil {
 		return nil, err
 	}
 	if len(res.Relink) > 0 {
-		rep.Partial("Partial: run link again for %s; the client host name changed", strings.Join(res.Relink, ", "))
+		rep.Partial("run link again for %s; the client host name changed", strings.Join(res.Relink, ", "))
 	}
 	return res, nil
 }
@@ -228,7 +228,7 @@ func Verify(ctx context.Context, rt *runtime.Runtime, e *registry.Entry, passwor
 		if err != nil {
 			return report.Errorf(report.ExitFailed, "HTTPS health %s: %s", u, strings.TrimSpace(string(out)))
 		}
-		rep.Pass("Passed: HTTPS health %s", u)
+		rep.Pass("HTTPS health %s", u)
 	}
 	out, err := paseoLS(ctx, rt, e.URL, "")
 	if err == nil {
@@ -237,11 +237,11 @@ func Verify(ctx context.Context, rt *runtime.Runtime, e *registry.Entry, passwor
 	if !strings.Contains(out, "Password required") {
 		return report.Errorf(report.ExitFailed, "unexpected answer without a password from %s: %s", e.Alias, lastLine(out))
 	}
-	rep.Pass("Passed: password required")
+	rep.Pass("password required")
 	if out, err := paseoLS(ctx, rt, e.URL, password); err != nil {
 		return report.Errorf(report.ExitFailed, "the stored password was not accepted by %s: %s", e.Alias, lastLine(out))
 	}
-	rep.Pass("Passed: stored password accepted")
+	rep.Pass("stored password accepted")
 	return nil
 }
 

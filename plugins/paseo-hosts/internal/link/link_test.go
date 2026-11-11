@@ -74,6 +74,7 @@ func (w *world) link(t *testing.T, client string, noApp bool, calls *[]appCall) 
 	if strings.Contains(out.String(), w.pw) {
 		t.Fatal("link printed the password")
 	}
+	testenv.CheckReport(t, out.String())
 	return out.String(), err
 }
 

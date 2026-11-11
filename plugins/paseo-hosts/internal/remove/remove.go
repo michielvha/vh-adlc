@@ -207,7 +207,7 @@ func Remove(ctx context.Context, o Options) (*Result, error) {
 			if err := entry.Save(o.Config.Dir); err != nil {
 				return res, err
 			}
-			rep.Partial("Partial: dropped %s, which did not answer; it keeps its %s app entry and alias block", n, o.Alias)
+			rep.Partial("dropped %s, which did not answer; it keeps its %s app entry and alias block", n, o.Alias)
 			res.Clients = append(res.Clients, ClientResult{Client: n})
 			continue
 		}
@@ -219,7 +219,7 @@ func Remove(ctx context.Context, o Options) (*Result, error) {
 	}
 
 	if o.SkipServer {
-		rep.Skip("Skipped: every step on %s (--skip-server)", o.Alias)
+		rep.Skip("every step on %s (--skip-server)", o.Alias)
 	} else {
 		rep.Step("Removing Paseo from %s", o.Alias)
 		if _, err := deleteKeys(ctx, entry, nil, "", true); err != nil {
@@ -232,9 +232,9 @@ func Remove(ctx context.Context, o Options) (*Result, error) {
 		}
 		res.Server, res.Purged = true, o.Purge
 		if o.Purge {
-			rep.Pass("Passed: paseo.service, its Serve routes and ~/.local/share/paseo are gone from %s", o.Alias)
+			rep.Pass("paseo.service, its Serve routes and ~/.local/share/paseo are gone from %s", o.Alias)
 		} else {
-			rep.Pass("Passed: paseo.service, its Serve routes, the runtime and the password hash are gone from %s", o.Alias)
+			rep.Pass("paseo.service, its Serve routes, the runtime and the password hash are gone from %s", o.Alias)
 		}
 	}
 	if err := registry.Delete(o.Config.Dir, o.Alias); err != nil {
@@ -243,7 +243,7 @@ func Remove(ctx context.Context, o Options) (*Result, error) {
 	if err := cleanBackups(o.Config.Dir, o.Alias, serverID); err != nil {
 		return res, err
 	}
-	rep.Pass("Passed: the registry files and password of %s are gone", o.Alias)
+	rep.Pass("the registry files and password of %s are gone", o.Alias)
 	return res, nil
 }
 
@@ -253,7 +253,7 @@ func (o Options) unlinkClient(ctx context.Context, entry *registry.Entry, c link
 	rep := o.Report
 	cr := ClientResult{Client: c.Alias, Contacted: true}
 	if c.App == "" {
-		rep.Skip("Skipped: no Paseo app on %s", c.Alias)
+		rep.Skip("no Paseo app on %s", c.Alias)
 	} else {
 		if err := o.App.Delete(ctx, c, o.Alias, serverID); err != nil {
 			return cr, err
@@ -264,7 +264,7 @@ func (o Options) unlinkClient(ctx context.Context, entry *registry.Entry, c link
 	if _, err := c.Run(ctx, unblockScript, unblockPS, remote.Vars{"name": name}); err != nil {
 		return cr, remoteError("deleting the alias block", err)
 	}
-	rep.Pass("Passed: no %s alias block on %s", name, c.Alias)
+	rep.Pass("no %s alias block on %s", name, c.Alias)
 	if server {
 		var keys []string
 		if k := keyData(pub); k != "" {
@@ -273,7 +273,7 @@ func (o Options) unlinkClient(ctx context.Context, entry *registry.Entry, c link
 		if _, err := deleteKeys(ctx, entry, keys, link.KeyComment(c.Alias), false); err != nil {
 			return cr, err
 		}
-		rep.Pass("Passed: no key line for %s on %s", c.Alias, o.Alias)
+		rep.Pass("no key line for %s on %s", c.Alias, o.Alias)
 	}
 	return cr, o.drop(entry, c.Alias)
 }
@@ -304,12 +304,12 @@ func serverOnly(ctx context.Context, o Options, entry *registry.Entry, name stri
 		if _, err := deleteKeys(ctx, entry, nil, comment, false); err != nil {
 			return cr, err
 		}
-		o.Report.Pass("Passed: no key line for %s on %s", name, o.Alias)
+		o.Report.Pass("no key line for %s on %s", name, o.Alias)
 	}
 	if err := o.drop(entry, name); err != nil {
 		return cr, err
 	}
-	o.Report.Partial("Partial: %s was not contacted and may still hold the %s app entry and alias block", name, o.Alias)
+	o.Report.Partial("%s was not contacted and may still hold the %s app entry and alias block", name, o.Alias)
 	return cr, nil
 }
 
@@ -331,7 +331,7 @@ func (o Options) serverID(ctx context.Context, entry *registry.Entry) string {
 			return id
 		}
 	}
-	o.Report.Skip("Skipped: reading the server id of %s (%v); app entries are matched by connection host %s", o.Alias, err, link.SSHAlias(o.Alias))
+	o.Report.Skip("reading the server id of %s (%v); app entries are matched by connection host %s", o.Alias, err, link.SSHAlias(o.Alias))
 	return ""
 }
 

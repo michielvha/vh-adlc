@@ -319,6 +319,19 @@ func (e *Env) CallsTo(name string) []Call {
 }
 
 // RequirePwsh skips the test when pwsh is not on PATH.
+// CheckReport fails t when a status line repeats the label the reporter
+// already adds, such as "Passed: Passed: ...".
+func CheckReport(t testing.TB, out string) {
+	t.Helper()
+	for _, line := range strings.Split(out, "\n") {
+		for _, label := range []string{"Passed: ", "Failed: ", "Partial: ", "Skipped: ", "No results: "} {
+			if i := strings.Index(line, label); i >= 0 && strings.Contains(line[i+len(label):], label) {
+				t.Errorf("status line repeats its label: %q", line)
+			}
+		}
+	}
+}
+
 func RequirePwsh(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("pwsh"); err != nil {

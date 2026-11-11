@@ -181,6 +181,7 @@ func (w *world) run(t *testing.T, unlink bool, o remove.Options) (string, error)
 	if strings.Contains(out.String(), w.pw) {
 		t.Fatal("the output holds the password")
 	}
+	testenv.CheckReport(t, out.String())
 	return out.String(), err
 }
 
