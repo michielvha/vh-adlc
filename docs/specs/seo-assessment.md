@@ -309,6 +309,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-11 | R-34 | spec | `da4e4de` | claude-opus-4.8 | procedural | Changes requested: exec check trusts post-run resolution of relative and repointed paths |
 | 2026-11-11 | R-35 | spec | `4c7ba61` | unknown | procedural | 2 should-fix: Codex's /proc/self/exe exec, login-shell gettext recursion; fixed |
 | 2026-11-11 | R-36 | spec | `3cf1213` | unknown | procedural | 1 should-fix, 1 nit: HOME scan fails on Codex's own plugin sync, vfork child and snapshot wording; fixed |
+| 2026-11-11 | R-37 | spec | `70a09ac` | unknown | procedural | No findings |
 
 ### R-1
 
@@ -1578,6 +1579,10 @@ SEVERITY: nit
 WHERE: Test Plan AC-11 `no-browser` (line 262), "Codex makes that call from its main process", "the main Codex process's `execve(\"/proc/self/exe\", ...)`" and "Codex runs its shell snapshot and the agent's commands through a login shell, `/bin/bash -lc`"
 EVIDENCE: In the same trace the main Codex process was PID 419104. Its thread 419114 was made with `clone(... CLONE_THREAD ...)`. That thread made a vfork child with `clone(child_stack=..., flags=CLONE_VM|CLONE_VFORK|SIGCHLD) = 419248`. PID 419248 issued `execve("/proc/self/exe", ["/proc/self/exe", "--codex-run-as-process-setup", "47", "419104", ...]) = 0`, then exec'd `bin/codex` as `codex-linux-sandbox` and forked both `bwrap` processes. The normative exception still holds because 419248 inherits the Codex program at clone. With the exception my rule script gave 0 flags. Without it, the script gave exactly this one flag. In the trace, the only `-lc` exec was the snapshot shell. The agent's command ran as `/bin/bash -c "__CODEX_SNAPSHOT_OVERRIDE..."` and then `/bin/bash -c "vh-adlc knowledge ..."`, even though the rollout event shows `/bin/bash -lc '...'`. An implementer who reads "main process" could tie the exception to the main PID, and then every run would be flagged.
 PROPOSAL: Say that a vfork child of a Codex thread makes the call, and that its program is inherited at clone, so the exception applies by program and not by PID. Say that only the snapshot runs as a login shell and that the agent's commands run as `/bin/bash -c` after sourcing the snapshot.
+
+### R-37
+
+NO FINDINGS
 
 ## Sources
 
