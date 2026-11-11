@@ -69,12 +69,8 @@ func TestOnlyATerminalCountsAsATerminal(t *testing.T) {
 	if isTerminal(w) {
 		t.Error("a pipe counts as a terminal")
 	}
-	ptmx, err := os.OpenFile("/dev/ptmx", os.O_RDWR, 0)
-	if err != nil {
-		t.Skipf("no pseudo-terminal: %v", err)
-	}
-	defer func() { _ = ptmx.Close() }()
-	if !isTerminal(ptmx) {
+	pty := openPTY(t)
+	if !isTerminal(pty) {
 		t.Error("a pseudo-terminal does not count as a terminal")
 	}
 }
