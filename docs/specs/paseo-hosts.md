@@ -394,6 +394,7 @@ None.
 | 2026-11-11 | R-23 | implementation | `d4155d62af70742f8d271e4bde7138e6459b379f` | unknown | procedural | One blocking factual finding (a lost page after the reload skips the restore) and two should-fix factual findings (a pending app update races the relaunch; the macOS debug launch needs a settle time); AC-05 and AC-06 not met, AC-12 not verified, twelve met; model identity not attested. |
 | 2026-11-11 | R-24 | spec | `f9405ec9afecea149a0f74bd3e4cb188a0e8f5e9` | unknown | procedural | Four should-fix findings (two factual: the restart count and the tasks' files; two judgement: unbounded AC-06 recovery and no executed update check) and two nits, none blocking; model identity not attested. |
 | 2026-11-11 | R-25 | spec | `a6a741c6d00d784fda40f3ebd24a597e978d92e8` | unknown | procedural | Four should-fix findings (three factual: the debug instance after a rollback check, a stand-in installer shorter than the wait floor, uncovered AC-06 and AC-16 clauses; one judgement: nothing protects or restores from the backup file) and two nits, none blocking; model identity not attested. |
+| 2026-11-11 | R-26 | spec | `8463b0667104764bb08145e359d467c71999f4a0` | unknown | procedural | Two should-fix factual findings (AC-06 does not carry its bound; nothing builds or tests the 120-second installer give-up), two factual nits (the summary's AC-06 wording, the kept copy's mode) and one judgement nit (how the live read picks the current registry value). Applied the factual findings and raised Q12. |
 
 ### R-1
 
@@ -1404,3 +1405,40 @@ SEVERITY: nit
 WHERE: Acceptance Criteria, AC-06; Test Plan, manual step 5; Tasks, T44
 EVIDENCE: AC-06 judges the host list "after the app's next start" but does not say which start: the CLI's check after the rollback, the step 6 relaunch, or a later start by the owner. Manual step 5 and T44 require a read of "the restarted app's `@paseo:daemon-registry`" while the app runs without a debugging port. They do not say how to read it, for example by parsing the app's localStorage leveldb as R-23 did, or by a separate debug launch, which would itself be another restart.
 PROPOSAL: Name the start in AC-06, for example "after the relaunch that ends the command". In manual step 5, give the read method and the wait before it.
+
+### R-26
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-06 and AC-16
+EVIDENCE: AC-06 says "When the app does not keep the new entry, `link` exits non-zero, and after the relaunch that ends the command the app lists exactly the hosts it listed before and runs without a debugging port, also when its window stops answering after a reload up to twice or the app deletes the restored list once." Its main clause has no condition: it promises the previous hosts on every rejected entry. "also when" adds cases to that promise. It does not limit it. The Design gives up on some paths: "at most twice in one command", "up to three launches in all", and "Every rollback that ends without a confirmed restore ... exits 1 with the message step 5 gives". AC-16 covers those paths, and the Test Plan exercises them ("make every restore fail", "make the page stop answering after every reload"). In those tests the app does not list its previous hosts, so read literally, they contradict AC-06. The Q7 answer folded in at a6a741c chose "A. Bound AC-06, add AC-16", where AC-06 "covers a window lost up to twice and a restored list deleted once". The criterion text does not carry that bound.
+PROPOSAL: Write the bound into AC-06. One way: start it with "When the app does not keep the new entry and the CLI confirms its restore", or add "except on the paths AC-16 describes". Then the AC-16 test cases cannot be read as evidence against AC-06.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry, quit and wait and step 6; Test Plan, AC-05, AC-06 and AC-16 row; Tasks, T41
+EVIDENCE: The Design says: "If an installer still runs after 120 seconds, the command does not start the app and exits 1, saying to run it again once the update has installed". Step 6 adds that the command ends "unless quit and wait gave up on an installer, which leaves the app stopped". At 8463b06, `session()` runs `a.launch(ctx, c, "")` whether or not `a.stop` failed (plugins/paseo-hosts/internal/clientapp/clientapp.go:204-208). So the current code starts the app during the install, which is the race R-23 F-02 found. T41 changes only `stop.sh`, `stop.ps1` and two test files, not `clientapp.go`. Its done condition and the Test Plan's `stop.sh` test cover only an installer that finishes (5 seconds) and a foreign ShipIt. Manual step 9 runs a 20-second stand-in. No test, task or manual step covers the 120-second give-up, its exit 1, the app left stopped, or the reason added to a rollback message. All planned checks can pass while the CLI still relaunches the app over a running installer.
+PROPOSAL: Add `internal/clientapp/clientapp.go` to T41, or to a new task. Add a fake case where the installer stand-in outlives a shortened installer timeout. It should assert exit 1, the "run it again" message, no launch after the quit and, during a rollback, the AC-16 message with that reason.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary
+EVIDENCE: The summary says "AC-06 judges the host list after the next start". After the Q11 answer, AC-06 says "after the relaunch that ends the command". R-25 F-06 found "next start" ambiguous for this reason. The summary also does not say that AC-06 now covers only a window lost up to twice and a restore deleted once.
+PROPOSAL: Change the summary to "AC-06 judges the host list after the relaunch that ends the command, for a window lost up to twice or a restore deleted once".
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan, manual step 5; Tasks, T44
+EVIDENCE: Manual step 5 asks for a read of `@paseo:daemon-registry` from "the relaunched app's localStorage leveldb files, copied to the operator host and parsed read-only there". It does not name the parser or say how the parser picks the current value. The Design describes R-23's Mac failure this way: "Chromium then commits the write and the delete in one batch and only the delete persists". A parser that takes the last put for the key, or reads only `.ldb` files, would find the restored value and miss the newer delete in the `.log` file. That run would pass while the host list is gone. Only the tunnel check in the same step would catch it, and only for hosts with Remote SSH connections.
+PROPOSAL: Name the parser, or say that it takes the record with the highest sequence number for the key across the `.log` and `.ldb` files and treats a deletion as no host list.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Desktop app entry, step 5
+EVIDENCE: Step 3 says the backup is saved "with mode 600". Step 5 says only that the CLI "copies `PASEO_HOSTS_DIR/app-registry-<client>.backup.json` to `app-registry-<client>.<UTC time>.backup.json`" and gives no mode. The copy holds every host's password, and later runs never overwrite it. The only protection the document states for it is the mode 700 on `PASEO_HOSTS_DIR`.
+PROPOSAL: State that the timestamped copy is written with mode 600, like the backup.
