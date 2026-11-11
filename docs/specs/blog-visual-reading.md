@@ -287,6 +287,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-11 | R-44 | spec | `314070f` | claude-opus-4.8 | procedural | Changes requested: endorsement pattern rejects correct reports and misses some endorsements, diagram edit assertion too loose |
 | 2026-11-11 | R-45 | spec | `026b1d5` | unknown | procedural | Changes requested: replace the image-verdict regex allowlist with labelled repair entries, stray backtick |
 | 2026-11-11 | R-46 | spec | `8598997` | claude-opus-4.8 | procedural | 2 should-fix, 1 nit: label case and Markdown, label overlap, splitter defined once; fixed |
+| 2026-11-11 | R-47 | spec | `0ad847c` | unknown | procedural | No findings |
 
 ### R-1
 
@@ -1568,6 +1569,10 @@ SEVERITY: nit
 WHERE: Test Plan, AC-01 and AC-08 rows (Presentation repairs entry splitting)
 EVIDENCE: The Design now says entries "are separated by `; ` before the next label". The AC-07 row splits "at each `; ` followed by a Design label and a colon", and its unit example "irrelevant image: ... plan review; replace it; no body treatment: ..." keeps "; replace it" inside the first entry. The AC-01 row still defines entries as "the text after `Presentation repairs:`, split on semicolons", which makes "replace it" a separate entry. AC-01 is therefore checking entries the Design does not define. The AC-08 row asserts "an entry ... starting with `unverified render:`" but does not say it uses the AC-07 splitter. The AC-07 splitter fails any entry without a label, and nothing says how it treats `None`, which the AC-01 row says "has no entries".
 PROPOSAL: Define the splitter once, including that `None` yields no entries, and have the AC-01, AC-07 and AC-08 rows all refer to it.
+
+### R-47
+
+NO FINDINGS
 
 ## Sources
 
