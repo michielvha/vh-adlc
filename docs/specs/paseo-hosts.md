@@ -26,7 +26,7 @@ Rebuild the working Paseo server onboarding and desktop-app linking tool as a Go
 
 The owner runs Paseo daemons on Linux servers and uses them from the Paseo desktop app on a Mac and a Windows PC. A local Bash tool did this for one server, but it is untracked and names the owner's machines.
 
-This feature rebuilds it as a Go CLI in a new vhco-tools plugin, `paseo-hosts`. The first run downloads two Go libraries, checked against `go.sum`, and the pinned Paseo CLI from npm. `onboard` installs a password-protected daemon reachable only over SSH, relay off; `--publish` adds a tailnet-only HTTPS route. `link` gives a macOS or Windows desktop a key that opens only the daemon tunnel and adds the server to its Paseo app unattended. `unlink` takes one desktop off; `remove` unlinks all and deletes the service, config and local password, keeping Paseo state and workspace unless `--purge`. Plaintext passwords stay on the operator host and in the apps.
+This feature rebuilds it as a Go CLI in a new vhco-tools plugin, `paseo-hosts`. The first run downloads two Go libraries, checked against `go.sum`, and the pinned Paseo CLI from npm. `onboard` installs a password-protected daemon reachable only over SSH, relay off; `--publish` adds a tailnet-only HTTPS route. `link` gives a macOS or Windows desktop a key that opens the daemon tunnel and, apart from the Unix socket limit below, nothing else, and adds the server to its Paseo app unattended. `unlink` takes one desktop off; `remove` unlinks all and deletes the service, config and local password, keeping Paseo state and workspace unless `--purge`. Plaintext passwords stay on the operator host and in the apps.
 
 Excluded: phones, the web UI, the Linux app, relay pairing, agent CLI installs and the operator's own daemon.
 
@@ -343,7 +343,27 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
 
 ## Open Questions
 
-None.
+### Q4: How is AC-12, the marketplace install, settled before the PR?
+
+**Recommendation:** B. Merging is the plugin's release path, so a real marketplace install can only happen after the merge, and B checks exactly that.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Install from the pushed feature branch** | T32 adds the vhco-tools marketplace at the feature branch ref in Codex and Claude, installs the plugin and runs a new session before the PR, so AC-12 can be `met`. | Pushing the branch early, swapping the operator host's marketplace source and back, and relying on both hosts accepting a branch ref. |
+| **B. Residual with a tracker issue** | T32 moves to a new issue in this repository, closed after the merge once the install check passes; AC-12 carries that issue as its residual and the complete gate can pass. | The install is proven only after the merge, and creating the issue needs your approval. |
+
+**Why this is yours:** a residual and a new issue need your decision, and A trades effort for proof before the merge.
+
+### Q5: How should servers with OpenSSH older than 7.8, which lacks `permitlisten`, be handled?
+
+**Recommendation:** B. 7.8 shipped in 2018, and on an older server `link` already fails at its tunnel check.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Preflight check** | `onboard` reads the server's sshd version and stops with exit 1 below 7.8. | A version probe that differs across distributions, more code and a test. |
+| **B. Stated prerequisite** | Design, the README and the skill name OpenSSH 7.8 or later; nothing new is built. | On an older server, `link` writes the client's files and key line, then fails at the tunnel check. |
+
+**Why this is yours:** it weighs an early, clear error against more code for servers that are rare.
 
 ## Review Log
 
