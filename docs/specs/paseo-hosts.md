@@ -395,6 +395,7 @@ None.
 | 2026-11-11 | R-24 | spec | `f9405ec9afecea149a0f74bd3e4cb188a0e8f5e9` | unknown | procedural | Four should-fix findings (two factual: the restart count and the tasks' files; two judgement: unbounded AC-06 recovery and no executed update check) and two nits, none blocking; model identity not attested. |
 | 2026-11-11 | R-25 | spec | `a6a741c6d00d784fda40f3ebd24a597e978d92e8` | unknown | procedural | Four should-fix findings (three factual: the debug instance after a rollback check, a stand-in installer shorter than the wait floor, uncovered AC-06 and AC-16 clauses; one judgement: nothing protects or restores from the backup file) and two nits, none blocking; model identity not attested. |
 | 2026-11-11 | R-26 | spec | `8463b0667104764bb08145e359d467c71999f4a0` | unknown | procedural | Two should-fix factual findings (AC-06 does not carry its bound; nothing builds or tests the 120-second installer give-up), two factual nits (the summary's AC-06 wording, the kept copy's mode) and one judgement nit (how the live read picks the current registry value). Applied the factual findings and raised Q12. |
+| 2026-11-11 | R-27 | spec | `c79254865dc2b9a0130ffb70c69c03e3282c3d46` | unknown | procedural | One blocking factual finding (AC-06 was bounded by what the CLI reports rather than by what happens on the client, and covered only `link`), two should-fix factual findings (a debug-launch case that cannot fail first, a stand-in installer that may end before the quit) and one factual nit (T39 wording). Applied all four. |
 
 ### R-1
 
@@ -1442,3 +1443,33 @@ SEVERITY: nit
 WHERE: Design, Desktop app entry, step 5
 EVIDENCE: Step 3 says the backup is saved "with mode 600". Step 5 says only that the CLI "copies `PASEO_HOSTS_DIR/app-registry-<client>.backup.json` to `app-registry-<client>.<UTC time>.backup.json`" and gives no mode. The copy holds every host's password, and later runs never overwrite it. The only protection the document states for it is the mode 700 on `PASEO_HOSTS_DIR`.
 PROPOSAL: State that the timestamped copy is written with mode 600, like the backup.
+
+### R-27
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Acceptance Criteria, AC-06 and AC-16
+EVIDENCE: AC-06 (line 239) now begins "When the app does not keep the new entry and the CLI confirms its restore". AC-16 (line 249) covers every rollback the CLI "cannot confirm". The trigger for AC-06 is therefore the CLI's own report, not the app's state. Take an implementation that gives up after the first lost window and prints the "could not confirm" message. AC-06 then never applies, and AC-16 is met once a copy is named. The app can still come back with no hosts while both boxes are ticked, which is the R-23 Mac failure (the window was lost after the reload and the hosts were gone). The owner's Q7 answer A, at 7d22743 line 363, says "AC-06 covers a window lost up to twice and a restored list deleted once" and gives AC-16 "every other rollback path". So the owner bounded AC-06 by what happens on the client, not by whether the CLI confirms. R-26 F-01's suggested wording was applied, and it changed that bound. Under the current text, the fake cases "page stop answering once after a reload" and "after two reloads" (line 259) can fail without contradicting any criterion. Manual step 5's "holds the hosts it held before" is also stronger than any criterion. Separately, no criterion covers a confirmed rollback of `unlink` or `remove`. AC-06 names only `link`, and AC-16 covers only the unconfirmed case, so an `unlink` that never confirms also passes.
+PROPOSAL: Bound AC-06 by client conditions, as Q7 A says. For example: "When the app does not keep a change from `link`, `unlink` or `remove`, its window stops answering after a reload at most twice, and it deletes the restored list at most once, the command exits non-zero, and after the relaunch that ends the command the app lists exactly the hosts it listed before and runs without a debugging port." AC-16 then covers only the paths beyond that bound.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-05, AC-06 and AC-16 row; Tasks, T39
+EVIDENCE: The row (line 259) puts "make the stand-in app's first debug launch exit before it answers" among cases where "each asserts a non-zero exit, the restored registry after the restart and that no app process has a debugging port at the end". At c792548 the code already passes that case. findPage polls until LaunchTimeout and then fails with "the Paseo app window did not answer over DevTools" (internal/clientapp/cdp.go:23-38). session() then returns writeErr, which is non-zero, after a normal relaunch without a debugging port (clientapp.go:190-217). The registry was never written, so it equals the previous one. The case therefore cannot fail first, although T39 (line 355) says "each fails against the current code". Nothing tests the Design step 2 retry ("waits 3 seconds and launches it again, up to three launches in all"), so an implementation without it passes. If the case uses an entry the page keeps, the Design expects `link` to succeed after the retry, and the asserted non-zero exit contradicts the Design.
+PROPOSAL: Run this case with an entry the page keeps. Assert exit 0, the entry and the tunnel, plus two recorded debug launches at least the shortened settle time apart. Optionally add a case where three launches all exit early and assert exit 1 with nothing written.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, manual step 9; Tasks, T44
+EVIDENCE: Step 9 (line 270) starts a stand-in installer "that runs for 20 seconds", runs `link` "at once", and records "that the app's next start came after the stand-in ended". The app session is `link` step 5 (line 177). It runs after the probe, key, key line, host keys, alias block and tunnel check. On Windows the tunnel check alone took 12.7 s (T30 evidence), and a whole `link` took 30 s (T28 evidence), so the stand-in may have a few seconds left when the app quits, or none. If the stand-in ends before the quit, the recorded condition holds even when the CLI never looks for an installer. Nothing in the step requires that the stand-in was still running when the app's main process exited.
+PROPOSAL: Start the stand-in so that it is still running at the quit. For example, run it until the CLI reports the app step plus 20 seconds, or for 60 seconds. Record that it was running when the app's main process exited and that the next launch came after it ended.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T39
+EVIDENCE: T39 (line 355) lists "a page that stops answering after every reload, the same through `unlink`". Read naturally, "the same" means a lost window through `unlink`. The Test Plan (line 259) instead runs `unlink` "against a page that rejects the change and every restore". T39 also says each case fails "for the reason the Test Plan names", but the Test Plan states assertions, not the reason any case fails.
+PROPOSAL: Make T39 say "`unlink` against a page that rejects the change and every restore". Replace "for the reason the Test Plan names" with the assertion that fails first in each case, or drop the phrase.
