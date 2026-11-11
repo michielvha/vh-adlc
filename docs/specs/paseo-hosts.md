@@ -371,6 +371,7 @@ None.
 | 2026-11-11 | R-18 | spec | `6d2f22af4333c457b235e6bef0da65938b9b5095` | unknown | procedural | One should-fix factual finding (T36 would re-link the operator host's own daemon) and one factual nit (nothing builds the macOS terminal check), none blocking; model identity not attested. |
 | 2026-11-11 | R-19 | spec | `09384960f4f31b586c434c25b7094e96ddf2eb61` | claude-opus-4.8 | procedural | One factual nit (the reason CI does not check the macOS file), none blocking; model reported by the reviewer, not requested. |
 | 2026-11-11 | R-20 | spec | `6f705bfb52c4f044e66f22308d6ff6790014a044` | unknown | procedural | One should-fix factual finding (the README still says the key allows only the daemon forward), none blocking; model identity not attested. |
+| 2026-11-11 | R-21 | spec | `9db96c0807bb0ab275149d48882b4250b05fa7ba` | unknown | procedural | No findings; model identity not attested. |
 
 ### R-1
 
@@ -1016,3 +1017,7 @@ SEVERITY: should-fix
 WHERE: Tasks, T37 (line 343); Design, link step 2 (line 176); Context, decisions paragraph (line 80)
 EVIDENCE: `plugins/paseo-hosts/README.md:54` is in `covers`. It says "`link` gives the client a dedicated key that the server accepts only for a forward to the daemon port". Design link step 2 says the opposite: "No key option stops a Unix socket remote forward (`ssh -R <path>:...`), so the key can still create a socket at an unused path the server user can write". It also says lines written before `permitlisten` keep allowing TCP remote forwards until `link` runs again. Line 80 records that the owner chose to keep the Unix socket remote forward as "a stated known limit". Only the feature document states that limit. The plugin's README, SKILL.md and `--help` never mention it. T37 is the only unchecked task that edits the README, and it adds only the OpenSSH 7.8 requirement, so after every task is ticked the README still makes the false claim. I tested the planned key line `restrict,port-forwarding,permitopen="127.0.0.1:47911",permitlisten="127.0.0.1:1",command="/bin/false"` against a local unprivileged sshd (OpenSSH 10.0p2). `ssh -N -o ExitOnForwardFailure=yes -R <dir>/r.sock:127.0.0.1:47911` stayed connected until `timeout` ended it (exit 124) and left `srw------- r.sock`. The TCP `-R 127.0.0.1:47944:...` case failed with "remote port forwarding failed", and a shell command exited 1. R-19's finding is resolved: line 134 now says the `paseo-hosts` CI job does no cross build, so only T35's one-time `GOOS=darwin go vet` checks the macOS file, and `.github/workflows/ci.yml:132-153` confirms there is no cross build. A `-L` forward to a Unix socket was refused (`Received request to connect to path ..., but the request was denied`), because `channel_connect_to_path` checks the permitopen list in both 7.8p1 and 10.0p2. `vh-adlc lint` passes. `gate planned` fails only on `spec_review_fresh` and `accepted`.
 PROPOSAL: Extend T37 to correct README line 54 and state the Unix socket remote forward limit in the README, and say there that key lines from before `permitlisten` stay open until `link` runs again. The done condition would grep for both changes.
+
+### R-21
+
+NO FINDINGS
