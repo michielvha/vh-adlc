@@ -368,6 +368,7 @@ None.
 | 2026-11-11 | R-15 | spec | `6f76bd03fb3eb67333078ab200d764abf386d1c6` | claude-opus-4.8 | procedural | Two factual nits and one judgement nit (a re-link on a pre-7.8 server breaks the working tunnel), none blocking; model reported by the reviewer, not requested. |
 | 2026-11-11 | R-16 | spec | `d70c77e50e3d4acfe7895aa9755ccceb0fc88904` | unknown | procedural | Two factual nits (the key file backup covers only the latest run; the summary's tunnel-only wording), none blocking; model identity not attested. |
 | 2026-11-11 | R-17 | spec | `3178e9765baedcd8444cdedbaae3d02388b96538` | unknown | procedural | One judgement nit (whether the terminal check may add a dependency), none blocking; model identity not attested. |
+| 2026-11-11 | R-18 | spec | `6d2f22af4333c457b235e6bef0da65938b9b5095` | unknown | procedural | One should-fix factual finding (T36 would re-link the operator host's own daemon) and one factual nit (nothing builds the macOS terminal check), none blocking; model identity not attested. |
 
 ### R-1
 
@@ -979,3 +980,19 @@ I checked the following and found no other issues:
   - `permitlisten="none"` made sshd reject the whole key.
 - **Residual tracker:** issue #77 is open and tracks AC-12.
 - **Scratch files:** I put them in `/home/m/code/.r17-scratch` instead of `/tmp` and removed them afterwards. The worktree is unchanged.
+
+### R-18
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks, T36 (line 342); Scope, Out of scope (line 101)
+EVIDENCE: T36 says to "run `link` again for both desktops on every server in the registry so every key line carries `permitlisten`". The R-10 record (lines 738 and 739) shows that the registry holds `fedora-43` as well as arch-1. On the operator host, `hostname` prints `fedora-43`, so that entry is the operator host's own daemon. Scope (line 101) excludes it: "Managing the operator host's own Paseo daemon". The operator host's `~/.ssh/authorized_keys` is the default file, since sshd_config sets no AuthorizedKeysFile. It holds 2 lines, and neither has key options or a `paseo` comment: `grep -c "permitopen\|restrict"` printed 0. So fedora-43 has no tunnel-only line for T36 to replace. If someone ran T36 as written, it would add new restricted key lines on the operator host. Through Design, Desktop app entry step 3, it would also replace the existing fedora-43 entry in both desktop apps with a single `paseo-fedora-43` connection and make that the preferred connection. The T27 evidence (line 334) shows both apps use that entry today.
+PROPOSAL: Limit T36 to servers whose `authorized_keys` already holds a tunnel-only line written before `permitlisten`, which today means arch-1. State that the operator host's own fedora-43 entry is left alone.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T35 (line 341); Design, Output and logging (line 134); Test Plan, AC-11 row (line 260)
+EVIDENCE: Design gives macOS its own terminal check through `TIOCGETA`, and T35 adds `cmd/paseo-hosts/term_darwin.go` for it. T35's done condition is `go test -race ./...` and golangci-lint. The `paseo-hosts` CI job (`.github/workflows/ci.yml:132-153`) runs only on `ubuntu-latest` and does no cross build. Nothing in T35, the AC-11 row or CI therefore compiles or lints the darwin file. In Go 1.27.4, `syscall.Syscall` on darwin is a direct kernel trap (`asm_darwin_arm64.s`: `SVC $0x80`) and does not go through libSystem. x/sys v0.49.0 marks its darwin `SYS_*` constants "Deprecated: Use libSystem wrappers instead of direct syscalls". Q6 did not mention either cost. I built a scratch version of the planned files. On Linux it reported `false` for `/dev/null`, a file and a pipe, and `true` under a pty. `GOOS=darwin GOARCH=amd64` and `GOOS=darwin GOARCH=arm64` passed `go vet` and `go build`, and golangci-lint with the plugin's `.golangci.yml` and `GOOS=darwin` reported 0 issues. So the design is feasible, but no stated check would catch a broken macOS file.
+PROPOSAL: Add `GOOS=darwin go vet ./cmd/paseo-hosts` to T35's done condition. State in Design that the macOS check is a direct syscall that only a cross build covers.
