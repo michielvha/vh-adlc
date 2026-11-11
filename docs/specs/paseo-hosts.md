@@ -28,9 +28,9 @@ The owner runs Paseo daemons on Linux servers and uses them from the Paseo deskt
 
 This feature rebuilds it as a Go CLI in a new vhco-tools plugin, `paseo-hosts`. `onboard` installs a password-protected daemon reachable only over SSH, relay off; `--publish` adds a tailnet-only HTTPS route. `link` gives a macOS or Windows desktop a key that opens the daemon tunnel and, apart from the Unix socket limit below, nothing else, and adds the server to its Paseo app unattended. `unlink` takes one desktop off; `remove` unlinks all and deletes the service, config and local password, keeping Paseo state and workspace unless `--purge`. Plaintext passwords stay on the operator host and in the apps. Excluded: phones, the web UI, the Linux app, relay pairing, agent CLI installs and the operator's own daemon.
 
-Side effects: the first run downloads two Go libraries and the pinned Paseo CLI. `link`, `unlink` and `remove` restart the desktop app two or three times, which stops its built-in daemon and may install a downloaded update; the CLI waits up to 2 minutes for that install. They briefly open a loopback debugging port and keep a host-list backup, passwords included. Windows needs OpenSSH Server and a signed-in user.
+Side effects: the first run downloads two Go libraries and the pinned Paseo CLI. `link`, `unlink` and `remove` restart the desktop app at least twice, and more after a rollback or when it stops answering, which stops its built-in daemon and may install a downloaded update; the CLI waits up to 2 minutes for that install. They briefly open a loopback debugging port and keep a host-list backup, passwords included. Windows needs OpenSSH Server and a signed-in user.
 
-What changed: review R-23 found the app session unreliable on Paseo 0.15.4. On Windows, an update installed on quit left the app stopped although `link` reported success. On the Mac, a debug-mode app sometimes exits within a second, and in two rollbacks the window stopped answering after the reload, so the app came back with no hosts. The app can also delete the restored list right after the CLI writes it, and the CLI never read it back. The revised session waits for a running update installer, starts an app that exits early again, reconnects to a lost window, reads every restore back and checks a rollback again after a restart. If it still cannot confirm the list, it exits 1 naming the backup file. The owner's 2026-11-11 decisions stand: the Unix socket limit, OpenSSH 7.8 with no version check, and checking the marketplace install (AC-12) after the merge as https://github.com/michielvha/vh-adlc/issues/77. The revision resets every criterion; that residual returns at the next review.
+What changed: review R-23 found the app session unreliable. On Windows, the app installed its 0.15.4 update over 0.15.3 as it quit, which left it stopped although `link` reported success. On the Mac, a debug-mode app sometimes exits within a second, and in two rollbacks the window stopped answering after the reload, so the app came back with no hosts. The app can also delete the restored list right after the CLI writes it, and the CLI never read it back. The revised session waits for a running update installer, starts an app that exits early again, reconnects to a lost window, reads every restore back and checks a rollback again after a restart. If it still cannot confirm the list, it exits 1 naming the backup file. AC-05 now covers an update installed on quit, and AC-06 judges the host list after the app's next start, including a lost window and a deleted restore. The owner's 2026-11-11 decisions stand: the Unix socket limit, OpenSSH 7.8 with no version check, and checking the marketplace install (AC-12) after the merge as https://github.com/michielvha/vh-adlc/issues/77. The revision resets every criterion; that residual returns at the next review.
 
 Checks run: T1 to T38 pass Go tests, lint, race checks, a real `sshd` test and an installed-copy build, and R-22 and R-23 ran manual steps 1 to 7 live. Planned: fake DevTools and stand-in installer tests, and three live rollbacks per desktop, each read back after a restart. An update cannot be made pending on demand, so the live run records whether one was.
 
@@ -223,7 +223,7 @@ After a successful `unlink`, `unlink --server-only` or `remove`, the CLI also de
 
 ### Skill
 
-`SKILL.md` triggers on requests to add, onboard, link, unlink, remove, check or list Paseo servers. It uses `PASEO_HOSTS_DIR` or its default, which `onboard` creates, and asks the owner for a client alias only when `PASEO_HOSTS_CLIENT` is unset and the request names none. It runs `onboard` and then `link`, tells the owner before `link`, `unlink` or `remove` that the desktop app will restart twice and, with default app settings, stop the desktop's built-in daemon and its agents and may install a downloaded update, confirms `unlink` and `remove` with the owner first, and reports the CLI's checks from `--json`. It never prints, reads into the conversation or pastes a password, and runs `password` only into a pipe.
+`SKILL.md` triggers on requests to add, onboard, link, unlink, remove, check or list Paseo servers. It uses `PASEO_HOSTS_DIR` or its default, which `onboard` creates, and asks the owner for a client alias only when `PASEO_HOSTS_CLIENT` is unset and the request names none. It runs `onboard` and then `link`, tells the owner before `link`, `unlink` or `remove` that the desktop app will restart at least twice, and more after a rollback or when it stops answering, and, with default app settings, stop the desktop's built-in daemon and its agents and may install a downloaded update, confirms `unlink` and `remove` with the owner first, and reports the CLI's checks from `--json`. It never prints, reads into the conversation or pastes a password, and runs `password` only into a pipe.
 
 ### Delivery
 
@@ -353,14 +353,46 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
   - Evidence: Before the change, a `GOOS=darwin GOARCH=arm64 go test -c` binary run on the Mac with `-test.run TestOnlyATerminalCountsAsATerminal` failed with `a pseudo-terminal does not count as a terminal`; after it, the same run passes, and the whole `cmd/paseo-hosts` darwin test binary passes on the Mac under the login PATH (`node` is not on the non-interactive SSH PATH). `go test -race -count=1 ./...` with `pwsh` on PATH, golangci-lint (also with `GOOS=darwin`), `go vet` for linux, darwin and windows and `go mod tidy -diff` pass.
 - [ ] T39 `internal/clientapp/fakedevtools_test.go`, `internal/clientapp/clientapp_test.go`, `internal/testenv/standins.go` - fake DevTools and stand-in app cases for a page that stops answering once after a reload, a page that deletes the restored value once, a first debug launch whose app exits before it answers, and a restore that never holds; each fails against the current code for the reason the Test Plan names (AC-06)
 - [ ] T40 `internal/clientapp/clientapp.go`, `internal/clientapp/cdp.go`, `internal/clientapp/snippets/launch.sh`, `internal/clientapp/snippets/launch.ps1` - the debug launch retries an app that exits before it answers, a lost window leads to a new debug launch, every restore is read back, a rollback is confirmed after a restart, and an unconfirmed restore exits 1 naming the backup file; T39 and `go test -race ./...` pass (AC-06)
-- [ ] T41 `internal/clientapp/snippets/stop.sh`, `internal/clientapp/snippets/stop.ps1`, `internal/clientapp/clientapp_test.go` - quit and wait waits at least 3 seconds and until no app update installer runs, up to 120 seconds; the `stop.sh` test with a stand-in `sh.paseo.desktop.ShipIt` process and a stand-in `com.microsoft.VSCode.ShipIt` process fails first, then passes (AC-05)
-- [ ] T42 `internal/clientapp/clientapp.go`, `internal/clientapp/snippets/launch.sh`, `internal/clientapp/clientapp_test.go` - the final launch waits for the app's main process, and every command fails when that process is gone at the end; a test with a stand-in app that exits right after its final launch fails first, then passes (AC-05)
-- [ ] T43 `plugins/paseo-hosts/README.md`, `plugins/paseo-hosts/skills/paseo-hosts/SKILL.md` - both say that a command waits up to 2 minutes for a downloaded app update to install, and that a failed restore names the backup file; a grep finds `update` and `backup.json` in each file (Design)
+- [ ] T41 `internal/clientapp/snippets/stop.sh`, `internal/clientapp/snippets/stop.ps1`, `internal/clientapp/fakedevtools_test.go`, `internal/clientapp/clientapp_test.go` - quit and wait waits at least 3 seconds and until no app update installer runs, up to 120 seconds; the `stop.sh` test with a stand-in `sh.paseo.desktop.ShipIt` process and a stand-in `com.microsoft.VSCode.ShipIt` process fails first, then passes (AC-05)
+- [ ] T42 `internal/clientapp/clientapp.go`, `internal/clientapp/snippets/launch.sh`, `internal/clientapp/snippets/running.sh`, `internal/clientapp/snippets/running.ps1`, `internal/clientapp/fakedevtools_test.go`, `internal/clientapp/clientapp_test.go` - the final launch waits for the app's main process, and every command fails when that process is gone at the end, checked on macOS by `running.sh` and on Windows by `running.ps1`; a test with a stand-in app that exits right after its final launch fails first, then passes, and the PowerShell syntax test passes on `running.ps1` (AC-05)
+- [ ] T43 `plugins/paseo-hosts/README.md`, `plugins/paseo-hosts/skills/paseo-hosts/SKILL.md` - both say that the app restarts at least twice, and more after a rollback or when it stops answering, that a command waits up to 2 minutes for a downloaded app update to install, and that a failed restore names the backup file; a grep finds `at least twice`, `2 minutes` and `backup.json` in each file and `restart twice` or `starts again twice` in neither (Design)
 - [ ] T44 `docs/specs/paseo-hosts.md` - manual steps 5 and 6 with three `paseotest` rollbacks on each desktop, each followed by a read of the restarted app's `@paseo:daemon-registry`, recorded as evidence with whether an update was pending; both desktops end with their hosts and tunnels (AC-05, AC-06)
 
 ## Open Questions
 
-None.
+### Q7: Should a restore the CLI cannot confirm get its own criterion, with AC-06 limited to the cases the CLI recovers from?
+
+**Recommendation:** A. A run that ends with a damaged host list must say so, and R-23 F-01 was exactly that path going unreported.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Bound AC-06, add AC-16** | AC-06 covers a window lost up to twice and a restored list deleted once. A new AC-16 says that every other rollback path exits 1, names `PASEO_HOSTS_DIR/app-registry-<client>.backup.json`, and that file holds the list the app had before the command; the Design says every unconfirmed path reaches that exit | One more criterion to prove; its proof is the fake DevTools case that makes every restore fail |
+| **B. Keep AC-06 as written** | No new criterion; the backup-file exit stays in Design | AC-06 promises a restore on paths the Design gives up on, so a review can find it unmet, or pass a run that lost the list (R-24 F-02) |
+
+**Why this is yours:** it sets how much the CLI promises when the app keeps undoing its writes.
+
+### Q8: How should the live run prove that `link` waits for an app update installer?
+
+**Recommendation:** A. It runs the real snippets on both desktops in minutes, without depending on a Paseo release being available.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Stand-in installers** | A new manual step: during `link`, run a long-lived stand-in process whose executable is under `%LOCALAPPDATA%\@getpaseodesktop-updater\` on Windows, and one whose arguments contain `sh.paseo.desktop.ShipIt` on the Mac, stop it after 20 seconds, and record that the app started only after it ended; then check that each app still runs 60 seconds after `link` exits | It does not run a real update, so a real installer that behaves differently, for example by starting late, is not covered |
+| **B. A real pending update** | Install the previous Paseo release on a desktop, let it download the current one, then run `link` and record the install and the relaunch | Downgrades a desktop app the owner uses, depends on the updater's own timing, and takes longer; may need several tries |
+| **C. Keep the plan** | The live run records whether an update was pending | AC-05's update clause may have no executed evidence on Windows at review time (R-24 F-03) |
+
+**Why this is yours:** it trades proof strength against changes to the apps the owner works in.
+
+### Q9: Should the tests cover a restore that holds in the session but is gone after the restart, and should the Design say the check after a rollback opens a new forward?
+
+**Recommendation:** A. It is the branch that confirms a rollback after a restart, and the fake app can already lose uncommitted writes.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Add both** | A T39 case where the restored value reads back in the session but is missing after the restart, asserting that the CLI restores it and checks again; step 5 says that debug launch opens a new debugging-port forward | One more test case |
+| **B. Leave them out** | Less test code | The repeat-once branch has no test that fails first (R-24 F-05) |
+
+**Why this is yours:** the reviewer marked it a judgement nit, so the extra test is optional.
 
 ## Review Log
 
