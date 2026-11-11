@@ -391,6 +391,7 @@ None.
 | 2026-11-11 | R-21 | spec | `9db96c0807bb0ab275149d48882b4250b05fa7ba` | n/a | n/a | accepted by owner |
 | 2026-11-11 | R-22 | implementation | `75f133019ee3927b4b563121903ff9caa843b754` | claude-opus-4.8 | procedural | Fourteen criteria met, AC-12 not verified (needs the merge, issue #77); one should-fix factual finding (the pseudo-terminal test fails on macOS) and one factual nit (the owner summary is out of date); model reported by the reviewer, not requested. |
 | 2026-11-11 | R-23 | implementation | `d4155d62af70742f8d271e4bde7138e6459b379f` | unknown | procedural | One blocking factual finding (a lost page after the reload skips the restore) and two should-fix factual findings (a pending app update races the relaunch; the macOS debug launch needs a settle time); AC-05 and AC-06 not met, AC-12 not verified, twelve met; model identity not attested. |
+| 2026-11-11 | R-24 | spec | `f9405ec9afecea149a0f74bd3e4cb188a0e8f5e9` | unknown | procedural | Four should-fix findings (two factual: the restart count and the tasks' files; two judgement: unbounded AC-06 recovery and no executed update check) and two nits, none blocking; model identity not attested. |
 
 ### R-1
 
@@ -1313,3 +1314,47 @@ SEVERITY: should-fix
 WHERE: plugins/paseo-hosts/internal/clientapp/snippets/launch.sh, stop.sh
 EVIDENCE: On macOS, launch.sh runs `open -a ... --remote-debugging-port` as soon as stop.sh sees the main process gone. With no update pending (app already 0.15.4), the debug instance died right after the reload in both rollback runs. My own CDP script reproduced this with an immediate relaunch at 15:50, while a 3 s delay before the debug launch worked every time.
 PROPOSAL: After the quit, wait a short settle time on macOS before the debug launch. Retry the launch and findPage once when the page disappears, and keep F-01's restore on that path.
+
+### R-24
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Skill; Context, Owner summary; Tasks, T43
+EVIDENCE: Design Skill (line 226) still has the skill say "the desktop app will restart twice". plugins/paseo-hosts/README.md:64 says the app "quits and starts again twice", and skills/paseo-hosts/SKILL.md:23 says "will quit and restart twice". The Owner summary (line 31) says "two or three times". The revised Design restarts the app more often than either count. Step 5 adds a debug launch after every rollback and may "repeat this step once". Line 198 adds up to two more quit and debug-launch cycles when the window is lost. Step 2 allows up to three launches. T43 changes the README and SKILL.md only for the update wait and the backup file, so after T39 to T44 both files will still say "twice".
+PROPOSAL: Give one restart count in the Design Skill section and the Owner summary that matches the revised session, for example "at least twice, and more after a rollback or a lost window". Add the README and SKILL.md wording to T43's done condition.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-06; Design, Desktop app entry
+EVIDENCE: AC-06 says that after the app's next start it "lists exactly the hosts it listed before ... also when its window stops answering after a reload". It sets no limit on how many times the window can stop answering. The Design bounds that recovery: "It does this at most twice in one command" (line 198), launches stop after three attempts, and step 5 ends with "If the CLI still cannot confirm the previous host list, it exits 1 and names `PASEO_HOSTS_DIR/app-registry-<client>.backup.json`". On that path the app does not list its previous hosts. The Test Plan already tests the path ("make every restore fail ... the last a message naming the backup file"), but no criterion states it. The Design also never says that a third lost window, or a run out of launches during a restore or the check after a rollback, leads to that same exit naming the backup file. R-23 F-01 was exactly an unrestored path that did not say the list was lost.
+PROPOSAL: Bound AC-06 to the cases the Design recovers from, such as a window lost once and a restored list deleted once. Add an observable end state for every other path: `link`, `unlink` or a rollback exits 1 naming the backup file, and that file holds the previous list. State in the Design that every path that ends without a confirmed restore reaches that exit.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-05; Test Plan, AC-05 and AC-06 row and manual procedure
+EVIDENCE: AC-05 requires the tunnel to be open "also when the app installs a downloaded update as it quits". The only planned executed check is a `stop.sh` test whose stand-in `pgrep` reads processes from the fake app's `/ps` handler (internal/testenv/standins.go:1037, internal/clientapp/fakedevtools_test.go:184). Real ShipIt is never observed. "The Windows installer wait is checked live only", but "An app update cannot be made pending on demand, so the live run records whether one was pending." The Windows check that the app is still running after the final launch also has no unit test, because pwsh on Linux lacks Get-CimInstance, and no manual step covers it. R-23's Windows failure was on exactly this path. The Windows half of this composite criterion may therefore have no executed evidence at review time. The claim that an update cannot be made pending is also unsupported: R-23 observed a 0.15.3 app with 0.15.4 pending, and the Background shows that older installers are published.
+PROPOSAL: Add a manual step that makes the update path observable on each desktop. One option is to run a long-lived stand-in process from `%LOCALAPPDATA%\@getpaseodesktop-updater\` on Windows, and one whose arguments contain `sh.paseo.desktop.ShipIt` on the Mac, during `link`, then record that the CLI waits and then starts the app. Another is to install the previous release so an update becomes pending. Also add a step that checks the Windows app still runs some time after `link` exits.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks, T41 and T42
+EVIDENCE: The stand-in `pgrep` and `pkill` only see the process list that `fakeApp.handlePS` serves in internal/clientapp/fakedevtools_test.go:184-202. That list holds only the app's main process and its tunnels. The stand-in ShipIt processes in T41 and the stand-in app in T42 that "exits right after its final launch" both need changes to fakedevtools_test.go, which neither task lists. T42 also requires that "every command fails when that process is gone at the end". On Windows that check needs a PowerShell snippet: launch.ps1 starts the app and tunnel.ps1 looks only for ssh.exe. T42 lists only `launch.sh`, so the Windows half of the R-23 Windows failure has no file and no done condition.
+PROPOSAL: Add `internal/clientapp/fakedevtools_test.go` to T41 and T42. Name the Windows snippet that checks the main process in T42, with a done condition such as passing the PowerShell syntax test plus the live check from F-03.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan, AC-05 and AC-06 row; Tasks, T39 and T40; Design, step 5
+EVIDENCE: T40 implements "a rollback is confirmed after a restart". None of the four T39 cases has a restore that reads back correctly in the session but is missing after the restart, so the "restore it and repeat this step once" branch has no test that fails first. The fake app already loses uncommitted writes on a kill (fakedevtools_test.go:163-167), so such a case is feasible. Step 5 also says "Close the forward" before the debug launch that follows a rollback. That launch needs a forward to read the registry, and the Design does not say one is opened again.
+PROPOSAL: Add a T39 case where the restored value holds in the session but is gone after the restart, and assert that the CLI restores it and checks again. In step 5, say that the debug launch after a rollback opens a new forward.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary
+EVIDENCE: Line 33 says "review R-23 found the app session unreliable on Paseo 0.15.4. On Windows, an update installed on quit left the app stopped". R-23 records that the Windows app was 0.15.3 and was installing 0.15.4 ("The relaunched 0.15.3 instance logged last at 15:51:46"). The summary also does not say that the AC-05 and AC-06 text changed: AC-05 gained the update clause, and AC-06 now judges the host list "after the app's next start" and names the lost window and deleted restore cases. These are material changes to the accepted proof bar.
+PROPOSAL: Say that the Windows app was updating from 0.15.3 to 0.15.4, and add one sentence on how AC-05 and AC-06 were reworded.
