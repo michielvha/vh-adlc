@@ -95,10 +95,12 @@ With the [Antigravity CLI](https://antigravity.google/docs/cli/install/) (`agy`)
 agy plugin install https://github.com/michielvha/vh-adlc/tree/main/plugins/vh-adlc
 ```
 
-Reopen the IDE. The command installs the unchanged package globally. On plugin 0.3.1, CLI 1.4.7 and
-IDE 2.5.5 loaded every skill but skipped the reviewer, because Antigravity expects the agent's
-`tools` frontmatter as a YAML list. Workflows that need an independent reviewer were not run; see
-[compatibility](../reference/compatibility.md#support-matrix).
+The command installs the package from `main` globally. Antigravity is unsupported for vh-adlc
+workflows. Only installation and skill discovery have been checked, on plugin 0.3.1 with CLI 1.4.7 and
+the language server from IDE 2.5.5 run headless; no skill or workflow ran, and current versions are
+untested. Antigravity also skipped the reviewer agent because it expects the agent's `tools`
+frontmatter as a YAML list, so operations that dispatch the reviewer or the blog editor are not
+expected to work there. See [compatibility](../reference/compatibility.md#support-matrix).
 
 ## What the plugin installs
 

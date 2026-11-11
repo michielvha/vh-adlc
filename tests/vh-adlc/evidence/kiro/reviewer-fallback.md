@@ -6,9 +6,8 @@ the backend model identity was not attested. These were capability probes, not a
 
 ## Shared instructions and test isolation
 
-Every named reviewer profile referenced the same canonical
-[`vh-adlc-reviewer.agent.md`](../../../../plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md).
-The file matched the anonymously fetched
+Every named reviewer profile referenced the same canonical `vh-adlc-reviewer.agent.md` from a
+local checkout. The file matched the anonymously fetched
 [public source at commit 6ea0ce5](https://raw.githubusercontent.com/michielvha/vh-adlc/6ea0ce5c7f8b37bd2dd2c862b9005131a9ed9f34/plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md),
 SHA-256 `10e61a59222879c4882bd10fef8c30ca5963779275f96114503804daea49e87e`.
 No reviewer, plugin or normal user agent configuration was modified.
