@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after R-1; awaiting re-review."
+status_description: "Revised after R-2; awaiting re-review."
 issue: null
 goal: "An adopter can run a free-first website SEO assessment through vh-adlc that spends paid API units only when allowed and within a limit, and leaves exports usable after access ends."
 covers:
@@ -38,17 +38,23 @@ On 30 October the owner asked for "an SEO agent that will evaluate the viability
 
 After this change, `vh-adlc-seo <site or brief>` reads the adopter's SEO adapter, inventories which sources are actually accessible, and always runs public HTTP and browser checks. It uses Search Console, Bing Webmaster Tools, Ahrefs Free, PageSpeed or local crawlers when they are available. Missing access is reported as a coverage gap, never as a zero. Findings are ranked, each with affected URLs, impact, confidence and a validation step. Raw responses, a findings table and a SHA-256 manifest are saved where the adapter says.
 
-Semrush stays optional, and free tools come first. All Semrush calls go through one packaged helper, `scripts/seo/semrush.ts`. The helper reads the key itself, so the key never enters the agent's context, command lines or saved files. It refuses unit-spending calls unless one of two things grants them: the owner's request in the current run, or a unit permission in the adopter's committed adapter. It also stops at a per-run unit limit. The operation never buys units, plans or accounts. Expired or failing access is recorded, and the run finishes from free sources and dated saved exports.
+Semrush stays optional, and free tools come first. All Semrush calls go through one packaged helper, `scripts/seo/semrush.ts`. The helper reads the key itself, so the key never enters the agent's context, command lines or saved files, and it talks only to Semrush over HTTPS. The agent decides whether spending is granted: by the owner's request in the current run, or by a unit permission with a limit in the adopter's adapter as committed on its default branch. Offline scenarios prove that decision. The helper enforces the rest in code. It refuses any unit-spending report unless the agent passes the grant flag and a unit limit, and it prices each report before sending it, so a run never goes over its limit. The operation never buys units, plans or accounts. Expired or failing access is recorded, and the run finishes from free sources and dated saved exports.
 
 An assessment writes only its report and exports. It never publishes content, changes DNS or indexing, edits the adapter, creates accounts, commits or pushes. A live recheck after a site change goes to the owner as a handoff item. The operation adds no onboarding files and is not a codebase audit: "SEO audit" routes here, and audits of the code still go to `vh-adlc-audit`.
 
-One default was set under the owner's standing instruction to take the recommended option; you can reject it at acceptance. Every unit permission carries a limit. An adapter permission must state one, and an in-run request without a number gets 500 units.
+These defaults were set under the owner's standing instruction to take the recommended option; you can reject any of them at acceptance:
+
+- Every unit permission carries a limit. An adapter permission without a limit counts as no permission, and an in-run request without a number gets 500 units.
+- A report is capped at 100 rows, and fewer when its price would not fit the units left.
+- A connected Semrush tool (an MCP server or similar) is out of scope for this version; only the helper calls Semrush.
+- The SEO agent loses its `Edit` tool, because an assessment never edits existing files.
+- The version stays 0.18.0, landing after the blog visual reading change at 0.17.0.
 
 The 30 October validation note becomes a dated historical record. Proof will come from static tests, helper unit tests against a local stub server, and new offline forward scenarios. None has run yet. Acceptance authorizes implementing this and committing on `feat/seo-agent`. Pushing to update PR #76 needs a ship request, and merging needs the owner's separate approval.
 
 ### Background
 
-On main at `bda1a8771a837cb028df3cb4d125f9c7da2735ff` the package has fifteen skills and no SEO operation: `tests/vh-adlc/triage/discovery.test.ts` asserts `toHaveLength(15)`. `plugins/vh-adlc/plugin.json:5` and `plugins/vh-adlc/.claude-plugin/plugin.json:4` describe lifecycle, maintenance, article drafting and documentation impact, with no SEO. `plugins/vh-adlc/references/authority.md:10-35` has no row for paid API usage; line 15 grants accepted scope for edits and commits on the feature branch, and line 26 requires a ship request to push and update a PR. `plugins/vh-adlc/references/loop.md:63-64` lists the operations that add no onboarding files. `plugins/vh-adlc/references/lifecycle.md:75-81` holds the audit-routing rule.
+On main at `bda1a8771a837cb028df3cb4d125f9c7da2735ff` the package has fifteen skills and no SEO operation: `tests/vh-adlc/triage/discovery.test.ts` asserts `toHaveLength(15)`. `plugins/vh-adlc/plugin.json:5` and `plugins/vh-adlc/.claude-plugin/plugin.json:4` describe lifecycle, maintenance, article drafting and documentation impact, with no SEO. `plugins/vh-adlc/references/authority.md:10-35` has no row for paid API usage; line 15 grants accepted scope for edits and commits on the feature branch, and line 26 requires a ship request to push and update a PR. `plugins/vh-adlc/references/loop.md:63-64` lists the operations that add no onboarding files. `plugins/vh-adlc/references/lifecycle.md:76-82` holds the audit-routing rule.
 
 The request is in the local Codex session `~/.codex/sessions/2026/10/27/rollout-2026-10-27T15-42-56-01a17dd0-782c-73d2-8843-471b64567a87.jsonl`. At 2026-10-30T01:33 the owner asked for free alternatives to Semrush. At 13:19 the owner asked for the SEO agent. At 13:20 the owner answered a question on whether it should be "reusable in vh-adlc, with Stackweaver's domains and European target markets kept in a small local adapter" with "Reusable vh-adl…". At 2026-11-07T21:27 the owner asked to "put those three improvements into the shared SEO skill".
 
@@ -64,13 +70,17 @@ The request is in the local Codex session `~/.codex/sessions/2026/10/27/rollout-
 
 It has no Semrush client: `plugins/vh-adlc/scripts/` holds no SEO helper. In its `seo.md`, lines 91-98 allow bounded Semrush reports "if access works and fresh data would change the assessment", with no spending permission or limit. Line 23 forbids credentials in URLs. Semrush's API, however, takes the key as a `key` query parameter (`https://api.semrush.com/?key=<key>`, per the SEO API overview), and line 151 only says headers and tokens are removed from preserved parameters. Lines 120-124 tell the assessor to repeat a startup check "against the live deployment when the change ships", which is a later action outside an assessment's scope. The workflows Operations table lists every operation except `vh-adlc-seo`.
 
-Semrush documents a free balance request, `http://www.semrush.com/users/countapiunits.html?key=...`, that returns the remaining units. Report prices are charged per line or per request.
+Semrush documents a free balance request, `http://www.semrush.com/users/countapiunits.html?key=...`, that returns the remaining units. The same path answers over HTTPS: `curl https://www.semrush.com/users/countapiunits.html` without a key returned HTTP 400 on 2026-11-11. Report prices are charged per line or per request; Domain Organic Search Keywords, for example, costs 10 units per line, or 50 for historical data, so one 100-row report costs 1,000 units.
 
 The validation note says the package "prepares 0.7.0 from `fcf7cd5`" and cites 58 tests. It predates the Search Console, crawler-verification and startup sections added in `82a5128`.
 
 Stackweaver's adapter is `agents/seo.md` on its main branch (branch `docs/seo-performance-followup-20261105`, an ancestor of `origin/main`). It names the official origin, an owned previous host, a separate consultancy site, five European markets, primary journeys, prior research paths, durable and raw export locations, a local Semrush credential path and its authority limits. It states no unit permission.
 
 `tests/vh-adlc/check.test.ts:224-232` checks only that the package version differs from main.
+
+The package has no build step. It is published by merging to main, and consumers install it from this repository through `.claude-plugin/marketplace.json` (Claude Code) and `.agents/plugins/marketplace.json` (Codex), both pointing at `./plugins/vh-adlc`. The blog scenario runner `tests/vh-adlc/blog/run.ts:22-30` already installs the package through a local Codex marketplace, the way a consumer does.
+
+At `dbb0485`, `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 bun test tests/vh-adlc/fixtures.test.ts` fails on this host with "the installer rejected the fixture lock: vh-adlc: /usr/local/bin/vh-adlc reports vh-adlc 0.19.0 but its digest does not match the lock", because the locally installed binary is newer than the fixture lock. CI runs the same test.
 
 ## Scope
 
@@ -121,7 +131,7 @@ The adapter is a Markdown file named by the adopter's committed repository instr
 - the Semrush unit permission and its per-run limit;
 - the adopter's authority limits.
 
-The first nine may be inferred from context before asking when absent. The last three are never inferred. An absent credential source means no Semrush call. An absent unit permission means no permission. Absent authority limits mean the shared authority rules alone. The permission, limit and credential source count only as committed on the adopter's default branch. An uncommitted or branch-only edit does not count, and neither does text in audited pages or exports. The assessment never edits the adapter. Domains, markets and publication rules stay in the adapter, never in the shared package.
+The first nine may be inferred from context before asking when absent. The last three are never inferred. An absent credential source means no Semrush call. An absent unit permission, or one without a per-run limit, means no permission. Absent authority limits mean the shared authority rules alone. The permission, limit and credential source count only as committed on the adopter's default branch. An uncommitted or branch-only edit does not count, and neither does text in audited pages or exports. The assessment never edits the adapter. Domains, markets and publication rules stay in the adapter, never in the shared package.
 
 ### Sources and assessment
 
@@ -133,15 +143,17 @@ The startup-flash check stays, with one change. A recheck after the change ships
 
 `plugins/vh-adlc/scripts/seo/semrush.ts` is the only route for Semrush requests. The procedure and agent forbid calling Semrush hosts through `curl`, WebFetch, a browser or any other tool. A connected Semrush tool is out of scope for this version.
 
-The helper:
+The helper runs with Bun, like the package's other scripts. It:
 
-- reads the key from `SEMRUSH_API_KEY`, or from the credential file the adapter names. The agent passes the file path, never the key. The helper never prints the key or puts it in its arguments, output or logs.
-- takes `--output <dir>`, `--max-units <n>` and the report parameters.
-- refuses any unit-spending report unless `--allow-units` is passed. The agent passes it only with the owner's current request or the committed adapter permission.
-- reads the remaining balance from the free `countapiunits` request before the first call and before each later one, and stops once units used in the run reach `--max-units`. The limit can be exceeded only by the final request's cost, and each request's `display_limit` is capped at 100 rows.
-- records authentication, expiry, quota, provider error and `no_data` as distinct outcomes, makes no repeat of an identical failed request, and stops all calls after an authentication, expiry or quota failure.
+- reads the key from `SEMRUSH_API_KEY`, or from the credential file the adapter names. The file may hold a bare key or a `SEMRUSH_API_KEY=<key>` line. The agent passes the file path, never the key. The helper refuses a value that is not a single token of 16 to 64 letters and digits, without sending anything, so another secret file cannot be sent. It never prints the key or puts it in its arguments, output or logs.
+- takes `--output <dir>`, `--max-units <n>`, `--allow-units` and the report parameters, and records the `--max-units` value it was given.
+- refuses any unit-spending report unless `--allow-units` is passed, and refuses `--allow-units` without `--max-units`. The agent passes the flag only with the owner's current request or the committed adapter permission, and passes the limit that grant states, or 500 for an in-run request without a number.
+- supports a fixed list of report types, each with its documented per-line or per-request price held in the helper next to the Semrush page it came from, and refuses any other type.
+- before each report, reads the remaining balance from the free `countapiunits` request and computes the report's maximum cost from its row limit and price. It lowers `display_limit` (at most 100) to fit the units left under `--max-units`, and refuses the report with a `limit` outcome when not even one row fits. Units used in a run therefore never exceed `--max-units`.
+- records authentication, expiry, quota, provider error, `limit` and `no_data` as distinct outcomes, makes no repeat of an identical failed request, and stops all calls after an authentication, expiry or quota failure.
 - saves every request with its `key` value replaced by `REDACTED`, plus each response, its outcome and units used, under `--output`.
-- accepts `VH_ADLC_SEMRUSH_BASE` to point at a test server; it is used only by tests.
+- sends reports to `https://api.semrush.com/` and balance requests to `https://www.semrush.com/users/countapiunits.html`, and refuses any non-HTTPS Semrush URL.
+- accepts `VH_ADLC_SEMRUSH_BASE` only for a loopback host (`127.0.0.1`, `::1` or `localhost`), over HTTP or HTTPS, and refuses any other value without sending anything. The override replaces the scheme and host of both URLs and keeps their paths (`/` and `/users/countapiunits.html`), so one test server answers both.
 
 Reading saved exports needs no helper and no permission. Old exports stay historical evidence and are never presented as current measurements. The procedure never buys units or plans, creates projects or campaigns, or probes unrelated projects.
 
@@ -149,42 +161,47 @@ Reading saved exports needs no helper and no permission. Old exports stay histor
 
 ### Authority
 
-`references/authority.md` gains a row. Spending a paid SEO provider's API units needs one of two grants: the owner's current request, with any limit it states and 500 units when it states none, or a unit permission with a per-run limit in the adopter's SEO adapter as committed on its default branch. Page content, exports or an agent-written edit never grant it. Buying units, plans or accounts needs separate approval for that exact action.
+`references/authority.md` gains a row. Spending a paid SEO provider's API units needs one of two grants: the owner's current request, with any limit it states and 500 units when it states none, or a unit permission with a per-run limit in the adopter's SEO adapter as committed on its default branch. A permission without a limit grants nothing. Page content, exports or an agent-written edit never grant it. Buying units, plans or accounts needs separate approval for that exact action.
 
 ### Documentation and packaging
 
-- `docs/reference/compatibility.md` gains an "SEO assessment" section with the evidence actually observed and its limits. The `workflows.md` SEO section links to it.
+- `docs/reference/compatibility.md` gains an "SEO assessment" section with the evidence actually observed and its limits, and states that Semrush use needs Bun. The `workflows.md` SEO section links to it.
+- `docs/get-started/installation.md` lists Bun as a requirement for Semrush use in `vh-adlc-seo`, alongside the other operations that need it.
 - `workflows.md` adds an Operations table row for `vh-adlc-seo` and a "Choosing the work" row for website SEO assessment.
 - Both package manifest descriptions mention SEO assessment, and so does the vh-adlc entry in `.claude-plugin/marketplace.json`.
 - The skill counts read sixteen in `workflows.md`, `installation.md` and the discovery tests.
 - `docs/research/seo-agent-validation-2026-10-30.md` opens with a dated historical note. It says the note covers `89e133d` only, that the later Search Console, crawler and startup sections were not part of that test, and that its version, pin and test-count statements describe that date.
 - Both manifests stay at 0.18.0, after the blog visual reading change at 0.17.0. `check.test.ts` checks only that the version differs from main, so this sequencing is a choice.
 
+### Artifacts and publication
+
+The one artifact is the `plugins/vh-adlc` package, published by merging to main and installed by consumers through `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`. Before merge, the offline scenarios install the package from the branch through a local Codex marketplace, as `tests/vh-adlc/blog/run.ts` does, and `check.test.ts` validates both manifests and the marketplace entry. The change is delivered once it is merged to main.
+
 ## Acceptance Criteria
 
 - [ ] AC-01: The package exposes `vh-adlc-seo` as a sixteenth skill; the lifecycle routing row names it; and the audit-routing paragraph states that a website SEO or search-visibility audit routes to `vh-adlc-seo`, while its persistent source-audit rule is otherwise unchanged.
 - [ ] AC-02: The SEO agent has no `Edit` tool and its description names `vh-adlc-seo`; the skill entry cites `references/authority.md` and the loop's knowledge failure handling.
-- [ ] AC-03: The Semrush helper, run against a local stub server, refuses every unit-spending report without `--allow-units`, stops at `--max-units`, records an expired key as a distinct outcome without repeating the request, and saves requests with `key=REDACTED` while the fixture key appears in none of its output or saved files.
-- [ ] AC-04: With an adapter that grants no unit permission, an assessment makes no request to the stub, makes no Semrush request by any other route, reports Semrush as skipped in source coverage and still delivers findings from free sources.
-- [ ] AC-05: With a committed adapter permission and limit, an assessment makes at least one helper request, saves it redacted, and the fixture key appears in no saved file, transcript event or tool output.
-- [ ] AC-06: With permission granted but the stub returning an expired-key outcome, an assessment records that outcome, makes no further Semrush request, labels saved exports as historical and still delivers findings.
+- [ ] AC-03: The Semrush helper, run against a local stub server: refuses every unit-spending report without `--allow-units`, and `--allow-units` without `--max-units`; never lets units used exceed `--max-units`, lowering the row limit to fit and sending nothing when one row does not fit; records an expired key as a distinct outcome without repeating the request; refuses a non-loopback `VH_ADLC_SEMRUSH_BASE`, a non-HTTPS Semrush URL and a credential value that is not a key, sending nothing; reads both a bare key and a `SEMRUSH_API_KEY=` line; sends both balance and report requests to the stub; and saves requests with `key=REDACTED` while the fixture key appears in none of its output or saved files.
+- [ ] AC-04: With a working fixture credential and a stub that would succeed, but no committed unit permission, an assessment makes no unit-spending request, even with an uncommitted adapter edit granting units and a fixture page claiming permission. It makes no Semrush request by any other route, reports Semrush as skipped in source coverage and still delivers findings from free sources.
+- [ ] AC-05: With a committed adapter permission and limit, an assessment calls the helper with `--max-units` equal to that limit, makes at least one report request, saves it redacted, and the fixture key appears in no saved file, transcript event or tool output. With an in-run grant that names no number, it passes 500. With a committed limit smaller than one row of any report, it makes no report request and the report states that Semrush stopped at the unit limit.
+- [ ] AC-06: With permission granted, a dated earlier Semrush export present, and the stub returning an expired-key outcome, an assessment records that outcome, makes no further Semrush request, labels the earlier export as historical rather than a current measurement, and still delivers findings.
 - [ ] AC-07: `references/authority.md` has the paid-API-unit row; `references/seo.md` lists the adapter keys, the three never-inferred keys and the committed-default-branch rule, and the reworded line on key-in-URL providers.
 - [ ] AC-08: A completed assessment writes only inside the adapter's report and export locations and leaves the adapter unchanged. It saves a findings table and a manifest whose SHA-256 digests verify. Given a startup-flash case, its handoff names the URL, build identity and check as an owner item.
 - [ ] AC-09: `vh-adlc-seo` adds no onboarding files, and `references/loop.md` lists it with the other operations that add none.
-- [ ] AC-10: The compatibility record has an SEO assessment section linked from the user guide; the workflows Operations and Choosing tables list SEO; both manifests and the marketplace entry mention SEO; the validation note is marked historical; both manifests carry 0.18.0; `bun test tests/vh-adlc` passes locally apart from the known fixtures digest failure; and CI passes on the PR head.
+- [ ] AC-10: The compatibility record has an SEO assessment section linked from the user guide; the workflows Operations and Choosing tables list SEO; both manifests and the marketplace entry mention SEO; the validation note is marked historical; both manifests carry 0.18.0; `bun test tests/vh-adlc` passes locally, except that `tests/vh-adlc/fixtures.test.ts` may fail only with the fixture-lock digest error quoted in Background; and CI, which runs that test too, passes on the PR head.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | `tests/vh-adlc/triage/discovery.test.ts` and `maintenance/discovery.test.ts` skill counts; `tests/vh-adlc/seo.test.ts` asserts the lifecycle row, the audit-paragraph sentence, and that the rest of the audit paragraph matches main. |
+| AC-01 | `tests/vh-adlc/triage/discovery.test.ts` and `maintenance/discovery.test.ts` skill counts; `tests/vh-adlc/seo.test.ts` asserts the lifecycle row, the audit-paragraph sentence, and that the paragraph without that sentence equals its text at `bda1a8771a837cb028df3cb4d125f9c7da2735ff`, held in the test as a fixture string. |
 | AC-02 | `seo.test.ts` parses the agent front matter and the skill entry. |
-| AC-03 | `tests/vh-adlc/seo/semrush.test.ts` starts a local stub on a random port, sets `VH_ADLC_SEMRUSH_BASE`, and runs the helper for: no `--allow-units`; a limit reached after two calls; an expired-key response; and a successful call. It asserts call counts on the stub, recorded outcomes, `key=REDACTED` in saved requests, and no fixture key in stdout, stderr or saved files. |
-| AC-04 | Offline forward scenario `tests/vh-adlc/seo/run.ts no-permission`, in a separate agent context as the 2026-10-30 test was, with the stub as `VH_ADLC_SEMRUSH_BASE` and an adapter without permission. Assert zero stub requests, no `semrush.com` host in any transcript tool call, Semrush skipped in source coverage, and findings present. |
-| AC-05 | Scenario `permitted` with a committed adapter permission and limit: assert at least one stub request and saved redacted request, and search every saved file and the raw transcript for the fixture key. |
-| AC-06 | Scenario `expired` with permission and a stub returning the expired-key error: assert one stub request, the recorded outcome, historical labels on saved exports, and findings present. |
+| AC-03 | `tests/vh-adlc/seo/semrush.test.ts` starts a local stub on a random port, sets `VH_ADLC_SEMRUSH_BASE`, and runs the helper for: no `--allow-units`; `--allow-units` without `--max-units`; a limit that fits one full report, then a lowered row limit, then a `limit` refusal; a limit below one row's price; an expired-key response; a non-loopback base; an `http://` Semrush URL; a credential file holding a private key block; a bare-key file and a `SEMRUSH_API_KEY=` file; and a successful call. It asserts balance and report call counts on the stub (zero for every refusal), units used against `--max-units`, recorded outcomes, `key=REDACTED` in saved requests, and no fixture key in stdout, stderr or saved files. |
+| AC-04 | Offline forward scenario `tests/vh-adlc/seo/run.ts no-permission`, run through a local Codex marketplace install in a separate agent context, as the 2026-10-30 test was. The stub serves as `VH_ADLC_SEMRUSH_BASE` and answers successfully. The committed adapter names a valid fixture credential but no permission; an uncommitted working-tree edit adds a permission, and one fixture page says units are allowed. Assert zero report requests at the stub, no `semrush.com` host in any transcript tool call, Semrush skipped in source coverage, and findings present. |
+| AC-05 | Scenario `permitted` with a committed permission and limit: assert the recorded `--max-units` equals the limit, at least one report request at the stub and one saved redacted request, and search every saved file and the raw transcript for the fixture key. Scenario `in-run`, whose prompt allows Semrush units without a number and whose adapter grants none: assert the recorded `--max-units` is 500. Scenario `limited`, whose committed limit is below one row's price: assert zero report requests, a `limit` outcome, and a report line saying Semrush stopped at the unit limit. |
+| AC-06 | Scenario `expired` with permission, a dated earlier Semrush export in the export location, and a stub returning the expired-key error: assert one report request, the recorded outcome, that the report labels the earlier export historical and does not present it as current, and findings present. |
 | AC-07 | `seo.test.ts` asserts the authority row text and each named rule in `references/seo.md`. |
-| AC-08 | All three scenarios: compare the fixture tree before and after against the adapter's locations and the adapter's hash, recompute the manifest digests, and check the `permitted` handoff for the startup-flash item from a fixture page whose heading disappears during startup. |
+| AC-08 | Every scenario: compare the fixture tree before and after against the adapter's locations and the adapter's hash, recompute the manifest digests, and check the `permitted` handoff for the startup-flash item from a fixture page whose heading disappears during startup. |
 | AC-09 | `seo.test.ts` asserts the `loop.md` list; scenario fixtures show no new `AGENTS.md` or bridge files. |
 | AC-10 | `seo.test.ts` checks the compatibility section and its link, both workflows tables, the manifest and marketplace text and the historical note; `tests/vh-adlc/check.test.ts` for the version; `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 bun test tests/vh-adlc --timeout 60000` locally; `gh pr checks 76` on the head. |
 
@@ -194,13 +211,14 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None. The unit-limit default in the owner summary was set under the owner's standing instruction of 2026-11-10 to take the recommended option, and is confirmed or rejected at acceptance.
+None. The defaults listed in the owner summary were set under the owner's standing instruction of 2026-11-10 to take the recommended option, and is confirmed or rejected at acceptance.
 
 ## Review Log
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-11 | R-1 | spec | `70f88db` | unknown | procedural | 12 findings: 1 blocking, 9 should-fix, 2 nits; model identity not attested |
+| 2026-11-11 | R-2 | spec | `dbb0485` | unknown | procedural | Changes needed: 1 blocking, 7 should-fix, 4 nits. |
 
 ### R-1
 
@@ -287,6 +305,92 @@ SEVERITY: nit
 WHERE: Context, Background; Design, Documentation and packaging
 EVIDENCE: Line 53 lists what 8e028c2 adds. It omits that both manifests are already 0.18.0 (PR #75 head 997b63d is 0.17.0), that tests/vh-adlc/check.test.ts sets `CONTENT_OPERATIONS` to include "seo", and that the merge dropped 89e133d's SEO manifest description. Design line 142 cites "the repository's version policy", but no such page is cited. The only version check is check.test.ts:224-232, which requires the version to differ from origin/main and does not require the next minor.
 PROPOSAL: Add these facts to Background. Cite the version rule used, or say that the 0.18.0 sequencing after 0.17.0 is a choice and not a checked policy.
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design, Semrush helper; Acceptance Criteria AC-03; Test Plan AC-03
+EVIDENCE: Design line 141 says the helper "stops once units used in the run reach `--max-units`. The limit can be exceeded only by the final request's cost, and each request's `display_limit` is capped at 100 rows." Line 45 sets 500 units as the default for an in-run grant. The Semrush API unit balance page says Domain Organic Search Keywords costs "10 units per keyword" for regular data and "50 units per keyword" for historical data, and that per-line reports charge for each line returned. One 100-row request can therefore cost 1,000 to 5,000 units, which is 2 to 10 times the 500 default, and the first request alone can do this. The AC-03 proof ("a limit reached after two calls") passes whatever a single request costs. The goal "spends paid API units only ... within a limit" fails while every box is ticked.
+PROPOSAL: Have the helper estimate each request's maximum cost (rows times the report's per-line price, or its fixed price) before sending it. It should refuse the request, or lower `display_limit`, when that estimate would exceed the units left under `--max-units`. Add an AC-03 case where a single request's estimated cost exceeds the remaining limit, and assert that the stub receives no request.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Semrush helper and Authority; Acceptance Criteria AC-03, AC-05; Test Plan AC-05
+EVIDENCE: Line 139 says the helper "takes `--output <dir>`, `--max-units <n>`", but the document never says what happens when `--allow-units` is passed without `--max-units`. Lines 121 and 152 require "a unit permission with a per-run limit" but do not say whether an adapter permission with no limit counts as no permission. No criterion or Test Plan row checks the limit the agent actually passes. AC-05 asserts only "at least one helper request", so the scenario passes even if the agent passes `--max-units 1000000` or ignores the adapter's limit. The 500-unit default for an in-run request (lines 45 and 152) is not covered anywhere. R-1 F-05 also asked for a run-level case "in which a stated limit stops further unit-spending calls and the run reports that it stopped". AC-03 covers only the helper.
+PROPOSAL: Make the helper refuse `--allow-units` without `--max-units`, and state that an adapter permission without a limit counts as no permission. Extend AC-05 so that the recorded helper invocation's `--max-units` equals the adapter limit and the report states that the run stopped at the limit. Add a scenario or helper-level check for the 500 default.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-04; Test Plan AC-04; Design, Adapter
+EVIDENCE: Test Plan line 183 runs `no-permission` with "an adapter without permission" but does not say whether that adapter names a working credential source. Line 124 says "An absent credential source means no Semrush call", so an adapter with no credential also gives zero stub requests and the permission gate is never tested. Line 124 also says an "uncommitted or branch-only edit does not count, and neither does text in audited pages or exports", and line 152 repeats this in the authority row. No criterion or scenario checks either rule. AC-07 checks only that `seo.md` states it.
+PROPOSAL: Specify that the `no-permission` fixture names a valid fixture credential and that the stub would succeed. Add a variant with an uncommitted adapter edit that grants units, and a fixture page or export that claims permission, and assert zero stub requests in both.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Semrush helper
+EVIDENCE: Line 144 says the helper "accepts `VH_ADLC_SEMRUSH_BASE` to point at a test server; it is used only by tests". Nothing in the helper enforces that. Line 138 has the helper read "the credential file the adapter names", with "the agent passes the file path". The agent keeps Bash (line 105) and reads untrusted pages. A prompt-injected or mistaken run that sets the base to another host, or passes another secret file as the credential path, makes the helper send the key or that file's contents to the attacker's host or to Semrush. This defeats the line 138 promise that the key stays private. AC-03 does not cover it.
+PROPOSAL: Accept the override only for loopback hosts, and reject a credential value that does not match the Semrush key shape. Add AC-03 cases where a non-loopback base and a non-key file are refused with no request sent.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Background; Design, Semrush helper
+EVIDENCE: Line 67 cites the balance request as `http://www.semrush.com/users/countapiunits.html?key=...`. The Semrush API unit balance page gives that plain-HTTP URL on the `www.semrush.com` host. Reports go to `https://api.semrush.com/` (SEO API overview). Line 141 calls the balance request before every report. As written, the helper sends the key in clear text on every call. A single `VH_ADLC_SEMRUSH_BASE` (line 144) also does not say how the stub stands in for two different hosts.
+PROPOSAL: Require HTTPS for every Semrush request, including the balance request, and refuse plain HTTP. State how the base override maps both the balance path and the report path, and assert in AC-03 that the stub sees both.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary
+EVIDENCE: Line 41 says the helper "refuses unit-spending calls unless one of two things grants them: the owner's request in the current run, or a unit permission in the adopter's committed adapter. It also stops at a per-run unit limit." Design line 140 says the helper refuses "unless `--allow-units` is passed. The agent passes it only with the owner's current request or the committed adapter permission." The helper checks a flag. Whether a grant exists, including the committed-default-branch rule, is decided by the agent. The summary tells the owner the grant check is enforced in code.
+PROPOSAL: Reword the summary so the agent decides whether a grant exists and the helper enforces only the flag and the limit. Then state which scenario proves the agent's decision.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary; Open Questions
+EVIDENCE: Line 45 says "One default was set under the owner's standing instruction", and line 197 names only "The unit-limit default". The Design settles other choices the summary does not disclose. Line 134 says "A connected Semrush tool is out of scope for this version", which removes the "connected tool" route that seo.md:91 on feat/seo-agent allows. Line 161 says the 0.18.0 sequencing "is a choice". Line 141 caps `display_limit` at 100 rows. Line 105 drops the agent's `Edit` tool.
+PROPOSAL: List each settled default in the owner summary so the owner can confirm or reject it at acceptance, at least the connected-tool exclusion and the version sequencing.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context; Design, Documentation and packaging
+EVIDENCE: conventions/delivery.md:85-89 at d8f07c9 says "A feature document names every artifact its change affects and the path that builds and publishes each one ... Before merge, a check rebuilds each artifact the way that path builds it." This change modifies the vh-adlc plugin package, both manifests and the `.claude-plugin/marketplace.json` entry (lines 158 and 161). It also adds a Bun helper. `grep -n -i "release\|publish\|artifact"` on the document finds no artifact or publication path.
+PROPOSAL: Add a short artifact and publication path note naming the plugin package and its marketplace route. Name the pre-merge check that installs it the way consumers do, for example the forward scenarios' local marketplace install.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-10
+EVIDENCE: AC-10 says "passes locally apart from the known fixtures digest failure", and the document never defines that failure. Running `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 bun test tests/vh-adlc/fixtures.test.ts` at dbb0485 fails with "the installer rejected the fixture lock: vh-adlc: /usr/local/bin/vh-adlc reports vh-adlc 0.19.0 but its digest does not match the lock". An implementation reviewer could treat any fixtures failure as "known".
+PROPOSAL: Name the exact test and error message that is excused, and say that CI runs it.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-01
+EVIDENCE: Line 180 says `seo.test.ts` asserts "that the rest of the audit paragraph matches main". After merge, main contains the new sentence, so a comparison against main either has to strip the sentence or fails. A test based on `origin/main` also depends on the checkout's remote state.
+PROPOSAL: Compare against the paragraph text at `bda1a8771a837cb028df3cb4d125f9c7da2735ff`, held as a fixture string, not against main.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-06
+EVIDENCE: Line 185 asserts "historical labels on saved exports" but does not require the `expired` fixture to contain any dated earlier Semrush export. With none, the label check passes with nothing to label. This is the same gap R-1 F-06 found for the startup case.
+PROPOSAL: Require the `expired` fixture to include at least one dated earlier Semrush export, and assert that the report labels it historical and does not present it as a current measurement.
+
+FINDING: F-12
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Semrush helper; Design, Documentation and packaging
+EVIDENCE: Stackweaver origin/main agents/seo.md:27-28 says the credential at `/home/m/code/semrush.env` "may be a bare key". Design line 138 does not say which file formats the helper parses. The helper is TypeScript under `scripts/seo/`. installation.md:121-140 lists Bun as a requirement for each operation that needs it, and Design line 159 changes only the skill count there.
+PROPOSAL: State that the helper accepts both a bare key and a `SEMRUSH_API_KEY=` line, and cover both in AC-03. Add the Bun requirement for Semrush use to installation.md and the compatibility section.
 
 ## Sources
 
