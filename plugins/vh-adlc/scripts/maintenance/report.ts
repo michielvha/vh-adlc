@@ -4,8 +4,11 @@ import { dirname, isAbsolute, join, posix, resolve } from "node:path";
 import { git, resolveInside } from "../triage/settings";
 import { appendRun, canonicalJSON, digest, privateDirectory, publishBytes, publishJSON, readRun, runID, syncDirectory, type Run } from "./journal";
 import { commitID, parseObservation, validateObservation, type ObservationDocument } from "./history";
-import type { Inventory } from "./collect";
+import { acceptSecuritySettings, type Inventory } from "./collect";
+import { renderSecuritySettings } from "../security-settings/render";
 import type { Settings } from "./types";
+import { securitySummary, currentSecurityPolicy } from "./security-io";
+import { validateSecurityRevision, readSecurityRevisions, selectSecurityChain, type SecurityRevision } from "./security-history";
 
 function fail(message: string): never { throw Error(`maintenance report: ${message}`); }
 function writable(config: Settings, id: string): Run { const run = readRun(config, id); if (run.settings_changed) fail("settings changed; reconcile run scope first"); return run; }
@@ -98,7 +101,21 @@ export function portableObservations(run: Run, inventory: Inventory): Observatio
   return observations;
 }
 
-export function renderReport(config: Settings, run: Run, inventory: Inventory, options: { metadata?: Record<string, string | string[]>; analysis?: string } = {}): string {
+export const SECURITY_SETTINGS_OPT_IN = "Sweeps only check these settings. To let a sweep turn on the free ones, commit `security_settings: apply` in the maintenance settings on the default branch.";
+/** The report's `## Repository security settings` section from the helper files given to `report`; a rejected file never fails the report. */
+export function securitySettingsSection(config: Settings, run: Run, paths: string[] = []): string {
+  const scope = run.header.scope.repositories, { accepted, rejected } = acceptSecuritySettings(paths, { run_id: run.header.run_id, repositories: scope, hostname: config.hostname });
+  const outputs = scope.flatMap(repository => accepted.filter(output => output.repository === repository));
+  const missing = scope.filter(repository => !outputs.some(output => output.repository === repository)).map(repository => {
+    const reasons = rejected.filter(item => item.repository === repository).map(item => `\`${item.file}\` ${item.reason}`);
+    return { repository, reason: reasons.length ? `ignored ${reasons.join("; ")}` : "no helper file given" };
+  });
+  const notes = rejected.filter(item => item.repository === null).map(item => `Helper file \`${item.file}\` ignored, helper did not run for it: ${item.reason}.`);
+  if (!outputs.length || outputs.some(output => output.mode !== "apply")) notes.push(SECURITY_SETTINGS_OPT_IN);
+  return renderSecuritySettings(outputs, missing, notes);
+}
+
+export function renderReport(config: Settings, run: Run, inventory: Inventory, options: { metadata?: Record<string, string | string[]>; analysis?: string; security?:SecurityRevision; security_settings?: string[] } = {}): string {
   const observations = portableObservations(run, inventory);
   const metadata: Record<string, unknown> = { status: "in-progress", status_description: "Analysis saved; selection and outcomes pending.", run_id: run.header.run_id,
     repository: config.repository, hostname: config.hostname, scope: run.header.scope, source_commit: inventory.source_commit, created_at: run.header.created_at };
@@ -114,7 +131,12 @@ export function renderReport(config: Settings, run: Run, inventory: Inventory, o
   }
   lines.push("", "## Security alerts", "", "| Repository | Surface | Coverage | Count | Reason |", "| --- | --- | --- | --- | --- |");
   for (const row of observations.observations) lines.push(`| ${escapeCell(row.repository)} | ${row.surface} | ${row.status} | ${row.count === null ? row.status === "complete-unavailable" ? "n/a" : "unknown" : row.count} | ${escapeCell(row.reason ?? "")} |`);
-  lines.push("", "```maintenance-observation-v1", JSON.stringify(observations, null, 2), "```", "", "## Analysis", "", options.analysis ?? "Release-note, usage, ownership and readiness evidence is pending. No dependency action is authorized by this report.", "");
+  lines.push("", "```maintenance-observation-v1", JSON.stringify(observations, null, 2), "```", "", securitySettingsSection(config, run, options.security_settings).trimEnd(), "", "## Analysis", "", options.analysis ?? "Release-note, usage, ownership and readiness evidence is pending. No dependency action is authorized by this report.", "");
+  if(options.security){
+    const revision=validateSecurityRevision(options.security);
+    if(revision.run_id!==run.header.run_id||revision.collection_digest!==digest(canonicalJSON(inventory))||revision.original_projection_digest!==digest(canonicalJSON(observations)))throw Error("security report collection binding changed");
+    lines.push("",securitySummary(revision));
+  }else lines.push("", "Security accounting: pending (no typed security snapshot supplied).", "");
   return lines.join("\n");
 }
 
@@ -152,10 +174,10 @@ export function saveReport(config: Settings, id: string, text: string, options: 
   return { path, ...identity, kind };
 }
 
-type Update = { expected_digest: string; step_id: string; at: string; append: string; status?: string; status_description?: string };
+type Update = { expected_digest: string; step_id: string; at: string; append: string; status?: string; status_description?: string; security?:SecurityRevision };
 export function appendReport(config: Settings, id: string, update: Update): Saved {
   let run = writable(config, id); runID(update.step_id);
-  if (Object.keys(update).some(key => !["expected_digest", "step_id", "at", "append", "status", "status_description"].includes(key)) ||
+  if (Object.keys(update).some(key => !["expected_digest", "step_id", "at", "append", "status", "status_description", "security"].includes(key)) ||
       !Number.isFinite(Date.parse(update.at)) || typeof update.append !== "string" || !update.append.trim() || !/^[a-f0-9]{64}$/.test(update.expected_digest)) fail("invalid append update");
   for (const value of [update.status, update.status_description]) if (value !== undefined && (typeof value !== "string" || /[\r\n\0]/.test(value))) fail("invalid mutable scalar");
   const report = run.state.report;
@@ -164,6 +186,13 @@ export function appendReport(config: Settings, id: string, update: Update): Save
   const payload = digest(canonicalJSON(update));
   if (intent && (intent.kind !== "report-append" || intent.payload !== payload)) fail("step ID payload conflict");
   const current = fileIdentity(path), original = readFileSync(path, "utf8"); ownedText(original, run);
+  if(readSecurityRevisions(update.append).length)throw Error("security snapshots require a typed update");
+  if(update.security){
+    const revision=validateSecurityRevision(update.security),prior=selectSecurityChain(readSecurityRevisions(original));
+    const replay=intent?.after_digest===current.digest&&prior.latest?.digest===revision.digest;
+    if(prior.gaps.length||!prior.latest||revision.run_id!==id||!replay&&(revision.previous_snapshot_digest!==prior.latest.digest||revision.snapshot_revision!==prior.latest.snapshot_revision+1)||
+      canonicalJSON(revision.snapshot.input.policy)!==canonicalJSON(currentSecurityPolicy(config)))throw Error("security update predecessor/policy changed");
+  }
   if (intent?.after_digest === current.digest && intent.state === "receipt") return { path, ...current, kind: String(report.kind) };
   if (current.digest !== update.expected_digest && intent?.after_digest !== current.digest) fail("report digest changed; reconcile instead of appending");
   if (run.state.operations.some(op => op.kind === "report-append" && op.state === "intent" && op.step_id !== update.step_id)) fail("another append intent requires reconciliation");
@@ -175,7 +204,7 @@ export function appendReport(config: Settings, id: string, update: Update): Save
       const expression = new RegExp(`^${key}:.*$`, "m");
       if (!expression.test(raw)) fail("missing mutable header scalar"); raw = raw.replace(expression, () => `${key}: ${JSON.stringify(update[key])}`);
     }
-    const next = `---\n${raw}\n---\n${parsed.body}\n## Update ${update.at}\n\n${update.append.trimEnd()}\n\n<!-- Maintenance-Step: ${update.step_id} -->\n`, after = digest(next);
+    const next = `---\n${raw}\n---\n${parsed.body}\n## Update ${update.at}\n\n${update.append.trimEnd()}\n${update.security?"\n"+securitySummary(update.security):""}\n<!-- Maintenance-Step: ${update.step_id} -->\n`, after = digest(next);
     ownedText(next, run);
     if (intent && current.digest === intent.after_digest) {
       const operations = run.state.operations.map(op => op.step_id === update.step_id ? { ...op, state: "receipt" } : op);

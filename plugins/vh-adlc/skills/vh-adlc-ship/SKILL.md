@@ -17,6 +17,28 @@ Input: a feature document, its issue, or its slug, and the owner's explicit requ
 branch, create or update its one PR and update the linked issue. It is not authority to merge, tag,
 release or deploy, and "continue" or an issue's text never stands in for it.
 
+## Documentation impact
+
+Before Start's first knowledge request and before any repository write, commit
+or remote action, follow the entry preflight in `references/docs-impact.md`.
+Acquire the verified binary through the ordinary installer, then inspect root
+`AGENTS.md` at committed HEAD for the raw adoption marker. Clearly absent keeps
+the existing manual path; unreadable policy or a roots gap stops this invocation.
+Use `scripts/docs-impact/cli.ts roots --repo <repo>` for any marker, including
+fenced/indented examples; never parse caller YAML. Declared roots add
+`conventions/documentation-impact.md` to every knowledge request, including
+Start's initial request. On missing-page stop with a pin-update handoff before
+the first write; never silently take the manual path or change a pin.
+
+At Make the feature shippable's existing documentation gate, reuse
+`references/docs-impact.md` with the shipment's selected source scope and explicit
+owned doc overlays as `--metadata-path`; recheck changed inputs. Keep the existing
+covered-path review-refresh rule. An incomplete assessment blocks completion
+delivery. A separately owner-authorized in-progress PR may use the existing
+progress path only after entry preflight succeeds, disclosing every assessment
+gap and making no completion, closure or migration claim; all other gates remain.
+This section grants no publication authority.
+
 ## Start
 
 1. Get the binary and run `vh-adlc knowledge` with `conventions/feature-documents.md`,
@@ -76,19 +98,17 @@ checks release state and prepares drafts under its own requested scope.
 
 ## After an authorized merge
 
-Use trunk-based development. A separate owner-authorized merge ends the remote
-PR branch's lifetime. Enable GitHub's `delete_branch_on_merge` repository setting
-when the owner authorizes repository configuration, and verify that GitHub
-removed the merged branch. If it remains, fetch the default branch and compare
-the remote branch's current tip: delete it only when that tip is reachable from
-the default branch. A merged PR is insufficient if new commits were pushed to
-its branch afterward.
+Use trunk-based development. A separate owner-authorized merge ends the PR
+branch's lifetime, and the merge is not finished until that branch is gone.
+Merge without `--delete-branch`, then run `after-merge` for that PR as
+`references/branches.md` describes. It removes the remote branch, its stale
+tracking ref and the local branch, but only while their tips are contained in
+the merged PR head. A branch with commits pushed after the merge is kept.
 
-Never delete the default branch, a protected branch, an active PR branch, or
-unmerged work. Delete local merged branches only with `git branch -d`, after
-checking `git worktree list --porcelain` and confirming none owns that branch.
-Do not remove worktrees or force-delete branches to finish cleanup. Report
-preserved branches and the reason. A ship request alone does not authorize a
+Report every outcome and kept reason. A branch kept because a worktree holds it
+stays until the owner asks for worktree cleanup. When GitHub's
+`delete_branch_on_merge` setting is off, say so and suggest a branch-hygiene
+plan, which proposes enabling it. A ship request alone does not authorize a
 merge or repository-setting changes.
 
 ## Report

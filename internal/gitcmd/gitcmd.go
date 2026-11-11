@@ -39,11 +39,19 @@ func (e *ExitError) Error() string {
 	return fmt.Sprintf("git %s: exit %d: %s", strings.Join(e.Args, " "), e.Code, strings.TrimSpace(e.Stderr))
 }
 
-// TooOldError reports a Git older than MinMajor.MinMinor.
-type TooOldError struct{ Version string }
+// TooOldError reports a Git older than the floor a check named. A zero
+// Major means the binary's own floor, MinMajor.MinMinor.
+type TooOldError struct {
+	Version      string
+	Major, Minor int
+}
 
 func (e *TooOldError) Error() string {
-	return fmt.Sprintf("git %s is older than the required %d.%d", e.Version, MinMajor, MinMinor)
+	major, minor := e.Major, e.Minor
+	if major == 0 {
+		major, minor = MinMajor, MinMinor
+	}
+	return fmt.Sprintf("git %s is older than the required %d.%d", e.Version, major, minor)
 }
 
 // Run runs git with args and returns its standard output.
@@ -96,18 +104,28 @@ var versionRe = regexp.MustCompile(`^git version (\d+)\.(\d+)`)
 
 // CheckVersion fails with *TooOldError when git is older than the minimum.
 func (g Git) CheckVersion(ctx context.Context) error {
+	return g.CheckMinVersion(ctx, MinMajor, MinMinor)
+}
+
+// CheckMinVersion fails with *TooOldError when git is older than major.minor,
+// a floor a single command needs above the binary's own.
+func (g Git) CheckMinVersion(ctx context.Context, major, minor int) error {
 	out, err := g.Output(ctx, "--version")
 	if err != nil {
 		return err
 	}
+	return CheckVersionOutput(out, major, minor)
+}
+
+func CheckVersionOutput(out string, major, minor int) error {
 	m := versionRe.FindStringSubmatch(out)
 	if m == nil {
-		return &TooOldError{Version: out}
+		return &TooOldError{Version: out, Major: major, Minor: minor}
 	}
-	major, _ := strconv.Atoi(m[1])
-	minor, _ := strconv.Atoi(m[2])
-	if major < MinMajor || (major == MinMajor && minor < MinMinor) {
-		return &TooOldError{Version: strings.TrimPrefix(out, "git version ")}
+	gotMajor, _ := strconv.Atoi(m[1])
+	gotMinor, _ := strconv.Atoi(m[2])
+	if gotMajor < major || (gotMajor == major && gotMinor < minor) {
+		return &TooOldError{Version: strings.TrimPrefix(out, "git version "), Major: major, Minor: minor}
 	}
 	return nil
 }

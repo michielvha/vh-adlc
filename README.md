@@ -25,11 +25,14 @@ The agent runs the workflow; you accept the feature scope and decide when to shi
 
 ## Why use it?
 
+- Find docs affected by selected code changes with [shared documentation impact](plugins/vh-adlc/examples/docs-impact/README.md).
 - Keep a feature's requirements, tasks, and evidence together in Git.
 - Check review freshness and completion with deterministic commands.
 - Get independent spec and implementation reviews before completing a feature.
 - Handle documentation and small maintenance tasks without creating a feature spec.
 - Sweep dependency and security work through [shared maintenance](docs/user-guides/workflows.md#dependency-and-security-maintenance), keeping project rules local and selecting work from an evidence-based report.
+- Audit software bugs and reliability through a [persistent finding ledger](docs/user-guides/workflows.md#persistent-codebase-audit), then reverify findings or repair selected work under local project rules.
+- Free space that killed runs left in `/tmp` with [host cleanup](docs/user-guides/workflows.md#host-cleanup), limited to what each project declares on its default branch.
 - Triage backlog issues against source and observed checks. [Every published triage verdict requires the managed verification controller](plugins/vh-adlc/references/triage-boundary.md) and exact approval; local reports work across harnesses.
 
 ## Get started
@@ -80,6 +83,7 @@ This repository hosts the **vhco-tools** marketplace. Each plugin installs separ
 | Plugin | Purpose |
 | --- | --- |
 | `vh-adlc` | Development workflows, feature gates, and independent reviews. |
+| `remote-gui` | Share local apps through private tailnet links and hand a fresh browser to the human. |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes. |
 | `github-app-registration` | Register GitHub Apps and save their credentials locally. |
 | `codex-qr-pairing` | Generate a fresh QR code for pairing with this Codex host. |

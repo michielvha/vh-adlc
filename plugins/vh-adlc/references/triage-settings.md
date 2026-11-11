@@ -1,32 +1,50 @@
 # Triage repository settings
 
 The canonical validator and types live in `scripts/triage/settings.ts` and
-`scripts/triage/types.ts`. Runtime helpers require Bun; GitHub CLI is needed only
-for the CLI adapter. A host can supply equivalent structured connector data.
+`scripts/triage/types.ts`; `scripts/settings-file.ts` reads the file. Runtime helpers
+require Bun; GitHub CLI is needed only for the CLI adapter. Reading a settings file
+also needs the verified `vh-adlc` binary, which `scripts/ensure-vh-adlc.sh` obtains;
+with no settings file, no binary is needed. A host can supply equivalent structured
+connector data.
 
-Create `.vh-adlc/triage.json` when a project needs its own scope or ownership rules.
-Use schema version 1. Paths are relative to the selected checkout and cannot escape
-through parent segments or symlinks. The selected origin determines repository and
-hostname; optional configured identity must agree with it. No account is switched.
+Create `.vh-adlc/triage.yaml` when a project needs its own scope or ownership rules.
+Write it as block YAML, with comments where they help, and use schema version 1.
+The strict reader refuses anchors, aliases, merge keys, explicit tags, duplicate keys,
+numbers other than safe decimal integers, and boolean or null spellings other than
+`true`, `false` and `null`. Its error gives a fixed reason and, when known, the line,
+never text from the file. A settings file under another suffix, such as `.json` or
+`.yml`, fails and names `.vh-adlc/triage.yaml`; `--settings` takes only a path ending
+in `.yaml`. Paths are relative to the selected checkout and cannot escape through
+parent segments or symlinks. The selected origin determines repository and hostname;
+optional configured identity must agree with it. No account is switched.
 
-```json
-{
-  "schema_version": 1,
-  "repository": "example/project",
-  "source_roots": ["src"],
-  "generated_mirrors": ["generated"],
-  "plan_roots": ["plans"],
-  "report_dir": ".vh-adlc/reports/triage",
-  "protected_ids": [],
-  "index_ids": [],
-  "index_rules": {"labels": ["tracking"], "title_prefixes": ["Milestone:"]},
-  "bot_authors": [],
-  "owned_labels": [],
-  "priority_order": ["high", "medium", "low"],
-  "milestone_order": [],
-  "label_map": {},
-  "stale_days": 90
-}
+```yaml
+# Triage settings. Paths are relative to the checkout.
+schema_version: 1
+repository: example/project
+source_roots:
+  - src
+generated_mirrors:
+  - generated
+plan_roots:
+  - plans
+report_dir: .vh-adlc/reports/triage
+protected_ids: []
+index_ids: []
+index_rules:
+  labels:
+    - tracking
+  title_prefixes:
+    - "Milestone:"
+bot_authors: []
+owned_labels: []
+priority_order:
+  - high
+  - medium
+  - low
+milestone_order: []
+label_map: {}
+stale_days: 90
 ```
 
 `plan_fields` can map `issue`, `status`, `status_description` and `priority` to
@@ -36,7 +54,7 @@ Unknown keys and schema versions fail before collection.
 
 Without settings, source scope is the checkout, plan metadata and project mappings
 are absent, stale age is 90 days, and reports/history use `.vh-adlc/reports/triage/`.
-Loading settings creates no files. An explicitly requested missing file is an error.
+An explicitly requested missing file is an error.
 
 Protected IDs, bot authors and owned labels exclude work from action proposals.
 Index IDs and label/title rules identify umbrella work that needs the current

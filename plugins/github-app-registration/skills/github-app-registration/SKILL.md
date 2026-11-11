@@ -38,6 +38,20 @@ review and create the App, and they install it. Never click through GitHub on th
    port themselves from their machine (`ssh -L <port>:127.0.0.1:<port> <this host>`) and open
    the loopback link there; this machine usually cannot SSH into their laptop.
 
+   **In a VS Code remote session** (Remote-SSH, a tunnel or a dev container) you do the forward,
+   not the person, and Tailscale is not needed. Keep `"reach": "loopback"` and:
+   - start `register.ts` as a VS Code background task, for example with the create-and-run-task
+     tool, never in a plain background shell. VS Code forwards a port it sees in a task
+     terminal; it never forwarded one from a process started outside it, and the browser got
+     `ERR_CONNECTION_REFUSED`;
+   - open the printed link with the integrated browser tool. VS Code then reports that the remote
+     port is forwarded to a local address and loads the page on the person's machine, and
+     GitHub's redirect to `http://127.0.0.1:<port>/callback` comes back through the same forward;
+   - keep the local port equal to the remote one, because the helper only answers its exact
+     origin;
+   - tell the person to continue in that integrated browser tab. Restarting the helper changes
+     the launch key, so a tab from a stopped helper only shows `Not found`.
+
 ## Run
 
 1. Write the config to a scratch file (it holds no secrets). Shape, all fields:
@@ -65,9 +79,11 @@ review and create the App, and they install it. Never click through GitHub on th
    overwrite an existing file. `targetId` (the owner's numeric id) preselects the account on the
    install page.
 2. Run the tests: `bun test --cwd <skill dir>/scripts`.
-3. Start it in the background: `bun <skill dir>/scripts/register.ts <config>`. It prints the
-   registration link and stops by itself 3 seconds after a registration, or after 30 minutes.
-4. Give the person the link. Poll `curl -s <origin>/status` (the origin of the printed link) until it answers
+3. Start it in the background: `bun <skill dir>/scripts/register.ts <config>`, as a VS Code task
+   in a VS Code remote session. It prints the registration link and stops by itself 3 seconds
+   after a registration, or after 30 minutes.
+4. Give the person the link, or in a VS Code remote session open it for them in the integrated
+   browser. Poll `curl -s <origin>/status` (the origin of the printed link) until it answers
    `registered`. A registration whose owner, permissions or events differ from the request is
    still saved (GitHub hands out the private key once), but the page tells them not to install.
 5. Copy the credentials where the project reads them, for example:

@@ -53,6 +53,22 @@ const (
 	CodeReviewNotFound = "review-not-found"
 	CodeRecordsDiffer  = "records-differ"
 
+	CodeSettingsInvalid = "settings-invalid"
+
+	CodeUnsupportedPlatform = "unsupported-platform"
+	CodeRunningAsRoot       = "running-as-root"
+	CodePIDNamespace        = "pid-namespace"
+	CodeTempBaseRefused     = "temp-base-refused"
+	CodeHostSettingsInvalid = "host-settings-invalid"
+	CodeManifestMissing     = "manifest-missing"
+	CodeManifestInvalid     = "manifest-invalid"
+	CodeManifestUnmerged    = "manifest-unmerged"
+	CodeTempRootUndeclared  = "temp-root-undeclared"
+	CodeEngineAbsent        = "engine-absent"
+	CodeEngineUnreachable   = "engine-unreachable"
+	CodeKindUnavailable     = "kind-unavailable"
+	CodeRemovalFailed       = "removal-failed"
+
 	CodeError = "error"
 )
 
@@ -89,5 +105,10 @@ var Codes = []string{
 	CodeGitTooOld,
 	CodeTransitionNotAllowed,
 	CodeReviewNotFound, CodeRecordsDiffer,
+	CodeSettingsInvalid,
+	CodeUnsupportedPlatform, CodeRunningAsRoot, CodePIDNamespace, CodeTempBaseRefused,
+	CodeHostSettingsInvalid, CodeManifestMissing, CodeManifestInvalid, CodeManifestUnmerged,
+	CodeTempRootUndeclared, CodeEngineAbsent, CodeEngineUnreachable, CodeKindUnavailable,
+	CodeRemovalFailed,
 	CodeError,
 }

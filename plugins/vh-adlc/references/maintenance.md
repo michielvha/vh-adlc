@@ -58,6 +58,17 @@ checks, owned paths/refs, task pairs, commit/remote containment, outcomes and ha
 credential URLs, secrets or browser data. Moving hosts needs a deliberate journal transfer or pending
 recovery handoff; report bytes cannot recreate approvals.
 
+## Repository security settings
+
+Before a new run's collection, check or turn on each repository's free security settings with
+[security-settings.md](security-settings.md). Run `security-settings-mode` for each repository in
+scope, then the helper in the mode it prints, with the run ID and the default-branch binding. Save
+each JSON in the run's private journal directory and pass the files to `collect` and `report` with
+`--security-settings`, plus `--applied-repository` to `collect` for each repository run in `apply`.
+A helper failure or exit 1 never blocks collection. A continuation reuses the saved files and does
+not run the helper again. A request that forbids filesystem writes uses `check` without the mode
+command, keeps the output in chat and saves no JSON.
+
 ## Collect and account for coverage
 
 Use fixed-argv GET-only collection. Fetch only the declared/requested repositories and retain every
@@ -75,14 +86,32 @@ changing manager configuration during analysis.
 
 Report completeness separately for repository PR inventory, each PR's head/files/checks, dashboards,
 each alert surface and supplemental discovery. Partial results remain visible; unknown totals are
-null. Only the configured exact status/literal-message/evidence match is complete-unavailable and
-n/a, never zero. Successful scanning overrides an obsolete unavailable expectation. An unmatched
-403/404, denial, timeout, truncated page or moving head is incomplete. Missing supplemental coverage
-blocks organization-wide claims, not a separately complete explicit repository analysis. One
-unavailable scanning surface does not invalidate complete Dependabot evidence or unrelated decisions.
+null. A configured exact status/literal-message/evidence match is complete-unavailable and n/a,
+never zero. So is code scanning with reason `not-free-on-private` on github.com, when the
+repository is private or internal, the caller is admin, neither `advanced_security` nor
+`code_security` is enabled, and the read returns 403 or 404. Successful scanning overrides an
+obsolete unavailable expectation. Any other 403/404, denial, timeout, truncated page or moving head
+is incomplete. A Dependabot surface whose accepted helper file shows an alerts write this run is
+incomplete with `alerts-enabled-this-run`, null count and the alerts read, because GitHub fills the
+list after the write. One named by `--applied-repository` with no accepted helper file is incomplete
+with `helper-receipt-missing`. Record a coverage handoff for each, as the skill describes.
+Missing supplemental coverage blocks organization-wide claims, not a separately complete explicit
+repository analysis. One unavailable scanning surface does not invalidate complete Dependabot
+evidence or unrelated decisions.
 Never claim every vulnerability is fixed or that absence resolved an alert from incomplete data.
 
 ## Analyze actual deltas
+
+For a dependency advisory, first look for a maintained upstream version that fixes it. Prefer the
+existing bot update or the smallest compatible manifest/lockfile bump when that fully addresses the
+finding. If no bot PR exists, an authored dependency bump still follows bounded maintenance and its
+review gates. Check the affected usage and required consumer checks before calling it ready.
+
+Do not add an application workaround, vendor or fork the dependency, or write a replacement
+implementation when a supported version bump is sufficient. Authored source changes need evidence
+that an available bump is insufficient, no supported fixed version exists, or the upgrade requires
+application adaptation. Record that reason and use the existing bounded-maintenance or feature loop.
+A major upgrade follows the feature loop; avoiding it is not a reason to invent a custom patch.
 
 For every PR, record old/new version or digest, actual upstream release notes/migration source,
 scoped call-site searches and the relevant observed code. Green CI alone is insufficient. Read the
@@ -108,10 +137,37 @@ posture/configuration findings. Do not silence posture findings by weakening pro
 consumer backlog links, manager schedules/group/limit/security expectations and documented unavailable
 cases. Analysis does not grant a manager rewrite, dependency change or configuration purchase.
 
+## Stale branches
+
+Every normal sweep checks GitHub's automatic merged-branch deletion in each repository in scope with
+`auto-delete` from [branches.md](branches.md). A repository without a local checkout is checked with
+`--repository`. Report the setting first and offer to enable it in each repository where it is off;
+with the setting off, every later merge can leave another branch behind. A failed check is a visible
+coverage gap.
+
+The sweep also checks branch hygiene in each repository in scope that has a local checkout,
+using the plan step in [branches.md](branches.md). This reads GitHub and fetches; it deletes
+nothing. Store the plan file in the run's private journal directory. Record in the report the
+automatic-deletion setting, each proposed operation with its proof, each kept branch with its
+reason, and the plan digest. A repository without a checkout, or whose plan fails, is a visible
+coverage gap.
+
+Removal follows the sweep's normal selection. Apply only the exact presented digest after the owner
+selects it, or straight away when the sweep request already asked for stale-branch removal. Worktree
+removal needs the owner to ask for it. Record each apply outcome in the report and journal; a
+`changed` or failed operation stays visible for the next sweep.
+
 ## Save a durable report
 
 Record source revisions/scope, coverage/errors, every discovered PR and inventory gap, proposed
-disposition, version/notes/usage/ownership/risk evidence, unmet checks, majors and hygiene backlog.
+disposition, version/notes/usage/ownership/risk evidence, unmet checks, majors and hygiene backlog,
+including the stale-branch plan.
+Every sweep report has a `## Repository security settings` section after Security alerts. It names
+every repository in scope: one table per repository with an accepted helper file, rendered like the
+helper's Markdown, a "helper did not run" row with the reason for each other repository, and one
+"Owner decisions" list across them. A helper file is accepted only when it parses, carries this run
+ID, names one repository in scope and is that repository's only file. The section names the
+`security_settings: apply` opt-in unless every accepted file ran in `apply`.
 Use the consumer metadata, author/covers, observed version stamps, backlog references and actual
 index generator. Untrusted titles/advisories remain escaped task data. Include Security alerts with
 per-repository/surface counts, breakdowns, disposition and historical comparison.
@@ -183,7 +239,11 @@ Its valid local report commit still satisfies the consumer's report-commit prere
 approved merge/closure work. A pending push adds no new dependency gate. A read-only/no-commit draft
 still lacks the original commit prerequisite; analysis and authorized local preparation can continue.
 
-Helpers never push, merge shared main or mutate GitHub. The agent performs an authorized publication:
+Report helpers never push, merge shared main or mutate GitHub. The exceptions are the branch helper's
+`apply` and `after-merge`, which delete branches and may enable automatic branch deletion under the
+authority in branches.md, and the security-settings helper's `apply`, which turns on free security
+settings under the authority in security-settings.md. For the latter, the recorded run is the intent
+and the helper JSON saved in the run's private journal directory is the receipt. The agent performs an authorized publication:
 
 1. Verify current repository/account and exact artifact/destination authority. Locate the owning
    default-branch checkout from Git metadata. Missing checkout, overlapping report/index edits,
@@ -221,6 +281,126 @@ in original intent order. Do not append to the live report or make extra report 
 existing publication is pending. After explicit safe reconciliation and verified publication, import
 pending deltas once, in order, into a fresh candidate. Compare step receipts and body prefixes before
 replay; applied and published are distinct states. Retain immutable artifacts and journal refs.
+
+## Security finding accounting
+
+Use the existing dependency batch, bounded-maintenance, investigation and feature procedures for
+security work. A finding's route does not select its execution. A compatible bot patch retains its
+normal batch checks; a manual repair retains exact-target independent review; a major or wider
+contract/trust/data/delivery change starts or links its feature spec. Link a selected persistent audit
+record without creating another audit ledger. Repository posture and operational changes retain the
+consumer's local decision and authority requirements. Keep deadlines, owners, required surfaces,
+exception rules, topology and release/deployment checks in the consumer policy/procedure.
+
+Collect advisory aliases, package/ecosystem/version/ranges, dependency scope/relationship and raw
+response digests when available. Namespace occurrences by host/repository/surface/provider identity.
+Unknown fields and ownership stay unknown. Group only occurrences whose source mapping, package
+and advisory equivalence are evidenced; preserve every original target and outcome. No group grants
+execution in another repository or verifies its satellite/image automatically.
+
+For findings absent from a complete comparable open list, collect exact previously observed IDs with
+`collect --terminal <references.json>`. Each reference has hostname, repository, surface
+(`dependabot` or `code_scanning`) and positive numeric number. Never supply arbitrary advisory URLs
+or IDs outside the declared request. The fixed GET reader retains fixed, dismissed/auto-dismissed,
+open and unknown/unavailable outcomes separately. History comparison schema 2 names disappearance
+`no_longer_open`, not a verified fix; legacy disappearance claims remain unverified history.
+
+Use `security-reconcile --run-id <id> --input <packet.json>` for typed accounting. This operation
+reads and validates local evidence and returns a revision plus a private validation receipt; it does
+not mutate the run, execute scanners or change GitHub. A version-1 packet contains:
+
+| Field | Contract |
+| --- | --- |
+| `synthetic_input` | Explicit boolean; synthetic packets cannot establish live fixes or an all-clear |
+| `inventory` | `{path, sha256}` for the exact current collected inventory |
+| `analysis` | Evaluation time, positive collection revision, explicit local policy assessment, decisions, evidence, groups, locally required surfaces and coverage handoffs |
+| `scanner_packets` | Contained packet directories and their normalized manifest digests |
+| `history` | `{path, sha256}` copies of relevant prior reports, retaining their provenance |
+| `evidence_files` | `{reference, path, sha256}` raw receipts for each proposed verification/tracking decision |
+| `history_resolutions` | Optional conflicting snapshot digests and current authority evidence IDs for explicit supersession |
+
+Every path is relative to the packet's physical directory; reject traversal, symlinks, undeclared
+scanner files and changed digests. Policy/settings/source bindings are read from the owning consumer.
+A local operator assesses prose policy; a digest proves its bytes, not enforcement of its meaning.
+Use the returned input/validation errors to prepare missing decisions; never invent an owner,
+deadline, accessible tracker, approved exception or executed check to make accounting green.
+
+Scanner intake uses `maintenance-scanner-evidence-v1`, schema 1, with producer schema `normalized-v1`.
+The operator supplies tool/version/database/configuration identity, exact source commit or image
+digest/platform, scan scope/exclusions, completion, exit receipt, synthetic flag and normalization
+receipt. Each finding names a unique producer fingerprint, rule, package/version/location/severity,
+advisory aliases and a JSON pointer in a declared raw machine-output file. The manifest enumerates
+all files and SHA-256 digests. The same normalized envelope accepts Trivy vulnerability or
+misconfiguration and govulncheck evidence; consumers produce their own mapping and retain the raw
+output. The shared reader does not parse human CI summaries, download artifacts or run a supplied argv.
+An exit-zero report can contain findings; a nonzero findings exit can describe a complete scan.
+Incomplete or synthetic evidence cannot establish a clean live surface or verified fix.
+
+For each occurrence, record the existing-loop change class, intended outcome and either verified
+evidence or an accessible follow-up with a next action and owner/assignment handoff. Evidence binds
+the exact target, source/policy/scope digest, observation time, reference and raw-file digest.
+Source correction, checks and a comparable absence scan are all required for `fixed-verified`;
+provider state, green CI or a merged PR alone is insufficient. Non-affected, mitigation and risk
+acceptance are separate consumer-authorized exceptions with their evidence and local expiry rules.
+Unapproved dismissals, expired exceptions and changed inputs remain pending.
+
+For an immutable image, corrected successor B never patches digest A. Building B or deploying B while
+A remains active keeps A outstanding. Retiring A needs an explicit consumer scope/authority and
+observed inactivity/retirement plus successor verification. Keep A's vulnerable history and separate
+delivery status; reactivation invalidates retirement. The helper performs no rollout or deletion.
+
+The result separates accounting, coverage, open remediation, exceptions and pending delivery.
+`reconciled` requires complete accounting for each finding and an explicit handoff for coverage gaps;
+it does not mean vulnerability-free. Orphan findings prevent reconciliation. No all-clear is possible
+with unknown required coverage, active open findings, proposed exceptions or required pending delivery.
+
+Authority receipts with result `approved` use `decisionAuthorityBinding(input, occurrenceId)` from
+`security.ts`. This binds the exact normalized decision and policy assessment as well as the source,
+policy files, scope and target. Changing exception kind, rationale, expiry or approved successor
+requires a new approval receipt. Other evidence uses `evidenceBinding`; a generic target approval
+cannot authorize changed exception terms. These receipts record consumer authority procedurally.
+
+For explicit conflicting-history decisions, `historyAuthorityBinding(input, occurrenceId, priorDigests)`
+from `security-history.ts` binds the sorted exact prior snapshot digests and the chosen normalized
+decision and policy assessment. Supply it on the `authority` receipt whose result is
+`supersedes-history`. A new conflict set or chosen outcome requires renewed authority; changing only
+the packet's resolution list cannot reuse an earlier approval. Every prior occurrence remains visible.
+
+For a disappeared provider alert, a fresh exact terminal read and a complete, nonsynthetic `source`
+receipt with result `observed` or `corrected` can re-observe its current target. Bind that receipt to
+the occurrence, current source/policy/scope and exact target, and retain its physical proof file.
+The receipt must be observed at or after the terminal read. Primary source targets must match the
+inventory commit; code-scanning targets must also match the provider's analysis commit. Conflicting
+package/location/advisory/rule context, stale reads, denied reads and unknown targets remain incomplete.
+This does not establish a fix: current source correction, relevant passing checks and comparable
+absence evidence are still required separately. Provider dismissal creates no consumer exception.
+
+Pass the exact result file to `report --security <result.json>`. The report stores only its portable
+revision; validation paths and raw evidence remain private. For a later outcome, the append update's
+`security` field names the new verified result file. Preserve all earlier report bytes and exactly
+one original `maintenance-observation-v1` block. Linked security revisions bind their own collection
+revision/digest; only the first projects that original block. Reload the latest valid chain and merge
+relevant prior runs per occurrence, including separate repository scopes. A newer narrowed scope
+cannot erase earlier pending work. Forks, missing predecessors and conflicting histories remain pending.
+Committed default-branch report history is read automatically; supplied local copies supplement it.
+Security-labelled or explicitly security-titled PRs remain occurrences even without a provider alert.
+The consumer's `analysis.required_surfaces` adds named missing scanner surfaces; it creates no shared
+scanner requirement or execution. A history supersession names every conflicting prior digest and
+current `authority` evidence with result `supersedes-history`; timestamps alone are insufficient.
+
+Resume and report-candidate commits revalidate current packet/source/policy/evidence bindings. The
+report at the run's recorded path is read for its revisions before the one being checked, so later
+appends do not invalidate an earlier result. Its open alerts stay unresolved observations while none of
+those revisions exist. Uncommitted history reports carry a `local:` provenance label. A typed
+snapshot can never gain success from mutable report status text. Keep unresolved source/target,
+approval and capability handoffs explicit. Raw packet and operator receipts are procedural records,
+not execution attestations, signature verification or a new permission boundary.
+
+Before rolling back an adopted policy reference, invoke the actual prior helper's settings reader
+against frozen settings/references. Prior readers reject the new `security_policy` key; retain the
+original configuration and policy and return an incompatible-settings setup handoff. Dependent legacy
+collection requires separately authorized compatible consumer settings restoration. Never remove a
+policy silently or describe an older reader as certifying a new security snapshot.
 
 ## Selected work and authored repairs
 

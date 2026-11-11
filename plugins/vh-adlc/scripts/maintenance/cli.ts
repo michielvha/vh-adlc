@@ -3,17 +3,20 @@ import { randomUUID } from "node:crypto";
 import { loadSettings } from "./settings";
 import { collect } from "./collect";
 import { appendRun, canonicalJSON, createRun, digest, readRun } from "./journal";
-import { appendReport, renderReport, reserveReport, saveReport } from "./report";
+import { appendReport, renderReport, reserveReport, saveReport, portableObservations } from "./report";
 import { compareHistory, parseObservation, readHistory } from "./history";
-import { parseReportRequest, reportPermission, resolveStanding } from "./authority";
-import { capturePendingOutcome, pendingOutcomes, storeCollection } from "./artifacts";
+import { parseReportRequest, reportPermission, resolveStanding, securitySettingsMode } from "./authority";
+import { capturePendingOutcome, pendingOutcomes, storeCollection, storeSecurity, validateReportSecurity } from "./artifacts";
+import { reconcileSecurityPacket, verifySecurityResult } from "./security-io";
+import { createSecurityRevision } from "./security-history";
 import { adoptionPreflight } from "./migration";
 import { beginCandidate, candidateSnapshot, commitCandidate, promoteOriginal, publicationReadiness, type Candidate } from "./report-candidate";
 
 const commands: Record<string, string[]> = {
-  settings: [], collect: ["--repository", "--pull"], start: ["--repository", "--pull", "--request"], resume: ["--run-id"],
+  settings: [], collect: ["--repository", "--pull", "--terminal", "--run-id", "--security-settings", "--applied-repository"], start: ["--repository", "--pull", "--request"], resume: ["--run-id"],
   checkpoint: ["--run-id", "--revision", "--digest", "--state", "--kind"],
-  report: ["--run-id", "--inventory", "--default-commit", "--default-branch", "--request", "--report-output", "--metadata", "--analysis"],
+  report: ["--run-id", "--inventory", "--default-commit", "--default-branch", "--request", "--report-output", "--metadata", "--analysis", "--security", "--security-settings"],
+  "security-reconcile": ["--run-id", "--input"],
   append: ["--run-id", "--update", "--request"], history: ["--default-commit", "--observations"],
   authority: ["--run-id", "--default-commit", "--default-branch", "--request", "--later-update"],
   candidate: ["--run-id", "--permission", "--default-commit", "--refresh-of"],
@@ -23,17 +26,21 @@ const commands: Record<string, string[]> = {
   "adoption-preflight": ["--input"],
   "pending-outcome": ["--run-id", "--update", "--request"], "pending-outcomes": ["--run-id"],
   "store-collection": ["--run-id", "--inventory", "--step-id", "--request"],
+  "security-settings-mode": ["--repository", "--default-branch", "--default-commit", "--run-id"],
 };
+// The only flags that may repeat; every other flag is rejected when given twice.
+const REPEATABLE = ["--security-settings", "--applied-repository"];
 function argumentsFor(argv: string[]) {
   const [operation, ...values] = argv;
   if (!Object.hasOwn(commands, operation)) throw Error("maintenance expects a documented local/GET operation; no remote mutation command is available");
-  const args: Record<string, string> = {}, allowed = ["--repo", "--settings", ...commands[operation]];
+  const args: Record<string, string> = {}, lists: Record<string, string[]> = {}, allowed = ["--repo", "--settings", ...commands[operation]];
   for (let index = 0; index < values.length; index += 2) {
     const key = values[index], value = values[index + 1];
-    if (!allowed.includes(key) || !value || value.startsWith("--") || Object.hasOwn(args, key)) throw Error("maintenance invalid or duplicate argument");
-    args[key] = value;
+    if (!allowed.includes(key) || !value || value.startsWith("--") || !REPEATABLE.includes(key) && Object.hasOwn(args, key)) throw Error("maintenance invalid or duplicate argument");
+    if (REPEATABLE.includes(key)) (lists[key] ??= []).push(value);
+    else args[key] = value;
   }
-  return { operation, args };
+  return { operation, args, lists };
 }
 function input(path: string | undefined): any {
   if (!path) throw Error("maintenance required input file missing");
@@ -41,16 +48,29 @@ function input(path: string | undefined): any {
 }
 function required(args: Record<string, string>, key: string) { if (!args[key]) throw Error(`maintenance requires ${key}`); return args[key]; }
 function number(value: string) { if (!/^(?:0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(Number(value))) throw Error("maintenance invalid integer argument"); return Number(value); }
+function verified<T>(check: () => T): T {
+  try { return check(); }
+  catch (error) {
+    // Security checks throw fixed messages; system and parser errors can quote paths or file contents.
+    const cause = error instanceof Error && error.constructor === Error && !("code" in error) ? error.message : "unreadable security input";
+    throw Error(`maintenance security verification failed: ${cause}`);
+  }
+}
 function flag(value: string | undefined) { if (value !== undefined && !["true", "false"].includes(value)) throw Error("maintenance boolean flags take true or false"); return value === "true"; }
 export async function main(argv = process.argv.slice(2)) {
-  const { operation, args } = argumentsFor(argv), config = loadSettings(args["--repo"] ?? process.cwd(), args["--settings"] ? { settingsPath: args["--settings"] } : {});
+  const { operation, args, lists } = argumentsFor(argv), config = loadSettings(args["--repo"] ?? process.cwd(), args["--settings"] ? { settingsPath: args["--settings"] } : {});
   if (operation === "settings") return config;
   if (operation === "adoption-preflight") {
     const result = adoptionPreflight(input(required(args, "--input"))); if (!result.pass) process.exitCode = 1; return result;
   }
   const selected = args["--repository"], pull = args["--pull"] === undefined ? undefined : number(args["--pull"]);
   if (pull === 0) throw Error("maintenance pull must be positive");
-  if (operation === "collect") return collect(config, { scope: { repository: selected, pull } });
+  if (operation === "collect") {
+    if (lists["--security-settings"] && !args["--run-id"]) throw Error("maintenance collect --security-settings requires --run-id");
+    if (lists["--applied-repository"]?.some(repository => new Set(lists["--applied-repository"]).size !== lists["--applied-repository"].length || !/^[a-z0-9][a-z0-9-]*\/[a-z0-9_.-]+$/.test(repository))) throw Error("maintenance invalid --applied-repository");
+    return collect(config, { scope: { repository: selected, pull }, terminal:args["--terminal"]?input(args["--terminal"]):undefined,
+      run_id: args["--run-id"], security_settings: lists["--security-settings"], applied_repositories: lists["--applied-repository"] });
+  }
   if (operation === "start") {
     const request = parseReportRequest(args["--request"] ? input(args["--request"]) : { authorized_sweep: true });
     if (request.no_filesystem === true) return { persisted: false, mode: "chat-only", reason: "current request forbids filesystem writes" };
@@ -64,8 +84,19 @@ export async function main(argv = process.argv.slice(2)) {
   if (operation === "analysis-input") {
     const { exportAnalysisInput } = await import("./analysis-input"); return exportAnalysisInput(config, input(args["--input"]));
   }
+  if (operation === "security-settings-mode") {
+    const run = args["--run-id"] ? readRun(config, args["--run-id"]) : null;
+    const { committed: _, ...mode } = securitySettingsMode(config, required(args, "--repository"), { default_branch: required(args, "--default-branch"), default_commit: required(args, "--default-commit") },
+      run ? { request: run.state.request, scope: run.header.scope } : undefined);
+    return mode;
+  }
   const id = required(args, "--run-id"), run = readRun(config, id);
-  if (operation === "resume") return run;
+  if(operation==="security-reconcile")return reconcileSecurityPacket(config,id,required(args,"--input"));
+  if (operation === "resume") {
+    const path = run.state.report?.path;
+    if (typeof path === "string") { const text = readFileSync(path, "utf8"); verified(() => validateReportSecurity(config, id, text)); }
+    return run;
+  }
   if (operation === "pending-outcomes") return pendingOutcomes(config, id);
   if (operation === "pending-outcome" || operation === "store-collection") {
     const request = parseReportRequest(args["--request"] ? input(args["--request"]) : run.state.request ?? { authorized_sweep: true });
@@ -84,9 +115,13 @@ export async function main(argv = process.argv.slice(2)) {
     let authority = reportPermission(config, standing, request, { run_id: id, report_path: relative, later_update: flag(args["--later-update"]) });
     if (operation === "authority") return authority;
     const analysis = args["--analysis"] ? readFileSync(args["--analysis"], "utf8") : undefined;
-    const text = renderReport(config, run, inventory, { metadata: args["--metadata"] ? input(args["--metadata"]) : undefined, analysis });
+    const claimed=args["--security"]?input(args["--security"]):null,securityResult=claimed?verified(()=>verifySecurityResult(config,id,claimed)):null;
+    const security=securityResult?securityResult.revision.snapshot_revision===1?createSecurityRevision(securityResult.revision.snapshot,null,digest(canonicalJSON(portableObservations(run,inventory)))):securityResult.revision:undefined;
+    const text = renderReport(config, run, inventory, { metadata: args["--metadata"] ? input(args["--metadata"]) : undefined, analysis, security, security_settings: lists["--security-settings"] });
     if (authority.save === "chat") return { saved: false, text, authority };
-    if (canonicalJSON(run.state.request) !== canonicalJSON(request)) appendRun(config, id, run, { ...run.state, request: request as never });
+    if(securityResult && security)storeSecurity(config,id,securityResult,security);
+    const requestRun=readRun(config,id);
+    if (canonicalJSON(requestRun.state.request) !== canonicalJSON(request)) appendRun(config, id, requestRun, { ...requestRun.state, request: request as never });
     if (run.state.collection?.inventory_digest !== digest(canonicalJSON(inventory))) storeCollection(config, id, inventory, randomUUID());
     const saved = saveReport(config, id, text, { default_commit: defaultCommit, draft: authority.save === "draft" || authority.commit, output: args["--report-output"] });
     const current = readRun(config, id);
@@ -98,7 +133,11 @@ export async function main(argv = process.argv.slice(2)) {
   if (operation === "append") {
     const request = parseReportRequest(args["--request"] ? input(args["--request"]) : run.state.request ?? { authorized_sweep: true });
     if (request.no_filesystem || (request.read_only || request.draft_only || request.no_commit) && run.state.report?.kind === "checkout-draft") throw Error("maintenance current request requires private outcome capture instead of editing this report");
-    return appendReport(config, id, input(required(args, "--update")));
+    const update=input(required(args,"--update"));
+    if(typeof update.security==="string"){
+      const claimed=input(update.security),security=verified(()=>verifySecurityResult(config,id,claimed));storeSecurity(config,id,security,security.revision);update.security=security.revision;
+    }else if(update.security!==undefined)throw Error("maintenance typed security update requires a verified result file");
+    return appendReport(config, id, update);
   }
   const authority = args["--permission"] ? input(args["--permission"]) : null;
   if (operation === "candidate") return beginCandidate(config, id, authority, { default_commit: required(args, "--default-commit"), refresh_of: args["--refresh-of"] });
