@@ -67,6 +67,19 @@ skills read their pages from the binary's cache.
 
 ### Install
 
+#### Antigravity
+
+With the [Antigravity CLI](https://antigravity.google/docs/cli/install/) (`agy`) installed, run:
+
+```sh
+agy plugin install https://github.com/michielvha/vh-adlc/tree/main/plugins/vh-adlc
+```
+
+Reopen the IDE. The command installs the complete, unchanged package globally.
+CLI 1.4.7 and IDE 2.5.5 loaded all seven skills from public plugin 0.3.1. The reviewer was skipped:
+Antigravity expects its `tools` frontmatter to be a YAML list. Full workflow execution remains
+unvalidated. See the [installation evidence](tests/vh-adlc/evidence/antigravity/install-smoke.md).
+
 #### Codex desktop app
 
 1. Open **Plugins** and select the **Local** environment.
@@ -177,6 +190,8 @@ claiming that the whole scenario matrix passed.
 
 | Host or capability | Status | Evidence |
 | --- | --- | --- |
+| Antigravity CLI 1.4.7 and standalone IDE 2.5.5, Linux x64 | Native GitHub installation and seven skills passed on public plugin 0.3.1; reviewer registration failed; further fallback testing deferred by owner | [Installation](tests/vh-adlc/evidence/antigravity/install-smoke.md), [fallback verification](tests/vh-adlc/evidence/antigravity/reviewer-fallback.md) |
+| Kiro CLI 1.26.0, Linux x64 | Shared reviewer read through an explicit child profile; generic default fallback not verified usable; trusted-shell policy failed the read-only check | [Live fallback probes](tests/vh-adlc/evidence/kiro/reviewer-fallback.md) |
 | Claude Code CLI 2.1.303, Linux | Historical full scenario proof; the 0.2.0 model-policy changes have not had an authenticated scenario rerun | `tests/vh-adlc/evidence/claude-code/`; [0.2.0 compatibility discovery](tests/vh-adlc/evidence/codex/gui-smoke.md) |
 | Codex desktop app 26.1013.40934, macOS arm64 | Core GUI loop passed on plugin 0.2.0, through independent implementation review and gated completion; unsafe shipping preflight correctly stopped | [Codex GUI run](tests/vh-adlc/evidence/codex/gui-smoke.md) |
 | Codex CLI 0.163.0 | Native package installation passed in an isolated, credential-free profile; no CLI agent-loop claim | [Codex GUI run](tests/vh-adlc/evidence/codex/gui-smoke.md) |
