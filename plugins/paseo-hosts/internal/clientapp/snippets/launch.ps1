@@ -1,7 +1,8 @@
 # Starts the Paseo app in the signed-in user's desktop session through a
 # one-time scheduled task. Inputs: app, debug_port (empty for none), wait_ms.
 $task = 'paseo-hosts-launch'
-$user = "$env:USERDOMAIN\$env:USERNAME"
+# USERDOMAIN reads WORKGROUP in an SSH session, so take the name from the token.
+$user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
 if ($debug_port) {
     $action = New-ScheduledTaskAction -Execute $app -Argument "--remote-debugging-port=$debug_port"
 } else {
@@ -15,7 +16,8 @@ try {
     Start-ScheduledTask -TaskName $task
     $deadline = [DateTime]::UtcNow.AddMilliseconds([int]$wait_ms)
     while ([DateTime]::UtcNow -lt $deadline) {
-        if (@(Get-Process -Name 'Paseo' -ErrorAction SilentlyContinue).Count -gt 0) { $started = $true; break }
+        $main = @(Get-CimInstance Win32_Process -Filter "Name = 'Paseo.exe'" | Where-Object { $_.CommandLine -notmatch '--type=|\.m?js(\s|"|$)' })
+        if ($main.Count -gt 0) { $started = $true; break }
         Start-Sleep -Milliseconds 200
     }
 } finally {

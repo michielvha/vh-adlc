@@ -1,6 +1,9 @@
 # Stops the Paseo app on Windows. Inputs: wait_ms, the time the app has to
 # quit by itself after window.close(); 0 stops it at once.
-function Running { @(Get-Process -Name 'Paseo' -ErrorAction SilentlyContinue).Count -gt 0 }
+# The app's built-in daemon and terminal workers also run as Paseo.exe, and
+# they can outlive the app, so only the main process counts.
+function MainProcess { @(Get-CimInstance Win32_Process -Filter "Name = 'Paseo.exe'" | Where-Object { $_.CommandLine -notmatch '--type=|\.m?js(\s|"|$)' }) }
+function Running { @(MainProcess).Count -gt 0 }
 function Gone($ms) {
     $deadline = [DateTime]::UtcNow.AddMilliseconds($ms)
     while ([DateTime]::UtcNow -lt $deadline) {
