@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after R-3; awaiting re-review."
+status_description: "Revised after R-4; awaiting re-review."
 issue: null
 goal: "Long-form articles reach the owner with a checked visual reading pass, and the editor reviews presentation as well as prose."
 covers:
@@ -106,7 +106,7 @@ Blog-authoring's Context gains one paragraph pointing here and naming the two re
 
 `references/blog.md` gains a "Compose the reading experience" section. For a new long-form article, the writer composes the page before handoff, including founder stories and opinion pieces with no technical diagram. It places at least one treatment, more where the length calls for it, inside the body between paragraphs, at points that break sustained prose. A treatment before the first paragraph or after the last does not count. Headings and short paragraphs alone do not complete the pass. Placement follows the story, without a fixed image count or one template for every article.
 
-An article below 800 words may carry a no-visual exception with its reason. These are never valid reasons: the lack of a technical diagram, and missing assets while the author's notes contain a quotable point.
+A new article below 800 words either places a treatment or records a no-visual exception with its reason. These are never valid reasons: the lack of a technical diagram, and missing assets while the author's notes contain a quotable point.
 
 Revisions fall into three kinds:
 
@@ -189,7 +189,7 @@ Both package manifests move to 0.17.0, the version PR #75 already carries. `test
 - [ ] AC-06: `references/blog.md` has a "Presentation inputs" list with the five items, and the skill entry and editor name that list without restating its items.
 - [ ] AC-07: Given a real launch-dialog image whose caption and description claim a plan review, a pull quote that repeats a batch quote's meaning in new words, a long-form candidate whose only treatment follows its last paragraph, and a long-form candidate with one early body treatment followed by an unbroken run of over 1,500 words, the editor returns `Needs revision` and names all four under `Presentation repairs`. It reports the image as not matching its passage from what the image shows; an "unverified" entry for that image leaves this criterion unmet.
 - [ ] AC-08: Given sound prose and presentation with only phone evidence missing, the editor returns `Pass` and names the missing check under `Presentation repairs`, and the handoff repeats it. When rendering is unavailable, the handoff says presentation is unverified and makes no rendered-review claim. The editor agent states the unviewable-image fallback.
-- [ ] AC-09: The editor description says "prose and presentation"; the editor return has the four lines above; the skill entry states the rendering fallback and per-theme check; `references/blog.md` has the comparator guidance, the 800-word threshold and the handoff line for treatments, exceptions and rendered checks; the user guide states the 800-word threshold and the batch-or-related quote rule; these files use the Terminology terms; blog-authoring's Context points here; and both manifests carry 0.17.0. `bun test tests/vh-adlc` passes locally, except that `tests/vh-adlc/fixtures.test.ts` may fail only with the fixture-lock digest error quoted in Background, and CI, which runs that file, passes on the PR head.
+- [ ] AC-09: The editor description says "prose and presentation"; the editor text names each flag in the Design's list; the editor return has the four lines above; the skill entry states the rendering fallback and per-theme check; `references/blog.md` has the comparator guidance, the 800-word threshold and the handoff line for treatments, exceptions and rendered checks; the user guide states the 800-word threshold and the batch-or-related quote rule; these files use the Terminology terms; blog-authoring's Context points here; and both manifests carry 0.17.0. `bun test tests/vh-adlc` passes locally, except that `tests/vh-adlc/fixtures.test.ts` may fail only with the fixture-lock digest error quoted in Background, and CI, which runs that file, passes on the PR head.
 
 ## Test Plan
 
@@ -200,10 +200,10 @@ Both package manifests move to 0.17.0, the version PR #75 already carries. `test
 | AC-03 | `visual-new` run: hash every `png`, `jpg`, `jpeg`, `gif`, `webp`, `avif` and `svg` file in the fixture after the run and assert each matches a supplied asset; check each added quote verbatim against the notes file and that its markup names the author from the notes. |
 | AC-04 | Native `visual-presentation` scenario on an existing article with a protected span: diff shows added treatment markup and every original prose line unchanged. Native `visual-revision` (wording-only) and `visual-review` (review-only) scenarios each start from a long-form article with one treatment and a known gap: a run of over 1,000 words without a break. In the first, the article's image, figure and quote markup is byte-identical before and after the run; the second changes no file; both handoffs name that gap. |
 | AC-05 | Native `visual-illustration` scenario: notes calling for a conceptual illustration of a workflow, with image permission in the request and no supplied asset for it. Assert a new image file in the destination whose caption or alt text says it is an illustration, with alt text and a caption. In `visual-new`, `visual-presentation` and `visual-illustration`, assert every added image has alt text and a caption. |
-| AC-06 | `tests/vh-adlc/blog.test.ts` asserts the heading and five items in `references/blog.md`, that the skill entry's editor dispatch and the editor's input text name "Presentation inputs", and that neither names any item: "placement", "asset path", "provenance", "quote sources", "quote inventory" or "rendered evidence". |
-| AC-07 | Native `visual-editor` scenario: a real PNG showing a launch dialog, captioned and described as a plan review, a batch inventory with a same-meaning quote, a 1,200-word candidate whose only treatment follows the last paragraph, and a 2,500-word candidate with one pull quote after its second paragraph and no other break. Assert the verdict and all four named repairs: the image repair must describe the image as a launch dialog, not a plan review, and fails if it calls the image unverified; the prose-run repair must locate the unbroken run. |
+| AC-06 | `tests/vh-adlc/blog.test.ts` asserts the heading and five items in `references/blog.md`. It locates two spans: the skill entry's paragraph that dispatches the editor, and the editor agent's paragraph that says what it reads, each found as the paragraph containing "Presentation inputs". It asserts both spans name "Presentation inputs" and neither names any item: "placement", "asset path", "provenance", "quote sources", "quote inventory" or "rendered evidence". |
+| AC-07 | Native `visual-editor` scenario with two editor dispatches. The first candidate is 1,200 words whose only treatment, after the last paragraph, is a real PNG showing a launch dialog, captioned and described as a plan review. The second is 2,500 words whose only treatment, after its second paragraph, is a pull quote repeating the meaning of a quote in the supplied batch inventory, followed by unbroken prose. Assert `Needs revision` from each: the first names the image mismatch and the closing placement, the second names the repeated quote and locates the unbroken run. The image repair must describe the image as a launch dialog, not a plan review, and fails if it calls the image unverified. The assertion is valid only because no text the editor can read names or hints at a launch dialog: the PNG's file name, alt text, caption, description and the other fixture files avoid it, and the expected words live only in the runner's assertion code, which is not copied into any directory the agent can read. |
 | AC-08 | Native `visual-editor-pass` scenario: clean candidate with desktop evidence only. Assert `Pass`, the named phone check and its presence in the handoff. The `visual-new` handoff contains the unverified statement and no rendered-review claim. `blog.test.ts` asserts the editor's unviewable-image fallback text. |
-| AC-09 | `blog.test.ts` assertions for each named statement and term, including the threshold in the user guide, and for the pointer in `docs/specs/blog-authoring.md`; `tests/vh-adlc/check.test.ts` for the version; `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 bun test tests/vh-adlc --timeout 60000` locally; `gh pr checks 75` on the head. |
+| AC-09 | `blog.test.ts` assertions for each named statement and term, including the threshold in the user guide and each of the editor's nine flags in its agent text, and for the pointer in `docs/specs/blog-authoring.md`; `tests/vh-adlc/check.test.ts` for the version; `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 bun test tests/vh-adlc --timeout 60000` locally; `gh pr checks 75` on the head. |
 
 ## Tasks
 
@@ -220,6 +220,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-11 | R-1 | spec | `70f88db` | unknown | procedural | 10 findings: 1 blocking, 7 should-fix, 2 nits; model identity not attested |
 | 2026-11-11 | R-2 | spec | `dbb0485` | claude-opus-4.8 | procedural | Changes needed: 6 should-fix, 6 nits; no blocking finding. |
 | 2026-11-11 | R-3 | spec | `aba495b` | claude-opus-4.8 | procedural | Changes needed: 2 should-fix, 3 nits; no blocking finding. |
+| 2026-11-11 | R-4 | spec | `9c146a3` | unknown | procedural | Changes needed: 1 should-fix, 4 nits; no blocking finding. |
 
 ### R-1
 
@@ -421,6 +422,43 @@ SEVERITY: nit
 WHERE: Test Plan AC-04
 EVIDENCE: AC-04 at line 187 says a wording-only revision "changes no treatment" and that both runs "report presentation gaps as findings". The proof at line 201 checks only that visual-revision "adds or moves no image, figure or quote markup". Removing or replacing an existing treatment would pass that check. The proof also never says that the existing article in either fixture has a presentation gap to report. If it has none, "both handoffs list the gap" cannot be checked.
 PROPOSAL: Assert that the treatment markup in visual-revision is byte-identical before and after the run. State that the visual-revision and visual-review fixtures start from a long-form article with a known presentation gap.
+
+### R-4
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-07
+EVIDENCE: AC-07 at docs/specs/blog-visual-reading.md:190 requires the editor to report the image as not matching its passage "from what the image shows". The proof at line 204 passes when "the image repair must describe the image as a launch dialog, not a plan review". The row fixes only the caption and the description ("captioned and described as a plan review"). It says nothing about the PNG's file name, its alt text or any other text the editor receives. The existing runner names fixture files freely (tests/vh-adlc/blog/run.ts at bda1a87). It also copies the driver, with all fixture strings, into the parent of every project directory (`cpSync(import.meta.filename, join(out, "driver.ts"))`). Suppose the file is named something like `launch-dialog.png`. An editor that never opens the image can then write "launch dialog, not a plan review" from the name alone. AC-07 ticks, and R-1 F-03 and R-3 F-01 asked this criterion to prove exactly the opposite.
+PROPOSAL: Require the fixture's file name, alt text, caption, description and every other text input to avoid naming or hinting at a launch dialog. Say that the assertion is valid only under that condition.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-07
+EVIDENCE: Line 204 lists four fixture parts: a real PNG, a same-meaning batch quote, "a 1,200-word candidate whose only treatment follows the last paragraph" and "a 2,500-word candidate with one pull quote after its second paragraph and no other break". The row does not say where the PNG or the repeated quote sits. Each candidate may hold only one treatment. So the PNG has to be the 1,200-word candidate's closing treatment, and the repeated quote has to be the 2,500-word candidate's pull quote. Put either one anywhere else and one of the four conditions breaks. The row also does not say whether the two candidates go to one editor dispatch, which returns a single `Verdict` block (Design line 161-166), or to two.
+PROPOSAL: State that the PNG is the 1,200-word candidate's only treatment and the repeated quote is the 2,500-word candidate's pull quote. Also state whether one dispatch or two produces the asserted verdict.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design "The reading pass", AC-02
+EVIDENCE: Design line 107 requires the pass only "For a new long-form article". Line 109 says an article below 800 words "may carry a no-visual exception with its reason". Nothing in the Design requires a short new article to have either a treatment or an exception. AC-02 at line 185 and its proof at line 199 fail a short article that has neither. The Owner summary at line 29 ("Shorter articles may record a reasoned no-visual exception instead") suggests the stronger rule but does not state it.
+PROPOSAL: State in the Design that a new article below 800 words places a treatment or records a no-visual exception with a valid reason. Alternatively, loosen AC-02 to match the Design.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-06
+EVIDENCE: Line 203 asserts that "the editor's input text" names none of "placement", "asset path", "provenance", "quote sources", "quote inventory" or "rendered evidence". The editor agent has no delimited input section. At bda1a87 the agent mentions its inputs in its first prose paragraph (agents/vh-adlc-blog-editor.agent.md:10-14). The Design also requires the editor to handle missing rendered checks and to judge treatment placement (lines 145-168). If the test scans the whole agent file, a correct sentence about missing rendered evidence or a misplaced treatment fails AC-06. If it scans less, the scanned part is undefined.
+PROPOSAL: Say which text the AC-06 assertion scans in the editor agent, for example the paragraph that names what the editor reads, and keep the forbidden-word check to that span.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Design "Editor", Acceptance Criteria, Test Plan
+EVIDENCE: The editor flag list at lines 147-155 names nine checks. AC-07 (line 190) and its proof cover four of them: the missing body treatment, sustained runs, irrelevant images and repeated quotes. No criterion or proof has the editor flag an invalid no-visual exception, an illustration presented as product UI, illegible image text, missing alt text or captions, an unsupported screenshot or chart, or an inexact or unattributed quote. AC-05 (line 188) and AC-03 (line 186) cover only the writer side of some of these. An editor whose text omits those flags still ticks every box.
+PROPOSAL: Add the untested flags to the AC-09 static assertions on the editor text, or add fixture cases to `visual-editor`. Otherwise mark them as guidance outside the criteria.
 
 ## Sources
 
