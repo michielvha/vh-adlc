@@ -58,6 +58,17 @@ checks, owned paths/refs, task pairs, commit/remote containment, outcomes and ha
 credential URLs, secrets or browser data. Moving hosts needs a deliberate journal transfer or pending
 recovery handoff; report bytes cannot recreate approvals.
 
+## Repository security settings
+
+Before a new run's collection, check or turn on each repository's free security settings with
+[security-settings.md](security-settings.md). Run `security-settings-mode` for each repository in
+scope, then the helper in the mode it prints, with the run ID and the default-branch binding. Save
+each JSON in the run's private journal directory and pass the files to `collect` and `report` with
+`--security-settings`, plus `--applied-repository` to `collect` for each repository run in `apply`.
+A helper failure or exit 1 never blocks collection. A continuation reuses the saved files and does
+not run the helper again. A request that forbids filesystem writes uses `check` without the mode
+command, keeps the output in chat and saves no JSON.
+
 ## Collect and account for coverage
 
 Use fixed-argv GET-only collection. Fetch only the declared/requested repositories and retain every
@@ -75,11 +86,18 @@ changing manager configuration during analysis.
 
 Report completeness separately for repository PR inventory, each PR's head/files/checks, dashboards,
 each alert surface and supplemental discovery. Partial results remain visible; unknown totals are
-null. Only the configured exact status/literal-message/evidence match is complete-unavailable and
-n/a, never zero. Successful scanning overrides an obsolete unavailable expectation. An unmatched
-403/404, denial, timeout, truncated page or moving head is incomplete. Missing supplemental coverage
-blocks organization-wide claims, not a separately complete explicit repository analysis. One
-unavailable scanning surface does not invalidate complete Dependabot evidence or unrelated decisions.
+null. A configured exact status/literal-message/evidence match is complete-unavailable and n/a,
+never zero. So is code scanning with reason `not-free-on-private` on github.com, when the
+repository is private or internal, the caller is admin, neither `advanced_security` nor
+`code_security` is enabled, and the read returns 403 or 404. Successful scanning overrides an
+obsolete unavailable expectation. Any other 403/404, denial, timeout, truncated page or moving head
+is incomplete. A Dependabot surface whose accepted helper file shows an alerts write this run is
+incomplete with `alerts-enabled-this-run`, null count and the alerts read, because GitHub fills the
+list after the write. One named by `--applied-repository` with no accepted helper file is incomplete
+with `helper-receipt-missing`. Record a coverage handoff for each, as the skill describes.
+Missing supplemental coverage blocks organization-wide claims, not a separately complete explicit
+repository analysis. One unavailable scanning surface does not invalidate complete Dependabot
+evidence or unrelated decisions.
 Never claim every vulnerability is fixed or that absence resolved an alert from incomplete data.
 
 ## Analyze actual deltas
@@ -144,6 +162,12 @@ removal needs the owner to ask for it. Record each apply outcome in the report a
 Record source revisions/scope, coverage/errors, every discovered PR and inventory gap, proposed
 disposition, version/notes/usage/ownership/risk evidence, unmet checks, majors and hygiene backlog,
 including the stale-branch plan.
+Every sweep report has a `## Repository security settings` section after Security alerts. It names
+every repository in scope: one table per repository with an accepted helper file, rendered like the
+helper's Markdown, a "helper did not run" row with the reason for each other repository, and one
+"Owner decisions" list across them. A helper file is accepted only when it parses, carries this run
+ID, names one repository in scope and is that repository's only file. The section names the
+`security_settings: apply` opt-in unless every accepted file ran in `apply`.
 Use the consumer metadata, author/covers, observed version stamps, backlog references and actual
 index generator. Untrusted titles/advisories remain escaped task data. Include Security alerts with
 per-repository/surface counts, breakdowns, disposition and historical comparison.
@@ -215,9 +239,11 @@ Its valid local report commit still satisfies the consumer's report-commit prere
 approved merge/closure work. A pending push adds no new dependency gate. A read-only/no-commit draft
 still lacks the original commit prerequisite; analysis and authorized local preparation can continue.
 
-Report helpers never push, merge shared main or mutate GitHub. The one exception is the branch helper's
+Report helpers never push, merge shared main or mutate GitHub. The exceptions are the branch helper's
 `apply` and `after-merge`, which delete branches and may enable automatic branch deletion under the
-authority in branches.md. The agent performs an authorized publication:
+authority in branches.md, and the security-settings helper's `apply`, which turns on free security
+settings under the authority in security-settings.md. For the latter, the recorded run is the intent
+and the helper JSON saved in the run's private journal directory is the receipt. The agent performs an authorized publication:
 
 1. Verify current repository/account and exact artifact/destination authority. Locate the owning
    default-branch checkout from Git metadata. Missing checkout, overlapping report/index edits,

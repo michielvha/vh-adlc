@@ -71,6 +71,17 @@ Onboarding also checks GitHub's automatic deletion of merged PR branches with `a
 `references/branches.md` and reports the setting. When it is off, ask the owner whether to turn it
 on; enable it only after they say yes. The setting is a repository change, not a commit, so it never
 holds up the onboarding commit.
+Beside that check, onboarding runs the security-settings helper from
+`references/security-settings.md` in the mode `security-settings-mode` prints, and reports its
+output. That is also a repository change that never holds up the onboarding commit. Onboarding has no
+maintenance request, so the committed settings alone decide; it usually runs in `check`, because its
+own commit is what links the settings. A request that is read-only or draft-only, or forbids
+pushing or filesystem writes, selects `check` without calling the command. A nonzero
+`security-settings-mode` exit, whatever its cause, leads to `check` with mode reason
+`committed-settings-unresolved` and the cause, never to `apply`. Under `check`, report the states,
+say how to opt in with `security_settings: apply`, and record the onboarding guide's security
+checklist item as pending the owner's choice. Never run the guide's manual commands or the helper's
+`apply` on an in-session yes.
 
 Every page the loop needs is requested on every call, so a pin older than the plugin's pages stops with
 `missing-page`: always include `conventions/feature-documents.md` and `guides/humanize-prose.md`.

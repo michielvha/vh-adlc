@@ -4,6 +4,9 @@ import { classifyAuthor } from "./settings";
 import type { Settings } from "./types";
 import { canonicalJSON, digest } from "./journal";
 import { createMaintenanceReader } from "./cursor-reader";
+import { readFileSync } from "node:fs";
+import { basename } from "node:path";
+import { WRITABLE, type Output } from "../security-settings/security-settings";
 
 export type Coverage = { status: "complete" | "complete-unavailable" | "incomplete"; pages: number; count: number | null; reason?: string; http_status?: number | null };
 export type AlertContext = { identity: string; advisory_ids: string[]; ecosystem: string | null; installed_version: string | null;
@@ -54,8 +57,9 @@ export type Pull = {
   security?: boolean;
 };
 export function isSecurityPull(value:{title:string;security?:boolean}):boolean{return value.security===true||/\[security\]/i.test(value.title);}
+export type Access = { visibility: string | null; admin: boolean | null; security_and_analysis: Record<string, unknown> | null };
 export type RepositoryInventory = {
-  repository: string; identity?: { id: number; default_branch: string };
+  repository: string; identity?: { id: number; default_branch: string }; access?: Access;
   pulls: Pull[]; dashboards: { number: number; title: string; body: string; state: string }[];
   dependabot: { alerts: Alert[] | null; coverage: Coverage }; code_scanning: { alerts: Alert[] | null; coverage: Coverage };
   coverage: { identity: Coverage; pulls: Coverage; dashboards: Coverage };
@@ -105,13 +109,28 @@ function uniqueRows<T>(items: unknown[], normalize: (item: unknown) => T, key: (
   return { rows, ...(error === undefined ? {} : { error }) };
 }
 
-function alertSurface(config: Settings, reader: GitHubReader, repository: string, id: number, kind: "dependabot" | "code_scanning") {
+function paidScanning(access: Access) {
+  return ["advanced_security", "code_security"].some(name => {
+    const feature = access.security_and_analysis?.[name];
+    return !!feature && typeof feature === "object" && (feature as Record<string, unknown>).status === "enabled";
+  });
+}
+/** A 403 or 404 code scanning read on a private or internal github.com repository that cannot have the paid feature. */
+function freeUnavailable(config: Settings, access: Access | undefined, result: PageResult) {
+  const status = result.error?.status;
+  return !!access && config.hostname === "github.com" && (status === 403 || status === 404) && ["private", "internal"].includes(access.visibility ?? "") &&
+    access.admin === true && !paidScanning(access) ? status : null;
+}
+
+function alertSurface(config: Settings, reader: GitHubReader, repository: string, id: number, kind: "dependabot" | "code_scanning", access?: Access) {
   const endpoint = kind === "dependabot" ? "dependabot/alerts" : "code-scanning/alerts";
   const result = reader.pages(`repos/${repository}/${endpoint}?state=open&per_page=100`, { repositoryId: id });
   const expectation = kind === "code_scanning" && result.pages === 1 && !result.items.length && !result.complete
     ? config.surface_expectations.find(item => item.repository === repository && item.status === result.error?.status && result.error.message.includes(item.message_contains)) : undefined;
   if (expectation) return { alerts: null, coverage: { status: "complete-unavailable", pages: result.pages, count: null,
     reason: expectation.reason, http_status: expectation.status } as Coverage };
+  const unavailable = kind === "code_scanning" && result.pages === 1 && !result.items.length && !result.complete ? freeUnavailable(config, access, result) : null;
+  if (unavailable) return { alerts: null, coverage: { status: "complete-unavailable", pages: result.pages, count: null, reason: "not-free-on-private", http_status: unavailable } as Coverage };
   const parsed = uniqueRows<Alert>(result.items, value => {
     const row = object(value); if (row.state !== "open") throw Error("alert scope changed");
     if (kind === "dependabot") {
@@ -215,6 +234,10 @@ function collectRepository(config: Settings, reader: GitHubReader, repository: s
     const identity = object(reader.get(`repos/${repository}`));
     if (text(identity.full_name).toLowerCase() !== repository) throw Error("Repository identity mismatch");
     id = number(identity.id); result.identity = { id, default_branch: text(identity.default_branch) };
+    const permissions = identity.permissions && typeof identity.permissions === "object" ? identity.permissions as Record<string, unknown> : {};
+    const analysis = identity.security_and_analysis;
+    result.access = { visibility: typeof identity.visibility === "string" ? identity.visibility : null, admin: typeof permissions.admin === "boolean" ? permissions.admin : null,
+      security_and_analysis: analysis && typeof analysis === "object" && !Array.isArray(analysis) ? analysis as Record<string, unknown> : null };
     result.coverage.identity = { status: "complete", pages: 1, count: 1 };
   } catch (error) { result.coverage.identity = failure(error, 1); return result; }
 
@@ -238,7 +261,7 @@ function collectRepository(config: Settings, reader: GitHubReader, repository: s
   }
   result.coverage.pulls = malformed ? failure(malformed, pullResult.pages) : coverage(pullResult, result.pulls.length);
   result.dependabot = alertSurface(config, reader, repository, id, "dependabot");
-  result.code_scanning = alertSurface(config, reader, repository, id, "code_scanning");
+  result.code_scanning = alertSurface(config, reader, repository, id, "code_scanning", result.access);
 
   const configured = config.dashboards.filter(item => item.repository === repository);
   result.coverage.dashboards = { status: "complete", pages: 0, count: 0, ...(configured.length ? {} : { reason: "No dashboard configured" }) };
@@ -263,7 +286,65 @@ function collectRepository(config: Settings, reader: GitHubReader, repository: s
   return result;
 }
 
-export function collect(config: Settings, options: { reader?: GitHubReader; scope?: { repository?: string; pull?: number }; terminal?:AlertReference[] } = {}): Inventory {
+const STATES = ["already-on", "enabled", "left-off", "unavailable", "not-changed", "unknown"];
+function lookup(value: unknown, statuses: string[]) {
+  const row = object(value);
+  if (Object.keys(row).some(key => !["status", "evidence", "error"].includes(key)) || !statuses.includes(String(row.status)) ||
+    ![row.evidence, row.error].every(item => item === undefined || typeof item === "string")) throw Error("invalid helper detection");
+}
+function helperOutput(value: unknown): Output {
+  const row = object(value), allowed = ["schema_version", "repository", "hostname", "run_id", "command", "mode", "mode_reason", "mode_detail", "visibility", "archived", "admin", "detection", "entries"];
+  if (Object.keys(row).some(key => !allowed.includes(key)) || row.schema_version !== 1 || typeof row.repository !== "string" || typeof row.hostname !== "string" ||
+    !["check", "apply"].includes(String(row.command)) || !["check", "apply"].includes(String(row.mode)) || !(row.mode_reason === null || typeof row.mode_reason === "string") ||
+    !(row.run_id === undefined || typeof row.run_id === "string") || !(row.visibility === null || typeof row.visibility === "string") ||
+    !(row.mode_detail === undefined || typeof row.mode_detail === "string") ||
+    !(row.archived === null || typeof row.archived === "boolean") || !(row.admin === null || typeof row.admin === "boolean")) throw Error("invalid helper output");
+  const detection = object(row.detection);
+  if (Object.keys(detection).some(key => !["renovate", "dependabot"].includes(key))) throw Error("invalid helper detection");
+  lookup(detection.renovate, ["present", "none", "failed", "not-checked"]); lookup(detection.dependabot, ["configured", "not-configured", "failed", "not-checked"]);
+  if (!Array.isArray(row.entries)) throw Error("invalid helper entries");
+  const seen = new Set<string>();
+  for (const value of row.entries) {
+    const entry = object(value);
+    if (Object.keys(entry).some(key => !["setting", "state", "reason", "detail"].includes(key)) || ![...WRITABLE, "code_scanning"].includes(String(entry.setting)) ||
+      !STATES.includes(String(entry.state)) || seen.has(String(entry.setting)) || ![entry.reason, entry.detail].every(item => item === undefined || typeof item === "string")) throw Error("invalid helper entry");
+    seen.add(String(entry.setting));
+  }
+  return row as unknown as Output;
+}
+export type RejectedSecuritySettings = { file: string; repository: string | null; reason: string };
+/**
+ * Accepts a helper file only when it is valid helper JSON for this host, carries the run ID, names one repository in scope
+ * and is the only such file for that repository. Rejections are returned for the report; they never fail the caller.
+ */
+export function acceptSecuritySettings(paths: string[], expected: { run_id: string; repositories: string[]; hostname: string }) {
+  const rejected: RejectedSecuritySettings[] = [], candidates: { file: string; output: Output }[] = [];
+  for (const path of paths) {
+    const file = basename(path);
+    let output: Output;
+    try { output = helperOutput(JSON.parse(readFileSync(path, "utf8"))); } catch { rejected.push({ file, repository: null, reason: "not valid helper JSON" }); continue; }
+    if (output.hostname !== expected.hostname) rejected.push({ file, repository: null, reason: `names host ${output.hostname}, not ${expected.hostname}` });
+    else if (!expected.repositories.includes(output.repository)) rejected.push({ file, repository: null, reason: `names ${output.repository}, a repository outside the sweep's scope` });
+    else candidates.push({ file, output });
+  }
+  const accepted: Output[] = [];
+  for (const { file, output } of candidates) {
+    if (candidates.filter(other => other.output.repository === output.repository).length > 1) rejected.push({ file, repository: output.repository, reason: "more than one helper file for this repository" });
+    else if (output.run_id !== expected.run_id) rejected.push({ file, repository: output.repository, reason: `carries another run ID (${output.run_id ?? "none"})` });
+    else accepted.push(output);
+  }
+  return { accepted, rejected };
+}
+function alertsWriteAttempted(output: Output) {
+  return output.entries.some(entry => entry.setting === "dependabot_alerts" &&
+    (entry.state === "enabled" || entry.state === "not-changed" && entry.reason === "api-error" && output.mode === "apply"));
+}
+function markIncomplete(surface: RepositoryInventory["dependabot"], reason: string) {
+  if (surface.coverage.status === "complete") surface.coverage = { status: "incomplete", pages: surface.coverage.pages, count: null, reason };
+}
+
+export function collect(config: Settings, options: { reader?: GitHubReader; scope?: { repository?: string; pull?: number }; terminal?:AlertReference[];
+  run_id?: string; security_settings?: string[]; applied_repositories?: string[] } = {}): Inventory {
   const scope = options.scope ?? {}, allowed = [config.repository, ...config.repositories.map(item => item.repository)];
   const selected = scope.repository?.toLowerCase() ?? (scope.pull === undefined ? undefined : config.repository);
   if (selected && !allowed.includes(selected)) throw Error("Repository outside configured maintenance scope");
@@ -277,6 +358,15 @@ export function collect(config: Settings, options: { reader?: GitHubReader; scop
     requests: [],
     scope: { repositories, ...(scope.pull === undefined ? {} : { pull: scope.pull }) },
     repositories: repositories.map(repo => collectRepository(config, reader, repo, scope.pull)), discovery: [] };
+  const files = options.security_settings ?? [], applied = options.applied_repositories ?? [];
+  if (files.length && !options.run_id) throw Error("security settings files need the run ID");
+  if (applied.some(repo => !repositories.includes(repo))) throw Error("applied repository outside collection scope");
+  const { accepted } = options.run_id ? acceptSecuritySettings(files, { run_id: options.run_id, repositories, hostname: config.hostname }) : { accepted: [] };
+  for (const row of result.repositories) {
+    const output = accepted.find(item => item.repository === row.repository);
+    if (output && alertsWriteAttempted(output)) markIncomplete(row.dependabot, "alerts-enabled-this-run");
+    else if (!output && applied.includes(row.repository)) markIncomplete(row.dependabot, "helper-receipt-missing");
+  }
   if(options.terminal)result.terminal=collectTerminal(config,options.terminal,{reader});
   if (!selected) for (const organization of config.discovery_organizations) {
     const pages = reader.pages(`orgs/${organization}/repos?type=all&per_page=100`);

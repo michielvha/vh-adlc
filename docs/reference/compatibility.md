@@ -94,7 +94,9 @@ The security reconciliation candidate adds normalized scanner packets, typed rep
 history comparison schema 2. Its development evidence and unrun surfaces are recorded in
 [the security reconciliation feature](../specs/maintenance-security-resolution.md). Existing
 settings/inventories/reports remain readable; older helpers reject a newly adopted `security_policy`
-key and require the documented settings rollback handoff. Candidate tests do not establish a released
+key and require the documented settings rollback handoff. They reject `security_settings` and
+`security_settings_keep_off` the same way; adopting either key needs plugin 0.16.0 or later.
+Candidate tests do not establish a released
 marketplace upgrade, automatic scanner collection or live advisory remediation.
 
 Triage reads `.vh-adlc/triage.yaml` and maintenance reads `.vh-adlc/maintenance.yaml`. YAML settings need
