@@ -344,7 +344,16 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
 
 ## Open Questions
 
-None.
+### Q6: May the real terminal check add a Go dependency?
+
+**Recommendation:** A. The operator host runs Linux or macOS, so two small build-tagged files cover it, and the dependency count stated in three places stays true.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Standard library only** | T35 asks the terminal driver through `syscall` (`TCGETS` on Linux, `TIOCGETA` on macOS) in per-OS files; `go.mod` keeps its two dependencies. | About twenty lines of platform code the plugin maintains itself, and no answer on other systems, where colour stays off. |
+| **B. `golang.org/x/term`** | `term.IsTerminal`, maintained by the Go team and working on every platform. | Two more modules (`x/term`, `x/sys`) to download and track; T35 gains `go.mod` and `go.sum`, and the summary, Plugin layout and AC-14 row change from two dependencies to four. |
+
+**Why this is yours:** it trades a small amount of owned code against new dependencies, and you chose earlier which libraries the build pulls in.
 
 ## Review Log
 
