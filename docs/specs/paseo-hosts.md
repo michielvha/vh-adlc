@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revising the client key line after implementation review R-10 found that it allows remote forwards."
+status: planned
+status_description: "Revision accepted after spec review R-21; the remote-forward fix is ready to implement."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 branch: feat/paseo-hosts
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
@@ -372,6 +372,7 @@ None.
 | 2026-11-11 | R-19 | spec | `09384960f4f31b586c434c25b7094e96ddf2eb61` | claude-opus-4.8 | procedural | One factual nit (the reason CI does not check the macOS file), none blocking; model reported by the reviewer, not requested. |
 | 2026-11-11 | R-20 | spec | `6f705bfb52c4f044e66f22308d6ff6790014a044` | unknown | procedural | One should-fix factual finding (the README still says the key allows only the daemon forward), none blocking; model identity not attested. |
 | 2026-11-11 | R-21 | spec | `9db96c0807bb0ab275149d48882b4250b05fa7ba` | unknown | procedural | No findings; model identity not attested. |
+| 2026-11-11 | R-21 | spec | `9db96c0807bb0ab275149d48882b4250b05fa7ba` | n/a | n/a | accepted by owner |
 
 ### R-1
 
