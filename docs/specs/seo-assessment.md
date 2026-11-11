@@ -177,6 +177,93 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-11 | R-1 | spec | `70f88db` | unknown | procedural | 12 findings: 1 blocking, 9 should-fix, 2 nits; model identity not attested |
+
+### R-1
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Test Plan (AC-03, AC-04); Design, Semrush
+EVIDENCE: Test Plan line 161 says AC-03 passes when "a stub Semrush client on PATH that logs every call" shows "The log is empty". Line 162 says AC-04 passes when every saved file is searched for the fixture key and saved requests show `key=REDACTED`. The package ships no Semrush client. `grep -rli semrush plugins/` on feat/seo-agent at 8e028c2 finds only seo.md, the SKILL and the agent, and `plugins/vh-adlc/scripts/` has no Semrush helper. seo.md:91 allows "an authorized local credential/client or a connected tool". The Design never says which command or tool makes a Semrush request, so the agent could use curl, WebFetch or a connector and bypass a PATH stub. In that case the AC-03 log is empty because the stub was never on the call path. If no Semrush request is made at all, AC-04 ("every saved Semrush request shows key=REDACTED") is also true with nothing saved. Both central spending and redaction proofs can pass while the problem remains.
+PROPOSAL: Define in Design the single request route the procedure uses, such as a named command or `curl` against the Semrush API host, and make the stub intercept that route. Make the AC-03 scenario block or log all other egress. Require the AC-04 run to log at least one stub call and save at least one request, so it serves as the positive control for AC-03.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Semrush; Acceptance Criteria AC-04; Test Plan AC-04
+EVIDENCE: Design line 130: "It is never written into prompts, reports, client bundles or archives. Before any request URL or parameter set is saved, the `key` value is replaced with `REDACTED`." The Design does not say which component reads the key. If the agent reads it with Bash and builds the URL itself, the key ends up in the model context, the tool transcript and process arguments. authority.md:69 says "Never print tokens, credential-bearing URLs ... or keys." seo.md:23 ("Never paste credentials into prompts, URLs, ...") conflicts with a key-in-URL API, as Background line 62 notes, but no Design line amends it. The AC-04 proof searches only saved files.
+PROPOSAL: Specify a mechanism that keeps the key out of the agent's context and command lines, such as a client that reads the env var or file itself. State how seo.md:23 is reworded. Extend the AC-04 proof to search the scenario agent's transcript and tool output for the fixture key.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Adapter
+EVIDENCE: Design line 103 says the procedure "infers any that are absent from context before asking". The listed keys include "the Semrush credential source", "the Semrush unit permission" and "the adopter's authority limits" (lines 113-116). Design line 128 requires "an adapter entry that permits unit spending", and authority.md:70 says "Never try unrelated credentials." If inference applies to a permission key, spending could be authorized without any adapter entry. If it applies to a credential key, the agent may go looking for credentials.
+PROPOSAL: Exclude the permission, credential-source and authority-limit keys from inference. State that an absent unit permission means no permission and an absent credential source means no Semrush call, and add a check for this to AC-05 or AC-03.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Authority; Design, Adapter
+EVIDENCE: Design line 134 adds a row: spending "needs the owner's current request or the adopter's SEO adapter permitting it". Every other standing grant in authority.md is bound to committed, adopted state. Examples are lines 20 and 113 ("an adopted ... declaration"; "An unadopted declaration, report, advisory or journal cannot authorize itself") and line 134 ("Fresh committed origin/default AGENTS/settings/project-procedure bindings"). The SEO Design does not say whether an uncommitted, branch-only or agent-written adapter edit counts. The agent keeps `Write` and Bash (Design line 99).
+PROPOSAL: State that the unit permission counts only from the adapter as committed on the adopter's default branch and named by its committed instructions. Add that the assessment never edits the adapter and that page content or exports cannot grant it, and reflect this in the authority row.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Semrush; Acceptance Criteria; Open Questions
+EVIDENCE: Design line 128 says the adapter permits spending "optionally with a per-run limit", and line 134 says "within any stated limit". No criterion or Test Plan row covers honouring a limit, how usage is counted against it, what happens when it is reached, or whether an owner's in-run request carries a limit. With no stated limit, an adapter permission allows unbounded spending per run. Making the limit optional is a trade-off the document settles while Open Questions says "None."
+PROPOSAL: Raise the limit default (required, or optional and unbounded) as an Open Question for the owner. Add a criterion and a scenario row in which a stated limit stops further unit-spending calls and the run reports that it stopped.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-06; Test Plan AC-06
+EVIDENCE: AC-06: "lists any live recheck as an owner handoff". Test Plan line 164: "check the handoff for the recheck item." Neither the Test Plan nor the 2026-10-30 fixture (input/http.json, gsc.csv, semrush.json, access.json) includes a startup-flash or not-yet-shipped condition that would trigger a recheck. Without one, "any live recheck" is satisfied with no item, so the startup-check fix (Design line 124) is never exercised.
+PROPOSAL: Require the scenario fixture to include a startup-flash or pending-deployment case. Make the pass condition a handoff item naming the URL, build identity and check, with no instruction to repeat the check later.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria; frontmatter goal
+EVIDENCE: The goal is "... leaves exports usable after access ends." AC-03 covers runs without permission, AC-04 covers redaction and AC-06 covers the manifest digests. No criterion covers a run whose Semrush access has expired or fails, finishing from free sources and dated saved exports without turning them into fresh measurements or zeros (seo.md:105-108). The only test of that case is the 2026-10-30 scenario against 89e133d, which Design line 141 makes historical.
+PROPOSAL: Add a criterion and scenario row with permission granted but the stub returning an expired-key or quota outcome. The run must record that outcome, make no repeat calls and still deliver findings that label saved exports as historical.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-01; Test Plan AC-01; Design, Entry and routing
+EVIDENCE: AC-01 states a routing behaviour: "routed from SEO and search-visibility requests including 'SEO audit', while codebase audit requests still route to `vh-adlc-audit`". Test Plan line 159 proves it only with text assertions on the lifecycle row. lifecycle.md:18 tells intake to "Identify persistent audit intent before its installer or knowledge call", and lines 75-81 hold the audit-routing rule. A row note alone may not stop an "SEO audit" request from starting audit bootstrap, and a text check would not detect that.
+PROPOSAL: Either restate AC-01 as the text end state that the test actually checks, or add a routing scenario for "SEO audit" and "audit the code". Also place the SEO note in the audit-routing paragraph at lifecycle.md:75-81, not only in the table row.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary
+EVIDENCE: Line 45: "Acceptance authorizes implementing this on `feat/seo-agent` and updating PR #76." authority.md:15 grants accepted scope for "Edit code, tests and docs, and commit on the feature branch". authority.md:26 requires "An explicit ship request" to "Push the feature branch, create or update its PR".
+PROPOSAL: State that acceptance authorizes implementation and commits on feat/seo-agent, and that pushing and updating PR #76 needs a ship request, as merging does.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Documentation and packaging; Acceptance Criteria AC-08
+EVIDENCE: docs/user-guides/workflows.md at 8e028c2 lists every operation in its "Operations" table (Maintenance through Clean, including `vh-adlc-docs-impact` and `vh-adlc-blog`) and has a "Choosing the work" table. Neither has an SEO entry. The Design and AC-08 require only the count, a section and a compatibility link, so a reader choosing from the table does not find `vh-adlc-seo`.
+PROPOSAL: Add an Operations table row for `vh-adlc-seo` to the Design, and assert it in the AC-08 proof.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background; Sources
+EVIDENCE: Line 62: "the Semrush API takes its key as a query parameter". No citation or Sources entry supports it. The standard says "Sources lists every external page read, each with the claim it supports", and the redaction Design (line 130) and AC-04 depend on this claim.
+PROPOSAL: Cite the Semrush API documentation page that shows the `key` parameter, and add it to Sources.
+
+FINDING: F-12
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background; Design, Documentation and packaging
+EVIDENCE: Line 53 lists what 8e028c2 adds. It omits that both manifests are already 0.18.0 (PR #75 head 997b63d is 0.17.0), that tests/vh-adlc/check.test.ts sets `CONTENT_OPERATIONS` to include "seo", and that the merge dropped 89e133d's SEO manifest description. Design line 142 cites "the repository's version policy", but no such page is cited. The only version check is check.test.ts:224-232, which requires the version to differ from origin/main and does not require the next minor.
+PROPOSAL: Add these facts to Background. Cite the version rule used, or say that the 0.18.0 sequencing after 0.17.0 is a choice and not a checked policy.
 
 ## Sources
 
