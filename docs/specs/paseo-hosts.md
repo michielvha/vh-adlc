@@ -367,6 +367,7 @@ None.
 | 2026-11-11 | R-14 | spec | `889e786b7eedddb9a28cc4ea6686d07cd85201ab` | unknown | procedural | One should-fix factual finding (AC-12 cannot be met before the PR), one factual nit and one judgement nit (minimum OpenSSH version), none blocking; model identity not attested. |
 | 2026-11-11 | R-15 | spec | `6f76bd03fb3eb67333078ab200d764abf386d1c6` | claude-opus-4.8 | procedural | Two factual nits and one judgement nit (a re-link on a pre-7.8 server breaks the working tunnel), none blocking; model reported by the reviewer, not requested. |
 | 2026-11-11 | R-16 | spec | `d70c77e50e3d4acfe7895aa9755ccceb0fc88904` | unknown | procedural | Two factual nits (the key file backup covers only the latest run; the summary's tunnel-only wording), none blocking; model identity not attested. |
+| 2026-11-11 | R-17 | spec | `3178e9765baedcd8444cdedbaae3d02388b96538` | unknown | procedural | One judgement nit (whether the terminal check may add a dependency), none blocking; model identity not attested. |
 
 ### R-1
 
@@ -955,3 +956,26 @@ SEVERITY: nit
 WHERE: Context, Owner summary (line 29)
 EVIDENCE: R-14 F-02 asked that line 29 stop saying the key opens only the daemon tunnel. The text at e937e21 read "a key that opens the daemon tunnel and, apart from the Unix socket limit below, nothing else". The R-15 edit at d70c77e put back "`link` gives a macOS or Windows desktop a tunnel-only key", and the limit now appears only six sentences later, on line 35. My local unprivileged sshd (OpenSSH 10.0p2) used the planned key line `restrict,port-forwarding,permitopen="127.0.0.1:47711",permitlisten="127.0.0.1:1",command="/bin/false"`. With it, `-W` to the daemon port returned `HTTP/1.0 200 OK`. A shell command exited 1, `-W` to another port failed, and both TCP `-R` cases failed with "the request was denied", the daemon-port case after its listener stopped. But `ssh -N -o ExitOnForwardFailure=yes -R <dir>/r.sock:...` stayed up until `timeout` ended it (exit 124) and left `srw------- r.sock`.
 PROPOSAL: Put back the R-14 wording on line 29, or add "apart from the Unix socket limit below" after "tunnel-only key".
+
+### R-17
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Tasks, T35 (line 341); Design, Output and logging and Plugin layout (line 130); Context, Owner summary (line 29); Test Plan, AC-14
+EVIDENCE: Design says "Standard error counts as a terminal only when the terminal driver answers for it", and T35 says "the terminal check asks the terminal driver". T35 lists only `cmd/paseo-hosts/cli.go`, `main.go` and `cli_test.go`. At 3178e97, `plugins/paseo-hosts/go.mod` requires only `github.com/coder/websocket` and `github.com/michielvha/logger`, and `main.go:9-12` still uses `info.Mode()&os.ModeCharDevice`. The summary says "The first run downloads two Go libraries", line 130 says "the first build downloads the two dependencies", and the AC-14 row asserts "both dependencies are now in that cache". R-10 F-03 proposed `golang.org/x/term` `IsTerminal`, which is the obvious way to do this. It adds `golang.org/x/term` and `golang.org/x/sys` to go.mod and go.sum, which T35 does not list, and it would make those three statements false. With only the standard library, the check needs a per-OS ioctl (`syscall.TCGETS` on Linux, `syscall.TIOCGETA` on macOS). The document does not choose either way.
+PROPOSAL: Say in Design or T35 that the terminal check uses only the standard library. Otherwise, add `go.mod` and `go.sum` to T35 and update the dependency count in the summary, Plugin layout and the AC-14 row.
+
+<br>
+
+I checked the following and found no other issues:
+- **R-16's findings are fixed.** The summary now says the key opens "the daemon tunnel and, apart from the Unix socket limit below, nothing else". Link step 2 now says the backup covers only the latest run and that `unlink` does not restore a tunnel.
+- **Binary checks:** `lint` passes. `gate planned` fails only on `spec_review_fresh` and `accepted`, which is expected before this review and the owner's acceptance.
+- **Local sshd test (OpenSSH 10.0p2) with the planned key line:**
+  - `-W` to the daemon port returned 200.
+  - These were refused: `-W` to another port, the shell command, TCP `-R` to a free port, TCP `-R` to the daemon port after its listener stopped, remote dynamic `-R`, and a `localhost` name.
+  - `-R` to port 1 failed with `Permission denied` at bind.
+  - The Unix socket `-R` stayed up, which is the stated known limit.
+  - `permitlisten="none"` made sshd reject the whole key.
+- **Residual tracker:** issue #77 is open and tracks AC-12.
+- **Scratch files:** I put them in `/home/m/code/.r17-scratch` instead of `/tmp` and removed them afterwards. The worktree is unchanged.
