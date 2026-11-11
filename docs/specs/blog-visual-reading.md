@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after R-19; awaiting re-review."
+status_description: "Revised after R-20; awaiting re-review."
 issue: null
 goal: "Long-form articles reach the owner with a checked visual reading pass, and the editor reviews presentation as well as prose."
 covers:
@@ -94,6 +94,9 @@ Out of scope:
 | Treatment | A placed illustration, product image, pull quote or other component the destination supports, tied to a named point in the passage (AC-01). |
 | No-visual exception | A recorded decision, with its reason, that an article below 800 words needs no treatment (AC-02). |
 | Presentation revision | A request to add, move or replace treatments in an existing article without changing its prose (AC-04). |
+| Wording-only revision | A revision that changes prose wording only and changes no treatment; a revision request that names neither wording nor visuals is one (AC-04, AC-09). |
+| Review-only run | A run that reviews an article and changes no file (AC-04). |
+| Presentation gap | A missing treatment, quote, asset, permission or break that the writer reports in its handoff or findings instead of fixing (AC-04, AC-09). |
 | Presentation inputs | The list in `references/blog.md` under that heading, which the writer supplies to the editor (AC-06). |
 | Presentation repairs | The editor's return line for treatment, reading-flow and unverified rendering findings (AC-07, AC-08). |
 
@@ -188,7 +191,7 @@ Both package manifests move to 0.17.0, the version PR #75 already carries. `test
 
 - [ ] AC-01: A new long-form article run whose notes contain quotable points and an exact-wording span produces a draft of 800 or more body prose words with at least one treatment between body paragraphs, hands off the point each treatment serves, and keeps the exact-wording span byte-identical.
 - [ ] AC-02: A new article run whose draft is below 800 body prose words and whose notes contain a quotable point either places a treatment or records a no-visual exception whose reason is neither a missing diagram nor missing assets.
-- [ ] AC-03: Without permission for new images, a new article run or a presentation revision leaves every image file in the destination identical to a supplied or pre-existing asset, and every pull quote it adds appears word for word in the author's notes, or for a presentation revision in the notes or the article as it stood before the presentation step (after the wording fix in a combined request), and is attributed to the author.
+- [ ] AC-03: Without permission for new images, a new article run or a presentation revision leaves every image file in the destination identical to a supplied or pre-existing asset. In every run, with or without image permission, every pull quote it adds appears word for word in the author's notes, or for a presentation revision in the notes or the article as it stood before the presentation step (after the wording fix in a combined request), and is attributed to the author.
 - [ ] AC-04: A presentation revision, requested on its own, adds at least one treatment and leaves every prose line and exact-wording span byte-identical, and a request combining one wording fix with new visuals applies that fix and otherwise follows the same rule; a wording-only revision changes no treatment; a review-only run changes no file; the last two report presentation gaps as findings; and the nine existing blog scenarios still pass with the changed package.
 - [ ] AC-05: With permission for new images and notes that call for a conceptual illustration, a new article run adds an image file whose caption or alt text identifies it as an illustration and not product UI; every image any run adds has alt text and a caption.
 - [ ] AC-06: `references/blog.md` has a "Presentation inputs" list with the five items, and the skill entry and editor name that list without restating its items.
@@ -204,7 +207,7 @@ Each visual fixture's `AGENTS.md` declares the destination's image-with-caption 
 | --- | --- |
 | AC-01 | Native `visual-new` scenario in `tests/vh-adlc/blog/run.ts`: founder-style notes of about 1,200 words with quotable lines and one exact-wording span, one supplied relevant PNG, no renderer and no image permission. Count the draft's body prose words as Terminology defines them and fail unless 800 or more. Assert at least one treatment with body paragraphs both before and after it, a point for each in the handoff, and the exact-wording span unchanged. |
 | AC-02 | Native `visual-short` scenario: notes for a 400-word piece containing a quotable line. Count body prose words and fail unless below 800. Assert either a treatment or an exception whose reason does not mention a diagram or missing assets. |
-| AC-03 | `visual-new`, `visual-presentation` and `visual-backport` runs, none granting image permission: hash every `png`, `jpg`, `jpeg`, `gif`, `webp`, `avif` and `svg` file in the fixture after the run and assert each matches a supplied or pre-existing asset; check each added quote verbatim against the notes file, for `visual-backport` against the notes or the original article, and for `visual-presentation` against the notes, the original article or that article with only the named wording fix applied, and that its markup names the author from the notes. The `visual-backport` and `visual-presentation` fixtures each include a notes file that names the same author as the article's `author` front matter. |
+| AC-03 | `visual-new`, `visual-short`, `visual-presentation` and `visual-backport` runs, none granting image permission: hash every `png`, `jpg`, `jpeg`, `gif`, `webp`, `avif` and `svg` file in the fixture after the run and assert each matches a supplied or pre-existing asset. In those four runs and in `visual-illustration`, which grants image permission, check each added quote verbatim against the notes file, for `visual-backport` against the notes or the original article, and for `visual-presentation` against the notes, the original article or that article with only the named wording fix applied, and that its markup names the author from the notes. The notes file of each of those five fixtures names the author; in `visual-backport` and `visual-presentation` it names the same author as the article's `author` front matter. |
 | AC-04 | Native `visual-backport` scenario on an existing article with a protected span, whose prompt is the plain presentation request "add visuals to article.md": diff shows added treatment markup and every original prose line and the protected span unchanged. Native `visual-presentation` scenario on an existing article with a protected span, whose prompt asks for one named wording fix and new visuals: diff shows the fix applied, added treatment markup, and every other original prose line unchanged. Native `visual-revision` (wording-only by default: its prompt is the plain request "revise article.md", naming neither wording-only changes nor visuals) and `visual-review` (review-only) scenarios each start from a long-form article with one treatment and a known gap: a run of over 1,500 words without a break. In the first, the article's image, figure and quote markup is byte-identical before and after the run; the second changes no file; both handoffs name that gap. The nine existing cases in `tests/vh-adlc/blog/run.ts` (`new`, `keep`, `repair`, `promotion`, `denied-site`, `fallback`, `editor`, `ship-public` and `ship-internal`) rerun against the changed package and pass, and `tests/vh-adlc/evidence/blog/README.md` records the rerun with its version, leaving the 0.5.0 results as history. |
 | AC-05 | Native `visual-illustration` scenario: notes calling for a conceptual illustration of a workflow, with image permission in the request and no supplied asset for it. Assert a new image file in the destination whose caption or alt text says it is an illustration, with alt text and a caption. In `visual-new`, `visual-short`, `visual-presentation`, `visual-backport` and `visual-illustration`, assert every added image has alt text and a caption. |
 | AC-06 | `tests/vh-adlc/blog.test.ts` asserts the heading and five items in `references/blog.md`. It locates two spans: the skill entry's paragraph that dispatches the editor, and the editor agent's paragraph that says what it reads, each found as the paragraph containing "Presentation inputs". It asserts both spans name "Presentation inputs" and that neither matches, case-insensitively, "placement", "file path", "asset path", "provenance", "quote source", "quote inventory" or "rendered evidence". |
@@ -243,6 +246,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-11 | R-17 | spec | `95b03bd` | claude-opus-4.8 | procedural | Changes needed: 1 should-fix, 3 nits; no blocking finding. |
 | 2026-11-11 | R-18 | spec | `21ad25d` | unknown | procedural | Two nits: combined-run quotes and no permitted treatment; revising |
 | 2026-11-11 | R-19 | spec | `e9e2f25` | claude-opus-4.8 | procedural | Three nits: user-guide revision rule, attribution source, word count; revising |
+| 2026-11-11 | R-20 | spec | `ecc6cc2` | unknown | procedural | One should-fix (quote integrity in every run), one nit (terms); revising |
 
 ### R-1
 
@@ -805,6 +809,22 @@ SEVERITY: nit
 WHERE: Design "Terminology", Test Plan AC-01 and AC-02
 EVIDENCE: Line 93 defines long-form as "body prose 800 words or more, excluding front matter, code blocks and captions". The proofs at lines 205-206 make the runner "Count the draft's body prose words as Terminology defines them" and fail on the wrong side of 800. The definition does not say whether headings, alt text inside image markup or pull quote text count. A pull quote repeats words that already appear in the notes or the article, so counting it inflates the prose that the threshold is supposed to measure. Two runners that both follow the definition can count the same draft differently.
 PROPOSAL: Say in the Terminology row that treatment text (pull quotes, alt text and other declared treatment markup) is excluded from body prose, and say whether headings count.
+
+### R-20
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-03, Test Plan AC-02, AC-03 and AC-05
+EVIDENCE: Owner summary line 29 says the writer "never invents quotes". Design line 130 says a pull quote in a new article "comes word for word from the author's notes" and "carries attribution to the author", and does not depend on image permission. AC-03 at line 191 starts with "Without permission for new images, ..." and that clause governs both parts of the sentence, including "every pull quote it adds appears word for word ... and is attributed to the author". As a result, no criterion requires quote integrity in a run that has image permission. The AC-05 `visual-illustration` run (line 209) is that kind of run, and its proof checks only the image file, the alt text and the caption. The AC-03 proof at line 207 also runs the hash and verbatim checks only in `visual-new`, `visual-presentation` and `visual-backport`. It leaves out `visual-short` (line 206), which is a new article run without permission whose notes contain a quotable line. Placing a pull quote is the obvious way for that run to satisfy AC-02, yet nothing checks that quote or the images in that fixture. The proof also checks that quote markup "names the author from the notes" in `visual-new`, but the row does not say that the `visual-new` notes name an author. Only the two revision fixtures are given that property (line 207). With every box ticked, `visual-illustration` and `visual-short` can add a reworded or unattributed quote and still pass.
+PROPOSAL: Make the quote requirement in AC-03 a separate clause that applies to every run, whether or not it has image permission. Run the verbatim and attribution check in `visual-short` and `visual-illustration` too, and the hash check in `visual-short`. State that the `visual-new`, `visual-short` and `visual-illustration` notes name the author.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design "Terminology", AC-09
+EVIDENCE: feature-documents.md at d8f07c9 says "User-facing terms the feature introduces or changes appear in a glossary row and are held to it by a criterion." The document introduces "presentation gap" and uses it at lines 31, 40, 45, 112, 116, 117 and 177, in AC-04 at line 192, and in AC-09 at line 197 ("the no-permitted-treatment gap rule", "presentation gaps"). After the R-19 fix, Design line 177 also puts it in user documentation: the user guide "states that a plain revision changes no treatment and only reports presentation gaps". The Terminology table at lines 90 to 98 has no row for "presentation gap". It also has none for the revision kinds the user guide now names, "wording-only revision" and "review-only run" (lines 116 and 117). `git grep -i "presentation gap"` finds no definition in `plugins` or `docs/user-guides` at ecc6cc2 or at feat/blog-visual-reading. AC-09 holds the changed files only to "the Terminology terms", so it does not cover these terms.
+PROPOSAL: Add Terminology rows for "Presentation gap" (for example, a missing quote, asset, permission or break that the handoff or a finding reports instead of the writer fixing it), "Wording-only revision" and "Review-only run", each with the criteria that cite it.
 
 ## Sources
 
