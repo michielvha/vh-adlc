@@ -363,6 +363,7 @@ None.
 | 2026-11-11 | R-11 | spec | `e312b04259376552e59fdf0d2749259bdd247a2f` | claude-opus-4.8 | procedural | One blocking factual finding (Unix socket remote forwards still open), two should-fix judgement findings and one factual nit; model reported by the reviewer, not requested. |
 | 2026-11-11 | R-12 | spec | `586a3f15f625d380f663dad948cdb81aabaa067c` | unknown | procedural | Two should-fix factual findings (the CI runner has sshd, no tasks for the revision), two factual nits and one judgement nit, none blocking; model identity not attested. |
 | 2026-11-11 | R-13 | spec | `ff0b45686b127b816fe19c08ddb0bef4a14b7a32` | unknown | procedural | Two should-fix factual findings (the daemon-port test case passes for the wrong reason, no migration note for existing key lines) and one factual nit, none blocking; model identity not attested. |
+| 2026-11-11 | R-14 | spec | `889e786b7eedddb9a28cc4ea6686d07cd85201ab` | unknown | procedural | One should-fix factual finding (AC-12 cannot be met before the PR), one factual nit and one judgement nit (minimum OpenSSH version), none blocking; model identity not attested. |
 
 ### R-1
 
@@ -889,3 +890,26 @@ SEVERITY: nit
 WHERE: Context, Owner summary (line 37); Test Plan, AC-04 row (line 253)
 EVIDENCE: R-12 F-01 found that the `ubuntu-latest` runner has `sshd`, and it proposed saying that the test therefore runs in CI and confirming this on the first push. The revision instead says "wherever one is installed (no CI step is added for it)" and "skips with a message when `sshd` is not installed, and no CI step is added to install it". Those statements are accurate. Neither one says whether the `paseo-hosts` CI job is expected to run the test or skip it. The owner answered Q2 on the earlier claim that CI skips it, and the summary still does not say whether CI covers the R-10 fix.
 PROPOSAL: Add one clause to the summary and the AC-04 row saying that the runner is expected to have `sshd`, so the test should run in CI, and that the first push confirms whether it ran or skipped.
+
+### R-14
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (line 39); Tasks, T32 (line 342); Acceptance Criteria AC-12 (line 241); Design, Delivery (line 226)
+EVIDENCE: The summary says "The owner has approved opening the PR once the complete gate passes". The `complete` gate in feature-documents.md includes `all_met` and `impl_review_clean`, so AC-12 must be met or have a residual. AC-12 requires the plugin to install "from the vhco-tools marketplace". T32 runs only "once the plugin is in the vhco-tools marketplace". Delivery says the catalogs point at `./plugins/paseo-hosts` on the default branch, "so merging is the release path for the plugin". So AC-12 cannot be met before the merge, and the merge comes after the PR. R-10 returned AC-12 as `untested` for this reason (line 755). While T32 stays open, `next` keeps returning `implement` (`tasks_open`). The complete gate cannot pass without an owner residual, and that residual needs a tracker (delivery.md: "A residual needs a durable tracker before the feature is complete"). The document does not mention a residual, and the summary does not name this precondition. R-11 F-03 fixed the same kind of stall for the live criteria but did not cover AC-12.
+PROPOSAL: State how AC-12 is settled before the PR. One option is for T32 to install from a marketplace added at the feature branch ref before the PR. The other is for the owner to accept an AC-12 residual with a tracker issue, closed after the merge. Then say which one applies in the summary.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (line 29)
+EVIDENCE: Line 29 says "`link` gives a macOS or Windows desktop a key that opens only the daemon tunnel". Line 37 of the same summary and Design link step 2 say the key can still create a Unix socket remote forward at any unused path the server user can write. Key lines that already exist also keep allowing TCP remote forwards until `link` runs again. I checked this with a local unprivileged sshd (OpenSSH 10.0p2) and the planned key line. `-W` to the daemon port returned `HTTP/1.0 200 OK`. `-W` to another port, the shell command and both TCP `-R` cases failed, and the sshd log shows the `-R` cases were "denied". `ssh -N -o ExitOnForwardFailure=yes -R <dir>/r.sock:...` stayed up until `timeout` ended it (exit 124) and left `srw------- r.sock`.
+PROPOSAL: On line 29, say the key opens only the daemon tunnel apart from the Unix socket limit described below, or drop "only".
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, link step 2 (line 175) and onboard step 1 (line 162)
+EVIDENCE: The OpenSSH release notes (openssh.com/releasenotes.html, "Changes since OpenSSH 7.7") add the `permitlisten=` authorized_keys option in 7.8. Before this revision the key line needed only `restrict`, which came in 7.2. A server whose sshd predates 7.8, such as Ubuntu 18.04 with 7.6, does not know the new option. Neither the document nor preflight states a minimum sshd version, so on such a server `link` writes the key line, the client record, `known_hosts` and the alias block, and then fails only at the step 4 tunnel check.
+PROPOSAL: State that servers need OpenSSH 7.8 or later, and have onboard preflight report an older sshd. Otherwise, name the version as a known limit next to the Unix socket one.
