@@ -409,6 +409,7 @@ None.
 | 2026-11-12 | R-5 | spec | `e73cecfe2c1b2061dda8e47929e218a6f2785d48` | unknown | procedural | Four should-fix and two nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-6 | spec | `5bf5701d6e90be301c1fd34a14b3bf600e71f4f2` | unknown | procedural | Two should-fix and two nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-7 | spec | `7d0e5797c123e3f62316e655e32cb982a28a61f8` | unknown | procedural | Two should-fix and two nit findings; the reviewer did not report its model. |
+| 2026-11-12 | R-8 | spec | `5bfcf863788600670cca92a5ab3a56e4adfa1364` | claude-opus-4.8 | procedural | One should-fix and three nit findings; model self-reported, no model was requested. |
 
 ### R-1
 
@@ -738,3 +739,33 @@ SEVERITY: nit
 WHERE: Design item 1, AC-01
 EVIDENCE: Item 1 records the `!!` paths "exactly as Git prints them" and walks each one for its file count and bytes. A path the walk cannot read keeps the worktree. In a scratch repository with Git 2.55.0, `git status --porcelain --ignored=traditional --untracked-files=normal` printed `!! "build out/"` and `!! "cach\303\251/"` for the ignored directories `build out/` and `caché/`. Neither printed string is a path on disk. A literal walk fails, so any worktree with an ignored path that contains a space or a non-ASCII character is kept on every run.
 PROPOSAL: Walk the paths taken from the `-z` form of the same command, and display them as Git prints them. Add an AC-01 fixture whose ignored directory name contains a space.
+
+### R-8
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-02, Test Plan AC-02 row
+EVIDENCE: AC-02 says a worktree is kept when its "status check fails or times out, writes a warning". The AC-02 row tests a non-zero exit with "a `run` stub that makes `git status` exit non-zero". It also has "an untracked directory made unreadable with `chmod 000`", which writes a warning, but the whole-tree permission walk from Design item 1 keeps that worktree anyway. No row case makes a status command time out. No row case writes a warning while every other rule passes. The row also never checks the kept reason, so an implementation without the timeout rule or the stderr rule passes every listed case. The standard says "A passing subset never upgrades a composite criterion", so an implementation review would have to return AC-02 as `untested`.
+PROPOSAL: Add `run` stub cases where, on an otherwise clean worktree, a status command reports a timeout, and where it exits 0 but writes only a warning to stderr. Each should be kept with a reason that names that rule. If a timeout cannot be told apart from a non-zero exit, drop "or times out" from AC-02 and say why.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: AC-05
+EVIDENCE: The criterion reads "and so are an entry whose directory exists without a `.git` file a detached missing-directory entry with rebase state, and a missing-directory entry whose admin directory holds `modules/`." The first two items have no separator between them. The implementation review must match this text exactly.
+PROPOSAL: Put a comma after "without a `.git` file" so the criterion lists three separate cases.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-09 row
+EVIDENCE: Since R-7 F-01, Design item 1 also keeps a worktree when "any directory in it cannot be read, entered or written by the current user", or when a status command "writes anything to stderr". The AC-09 manual procedure lists the checks to run independently: status, merge proof, reflog, nesting, `find ... -name .git`, admin state, the lock, `ls-files -v` and the detached `rev-list`. It includes neither the permission walk nor the stderr and exit check. So the manual check cannot confirm that a proposed worktree meets item 1. On 2026-11-12, `find <w> -type d \( ! -readable -o ! -writable -o ! -executable \)` found no such directory in any of the 67 Stackweaver worktrees still on disk, so the current tree is not affected.
+PROPOSAL: Add the permission walk, for example that `find` expression, and a check of each status command's stderr and exit code to the AC-09 procedure.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design item 5, Scope, covers, AC-08
+EVIDENCE: Code creates the run-owned worktrees: `plugins/vh-adlc/scripts/audit/ledger.ts:235` runs `git worktree add -b`, and `plugins/vh-adlc/scripts/maintenance/report-candidate.ts:145-146` does the same. `ledger.ts:274` (`cleanupOwnedLedger`) removes with plain `git worktree remove`. Neither script is in `covers` or Scope. The design adds the lock only as prose in the references, and the AC-08 proof is "a reading". Scratch repository, Git 2.55.0: `git worktree remove` on a worktree locked with reason `vh-adlc r1` exited 128 with "fatal: cannot remove a locked working tree, lock reason: vh-adlc r1". `git worktree add --lock --reason "vh-adlc run-x" -b k ../k main` created the worktree already locked. As written, locking is a separate manual step after creation, and no executed check shows that any run locks or unlocks its worktrees. The document does not raise the choice between prose and code for locking.
+PROPOSAL: Lock at creation in those scripts with `git worktree add --lock --reason "vh-adlc <run-id>"`, unlock in their cleanup path, and add the scripts and tests to `covers` and the Test Plan. Otherwise, raise the prose-only mechanism as an owner question.
