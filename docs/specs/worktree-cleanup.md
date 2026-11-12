@@ -446,6 +446,7 @@ None.
 | 2026-11-12 | R-8 | spec | `5bfcf863788600670cca92a5ab3a56e4adfa1364` | claude-opus-4.8 | procedural | One should-fix and three nit findings; model self-reported, no model was requested. |
 | 2026-11-12 | R-9 | spec | `3167ec932ea73aa067937ffa722ccf900760d77d` | unknown | procedural | One should-fix and four nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-10 | spec | `298022d4283735c05526ec05c585961fdaf0604a` | unknown | procedural | One blocking, one should-fix and two nit findings; the reviewer did not report its model. |
+| 2026-11-12 | R-11 | spec | `8e1cf1f59d076e250cbd128e9ea6df95bf749e9b` | unknown | procedural | One factual should-fix, one judgement should-fix and two nit findings; the reviewer did not report its model. |
 
 ### R-1
 
@@ -872,3 +873,33 @@ SEVERITY: nit
 WHERE: AC-03 (lines 359-362)
 EVIDENCE: The R-9 F-03 fix changed AC-03 to "is deleted, together with its worktree when it has one and Design item 1 allows its removal". Items 3 and 5 also keep branch worktrees: main, invoking, `--repo` and locked worktrees, and rebase or bisect state for "Any worktree, detached or on a branch". Read literally, AC-03 says that a seven-day-old branch at the default tip with a locked worktree is deleted and the worktree removed, which contradicts AC-10. It also does not say that the branch stays when its worktree is kept. AC-07 already uses the wording "unless a rule in Design items 1 to 5 keeps it".
 PROPOSAL: Reword AC-03 to say the branch is deleted, together with its worktree, unless a rule in Design items 1 to 5 keeps that worktree, in which case the branch is kept with a reason.
+
+### R-11
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (line 211), Design items 1, 3 and 4, Test Plan AC-04 and AC-05 rows
+EVIDENCE: Line 211 says "`worktrees()` also reads each entry's HEAD and admin directory name", and item 3 (line 259) gives the admin directory as "`$(git rev-parse --git-common-dir)/worktrees/<name>`". Neither says where `<name>` comes from. `git worktree list --porcelain` does not print it, and for a `prunable` entry `git -C <path> rev-parse --absolute-git-dir` cannot run because the directory is gone. Git does not always name the admin directory after the path's basename. In /home/m/code/stackweaver, `worktrees/stackweaver` belongs to `/home/m/.codex-workspaces/worktrees/ios-.../stackweaver`, and `stackweaver1`, `stackweaver2` and `stackweaver3` belong to three `/home/m/.codex/worktrees/*/stackweaver` paths. I tested this in a scratch repository with Git 2.55.0. I created detached worktrees `p1/w` and `p2/w`, committed Y in `p2/w`, ran `git checkout --detach main` there, then deleted `p2/w`. `p2/w` was then `prunable` with admin directory `w1`. `worktrees/w` belonged to the present `p1/w`. `git rev-list` over the reflog of `worktrees/w` printed 0 commits, and over the reflog of `worktrees/w1` it printed 1 (Y). If an implementation takes the basename, the reflog, `refs/worktree/`, rebase or bisect and `modules/` checks for `p2/w` all read `p1/w`'s admin directory and pass without any error. `git worktree remove` on `p2/w` then deletes `w1` and loses Y. This is the same silent pass that R-10 F-01 found, by a different route. No fixture has two worktrees with the same basename.
+PROPOSAL: For a present entry, read the admin directory from `git -C <path> rev-parse --absolute-git-dir`. For a `prunable` entry, use the `worktrees/*` directory whose `gitdir` file, resolved relative to that directory when the path is relative, names `<path>/.git`. If no admin directory or more than one matches, keep the entry with a reason. Add an AC-04 or AC-05 fixture with a `prunable` detached entry whose admin directory has a numeric suffix.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-03, AC-04, Test Plan AC-03 and AC-04 rows
+EVIDENCE: The R-10 fixes added two clauses that no Test Plan row exercises. AC-04 (line 378) now ends "as is one whose HEAD reflog cannot be read". The AC-04 row has no case where `reflog show` fails, for example a `run` stub. The AC-02 row stubs only `git status`. AC-03 (line 368) now says that when a rule in items 1 to 5 keeps the worktree, "then the branch is kept with a reason too". The AC-03 row has no branch that is at least seven days old, at the default tip or on its first-parent history, and has a kept worktree. The AC-10 row's "locked worktree on a merged branch older than seven days" does not say which proof makes the branch merged, and it checks only the `worktree` kept record, not the branch's `local` record. The standard says "A passing subset never upgrades a composite criterion", so an implementation review would have to return AC-03 and AC-04 as `untested`.
+PROPOSAL: Add an AC-04 case where a `run` stub makes the HEAD reflog command fail on a detached worktree that would otherwise be removed, and expect it to be kept with a reason naming that rule. Add an AC-03 case with an 8-day branch at the default tip whose worktree holds an untracked file or is locked, and expect both the `worktree` record and the branch's `local` kept record.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-02, Test Plan AC-02 row
+EVIDENCE: AC-02 (lines 354-355) says a worktree with a changed tracked file or an untracked file is never removed, "even with ignored files beside them". The AC-02 row's first fixtures are "with a modified tracked file, with an untracked file, and with an untracked file under `status.showUntrackedFiles=no`". None of them is said to hold an ignored file, and no other fixture combines dirty and ignored content in plan and apply.
+PROPOSAL: Give the modified-file and untracked-file fixtures an ignored `node_modules/` as well, or narrow the criterion.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design item 2, Owner summary trade-offs, Open Questions
+EVIDENCE: `skills/vh-adlc-implement/SKILL.md:69-72` creates the feature branch "at the claim commit", which is pushed to the default branch (step 5). So every vh-adlc feature branch starts on the default branch's first-parent history and has no commits of its own until its first task commit. Under item 2, if implementation stalls for seven days after the claim in a clean linked owning worktree, a sweep deletes the branch and the worktree. A preauthorized sweep does this without stopping when the worktree holds no ignored files. The document still says `status: in-progress` and names that `branch`. The implement skill can recover by recreating the branch at the claim commit (lines 79-80), but it then asks the owner for a new worktree. The trade-offs name "a branch kept on purpose as a bookmark", not the plugin's own claimed feature branches.
+PROPOSAL: Name this case in the Owner summary trade-offs, or raise as an owner question whether to keep a branch that an `in-progress` feature document names in its `branch` field.
