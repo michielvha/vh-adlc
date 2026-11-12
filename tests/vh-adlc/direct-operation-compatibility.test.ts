@@ -38,9 +38,9 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     const cleanup = current.slice(start, end);
     for (const requirement of [
       "delete_branch_on_merge",
-      "tip is reachable from",
-      "git branch -d",
-      "git worktree list --porcelain",
+      "after-merge",
+      "references/branches.md",
+      "contained in",
       "does not authorize a",
     ]) expect(cleanup).toContain(requirement);
     current = current.slice(0, start) + current.slice(end);
