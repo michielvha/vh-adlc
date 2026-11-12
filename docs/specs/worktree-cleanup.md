@@ -371,6 +371,7 @@ None.
 | 2026-11-12 | R-3 | spec | `e359f41bcaee7249b2fe27cba2aada158e3781b0` | claude-opus-4.8 | procedural | One blocking, four should-fix and two nit findings; model self-reported, no model was requested. |
 | 2026-11-12 | R-4 | spec | `b04d5e5fc2125e31fb329d08f9a57f049625fa29` | claude-opus-4.8 | procedural | One blocking, three should-fix and two nit findings; model self-reported, no model was requested. |
 | 2026-11-12 | R-5 | spec | `e73cecfe2c1b2061dda8e47929e218a6f2785d48` | unknown | procedural | Four should-fix and two nit findings; the reviewer did not report its model. |
+| 2026-11-12 | R-6 | spec | `5bf5701d6e90be301c1fd34a14b3bf600e71f4f2` | unknown | procedural | Two should-fix and two nit findings; the reviewer did not report its model. |
 
 ### R-1
 
@@ -640,3 +641,33 @@ SEVERITY: nit
 WHERE: goal, Design item 1, AC-02
 EVIDENCE: The goal says a worktree "with changed ... files ... is always kept", and item 1 relies on `git status`. I tested this in a scratch repository with Git 2.55.0. On a linked worktree on branch `f`, I appended to tracked file `a` and ran `git update-index --skip-worktree a`. Both item 1 status commands then printed nothing. `git worktree remove ../w` exited 0 and deleted the local change. `assume-unchanged` hides changes from `git status` in the same way. Today the same gap exists only with `--worktrees true`. Item 5 makes removal the default.
 PROPOSAL: Keep a worktree whose `git ls-files -v` shows an assume-unchanged entry, or a skip-worktree entry whose file exists on disk. Otherwise, name this limit in the Owner summary trade-offs.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design items 1 and 4, AC-05, Test Plan AC-05 row, Owner summary
+EVIDENCE: Item 1 keeps a worktree with submodule state "because `git worktree remove` refuses it" and counts a `modules/` directory in the admin directory as such state. Item 4 lists the only keep conditions for a `prunable` entry: an unproven branch, a detached HEAD that fails the reachability or reflog check, or a directory that still exists without `.git`. Item 3 adds rebase and bisect state, "present or prunable". Nothing applies the submodule rule to a missing-directory entry, and AC-05 and its row have no such case. Git checks for submodules only when the worktree directory exists. I tested this in a scratch repository with Git 2.55.0. Linked worktree `w` on branch `f` had an initialized submodule `s` with one commit, 77c6cec, that existed only in the worktree's admin `modules/s`. After `rm -rf ../w`, `git worktree list --porcelain` showed `prunable gitdir file points to non-existent location` and `branch refs/heads/f`, and the admin directory still held `modules`. `git worktree remove ../w` exited 0 and deleted the whole admin directory, including `modules/s` and the only copy of that commit. Today `branches.ts:193` keeps every prunable entry, so this loss would be new. It contradicts the summary's "Work that is not on the default branch or in a merged PR head is never removed."
+PROPOSAL: State that submodule state, including a `modules/` directory in the admin directory, keeps a worktree whether it is present or `prunable`, with a reason. Add an AC-05 fixture that deletes the directory of a merged-branch worktree that has a submodule and checks that the entry is kept.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design item 3, Owner summary, goal, Open Questions
+EVIDENCE: Item 3 says "Branch worktrees skip this check, because their pre-rebase commits would keep every rebased and merged feature worktree forever." The owner's Q13 (commit 2f6bce0) asked only about detached worktrees. The summary's trade-offs name only the detached case, while the summary says "Work that is not on the default branch or in a merged PR head is never removed" and the goal says a worktree with "unmerged commits is always kept". Removing a worktree deletes its own `logs/HEAD`, so commits that only that reflog names are lost. On 2026-11-12 I compared each branch worktree's `logs/HEAD` oids in Stackweaver against `git rev-list <oids> --not --branches --remotes`. At least 15 branch worktrees hold such commits. For example, `.claude/worktrees/feat-design-system-sweep` is on `fix/landing-hero-compat-copy`, which is on origin/main's first-parent history with a tip dated 2026-10-17. Its `git status --porcelain --untracked-files=all --ignore-submodules=none` prints nothing, and 72 commits appear only in its HEAD reflog. Under items 1 and 2 that worktree would be proposed for removal. Most of these commits are probably pre-rebase copies, but the document settles this trade-off without asking the owner.
+PROPOSAL: Raise the branch-worktree reflog exemption as an owner question, or at least name it in the Owner summary trade-offs and qualify the goal and the summary's "never removed" sentence.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Owner summary, Design item 5, AC-08
+EVIDENCE: The summary says "`after-merge` removes the merged PR's own worktree". `skills/vh-adlc-ship/SKILL.md:47` tells the ship step to "work in the feature's owning worktree", which is the PR's branch worktree, and then run `after-merge` (lines 98-100). AC-07 and item 3 keep "the worktree `after-merge` runs from" as the invoking worktree. Ignored files also keep it after a merge. So after a vh-adlc ship, `after-merge` will normally keep the PR's own worktree and its branch, and only a later sweep removes them. Neither the summary nor AC-08 says this or tells ship where to run `after-merge`.
+PROPOSAL: Say in the summary that `after-merge` keeps the worktree it runs from, so a feature shipped from its owning worktree is cleaned up by the next sweep. Alternatively, have AC-08 tell the ship skill to run `after-merge` from another worktree.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-04 and AC-10 rows
+EVIDENCE: AC-04 keeps a detached worktree with "changed or untracked files", but its row tests only "with an untracked file". AC-10 covers every locked worktree and requires the kept reason to include the lock reason. Its row tests only a detached worktree in `plan`, and the AC-07 row's "locked" case checks only that the worktree is kept "with a reason". Under the standard, "A passing subset never upgrades a composite criterion."
+PROPOSAL: Add a detached fixture with a modified tracked file to the AC-04 row, and a locked branch worktree in `plan` whose kept reason contains the lock reason to the AC-10 row. Alternatively, narrow the criteria to the tested cases.
