@@ -398,6 +398,7 @@ None.
 | 2026-11-11 | R-26 | spec | `8463b0667104764bb08145e359d467c71999f4a0` | unknown | procedural | Two should-fix factual findings (AC-06 does not carry its bound; nothing builds or tests the 120-second installer give-up), two factual nits (the summary's AC-06 wording, the kept copy's mode) and one judgement nit (how the live read picks the current registry value). Applied the factual findings and raised Q12. |
 | 2026-11-11 | R-27 | spec | `c79254865dc2b9a0130ffb70c69c03e3282c3d46` | unknown | procedural | One blocking factual finding (AC-06 was bounded by what the CLI reports rather than by what happens on the client, and covered only `link`), two should-fix factual findings (a debug-launch case that cannot fail first, a stand-in installer that may end before the quit) and one factual nit (T39 wording). Applied all four. |
 | 2026-11-11 | R-28 | spec | `fc82f98615fbd4a2c1c77e1413dba353631389d0` | unknown | procedural | Two should-fix factual findings (AC-05 and AC-06 not bounded by the installer limit and the launch limit; two T39 cases that cannot fail first), one should-fix judgement finding (a macOS update install may relaunch the app before the debug launch), one judgement nit (the restore read-back is stricter than AC-06) and one factual nit (AC-16 wording on later changes to the copy). Applied the factual findings and raised Q13 and Q14. |
+| 2026-11-12 | R-29 | spec | `39e23fa90d04e2fa491e3681eee7fd556af59399` | unknown | procedural | Four should-fix factual findings (two cases that cannot fail first, AC-17 checked only through macOS `link`, an unclear debug-launch limit with no outcome for a page that never answers) and two factual nits (AC-17's rollback message, the name of the wait between launches). Applied all six. |
 
 ### R-1
 
@@ -1512,3 +1513,47 @@ SEVERITY: nit
 WHERE: Acceptance Criteria, AC-16; Design, Desktop app entry, step 5
 EVIDENCE: AC-16 (line 249) says the copy "holds the host list the app had before the command and which later commands do not overwrite". Step 5 says "`unlink` and `remove` delete their server's entry from it, as they do from every app backup". `cleanBackups` globs `app-registry-*.backup.json` (plugins/paseo-hosts/internal/remove/remove.go:397), which matches `app-registry-<client>.<UTC time>.backup.json` and rewrites it. After a later `unlink` or `remove`, the copy no longer holds the list from before the command, so an implementation that follows the Design can be read as failing AC-16.
 PROPOSAL: Word AC-16 so that later commands change the copy only by deleting the entry of a server they unlink or remove, as the Design states.
+
+### R-29
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks, T39; Test Plan, AC-05, AC-06, AC-16 and AC-17 row
+EVIDENCE: T39 (line 356) says each listed case "fails against the current code on an assertion the Test Plan gives for it", and it lists "a page that rewrites the restored connections on reload". The Test Plan (line 260) gives that case only two assertions: "asserts the "restored" message and no kept copy". At 39e23fa, `write()` writes the raw backup back, reloads, does not read it back and returns "the app on %s did not keep the change; its previous host list is restored" (plugins/paseo-hosts/internal/clientapp/clientapp.go:287-299). The current code has no kept copy at all. The fake's `reload()` rewrites Remote SSH connections into the normalized form and stores the result (fakedevtools_test.go `reload` and `normalize`). So the current code prints the "restored" message and writes no copy, and it meets both assertions. The case cannot fail first.
+PROPOSAL: Add an assertion that only the new code meets, for example a second debug launch after the rollback for the check after a restart, as the `unlink` case does. Otherwise, name this case in T39 as a regression guard for T40's comparison that is not expected to fail first.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-05, AC-06, AC-16 and AC-17 row; Tasks, T42
+EVIDENCE: The Test Plan (line 260) says "A test with a stand-in app that exits right after its final launch asserts that `link` fails". T42 (line 359) says that test "fails first, then passes". Design step 6 (line 192) runs the new main-process check after the tunnel check: "`link` succeeds only when the client shows an `ssh` process ... within 30 seconds. Every command then checks that the app's main process still runs". The fake lists tunnel processes only while the app runs (fakedevtools_test.go:184-201, `if a.running`). `Add` runs `tunnel.sh` after the session (clientapp.go:114-118). So with an app that exits right after launch, today's `link` already fails at the tunnel check after `TunnelTimeout`, and the test passes before T42. `unlink` and `remove` have no tunnel check (`Delete`, clientapp.go:126-143), so for them the clause "every command fails when that process is gone at the end" has no test. In the R-23 Windows failure the app opened its tunnel and only then stopped, so `link` reported success.
+PROPOSAL: Have the stand-in app exit after its tunnel appears, which is after the tunnel check would pass. Assert exit 1 for that case. Add the same case through `unlink`, where no tunnel check hides the missing main-process check.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-17; Test Plan, AC-05, AC-06, AC-16 and AC-17 row and manual step 9
+EVIDENCE: AC-17 (line 250) covers `link`, `unlink` and `remove`. Its only planned check is "A fake case whose stand-in installer outlives an installer limit the test shortens to 2 seconds asserts that `link` exits 1" (line 260). That case runs `link` through the macOS `stop.sh` stand-ins. No case runs `unlink` or `remove`. On Windows the installer detection and the 120-second give-up are in `stop.ps1`, which "is checked live only, because the snippets need `Get-CimInstance`". Manual step 9 (line 271) runs a 60-second stand-in, which is shorter than the 120-second limit. So the Windows give-up branch never runs in any planned check. A passing subset does not meet a composite criterion, so an implementation review would have no executed evidence for those clauses.
+PROPOSAL: Add the give-up case through `unlink` to the fake tests. Add a Windows variant of step 9 with a stand-in that runs longer than 120 seconds, and record exit 1, the "run it again" message and the app left stopped. Otherwise, narrow AC-17 to what is checked.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry, step 2, step 5 and the lost-window paragraph; Acceptance Criteria, AC-05 and AC-06
+EVIDENCE: Step 2 (line 188) says "the CLI waits 3 seconds and launches it again, up to three launches in all". AC-05 says "up to two of three debug launches", AC-06 says "one of every three debug launches answers", and line 198 says "a debug launch that fails three times". These read as a limit for each debug launch. The text "in all" reads as a limit for the whole command. Step 5 ("debug-launch the app once more", line 191) and the lost-window paragraph ("debug-launches the app again", line 198) do not say whether those launches retry. The Design reports early exits on the Mac in 3 of about 9 runs. Under a command-wide limit of three, one early exit in step 2 followed by two checks after a restart uses up the limit, and the result is the AC-16 exit inside AC-06's premise. The Design also gives no limit and no outcome for a debug launch whose app keeps running but never answers. That happens when `open -a` (launch.sh:4) only activates an instance that started after the check before launch. The code's `LaunchTimeout` of 60 seconds (clientapp.go:39, cdp.go:23-38) is not in the Design, and the retry covers only an app that exits.
+PROPOSAL: State that every debug launch (step 2, after a lost window, and each check after a rollback) gets up to three attempts. State that an attempt also fails when the page has not answered within a named time while the main process runs. In that case the CLI quits and waits before the next attempt.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria, AC-17; Design, Desktop app entry, step 5
+EVIDENCE: AC-17 (line 250) says "during a rollback, the message also names the kept copy AC-16 describes". Step 5 (line 191) says "A force-stop or an installer that does not finish during a rollback leads to one of these two messages, with its reason added". So when a check after a restart has already confirmed the restore and the following quit and wait gives up on an installer, the Design gives the "restored" message with no copy. When the app had no host list, AC-16 itself says "no copy is written". In both cases AC-17's wording contradicts the Design.
+PROPOSAL: Word AC-17 as "during a rollback, the message is one of the two step 5 gives, with this reason added". Another option is "during a rollback whose restore is not confirmed, the message also names the kept copy AC-16 describes".
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, AC-05, AC-06, AC-16 and AC-17 row
+EVIDENCE: Two cases assert debug launches "at least the shortened settle time apart" (line 260). The Design does not name the 3-second wait between debug launches ("the CLI waits 3 seconds and launches it again", line 188). In the code, `SettleDelay` is the 4-second wait after a reload ("SettleDelay lets the reloaded app load and rewrite its registry", clientapp.go:36-37). A test written against `SettleDelay` would check the wrong wait.
+PROPOSAL: Name the 3-second wait between debug launches in the Design and use that name in the Test Plan, or write "the shortened 3-second wait between debug launches".
