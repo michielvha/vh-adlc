@@ -422,6 +422,7 @@ None.
 | 2026-11-12 | R-6 | spec | `5bf5701d6e90be301c1fd34a14b3bf600e71f4f2` | unknown | procedural | Two should-fix and two nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-7 | spec | `7d0e5797c123e3f62316e655e32cb982a28a61f8` | unknown | procedural | Two should-fix and two nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-8 | spec | `5bfcf863788600670cca92a5ab3a56e4adfa1364` | claude-opus-4.8 | procedural | One should-fix and three nit findings; model self-reported, no model was requested. |
+| 2026-11-12 | R-9 | spec | `3167ec932ea73aa067937ffa722ccf900760d77d` | unknown | procedural | One should-fix and four nit findings; the reviewer did not report its model. |
 
 ### R-1
 
@@ -781,3 +782,40 @@ SEVERITY: nit
 WHERE: Design item 5, Scope, covers, AC-08
 EVIDENCE: Code creates the run-owned worktrees: `plugins/vh-adlc/scripts/audit/ledger.ts:235` runs `git worktree add -b`, and `plugins/vh-adlc/scripts/maintenance/report-candidate.ts:145-146` does the same. `ledger.ts:274` (`cleanupOwnedLedger`) removes with plain `git worktree remove`. Neither script is in `covers` or Scope. The design adds the lock only as prose in the references, and the AC-08 proof is "a reading". Scratch repository, Git 2.55.0: `git worktree remove` on a worktree locked with reason `vh-adlc r1` exited 128 with "fatal: cannot remove a locked working tree, lock reason: vh-adlc r1". `git worktree add --lock --reason "vh-adlc run-x" -b k ../k main` created the worktree already locked. As written, locking is a separate manual step after creation, and no executed check shows that any run locks or unlocks its worktrees. The document does not raise the choice between prose and code for locking.
 PROPOSAL: Lock at creation in those scripts with `git worktree add --lock --reason "vh-adlc <run-id>"`, unlock in their cleanup path, and add the scripts and tests to `covers` and the Test Plan. Otherwise, raise the prose-only mechanism as an owner question.
+
+### R-9
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design item 1 (line 226), AC-02, Test Plan AC-02 row
+EVIDENCE: The AC-02 row says "`run` stubs make `git status` ... report a timeout ... each is kept with a reason naming that rule". The `Run`/`Result` type (branches.ts:5-6) only has `{code, stdout, stderr}`. `spawn` (branches.ts:9-12) turns a killed process into `code: 1` with empty output. I checked with Bun: on a timeout, `Bun.spawnSync` returns `exitCode: null`, `signalCode: "SIGTERM"` and `exitedDueToTimeout: true`, and the current mapping drops all three. So a stub cannot report a timeout that the code can tell apart from a non-zero exit, and no reason can name the timeout rule. The Design list of changed places (worktrees(), Worktree, observe, perform, absent(), execute, afterMerge, parsePlan) does not include `Result` or `spawn`. R-8 F-04's proposal offered this choice ("If a timeout cannot be told apart ... drop 'or times out'"). The document kept the timeout case but did not add the interface change it needs.
+PROPOSAL: In Design item 1, say that `Result` gains a timeout flag set from `exitedDueToTimeout` and that `spawn` fills it, and list both among the changed places. Otherwise, drop the separate timeout reason from item 1, AC-02 and the row, and say that a timeout is reported as a non-zero exit.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-02 row, last sentence
+EVIDENCE: "Another has an ignored directory the test makes unreadable with `chmod 000`; both are kept with a reason." That sentence describes one fixture, so "both" has nothing to pair with. This fixture is also already kept by the whole-tree permission rule from R-7 F-01 ("any directory in it cannot be read, entered or written"), so as worded the ignored-walk rule never gets its own test.
+PROPOSAL: Change "both are kept" to "it is kept with a reason naming the unreadable-directory rule". Also say which rule the fixture is meant to exercise.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-07 (lines 366-371), AC-03 (line 347)
+EVIDENCE: AC-07 lists the reasons to keep a worktree as main, locked, `--repo`, cwd, changed or untracked files, and ignored files. AC-03 says a branch is deleted "together with its clean worktree". Neither mentions the other keep rules in Design items 1 and 3. Those rules cover submodule state, nested Git repositories, unreadable or read-only directories, skip-worktree or assume-unchanged entries, status that fails or writes to stderr, and a rebase or bisect in progress. Read literally, both ACs say such worktrees are removed, which contradicts the design and the AC-02 fixtures.
+PROPOSAL: In AC-07, replace the list with "unless a rule in Design items 1 to 5 keeps it, including ...". In AC-03, say "together with its worktree when Design item 1 allows its removal".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Owner summary (line 41 and the review-history paragraph ending line 132)
+EVIDENCE: "This feature changes the helper in `plugins/vh-adlc/scripts/branches/` and the guides that call it." Since R-8, Scope, `covers` and AC-10 also change `scripts/audit/ledger.ts` and `scripts/maintenance/report-candidate.ts`, which now create their worktrees locked and unlock them before removal. The review-history paragraph stops at R-7 and does not describe the R-8 changes.
+PROPOSAL: Add the two scripts and the lock behaviour to the summary sentence, and add an R-8 sentence to the history paragraph.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Owner summary (lines 46-49)
+EVIDENCE: "Commits that are not on the default branch or in a merged PR head are never removed, with one exception ..." This is broader than the feature. The existing `prune-tracking` (branches.ts:181) already drops commits that only a stale tracking ref names, with no merge proof. Removing a worktree also discards its per-worktree refs (`refs/worktree/*`), which the summary does not mention.
+PROPOSAL: Limit the sentence to this feature: "Worktree removal and local branch deletion never discard commits that are not on ..." Mention per-worktree refs, or add a rule in Design item 1 that keeps them.
