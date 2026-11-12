@@ -389,6 +389,7 @@ None.
 | 2026-11-12 | R-4 | spec | `b04d5e5fc2125e31fb329d08f9a57f049625fa29` | claude-opus-4.8 | procedural | One blocking, three should-fix and two nit findings; model self-reported, no model was requested. |
 | 2026-11-12 | R-5 | spec | `e73cecfe2c1b2061dda8e47929e218a6f2785d48` | unknown | procedural | Four should-fix and two nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-6 | spec | `5bf5701d6e90be301c1fd34a14b3bf600e71f4f2` | unknown | procedural | Two should-fix and two nit findings; the reviewer did not report its model. |
+| 2026-11-12 | R-7 | spec | `7d0e5797c123e3f62316e655e32cb982a28a61f8` | unknown | procedural | Two should-fix and two nit findings; the reviewer did not report its model. |
 
 ### R-1
 
@@ -688,3 +689,33 @@ SEVERITY: nit
 WHERE: Test Plan AC-04 and AC-10 rows
 EVIDENCE: AC-04 keeps a detached worktree with "changed or untracked files", but its row tests only "with an untracked file". AC-10 covers every locked worktree and requires the kept reason to include the lock reason. Its row tests only a detached worktree in `plan`, and the AC-07 row's "locked" case checks only that the worktree is kept "with a reason". Under the standard, "A passing subset never upgrades a composite criterion."
 PROPOSAL: Add a detached fixture with a modified tracked file to the AC-04 row, and a locked branch worktree in `plan` whose kept reason contains the lock reason to the AC-10 row. Alternatively, narrow the criteria to the tested cases.
+
+### R-7
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design item 1, AC-02, Test Plan AC-02 row
+EVIDENCE: Item 1 checks readability only for ignored paths ("A path the walk cannot read keeps the worktree") and keeps a worktree only when a status command "exits non-zero or times out". I tested this in a scratch repository with Git 2.55.0, running as uid 1000. Linked worktree `w` on branch `f` had an untracked directory `d/` with `u.txt`, and I ran `chmod 000 d`. Both `git status --porcelain --untracked-files=all --ignore-submodules=none` and `git status --porcelain --ignored=traditional --untracked-files=normal` printed only `warning: could not open directory 'd/': Permission denied` to stderr. Both exited 0 and printed nothing to stdout, so item 1 would call the worktree clean with no ignored files. `git worktree remove ../w` then exited 255 with `failed to delete ... Directory not empty`. It had already deleted the tracked files, the `.git` file and the admin directory. `git worktree list` showed only the main worktree, and `../w/d/u.txt` was left in an orphaned directory. In a second fixture, a read-only directory under an ignored `node_modules/` (`chmod a-w`) gave the same result: `error: failed to delete ... Permission denied`, exit 255, entry gone, and the directory left behind. Today ignored or untracked content blocks removal (`branches.ts:192`), so these orphans are new. No later plan lists them, because they are no longer worktree entries. Item 6 would also report `its worktree was not removed` for the `delete-local` after that entry was gone.
+PROPOSAL: Keep a worktree with a reason when any directory in it, not only those under ignored paths, cannot be read or written, or when either status command writes a warning. Run that check at plan time and again before removal. Add AC-02 fixtures for an unreadable untracked directory and for a read-only directory under an ignored path.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: goal, Owner summary, Design item 2
+EVIDENCE: The goal and the summary say commits that are not on the default branch or in a merged PR head are never removed, "with one exception: commits that only a branch worktree's HEAD reflog still names". Deleting a branch also deletes its own reflog. In a scratch repository, `git update-ref -d refs/heads/g <tip>` removed `.git/logs/refs/heads/g`. Item 2 now deletes branches that today are kept with `points at a commit on main's own history` (`branches.ts:162`). In /home/m/code/stackweaver on 2026-11-12, 13 of the 56 local branches whose tip is on origin/main's first-parent history had reflog commits that `git rev-list <reflog oids> --not --branches --remotes` printed. Three of them have no worktree: `feat/full-bleed-explorer`, `fix/e2e-signout-tunnel-race` and `implement-api-reference`. Their reflogs alone name 5 commits that no branch, remote-tracking ref or worktree HEAD reflog contains. Each is older than seven days, so item 2 deletes it and those commits lose their last reference. The reflogs show `commit (amend)` and `rebase (finish)` entries, so these are probably pre-rewrite copies, the same kind of commit as in the exception the owner accepted for branch worktrees (R-6, F-02). The stated exception still does not cover them.
+PROPOSAL: Extend the goal's and summary's exception, and the trade-offs, to say that commits named only by a deleted branch's own reflog also go. If the owner should decide this, raise it as an open question.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design item 5, Owner summary, Test Plan AC-07 row
+EVIDENCE: The summary and item 5 say `after-merge` keeps "the worktree it runs from", so "a feature shipped from its owning worktree, as the ship skill does, is therefore removed by the next sweep". In the helper, the invoking worktree is `real(checkout.root)` (`branches.ts:183`), and `root` is the toplevel of `--repo` (`branches.ts:62-64`), not the process's working directory. `references/branches.md:60` says to pass `--repo <checkout>`. A session working in the owning worktree that passes the main checkout as `--repo` would have its clean, ignored-free owning worktree removed, along with the shell's current directory. The AC-07 row's "the worktree `after-merge` runs from" does not say which of these two the fixture uses.
+PROPOSAL: Define the worktree a command runs from as both the `--repo` worktree and the worktree that holds the process's working directory, or have the ship skill pass its owning worktree as `--repo`. Make the AC-07 fixture run with its working directory in the PR's worktree and `--repo` naming another checkout.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design item 1, AC-01
+EVIDENCE: Item 1 records the `!!` paths "exactly as Git prints them" and walks each one for its file count and bytes. A path the walk cannot read keeps the worktree. In a scratch repository with Git 2.55.0, `git status --porcelain --ignored=traditional --untracked-files=normal` printed `!! "build out/"` and `!! "cach\303\251/"` for the ignored directories `build out/` and `caché/`. Neither printed string is a path on disk. A literal walk fails, so any worktree with an ignored path that contains a space or a non-ASCII character is kept on every run.
+PROPOSAL: Walk the paths taken from the `-z` form of the same command, and display them as Git prints them. Add an AC-01 fixture whose ignored directory name contains a space.
