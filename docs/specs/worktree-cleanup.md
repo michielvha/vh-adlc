@@ -1,8 +1,8 @@
 ---
 status: draft
-status_description: "Review R-5 fixes applied on 2026-11-12; awaiting a new independent spec review."
+status_description: "Review R-6 fixes applied on 2026-11-12; awaiting a new independent spec review."
 issue: null
-goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept."
+goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept; only commits that a branch worktree's HEAD reflog alone still names, such as copies from before a rebase, go with it."
 covers:
   - plugins/vh-adlc/scripts/branches/
   - plugins/vh-adlc/references/branches.md
@@ -39,10 +39,13 @@ worktree counts as clean when it has no changed tracked files and no untracked f
 with it. A branch with no commits beyond the default branch's history is removed, with its worktree if
 it has one, once it is at least seven days old. Detached worktrees whose commit is on the default
 branch, and worktree entries whose directory is gone, are removed under the same rules. Removal still
-uses plain `git worktree remove`, never `--force`. Work that is not on the default branch or in a
-merged PR head is never removed.
+uses plain `git worktree remove`, never `--force`. Commits that are not on the default branch or in
+a merged PR head are never removed, with one exception: commits that only a branch worktree's HEAD
+reflog still names, such as copies from before a rebase, go with that worktree.
 
-A sweep plans worktree removal by default, and `after-merge` removes the merged PR's own worktree. A
+A sweep plans worktree removal by default, and `after-merge` removes the merged PR's own worktree
+unless it runs from that worktree. A feature shipped from its owning worktree, as the ship skill does,
+is therefore removed by the next sweep. A
 worktree that holds ignored files is removed only through a plan the owner approved by digest after
 seeing its list of ignored paths. `after-merge` keeps such a worktree, and a sweep the owner authorized
 in advance stops for an explicit digest approval when its plan would delete ignored files.
@@ -53,8 +56,8 @@ helper keeps them until the run closes and unlocks them.
 Out of scope: how Claude Code, Codex or other hosts create their worktrees, the `vh-adlc clean` binary,
 and anything outside Git worktrees and local branches.
 
-The owner settled sixteen decisions on 2026-11-12, choosing option A each time, the last under a
-standing instruction to take the recommended option:
+The owner settled eighteen decisions on 2026-11-12, choosing option A each time, the last three under
+a standing instruction to take the recommended option:
 
 - Worktrees whose only extra files are ignored ones may go, and the plan lists those files first.
 - Each listed ignored path shows how many files and bytes go with it.
@@ -73,6 +76,8 @@ standing instruction to take the recommended option:
 - Audit and maintenance runs lock the worktrees they create and unlock them when the run closes.
 - The proofs were tightened as reviews R-1, R-3 and R-4 proposed.
 - A kept record names every rule that keeps it, so each rule can be tested on its own.
+- A branch worktree's HEAD reflog is not checked, so commits only it names go with the worktree.
+- `after-merge` keeps the worktree it runs from, and the ship skill says the next sweep removes it.
 
 A worktree whose directory was moved by hand looks missing to Git, so its entry can go while the files
 stay where they are. An entry whose directory still exists without its `.git` file, such as an empty
@@ -90,7 +95,9 @@ days ago is removed even if it was used today. A detached worktree that was reba
 experiments keeps its old commits in its HEAD reflog, so it stays until the owner removes it by hand. A
 run that dies before closing leaves its worktrees locked, and the owner unlocks them by hand. Worktrees
 of runs already pending when this ships are not locked, so the owner locks any that must survive the
-first sweep.
+first sweep. Branch worktrees are not checked for commits that only their HEAD reflog names. On
+2026-11-12 at least 15 Stackweaver branch worktrees held such commits, 72 in one, most likely copies
+from before a rebase, and they go with their worktree.
 
 Nothing is implemented. The checks below are planned, not run. Spec review R-1 found two blocking
 issues: missing-directory entries could drop unmerged detached commits, and `after-merge` would delete
@@ -108,7 +115,9 @@ to have runs lock the worktrees they own, and to add tests for the remaining kee
 R-5 found that a branch could still be deleted while checked out, when a worktree was added on it or
 moved after the plan, and that a stale remote-tracking ref could make a reflog-only commit look safe.
 It also found that changes hidden with `skip-worktree` or `assume-unchanged` were lost on removal.
-Design items 1, 3, 5 and 6 now close these. A new independent review must pass before acceptance. Acceptance would authorize implementation on a feature branch; pushing, a PR,
+Design items 1, 3, 5 and 6 now close these. Spec review R-6 found that a missing-directory entry
+with submodule state would lose commits that exist only in its admin `modules/` directory; design item
+4 now keeps it. A new independent review must pass before acceptance. Acceptance would authorize implementation on a feature branch; pushing, a PR,
 merging and releasing each still need their own approval.
 
 ### Background
@@ -222,7 +231,7 @@ schema. `worktrees()` also reads each entry's HEAD and admin directory name, whi
    count, because the same plan prunes them before it removes worktrees (R-5, F-02). A worktree that committed X and then
    checked out the default branch would otherwise look merged, and removing it would lose X (R-4,
    F-02). Branch worktrees skip this check, because their pre-rebase commits would keep every rebased
-   and merged feature worktree forever. Any worktree, detached or on a branch, present or `prunable`, is
+   and merged feature worktree forever; the owner accepted that trade-off (R-6, F-02). Any worktree, detached or on a branch, present or `prunable`, is
    kept when its admin directory holds `rebase-merge`, `rebase-apply` or `BISECT_LOG`. Today's check
    only notices these when they name a branch, so a detached rebase whose HEAD already sits on the
    default branch would otherwise be removed and its own commits lost (R-3, F-01).
@@ -235,12 +244,16 @@ schema. `worktrees()` also reads each entry's HEAD and admin directory name, whi
    `git worktree remove` removes only the stale entry and never touches a moved directory. A
    `prunable` entry whose path still exists without a `.git` file is kept with a reason, because
    `git worktree remove` refuses it with `validation failed` and would fail on every apply (R-2, F-04).
+   A `prunable` entry whose admin directory holds `modules/` is kept with a reason too. Git checks for
+   submodules only when the directory exists, so removing the entry would delete that `modules/`
+   directory and any submodule commits that exist only there (R-6, F-01).
 5. **When removal runs.** `plan` includes worktree removal by default and takes `--worktrees false` to
    leave it out. `after-merge` also removes worktrees by default, and `after-merge --worktrees false`
    still leaves every worktree alone. It considers only the merged PR's branch and the worktree that
    has it checked out, never detached or other worktrees (R-5, F-04). It removes the merged PR's own
-   worktree under the same proof and blockers,
-   and also keeps it when it holds ignored files, with the reason `holds ignored files; remove it
+   worktree under the same proof and blockers, so it keeps the worktree it runs from. A feature
+   shipped from its owning worktree is removed by the next sweep, and the ship skill says so (R-6,
+   F-03). `after-merge` also keeps the PR's worktree when it holds ignored files, with the reason `holds ignored files; remove it
    through an approved plan`. A sweep request that asks for stale-branch removal still preauthorizes
    its plan, except when a `remove-worktree` operation lists ignored paths: then the agent presents the
    plan with those lists and applies it only after the owner approves its digest. The maintenance and
@@ -281,6 +294,8 @@ Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives wer
 - narrowing the criteria to the cases already tested;
 - judging a detached worktree by its current HEAD only;
 - finding run-owned worktrees through the run journal, or accepting their removal;
+- checking a branch worktree's HEAD reflog too;
+- having the ship skill run `after-merge` from another worktree;
 - keeping today's rules.
 
 ## Acceptance Criteria
@@ -315,7 +330,8 @@ Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives wer
       at a commit reachable from the default branch, is removed from `git worktree list` by an applied
       plan, with no minimum age for a detached one. A detached missing-directory entry at an unmerged
       commit is kept with a reason, and so are an entry whose directory exists without a `.git` file
-      and a detached missing-directory entry with rebase state.
+      a detached missing-directory entry with rebase state, and a missing-directory entry whose admin
+      directory holds `modules/`.
 - [ ] AC-06: `plan` without `--worktrees` proposes worktree removals, and `--worktrees false` proposes
       none. `after-merge --worktrees false` leaves the merged PR's clean worktree, and with it its local
       branch, in place. `apply` refuses a plan written in the previous format.
@@ -328,7 +344,8 @@ Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives wer
       `references/audit.md`, the
       maintenance and ship skills and `docs/user-guides/workflows.md` describe these removal rules, no
       longer require a separate request for worktree cleanup, and say that a preauthorized sweep whose
-      plan lists ignored paths waits for the owner's digest approval. `references/audit.md`,
+      plan lists ignored paths waits for the owner's digest approval. The ship skill says a feature
+      shipped from its owning worktree is removed by the next sweep. `references/audit.md`,
       `references/maintenance.md` and `references/authority.md` tell each run to lock every worktree it
       creates with the reason `vh-adlc <run-id>` and to unlock it when the run closes.
 - [ ] AC-10: A locked worktree, including a clean detached one at a default-branch commit older than
@@ -346,13 +363,13 @@ Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives wer
 | AC-01 | `bun test tests/vh-adlc/branches`: a fixture worktree with an ignored `node_modules/` and `.env` on a merged-PR branch is planned with both ignored paths, each with the file count and byte total the test wrote, then removed by `apply` along with its branch. A second fixture under `status.showUntrackedFiles=no` lists the same paths. |
 | AC-02 | `bun test tests/vh-adlc/branches`: fixtures with a modified tracked file, with an untracked file, and with an untracked file under `status.showUntrackedFiles=no` are kept. A fourth has a second worktree with an untracked file inside its ignored `.claude/` directory, and a fifth has a plain nested Git repository there; both are kept. A sixth has an initialized submodule, and another had its submodule removed with `git submodule deinit -f`; both are kept. A seventh gains an untracked file after `plan`; `apply` reports both its approved operations as `changed`, and the worktree, the file and the branch remain. An eighth gains an ignored file after `plan`; `apply` reports its `remove-worktree` as `changed` and its `delete-local` as `failed`, and the worktree and its branch remain. Another plan has only a `delete-local` for a branch with no worktree; the test then adds a clean worktree on that branch, and `apply` reports the `delete-local` as `failed` and the branch remains. Another moves the approved worktree with `git worktree move` before `apply`; its removal reports `already-absent`, its `delete-local` `failed`, and the branch remains. Two more have a modified tracked file marked `--skip-worktree` and `--assume-unchanged`; both are kept. Another runs with a `run` stub that makes `git status` exit non-zero, and another has an ignored directory the test makes unreadable with `chmod 000`; both are kept with a reason. |
 | AC-03 | `bun test tests/vh-adlc/branches`: separate fixtures, ages set with `GIT_COMMITTER_DATE` or by rewriting the reflog file: a branch at the default tip with an 8-day reflog and a worktree (removed with it); one at an older first-parent commit with an 8-day reflog and no worktree (removed); one with a 1-day reflog (kept with reason); one with its reflog deleted and a tip committed 8 days ago (removed); one with its reflog deleted and a tip committed 1 day ago (kept). |
-| AC-04 | `bun test tests/vh-adlc/branches`: detached worktrees at a default-branch commit with an 8-day and a 1-day `logs/HEAD`, at an unmerged commit, and with an untracked file; only the first is removed. Two more with an emptied `logs/HEAD` and HEAD commits dated 8 days and 1 day ago: only the older is removed. One more, holding an unmerged commit, is paused by `git rebase -i` with a `break` so its HEAD is the default tip, and is kept with a reason naming the rebase. Another runs `git bisect start <unmerged> <older default commit>` so its HEAD is on the default branch, and is kept with a reason naming the bisect. Another commits X, runs `git checkout --detach main` and is kept with a reason naming the reflog-only commit; the same worktree with its directory deleted is kept too. Another does the same after pushing X to a remote branch that is then deleted on the remote, leaving a stale `refs/remotes/origin/<b>`; it is kept. Each kept reason names every rule that applies, so the rebase and bisect fixtures, which also hold reflog-only commits, show both reasons. Every kept one has a `worktree` kept record with its path. |
-| AC-05 | `bun test tests/vh-adlc/branches`: a merged-branch worktree and a detached worktree at a default-branch commit created moments before, whose directories the test deletes, are planned and gone from `git worktree list --porcelain` after `apply`; a detached one at an unmerged commit, with its directory deleted, is kept with a reason, and so is one whose directory the test empties but keeps, and a detached one paused mid-rebase whose directory the test deletes. |
+| AC-04 | `bun test tests/vh-adlc/branches`: detached worktrees at a default-branch commit with an 8-day and a 1-day `logs/HEAD`, at an unmerged commit, with an untracked file, and with a modified tracked file; only the first is removed. Two more with an emptied `logs/HEAD` and HEAD commits dated 8 days and 1 day ago: only the older is removed. One more, holding an unmerged commit, is paused by `git rebase -i` with a `break` so its HEAD is the default tip, and is kept with a reason naming the rebase. Another runs `git bisect start <unmerged> <older default commit>` so its HEAD is on the default branch, and is kept with a reason naming the bisect. Another commits X, runs `git checkout --detach main` and is kept with a reason naming the reflog-only commit; the same worktree with its directory deleted is kept too. Another does the same after pushing X to a remote branch that is then deleted on the remote, leaving a stale `refs/remotes/origin/<b>`; it is kept. Each kept reason names every rule that applies, so the rebase and bisect fixtures, which also hold reflog-only commits, show both reasons. Every kept one has a `worktree` kept record with its path. |
+| AC-05 | `bun test tests/vh-adlc/branches`: a merged-branch worktree and a detached worktree at a default-branch commit created moments before, whose directories the test deletes, are planned and gone from `git worktree list --porcelain` after `apply`; a detached one at an unmerged commit, with its directory deleted, is kept with a reason, and so is one whose directory the test empties but keeps, and a detached one paused mid-rebase whose directory the test deletes. So is a merged-branch worktree with an initialized submodule holding a commit of its own, whose directory the test deletes; its admin `modules/` directory remains. |
 | AC-06 | `bun test tests/vh-adlc/branches`: plans from the CLI with no flag and with `--worktrees false`; `after-merge --worktrees false` on a merged PR whose branch has a clean worktree with no ignored files leaves both; `apply` on a `schema_version: 1` plan exits non-zero with `unsupported branch plan`. |
 | AC-07 | `bun test tests/vh-adlc/branches`: one fixture per case, each with the merged PR's branch checked out in a single worktree: clean with no ignored files (worktree and branch gone); holding an ignored `node_modules/`; holding an ignored `.env` under `status.showUntrackedFiles=no`; with a modified tracked file; with an untracked file; locked; the main worktree; and the worktree `after-merge` runs from. Every case but the first keeps the worktree and branch with a reason. In the first case, an unrelated clean detached worktree at a default-branch commit with an 8-day `logs/HEAD` is still present afterwards. |
 | AC-08 | `bun test tests/vh-adlc` passes, and a reading of each named file shows the new rules, no remaining requirement for a separate worktree request, the digest stop for plans that list ignored paths, and the lock and unlock step for run-owned worktrees. |
 | AC-09 | Manual: run `bun plugins/vh-adlc/scripts/branches/cli.ts plan --repo ~/code/stackweaver --output <private file>`. For each linked worktree in `git worktree list --porcelain`, check items 1 to 4 independently with `git status --porcelain --untracked-files=all --ignore-submodules=none`, `git merge-base --is-ancestor`, the merged PR head, the reflog and the commit date. Also check: whether another `git worktree list` path lies inside it; `find <each ignored path> -name .git`; `rebase-merge`, `rebase-apply`, `BISECT_LOG` and `modules` in its admin directory; its `locked` flag and whether it is the main or invoking worktree; `git ls-files -v` for lowercase or `S` tags; and, when detached, `git rev-list` over its `logs/HEAD` oids `--not --branches` plus each origin tracking ref whose branch `git ls-remote --heads origin` lists. Pass when every worktree that meets them has a `remove-worktree`, every other one matches a `worktree` kept record by path, and no proposed worktree has changed or untracked files or unmerged commits. Applying that plan needs separate owner approval. |
-| AC-10 | `bun test tests/vh-adlc/branches`: a clean detached worktree at a default-branch commit with an 8-day `logs/HEAD`, locked with `git worktree lock --reason "vh-adlc test-run"`, is kept by `plan` with a `worktree` kept record whose reason contains `vh-adlc test-run`; after `git worktree unlock` the next plan proposes it. |
+| AC-10 | `bun test tests/vh-adlc/branches`: a clean detached worktree at a default-branch commit with an 8-day `logs/HEAD`, locked with `git worktree lock --reason "vh-adlc test-run"`, is kept by `plan` with a `worktree` kept record whose reason contains `vh-adlc test-run`; after `git worktree unlock` the next plan proposes it. A locked worktree on a merged branch older than seven days is kept by `plan` with a `worktree` kept record whose reason contains its lock reason. |
 
 ## Tasks
 
