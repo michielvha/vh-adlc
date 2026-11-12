@@ -1,7 +1,7 @@
 ---
 status: draft
 status_description: "Drafted on Opus from a behavior-by-behavior comparison of both loops; ten owner questions open, no review yet."
-issue: null
+issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-spec/
