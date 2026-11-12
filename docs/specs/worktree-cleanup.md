@@ -305,6 +305,7 @@ None.
 | 2026-11-12 | R-1 | spec | `365242f8508007bb91a58a65055e660a0f4a6730` | unknown | procedural | Two blocking, seven should-fix and two nit findings; model identity not attested. |
 | 2026-11-12 | R-2 | spec | `7806b5c77e6f55addd4b0f3d1d6487309104b4ee` | unknown | procedural | Two blocking, four should-fix and one nit finding; model identity not attested. |
 | 2026-11-12 | R-3 | spec | `e359f41bcaee7249b2fe27cba2aada158e3781b0` | claude-opus-4.8 | procedural | One blocking, four should-fix and two nit findings; model self-reported, no model was requested. |
+| 2026-11-12 | R-4 | spec | `b04d5e5fc2125e31fb329d08f9a57f049625fa29` | claude-opus-4.8 | procedural | One blocking, three should-fix and two nit findings; model self-reported, no model was requested. |
 
 ### R-1
 
@@ -486,3 +487,47 @@ SEVERITY: nit
 WHERE: Scope, covers, AC-08
 EVIDENCE: `plugins/vh-adlc/references/audit.md:214-216` says `after-merge` "removes the just-merged head remotely and locally". After item 5, it also removes that PR's worktree by default. `audit.md` is not in Scope's guide list, `covers` or AC-08.
 PROPOSAL: Add `references/audit.md` to the guides that AC-08 updates, or say why its description stays accurate.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design items 1 and 6, AC-01, AC-02, Test Plan AC-02 row
+EVIDENCE: Item 6 says "`same()` compares both, so a change after observation, including a changed file count or size, reports `changed`." `execute` (branches.ts:241-249) adds a branch to `blocked` only when its `remove-worktree` returns `failed` (branches.ts:247). It then performs any approved `delete-local` that the fresh plan still proposes unchanged (branches.ts:245-246). A `delete-local` record holds only `kind`, `branch`, `oid` and `proof` (branches.ts:19), and none of these depend on the ignored list. Suppose an ignored file is added or grows between `plan` and `apply`, for example a build cache under `node_modules/` or a new file under `.tmp/`. The fresh plan then proposes a `remove-worktree` with different `ignored` counts, so the approved one gets `changed` and the worktree stays. The fresh plan still proposes the same `delete-local`, so `git update-ref -d` runs. In a scratch repository with Git 2.55.0, `git update-ref -d refs/heads/g <tip>` exited 0 while `g` was checked out in a linked worktree. Afterwards `git worktree list --porcelain` showed that worktree with `HEAD 0000000000000000000000000000000000000000` and `branch refs/heads/g`, and its `git status --porcelain` printed `A  a.txt` for every tracked file. This breaks `conventions/delivery.md:22-23` at d8f07c9: "delete only merged local branches that are not checked out in any worktree". Today this cannot happen because `remove-worktree` and `delete-local` change together. The AC-02 row's seventh case adds an untracked file, which removes both operations from the fresh plan, so it does not catch this.
+PROPOSAL: State that a `delete-local` is performed only when its branch's `remove-worktree` in the same apply ended `done` or `already-absent`; any other outcome, including `changed`, keeps the branch. Add a Test Plan case in which an ignored file is added between `plan` and `apply`, and check that both the worktree and the branch remain.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design item 3, goal, Owner summary
+EVIDENCE: The goal says a worktree with "unmerged commits is always kept", and the Owner summary says "Work that is not on the default branch or in a merged PR head is never removed." Item 3 checks only whether the current HEAD is reachable from the default branch. In a scratch repository with Git 2.55.0, I committed X on a detached linked worktree and then ran `git checkout --detach main` there. HEAD was then an ancestor of main, and `git status --porcelain --untracked-files=all --ignore-submodules=none` printed nothing. `git worktree remove` exited 0, and `git fsck --unreachable --no-reflogs` then listed X. Its only reference had been that worktree's `logs/HEAD`, which item 3 reads for age but not for commits. Today detached worktrees are never removed, so this loss is new. In Stackweaver, read-only checks found 499 and 26 reflog-only commits in the `logs/HEAD` of two detached worktrees, `runner-architecture` and `runner-kind-snapshot`. Both are kept today only because their current HEAD is unmerged.
+PROPOSAL: Keep a detached worktree whose `logs/HEAD` names a commit that no branch, remote-tracking ref or the default branch contains, with a reason, and add an AC-04 case for it. Otherwise raise it as an owner question and correct the goal and summary.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design items 2, 3 and 5, Scope, AC-08
+EVIDENCE: The plugin itself creates the kind of worktree items 2 and 3 now remove. `references/audit.md:103-105` and `references/authority.md:153-156` describe "a separately recorded clean detached assessment worktree at the freshly fetched default commit", and the run keeps "its owner, path and base in private run evidence". `references/audit.md:100-101` puts every ledger application in a new `chore/audit-ledger-<run-id>` worktree at the default commit. Such a branch has no commits of its own until something is committed. `references/authority.md:105-107` requires "Preserve evidence through source cleanup and pending reconciliation", and `references/audit.md:219` says "Cleanup cannot discard a pending resource intent". Under items 2, 3 and 5, a sweep plan removes these worktrees once they are seven days old, with no check of a pending run that owns them. This happens even under a preauthorized sweep when they hold no ignored files. The design, Scope and AC-08 never mention these owned worktrees. Stackweaver has a detached `stackweaver-audit-adoption-check` worktree, 8 days old, with HEAD on main.
+PROPOSAL: Say how worktrees owned by a pending audit or maintenance run are protected, for example by locking them or by reading the run journal, and add a criterion for it. Otherwise raise their removal as an owner question and name it in the trade-offs.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-04, Design item 1, Test Plan AC-02 and AC-04 rows
+EVIDENCE: AC-04 says a detached worktree "paused in a rebase or bisect" is kept. The AC-04 row tests only "`git rebase -i` with a `break`" and has no bisect case. A bisect started from an unmerged detached commit moves HEAD onto default-branch commits, and the original commit then lives only in `BISECT_START` and the reflog. Under the standard, "A passing subset never upgrades a composite criterion". Design item 1 adds two fail-closed rules: "When either status command exits non-zero or times out, the worktree is kept" and "A path the walk cannot read keeps the worktree with a reason". No criterion or Test Plan row covers either rule. Today `Checkout.git` with `allowFailure` returns `""` for a failure (branches.ts:73-76), which reads as clean, so an implementation could keep that behaviour and still meet every criterion.
+PROPOSAL: Add a detached bisect fixture to the AC-04 row. Add the status-failure and unreadable-path keeps to AC-02 with fixtures, for example a `run` stub that fails `git status` and an ignored directory without read permission.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design item 1, AC-02
+EVIDENCE: Item 1 and AC-02 keep "a worktree with an initialized submodule". In a scratch repository with Git 2.55.0, I added a submodule in a linked worktree, initialized it and then ran `git submodule deinit -f`. `git submodule status` printed `-<oid> s`, which means not initialized, and the status check printed nothing. `git worktree remove` still exited 128 with `fatal: working trees containing submodules cannot be moved or removed`, because the worktree's admin directory still held `modules/`. Such a worktree would be proposed in every plan and fail on every apply, the same pattern as R-3 F-02.
+PROPOSAL: Also keep a worktree when its admin directory contains `modules/`, and describe the blocker as submodule state rather than an initialized submodule.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-09 row
+EVIDENCE: The row says "check items 1 to 4 independently with `git status --porcelain --untracked-files=all --ignore-submodules=none`, `git merge-base --is-ancestor`, the merged PR head, the reflog and the commit date". Items 1 to 4 also keep worktrees for other reasons: a nested worktree or `.git` under an ignored path, submodule state, rebase or bisect state in the admin directory, and the main, invoking or locked worktree. The procedure names no check for any of them. Stackweaver's linked worktrees sit under ignored `.claude/` and `.tmp/` directories, so the nested case is the most likely one there.
+PROPOSAL: List the remaining independent checks in the AC-09 procedure: worktree containment from `git worktree list`, a search for `.git` under ignored paths, admin-directory state files, and the locked, main and invoking flags.
