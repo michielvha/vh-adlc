@@ -509,6 +509,7 @@ None.
 | 2026-11-12 | R-14 | spec | `703eeb294056f8f59f940ab041c83f96e645bda6` | unknown | procedural | One judgement nit and one factual nit; the reviewer did not report its model. |
 | 2026-11-12 | R-15 | spec | `bd8119770007c1db212d95a16a243a9c5c3ca99d` | unknown | procedural | One factual should-fix, one judgement nit and one factual nit; the reviewer did not report its model. |
 | 2026-11-12 | R-16 | spec | `6e6ee5b2a7db567416f541c91ec15512e5ec6dd2` | claude-opus-4.8 | procedural | One should-fix and one nit finding; model self-reported, no model was requested. |
+| 2026-11-12 | R-17 | spec | `3d2898240ace68bc33171a21b2291f732484e34c` | unknown | procedural | One nit finding; the reviewer did not report its model. |
 
 ### R-1
 
@@ -1073,3 +1074,18 @@ SEVERITY: nit
 WHERE: Design, Glossary subsection
 EVIDENCE: The R-15 fix added `### Glossary` (line 361) after item 6. The paragraph "Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives were:" and its list (lines 369 to 388) come after it, so the rejected design alternatives now sit under the Glossary heading instead of under Design.
 PROPOSAL: Move the Glossary subsection after the rejected-alternatives list, or put that paragraph and list back above the Glossary heading.
+
+### R-17
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Owner summary trade-offs ("A detached worktree that was rebased or used for experiments keeps its old commits in its HEAD reflog, so it stays until the owner removes it by hand"), Owner summary decisions ("A detached worktree's age comes from its own HEAD reflog, so it measures creation, not last use") and Design item 3 ("Its age is the oldest entry, which records its creation").
+EVIDENCE: Git 2.55.0 runs `git reflog expire --all` from the main worktree during `git gc` and auto-gc, and that command also expires each linked worktree's HEAD reflog. Unreachable entries expire after gc.reflogExpireUnreachable, which defaults to 30 days.
+
+In a scratch repository I committed X on a detached linked worktree and then ran `checkout --detach main` there. I then ran `git reflog expire --all --expire-unreachable=now` from the main worktree. Only HEAD@{0} remained, and the item 3 guard `git rev-list <reflog oids> --not --branches` printed 0. With entries dated 40 days back, plain `git gc` emptied the linked worktree's HEAD reflog.
+
+With default settings, `git reflog expire --all --dry-run --verbose` also marked entries 31 to 60 days old as "would prune" even though their commits are on main. Entries 5 and 20 days old were kept.
+
+So the reflog guard protects reflog-only commits only until gc expires them, and the next sweep then removes the worktree. Git, not the helper, loses those commits. After expiry the oldest remaining entry no longer records creation. That errs toward keeping, so it is not a safety problem, but the summary's "stays until the owner removes it by hand" and "measures creation" are not true over time.
+PROPOSAL: In the trade-offs, say such a worktree is kept until Git's reflog expiry drops those entries, about 30 days by default, and is then treated like any other detached worktree. In the decisions bullet and in item 3, say the oldest entry records creation only until gc expires it, after which the age comes from the remaining entries or, when none remain, the HEAD commit's date.
