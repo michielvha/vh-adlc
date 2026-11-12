@@ -460,6 +460,7 @@ None.
 | 2026-11-12 | R-9 | spec | `3167ec932ea73aa067937ffa722ccf900760d77d` | unknown | procedural | One should-fix and four nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-10 | spec | `298022d4283735c05526ec05c585961fdaf0604a` | unknown | procedural | One blocking, one should-fix and two nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-11 | spec | `8e1cf1f59d076e250cbd128e9ea6df95bf749e9b` | unknown | procedural | One factual should-fix, one judgement should-fix and two nit findings; the reviewer did not report its model. |
+| 2026-11-12 | R-12 | spec | `a0e8e8114909c19a61019ae389f6d6cf533ba88d` | unknown | procedural | One judgement should-fix, one factual nit and two further nit findings; the reviewer did not report its model. |
 
 ### R-1
 
@@ -916,3 +917,33 @@ SEVERITY: nit
 WHERE: Design item 2, Owner summary trade-offs, Open Questions
 EVIDENCE: `skills/vh-adlc-implement/SKILL.md:69-72` creates the feature branch "at the claim commit", which is pushed to the default branch (step 5). So every vh-adlc feature branch starts on the default branch's first-parent history and has no commits of its own until its first task commit. Under item 2, if implementation stalls for seven days after the claim in a clean linked owning worktree, a sweep deletes the branch and the worktree. A preauthorized sweep does this without stopping when the worktree holds no ignored files. The document still says `status: in-progress` and names that `branch`. The implement skill can recover by recreating the branch at the claim commit (lines 79-80), but it then asks the owner for a new worktree. The trade-offs name "a branch kept on purpose as a bookmark", not the plugin's own claimed feature branches.
 PROPOSAL: Name this case in the Owner summary trade-offs, or raise as an owner question whether to keep a branch that an `in-progress` feature document names in its `branch` field.
+
+### R-12
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (admin directory paragraph before item 1), AC-03, AC-04, AC-05, AC-07, AC-09, Test Plan AC-04 and AC-09 rows
+EVIDENCE: The R-11 fix adds a keep rule to the Design preamble, not to a numbered item: "When no directory or more than one matches, the entry is kept with a reason". No criterion states this rule. AC-03 and AC-07 refer to "a rule in Design items 1 to 5", and AC-09 refers to worktrees that "meet items 1 to 4". AC-05 says a missing-directory entry "on a proven-merged branch ... is removed from `git worktree list` by an applied plan" and lists its exceptions, but the ambiguous admin directory is not one of them. Only the AC-04 row tests the rule, with two detached entries. AC-04's own text says nothing about it. No row covers a branch entry or the "no directory matches" case. The AC-09 procedure has no step that checks admin-directory uniqueness. In a scratch repository with Git 2.55.0, I created detached `p1/w` and `p2/w`, deleted `p2/w`, and copied `worktrees/w1/gitdir` over `worktrees/w/gitdir`. `git worktree list --porcelain` then printed two `prunable` entries with the same path `.../p2/w`, while the directory `p1/w`, whose `.git` points to `worktrees/w`, still existed. The rule therefore protects a present checkout's admin directory, and an implementation that omits it would still meet every criterion as worded.
+PROPOSAL: Move the rule into a numbered Design item, for example item 1 or 4, so that "items 1 to 5" and "items 1 to 4" include it. Name it in AC-05 (or AC-04) and add an admin-directory uniqueness step to the AC-09 procedure. Add a row case with a branch entry, or narrow the criterion to detached entries.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (admin directory paragraph before item 1)
+EVIDENCE: The paragraph says "For a present entry the admin directory is `git -C <path> rev-parse --absolute-git-dir`" and ends "so no check reads another worktree's state". That command follows whatever `<path>/.git` names and does not check that it points back. In a scratch repository with Git 2.55.0, I created detached worktrees `p1/w` (admin `w`) and `p2/w` (admin `w1`), then ran `rm -rf p1/w` and `mv p2/w p1/w`. `git worktree list --porcelain` listed `p1/w` as present, using admin `w`'s HEAD, and `p2/w` as `prunable`. `git -C p1/w rev-parse --absolute-git-dir` printed `.git/worktrees/w1`. That is the same admin directory the gitdir match gives for the `prunable` `p2/w`, so both entries read `w1`, and `w`'s reflog, `refs/worktree/` and state files are never read. `git worktree remove ../p1/w` then exited 128 with `validation failed ... does not point back to '.git/worktrees/w'`. Such an entry can be proposed in every plan and fail on every apply. Commits are not lost, but the stated guarantee does not hold.
+PROPOSAL: For a present entry, accept the `rev-parse` result only when that admin directory's `gitdir` file names `<path>/.git`. Otherwise keep the entry with the same reason as the ambiguous case.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design item 6, AC-09
+EVIDENCE: Item 6 says "Every linked worktree in scope then appears either as a `remove-worktree` or as one such record". Branch worktrees are classified in the local-branch loop, which skips the default branch (`branches.ts:187`, `if (branch === defaultBranch ...) continue`) and covers only refs from `refs/heads/`. In a scratch repository with Git 2.55.0, `git worktree add --orphan -b o ../o` listed `HEAD 0000000000000000000000000000000000000000` and `branch refs/heads/o`, and `git for-each-ref refs/heads/` did not list `o`. The Design does not say what record a linked worktree gets when it has the default branch or an unborn branch checked out, so an implementation built on that loop would silently omit both. In Stackweaver only the main worktree has `main` checked out, and no entry has HEAD `0000...`, so AC-09 is not affected there.
+PROPOSAL: State that a linked worktree with the default branch or an unborn branch checked out gets a `worktree` kept record with a reason, or say that such worktrees are out of scope.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Owner summary, trade-offs paragraph
+EVIDENCE: The summary says "the implement skill recreates the branch at the claim commit, in a new worktree". `skills/vh-adlc-implement/SKILL.md` claim step 6 says that when no suitable worktree is available, "report the owner action needed (a worktree for the branch) and stop; never create, move or reset a worktree yourself". The re-enter step only says "create the branch at that exact claim commit". The skill recreates the branch, but the owner has to provide the worktree.
+PROPOSAL: Say that the implement skill recreates the branch at the claim commit and asks the owner for a worktree to continue in.
