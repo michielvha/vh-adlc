@@ -442,11 +442,15 @@ func runPwsh(dir string) int {
 
 // forward serves -L. A client key reaches the fake daemon on the server;
 // otherwise it proxies to the fake app's DevTools listener for the remote
-// port.
+// port. A forward-refused marker on the host makes the operator's forward
+// fail.
 func forward(dir string, key *keyLine, spec string) int {
 	parts := strings.Split(spec, ":")
 	if len(parts) != 4 {
 		return fail(255, "testenv: unsupported forward %q", spec)
+	}
+	if _, refused := marker(dir, "forward-refused"); refused && key == nil {
+		return fail(255, "ssh: connect to host %s port 22: Connection refused", filepath.Base(dir))
 	}
 	target := net.JoinHostPort(parts[2], parts[3])
 	allowed, daemon := opens(dir, key, target)

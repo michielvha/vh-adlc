@@ -29,6 +29,7 @@ const (
 // marker, and serves DevTools while it runs with --remote-debugging-port.
 type fakeApp struct {
 	appPath string
+	client  *testenv.Host
 
 	mu sync.Mutex
 	// committed is local storage on disk; live is the running page's copy.
@@ -45,12 +46,40 @@ type fakeApp struct {
 	lastWrite   time.Time
 	// stuck makes the app ignore a graceful quit while it is debuggable.
 	stuck bool
+	// stuckHung makes the app ignore a graceful quit while its window is
+	// lost.
+	stuckHung bool
 	// reject makes the page drop the whole registry on reload when it
 	// returns true for an entry, as the app's strict schema does.
-	reject   func(map[string]any) bool
-	events   []event
-	launches [][]string
+	reject func(map[string]any) bool
+	// onReload runs after each reload has applied the schema, with the
+	// number of the reload counted from 1, and may change live.
+	onReload func(n int)
+	// onQuit runs when the app quits gracefully, before it flushes.
+	onQuit func()
+	// loseReloads loses the window after that many next reloads: the page
+	// stops answering while the app keeps running.
+	loseReloads int
+	// exitReloads makes the app exit by itself after that many next
+	// reloads, keeping only the writes a kill keeps.
+	exitReloads int
+	// earlyExits makes that many next debug launches exit before the page
+	// answers.
+	earlyExits int
+	// deafLaunches makes that many next debug launches run with a page
+	// that never answers.
+	deafLaunches int
+	hung, deaf   bool
+	reloads      int
+	// regWrites holds every value the page wrote to the registry key, with
+	// removed for a removeItem.
+	regWrites []string
+	events    []event
+	launches  [][]string
+	launchAt  []time.Time
 }
+
+const removed = "<removed>"
 
 type event struct {
 	at   time.Time
@@ -62,6 +91,7 @@ func newFakeApp(t *testing.T, client *testenv.Host, registry string) *fakeApp {
 	client.Write("Applications/Paseo.app/Contents/MacOS/Paseo", "", 0o755)
 	a := &fakeApp{
 		appPath:     client.Path("Applications/Paseo.app"),
+		client:      client,
 		committed:   map[string]string{clientIDKey: "cid_test"},
 		commitDelay: 100 * time.Millisecond,
 		pid:         4000,
@@ -76,7 +106,7 @@ func newFakeApp(t *testing.T, client *testenv.Host, registry string) *fakeApp {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 		a.event("quit")
-		if a.running && (!a.stuck || a.debugPort == "") {
+		if a.running && !a.ignoresQuit() {
 			a.stop(true)
 		}
 	})
@@ -149,18 +179,38 @@ func (a *fakeApp) launch(args []string) {
 	a.pid++
 	a.live = maps.Clone(a.committed)
 	a.launches = append(a.launches, args)
+	a.launchAt = append(a.launchAt, time.Now())
+	a.hung, a.deaf = false, false
 	a.event("launch")
 	for _, arg := range args {
 		if p, ok := strings.CutPrefix(arg, "--remote-debugging-port="); ok {
+			if a.earlyExits > 0 {
+				a.earlyExits--
+				a.running = false
+				a.event("early exit")
+				return
+			}
+			if a.deafLaunches > 0 {
+				a.deafLaunches--
+				a.deaf = true
+			}
 			a.debugPort = p
 			a.devtools = a.serveDevTools(p)
 		}
 	}
 }
 
+// ignoresQuit reports whether the app ignores a graceful quit now.
+func (a *fakeApp) ignoresQuit() bool {
+	return a.debugPort != "" && (a.stuck || a.stuckHung && a.hung)
+}
+
 // stop ends the app. A graceful stop flushes every write; a kill keeps
 // only writes older than the commit delay.
 func (a *fakeApp) stop(graceful bool) {
+	if graceful && a.onQuit != nil {
+		a.onQuit()
+	}
 	if graceful || time.Since(a.lastWrite) >= a.commitDelay {
 		a.committed = maps.Clone(a.live)
 	}
@@ -239,7 +289,7 @@ func (a *fakeApp) handleSignal(w http.ResponseWriter, r *http.Request) {
 	case "KILL", "9":
 		a.stop(false)
 	case "TERM", "15":
-		if !a.stuck || a.debugPort == "" {
+		if !a.ignoresQuit() {
 			a.stop(true)
 		}
 	}
@@ -251,6 +301,13 @@ func (a *fakeApp) serveDevTools(port string) *httptest.Server {
 		_, _ = fmt.Fprint(w, `{"Browser":"Paseo/0.15.3"}`)
 	})
 	mux.HandleFunc("GET /json/list", func(w http.ResponseWriter, _ *http.Request) {
+		a.mu.Lock()
+		lost := a.hung || a.deaf
+		a.mu.Unlock()
+		if lost {
+			_, _ = fmt.Fprint(w, "[]")
+			return
+		}
 		_, _ = fmt.Fprintf(w, `[{"id":"2","type":"page","url":"about:blank","webSocketDebuggerUrl":"ws://127.0.0.1:%[1]s/devtools/page/2"},`+
 			`{"id":"1","type":"page","url":"app://paseo/","webSocketDebuggerUrl":"ws://127.0.0.1:%[1]s/devtools/page/1"}]`, port)
 	})
@@ -298,6 +355,9 @@ func (a *fakeApp) handlePage(w http.ResponseWriter, r *http.Request) {
 func (a *fakeApp) dispatch(appPage bool, method, expr string) any {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	if a.hung || a.deaf {
+		return map[string]any{"result": map[string]any{"type": "undefined"}, "exceptionDetails": map[string]any{"text": "the page does not answer"}}
+	}
 	switch method {
 	case "Page.reload":
 		if appPage {
@@ -310,7 +370,7 @@ func (a *fakeApp) dispatch(appPage bool, method, expr string) any {
 	}
 	if expr == "window.close()" {
 		a.event("window.close")
-		if !a.stuck {
+		if !a.ignoresQuit() {
 			go func() {
 				a.mu.Lock()
 				defer a.mu.Unlock()
@@ -338,8 +398,14 @@ func (a *fakeApp) dispatch(appPage bool, method, expr string) any {
 		return value(nil)
 	case m[1] == "setItem" && len(args) == 2 && appPage:
 		store[args[0]] = args[1]
+		if args[0] == registryKey {
+			a.regWrites = append(a.regWrites, args[1])
+		}
 	case m[1] == "removeItem" && len(args) == 1 && appPage:
 		delete(store, args[0])
+		if args[0] == registryKey {
+			a.regWrites = append(a.regWrites, removed)
+		}
 	default:
 		return map[string]any{"result": map[string]any{"type": "undefined"}, "exceptionDetails": map[string]any{"text": "bad call: " + expr}}
 	}
@@ -360,11 +426,35 @@ var (
 	connKeys = []string{"id", "type", "host", "sshPort", "daemonPort", "endpoint", "useTls"}
 )
 
-// reload applies the app's strict schema: one invalid entry drops the
-// whole registry. Remote SSH connections are rewritten in the app's
-// normalized form.
+// reload applies the app's strict schema, runs onReload, and then loses
+// the window or exits as loseReloads and exitReloads ask.
 func (a *fakeApp) reload() {
+	a.reloads++
 	a.event("reload")
+	a.applySchema()
+	if a.onReload != nil {
+		before, had := a.live[registryKey]
+		a.onReload(a.reloads)
+		if after, has := a.live[registryKey]; has != had || after != before {
+			a.lastWrite = time.Now()
+		}
+	}
+	if a.loseReloads > 0 {
+		a.loseReloads--
+		a.hung = true
+		a.event("window lost")
+	}
+	if a.exitReloads > 0 {
+		a.exitReloads--
+		a.event("exits by itself")
+		a.stop(false)
+	}
+}
+
+// applySchema applies the app's strict schema: one invalid entry drops the
+// whole registry. Remote SSH connections are rewritten in the app's
+// normalized form, and a preferred connection id follows its connection.
+func (a *fakeApp) applySchema() {
 	raw, ok := a.live[registryKey]
 	if !ok {
 		return
@@ -384,8 +474,12 @@ func (a *fakeApp) reload() {
 			for k := range m {
 				valid = valid && slices.Contains(connKeys, k)
 			}
+			old := m["id"]
 			if m["type"] == "remoteSsh" && normalize(m) {
 				changed = true
+				if h["preferredConnectionId"] == old {
+					h["preferredConnectionId"] = m["id"]
+				}
 			}
 		}
 	}
@@ -443,4 +537,65 @@ func (a *fakeApp) state() (bool, string, []string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.running, a.debugPort, a.launches[len(a.launches)-1]
+}
+
+// debugLaunches returns the times of the launches with a debugging port.
+func (a *fakeApp) debugLaunches() []time.Time {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var at []time.Time
+	for i, args := range a.launches {
+		if slices.ContainsFunc(args, func(s string) bool { return strings.HasPrefix(s, "--remote-debugging-port=") }) {
+			at = append(at, a.launchAt[i])
+		}
+	}
+	return at
+}
+
+// writesOf counts the registry writes whose value contains s.
+func (a *fakeApp) writesOf(s string) int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	n := 0
+	for _, v := range a.regWrites {
+		if strings.Contains(v, s) {
+			n++
+		}
+	}
+	return n
+}
+
+// writesEqual counts the registry writes of exactly v.
+func (a *fakeApp) writesEqual(v string) int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	n := 0
+	for _, w := range a.regWrites {
+		if w == v {
+			n++
+		}
+	}
+	return n
+}
+
+// happened reports whether an event of kind came between from and to.
+func (a *fakeApp) happened(kind string, from, to time.Time) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return slices.ContainsFunc(a.events, func(e event) bool { return e.kind == kind && e.at.After(from) && e.at.Before(to) })
+}
+
+// hasTunnel reports whether the running app has a tunnel to host.
+func (a *fakeApp) hasTunnel(host string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.running && a.debugPort == "" && slices.ContainsFunc(a.tunnels(), func(s string) bool { return strings.HasSuffix(s, " "+host) })
+}
+
+// calm ends every fault, so a following command runs against a normal app.
+func (a *fakeApp) calm() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.stuck, a.stuckHung, a.reject, a.onReload, a.onQuit = false, false, nil, nil, nil
+	a.loseReloads, a.exitReloads, a.earlyExits, a.deafLaunches = 0, 0, 0, 0
 }

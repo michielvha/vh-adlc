@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -22,13 +23,15 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	if clientapp.CommitDelay != 8*time.Second || clientapp.QuitTimeout != 20*time.Second || clientapp.TunnelTimeout != 30*time.Second {
+	if clientapp.CommitDelay != 8*time.Second || clientapp.QuitTimeout != 20*time.Second || clientapp.TunnelTimeout != 30*time.Second ||
+		clientapp.LaunchTimeout != 60*time.Second {
 		panic("clientapp waits differ from the Design")
 	}
 	clientapp.CommitDelay = 300 * time.Millisecond
 	clientapp.QuitTimeout = 500 * time.Millisecond
 	clientapp.SettleDelay = 50 * time.Millisecond
 	clientapp.TunnelTimeout = 3 * time.Second
+	clientapp.LaunchTimeout = time.Second
 	testenv.Main(m)
 }
 
@@ -241,6 +244,429 @@ func TestForceStop(t *testing.T) {
 		if got := w.app.stored(); got != "["+otherHost+"]" {
 			t.Fatalf("registry %s", got)
 		}
+		w.check(t)
+	})
+}
+
+// quitFloor is the quit-and-wait floor the tests use in place of the
+// Design's 3 seconds.
+const quitFloor = 200 * time.Millisecond
+
+// longCommit is a commit delay longer than the CLI waits, so a force-stop
+// or an app that exits by itself loses every write since its launch.
+const longCommit = time.Minute
+
+// srvHost is the server's entry as an earlier link left it.
+var srvHost = strings.Replace(staleHost, `"host":"old"`, `"host":"paseo-srv"`, 1)
+
+var keptCopyRE = regexp.MustCompile(`app-registry-mac\.\d{8}T\d{6}Z\.backup\.json`)
+
+func (w *world) add() error { return w.ca.Add(context.Background(), w.client(), w.entry, w.pw) }
+
+func (w *world) del() error { return w.ca.Delete(context.Background(), w.client(), "srv", "") }
+
+func rejectSrv(h map[string]any) bool { return h["serverId"] == "srv_srv" }
+
+func mustFail(t *testing.T, err error) {
+	t.Helper()
+	if err == nil || report.Code(err) == report.ExitOK {
+		t.Fatalf("err = %v, want a non-zero exit", err)
+	}
+}
+
+func mustExit1(t *testing.T, err error) {
+	t.Helper()
+	if report.Code(err) != report.ExitFailed {
+		t.Fatalf("err = %v (code %d), want exit 1", err, report.Code(err))
+	}
+}
+
+// restoredTo checks the registry the relaunched app keeps.
+func (w *world) restoredTo(t *testing.T, want string) {
+	t.Helper()
+	if got := w.app.stored(); got != want {
+		t.Fatalf("registry after the command %s, want %s", got, want)
+	}
+}
+
+// linked checks the entry in the relaunched app and its tunnel.
+func (w *world) linked(t *testing.T) {
+	t.Helper()
+	if !strings.Contains(w.app.stored(), `"serverId":"srv_srv"`) {
+		t.Fatalf("registry %s lacks the entry", w.app.stored())
+	}
+	if !w.app.hasTunnel("paseo-srv") {
+		t.Fatal("the app has no tunnel to paseo-srv")
+	}
+}
+
+// debugLaunches checks the number of debug launches, at least n, and
+// that consecutive ones are at least the quit-and-wait floor apart.
+func (w *world) debugLaunches(t *testing.T, n int, exact bool) {
+	t.Helper()
+	at := w.app.debugLaunches()
+	if len(at) < n || exact && len(at) != n {
+		t.Fatalf("%d debug launches, want %d; events %q", len(at), n, w.app.kinds())
+	}
+	for i := 1; i < len(at); i++ {
+		if gap := at[i].Sub(at[i-1]); gap < quitFloor {
+			t.Fatalf("debug launch %d came %v after the one before, want at least %v", i+1, gap, quitFloor)
+		}
+	}
+}
+
+// keptCopy checks that err names a kept copy holding want, mode 600, and
+// returns its path.
+func (w *world) keptCopy(t *testing.T, err error, want string) string {
+	t.Helper()
+	name := keptCopyRE.FindString(err.Error())
+	if name == "" {
+		t.Fatalf("error %q names no kept copy", err)
+	}
+	path := filepath.Join(w.cfg.Dir, name)
+	if !strings.Contains(err.Error(), path) {
+		t.Fatalf("error %q does not name %s", err, path)
+	}
+	info, serr := os.Stat(path)
+	if serr != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("kept copy: %v %v", info, serr)
+	}
+	if data, _ := os.ReadFile(path); string(data) != want {
+		t.Fatalf("kept copy holds %s, want %s", data, want)
+	}
+	return path
+}
+
+func (w *world) noKeptCopy(t *testing.T) {
+	t.Helper()
+	if m, _ := filepath.Glob(filepath.Join(w.cfg.Dir, "app-registry-mac.*.backup.json")); len(m) > 0 {
+		t.Fatalf("kept copies %q", m)
+	}
+}
+
+// keepsCopyThroughLink runs a following link against a normal app and
+// checks that it leaves the kept copy unchanged.
+func (w *world) keepsCopyThroughLink(t *testing.T, path string) {
+	t.Helper()
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.app.calm()
+	if err := w.add(); err != nil {
+		t.Fatalf("following link: %v\n%s", err, w.out)
+	}
+	if after, _ := os.ReadFile(path); !bytes.Equal(after, before) {
+		t.Fatalf("the following link changed the kept copy to %s", after)
+	}
+}
+
+func TestRollbackAfterLostWindows(t *testing.T) {
+	before := "[" + otherHost + "]"
+	for _, tc := range []struct {
+		name string
+		lose int
+	}{{"page stops answering once after a reload", 1}, {"page stops answering after two reloads", 2}} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorld(t, 6767, before)
+			w.app.reject = rejectSrv
+			w.app.loseReloads = tc.lose
+			mustFail(t, w.add())
+			w.restoredTo(t, before)
+			w.check(t)
+		})
+	}
+}
+
+func TestRestoreIsReadBack(t *testing.T) {
+	before := "[" + otherHost + "]"
+	w := newWorld(t, 6767, before)
+	w.app.reject = rejectSrv
+	deleted := false
+	w.app.onReload = func(int) {
+		if !deleted && w.app.live[registryKey] == before {
+			delete(w.app.live, registryKey)
+			deleted = true
+		}
+	}
+	mustFail(t, w.add())
+	w.restoredTo(t, before)
+	w.check(t)
+}
+
+func TestUnlinkRejectedOnceIsCheckedAfterARestart(t *testing.T) {
+	before := "[" + otherHost + "," + srvHost + "]"
+	w := newWorld(t, 6767, before)
+	w.app.onReload = func(n int) {
+		if n == 1 {
+			w.app.live[registryKey] = before
+		}
+	}
+	mustFail(t, w.del())
+	w.restoredTo(t, before)
+	w.debugLaunches(t, 2, false)
+	w.check(t)
+}
+
+func TestRestoreMissingAfterARestartIsRestoredAgain(t *testing.T) {
+	before := "[" + otherHost + "]"
+	w := newWorld(t, 6767, before)
+	w.app.reject = rejectSrv
+	deleted := false
+	w.app.onQuit = func() {
+		if !deleted && w.app.debugPort != "" {
+			delete(w.app.live, registryKey)
+			deleted = true
+		}
+	}
+	mustFail(t, w.add())
+	w.restoredTo(t, before)
+	w.debugLaunches(t, 3, false)
+	if n := w.app.writesEqual(before); n < 2 {
+		t.Fatalf("%d restores, want one in the session and one in the check after the restart", n)
+	}
+	w.check(t)
+}
+
+func TestDebugLaunchAttempts(t *testing.T) {
+	t.Run("the first attempt exits early", func(t *testing.T) {
+		w := newWorld(t, 6767, "["+otherHost+"]")
+		w.app.earlyExits = 1
+		if err := w.add(); err != nil {
+			t.Fatalf("Add: %v\n%s", err, w.out)
+		}
+		w.linked(t)
+		w.debugLaunches(t, 2, true)
+		w.check(t)
+	})
+	t.Run("all three attempts exit early", func(t *testing.T) {
+		before := "[" + otherHost + "]"
+		w := newWorld(t, 6767, before)
+		w.app.earlyExits = 3
+		mustExit1(t, w.add())
+		w.restoredTo(t, before)
+		w.debugLaunches(t, 3, true)
+		w.check(t)
+	})
+	t.Run("the first page does not answer", func(t *testing.T) {
+		w := newWorld(t, 6767, "["+otherHost+"]")
+		w.app.deafLaunches = 1
+		if err := w.add(); err != nil {
+			t.Fatalf("Add: %v\n%s", err, w.out)
+		}
+		w.linked(t)
+		w.debugLaunches(t, 2, true)
+		at := w.app.debugLaunches()
+		if !w.app.happened("quit", at[0], at[1]) {
+			t.Fatalf("no quit after the first attempt: %q", w.app.kinds())
+		}
+		w.check(t)
+	})
+}
+
+func TestNormalizedRestoreIsConfirmed(t *testing.T) {
+	legacy := `{"serverId":"srv_x","label":"x","password":"x-secret","lifecycle":{},` +
+		`"connections":[{"id":"legacy-x","type":"remoteSsh","host":"paseo-x","daemonPort":6767}],"preferredConnectionId":"legacy-x",` +
+		`"createdAt":"2025-01-01T00:00:00.000Z","updatedAt":"2025-01-01T00:00:00.000Z"}`
+	w := newWorld(t, 6767, "["+otherHost+","+legacy+"]")
+	w.app.reject = rejectSrv
+	err := w.add()
+	mustFail(t, err)
+	if !strings.Contains(err.Error(), "restored") {
+		t.Fatalf("error %q does not say the host list is restored", err)
+	}
+	w.noKeptCopy(t)
+	w.debugLaunches(t, 2, false)
+	w.check(t)
+}
+
+func TestKeptEntryAfterALostWindow(t *testing.T) {
+	t.Run("lost once after the step 4 reload", func(t *testing.T) {
+		w := newWorld(t, 6767, "["+otherHost+"]")
+		w.app.loseReloads = 1
+		if err := w.add(); err != nil {
+			t.Fatalf("Add: %v\n%s", err, w.out)
+		}
+		w.linked(t)
+		w.debugLaunches(t, 2, false)
+		w.check(t)
+	})
+	for _, tc := range []struct {
+		name   string
+		lose   int
+		writes int
+	}{{"a force-stopped lost window loses the write", 1, 2}, {"two force-stopped lost windows lose the writes", 2, 3}} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorld(t, 6767, "["+otherHost+"]")
+			w.app.commitDelay = longCommit
+			w.app.loseReloads = tc.lose
+			w.app.stuckHung = true
+			if err := w.add(); err != nil {
+				t.Fatalf("Add: %v\n%s", err, w.out)
+			}
+			w.linked(t)
+			if n := w.app.writesOf(`"srv_srv"`); n < tc.writes {
+				t.Fatalf("%d writes of the change, want %d", n, tc.writes)
+			}
+			w.check(t)
+		})
+	}
+	t.Run("the app exits by itself after the step 4 reload", func(t *testing.T) {
+		w := newWorld(t, 6767, "["+otherHost+"]")
+		w.app.commitDelay = longCommit
+		w.app.exitReloads = 1
+		if err := w.add(); err != nil {
+			t.Fatalf("Add: %v\n%s", err, w.out)
+		}
+		w.linked(t)
+		if n := w.app.writesOf(`"srv_srv"`); n < 2 {
+			t.Fatalf("%d writes of the change, want 2", n)
+		}
+		w.check(t)
+	})
+}
+
+func TestRejectedEntryAfterTheAppExitsByItself(t *testing.T) {
+	before := "[" + otherHost + "]"
+	w := newWorld(t, 6767, before)
+	w.app.commitDelay = longCommit
+	w.app.reject = rejectSrv
+	w.app.exitReloads = 1
+	mustFail(t, w.add())
+	if n := w.app.writesOf(`"srv_srv"`); n < 2 {
+		t.Fatalf("%d writes of the change, want 2", n)
+	}
+	w.restoredTo(t, before)
+	w.check(t)
+}
+
+func TestRollbackWithAForceStop(t *testing.T) {
+	w := newWorld(t, 6767, "["+otherHost+"]")
+	w.app.commitDelay = longCommit
+	w.app.reject = rejectSrv
+	w.app.stuck = true
+	err := w.add()
+	mustExit1(t, err)
+	if !strings.Contains(err.Error(), "restored") || !strings.Contains(err.Error(), "force-stopped") {
+		t.Fatalf("error %q does not say the host list is restored and the app was force-stopped", err)
+	}
+	w.debugLaunches(t, 2, false)
+	w.noKeptCopy(t)
+	w.check(t)
+}
+
+func TestStep5ForceStopLosesTheChange(t *testing.T) {
+	w := newWorld(t, 6767, "["+otherHost+"]")
+	w.app.commitDelay = longCommit
+	w.app.stuck = true
+	err := w.add()
+	mustExit1(t, err)
+	if !strings.Contains(err.Error(), "may not have saved") {
+		t.Fatalf("error %q does not say the app may not have saved the change", err)
+	}
+	w.check(t)
+}
+
+func TestUnknownOutcomeKeepsACopy(t *testing.T) {
+	before := "[" + otherHost + "]"
+	t.Run("a third lost window during the rewrites", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.commitDelay = longCommit
+		w.app.loseReloads = 1000
+		w.app.stuckHung = true
+		err := w.add()
+		mustExit1(t, err)
+		w.keptCopy(t, err, before)
+		w.check(t)
+	})
+	t.Run("a forward refused after a lost window", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.loseReloads = 1
+		w.app.onReload = func(n int) {
+			if n == 1 {
+				w.mac.Mark("forward-refused", "")
+			}
+		}
+		err := w.add()
+		mustExit1(t, err)
+		w.keptCopy(t, err, before)
+		w.check(t)
+	})
+	t.Run("three failed attempts after a lost window", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.loseReloads = 1
+		w.app.onReload = func(n int) {
+			if n == 1 {
+				w.app.earlyExits = 3
+			}
+		}
+		err := w.add()
+		mustExit1(t, err)
+		w.keptCopy(t, err, before)
+		w.check(t)
+	})
+}
+
+func TestUnconfirmedRestoreKeepsACopy(t *testing.T) {
+	before := "[" + otherHost + "]"
+	dropRestored := func(w *world) func(int) {
+		return func(int) {
+			if w.app.live[registryKey] == before {
+				delete(w.app.live, registryKey)
+			}
+		}
+	}
+	t.Run("every restore fails", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.reject = rejectSrv
+		w.app.onReload = dropRestored(w)
+		err := w.add()
+		mustExit1(t, err)
+		path := w.keptCopy(t, err, before)
+		w.check(t)
+		w.keepsCopyThroughLink(t, path)
+		w.check(t)
+	})
+	t.Run("a third reload inside the rollback loses the window", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.reject = rejectSrv
+		w.app.onReload = dropRestored(w)
+		w.app.loseReloads = 1000
+		err := w.add()
+		mustExit1(t, err)
+		path := w.keptCopy(t, err, before)
+		w.check(t)
+		w.keepsCopyThroughLink(t, path)
+		w.check(t)
+	})
+	t.Run("unlink against a page that rejects the change and every restore", func(t *testing.T) {
+		withSrv := "[" + otherHost + "," + srvHost + "]"
+		w := newWorld(t, 6767, withSrv)
+		w.app.onReload = func(int) { w.app.live[registryKey] = "[]" }
+		err := w.del()
+		mustExit1(t, err)
+		path := w.keptCopy(t, err, withSrv)
+		w.check(t)
+		w.keepsCopyThroughLink(t, path)
+		w.check(t)
+	})
+	t.Run("an app without a host list", func(t *testing.T) {
+		w := newWorld(t, 6767, "")
+		w.app.reject = rejectSrv
+		w.app.onReload = func(int) {
+			if _, ok := w.app.live[registryKey]; !ok {
+				w.app.live[registryKey] = "[]"
+			}
+		}
+		err := w.add()
+		mustFail(t, err)
+		if !strings.Contains(err.Error(), "no host list") {
+			t.Fatalf("error %q does not say the app had no host list", err)
+		}
+		if _, serr := os.Stat(filepath.Join(w.cfg.Dir, "app-registry-mac.backup.json")); !os.IsNotExist(serr) {
+			t.Fatalf("a backup was written: %v", serr)
+		}
+		w.noKeptCopy(t)
 		w.check(t)
 	})
 }
