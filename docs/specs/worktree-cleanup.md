@@ -502,6 +502,7 @@ None.
 | 2026-11-12 | R-13 | spec | `533cb53acc4327c09be13fcd0bae9f2fe5a55ad4` | unknown | procedural | One factual should-fix, one factual nit and one judgement nit; the reviewer did not report its model. |
 | 2026-11-12 | R-14 | spec | `703eeb294056f8f59f940ab041c83f96e645bda6` | unknown | procedural | One judgement nit and one factual nit; the reviewer did not report its model. |
 | 2026-11-12 | R-15 | spec | `bd8119770007c1db212d95a16a243a9c5c3ca99d` | unknown | procedural | One factual should-fix, one judgement nit and one factual nit; the reviewer did not report its model. |
+| 2026-11-12 | R-16 | spec | `6e6ee5b2a7db567416f541c91ec15512e5ec6dd2` | claude-opus-4.8 | procedural | One should-fix and one nit finding; model self-reported, no model was requested. |
 
 ### R-1
 
@@ -1050,3 +1051,19 @@ SEVERITY: nit
 WHERE: Context Owner summary, Design item 1, AC-08, Open Questions
 EVIDENCE: feature-documents.md at d8f07c9 says "User-facing terms the feature introduces or changes appear in a glossary row and are held to it by a criterion." This feature changes what "clean" means for a worktree: "A worktree counts as clean when it has no changed tracked files and no untracked files; ignored files go with it". Today, `references/branches.md:49-52` and `docs/user-guides/workflows.md:164` ("Clean worktrees are removed only when you ask") use the term for a worktree where `git status --porcelain --ignored` prints nothing. The pinned `conventions/delivery.md:26-27` says "only when it is clean". The feature also adds the `worktree` kept record and the plan's ignored-paths list, and readers see both. The document has no glossary. AC-08 says only that the guides "describe these removal rules".
 PROPOSAL: Add a glossary with rows for "clean worktree", "ignored paths" and the `worktree` kept record. Have AC-08 check that the named guides use those meanings.
+
+### R-16
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design items 3, 4 and 6, AC-02, Test Plan AC-02 and AC-05 rows
+EVIDENCE: `worktrees()` gives a rebase or bisect worktree its branch only for entries that are not prunable. branches.ts:117 has `if (!branch && !flag("prunable"))`, and only then reads `rebase-merge/head-name`, `rebase-apply/head-name` or `BISECT_START`. Item 3 keeps a `prunable` entry that is mid-rebase. Item 6 deletes a branch "when the fresh observation showed no worktree on it". No item says that a `prunable` entry's rebase or bisect state ties it to the branch it names. I tested this in a scratch repository with Git 2.55.0. I created branch B at main~1, which is on main's first-parent history, and added worktree wt2 on B. In wt2 I started `git rebase -i` with a `break`, committed new work, and moved wt2 by hand. `git worktree list --porcelain` then showed the entry as `detached` and `prunable`, and `rebase-merge/head-name` in its admin directory still held `refs/heads/B`. In an earlier fixture of the same kind, `git branch -D B` refused with "cannot delete branch 'B' used by worktree". The helper's `git update-ref -d refs/heads/B` exited 0. After `git worktree repair` and `git rebase --continue` in the moved directory, Git printed "could not update refs/heads/B" and left the rebase stuck with the new commits on a detached HEAD. Once B is seven days old it counts as proven merged, so a plan proposes `delete-local` B while it keeps the entry. That contradicts AC-02's "`apply` never deletes a branch that is still checked out in a worktree", and it is the same "worktree on a missing branch" outcome that R-4 F-01 and R-15 F-01 closed. No fixture covers it.
+PROPOSAL: In Design item 3 or 6, say that `worktrees()` reads `rebase-merge/head-name`, `rebase-apply/head-name` and `BISECT_START` from the admin directory of `prunable` entries too, so their branch is kept with a reason. Add a fixture to the AC-02 or AC-05 row: a seven-day-old branch on main's first-parent history, mid-rebase in a worktree whose directory the test moves. Expect the branch and the entry to remain.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Glossary subsection
+EVIDENCE: The R-15 fix added `### Glossary` (line 361) after item 6. The paragraph "Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives were:" and its list (lines 369 to 388) come after it, so the rejected design alternatives now sit under the Glossary heading instead of under Design.
+PROPOSAL: Move the Glossary subsection after the rejected-alternatives list, or put that paragraph and list back above the Glossary heading.
