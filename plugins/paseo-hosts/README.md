@@ -61,7 +61,21 @@ Every command takes `--json`, which prints one object with `schema_version`, `co
 
 ## The desktop app restarts
 
-`link`, `unlink` and `remove` change the app's host list through its DevTools port, so the app on the client quits and starts again twice. With the default settings `manageBuiltInDaemon: true` and `keepRunningAfterQuit: false`, each quit stops the desktop's own built-in daemon and the agents running in it, and the app may install a downloaded update before it exits. Finish work in the built-in daemon first. The CLI does not change those settings.
+`link`, `unlink` and `remove` change the app's host list through its DevTools port, so the app on the client quits and starts again at least twice, and more after a rollback or when it stops answering. With the default settings `manageBuiltInDaemon: true` and `keepRunningAfterQuit: false`, each quit stops the desktop's own built-in daemon and the agents running in it, and the app may install a downloaded update before it exits. Finish work in the built-in daemon first. The CLI does not change those settings.
+
+Before each start the CLI waits up to 2 minutes for a downloaded app update to install. When the install takes longer, the command exits 1 and leaves the app stopped; run it again once the update has installed.
+
+Before it changes the host list, the CLI saves the app backup, `PASEO_HOSTS_DIR/app-registry-<client>.backup.json`, mode 600, passwords included. When a change fails, it writes that list back and checks it after a restart.
+
+## Restoring a kept copy
+
+When the CLI cannot confirm that the app has its previous host list again, it exits 1 and names a kept copy of the app backup, `PASEO_HOSTS_DIR/app-registry-<client>.<UTC time>.backup.json`. No command overwrites it; `unlink` and `remove` only delete the entry of the server they take away. The copy holds passwords, so never paste it into a chat or log. To put it back through the app's DevTools:
+
+1. Quit the Paseo app on the client and start it with a loopback debugging port. On macOS run `open -a Paseo --args --remote-debugging-port=9222`; on Windows, in the signed-in user's session, run `& "$env:LOCALAPPDATA\Programs\Paseo\Paseo.exe" --remote-debugging-port=9222`.
+2. On the operator host, run `ssh -N -L 9222:127.0.0.1:9222 <client>`. In a Chromium browser open `chrome://inspect`, add `localhost:9222` under Configure, and click inspect under the Paseo page.
+3. In the Console, type `localStorage.setItem('@paseo:daemon-registry', JSON.stringify(`, paste the copy's contents, type `))` and press Enter. Then run `location.reload()`.
+4. Check that the app lists its hosts, wait 10 seconds, quit the app from its menu so it saves the list, and start it again normally.
+5. Delete the copy, and stop the `ssh` forward.
 
 ## Configuration
 

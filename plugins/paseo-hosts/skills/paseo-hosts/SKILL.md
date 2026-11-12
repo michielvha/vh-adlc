@@ -20,7 +20,7 @@ A server needs Linux with OpenSSH 7.8 or later; the plugin `README.md` lists the
 
 1. Take the server's SSH alias from the request. Take the client's SSH alias from the request; when it names none and `PASEO_HOSTS_CLIENT` is unset, ask the owner for it.
 2. Run `onboard <alias> --json`. Add `--publish` only when the owner asks for phone or browser access over the tailnet.
-3. Before `link`, tell the owner that the Paseo desktop app on the client will quit and restart twice. With the app's default settings each quit also stops the desktop's built-in daemon and the agents running in it, and may install a downloaded app update.
+3. Before `link`, tell the owner that the Paseo desktop app on the client will quit and start again at least twice, and more after a rollback or when it stops answering. With the app's default settings each quit also stops the desktop's built-in daemon and the agents running in it, and may install a downloaded app update. A command waits up to 2 minutes for that install; when it takes longer, the command exits 1 and leaves the app stopped.
 4. Run `link <alias> --client <client> --json`. With `--no-app` it sets up SSH access only and leaves the app alone.
 5. Report the checks: the exposure, the daemon port, the client's platform and whether the app lists the server.
 
@@ -42,3 +42,7 @@ Confirm with the owner before `unlink` or `remove`, and give the same app restar
 Never print a password, read one into the conversation or paste one. Never read the registry's `.password` files. Run `password <alias>` only into a pipe, for example into the clipboard command the owner names. The other commands never print the password.
 
 Exit codes: 0 success, 1 a failed check or remote step, 2 usage, 3 missing configuration, 4 an unsupported client. Report a non-zero exit with the command's `data.error`.
+
+## A kept copy of the app backup
+
+When a command names a kept copy of the app backup, `PASEO_HOSTS_DIR/app-registry-<client>.<UTC time>.backup.json`, the CLI could not confirm that the app has its previous host list. Stop: report the file and the plugin `README.md` steps under "Restoring a kept copy" to the owner, and run no other command for that client. Never read the copy into the conversation; it holds passwords.
