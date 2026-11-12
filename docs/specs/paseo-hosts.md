@@ -416,6 +416,7 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
 | 2026-11-12 | R-33 | spec | `e35b672a3e3af910d117154727562cf94ed55ca1` | unknown | procedural | Three should-fix factual findings (a step 5 force-stop is outside AC-05's bound and breaks the planned case; one rewrite does not cover two force-stopped lost windows; the every-reload case and a third-loss trigger cannot happen as written) and one factual nit (the Mac measurements are not cited by command and output). Applied all four. |
 | 2026-11-12 | R-34 | spec | `9a173efdc28ce3bffd65b632df3a1279b4f1bc62` | unknown | procedural | One should-fix factual finding (an app that exits by itself after a reload gets no rewrite) and four factual nits (AC-05 lacks the forward bound, the launch floor arrives after T40, no Sources section, no Terms rows for the backup and its copy), plus one judgement nit (the summary's length). Applied the factual findings and raised Q15. |
 | 2026-11-12 | R-35 | spec | `85cb9d40735f5124edfee01d625a4be52b28ca57` | unknown | procedural | One should-fix factual finding (AC-06 reads an app that exits by itself as a quit that was not graceful, so it excludes the Mac failure) and one factual nit (the summary's AC-05 clause lacks the forward bound). Applied both. |
+| 2026-11-12 | R-36 | spec | `41f03025c0bac68f3ef33f0a395dd74768421f68` | unknown | procedural | One should-fix factual finding (the updater path and the ShipIt job name are not cited, and no live check reads the real ones) and two factual nits (AC-06 counts force-stops of an instance holding no writes; the summary's AC-06 bound predates R-35). Measured both values and applied all three. |
 
 ### R-1
 
@@ -1761,6 +1762,29 @@ SEVERITY: nit
 WHERE: Context, Owner summary, "What changed" paragraph
 EVIDENCE: This commit added "each forward opens" to AC-05's bound (line 240: "as long as each forward opens and the quit in step 5 completes gracefully within 20 seconds"). The summary (line 33) still says "AC-05 now covers an update installed on quit, debug launch attempts that fail up to twice and a window lost up to twice, as long as the quit after the write is graceful". For AC-06 it does list "each forward opens".
 PROPOSAL: If Q15 keeps the bounds in the summary, add "each forward opens" to the AC-05 clause. If Q15 option A is chosen, the new AC-05 sentence covers this.
+
+### R-36
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry, quit and wait (line 196); Test Plan, manual step 9 (line 273); Tasks, T41 and T44
+EVIDENCE: Quit and wait says "On Windows the installer is any process whose executable is under `%LOCALAPPDATA%\@getpaseodesktop-updater\`". It gives no citation. The macOS rule, "the Squirrel.Mac `ShipIt` process whose arguments name the job `sh.paseo.desktop.ShipIt`", has none either. `grep -n getpaseodesktop-updater` finds the path only at line 196, in manual step 9 and in R-24 F-03's proposal. No measurement in the document places the real Windows installer there. R-23 F-02 records only that "the installer then rewrote the install directory at 15:52:04 and left no Paseo.exe running". The Windows wait is "checked live only". Its only planned live check is step 9, which puts a stand-in `ping.exe` under that same directory. So step 9 shows that the CLI detects a process at the path it already assumes. It does not show that Paseo's real updater runs from there. If the real installer runs from somewhere else, every planned check still passes. T44 then only records "whether a real update was pending", and the R-23 Windows failure remains: `link` relaunches the app during the install, the step 6 check runs at once and passes, and the installer then leaves the app stopped.
+PROPOSAL: Cite where the updater directory comes from, for example the `updaterCacheDirName` in the installed app's `resources\app-update.yml` or a process listing taken during R-23, and cite the ShipIt job name the same way. Add a step to manual step 9 and T44 that reads that value on win-main and records that it matches the path `stop.ps1` checks.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria, AC-06 (line 241); Design, Desktop app entry, step 2 (line 190) and quit and wait
+EVIDENCE: AC-06's bound includes "each debug launch answers within three attempts" and "each quit the CLI makes after a registry write completes gracefully within 20 seconds". Step 2 says that on Windows the CLI "stops the `Paseo` process". Every later quit and wait reuses that quit. It applies when "the page has not answered after 60 seconds" on an attempt, and when an app main process "has appeared, for example because an update install started the app again". In the check after a rollback, both happen after a registry write. On Windows both are force-stops of an instance that holds none of the CLI's writes. Read literally, one failed attempt in that check on Windows takes the run outside AC-06, although the same criterion allows up to two failed attempts. AC-16 does not cover that run either, so nothing states its outcome. The force-stop does not cause the risk the bound guards against, a write lost because the app had not committed it.
+PROPOSAL: Limit the graceful-quit bound in AC-06 to quits of an app instance the CLI wrote to since its launch, which are the lost-window quit and the step 5 quit. Or state that quitting an instance that never answered, or that the CLI did not write to, does not count.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary, "What changed" paragraph (line 33)
+EVIDENCE: The summary bounds AC-06 by "each quit after a registry write is graceful, so on Windows, where a lost window is force-stopped, that path falls outside AC-06". This commit changed AC-06 to "each quit the CLI makes after a registry write" and added "or the app exits by itself after a reload". The lost-window paragraph now says an app that exits by itself "counts as a lost window", and that in that case "the quit found no process". So on Windows, a window lost because the app exited by itself is not force-stopped, and the run stays inside AC-06. The summary still describes the bound from before R-35, which R-35 F-01 found excludes the self-exit failure.
+PROPOSAL: Whatever Q15 decides about length, say "each quit the CLI makes", and limit the Windows remark to a window that stops answering while the app keeps running.
 
 ## Sources
 
