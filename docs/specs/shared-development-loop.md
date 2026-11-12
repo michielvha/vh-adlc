@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft with the owner's answers to Q1, Q3 and Q4 folded in; seven owner questions open, no review yet."
+status_description: "Draft with all ten owner answers folded in; waiting for an independent spec review."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
@@ -58,15 +58,21 @@ The owner settled three questions on 2026-11-13. Model routes live in a committe
 claimed from the session's own host worktree when it sits at the tip of the default branch, as
 Stackweaver sessions work today, and vh-adlc gains that as a shared behavior because Claude Code and
 Codex both start work in worktrees they create. Feature PRs land by merge commit with additive
-follow-ups; squash and amend stay for non-feature and bot PRs.
+follow-ups; squash and amend stay for non-feature and bot PRs. The external review route is generic:
+any CLI described by a command template. Stackweaver keeps two standing behaviors: `/implement` hands
+straight to ship under a written grant, and small non-feature fixes keep shipping through Stackweaver's
+own `/ship`. The 58 non-terminal specs move to the shared format and finished ones stay as history.
+Stackweaver adopts vh-adlc's acceptance, completion and issue rules and its document style. A consumer
+may declare extra paths that still skip CI for a feature, which needs a small revision to the central
+delivery convention in vhco-pro/docs.
 
 Shared changes ship first in a vh-adlc release. Stackweaver then adopts them through thin command
 adapters, a `.vh-adlc/loop.yaml` settings file and one project procedure, behind a parity map that fails
 if any legacy rule has no new home. Rollback is rehearsed on a disposable checkout. Active Stackweaver
-specs move to the shared format. How far that migration reaches is an owner question.
+specs move to the shared format.
 
-Nothing here is reviewed yet. Seven questions are open, among them whether the external route is
-generic, whether `/implement` keeps shipping on its own, and how far the spec migration reaches. Accepting this
+Nothing here is reviewed yet and no question is open; the next step is an independent spec review on
+the GPT route. Accepting this
 document authorizes implementation of the accepted scope on a feature branch. Publishing the vh-adlc
 release, merging either repository and retiring the native agents each still need their own approval.
 
@@ -123,11 +129,13 @@ In scope:
   claiming a feature from a host worktree at the default branch tip, a settings file and project
   procedure read by every SDD operation, repository instructions and
   declared lenses in reviews, conditional verification rungs, a declared CI trigger policy, a declared
-  post-merge watch, `**` support in `covers`, and investigation defaults (always write the document,
-  search for duplicates, verdict vocabulary).
+  post-merge watch, consumer-declared skip-CI paths, `**` support in `covers`, and investigation
+  defaults (always write the document, search for duplicates, verdict vocabulary).
+- A vhco-pro/docs revision of `conventions/delivery.md` that lets a consumer declare extra skip-eligible
+  paths, and the plugin pin bump that adopts it.
 - Stackweaver adoption: thin adapters for `/spec`, `/tasks`, `/implement`, `/ship` (feature path),
   `/investigate` and spec review; `.vh-adlc/loop.yaml`; one project procedure; a committed parity map
-  with contract tests; migration of active specs; rollback rehearsal.
+  with contract tests; migration of the 58 non-terminal specs; rollback rehearsal.
 - Roadmap row D-05 in `shared-workflow-migration.md`, pointing here.
 
 Out of scope:
@@ -137,7 +145,8 @@ Out of scope:
 - TFE compatibility and provider-fork workflows (roadmap D-04), docs drift (vh-adlc #59), docs truth.
 - Stackweaver product code, its dev-stack scripts (`agent-slot.sh`, `worktree-dev.sh`,
   `watch-merge.sh`) and its CI workflows. These are called, never changed.
-- Converting terminal Stackweaver specs, unless Q7 says otherwise.
+- Converting terminal Stackweaver specs (complete, abandoned, superseded, archived).
+- A shared non-feature delivery. Stackweaver's own `/ship` keeps that path.
 - Codex and Copilot as authoring hosts for Stackweaver. The external route covers reviews only.
 
 ## Design
@@ -190,7 +199,9 @@ spec_reviewer:
 
 The operation writes the canonical reviewer instructions, document path, exact commit, kind, docs
 revision, binary path and plugin pin into a prompt file, runs the command from the owning worktree with
-no worktree creation, and reads the reply. The reply must open with `MODEL:`, then carry records in the
+no worktree creation, and reads the reply. The route is generic: `argv` is any command with
+`{model}` and `{prompt_file}` placeholders, so Copilot, Codex or another CLI needs only settings. A
+command that is not given a read-only tool restriction is recorded with `procedural` isolation. The reply must open with `MODEL:`, then carry records in the
 standard's format. The same requested-model rule applies: a missing, mismatched or `unknown` model, a
 non-zero exit or a timeout leaves the review pending, writes no Review Log row, and puts the raw reply
 and the command's exit status in the handoff. Records are stored byte for byte and pass
@@ -248,13 +259,23 @@ a run or suggesting a dispatch. A declared `post_merge_watch` command (Stackweav
 matching the delivery convention's rule that a feature is delivered once every release path has
 published.
 
+### Skip-CI paths
+
+A consumer may declare `skip_ci_paths` in `loop.yaml`. A feature delivery then carries the skip marker
+when its commit, outgoing push range and PR diff change only feature documents, Markdown onboarding
+files or declared paths; any other change still runs normal CI. Stackweaver declares its tooling paths
+(`agents/`, `.claude/`, `.githooks/`, dev-only `scripts/`, `CLAUDE.md`), and never code, `deploy/`,
+workflows, dependency manifests or public `docs/`. The pinned delivery convention forbids this today
+(`conventions/delivery.md:90-94`), so the shared change starts with a revision of that page in
+vhco-pro/docs and a plugin pin bump.
+
 ### Investigation defaults
 
 A `findings_document: always` setting makes invoking investigate the request to write the document,
 in the consumer's declared analysis home. Investigate also searches existing analysis documents and
 open issues for duplicates before writing, states that conclusions come from primary sources read in
 the run, and ends with one verdict: act now, track with named flip conditions, or reject. Issue filing
-keeps vh-adlc's authority rule (Q8).
+keeps vh-adlc's authority rule: only on request or as part of acceptance.
 
 ### `covers` globs
 
@@ -268,10 +289,16 @@ Stackweaver's adapters forward each command to the installed operation with `loo
 `model:` frontmatter that settings require, and keep the arguments users type today. A new
 `agents/loop-project.md` holds the local rules: worktree slots, the verification ladder, the
 direct-to-main policy and `[skip ci]` rules for non-feature work, satellite rules, `lessons.md`
-recording, the docs index rebuild and plan categories under `docs/internal/plans/`. A committed parity
+recording, the docs index rebuild and plan categories under `docs/internal/plans/`. The same file
+holds the standing grant that lets implement hand straight to ship, and keeps Stackweaver's `/ship`
+for non-feature changes. Stackweaver specs adopt the shared document style (an owner summary under
+Context, `issue: null`, full issue URLs, `AC-01` IDs, `file:line` citations in Design), while its other
+internal docs keep the symbol-name rule. `/spec review` no longer moves a spec to `planned` by itself,
+and `/spec` and `/investigate` file issues only on request or with acceptance. A committed parity
 map, shaped like `tests/agent-audit/parity.json`, lists each legacy behavior with its legacy source
-excerpt hash, its new home and a contract test; a legacy rule with no row fails the test. Active specs
-move to the shared format in one migration. The native agent files are retired only after the
+excerpt hash, its new home and a contract test; a legacy rule with no row fails the test. The 58 specs
+under `docs/internal/plans/` with a non-terminal status (draft, planned, in-progress, blocked or parked)
+move to the shared format in one migration; terminal specs stay as written. The native agent files are retired only after the
 published plugin is installed from the marketplace and exercised, and a rollback to them is rehearsed.
 
 ### Conflicts and their homes
@@ -280,13 +307,13 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | --- | --- |
 | Worktree model | Claim from a host worktree, shared (owner, Q3) |
 | Squash, amend and force-push on feature PRs | Merge commits for features (owner, Q4) |
-| `/implement` pushes and opens the PR | Q5 |
-| Non-feature and direct-to-main shipping | Q6 |
-| `AC1`, Test Plan and Review Log formats in existing specs | Q7 |
-| Status flip without owner acceptance; `complete` versus delivered | Q8 |
-| Issue filing during `/spec` and `/investigate` | Q8 |
-| Owner summary placement, `issue: ""`, bare `#N`, line numbers in Design | Q9 |
-| `[skip ci]` for features that touch only `agents/` or `.claude/` | Q10 |
+| `/implement` pushes and opens the PR | Standing grant in the project procedure (owner, Q5) |
+| Non-feature and direct-to-main shipping | Stays in Stackweaver's `/ship` (owner, Q6) |
+| `AC1`, Test Plan and Review Log formats in existing specs | Convert non-terminal specs (owner, Q7) |
+| Status flip without owner acceptance; `complete` versus delivered | vh-adlc rules, delivered after the watch (owner, Q8) |
+| Issue filing during `/spec` and `/investigate` | vh-adlc authority rule (owner, Q8) |
+| Owner summary placement, `issue: ""`, bare `#N`, line numbers in Design | vh-adlc style for specs (owner, Q9) |
+| `[skip ci]` for features that touch only `agents/` or `.claude/` | Consumer-declared skip paths (owner, Q10) |
 | `covers` with `**` | Fixed in vh-adlc (AC-06) |
 | Investigation writes a document only on request | Setting (AC-07) |
 
@@ -300,12 +327,14 @@ published plugin is installed from the marketplace and exercised, and a rollback
 - [ ] AC-06: Feature-document lint accepts `covers` entries containing `**` and matches them as the docs-impact matcher does.
 - [ ] AC-07: With `findings_document: always`, investigate writes its findings document, reports any duplicate analysis document or open issue it found, and ends with one of the three verdicts.
 - [ ] AC-08: Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` run the installed vh-adlc operations with Stackweaver's settings, and every row of the committed parity map passes its contract test.
-- [ ] AC-09: Every Stackweaver spec in the migration set passes `vh-adlc lint`, and its gate results agree with a manual reading of the document.
-- [ ] AC-10: Stackweaver's local behaviors stay available with unchanged invocation: worktree slots, direct-to-main non-feature shipping, `[skip ci]` rules, `watch-merge.sh`, the triad and satellite lenses, and the browser-pass summary table.
+- [ ] AC-09: Every Stackweaver spec under `docs/internal/plans/` with a non-terminal status passes `vh-adlc lint`, and its gate results agree with a manual reading of the document.
+- [ ] AC-10: Stackweaver's local behaviors stay available with unchanged invocation: worktree slots, direct-to-main non-feature shipping through its own `/ship`, `[skip ci]` rules, `watch-merge.sh`, the triad and satellite lenses, the browser-pass summary table, and `/implement` handing straight to ship.
 - [ ] AC-11: A disposable Stackweaver checkout rolls back to the native loop and reapplies the adoption, with the docs index and unrelated workflow files byte-identical afterwards.
 - [ ] AC-12: The shared changes are installed from the published marketplace in an isolated profile and exercised through their entry points before Stackweaver's native agent files are retired.
 - [ ] AC-13: Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on another branch name, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops and changes nothing.
 - [ ] AC-14: A Stackweaver feature taken through the adopted loop and merged keeps every commit its Review Log names reachable from `main`, and its completion gate passes there.
+- [ ] AC-15: With `skip_ci_paths` declared, a feature delivery whose commit, push range and PR diff touch only feature documents, Markdown onboarding files or declared paths carries the skip marker, and any other change in the delivery leaves it off.
+- [ ] AC-16: In Stackweaver, `/spec review` never moves a spec to `planned` without an owner acceptance row, and `/spec` and `/investigate` create no issue without an explicit request or accepted scope.
 
 ## Test Plan
 
@@ -325,6 +354,8 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | AC-12 | Isolated Claude Code profile install from the marketplace, payload digest check, and one spec review through the command route at the published revision. |
 | AC-13 | Fixture repositories with a detached worktree at the tip, a worktree on another branch at the tip, one behind the tip, one with a stray change, and a rejected push; only the first two claim, and the others leave the repository unchanged. |
 | AC-14 | One disposable Stackweaver feature taken from claim to merge by merge commit, then `vh-adlc fresh` and `vh-adlc gate complete` run on `main`. |
+| AC-15 | Ship fixtures whose delivery touches only declared paths, declared paths plus code, and declared paths with an earlier code commit in the push range; only the first carries the marker. |
+| AC-16 | Stackweaver parity contract tests for the acceptance and issue rules, plus a disposable spec review run that ends with the spec still `draft` until an acceptance row exists. |
 
 ## Tasks
 
@@ -332,90 +363,8 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q2: Should the external review route be generic or Copilot-only?
-
-**Recommendation:** A. A command template covers Copilot today and any other CLI later without another
-plugin change.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Generic command route with placeholders** | Copilot, Codex or another CLI by settings alone | A wider surface to test and to keep read-only |
-| **B. Built-in Copilot CLI route** | Smaller, easier to verify | Another provider needs another plugin release |
-| **C. Stackweaver-local script, nothing shared** | No vh-adlc change | Other repositories cannot use it, and the review protocol stays unaware of it |
-
-**Why this is yours:** it trades shared reach against a smaller attack and test surface.
-
-### Q5: Should `/implement` keep pushing and opening the PR by itself?
-
-**Recommendation:** A. It keeps today's flow, and the grant is written down and reviewable instead of
-implied.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. A standing grant in Stackweaver's project procedure lets implement hand straight to ship** | No extra step | The grant applies to every feature until removed |
-| **B. Follow vh-adlc: a separate ship request each time** | An explicit go before anything is pushed | One more command per feature |
-
-**Why this is yours:** it is a standing publication permission.
-
-### Q6: Where should small non-feature fixes and their direct-to-main pushes live?
-
-**Recommendation:** A. vh-adlc ship is feature-only by design, and these fixes are Stackweaver policy.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Keep Stackweaver's own `/ship` path for non-feature changes** | Unchanged daily flow | Two shipping paths in Stackweaver |
-| **B. Add a shared non-feature delivery to vh-adlc with consumer-declared rules** | One shipping entry point | A large new shared capability with its own authority rules |
-
-**Why this is yours:** it decides whether the shared plugin grows a new publishing capability.
-
-### Q7: Which existing Stackweaver specs should move to the shared format?
-
-**Recommendation:** A. The 55 non-terminal specs are the ones gates will run on; finished specs are
-history and stay as written.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Convert non-terminal specs; leave terminal ones as history** | Gates trustworthy where they matter; bounded work | Two formats exist side by side in `docs/internal/plans/` |
-| **B. Convert every spec** | One format everywhere | Large churn in documents nobody will gate again |
-| **C. Declare `Feature document format: local`** | No conversion | Every gate becomes manual, which loses the main gain |
-
-**Why this is yours:** it trades migration effort against format consistency.
-
-### Q8: Should Stackweaver adopt vh-adlc's acceptance, completion and issue authority rules?
-
-**Recommendation:** A. You already treat an explicit pick, not iteration, as acceptance, and issue
-actions already wait for your go in practice.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Adopt them: owner acceptance row before `planned`; `complete` on the feature branch; delivered after the post-merge watch; issues filed only on request or with acceptance** | One rule set, enforced by gates | `/spec review` no longer flips a spec to `planned` alone; `/spec` and `/investigate` ask before filing |
-| **B. Keep Stackweaver's rules locally** | Today's behavior | The `accepted` gate fails on every spec, so gates become manual again |
-
-**Why this is yours:** it changes who moves a spec forward and when issues appear.
-
-### Q9: Which document style should Stackweaver specs use?
-
-**Recommendation:** A. The shared reviewer and binary expect it, and Stackweaver's symbol-name rule can
-stay for its other internal docs.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. vh-adlc style for specs: `### Owner summary` under Context, `issue: null`, full issue URLs, `AC-01` IDs, `file:line` citations in Design** | No special cases in the shared tools | Specs read slightly differently from other Stackweaver docs |
-| **B. Keep Stackweaver style; vh-adlc learns the variants** | Familiar documents | Shared tools carry Stackweaver-specific exceptions |
-
-**Why this is yours:** it is a house-style choice with a cost on one side or the other.
-
-### Q10: Should a feature that touches only `agents/` or `.claude/` still skip CI?
-
-**Recommendation:** B. Stackweaver CI is manual-only, so the marker mainly protects the release pipeline
-on merge, and the narrower shared rule only adds a pipeline run for tooling-only features.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Let a consumer declare extra skip-eligible paths** | Stackweaver's current skip set for features | A shared rule that each consumer can widen |
-| **B. Accept the shared rule for features** | No new setting | Tooling-only feature merges run the release pipeline |
-
-**Why this is yours:** it trades CI minutes against a simpler shared rule.
+None. The owner answered Q1 to Q10 on 2026-11-13; the answers are folded into Owner summary, Scope and
+Design.
 
 ## Review Log
 
