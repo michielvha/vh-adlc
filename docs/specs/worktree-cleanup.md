@@ -283,6 +283,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-12 | R-1 | spec | `365242f8508007bb91a58a65055e660a0f4a6730` | unknown | procedural | Two blocking, seven should-fix and two nit findings; model identity not attested. |
 | 2026-11-12 | R-2 | spec | `7806b5c77e6f55addd4b0f3d1d6487309104b4ee` | unknown | procedural | Two blocking, four should-fix and one nit finding; model identity not attested. |
+| 2026-11-12 | R-3 | spec | `e359f41bcaee7249b2fe27cba2aada158e3781b0` | claude-opus-4.8 | procedural | One blocking, four should-fix and two nit findings; model self-reported, no model was requested. |
 
 ### R-1
 
@@ -413,3 +414,54 @@ SEVERITY: nit
 WHERE: Design
 EVIDENCE: "All changes are in `observe`, `perform` and `execute` in `branches.ts`, plus the plan schema." The `--worktrees` default is set in `cli.ts:7-8` (`undefined` becomes `false`). The `after-merge` keep rule in item 5 touches `afterMerge` (`branches.ts:287-298`), and the version 1 refusal is in `parsePlan` (`branches.ts:256`). `after-merge` also accepts `--worktrees` today (`cli.ts:6`, `cli.ts:20`), and the design does not say what that flag does after the change.
 PROPOSAL: List `cli.ts`, `afterMerge` and `parsePlan` among the changed places, and say whether `after-merge --worktrees false` still leaves worktrees alone.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design items 3 and 4, AC-04, AC-05, goal
+EVIDENCE: Design item 3 says "Rebase or bisect in progress, main, invoking and locked worktrees stay kept as today". Today's detection (branches.ts:117-121) marks a worktree busy only when `rebase-merge/head-name`, `rebase-apply/head-name` or `BISECT_START` names a `refs/heads/` branch, and it skips the check entirely for `prunable` entries. When a rebase starts on a detached HEAD, `head-name` holds `detached HEAD`, so busy stays false. A bisect started detached writes a commit id to `BISECT_START`, which the code turns into a fake branch name. I tested this in a scratch repository with Git 2.55.0. A detached linked worktree had an unmerged commit X, and I ran `git rebase -i main` with a leading `break`. HEAD then equaled the main tip, `git status --porcelain --untracked-files=all --ignore-submodules=none` printed nothing, `rebase-merge/head-name` read `detached HEAD`, `git worktree list --porcelain` showed `detached`, and `git merge-base --is-ancestor HEAD main` succeeded. `git worktree remove` exited 0, and `git fsck --unreachable` then reported `unreachable commit` X. Under items 3 and 4 such a worktree meets every removal condition. A missing-directory one needs no age. This contradicts the goal's promise that a worktree with "unmerged commits is always kept". No AC or Test Plan row covers a detached rebase or bisect.
+PROPOSAL: State that any rebase or bisect state in the worktree's admin directory (`rebase-merge`, `rebase-apply`, `BISECT_LOG`) keeps it, detached or prunable included, rather than relying on "as today". Add AC-04 and AC-05 cases for a detached worktree stopped mid-rebase with HEAD on the default branch.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design items 1 and 5, AC-07
+EVIDENCE: In a scratch repository with Git 2.55.0, a linked worktree on branch `f` had an initialized submodule. Both `git status --porcelain --untracked-files=all --ignore-submodules=none` and `git status --porcelain --ignored=traditional --untracked-files=normal` printed nothing, so item 1 calls it clean with no ignored files. `git worktree remove ../w` then exited 128 with `fatal: working trees containing submodules cannot be moved or removed`. The design has no blocker for submodules. Every plan would propose this worktree, and every apply would fail it. Its `delete-local` would fail with "its worktree was not removed" (branches.ts:244), and the run would report `complete: false`. Because item 5 makes removal the default, `after-merge` would also exit 1 on every merge in such a repository, where today it keeps the branch and completes. This is the same failure pattern as R-2 F-04.
+PROPOSAL: Keep a worktree that has initialized submodules, with a reason, in plan and in `after-merge`, and add a fixture for it to AC-02 or AC-07.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design item 1
+EVIDENCE: Item 1 says a worktree "blocks removal only when `git status ...` prints anything". Today's call passes `allowFailure` (branches.ts:192), and `Checkout.git` returns `""` for any non-zero exit (branches.ts:73-76). That includes a kill at spawn's 120 s timeout (branches.ts:10), where `exitCode` is null and the code becomes 1. So a status that fails or times out reads as clean, with an empty ignored list. That also skips the `after-merge` ignored-files keep and the sweep's digest stop. Under `status.showUntrackedFiles=no`, `git worktree remove` does not protect untracked files. I confirmed again with Git 2.55.0 that it exited 0 and deleted a worktree holding an untracked `u.txt`. The helper's check is then the only safeguard.
+PROPOSAL: State that a status or ignored-list command that exits non-zero or times out keeps the worktree with a reason, at plan time and on the re-check in `apply`.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner summary, Design item 1, Open Questions
+EVIDENCE: The Owner summary says a worktree with ignored files is removed only "after seeing its list of ignored paths", and the first decision bullet says "the plan lists those files first". Item 1 instead lists paths "collapsed to directories" via `--ignored=traditional --untracked-files=normal`, an author choice made in response to R-2 F-01 that never appeared as an owner question. On 2026-11-12, that command across Stackweaver's 67 on-disk linked worktrees printed `!! .tmp/` for 18 of them. Inside, `find` counted from 1 to 24506 files, including `seo-browser-proof.json`, `blog-nav-preview-verification.json` and `maintenance-evidence-f6de2451/`. The owner would see only `.tmp/`. So saved evidence goes even when the list is read, not only "when a plan is approved without reading its ignored list", as the trade-offs paragraph says.
+PROPOSAL: Raise the listing granularity as an owner question (for example, collapsed directories plus a file count and size per directory, or a per-repository list of directories to expand). Otherwise, say in the Owner summary and trade-offs that only collapsed directory names are shown.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-02, AC-07, Design item 5, Test Plan AC-06 and AC-07 rows
+EVIDENCE: AC-07 excepts a worktree that "has changed or untracked files". The AC-07 row tests "with an untracked file" but has no case with a modified tracked file. The AC-02 row tests the modified-file case only through plan and apply, so `after-merge` with a changed tracked file is untested. Design item 5 promises "`after-merge --worktrees false` still leaves every worktree alone". AC-06 and its row cover only `plan` with and without the flag, so no criterion or proof covers the after-merge flag. Under the standard, "A passing subset never upgrades a composite criterion".
+PROPOSAL: Add an AC-07 fixture with a modified tracked file. Extend AC-06 and its row to `after-merge --worktrees false` keeping a clean, ignored-free worktree of the merged PR.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design
+EVIDENCE: The Design says "The changes are in `observe`, `perform`, `execute`, `afterMerge` and `parsePlan` in `branches.ts`, the `--worktrees` default in `cli.ts`, and the plan schema." Items 3 and 4 need each detached entry's HEAD oid and admin directory name. `worktrees()` (branches.ts:109-126) reads neither, because it ignores the porcelain `HEAD` line, and the `Worktree` type (branches.ts:35) has no field for them. `absent()` (branches.ts:203-211) also handles `remove-worktree`.
+PROPOSAL: Add `worktrees()`, the `Worktree` type and `absent()` to the list of changed places.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Scope, covers, AC-08
+EVIDENCE: `plugins/vh-adlc/references/audit.md:214-216` says `after-merge` "removes the just-merged head remotely and locally". After item 5, it also removes that PR's worktree by default. `audit.md` is not in Scope's guide list, `covers` or AC-08.
+PROPOSAL: Add `references/audit.md` to the guides that AC-08 updates, or say why its description stays accurate.
