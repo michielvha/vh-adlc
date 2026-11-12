@@ -24,7 +24,7 @@ import (
 
 func TestMain(m *testing.M) {
 	if clientapp.CommitDelay != 8*time.Second || clientapp.QuitTimeout != 20*time.Second || clientapp.TunnelTimeout != 30*time.Second ||
-		clientapp.LaunchTimeout != 60*time.Second {
+		clientapp.LaunchTimeout != 60*time.Second || clientapp.QuitFloor != 3*time.Second {
 		panic("clientapp waits differ from the Design")
 	}
 	clientapp.CommitDelay = 300 * time.Millisecond
@@ -32,6 +32,7 @@ func TestMain(m *testing.M) {
 	clientapp.SettleDelay = 50 * time.Millisecond
 	clientapp.TunnelTimeout = 3 * time.Second
 	clientapp.LaunchTimeout = time.Second
+	clientapp.QuitFloor = quitFloor
 	testenv.Main(m)
 }
 
@@ -256,8 +257,9 @@ const quitFloor = 200 * time.Millisecond
 // or an app that exits by itself loses every write since its launch.
 const longCommit = time.Minute
 
-// srvHost is the server's entry as an earlier link left it.
-var srvHost = strings.Replace(staleHost, `"host":"old"`, `"host":"paseo-srv"`, 1)
+// srvHost is the server's entry as an earlier link left it, in the form
+// the app keeps.
+var srvHost = strings.ReplaceAll(strings.Replace(staleHost, `"host":"old"`, `"host":"paseo-srv"`, 1), "ssh:old::", "ssh:paseo-srv::")
 
 var keptCopyRE = regexp.MustCompile(`app-registry-mac\.\d{8}T\d{6}Z\.backup\.json`)
 

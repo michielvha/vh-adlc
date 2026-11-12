@@ -18,26 +18,7 @@ type page struct {
 	id int
 }
 
-// findPage connects to the page that holds the app's client id, retrying
-// while the app starts.
-func findPage(ctx context.Context, addr string) (*page, error) {
-	deadline := time.Now().Add(LaunchTimeout)
-	var last error
-	for {
-		p, err := tryPages(ctx, addr)
-		if err == nil {
-			return p, nil
-		}
-		last = err
-		if time.Now().After(deadline) {
-			return nil, fmt.Errorf("the Paseo app window did not answer over DevTools: %w", last)
-		}
-		if err := sleep(ctx, 200*time.Millisecond); err != nil {
-			return nil, err
-		}
-	}
-}
-
+// tryPages connects to the page that holds the app's client id.
 func tryPages(ctx context.Context, addr string) (*page, error) {
 	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

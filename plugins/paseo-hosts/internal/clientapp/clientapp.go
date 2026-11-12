@@ -3,11 +3,13 @@
 package clientapp
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"math/rand/v2"
 	"net"
 	"os"
@@ -19,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/michielvha/logger"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/link"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/registry"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/remote"
@@ -37,6 +40,12 @@ var (
 	SettleDelay = 4 * time.Second
 	// LaunchTimeout is how long the app has to answer on its debugging port.
 	LaunchTimeout = 60 * time.Second
+	// QuitFloor is the least time quit and wait takes, and so the wait
+	// between debug launch attempts.
+	QuitFloor = 3 * time.Second
+	// AliveInterval is how often the CLI checks that the app runs while it
+	// waits for the window.
+	AliveInterval = 2 * time.Second
 )
 
 const (
@@ -58,6 +67,10 @@ var (
 	tunnelScript string
 	//go:embed snippets/tunnel.ps1
 	tunnelPS string
+	//go:embed snippets/running.sh
+	runningScript string
+	//go:embed snippets/running.ps1
+	runningPS string
 )
 
 // inject changes an entry before it is written; only paseotest builds set it.
@@ -103,10 +116,9 @@ func (a *App) Add(ctx context.Context, c link.Client, e *registry.Entry, passwor
 	host := link.SSHAlias(e.Alias)
 	want := newEntry(serverID, e.Alias, password, Connection(host, e.ListenPort))
 	a.Report.Step("Adding %s to the Paseo app on %s", e.Alias, c.Alias)
-	err = a.session(ctx, c, change{
-		apply:    func(prev []json.RawMessage) ([]json.RawMessage, error) { return upsert(prev, want, time.Now()) },
-		kept:     func(prev, cur []json.RawMessage) bool { return keptEntry(prev, cur, want) },
-		forcedOK: true,
+	forced, err := a.session(ctx, c, change{
+		apply: func(prev []json.RawMessage) ([]json.RawMessage, error) { return upsert(prev, want, time.Now()) },
+		kept:  func(prev, cur []json.RawMessage) bool { return keptEntry(prev, cur, want) },
 	})
 	if err != nil {
 		return err
@@ -114,6 +126,9 @@ func (a *App) Add(ctx context.Context, c link.Client, e *registry.Entry, passwor
 	if _, err := c.Run(ctx, tunnelScript, tunnelPS, remote.Vars{
 		"name": host, "port": strconv.Itoa(e.ListenPort), "wait_ms": ms(TunnelTimeout),
 	}); err != nil {
+		if forced {
+			return report.Errorf(report.ExitFailed, "the app on %s was force-stopped and may not have saved the change (%v); run the command again", c.Alias, err)
+		}
 		return remoteError("checking the app's tunnel", err)
 	}
 	a.Report.Pass("the Paseo app on %s lists %s and opened its tunnel", c.Alias, e.Alias)
@@ -127,7 +142,7 @@ func (a *App) Delete(ctx context.Context, c link.Client, alias, serverID string)
 	host := link.SSHAlias(alias)
 	match := func(raw json.RawMessage) bool { return Matches(raw, serverID, host) }
 	a.Report.Step("Deleting %s from the Paseo app on %s", alias, c.Alias)
-	err := a.session(ctx, c, change{
+	forced, err := a.session(ctx, c, change{
 		apply: func(prev []json.RawMessage) ([]json.RawMessage, error) {
 			return slices.DeleteFunc(slices.Clone(prev), match), nil
 		},
@@ -137,6 +152,9 @@ func (a *App) Delete(ctx context.Context, c link.Client, alias, serverID string)
 	})
 	if err != nil {
 		return err
+	}
+	if forced {
+		return report.Errorf(report.ExitFailed, "the app on %s was force-stopped and may not have saved the change; run the command again", c.Alias)
 	}
 	a.Report.Pass("the Paseo app on %s no longer lists %s", c.Alias, alias)
 	return nil
@@ -170,133 +188,530 @@ func Matches(raw json.RawMessage, serverID, host string) bool {
 type change struct {
 	apply func(prev []json.RawMessage) ([]json.RawMessage, error)
 	kept  func(prev, cur []json.RawMessage) bool
-	// forcedOK accepts a force-stopped app; the caller checks the result.
-	forcedOK bool
 }
 
-// session runs Design steps 2 to 5: quit, relaunch with a debugging port,
-// write and verify, wait for the commit, quit and relaunch normally.
-func (a *App) session(ctx context.Context, c link.Client, ch change) error {
-	if _, err := a.stop(ctx, c, 0); err != nil {
-		return err
-	}
-	debugPort := 20000 + rand.IntN(40000)
-	if err := a.launch(ctx, c, strconv.Itoa(debugPort)); err != nil {
-		return err
-	}
-	fwd, err := forward(ctx, c.Alias, debugPort)
-	var lastWrite time.Time
-	var writeErr error
-	if err != nil {
-		writeErr = err
-	} else {
-		lastWrite, writeErr = a.write(ctx, fwd.addr, c, ch)
-	}
+// unknownError ends a session whose outcome the CLI cannot confirm: it
+// stops driving the app and keeps a copy of the backup.
+type unknownError struct{ reason string }
 
-	if !lastWrite.IsZero() {
-		if err := sleep(ctx, time.Until(lastWrite.Add(CommitDelay))); err != nil {
+func (e *unknownError) Error() string { return e.reason }
+
+func unknown(format string, args ...any) error {
+	return &unknownError{reason: fmt.Sprintf(format, args...)}
+}
+
+// errLost marks a window that does not answer.
+var errLost = errors.New("the app window does not answer")
+
+// run is one command's session with the app on a client.
+type run struct {
+	a  *App
+	c  link.Client
+	ch change
+
+	pg  *page
+	fwd *forwarder
+	// wrote reports a registry write since the running instance launched.
+	wrote     bool
+	lastWrite time.Time
+	// forced reports a step 5 force-stop of an instance that had written.
+	forced bool
+	// losses counts the lost windows; the Design allows two per command.
+	losses int
+
+	// raw and had are the registry before the command; prev is raw parsed.
+	raw  string
+	had  bool
+	prev []json.RawMessage
+	data string
+
+	rollingBack bool
+	reasons     []string
+}
+
+// session runs Design steps 2 to 6 up to the tunnel check. It reports
+// whether the step 5 quit force-stopped an instance that holds the change.
+func (a *App) session(ctx context.Context, c link.Client, ch change) (bool, error) {
+	r := &run{a: a, c: c, ch: ch}
+	defer r.closeForward()
+	if err := r.quitAndWait(ctx); err != nil {
+		return false, err
+	}
+	if err := r.debugLaunch(ctx); err != nil {
+		return false, r.unchanged(ctx, err)
+	}
+	if err := r.readBackup(ctx); err != nil {
+		return false, r.unchanged(ctx, err)
+	}
+	kept, err := r.writeChange(ctx)
+	if err == nil && !kept {
+		err = r.rollBack(ctx)
+	}
+	var u *unknownError
+	switch {
+	case errors.As(err, &u):
+		return false, r.unconfirmed(ctx, u)
+	case err != nil:
+		return false, err
+	}
+	if err := r.finish(ctx); err != nil {
+		return false, r.unconfirmed(ctx, &unknownError{reason: err.Error()})
+	}
+	if err := r.relaunch(ctx); err != nil {
+		return false, err
+	}
+	return r.forced, nil
+}
+
+// readBackup reads the registry and saves the backup (step 3).
+func (r *run) readBackup(ctx context.Context) error {
+	raw, ok, err := r.pg.getItem(ctx, registryKey)
+	if err != nil {
+		return err
+	}
+	prev, err := parseRegistry(raw, ok)
+	if err != nil {
+		return err
+	}
+	next, err := r.ch.apply(prev)
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(next)
+	if err != nil {
+		return err
+	}
+	if ok {
+		if err := r.a.backup(r.c.Alias, raw); err != nil {
 			return err
 		}
 	}
-	if fwd != nil && c.Kind == link.Windows {
-		closeWindow(ctx, fwd.addr)
+	r.raw, r.had, r.prev, r.data = raw, ok, prev, string(data)
+	return nil
+}
+
+// writeChange writes the change and reloads (steps 3 and 4), rewriting it
+// after a lost window that may have lost the write, and reports whether
+// the app kept it.
+func (r *run) writeChange(ctx context.Context) (bool, error) {
+	r.writeAndReload(ctx, r.data, false)
+	for {
+		cur, ok, graceful, err := r.readBack(ctx)
+		if err != nil {
+			return false, err
+		}
+		if !graceful && r.matchesBackup(cur, ok) {
+			r.writeAndReload(ctx, r.data, false)
+			continue
+		}
+		hosts, err := parseRegistry(cur, ok)
+		if err == nil && r.ch.kept(r.prev, hosts) {
+			r.a.Report.Pass("the app on %s kept the change after a reload", r.c.Alias)
+			return true, nil
+		}
+		return false, nil
 	}
-	stopped, stopErr := a.stop(ctx, c, QuitTimeout)
-	if fwd != nil {
-		fwd.close()
+}
+
+// rollBack restores the backup and checks it after a restart, twice at
+// most. It returns nil only when a check found the backup.
+func (r *run) rollBack(ctx context.Context) error {
+	r.rollingBack = true
+	if _, err := r.restore(ctx); err != nil {
+		return err
 	}
-	launchErr := a.launch(ctx, c, "")
-	forced := stopped == "KILL"
-	if forced {
-		a.Report.Partial("the app on %s did not quit within %v and was force-stopped", c.Alias, QuitTimeout)
+	for range 2 {
+		if err := r.finish(ctx); err != nil {
+			return unknown("%v", err)
+		}
+		if err := r.debugLaunch(ctx); err != nil {
+			return unknown("%v", err)
+		}
+		cur, ok, _, err := r.readBack(ctx)
+		if err != nil {
+			return err
+		}
+		if r.matchesBackup(cur, ok) {
+			if err := r.finish(ctx); err != nil {
+				return unknown("%v", err)
+			}
+			if err := r.relaunch(ctx); err != nil {
+				return err
+			}
+			return report.Errorf(report.ExitFailed, "%s", r.withReasons(fmt.Sprintf("the app on %s did not keep the change; its previous host list is restored", r.c.Alias)))
+		}
+		if _, err := r.restore(ctx); err != nil {
+			return err
+		}
 	}
-	switch {
-	case writeErr != nil && forced:
-		return report.Errorf(report.ExitFailed, "%v; the app was force-stopped and may not have saved the restored host list, so run the command again", writeErr)
-	case writeErr != nil:
-		return writeErr
-	case stopErr != nil:
-		return stopErr
-	case launchErr != nil:
-		return launchErr
-	case forced && !lastWrite.IsZero() && !ch.forcedOK:
-		return report.Errorf(report.ExitFailed, "the app on %s was force-stopped and may not have saved the change; run the command again", c.Alias)
+	return unknown("the app did not hold the restored host list after a restart")
+}
+
+// restore writes the backup, or removes the key when there was none, up to
+// three times until the read-back matches it.
+func (r *run) restore(ctx context.Context) (bool, error) {
+	for range 3 {
+		r.writeAndReload(ctx, r.raw, !r.had)
+		cur, ok, _, err := r.readBack(ctx)
+		if err != nil {
+			return false, err
+		}
+		if r.matchesBackup(cur, ok) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// writeAndReload writes value, or removes the key, and reloads the page.
+// A failure shows as a lost window in the read that follows.
+func (r *run) writeAndReload(ctx context.Context, value string, remove bool) {
+	if r.pg == nil {
+		return
+	}
+	var err error
+	if remove {
+		err = r.pg.removeItem(ctx, registryKey)
+	} else {
+		err = r.pg.setItem(ctx, registryKey, value)
+	}
+	r.wrote, r.lastWrite = true, time.Now()
+	if err == nil {
+		_, err = r.pg.call(ctx, "Page.reload", map[string]any{})
+	}
+	if err != nil {
+		logger.Debug("registry write", "client", r.c.Alias, "error", err)
+	}
+	r.closePage()
+}
+
+// readBack waits for the window and reads the registry. A window that
+// does not answer is quit and debug-launched again, at most twice per
+// command; graceful is false when one of those quits was not graceful.
+func (r *run) readBack(ctx context.Context) (cur string, ok, graceful bool, err error) {
+	graceful = true
+	for {
+		cur, ok, err = r.read(ctx)
+		if err == nil || ctx.Err() != nil {
+			return cur, ok, graceful, err
+		}
+		logger.Debug("lost window", "client", r.c.Alias, "error", err)
+		g, err := r.recover(ctx)
+		if err != nil {
+			return "", false, false, err
+		}
+		graceful = graceful && g
+	}
+}
+
+func (r *run) read(ctx context.Context) (string, bool, error) {
+	if err := sleep(ctx, SettleDelay); err != nil {
+		return "", false, err
+	}
+	if r.pg == nil {
+		if r.fwd == nil {
+			return "", false, errLost
+		}
+		p, err := r.waitPage(ctx)
+		if err != nil {
+			return "", false, err
+		}
+		r.pg = p
+	}
+	v, ok, err := r.pg.getItem(ctx, registryKey)
+	if err != nil {
+		r.closePage()
+	}
+	return v, ok, err
+}
+
+// recover quits an app whose window stopped answering and debug-launches
+// it again. It reports whether the app quit gracefully.
+func (r *run) recover(ctx context.Context) (bool, error) {
+	if r.losses == 2 {
+		return false, unknown("the app window stopped answering a third time")
+	}
+	r.losses++
+	r.a.Report.Step("The app window on %s stopped answering; restarting the app", r.c.Alias)
+	r.closePage()
+	wait := ms(QuitTimeout)
+	if r.c.Kind == link.Windows {
+		// window.close() needs the page, so Windows stops the process.
+		wait = "0"
+	}
+	stopped, err := r.a.stop(ctx, r.c, wait, "KILL")
+	r.closeForward()
+	if err != nil {
+		return false, unknown("%v", err)
+	}
+	if stopped == "KILL" {
+		r.forceStopped()
+	}
+	if err := sleep(ctx, QuitFloor); err != nil {
+		return false, err
+	}
+	if err := r.debugLaunch(ctx); err != nil {
+		return false, unknown("%v", err)
+	}
+	return stopped == "graceful", nil
+}
+
+// debugLaunch starts the app with a debugging port and connects to its
+// window, in up to three attempts with a quit and wait between them.
+func (r *run) debugLaunch(ctx context.Context) error {
+	var last error
+	for attempt := range 3 {
+		if attempt > 0 {
+			logger.Debug("debug launch failed", "client", r.c.Alias, "attempt", attempt, "error", last)
+			if err := r.quitAndWait(ctx); err != nil {
+				return err
+			}
+		}
+		port := 20000 + rand.IntN(40000)
+		if err := r.a.launch(ctx, r.c, strconv.Itoa(port)); err != nil {
+			var f *remote.Failure
+			if !errors.As(err, &f) {
+				return remoteError("starting the Paseo app", err)
+			}
+			last = err
+			continue
+		}
+		r.wrote = false
+		fwd, err := forward(ctx, r.c.Alias, port)
+		if err != nil {
+			return err
+		}
+		r.fwd = fwd
+		p, err := r.waitPage(ctx)
+		if err == nil {
+			r.pg = p
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		last = err
+		r.closeForward()
+	}
+	return fmt.Errorf("the Paseo app on %s did not answer over DevTools in three attempts: %w", r.c.Alias, last)
+}
+
+// waitPage connects to the app window, failing when the app's main
+// process exits or the window has not answered within LaunchTimeout.
+func (r *run) waitPage(ctx context.Context) (*page, error) {
+	deadline := time.Now().Add(LaunchTimeout)
+	var nextCheck time.Time
+	for {
+		p, err := tryPages(ctx, r.fwd.addr)
+		if err == nil {
+			return p, nil
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("the Paseo app window did not answer over DevTools within %v: %w", LaunchTimeout, err)
+		}
+		if time.Now().After(nextCheck) {
+			alive, aerr := r.a.running(ctx, r.c)
+			if aerr != nil {
+				return nil, aerr
+			}
+			if !alive {
+				return nil, errors.New("the Paseo app exited before its window answered")
+			}
+			nextCheck = time.Now().Add(AliveInterval)
+		}
+		if err := sleep(ctx, 200*time.Millisecond); err != nil {
+			return nil, err
+		}
+	}
+}
+
+// finish runs step 5 for the running instance: it waits for the commit,
+// quits the app gracefully, force-stops it if it does not quit, closes
+// the forward and waits.
+func (r *run) finish(ctx context.Context) error {
+	if r.wrote {
+		if err := sleep(ctx, time.Until(r.lastWrite.Add(CommitDelay))); err != nil {
+			return err
+		}
+	}
+	if r.c.Kind == link.Windows && r.fwd != nil {
+		closeWindow(ctx, r.fwd.addr)
+	}
+	r.closePage()
+	stopped, err := r.a.stop(ctx, r.c, ms(QuitTimeout), "KILL")
+	r.closeForward()
+	if err != nil {
+		return err
+	}
+	if stopped == "KILL" {
+		r.a.Report.Partial("the app on %s did not quit within %v and was force-stopped", r.c.Alias, QuitTimeout)
+		r.forced = r.forced || r.wrote
+		r.forceStopped()
+	}
+	r.wrote = false
+	return sleep(ctx, QuitFloor)
+}
+
+func (r *run) forceStopped() {
+	const reason = "the app was force-stopped during the rollback"
+	if r.rollingBack && !slices.Contains(r.reasons, reason) {
+		r.reasons = append(r.reasons, reason)
+	}
+}
+
+// quitAndWait quits the app as step 2 does and waits the floor.
+func (r *run) quitAndWait(ctx context.Context) error {
+	wait := ms(QuitTimeout)
+	if r.c.Kind == link.Windows {
+		// The app holds none of the CLI's writes yet.
+		wait = "0"
+	}
+	r.closePage()
+	if _, err := r.a.stop(ctx, r.c, wait, "TERM"); err != nil {
+		return err
+	}
+	return sleep(ctx, QuitFloor)
+}
+
+// relaunch is step 6: start the app without the debugging port.
+func (r *run) relaunch(ctx context.Context) error {
+	if err := r.a.launch(ctx, r.c, ""); err != nil {
+		return remoteError("starting the Paseo app", err)
 	}
 	return nil
 }
 
-// write runs Design steps 3 and 4 and returns the time of the last
-// registry write.
-func (a *App) write(ctx context.Context, addr string, c link.Client, ch change) (time.Time, error) {
-	var lastWrite time.Time
-	p, err := findPage(ctx, addr)
-	if err != nil {
-		return lastWrite, err
+// unchanged ends a session that wrote nothing.
+func (r *run) unchanged(ctx context.Context, cause error) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
-	raw, ok, err := p.getItem(ctx, registryKey)
-	if err != nil {
-		p.close()
-		return lastWrite, err
+	_ = r.finish(ctx)
+	launchErr := r.relaunch(ctx)
+	if err := report.Errorf(report.ExitFailed, "%v; the app's host list on %s is unchanged", cause, r.c.Alias); launchErr == nil {
+		return err
 	}
-	prev, err := parseRegistry(raw, ok)
-	if err != nil {
-		p.close()
-		return lastWrite, err
+	return report.Errorf(report.ExitFailed, "%v; the app's host list on %s is unchanged, and %v", cause, r.c.Alias, launchErr)
+}
+
+// unconfirmed ends a session whose result the CLI cannot confirm: it stops
+// the app, keeps a copy of the backup and relaunches the app.
+func (r *run) unconfirmed(ctx context.Context, u *unknownError) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
 	}
-	if ok {
-		if err := a.backup(c.Alias, raw); err != nil {
-			p.close()
-			return lastWrite, err
+	_ = r.finish(ctx)
+	msg := fmt.Sprintf("the CLI could not tell whether the app on %s kept the change (%s)", r.c.Alias, u.reason)
+	if r.rollingBack {
+		msg = fmt.Sprintf("the app on %s did not keep the change, and the CLI could not confirm that its previous host list is restored (%s)", r.c.Alias, u.reason)
+	}
+	msg = r.withReasons(msg)
+	if r.had {
+		path, err := r.a.keepCopy(r.c.Alias, r.raw)
+		if err != nil {
+			msg += fmt.Sprintf("; keeping a copy of the previous host list failed: %v", err)
+		} else {
+			msg += "; the previous host list is kept in " + path + ", and the README gives the steps to restore it"
+		}
+	} else {
+		msg += "; the app had no host list before the command, so there is no copy to restore"
+	}
+	if err := r.relaunch(ctx); err != nil {
+		msg += fmt.Sprintf("; %v", err)
+	}
+	return report.Errorf(report.ExitFailed, "%s", msg)
+}
+
+func (r *run) withReasons(msg string) string {
+	for _, reason := range r.reasons {
+		msg += "; " + reason
+	}
+	return msg
+}
+
+func (r *run) closePage() {
+	if r.pg != nil {
+		r.pg.close()
+		r.pg = nil
+	}
+}
+
+func (r *run) closeForward() {
+	if r.fwd != nil {
+		r.fwd.close()
+		r.fwd = nil
+	}
+}
+
+// matchesBackup reports whether the registry read back holds the backup:
+// no key when there was none, otherwise the same hosts by serverId, each
+// equal apart from the fields the app rewrites on load.
+func (r *run) matchesBackup(cur string, ok bool) bool {
+	if !r.had || !ok {
+		return r.had == ok
+	}
+	want, err1 := comparable(r.raw)
+	got, err2 := comparable(cur)
+	if err1 != nil || err2 != nil || len(want) != len(got) {
+		return false
+	}
+	for _, w := range want {
+		i := slices.IndexFunc(got, func(g map[string]any) bool { return reflect.DeepEqual(g, w) })
+		if i < 0 {
+			return false
+		}
+		got = slices.Delete(got, i, i+1)
+	}
+	return true
+}
+
+// comparable parses a registry into entries without createdAt and
+// updatedAt and with Remote SSH connections in the app's normalized form.
+func comparable(raw string) ([]map[string]any, error) {
+	var hosts []map[string]any
+	if raw != "" {
+		if err := json.Unmarshal([]byte(raw), &hosts); err != nil {
+			return nil, err
 		}
 	}
-	next, err := ch.apply(prev)
-	if err != nil {
-		p.close()
-		return lastWrite, err
+	for _, h := range hosts {
+		delete(h, "createdAt")
+		delete(h, "updatedAt")
+		conns, _ := h["connections"].([]any)
+		for _, c := range conns {
+			m, ok := c.(map[string]any)
+			if !ok || m["type"] != "remoteSsh" {
+				continue
+			}
+			old := m["id"]
+			normalizeConnection(m)
+			if h["preferredConnectionId"] == old {
+				h["preferredConnectionId"] = m["id"]
+			}
+		}
 	}
-	data, err := json.Marshal(next)
-	if err != nil {
-		p.close()
-		return lastWrite, err
-	}
-	err = p.setItem(ctx, registryKey, string(data))
-	lastWrite = time.Now()
-	if err == nil {
-		_, err = p.call(ctx, "Page.reload", map[string]any{})
-	}
-	p.close()
-	if err != nil {
-		return lastWrite, err
-	}
+	return hosts, nil
+}
 
-	if err := sleep(ctx, SettleDelay); err != nil {
-		return lastWrite, err
-	}
-	if p, err = findPage(ctx, addr); err != nil {
-		return lastWrite, err
-	}
-	defer p.close()
-	cur, curOK, err := p.getItem(ctx, registryKey)
-	if err != nil {
-		return lastWrite, err
-	}
-	if hosts, perr := parseRegistry(cur, curOK); perr == nil && ch.kept(prev, hosts) {
-		a.Report.Pass("the app on %s kept the change after a reload", c.Alias)
-		return lastWrite, nil
-	}
-	if ok {
-		err = p.setItem(ctx, registryKey, raw)
+// normalizeConnection rewrites a Remote SSH connection the way the app
+// does on load: the default daemon port is dropped and the id is derived
+// from the host and ports.
+func normalizeConnection(c map[string]any) {
+	port := ""
+	if p, ok := c["daemonPort"].(float64); ok && p != defaultDaemonPort {
+		port = strconv.FormatFloat(p, 'f', -1, 64)
 	} else {
-		err = p.removeItem(ctx, registryKey)
+		delete(c, "daemonPort")
 	}
-	lastWrite = time.Now()
-	if err == nil {
-		_, err = p.call(ctx, "Page.reload", map[string]any{})
+	ssh := ""
+	if p, ok := c["sshPort"].(float64); ok {
+		ssh = strconv.FormatFloat(p, 'f', -1, 64)
 	}
-	if err != nil {
-		return lastWrite, report.Errorf(report.ExitFailed, "the app on %s did not keep the change, and restoring its previous host list failed: %v", c.Alias, err)
-	}
-	return lastWrite, report.Errorf(report.ExitFailed, "the app on %s did not keep the change; its previous host list is restored", c.Alias)
+	host, _ := c["host"].(string)
+	c["id"] = "ssh:" + encodeURIComponent(host) + ":" + ssh + ":" + port
 }
 
 func (a *App) backup(client, raw string) error {
@@ -307,16 +722,36 @@ func (a *App) backup(client, raw string) error {
 	return os.Chmod(path, 0o600)
 }
 
-// stop quits the app and reports how: none, graceful or the fallback
-// signal. With wait 0 it is Design step 2.
-func (a *App) stop(ctx context.Context, c link.Client, wait time.Duration) (string, error) {
-	fallback, waitMS := "KILL", ms(wait)
-	if wait == 0 {
-		fallback, waitMS = "TERM", ms(QuitTimeout)
-		if c.Kind == link.Windows {
-			waitMS = "0"
+// keepCopy writes raw to a new app-registry-<client>.<UTC time>.backup.json
+// and never replaces an existing copy.
+func (a *App) keepCopy(client, raw string) (string, error) {
+	at := time.Now().UTC().Truncate(time.Second)
+	for range 60 {
+		path := filepath.Join(a.Dir, "app-registry-"+client+"."+at.Format("20060102T150405Z")+".backup.json")
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if errors.Is(err, fs.ErrExist) {
+			at = at.Add(time.Second)
+			continue
 		}
+		if err != nil {
+			return "", err
+		}
+		_, err = f.WriteString(raw)
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+		if err == nil {
+			err = os.Chmod(path, 0o600)
+		}
+		return path, err
 	}
+	return "", errors.New("every copy name for the next minute is taken")
+}
+
+// stop quits the app: AppleScript on macOS, then fallback after wait_ms;
+// on Windows Stop-Process, at once when wait_ms is 0. It reports how the
+// app stopped: none, graceful or the fallback.
+func (a *App) stop(ctx context.Context, c link.Client, waitMS, fallback string) (string, error) {
 	out, err := c.Run(ctx, stopScript, stopPS, remote.Vars{"app": c.App, "wait_ms": waitMS, "fallback": fallback})
 	if err != nil {
 		return "", remoteError("quitting the Paseo app", err)
@@ -324,11 +759,19 @@ func (a *App) stop(ctx context.Context, c link.Client, wait time.Duration) (stri
 	return out.Values["STOPPED"], nil
 }
 
+// launch starts the app, with a debugging port unless debugPort is empty.
 func (a *App) launch(ctx context.Context, c link.Client, debugPort string) error {
-	if _, err := c.Run(ctx, launchScript, launchPS, remote.Vars{"app": c.App, "debug_port": debugPort, "wait_ms": ms(LaunchTimeout)}); err != nil {
-		return remoteError("starting the Paseo app", err)
+	_, err := c.Run(ctx, launchScript, launchPS, remote.Vars{"app": c.App, "debug_port": debugPort, "wait_ms": ms(LaunchTimeout)})
+	return err
+}
+
+// running reports whether the app's main process runs.
+func (a *App) running(ctx context.Context, c link.Client) (bool, error) {
+	out, err := c.Run(ctx, runningScript, runningPS, remote.Vars{"app": c.App})
+	if err != nil {
+		return false, remoteError("checking that the Paseo app runs", err)
 	}
-	return nil
+	return out.Values["RUNNING"] == "yes", nil
 }
 
 // Connection is a Remote SSH connection in the app's normalized form.
@@ -466,10 +909,12 @@ func encodeURIComponent(s string) string {
 type forwarder struct {
 	addr string
 	cmd  *exec.Cmd
+	done chan struct{}
 }
 
 // forward opens an SSH forward from a free loopback port on the operator
-// host to the app's debugging port on the client.
+// host to the app's debugging port on the client, and waits until it
+// accepts connections.
 func forward(ctx context.Context, alias string, port int) (*forwarder, error) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -479,15 +924,43 @@ func forward(ctx context.Context, alias string, port int) (*forwarder, error) {
 	_ = ln.Close()
 	cmd := exec.CommandContext(ctx, "ssh", "-N", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15", "-o", "ExitOnForwardFailure=yes",
 		"-L", addr+":127.0.0.1:"+strconv.Itoa(port), alias)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("forwarding the debugging port: %w", err)
 	}
-	return &forwarder{addr: addr, cmd: cmd}, nil
+	f := &forwarder{addr: addr, cmd: cmd, done: make(chan struct{})}
+	go func() {
+		_ = cmd.Wait()
+		close(f.done)
+	}()
+	deadline := time.Now().Add(forwardTimeout)
+	for {
+		if c, err := net.DialTimeout("tcp", addr, time.Second); err == nil {
+			_ = c.Close()
+			return f, nil
+		}
+		select {
+		case <-f.done:
+			return nil, report.Errorf(report.ExitFailed, "forwarding the debugging port of the app on %s failed: %s", alias, lastLine(stderr.String()))
+		case <-ctx.Done():
+			f.close()
+			return nil, ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+		if time.Now().After(deadline) {
+			f.close()
+			return nil, report.Errorf(report.ExitFailed, "forwarding the debugging port of the app on %s did not open within %v", alias, forwardTimeout)
+		}
+	}
 }
+
+// forwardTimeout covers ssh's 15 second connect timeout.
+const forwardTimeout = 20 * time.Second
 
 func (f *forwarder) close() {
 	_ = f.cmd.Process.Kill()
-	_ = f.cmd.Wait()
+	<-f.done
 }
 
 func sleep(ctx context.Context, d time.Duration) error {
