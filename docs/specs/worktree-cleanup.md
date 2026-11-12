@@ -352,6 +352,7 @@ None.
 | 2026-11-12 | R-2 | spec | `7806b5c77e6f55addd4b0f3d1d6487309104b4ee` | unknown | procedural | Two blocking, four should-fix and one nit finding; model identity not attested. |
 | 2026-11-12 | R-3 | spec | `e359f41bcaee7249b2fe27cba2aada158e3781b0` | claude-opus-4.8 | procedural | One blocking, four should-fix and two nit findings; model self-reported, no model was requested. |
 | 2026-11-12 | R-4 | spec | `b04d5e5fc2125e31fb329d08f9a57f049625fa29` | claude-opus-4.8 | procedural | One blocking, three should-fix and two nit findings; model self-reported, no model was requested. |
+| 2026-11-12 | R-5 | spec | `e73cecfe2c1b2061dda8e47929e218a6f2785d48` | unknown | procedural | Four should-fix and two nit findings; the reviewer did not report its model. |
 
 ### R-1
 
@@ -577,3 +578,47 @@ SEVERITY: nit
 WHERE: Test Plan AC-09 row
 EVIDENCE: The row says "check items 1 to 4 independently with `git status --porcelain --untracked-files=all --ignore-submodules=none`, `git merge-base --is-ancestor`, the merged PR head, the reflog and the commit date". Items 1 to 4 also keep worktrees for other reasons: a nested worktree or `.git` under an ignored path, submodule state, rebase or bisect state in the admin directory, and the main, invoking or locked worktree. The procedure names no check for any of them. Stackweaver's linked worktrees sit under ignored `.claude/` and `.tmp/` directories, so the nested case is the most likely one there.
 PROPOSAL: List the remaining independent checks in the AC-09 procedure: worktree containment from `git worktree list`, a search for `.git` under ignored paths, admin-directory state files, and the locked, main and invoking flags.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design item 6, AC-02
+EVIDENCE: Item 6 limits the new guard to "a branch whose `remove-worktree` it also approved". `execute` (branches.ts:241-249) observes again and then performs any approved `delete-local` that the fresh plan still proposes unchanged. A `delete-local` record holds only `kind`, `branch`, `oid` and `proof` (branches.ts:19), so it does not change when a worktree appears. Case 1: the approved plan has only `delete-local` for branch B, and a clean or ignored-only worktree is then added on B before `apply`. The fresh plan proposes `remove-worktree` plus an identical `delete-local` (branches.ts:190-197). Only the `delete-local` was approved, so `git update-ref -d` deletes B while it is checked out. Case 2: an approved `remove-worktree` at path P ends `already-absent` because `absent()` matches only by path (branches.ts:208), for example after `git worktree move P P2`. Item 6 then allows the `delete-local`, and B is deleted while P2 still has it checked out. Both cases break `conventions/delivery.md:22-23`: "delete only merged local branches that are not checked out in any worktree". R-4 F-01 showed the result, a worktree left on a missing branch. Today the default `--worktrees false` path keeps such a branch with a blocker (branches.ts:193). Item 5 makes worktree removal the default, and ignored files no longer block it, so this path is now the normal one.
+PROPOSAL: Perform a `delete-local` only when the fresh observation shows no worktree on that branch, or when the worktree on it was removed with result `done` earlier in the same run. Report every other case as `failed`. Add an AC-02 Test Plan case in which a worktree is added on the branch between `plan` and `apply`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design item 3, AC-04, goal
+EVIDENCE: Item 3 keeps a detached worktree when `git rev-list <logs/HEAD oids> --not --branches --remotes` prints anything. `--remotes` also counts stale remote-tracking refs. The same plan prunes those refs with `prune-tracking`, which needs no merge proof (branches.ts:181). The operation order runs `prune-tracking` before `remove-worktree` (branches.ts:28), and `execute` observes only once, before it performs anything. I tested this in a scratch repository with Git 2.55.0. A detached linked worktree committed X, ran `git push origin HEAD:refs/heads/foo`, then ran `git checkout --detach main`. `foo` was then deleted on the remote side, and `git fetch origin` without `--prune` left `refs/remotes/origin/foo`. The reflog check printed nothing, so the worktree counts as removable. After `git update-ref -d refs/remotes/origin/foo` and `git worktree remove ../d`, `git fsck --unreachable --no-reflogs` listed `unreachable commit` X. That contradicts the goal's "unmerged commits is always kept". Stackweaver has 10 such stale tracking refs today: 106 tracking refs against 96 heads from `git ls-remote --heads origin`. No current detached worktree depends on them.
+PROPOSAL: In the reflog check, count only remote-tracking refs whose branch still exists in the observed `ls-remote` set, or exclude refs that the same plan prunes. Add an AC-04 case with a reflog-only commit that only a stale tracking ref contains.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-02 row, Design item 6
+EVIDENCE: The AC-02 row's seventh case says "A seventh gains an untracked file after `plan`; `apply` reports both its approved operations as `changed`". Item 6 says that when a branch's approved `remove-worktree` ends with any outcome other than `done` or `already-absent`, "`changed` included, reports the `delete-local` as `failed` with `its worktree was not removed`". The eighth case follows item 6 and expects `changed` then `failed`. Item 6 gives the seventh case's `remove-worktree` the result `changed`, so its `delete-local` must be `failed`, not `changed`. No implementation can pass both item 6 and the row as written.
+PROPOSAL: Change the seventh case to expect `remove-worktree` `changed` and `delete-local` `failed`. Otherwise, state in item 6 that a `delete-local` the fresh plan no longer proposes reports `changed` before the worktree guard applies.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design item 5, AC-07, AC-10, Test Plan AC-10 row
+EVIDENCE: Item 5 says `after-merge` "removes the merged PR's own worktree", and item 5 treats owner approval "of the merge" as the request. Today `after-merge` limits observation to the PR head with `only` (branches.ts:291-292). A detached worktree has no branch, so it can never be the merged PR's own worktree. Even so, the AC-10 row requires that a locked detached worktree "is kept by `plan` and `after-merge` with a `worktree` kept record". `after-merge` returns `observed.plan.kept` (branches.ts:295). That record can only exist if `after-merge` evaluates detached worktrees that belong to no PR. If it does, it would also remove other clean, unlocked detached worktrees older than seven days on every merge, which the merge approval does not cover. If it does not, the AC-10 row cannot pass. AC-07 and its row never check that `after-merge` leaves unrelated worktrees in place.
+PROPOSAL: State that `after-merge` considers only the merged PR's branch and its worktree. Drop `after-merge` from the AC-10 row, or test the lock with a locked worktree on the PR's branch. Add an AC-07 case in which an unrelated, clean detached worktree older than seven days survives `after-merge`.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Design items 3 and 4, Test Plan AC-04 and AC-05 rows
+EVIDENCE: The AC-04 row expects the detached rebase fixture "kept with a reason naming the rebase" and the bisect fixture "with a reason naming the bisect". Both fixtures hold an unmerged commit that appears in their `logs/HEAD`. The reflog rule in item 3 keeps them on its own, and the AC-05 mid-rebase fixture likewise. The design does not say which reason wins or whether a kept record names every rule that applies. An implementation that checks the reflog first and omits the rebase or bisect check would keep all three fixtures, and only the reason text could tell the difference.
+PROPOSAL: State that a kept reason names every rule that keeps the worktree, or give the order of precedence, so that these fixtures test the rebase and bisect rule itself.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: goal, Design item 1, AC-02
+EVIDENCE: The goal says a worktree "with changed ... files ... is always kept", and item 1 relies on `git status`. I tested this in a scratch repository with Git 2.55.0. On a linked worktree on branch `f`, I appended to tracked file `a` and ran `git update-index --skip-worktree a`. Both item 1 status commands then printed nothing. `git worktree remove ../w` exited 0 and deleted the local change. `assume-unchanged` hides changes from `git status` in the same way. Today the same gap exists only with `--worktrees true`. Item 5 makes removal the default.
+PROPOSAL: Keep a worktree whose `git ls-files -v` shows an assume-unchanged entry, or a skip-worktree entry whose file exists on disk. Otherwise, name this limit in the Owner summary trade-offs.
