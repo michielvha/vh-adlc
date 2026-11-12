@@ -253,6 +253,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-12 | R-1 | spec | `365242f8508007bb91a58a65055e660a0f4a6730` | unknown | procedural | Two blocking, seven should-fix and two nit findings; model identity not attested. |
+| 2026-11-12 | R-2 | spec | `7806b5c77e6f55addd4b0f3d1d6487309104b4ee` | unknown | procedural | Two blocking, four should-fix and one nit finding; model identity not attested. |
 
 ### R-1
 
@@ -332,3 +333,54 @@ SEVERITY: nit
 WHERE: Context, Background
 EVIDENCE: "After the directory of a third worktree was deleted, `git worktree remove ../w1` removed its stale entry". `../w1` is the worktree already deleted in the first experiment, so the command does not match the "third worktree" it describes.
 PROPOSAL: Name the third worktree's actual path in the command.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design items 1 and 5, AC-01, AC-07, AC-08, Owner summary
+EVIDENCE: Design item 1 builds the ignored list from "the `!!` paths of `git status --porcelain --ignored`". Item 5 and the Owner summary make that list the safeguard: `after-merge` keeps a worktree that "holds ignored files", and a preauthorized sweep stops for digest approval only "when a `remove-worktree` operation lists ignored paths". I tested this in a scratch repository with Git 2.55.0, using a linked worktree that held an ignored `.env` and `node_modules/x`. With default config, the command printed `!! .env` and `!! node_modules/`. After `git config status.showUntrackedFiles no`, the same command printed nothing. With `--untracked-files=normal` added, it printed both again. With `status.showUntrackedFiles all`, it printed `!! node_modules/x`, so every file under `node_modules` would be listed. Under the `no` setting, which the document already handles for untracked files (R-1 F-03), the ignored list is empty. `after-merge` and a preauthorized sweep would then delete `.env` before the owner ever saw it. That breaks the owner's Q1 and Q5 answers, "Outside a digest-approved plan, worktrees holding ignored files are kept." No AC or Test Plan row covers this config for the ignored list.
+PROPOSAL: Collect the ignored list with explicit flags that override config, for example `git status --porcelain --ignored=traditional --untracked-files=normal`. Add a case under `status.showUntrackedFiles=no` to the AC-01 and AC-07 proofs in which the ignored files are still listed and the worktree is still kept by `after-merge`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Design item 1, goal, AC-02, Owner summary
+EVIDENCE: Design item 1 treats a worktree as clean when the status check prints nothing and lets ignored files "go with it". In a scratch repository with Git 2.55.0, linked worktree `a` ignored `.claude/`. A second worktree, `b`, was added at `a/.claude/worktrees/b` and given an untracked `u.txt`. `git -C a status --porcelain --untracked-files=all --ignore-submodules=none` printed nothing, and the ignored list showed only `!! .claude/`. `git worktree remove a` exited 0 and deleted `a/.claude/worktrees/b`, including `u.txt`. `git worktree list --porcelain` then showed `b` as `prunable`, so Design item 4 would remove its entry next. In Stackweaver, `git check-ignore -v` reports `.gitignore:72:.claude/*` and `.gitignore:9:.tmp/`, which are the two places where its linked worktrees live. Today `branches.ts:192` keeps any worktree with ignored output, so this loss is new with this feature. It contradicts the goal's "a worktree with changed or untracked files ... is always kept", and the owner sees only `.claude/` in the list.
+PROPOSAL: Keep a worktree whose directory contains another entry from `git worktree list` (or any nested `.git`), with a reason, and add that case to AC-02 and its Test Plan row.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary, Design item 4, AC-05
+EVIDENCE: The Owner summary's decision list says "Detached worktrees and entries with a missing directory are included, but only when their commit is on the default branch." Design item 4 and AC-05 also remove a missing-directory entry "when its branch is proven merged under the branch rules" ("on a proven-merged branch"). Those rules include containment in a merged PR head (`branches.ts:158`), which covers squash-merged branches whose commits are not on the default branch.
+PROPOSAL: Correct the summary bullet so that branch entries need a proven-merged branch and only detached entries need a commit on the default branch. Alternatively, narrow item 4 and AC-05 if the bullet is what the owner meant.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design item 4, Owner summary
+EVIDENCE: Item 4 says a `prunable` worktree is one "whose directory is gone", and that `git worktree remove` "removes only the stale entry". The summary says an entry on an unmounted volume "can go while the files stay". Git marks an entry prunable when its `.git` file is missing, even if the directory still exists. For example, an empty mount point stays behind when its volume is unmounted. In a scratch repository I emptied a worktree directory but kept the directory. `git worktree list --porcelain` showed `prunable gitdir file points to non-existent location`, and `git worktree remove ../m` exited 128 with `fatal: validation failed, cannot remove working tree: '.../m/.git' does not exist`. The entry stayed. Under item 4 such an entry is proposed in every plan and fails every apply. Its `delete-local` then fails with "its worktree was not removed" (`branches.ts:244`), and the run reports `complete: false`.
+PROPOSAL: Plan removal only for a prunable entry whose path does not exist. Keep one whose directory exists without a `.git` file, with a reason. Correct the summary's wording on unmounted volumes.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design items 3 and 4, AC-04, AC-05, Test Plan
+EVIDENCE: Item 3 requires a detached worktree to be "at least seven days old" and falls back to the HEAD commit's committer date when `logs/HEAD` has no entries. Item 4 removes a detached missing-directory entry "when its HEAD is reachable from the default branch" and says nothing about age. So it is unclear whether the seven-day rule applies there. The AC-05 row's fixture is created during the test, so it passes or fails depending on that reading. The item 3 fallback appears in neither AC-04 nor the AC-04 row. All 14 on-disk detached Stackweaver worktrees have a non-empty `logs/HEAD` (checked read-only), so AC-09 does not exercise the fallback either.
+PROPOSAL: State whether the age rule applies to detached missing-directory entries, and set the AC-05 fixture age to match. Add an AC-04 case for a detached worktree with an empty `logs/HEAD` and an old and a recent HEAD commit date.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design item 6, AC-04, AC-05, AC-09
+EVIDENCE: AC-04, AC-05 and AC-09 require detached and other linked worktrees to be "kept with a reason". The plan's kept record is `{ scope: "remote" | "local"; branch: string; reason: string }` (`branches.ts:20`), and every kept entry today names a branch. Branches whose proof fails are kept before their worktree is looked up (`branches.ts:189-190`), so the record never names the worktree path. Design item 6 changes only `remove-worktree` and does not say how a detached worktree, which has no branch, or a worktree path appears in `kept`. Without that, the AC-09 check "every other linked worktree is kept with a reason" has nothing in the plan to match.
+PROPOSAL: Specify in item 6 a kept record that can name a worktree by path, with no branch when detached. Make AC-09 match worktrees to kept records by path.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design
+EVIDENCE: "All changes are in `observe`, `perform` and `execute` in `branches.ts`, plus the plan schema." The `--worktrees` default is set in `cli.ts:7-8` (`undefined` becomes `false`). The `after-merge` keep rule in item 5 touches `afterMerge` (`branches.ts:287-298`), and the version 1 refusal is in `parsePlan` (`branches.ts:256`). `after-merge` also accepts `--worktrees` today (`cli.ts:6`, `cli.ts:20`), and the design does not say what that flag does after the change.
+PROPOSAL: List `cli.ts`, `afterMerge` and `parsePlan` among the changed places, and say whether `after-merge --worktrees false` still leaves worktrees alone.
