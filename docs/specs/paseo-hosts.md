@@ -410,6 +410,7 @@ None.
 | 2026-11-12 | R-36 | spec | `41f03025c0bac68f3ef33f0a395dd74768421f68` | unknown | procedural | One should-fix factual finding (the updater path and the ShipIt job name are not cited, and no live check reads the real ones) and two factual nits (AC-06 counts force-stops of an instance holding no writes; the summary's AC-06 bound predates R-35). Measured both values and applied all three. |
 | 2026-11-12 | R-37 | spec | `030bfc28d2977ee7a9ed07fae01cd94fee2e483b` | claude-opus-4.8 | procedural | Two factual nits (AC-05 counts attempts differently from the Design; step 9 reads the Mac job from a state file that may not exist) and one judgement nit (fixed installer names rather than reading them at run time). Applied the nits and raised Q16. |
 | 2026-11-12 | R-38 | spec | `1350926d925c2d9642f74670eb26b20d73109bf8` | unknown | procedural | One should-fix factual finding (no check tells the Windows installer read from its fallback, and YAML quotes could break it) and one judgement nit (the macOS quit keeps a fixed app id). Applied the finding and raised Q17. |
+| 2026-11-12 | R-39 | spec | `9c48ee3aafbb2077655321aa342d39fcc345b468` | unknown | procedural | Two factual nits: step 9 and T44 ask each desktop for both installer values, and the plist read has no named tool or test stand-in. Applied both. |
 
 ### R-1
 
@@ -1817,6 +1818,22 @@ SEVERITY: nit
 WHERE: Design, Desktop app entry steps 2 and 5, and quit and wait
 EVIDENCE: Q16's reason is that a fixed name could go stale after an app update. The design now reads `CFBundleIdentifier` for the `ShipIt` match only. The macOS quit still uses a fixed id: `internal/clientapp/snippets/stop.sh:16` runs `osascript -e 'tell application id "sh.paseo.desktop" to quit'`. In `clientapp.go` `stop()`, the step 5 quit (wait > 0) falls back to `KILL`. If the identifier changed, the AppleScript quit would fail with no message, and every step 5 quit would become a force-stop after 20 seconds. `link` would then succeed only if the tunnel appears, and rollbacks would fall outside AC-06.
 PROPOSAL: Have `stop.sh` use the identifier it reads from `Info.plist`, with the same fallback, for the AppleScript quit too. Alternatively, record in Design that the quit keeps the fixed id and explain why.
+
+### R-39
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, manual step 9 (line 273); Tasks, T44 (line 363)
+EVIDENCE: Step 9 says "On each desktop, also read `updaterCacheDirName` from the installed app's `app-update.yml`, and on the Mac `CFBundleIdentifier` from `Paseo.app/Contents/Info.plist`, and record from the CLI's debug log at `LOG_LEVEL=debug` that the stop snippet printed `INSTALLER_SOURCE=file` and an `INSTALLER` naming those values." T44 records "the updater directory and `ShipIt` job read from each installed app and the debug log showing `INSTALLER_SOURCE=file` and those values on each desktop". Quit and wait (line 196) uses `updaterCacheDirName` only on Windows and the `<identifier>.ShipIt` job only on macOS, and "Each stop snippet prints `INSTALLER=<job or directory>`", so each desktop prints one value. Read literally, the pass condition asks the Mac's `INSTALLER` to name the updater directory as well, and `stop.sh` never prints it. The Mac app may also have an `app-update.yml` the CLI ignores, so "on each desktop" does not make the step fail for a missing file. It only leaves the pass condition open to two readings.
+PROPOSAL: In step 9 and T44, read `updaterCacheDirName` on Windows and `CFBundleIdentifier` on the Mac. Require each desktop's `INSTALLER` to be its own value: `<directory>` on Windows and `<identifier>.ShipIt` on the Mac.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T41 (line 360); Test Plan, AC-05, AC-06, AC-16, AC-17 row (line 262) and the stand-in list above the table; Design, quit and wait (line 196)
+EVIDENCE: The row requires a `stop.sh` test with "a stand-in `Info.plist` naming `test.paseo.other`" that asserts "that the AppleScript quit names `test.paseo.other`, and that it prints `INSTALLER_SOURCE=file`". The `osascript` stand-in fails every script that does not name the current id: `internal/testenv/standins.go:1004` has `if !strings.Contains(script, `"sh.paseo.desktop"`) ... return fail(1, "testenv osascript: unsupported script %q", script)`. Snippets run with only the stand-ins in `internal/testenv/testenv.go:40-56` and the real tools in `sysTools` (`:66-70`). Neither list has a plist reader such as `defaults`, `plutil` or `PlistBuddy`. The Design does not say how `stop.sh` reads `CFBundleIdentifier`. If it uses a macOS plist tool, the read fails under testenv and falls back, so the `INSTALLER_SOURCE=file` assertion cannot pass without a new stand-in. If it parses the file as text, it depends on the real `Info.plist` being XML, and the document does not cite the file's format. T41 lists `stop.sh`, `stop.ps1`, `clientapp.go`, `fakedevtools_test.go` and `clientapp_test.go`, but not `internal/testenv/standins.go`. The Test Plan's stand-in list names `osascript` and `open` but no plist reader.
+PROPOSAL: State in Design how `stop.sh` reads `CFBundleIdentifier`, for example `plutil` or `defaults read`, which accept both plist formats. Add `internal/testenv/standins.go` to T41 for the plist-reader stand-in and an `osascript` stand-in that accepts the identifier it is given. Otherwise, cite that Paseo's `Info.plist` is XML and say the snippet parses it as text.
 
 ## Sources
 
