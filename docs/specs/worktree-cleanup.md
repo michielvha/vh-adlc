@@ -475,6 +475,7 @@ None.
 | 2026-11-12 | R-10 | spec | `298022d4283735c05526ec05c585961fdaf0604a` | unknown | procedural | One blocking, one should-fix and two nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-11 | spec | `8e1cf1f59d076e250cbd128e9ea6df95bf749e9b` | unknown | procedural | One factual should-fix, one judgement should-fix and two nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-12 | spec | `a0e8e8114909c19a61019ae389f6d6cf533ba88d` | unknown | procedural | One judgement should-fix, one factual nit and two further nit findings; the reviewer did not report its model. |
+| 2026-11-12 | R-13 | spec | `533cb53acc4327c09be13fcd0bae9f2fe5a55ad4` | unknown | procedural | One factual should-fix, one factual nit and one judgement nit; the reviewer did not report its model. |
 
 ### R-1
 
@@ -961,3 +962,26 @@ SEVERITY: nit
 WHERE: Owner summary, trade-offs paragraph
 EVIDENCE: The summary says "the implement skill recreates the branch at the claim commit, in a new worktree". `skills/vh-adlc-implement/SKILL.md` claim step 6 says that when no suitable worktree is available, "report the owner action needed (a worktree for the branch) and stop; never create, move or reset a worktree yourself". The re-enter step only says "create the branch at that exact claim commit". The skill recreates the branch, but the owner has to provide the worktree.
 PROPOSAL: Say that the implement skill recreates the branch at the claim commit and asks the owner for a worktree to continue in.
+
+### R-13
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (admin directory paragraph before item 1), Design item 1 (shared admin directory rule), AC-02, Test Plan AC-02 row
+EVIDENCE: Item 1 keeps an entry "when another entry's admin directory is the same one", and the preamble accepts a present entry's `rev-parse --absolute-git-dir` result "only when that directory's `gitdir` file names `<path>/.git`". If a present checkout has been moved over another worktree's path, its result is rejected. That means it has no admin directory to compare. The `prunable` entry whose admin directory it actually uses then finds that directory uniquely, and no rule keeps it. The AC-02 row expects otherwise: "the present `p1/w` points to `w1`, which the `prunable` `p2/w` also uses; both are kept". I tested this in a scratch repository with Git 2.55.0. I created detached `p1/w` (admin `w`) and `p2/w` (admin `w1`) at main, then ran `rm -rf p1/w` and `mv p2/w p1/w`. `git worktree list --porcelain` showed `p1/w` as present and `p2/w` as `prunable`. `git -C p1/w rev-parse --absolute-git-dir` printed `.git/worktrees/w1`, while `w1/gitdir` names `p2/w/.git`, so the present entry's result is rejected. Only `w1` names `p2/w/.git`, so under the Design `p2/w` passes the admin rule. Item 4 sets no minimum age for a detached missing-directory entry, so `p2/w` would be proposed. `git worktree remove ../p2/w` exited 0 and deleted `worktrees/w1`. Afterwards `git -C p1/w status` failed with `fatal: not a git repository`. This contradicts the stated purpose "no removal deletes another checkout's admin directory", and the literal Design cannot satisfy the row.
+PROPOSAL: Define the shared-admin comparison to include the admin directory that each present entry's `.git` names, whether or not that directory's `gitdir` points back. Then a `prunable` entry whose admin directory a present checkout uses is kept. Make AC-02's "that no other entry uses" match that wording.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (admin directory paragraph before item 1), Test Plan AC-09 row
+EVIDENCE: For `prunable` entries the paragraph says the `gitdir` file is "resolved against that directory when relative". The present-entry rule says only that the admin directory is "accepted only when that directory's `gitdir` file names `<path>/.git`", with no resolution step. The AC-09 row says the same. In a scratch repository with Git 2.55.0, `git -c worktree.useRelativePaths=true worktree add --detach ../rel main` wrote `../../../../rel/.git` into `worktrees/rel/gitdir`. `git worktree list --porcelain` printed the absolute path. A literal string comparison would therefore reject every present worktree in a repository that uses relative worktree paths, and keep them all.
+PROPOSAL: Say that the present-entry check resolves a relative `gitdir` against the admin directory and compares normalized paths, the same way as for `prunable` entries.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-04, AC-05
+EVIDENCE: AC-04 says "A clean detached worktree whose HEAD is reachable from the default branch and whose own HEAD reflog starts at least seven days ago is removed." AC-10 says "A locked worktree, including a clean detached one at a default-branch commit older than seven days, is never proposed for removal". AC-05 says that a missing-directory entry "on a proven-merged branch or detached at a commit reachable from the default branch, is removed ... by an applied plan". AC-02 keeps a worktree "present or with its directory missing, with a ref under `refs/worktree/`" or with an unresolved or shared admin directory. Read literally, these criteria contradict each other. R-9 F-03 and R-10 F-04 fixed the same problem in AC-07 and AC-03 by adding "unless a rule in Design items 1 to 5 keeps it", but AC-04 and AC-05 still lack it.
+PROPOSAL: Add "unless a rule in Design items 1 to 5 keeps it" to the removal clauses of AC-04 and AC-05.
