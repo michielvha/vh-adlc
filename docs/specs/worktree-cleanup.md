@@ -436,6 +436,7 @@ None.
 | 2026-11-12 | R-7 | spec | `7d0e5797c123e3f62316e655e32cb982a28a61f8` | unknown | procedural | Two should-fix and two nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-8 | spec | `5bfcf863788600670cca92a5ab3a56e4adfa1364` | claude-opus-4.8 | procedural | One should-fix and three nit findings; model self-reported, no model was requested. |
 | 2026-11-12 | R-9 | spec | `3167ec932ea73aa067937ffa722ccf900760d77d` | unknown | procedural | One should-fix and four nit findings; the reviewer did not report its model. |
+| 2026-11-12 | R-10 | spec | `298022d4283735c05526ec05c585961fdaf0604a` | unknown | procedural | One blocking, one should-fix and two nit findings; the reviewer did not report its model. |
 
 ### R-1
 
@@ -832,3 +833,33 @@ SEVERITY: nit
 WHERE: Owner summary (lines 46-49)
 EVIDENCE: "Commits that are not on the default branch or in a merged PR head are never removed, with one exception ..." This is broader than the feature. The existing `prune-tracking` (branches.ts:181) already drops commits that only a stale tracking ref names, with no merge proof. Removing a worktree also discards its per-worktree refs (`refs/worktree/*`), which the summary does not mention.
 PROPOSAL: Limit the sentence to this feature: "Worktree removal and local branch deletion never discard commits that are not on ..." Mention per-worktree refs, or add a rule in Design item 1 that keeps them.
+
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design items 3 and 4, AC-04, goal
+EVIDENCE: Item 3 (lines 256-262) reads a detached worktree's age and its reflog-only commits from the file `$(git rev-parse --git-common-dir)/worktrees/<name>/logs/HEAD`. Item 1 (line 243) already treats reftable storage as a supported case. I tested this in a scratch repository with Git 2.55.0, created with `git init --ref-format=reftable`. In a detached linked worktree I committed Y and then ran `git checkout --detach main`. The admin directory held `reftable/` and no `logs/HEAD`, so the oid list from that file was empty. `git rev-list --not --branches` with no oids printed nothing and exited 0, so the check passed. The status check printed nothing, and `git merge-base --is-ancestor HEAD main` succeeded. Item 3 then falls back to the HEAD commit's date for age, so a worktree created today at an old main commit counts as old. `git worktree remove` exited 0, and `git fsck --unreachable --no-reflogs` listed `unreachable commit` Y. In the same repository, `git --git-dir=<admin dir> reflog show --format=%H HEAD` listed Y. It did so both with the worktree present and after `rm -rf` of the worktree directory, which left the entry `prunable`. This breaks the goal's "a worktree with ... unmerged commits is always kept" in reftable repositories, and the reflog guard fails silently.
+PROPOSAL: Read a worktree's HEAD reflog with `git --git-dir=<admin dir> reflog show HEAD`, which works with both storage backends and for `prunable` entries, and keep the worktree when that command fails. Alternatively, keep every detached worktree in a reftable repository. Add an AC-04 fixture in a reftable repository with a reflog-only commit.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design item 1 (lines 240-244), AC-05, Owner summary
+EVIDENCE: Item 1 keeps a `prunable` entry when "the repository uses reftable storage, where the helper cannot list them". That keeps every missing-directory entry in a reftable repository. AC-05 says such entries are "removed from `git worktree list` by an applied plan", and the summary says "worktree entries whose directory is gone, are removed". Neither mentions this exception. The premise is also wrong. In scratch repositories with Git 2.55.0, after `git update-ref refs/worktree/keep HEAD` in a linked worktree and `rm -rf` of its directory, `git --git-dir=.git/worktrees/<name> for-each-ref refs/worktree/` listed `refs/worktree/keep` and exited 0. That happened with both `--ref-format=files` and `--ref-format=reftable`. With files storage, `git pack-refs --all` left the ref loose under the admin directory's `refs/worktree/`.
+PROPOSAL: Check per-worktree refs of `prunable` entries with `git --git-dir=<admin dir> for-each-ref refs/worktree/` for both storage backends, and drop the reftable exception. If the exception stays, name it in AC-05 and in the Owner summary.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-09 row
+EVIDENCE: Since R-9, Design item 1 keeps a worktree, present or `prunable`, that has a ref under `refs/worktree/`. The AC-09 manual procedure lists every other independent keep check, including the permission `find`, `ls-files -v` and admin-directory state. It does not list a per-worktree ref check. So the manual pass cannot confirm that a proposed worktree has no per-worktree refs. This is the same gap that R-8 F-03 found for the rules R-7 added.
+PROPOSAL: Add `git --git-dir=<admin dir> for-each-ref refs/worktree/` for each linked worktree to the AC-09 procedure.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-03 (lines 359-362)
+EVIDENCE: The R-9 F-03 fix changed AC-03 to "is deleted, together with its worktree when it has one and Design item 1 allows its removal". Items 3 and 5 also keep branch worktrees: main, invoking, `--repo` and locked worktrees, and rebase or bisect state for "Any worktree, detached or on a branch". Read literally, AC-03 says that a seven-day-old branch at the default tip with a locked worktree is deleted and the worktree removed, which contradicts AC-10. It also does not say that the branch stays when its worktree is kept. AC-07 already uses the wording "unless a rule in Design items 1 to 5 keeps it".
+PROPOSAL: Reword AC-03 to say the branch is deleted, together with its worktree, unless a rule in Design items 1 to 5 keeps that worktree, in which case the branch is kept with a reason.
