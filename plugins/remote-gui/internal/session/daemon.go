@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -419,6 +420,8 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	}
 
 	var bundle BrowserHandle
+	var stopBrowser func()
+	var viewers atomic.Pointer[proxy.Proxy]
 	var browserState *browserControl
 	target := r.Config.Target
 	client := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET"))
@@ -450,8 +453,21 @@ func serve(ctx context.Context, r state.Record) (result error) {
 			return err
 		}
 		target = bundle.Target
-		if bundle.Stop != nil {
-			defer bundle.Stop()
+		stopBrowser = bundle.Stop
+		if r.Config.Profile != "" && bundle.Stop != nil {
+			// A reusable profile's browser stop starts the moment ctx is
+			// canceled, rejecting viewer access first, so no startup state
+			// update can hold it past the guard's deadline. It runs once.
+			stopBrowser = sync.OnceFunc(func() {
+				if p := viewers.Load(); p != nil {
+					p.Revoke()
+				}
+				bundle.Stop()
+			})
+			go func() { <-ctx.Done(); stopBrowser() }()
+		}
+		if stopBrowser != nil {
+			defer stopBrowser()
 		}
 		if err = update(home, id, func(r *state.Record) {
 			r.CDPAddress = bundle.CDPAddress
@@ -495,6 +511,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	if err != nil {
 		return err
 	}
+	viewers.Store(p)
 	defer p.Revoke()
 	public := &http.Server{Handler: p, ConnContext: p.ConnContext, ConnState: p.ConnState, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 0, IdleTimeout: 30 * time.Second}
 	publicErrors := make(chan struct{})
@@ -502,13 +519,14 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	// Remove remote exposure while the lifetime guard still reserves this listener.
 	defer func() {
 		p.Revoke()
-		// A reusable profile's browser stop starts once access is rejected,
-		// alongside forward removal, so a slow removal cannot leave it to the
-		// guard's group stop. Without a profile the existing order stays.
+		// A reusable profile's browser stop, if ctx has not started it yet,
+		// starts once access is rejected, alongside forward removal, so a slow
+		// removal cannot leave it to the guard's group stop. Without a profile
+		// the existing order stays.
 		var browserStopped chan struct{}
 		if r.Kind == "browser" && r.Config.Profile != "" && bundle.Stop != nil {
 			browserStopped = make(chan struct{})
-			go func() { bundle.Stop(); close(browserStopped) }()
+			go func() { stopBrowser(); close(browserStopped) }()
 		}
 		if browserStopped != nil {
 			defer func() { <-browserStopped }()
@@ -564,7 +582,14 @@ func serve(ctx context.Context, r state.Record) (result error) {
 			w.WriteHeader(405)
 			return
 		}
-		if browserState != nil {
+		// A reusable-profile session still starting has no state to mark, so
+		// a startup state update waiting on the lock cannot delay its stop.
+		starting := false
+		if r.Config.Profile != "" {
+			current, e := state.Load(home, id)
+			starting = e == nil && current.State == "starting"
+		}
+		if browserState != nil && !starting {
 			_ = update(home, id, func(current *state.Record) {
 				if current.State == "ready" || current.State == "handoff" || current.State == "handoff-failed" {
 					current.State = "stopping"

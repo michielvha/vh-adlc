@@ -162,9 +162,10 @@ type viewerProbe struct {
 	Code   string `json:"code,omitempty"`
 }
 
-// status returns the proxy's answer, or 0 when none came within 400 ms. Once
-// the supervisor has closed its server, the guard still holds the listening
-// socket, so a request is accepted by the kernel and never answered.
+// status returns the proxy's answer, or 0 when none came within 400 ms. A
+// revoke closes the proxy's connections, and once the supervisor has closed
+// its server the guard still holds the listening socket, so a request is
+// accepted by the kernel and never answered.
 func (v viewerProbe) status() int {
 	request, err := http.NewRequest(http.MethodGet, v.URL, nil)
 	if err != nil {
@@ -732,8 +733,8 @@ func standInBrowser(t *testing.T, f profileFixture, id string) state.Identity {
 // access already rejected, sent SIGTERM within 800 ms of began, and ended the
 // browser with the session's own kill two seconds later, never the guard's
 // group stop. The viewer was rejected when the proxy answered 410 Gone, or
-// gave no answer because the supervisor had already closed its server after
-// revoking access.
+// gave no answer because the supervisor's shutdown, which revokes access
+// before it closes its server, cut the request; an unrevoked proxy answers 200.
 func checkStubbornStop(t *testing.T, f profileFixture, id string, browser state.Identity, began time.Time, ending string) {
 	t.Helper()
 	var terms []time.Time
@@ -761,6 +762,8 @@ func checkStubbornStop(t *testing.T, f profileFixture, id string, browser state.
 	if got := termTimes(filepath.Join(f.fake, "term-"+id)); len(got) != 1 {
 		t.Fatalf("the browser got %d SIGTERMs: the guard's group stop ended it", len(got))
 	}
+	viewer, _ := os.ReadFile(filepath.Join(f.fake, "stop-viewer-"+id))
+	t.Logf("SIGTERM %v after the %s began, kill %v later, viewer answer %s", terms[0].Sub(began), ending, died.Sub(terms[0]), viewer)
 	// The supervisor records the end of its browser stop just after the browser dies.
 	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		if _, err := os.Stat(filepath.Join(f.fake, "stop-end-"+id)); err == nil {
