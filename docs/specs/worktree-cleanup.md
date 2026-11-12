@@ -483,6 +483,7 @@ None.
 | 2026-11-12 | R-11 | spec | `8e1cf1f59d076e250cbd128e9ea6df95bf749e9b` | unknown | procedural | One factual should-fix, one judgement should-fix and two nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-12 | spec | `a0e8e8114909c19a61019ae389f6d6cf533ba88d` | unknown | procedural | One judgement should-fix, one factual nit and two further nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-13 | spec | `533cb53acc4327c09be13fcd0bae9f2fe5a55ad4` | unknown | procedural | One factual should-fix, one factual nit and one judgement nit; the reviewer did not report its model. |
+| 2026-11-12 | R-14 | spec | `703eeb294056f8f59f940ab041c83f96e645bda6` | unknown | procedural | One judgement nit and one factual nit; the reviewer did not report its model. |
 
 ### R-1
 
@@ -992,3 +993,19 @@ SEVERITY: nit
 WHERE: AC-04, AC-05
 EVIDENCE: AC-04 says "A clean detached worktree whose HEAD is reachable from the default branch and whose own HEAD reflog starts at least seven days ago is removed." AC-10 says "A locked worktree, including a clean detached one at a default-branch commit older than seven days, is never proposed for removal". AC-05 says that a missing-directory entry "on a proven-merged branch or detached at a commit reachable from the default branch, is removed ... by an applied plan". AC-02 keeps a worktree "present or with its directory missing, with a ref under `refs/worktree/`" or with an unresolved or shared admin directory. Read literally, these criteria contradict each other. R-9 F-03 and R-10 F-04 fixed the same problem in AC-07 and AC-03 by adding "unless a rule in Design items 1 to 5 keeps it", but AC-04 and AC-05 still lack it.
 PROPOSAL: Add "unless a rule in Design items 1 to 5 keeps it" to the removal clauses of AC-04 and AC-05.
+
+### R-14
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-01
+EVIDENCE: AC-01 says "In a plan, a worktree on a proven-merged branch that has no changed or untracked files but does hold ignored files is proposed for removal". It has no exception clause. AC-02 says the opposite for some of these same worktrees: "The same holds for a worktree that has another worktree, or any `.git`, inside one of its ignored directories". AC-02 also keeps a worktree "whose ignored paths cannot all be read" and one with a read-only directory under ignored `node_modules/`. AC-10 says a locked worktree "is never proposed for removal". Read literally, AC-01 requires removing worktrees that AC-02 and AC-10 keep. R-9 F-03, R-10 F-04 and R-13 F-03 fixed this same problem by adding "unless a rule in Design items 1 to 5 keeps it" to AC-07, AC-03, AC-04 and AC-05. AC-01 still does not have that clause.
+PROPOSAL: Add "unless a rule in Design items 1 to 5 keeps it" to AC-01's removal clause.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: AC-02, Owner summary (R-13 sentence), Design item 1
+EVIDENCE: Design item 1 keeps an entry whose admin directory is also "the one another entry's admin directory or another present entry's `.git` file points to". AC-02 says instead "or is also the admin directory of another entry or the one a present checkout's `.git` points to". The Owner summary says "item 1 now keeps any entry whose admin directory a present checkout points to". In both places, "another" is missing from the present-checkout half. Every present worktree's own `.git` points to its own admin directory, so read literally, AC-02 and the summary keep every present worktree. "A present checkout" also covers checkouts outside `git worktree list`, which the helper cannot see. The Design limits the check to other entries. An implementation review compares behaviour with the exact text of AC-02.
+PROPOSAL: In AC-02, write "or the one another present entry's `.git` points to". In the summary, write "whose admin directory another present checkout's `.git` points to". Both then match Design item 1.
