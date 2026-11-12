@@ -69,10 +69,23 @@ func fakeBrowser(dir string, c config.Config, id string) (BrowserHandle, error) 
 	if err != nil {
 		return BrowserHandle{}, err
 	}
+	// With REMOTE_GUI_TEST_HOLD_PROBE set, the viewer is unavailable until the
+	// test creates probe-open-<id>, which keeps the supervisor in its startup
+	// probe; probed-<id> marks the probe's WebSocket, its last step before ready.
+	held := os.Getenv("REMOTE_GUI_TEST_HOLD_PROBE") != ""
 	server := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if held {
+			if _, err := os.Stat(filepath.Join(dir, "probe-open-"+id)); err != nil {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+		}
 		if !strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
 			_, _ = io.WriteString(w, "fake viewer")
 			return
+		}
+		if held {
+			stamp(filepath.Join(dir, "probed-"+id))
 		}
 		conn, buffered, err := http.NewResponseController(w).Hijack()
 		if err != nil {
@@ -106,6 +119,13 @@ func fakeBrowser(dir string, c config.Config, id string) (BrowserHandle, error) 
 		}
 		time.Sleep(100 * time.Millisecond)
 		closeBrowser = func() {
+			// Record whether the proxy already rejects the test's viewer when the browser stop begins.
+			if data, err := os.ReadFile(filepath.Join(dir, "viewer-"+id)); err == nil {
+				var probe viewerProbe
+				if json.Unmarshal(data, &probe) == nil {
+					_ = os.WriteFile(filepath.Join(dir, "stop-viewer-"+id), []byte(strconv.Itoa(probe.status())), 0o600)
+				}
+			}
 			stamp(filepath.Join(dir, "stop-begin-"+id))
 			_ = cmd.Process.Signal(syscall.SIGTERM)
 			select {
@@ -132,6 +152,49 @@ func fakeBrowser(dir string, c config.Config, id string) (BrowserHandle, error) 
 			})
 		},
 	}, nil
+}
+
+// viewerProbe is a viewer request through the session proxy. The test writes
+// it to the fake directory, and the stand-in close repeats it when it begins.
+type viewerProbe struct {
+	URL    string `json:"url"`
+	Cookie string `json:"cookie,omitempty"`
+	Code   string `json:"code,omitempty"`
+}
+
+// status returns the proxy's answer, or 0 when none came within 400 ms. Once
+// the supervisor has closed its server, the guard still holds the listening
+// socket, so a request is accepted by the kernel and never answered.
+func (v viewerProbe) status() int {
+	request, err := http.NewRequest(http.MethodGet, v.URL, nil)
+	if err != nil {
+		return 0
+	}
+	if v.Cookie != "" {
+		request.Header.Set("Cookie", v.Cookie)
+	}
+	if v.Code != "" {
+		request.SetBasicAuth("viewer", v.Code)
+	}
+	client := &http.Client{Timeout: 400 * time.Millisecond, Transport: &http.Transport{Proxy: nil}}
+	defer client.Transport.(*http.Transport).CloseIdleConnections()
+	response, err := client.Do(request)
+	if err != nil {
+		return 0
+	}
+	_ = response.Body.Close()
+	return response.StatusCode
+}
+
+func (f profileFixture) recordViewer(t *testing.T, id string, v viewerProbe) {
+	t.Helper()
+	data, err := json.Marshal(v)
+	if err == nil {
+		err = os.WriteFile(filepath.Join(f.fake, "viewer-"+id), data, 0o600)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func stamp(file string) {
@@ -655,6 +718,73 @@ func termTimes(file string) []time.Time {
 	return times
 }
 
+func standInBrowser(t *testing.T, f profileFixture, id string) state.Identity {
+	t.Helper()
+	var browser state.Identity
+	data, err := os.ReadFile(filepath.Join(f.fake, "browser-"+id))
+	if err != nil || json.Unmarshal(data, &browser) != nil {
+		t.Fatal("stand-in browser identity missing")
+	}
+	return browser
+}
+
+// checkStubbornStop asserts that the stand-in browser stop began with viewer
+// access already rejected, sent SIGTERM within 800 ms of began, and ended the
+// browser with the session's own kill two seconds later, never the guard's
+// group stop. The viewer was rejected when the proxy answered 410 Gone, or
+// gave no answer because the supervisor had already closed its server after
+// revoking access.
+func checkStubbornStop(t *testing.T, f profileFixture, id string, browser state.Identity, began time.Time, ending string) {
+	t.Helper()
+	var terms []time.Time
+	for deadline := time.Now().Add(8 * time.Second); len(terms) == 0; time.Sleep(5 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the stand-in browser got no SIGTERM")
+		}
+		terms = termTimes(filepath.Join(f.fake, "term-"+id))
+	}
+	if wait := terms[0].Sub(began); wait > 800*time.Millisecond {
+		t.Fatalf("SIGTERM %v after the %s began: the browser stop started late", wait, ending)
+	}
+	if data, err := os.ReadFile(filepath.Join(f.fake, "stop-viewer-"+id)); err != nil || (string(data) != strconv.Itoa(http.StatusGone) && string(data) != "0") {
+		t.Fatalf("the proxy answered the viewer %q when the browser stop began: access was not rejected first", data)
+	}
+	for deadline := time.Now().Add(6 * time.Second); state.Alive(browser); time.Sleep(5 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("the stand-in browser survived")
+		}
+	}
+	died := time.Now()
+	if wait := died.Sub(terms[0]); wait < 1900*time.Millisecond || wait > 2700*time.Millisecond {
+		t.Fatalf("the browser died %v after its SIGTERM, want the kill two seconds later", wait)
+	}
+	if got := termTimes(filepath.Join(f.fake, "term-"+id)); len(got) != 1 {
+		t.Fatalf("the browser got %d SIGTERMs: the guard's group stop ended it", len(got))
+	}
+	// The supervisor records the end of its browser stop just after the browser dies.
+	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		if _, err := os.Stat(filepath.Join(f.fake, "stop-end-"+id)); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the supervisor did not finish its browser stop")
+		}
+	}
+}
+
+// awaitStopping waits until the supervisor has accepted a stop.
+func awaitStopping(t *testing.T, f profileFixture, id string, began time.Time) {
+	t.Helper()
+	for {
+		if current, e := state.Load(f.home, id); e == nil && current.State == "stopping" {
+			return
+		}
+		if time.Since(began) > 3*time.Second {
+			t.Fatal("stop was not accepted")
+		}
+	}
+}
+
 // When forward removal is delayed, here by holding the state lock that it
 // must take, a reusable profile's browser stop starts once the proxy has
 // rejected access, without waiting for the removal, so the browser gets its
@@ -672,32 +802,17 @@ func TestProfileBrowserStopDoesNotWaitForForwardRemoval(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var browser state.Identity
-			data, err := os.ReadFile(filepath.Join(f.fake, "browser-"+v.ID))
-			if err != nil || json.Unmarshal(data, &browser) != nil {
-				t.Fatal("stand-in browser identity missing")
-			}
+			browser := standInBrowser(t, f, v.ID)
 			access, err := Access(f.home, v.ID, true)
 			if err != nil {
 				t.Fatal(err)
 			}
 			grant := auth(t, access, access.AccessCode)
-			viewer := func() int {
-				request, _ := http.NewRequest(http.MethodGet, access.URL, nil)
-				request.AddCookie(grant.Cookie)
-				request.SetBasicAuth("viewer", grant.Code)
-				client := &http.Client{Timeout: time.Second, Transport: &http.Transport{Proxy: nil}}
-				defer client.Transport.(*http.Transport).CloseIdleConnections()
-				response, e := client.Do(request)
-				if e != nil {
-					return 0
-				}
-				_ = response.Body.Close()
-				return response.StatusCode
-			}
-			if code := viewer(); code != http.StatusOK {
+			enrolled := viewerProbe{URL: access.URL, Cookie: grant.Cookie.Name + "=" + grant.Cookie.Value, Code: grant.Code}
+			if code := enrolled.status(); code != http.StatusOK {
 				t.Fatalf("enrolled viewer rejected before the stop: %d", code)
 			}
+			f.recordViewer(t, v.ID, enrolled)
 			held := make(chan func(), 1)
 			hold := func() {
 				release, e := state.Lock(context.Background(), f.home)
@@ -718,57 +833,112 @@ func TestProfileBrowserStopDoesNotWaitForForwardRemoval(t *testing.T) {
 			} else {
 				began = time.Now()
 				go func() { end, _ := Stop(f.home, v.ID); stopped <- end }()
-				for {
-					if current, e := state.Load(f.home, v.ID); e == nil && current.State == "stopping" {
-						break
-					}
-					if time.Since(began) > 3*time.Second {
-						t.Fatal("stop was not accepted")
-					}
-				}
+				awaitStopping(t, f, v.ID, began)
 				go hold()
 			}
 			<-held
-			var terms []time.Time
-			for deadline := time.Now().Add(8 * time.Second); len(terms) == 0; time.Sleep(5 * time.Millisecond) {
-				if time.Now().After(deadline) {
-					t.Fatal("the stand-in browser got no SIGTERM")
-				}
-				terms = termTimes(filepath.Join(f.fake, "term-"+v.ID))
-			}
-			if code := viewer(); code == http.StatusOK {
-				t.Fatal("viewer access was still accepted once the browser stop began")
-			}
-			if wait := terms[0].Sub(began); wait > 800*time.Millisecond {
-				t.Fatalf("SIGTERM %v after the %s began: the browser stop waited for forward removal", wait, ending)
-			}
-			for deadline := time.Now().Add(6 * time.Second); state.Alive(browser); time.Sleep(5 * time.Millisecond) {
-				if time.Now().After(deadline) {
-					t.Fatal("the stand-in browser survived")
-				}
-			}
-			died := time.Now()
-			if wait := died.Sub(terms[0]); wait < 1900*time.Millisecond || wait > 2700*time.Millisecond {
-				t.Fatalf("the browser died %v after its SIGTERM, want the kill two seconds later", wait)
-			}
-			if got := termTimes(filepath.Join(f.fake, "term-"+v.ID)); len(got) != 1 {
-				t.Fatalf("the browser got %d SIGTERMs: the guard's group stop ended it", len(got))
-			}
-			// The supervisor records the end of its browser stop just after the browser dies.
-			for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(10 * time.Millisecond) {
-				if _, err = os.Stat(filepath.Join(f.fake, "stop-end-"+v.ID)); err == nil {
-					break
-				}
-				if time.Now().After(deadline) {
-					t.Fatal("the supervisor did not finish its browser stop")
-				}
-			}
+			checkStubbornStop(t, f, v.ID, browser, began, ending)
 			if ending == "stop" {
 				if end := <-stopped; end.State != "stopped" {
 					t.Fatalf("stop reported %+v", end)
 				}
 			} else {
 				waitEnd(t, f.home, v.ID)
+			}
+			if m, e := profile.ReadMeta(f.profiles, "work"); e != nil || m.HolderID != "" {
+				t.Fatalf("holder not cleared: %+v %v", m, e)
+			}
+		})
+	}
+}
+
+// While the supervisor is still starting after the browser launch, here
+// blocked on the state lock it needs to record ready, expiry or stop starts a
+// reusable profile's browser stop at once: viewer access is rejected first,
+// then the browser gets its SIGTERM and its kill two seconds later, never the
+// guard's group stop.
+func TestProfileBrowserStopDuringStartup(t *testing.T) {
+	for _, ending := range []string{"expiry", "stop"} {
+		t.Run(ending, func(t *testing.T) {
+			f := newProfileFixture(t)
+			t.Setenv("REMOTE_GUI_TEST_STUBBORN_STOP", "1")
+			t.Setenv("REMOTE_GUI_TEST_HOLD_PROBE", "1")
+			c := f.config(t, "work", "--ttl", map[string]string{"expiry": "2700ms", "stop": "1m"}[ending])
+			started := make(chan struct{})
+			go func() { _, _ = Start(c); close(started) }()
+			var id string
+			for deadline := time.Now().Add(5 * time.Second); id == ""; time.Sleep(5 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("no session record")
+				}
+				if ids, _ := state.IDs(f.home); len(ids) == 1 {
+					id = ids[0]
+				}
+			}
+			var record state.Record
+			for deadline := time.Now().Add(5 * time.Second); record.Origin == ""; time.Sleep(5 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("the supervisor did not record its origin")
+				}
+				record, _ = state.Load(f.home, id)
+			}
+			// The supervisor is in its startup probe; from here it needs the
+			// lock only to record ready.
+			release, err := state.Lock(context.Background(), f.home)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var releaseOnce sync.Once
+			unlock := func() { releaseOnce.Do(release) }
+			defer func() {
+				unlock()
+				select {
+				case <-started:
+				case <-time.After(30 * time.Second):
+					t.Error("start did not return")
+				}
+			}()
+			if err = os.WriteFile(filepath.Join(f.fake, "probe-open-"+id), nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+				if _, err = os.Stat(filepath.Join(f.fake, "probed-"+id)); err == nil {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatal("the supervisor's startup probe did not pass")
+				}
+			}
+			time.Sleep(100 * time.Millisecond)
+			browser := standInBrowser(t, f, id)
+			viewer := viewerProbe{URL: record.Origin + "/vnc.html"}
+			if code := viewer.status(); code == 0 || code == http.StatusGone {
+				t.Fatalf("the proxy answered %d before the %s", code, ending)
+			}
+			f.recordViewer(t, id, viewer)
+			if current, e := state.Load(f.home, id); e != nil || current.State != "starting" {
+				t.Fatalf("the session is no longer starting: %+v %v", current.State, e)
+			}
+			began := record.Expires
+			stopped := make(chan View, 1)
+			if ending == "expiry" {
+				time.Sleep(time.Until(record.Expires))
+			} else {
+				began = time.Now()
+				go func() { end, _ := Stop(f.home, id); stopped <- end }()
+			}
+			checkStubbornStop(t, f, id, browser, began, ending)
+			// The supervisor is still serving, so the proxy itself refused the viewer.
+			if data, _ := os.ReadFile(filepath.Join(f.fake, "stop-viewer-"+id)); string(data) != strconv.Itoa(http.StatusGone) {
+				t.Fatalf("the proxy answered the viewer %q when the browser stop began, want %d", data, http.StatusGone)
+			}
+			unlock()
+			if ending == "stop" {
+				if end := <-stopped; end.State != "stopped" {
+					t.Fatalf("stop reported %+v", end)
+				}
+			} else {
+				waitEnd(t, f.home, id)
 			}
 			if m, e := profile.ReadMeta(f.profiles, "work"); e != nil || m.HolderID != "" {
 				t.Fatalf("holder not cleared: %+v %v", m, e)
