@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Drafted on Opus from a behavior-by-behavior comparison of both loops; ten owner questions open, no review yet."
+status_description: "Draft with the owner's answers to Q1, Q3 and Q4 folded in; seven owner questions open, no review yet."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
@@ -43,9 +43,9 @@ independent implementation review with one record per criterion, binary-checked 
 commit, an explicit handoff between sessions, and a resume operation. It also found 21 conflicts and 9
 missing hooks. The main ones: the SDD skills read no repository settings, so Stackweaver's review lenses
 and conditional verification can only reach them as loose prose. The reviewer cannot run on another
-harness. Lint rejects `**` in `covers`. The worktree model would move Stackweaver's live main checkout
-onto a feature branch. Feature PRs may not be squashed or amended. And nothing handles manual-only CI or
-a post-merge satellite watch.
+harness. Lint rejects `**` in `covers`. The claim step would move Stackweaver's live main checkout onto
+a feature branch. Feature PRs may not be squashed or amended. And nothing handles manual-only CI or a
+post-merge satellite watch.
 
 The model decision is already made. Stackweaver commit `7861b9dc` moved every command to Opus and sends
 independent reviews to `gpt-6.1-sol` through the Copilot CLI. vh-adlc already keeps models out of agent
@@ -53,13 +53,20 @@ files, but its review protocol only knows an in-host subagent or a manual handof
 model routing per role, declared in settings, plus an external command route, so a Claude session can
 get a read-only GPT review that is stored and checked like any other.
 
+The owner settled three questions on 2026-11-13. Model routes live in a committed
+`.vh-adlc/loop.yaml`, with only the reviewer CLI's binary path overridable per user. A feature is
+claimed from the session's own host worktree when it sits at the tip of the default branch, as
+Stackweaver sessions work today, and vh-adlc gains that as a shared behavior because Claude Code and
+Codex both start work in worktrees they create. Feature PRs land by merge commit with additive
+follow-ups; squash and amend stay for non-feature and bot PRs.
+
 Shared changes ship first in a vh-adlc release. Stackweaver then adopts them through thin command
 adapters, a `.vh-adlc/loop.yaml` settings file and one project procedure, behind a parity map that fails
 if any legacy rule has no new home. Rollback is rehearsed on a disposable checkout. Active Stackweaver
 specs move to the shared format. How far that migration reaches is an owner question.
 
-Nothing here is reviewed yet. Ten questions are open, among them where the model routing lives, the
-worktree model, squash merges, and whether `/implement` keeps shipping on its own. Accepting this
+Nothing here is reviewed yet. Seven questions are open, among them whether the external route is
+generic, whether `/implement` keeps shipping on its own, and how far the spec migration reaches. Accepting this
 document authorizes implementation of the accepted scope on a feature branch. Publishing the vh-adlc
 release, merging either repository and retiring the native agents each still need their own approval.
 
@@ -113,7 +120,8 @@ force-pushes and squash-merges (Stackweaver `CLAUDE.md:169,172,279`).
 In scope:
 
 - Shared vh-adlc changes: per-role model routing in settings, an external command route for reviews,
-  a settings file and project procedure read by every SDD operation, repository instructions and
+  claiming a feature from a host worktree at the default branch tip, a settings file and project
+  procedure read by every SDD operation, repository instructions and
   declared lenses in reviews, conditional verification rungs, a declared CI trigger policy, a declared
   post-merge watch, `**` support in `covers`, and investigation defaults (always write the document,
   search for duplicates, verdict vocabulary).
@@ -188,7 +196,32 @@ non-zero exit or a timeout leaves the review pending, writes no Review Log row, 
 and the command's exit status in the handoff. Records are stored byte for byte and pass
 `vh-adlc review check`. Isolation is recorded as `structural` only when the command's tool allow-list
 is one the host is verified to enforce, otherwise `procedural`. The binary path in `argv` is
-machine-specific, so a per-user override of `argv[0]` is allowed outside the repository (Q1).
+machine-specific, so a per-user file outside the repository may override `argv[0]` and nothing else;
+the model, the arguments and the role mapping always come from the committed file.
+
+### Claiming from a host worktree
+
+Implement may make the claim commit in any worktree whose `HEAD` equals the freshly fetched default
+branch tip and whose tracked files are clean, whether `HEAD` is detached or on a branch with another
+name. It pushes the claim with `git push origin HEAD:<default branch>`, creates the feature branch at the
+claim commit with `git switch -c`, and that worktree becomes the owning worktree. Any staged or
+unstaged change that does not belong to the claim stops the step, as today. The plugin still never
+creates, moves, prunes or resets a worktree. When the push is rejected because the default branch moved,
+the step stops with the local commit kept, as the current procedure already says; a retry starts from a
+worktree at the new tip. Today's path, a worktree that has the default branch checked out, keeps working.
+
+For Stackweaver this is the normal start: a session's host worktree is created from a fresh `main`
+(Stackweaver `.claude/settings.json:9` sets `worktree.baseRef: "fresh"`), so the live main checkout is
+never switched.
+
+### Feature PR history
+
+Feature PRs land by merge commit or fast-forward, as the delivery convention requires. Follow-ups on a
+feature branch are new commits, and drift from the default branch is merged in, never rebased, so every
+commit a Review Log row names stays reachable. Stackweaver's project procedure and `CLAUDE.md` change
+to match for features: the amend, force-push and rebase-onto-`origin/main` guidance (Stackweaver
+`CLAUDE.md:169,172`) and the squash-message rule (`CLAUDE.md:279`) stay in force for non-feature
+changes and bot dependency PRs only.
 
 ### Project procedure and review lenses
 
@@ -245,8 +278,8 @@ published plugin is installed from the marketplace and exercised, and a rollback
 
 | Conflict | Resolution |
 | --- | --- |
-| Worktree model | Q3 |
-| Squash, amend and force-push on feature PRs | Q4 |
+| Worktree model | Claim from a host worktree, shared (owner, Q3) |
+| Squash, amend and force-push on feature PRs | Merge commits for features (owner, Q4) |
 | `/implement` pushes and opens the PR | Q5 |
 | Non-feature and direct-to-main shipping | Q6 |
 | `AC1`, Test Plan and Review Log formats in existing specs | Q7 |
@@ -271,6 +304,8 @@ published plugin is installed from the marketplace and exercised, and a rollback
 - [ ] AC-10: Stackweaver's local behaviors stay available with unchanged invocation: worktree slots, direct-to-main non-feature shipping, `[skip ci]` rules, `watch-merge.sh`, the triad and satellite lenses, and the browser-pass summary table.
 - [ ] AC-11: A disposable Stackweaver checkout rolls back to the native loop and reapplies the adoption, with the docs index and unrelated workflow files byte-identical afterwards.
 - [ ] AC-12: The shared changes are installed from the published marketplace in an isolated profile and exercised through their entry points before Stackweaver's native agent files are retired.
+- [ ] AC-13: Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on another branch name, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops and changes nothing.
+- [ ] AC-14: A Stackweaver feature taken through the adopted loop and merged keeps every commit its Review Log names reachable from `main`, and its completion gate passes there.
 
 ## Test Plan
 
@@ -288,25 +323,14 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | AC-10 | A scripted check that each listed local behavior's entry point still exists and runs in dry-run or help mode, and a review of `agents/loop-project.md` against the parity map. |
 | AC-11 | The rollback and reapply procedure on a disposable checkout, comparing file hashes before and after. |
 | AC-12 | Isolated Claude Code profile install from the marketplace, payload digest check, and one spec review through the command route at the published revision. |
+| AC-13 | Fixture repositories with a detached worktree at the tip, a worktree on another branch at the tip, one behind the tip, one with a stray change, and a rejected push; only the first two claim, and the others leave the repository unchanged. |
+| AC-14 | One disposable Stackweaver feature taken from claim to merge by merge commit, then `vh-adlc fresh` and `vh-adlc gate complete` run on `main`. |
 
 ## Tasks
 
 None yet; written once the document is planned.
 
 ## Open Questions
-
-### Q1: Where should the model for each role be declared?
-
-**Recommendation:** A. Committed settings keep every session on the same models and make a change
-reviewable, which is how triage, maintenance and audit settings already work.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Committed `.vh-adlc/loop.yaml`, with a per-user override only for the CLI path** | One reviewed source of truth per repository; command frontmatter checked against it | A settings change is a commit |
-| **B. Per-user file outside the repository** | Each machine picks its own models | Two sessions can review the same spec on different models without anyone seeing it |
-| **C. Keep it in `CLAUDE.md` prose and command frontmatter** | No new file | Nothing checks it, and vh-adlc operations cannot read it reliably |
-
-**Why this is yours:** it decides who can change review models and whether that is visible in history.
 
 ### Q2: Should the external review route be generic or Copilot-only?
 
@@ -320,31 +344,6 @@ plugin change.
 | **C. Stackweaver-local script, nothing shared** | No vh-adlc change | Other repositories cannot use it, and the review protocol stays unaware of it |
 
 **Why this is yours:** it trades shared reach against a smaller attack and test surface.
-
-### Q3: How should a Stackweaver session claim a feature without moving the live main checkout?
-
-**Recommendation:** B. Stackweaver sessions already work in host-created worktrees based on a fresh
-main, so making the claim there keeps vh-adlc's rule that it never creates worktrees.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. vh-adlc creates the feature worktree for the claimed branch** | One command does the whole claim | Changes a shared rule that every consumer relies on |
-| **B. A host worktree level with `origin/main` makes and pushes the claim, then becomes the owning worktree** | No worktree creation by the plugin; matches Stackweaver's default | vh-adlc must accept a detached or non-`main` worktree that sits at the default branch tip |
-| **C. Keep the current rule** | No change | Claims either stop or switch the bind-mounted checkout onto a feature branch |
-
-**Why this is yours:** it changes either a shared invariant or how Stackweaver sessions start work.
-
-### Q4: May feature PRs still be squashed or amended?
-
-**Recommendation:** A. A squash or amend makes the reviewed commits unreachable, which the binary
-treats as a stale review, so the feature could never complete.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Feature PRs land by merge commit with additive follow-ups; squash and amend stay for non-feature and bot PRs** | Reviews stay valid through merge | More commits in `main`'s history; the "amend and force-push" habit changes for features |
-| **B. Keep squash and amend everywhere** | Today's history shape | Every feature review goes stale at merge and gates fail |
-
-**Why this is yours:** it changes a delivery habit written in Stackweaver's `CLAUDE.md`.
 
 ### Q5: Should `/implement` keep pushing and opening the PR by itself?
 
