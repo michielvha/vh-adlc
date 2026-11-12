@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revising the desktop app session after review R-23: update installs, lost pages and restores the app undoes."
+status: planned
+status_description: "Revision accepted after spec review R-40; the desktop app session fixes are ready to implement."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 branch: feat/paseo-hosts
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
@@ -412,6 +412,7 @@ None.
 | 2026-11-12 | R-38 | spec | `1350926d925c2d9642f74670eb26b20d73109bf8` | unknown | procedural | One should-fix factual finding (no check tells the Windows installer read from its fallback, and YAML quotes could break it) and one judgement nit (the macOS quit keeps a fixed app id). Applied the finding and raised Q17. |
 | 2026-11-12 | R-39 | spec | `9c48ee3aafbb2077655321aa342d39fcc345b468` | unknown | procedural | Two factual nits: step 9 and T44 ask each desktop for both installer values, and the plist read has no named tool or test stand-in. Applied both. |
 | 2026-11-12 | R-40 | spec | `d2726cca4b69656f5b3ecc7666d191087a8f54ad` | unknown | procedural | No findings. |
+| 2026-11-12 | R-40 | spec | `d2726cca4b69656f5b3ecc7666d191087a8f54ad` | n/a | n/a | accepted by owner |
 
 ### R-1
 
