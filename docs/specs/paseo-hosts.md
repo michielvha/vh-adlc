@@ -417,6 +417,7 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
 | 2026-11-12 | R-34 | spec | `9a173efdc28ce3bffd65b632df3a1279b4f1bc62` | unknown | procedural | One should-fix factual finding (an app that exits by itself after a reload gets no rewrite) and four factual nits (AC-05 lacks the forward bound, the launch floor arrives after T40, no Sources section, no Terms rows for the backup and its copy), plus one judgement nit (the summary's length). Applied the factual findings and raised Q15. |
 | 2026-11-12 | R-35 | spec | `85cb9d40735f5124edfee01d625a4be52b28ca57` | unknown | procedural | One should-fix factual finding (AC-06 reads an app that exits by itself as a quit that was not graceful, so it excludes the Mac failure) and one factual nit (the summary's AC-05 clause lacks the forward bound). Applied both. |
 | 2026-11-12 | R-36 | spec | `41f03025c0bac68f3ef33f0a395dd74768421f68` | unknown | procedural | One should-fix factual finding (the updater path and the ShipIt job name are not cited, and no live check reads the real ones) and two factual nits (AC-06 counts force-stops of an instance holding no writes; the summary's AC-06 bound predates R-35). Measured both values and applied all three. |
+| 2026-11-12 | R-37 | spec | `030bfc28d2977ee7a9ed07fae01cd94fee2e483b` | claude-opus-4.8 | procedural | Two factual nits (AC-05 counts attempts differently from the Design; step 9 reads the Mac job from a state file that may not exist) and one judgement nit (fixed installer names rather than reading them at run time). Applied the nits and raised Q16. |
 
 ### R-1
 
@@ -1785,6 +1786,29 @@ SEVERITY: nit
 WHERE: Context, Owner summary, "What changed" paragraph (line 33)
 EVIDENCE: The summary bounds AC-06 by "each quit after a registry write is graceful, so on Windows, where a lost window is force-stopped, that path falls outside AC-06". This commit changed AC-06 to "each quit the CLI makes after a registry write" and added "or the app exits by itself after a reload". The lost-window paragraph now says an app that exits by itself "counts as a lost window", and that in that case "the quit found no process". So on Windows, a window lost because the app exited by itself is not force-stopped, and the run stays inside AC-06. The summary still describes the bound from before R-35, which R-35 F-01 found excludes the self-exit failure.
 PROPOSAL: Whatever Q15 decides about length, say "each quit the CLI makes", and limit the Windows remark to a window that stops answering while the app keeps running.
+
+### R-37
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria, AC-05 (line 240); Design, Desktop app entry, step 2 (line 190)
+EVIDENCE: Step 2 says "Before each attempt, the CLI checks that no app main process runs; when one has appeared, for example because an update install started the app again, it quits and waits again, and that uses one of the three attempts." AC-05 promises success "when the app exits or does not answer on up to two of the three attempts of a debug launch". Take a `link` in which an update install starts the app again before the first attempt, so that attempt is used, and the app then exits early on the other two. Under the Design all three attempts are used and none answered, so the command exits 1. The app exited on only two of the three attempts, so AC-05 promises success. AC-06 states the bound as "each debug launch answers within three attempts", which matches the Design.
+PROPOSAL: Use AC-06's wording in AC-05 ("each debug launch answers within three attempts"), or have AC-05 say that quitting an app that has started again uses one of the three attempts.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Desktop app entry, quit and wait (line 196); Test Plan, manual step 9 (line 273); Tasks, T41 and T44
+EVIDENCE: Quit and wait fixes the installer identity as the job `sh.paseo.desktop.ShipIt` and the directory `%LOCALAPPDATA%\@getpaseodesktop-updater\`, and T41 builds both into `stop.sh` and `stop.ps1`. Configuration pins only the Paseo CLI (`PASEO_HOSTS_VERSION`, line 146). The desktop app updates itself: R-23 saw Windows go from 0.15.3 to 0.15.4 during a run. The document's own citations show that both values come from the app's build settings. Squirrel.Mac takes the label from `NSBundle.mainBundle.bundleIdentifier` (`SQRLDirectoryManager.m`, `currentApplicationManager`, used by `SQRLShipItLauncher.shipItJobLabel`). electron-updater takes the directory from `updaterCacheDirName` in `app-update.yml`. The live check that R-36 added to step 9 and T44 compares those values with the snippets once. If a later app release changes either value, the wait stops seeing the installer without any error, and the R-23 race comes back. The document picks fixed values over reading them at run time from the client's installed app and does not raise that choice as a question.
+PROPOSAL: Have the stop snippets read `CFBundleIdentifier` from the app's `Info.plist` and `updaterCacheDirName` from `resources\app-update.yml` on the client at run time, keeping the current values as fallbacks. Otherwise raise the choice as an open question.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, manual step 9 (line 273); Tasks, T44 (line 363)
+EVIDENCE: T44 records "the updater directory and `ShipIt` job read from each installed app". Step 9 reads the Mac value from "the bundle identifier in `ShipItState.plist`", and that file is under `~/Library/Caches/sh.paseo.desktop.ShipIt/`, not in the installed app. In `SQRLShipItLauncher.m`, the launcher writes the state file and starts ShipIt only when an update is ready to install (`SQRLUpdater.m`, `_shipItLauncher`). A Mac with no update staged may not have the file, so the step cannot always be done as written. The label comes from the main bundle's identifier (`SQRLDirectoryManager.m:22`, `NSBundle.mainBundle.bundleIdentifier`), which is `CFBundleIdentifier` in `Paseo.app/Contents/Info.plist`.
+PROPOSAL: In step 9 and T44, read `CFBundleIdentifier` from the installed app's `Info.plist` on the Mac. Then cite `SQRLDirectoryManager.m` for how the label is derived, next to `SQRLShipItLauncher.m`.
 
 ## Sources
 
