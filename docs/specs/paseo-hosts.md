@@ -399,6 +399,7 @@ None.
 | 2026-11-11 | R-27 | spec | `c79254865dc2b9a0130ffb70c69c03e3282c3d46` | unknown | procedural | One blocking factual finding (AC-06 was bounded by what the CLI reports rather than by what happens on the client, and covered only `link`), two should-fix factual findings (a debug-launch case that cannot fail first, a stand-in installer that may end before the quit) and one factual nit (T39 wording). Applied all four. |
 | 2026-11-11 | R-28 | spec | `fc82f98615fbd4a2c1c77e1413dba353631389d0` | unknown | procedural | Two should-fix factual findings (AC-05 and AC-06 not bounded by the installer limit and the launch limit; two T39 cases that cannot fail first), one should-fix judgement finding (a macOS update install may relaunch the app before the debug launch), one judgement nit (the restore read-back is stricter than AC-06) and one factual nit (AC-16 wording on later changes to the copy). Applied the factual findings and raised Q13 and Q14. |
 | 2026-11-12 | R-29 | spec | `39e23fa90d04e2fa491e3681eee7fd556af59399` | unknown | procedural | Four should-fix factual findings (two cases that cannot fail first, AC-17 checked only through macOS `link`, an unclear debug-launch limit with no outcome for a page that never answers) and two factual nits (AC-17's rollback message, the name of the wait between launches). Applied all six. |
+| 2026-11-12 | R-30 | spec | `62c578b79e35bf46bf29ac2fc33450591595ffe8` | unknown | procedural | Two should-fix factual findings (a force-stop during a rollback is outside AC-06's bound and untested, and the Mac's 60-second commit delay is uncited; a window lost after a kept change is untested and unbounded) and two factual nits (the `unlink` case's placement, whether a quit before an attempt uses one). Applied all four. |
 
 ### R-1
 
@@ -1557,3 +1558,33 @@ SEVERITY: nit
 WHERE: Test Plan, AC-05, AC-06, AC-16 and AC-17 row
 EVIDENCE: Two cases assert debug launches "at least the shortened settle time apart" (line 260). The Design does not name the 3-second wait between debug launches ("the CLI waits 3 seconds and launches it again", line 188). In the code, `SettleDelay` is the 4-second wait after a reload ("SettleDelay lets the reloaded app load and rewrite its registry", clientapp.go:36-37). A test written against `SettleDelay` would check the wrong wait.
 PROPOSAL: Name the 3-second wait between debug launches in the Design and use that name in the Test Plan, or write "the shortened 3-second wait between debug launches".
+
+### R-30
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-06; Design, Desktop app entry, step 5; Test Plan, AC-05, AC-06, AC-16 and AC-17 row and manual step 5
+EVIDENCE: AC-06 (line 239) limits its premise to five conditions: the window is lost at most twice, the restored list is deleted at most once, each install ends within 2 minutes, each debug launch answers within three attempts and each forward opens. A force-stop is not one of them. Step 5 (line 191) expects a force-stop during a rollback and says it "leads to one of these two messages", which can be the unconfirmed one. Step 5 justifies its 8-second wait only by "Chromium's default 5-second localStorage commit delay" and adds that "only a graceful shutdown flushes pending writes". Manual step 5 (line 271) cites "the 60-second commit delay seen on the Mac", and neither Context nor Design states or cites that delay. On the Mac, an app that does not quit within 20 seconds is force-stopped about 28 seconds after the restore write, so the restore is lost. The check after a restart restores and repeats only once. A second force-stop therefore ends in the AC-16 exit while every AC-06 condition holds, which contradicts AC-06's "lists exactly the hosts it listed before". This can happen in practice: the fake models such an app (`stuck`, fakedevtools_test.go:46-47, :79), and T31 recorded a real force-stop on Windows. No Test Plan case runs a rollback with a force-stop. `TestForceStop` (clientapp_test.go:219-246) covers only a kept `link` and a kept delete.
+PROPOSAL: Add to AC-06's bound that each quit is graceful within 20 seconds, and leave the force-stopped paths to AC-16. Otherwise, make the Design survive a force-stop. Either way, state the Mac's 60-second commit delay and its source in step 5, and add a fake case that rolls back with an app that ignores the graceful quit.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry, lost-window paragraph; Acceptance Criteria, AC-05; Test Plan, AC-05, AC-06, AC-16 and AC-17 row
+EVIDENCE: Line 198 says that when the window stops answering "after a reload in step 4", the CLI debug-launches again and "continues with the read that follows the reload". If the app kept the entry, `link` then succeeds. Every planned lost-window case in the Test Plan (line 260) is a rollback, where "each asserts a non-zero exit". No case loses the window after the step 4 reload of an entry the page keeps. At 62c578b, `write()` returns an error when the page is gone after the reload (clientapp.go:275-277). An implementation that rolls back or fails on any lost window therefore passes every planned test, although the Design says `link` should succeed. AC-05 (line 238) bounds the installer and the debug-launch attempts but says nothing about a lost window, so no criterion states the end state for this path either. R-23 F-03 saw the Mac debug instance die right after a reload. Line 198 also assumes the third loss happens inside a rollback ("Every rollback that ends without a confirmed restore, including a window lost a third time"). It does not say what happens when the third loss comes in step 4, before the CLI knows whether the app kept the change.
+PROPOSAL: Add a fake case where the page keeps the entry and stops answering once after the step 4 reload, and assert exit 0, the entry, the tunnel and a second debug launch. Add "a window lost after a reload at most twice" to AC-05's bound, and state in the Design that a third loss in step 4 ends like an unconfirmed rollback.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, AC-05, AC-06, AC-16 and AC-17 row
+EVIDENCE: Line 260 reads: "A case whose stand-in installer starts the app as it ends asserts that `link` exits 0, that the CLI quit the app again before its debug launch and that the debug launch answered; the `unlink` case also asserts a second debug launch after the rollback, for the check after a restart." Placed there, "the `unlink` case" reads as an `unlink` variant of the installer case, which T39 does not list. The case it was written for (R-28 F-02) is "run `unlink` against a page that rejects the removal once". The second debug launch is the only assertion in that case the current code fails, and T39 requires each case to fail first.
+PROPOSAL: Move the clause to the sentence that lists the further cases, and name the case: "the `unlink` case that rejects the removal once also asserts a second debug launch after the rollback".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Desktop app entry, step 2
+EVIDENCE: The owner chose option A for Q13 (dc69cbe, Open Questions): "when one has appeared, it quits and waits again, counted against the three-launch limit". Step 2 (line 188) now says "Before each attempt, the CLI checks that no app main process runs; when one has appeared, for example because an update install started the app again, it quits and waits again". It does not say whether this uses one of the three attempts. So the folded text does not settle whether an app that keeps reappearing can ever end the launch.
+PROPOSAL: State whether an extra quit for an app that started again counts as one of the three attempts of that debug launch, as the Q13 answer says.
