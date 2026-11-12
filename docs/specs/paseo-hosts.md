@@ -403,6 +403,7 @@ None.
 | 2026-11-12 | R-31 | spec | `fcb3beaa0989eae085e3c123efe98b0422215801` | unknown | procedural | Three should-fix factual findings (the graceful-quit bound excluded every Windows run and the lost-window quit was unstated; the force-stopped rollback case could pass before the change; a failed relaunch after a window lost in step 4 had no outcome). Applied all three. |
 | 2026-11-12 | R-32 | spec | `21dcbc3c3e6c7d017ce23ed787ecbfe015b00e62` | claude-opus-4.8 | procedural | Four should-fix factual findings (a force-stopped lost window can drop a kept change; the force-stopped rollback case expects the wrong outcome; no case for a failed forward; an installer give-up after a lost window keeps no copy) and two factual nits (the installer-start case needs T41, the summary's AC-05 changes). Applied all six. |
 | 2026-11-12 | R-33 | spec | `e35b672a3e3af910d117154727562cf94ed55ca1` | unknown | procedural | Three should-fix factual findings (a step 5 force-stop is outside AC-05's bound and breaks the planned case; one rewrite does not cover two force-stopped lost windows; the every-reload case and a third-loss trigger cannot happen as written) and one factual nit (the Mac measurements are not cited by command and output). Applied all four. |
+| 2026-11-12 | R-34 | spec | `9a173efdc28ce3bffd65b632df3a1279b4f1bc62` | unknown | procedural | One should-fix factual finding (an app that exits by itself after a reload gets no rewrite) and four factual nits (AC-05 lacks the forward bound, the launch floor arrives after T40, no Sources section, no Terms rows for the backup and its copy), plus one judgement nit (the summary's length). Applied the factual findings and raised Q15. |
 
 ### R-1
 
@@ -1688,3 +1689,47 @@ SEVERITY: nit
 WHERE: Design, Desktop app entry, step 5 and "To restore"
 EVIDENCE: Step 5 (line 191) gives the Mac's commit timing as "between 0.25 and 60 seconds after the write ... as measured during the R-23 investigation". The restore paragraph says "the Mac app's localStorage log showed" the write and the delete committed in one batch. Neither names the command or its output, and the R-23 records stored in this document hold neither measurement. feature-documents.md asks Context and Design to cite "a `file:line`, or a command and its output, gathered when the claim was written". The 60-second figure is the basis for the 90-second wait in manual step 5 and for the force-stop reasoning in AC-05 and AC-06.
 PROPOSAL: Name the probe and the log the measurements came from: the command, the client and app version, and the observed range or the batch record.
+
+### R-34
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry, lost-window paragraph; Acceptance Criteria, AC-05; Test Plan, AC-05, AC-06, AC-16 and AC-17 row
+EVIDENCE: The lost-window paragraph (line 198) rewrites the change only "When that quit was a force-stop": "the step 3 write may be lost with it, so if the read in step 4 finds the registry still matching the backup, the CLI writes the change again". Step 5 (line 191) says "only a graceful shutdown flushes pending writes". The lost window actually seen on the Mac was an app process that ended by itself. R-23 records "the debug instance then vanished" (AC-06 evidence) and "the debug instance died right after the reload in both rollback runs" (R-23 F-03). In that case the CLI's quit finds no process (stop.sh:13-15 prints `STOPPED=none`), so the quit is neither graceful nor a force-stop. The Design does not say how to treat it. The step 3 write is about 4 seconds old at the reload, which is less than the 5-second minimum commit delay. If the exit was not a clean shutdown, the write is gone. The read then matches the backup, no rewrite happens, step 4 judges the change not kept, and `link` rolls back and exits 1. That stays inside AC-05's bound (line 238): the window was lost once and the step 5 quit was graceful. In every planned lost-window case (line 260) the app process keeps running and the CLI then quits it gracefully or force-stops it. No case has an app that exits by itself after a reload.
+PROPOSAL: Rewrite the change whenever the read after a lost window matches the backup, unless the CLI saw the app quit gracefully. This covers an app that had already exited and one that was force-stopped. Add a fake case where the app process exits by itself after the step 4 reload and drops its uncommitted writes, with an entry the page keeps, and assert exit 0, the entry and a second write.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria, AC-05; Design, Desktop app entry, lost-window paragraph
+EVIDENCE: AC-05 (line 238) bounds success by the installer limit, the debug-launch attempts, at most two lost windows and a graceful step 5 quit. It does not require that each forward opens. AC-06 (line 239) does include "each forward opens". The lost-window paragraph (line 198) says that after a window lost in step 4, a forward that does not open "ends like an unconfirmed rollback: the CLI keeps a copy of the backup, names it, adds the reason and exits 1". So a `link` whose entry the app kept can exit 1 inside every bound AC-05 states.
+PROPOSAL: Add "each forward opens" to AC-05's bound, as AC-06 has it.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T39, T40 and T41
+EVIDENCE: T39 (line 356) includes "a first debug launch whose app exits before it answers" and "three debug launch attempts that all exit early". The Test Plan (line 260) checks that their attempts are "at least the quit-and-wait floor apart, as the test shortens it". T40 (line 357) requires "T39 and `go test -race ./...` pass". T40 does not mention that floor. It arrives only in T41 (line 358): "quit and wait waits at least 3 seconds". At 9a173ef, stop.sh returns as soon as the main process is gone (snippets/stop.sh:13-20), and clientapp.go has no wait between attempts and no floor variable a test could shorten (clientapp.go:29-40). So T40's done condition cannot hold before T41. R-32 F-05 found the same ordering problem for the installer case.
+PROPOSAL: Move the two floor assertions to T41's done condition, or have T40 add the wait between attempts and the variable that names it.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Document structure (no Sources section); Design, Desktop app entry, step 5; Test Plan
+EVIDENCE: feature-documents.md says "Sources lists every external page read, each with the claim it supports". The document cites external pages it read: Chromium `local_storage_impl.cc` and `kCommitDefaultDelaySecs` (line 191), runner-images `Ubuntu2404-Readme.md` (Test Plan intro), the getpaseo/paseo v0.15.4 release (Background) and `michielvha/logger` `logger.go:55` (Background). `grep -n "Sources"` finds only matches inside stored review records, and the document has no Sources section.
+PROPOSAL: Add a Sources section at the end that lists those pages, each with the claim it supports.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Terms; Acceptance Criteria, AC-13; Tasks, T43
+EVIDENCE: The revision adds user-facing concepts that the owner must act on: the app backup `app-registry-<client>.backup.json` and its kept, timestamped copy (step 5, line 191; AC-16, line 249). T43 puts them into the README and the skill, and the skill must "stop" when "a command names a kept copy of the app backup" (Design, Skill). The standard says "User-facing terms the feature introduces or changes appear in a glossary row and are held to it by a criterion." The Terms table (lines 108-119) has no row for either term, so AC-13 holds no wording for them.
+PROPOSAL: Add Terms rows for the app backup and the kept copy, so that AC-13 covers how the README, skill and CLI messages name them.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary
+EVIDENCE: The Owner summary (lines 25-37) runs to 651 words, and its "What changed" paragraph (line 33) is 284 words. One sentence of that paragraph, starting "AC-05 now covers an update installed on quit", is 147 words long and walks through AC-05, AC-06, AC-16 and AC-17 together. The standard asks for "a few short paragraphs" and says 250 to 400 words is usually enough.
+PROPOSAL: Split that sentence into one short sentence per criterion, and leave the detailed bounds to the criteria themselves.
