@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Drafted with four open questions for the owner; not yet reviewed."
+status_description: "Owner answered Q1 to Q4 on 2026-11-12; awaiting independent spec review."
 issue: null
 goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept."
 covers:
@@ -39,19 +39,27 @@ and no untracked files, while ignored files go with it. A branch with no commits
 branch's history is removed with its worktree once it is older than seven days. Detached worktrees whose
 commit is on the default branch, and worktree entries whose directory is already gone, are removed too.
 Removal still uses plain `git worktree remove`, never `--force`, and every removal still goes through
-the plan and its approved digest. Under the recommended answers, a sweep plans worktree removal by
-default and `after-merge` removes the merged PR's own worktree. Work that is not on the default branch
+the plan and its approved digest. A sweep plans worktree removal by default and `after-merge` removes the
+merged PR's own worktree. Work that is not on the default branch
 or in a merged PR head is never removed.
 
 Out of scope: how Claude Code, Codex or other hosts create their worktrees, the `vh-adlc clean` binary,
 and anything outside Git worktrees and local branches.
 
-Four decisions are open: whether ignored files may go, whether branches with no commits of their own
-may go, whether detached and missing worktrees are included, and when removal runs. Q4 touches the
-central rule that a worktree is removed only when the owner asks, so its recommended answer reads an
-approved merge or sweep plan as that request.
+The owner settled four decisions on 2026-11-12. Worktrees that hold only ignored files may go, and
+the plan lists those files first. Branches with no commits of their own may go once their reflog is
+seven days old. Detached worktrees and entries with a missing directory are included. Removal runs by
+default in sweeps and after merges, so approving a merge or a sweep plan counts as the owner asking for
+the worktree to go. The central delivery rule says a worktree goes only when the owner asks; this
+feature reads an approved plan or merge as that request, and any wording change in `vhco-pro/docs` is
+a separate change there.
 
-Nothing is implemented. The checks below are planned, not run. No review has run yet. Acceptance would
+The trade-off is that an ignored file the owner cares about, such as a local `.env` or saved evidence,
+goes with its worktree when the plan is approved without reading its ignored list. A branch kept on
+purpose as a bookmark at an old default-branch commit, or a clean detached scratch checkout older than
+seven days, is removed too.
+
+Nothing is implemented. The checks below are planned, not run. The spec review has not run yet. Acceptance would
 authorize implementation on a feature branch; pushing, a PR, merging and releasing each still need
 their own approval.
 
@@ -145,7 +153,11 @@ All changes are in `observe`, `perform` and `execute` in `branches.ts`, plus the
    under the old rules. `remove-worktree` gains an optional `branch` (absent when detached) and an
    `ignored` list. `same()` compares both, so a change after observation reports `changed`.
 
-Items 1 to 5 follow the recommended answers to Q1 to Q4 and change when those answers are folded in.
+Items 1 to 5 follow the owner's answers of 2026-11-12. Item 1: ignored files may go, listed in the
+plan first. Item 2: seven days by reflog, whether or not the branch has a worktree. Items 3 and 4: both
+detached and missing-directory worktrees. Item 5: default in sweeps and after merges. Rejected
+alternatives were a per-repository list of removable ignored paths, removing such branches only
+together with their worktree, missing-directory entries only, sweeps only, and keeping today's rules.
 
 ## Acceptance Criteria
 
@@ -194,58 +206,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q1: May a worktree go when its only extra files are ignored ones?
-
-**Recommendation:** A. Clean to Git. Ignored files such as `node_modules` and `dist` held 22 of the 23
-blocked Stackweaver worktrees, and the plan lists them before you approve.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Clean to Git** | Matches `git worktree remove` without `--force`; frees most stale worktrees | An ignored file you care about, such as a local `.env` or saved evidence, goes with the worktree if you approve the plan without reading the list |
-| **B. Named ignored paths only** | Only paths a repository setting lists, such as `node_modules`, may go | A new per-repository setting to maintain; unlisted build output still blocks removal |
-| **C. Keep today's rule** | No change in risk | Worktrees keep piling up |
-
-**Why this is yours:** It decides whether files Git treats as disposable are disposable to you.
-
-### Q2: May a branch with no commits of its own go once it is a week old?
-
-**Recommendation:** A. Seven days by reflog. Its tip is already on the default branch, so no commit is
-lost, and the age keeps a branch that was just created for new work.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. After seven days, by reflog** | Removes the 16 Stackweaver worktrees on such branches | A branch kept on purpose as a bookmark at an old commit is removed; a branch without a reflog is never removed |
-| **B. Only together with its worktree** | Same as A, but a branch with no worktree stays | Leftover branches without worktrees remain |
-| **C. Keep today's rule** | No change | Agent worktrees that never committed stay forever |
-
-**Why this is yours:** The current rule deliberately protects such branches, and the right age is a
-judgement.
-
-### Q3: Should detached worktrees and worktrees with a missing directory be included?
-
-**Recommendation:** A. Both. Stackweaver has 15 detached and 8 missing ones, and neither holds work
-that is not already on the default branch.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Both** | Covers every kind of stale worktree | A detached worktree used as a scratch checkout of an old commit is removed after seven days if it is clean |
-| **B. Missing directories only** | Removes only entries with nothing left on disk | Detached worktrees keep piling up |
-| **C. Neither** | No change | Both kinds stay |
-
-**Why this is yours:** It widens what the helper touches beyond branches.
-
-### Q4: Should worktree removal run by default in sweeps and after merges?
-
-**Recommendation:** A. Default on in both. That is what stops the build-up, and each removal still sits
-in a plan you approve or follows a merge you approved.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Default in sweeps and after merges** | Worktrees go as soon as their work is merged | Your approval of a merge or plan now also covers worktree removal; the central rule that a worktree goes only on request is read that way, and may need a matching wording change in `vhco-pro/docs` |
-| **B. Default in sweeps only** | Every sweep cleans up; merges leave the worktree until the next sweep | Worktrees linger between sweeps |
-| **C. Keep opt-in** | No change to approvals | Nothing removes worktrees unless you ask, which is how they piled up |
-
-**Why this is yours:** It changes what an approval you give covers, and it touches a central convention.
+None.
 
 ## Review Log
 
