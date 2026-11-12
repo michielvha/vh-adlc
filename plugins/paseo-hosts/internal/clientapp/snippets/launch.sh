@@ -1,12 +1,11 @@
 # Starts the Paseo app on a Mac. Inputs: app, debug_port (empty for none),
-# wait_ms. A debug launch waits up to wait_ms for the app's main process.
+# wait_ms. It waits up to wait_ms for the app's main process.
 set -euo pipefail
 if [[ -z "$debug_port" ]]; then
   open -a "$app"
-  echo "LAUNCHED=yes"
-  exit 0
+else
+  open -a "$app" --args "--remote-debugging-port=$debug_port"
 fi
-open -a "$app" --args "--remote-debugging-port=$debug_port"
 for ((i = 0; i < wait_ms / 100; i++)); do
   if pgrep -f -- "^${app}/Contents/MacOS/Paseo( |\$)" >/dev/null 2>&1; then
     echo "LAUNCHED=yes"

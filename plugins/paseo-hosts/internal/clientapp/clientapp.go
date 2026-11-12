@@ -134,6 +134,9 @@ func (a *App) Add(ctx context.Context, c link.Client, e *registry.Entry, passwor
 		}
 		return remoteError("checking the app's tunnel", err)
 	}
+	if err := a.stillRuns(ctx, c); err != nil {
+		return err
+	}
 	a.Report.Pass("the Paseo app on %s lists %s and opened its tunnel", c.Alias, e.Alias)
 	return nil
 }
@@ -158,6 +161,9 @@ func (a *App) Delete(ctx context.Context, c link.Client, alias, serverID string)
 	}
 	if forced {
 		return report.Errorf(report.ExitFailed, "the app on %s was force-stopped and may not have saved the change; run the command again", c.Alias)
+	}
+	if err := a.stillRuns(ctx, c); err != nil {
+		return err
 	}
 	a.Report.Pass("the Paseo app on %s no longer lists %s", c.Alias, alias)
 	return nil
@@ -829,6 +835,18 @@ func (a *App) running(ctx context.Context, c link.Client) (bool, error) {
 		return false, remoteError("checking that the Paseo app runs", err)
 	}
 	return out.Values["RUNNING"] == "yes", nil
+}
+
+// stillRuns is the end of step 6: the app's main process must still run.
+func (a *App) stillRuns(ctx context.Context, c link.Client) error {
+	alive, err := a.running(ctx, c)
+	if err != nil {
+		return err
+	}
+	if !alive {
+		return report.Errorf(report.ExitFailed, "the Paseo app on %s stopped running after it started; start it again and check its host list", c.Alias)
+	}
+	return nil
 }
 
 // Connection is a Remote SSH connection in the app's normalized form.

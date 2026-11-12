@@ -884,3 +884,26 @@ func TestInstallerStartsTheAppAsItEnds(t *testing.T) {
 	}
 	w.check(t)
 }
+
+func TestAppExitsAfterItsTunnelAppears(t *testing.T) {
+	two := strings.NewReplacer("srv_srv", "srv_two", "paseo-srv", "paseo-two").Replace(srvHost)
+	t.Run("link", func(t *testing.T) {
+		w := newWorld(t, 6767, "["+otherHost+"]")
+		// The tunnel check sees the tunnel; the app exits after it.
+		w.app.exitAfterTunnel = 2
+		err := w.add()
+		mustExit1(t, err)
+		if !strings.Contains(err.Error(), "stopped running") {
+			t.Fatalf("error %q does not say that the app stopped running", err)
+		}
+	})
+	t.Run("unlink", func(t *testing.T) {
+		w := newWorld(t, 6767, "["+otherHost+","+srvHost+","+two+"]")
+		w.app.exitAfterTunnel = 1
+		err := w.del()
+		mustExit1(t, err)
+		if !strings.Contains(err.Error(), "stopped running") {
+			t.Fatalf("error %q does not say that the app stopped running", err)
+		}
+	})
+}

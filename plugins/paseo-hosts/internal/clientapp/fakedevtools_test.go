@@ -74,6 +74,11 @@ type fakeApp struct {
 	// regWrites holds every value the page wrote to the registry key, with
 	// removed for a removeItem.
 	regWrites []string
+	// exitAfterTunnel, when above 0, is the number of process listings
+	// after a launch by the CLI that show the app's tunnels; the app
+	// exits by itself before the listing that follows them.
+	exitAfterTunnel int
+	tunnelListings  int
 	// installers are stand-in app update installer processes.
 	installers []*installer
 	events     []event
@@ -273,6 +278,15 @@ func (a *fakeApp) handlePS(w http.ResponseWriter, _ *http.Request) {
 	})
 	for n, i := range a.installers {
 		procs = append(procs, testenv.Proc{PID: 7000 + n, Cmd: i.cmd})
+	}
+	if a.exitAfterTunnel > 0 && a.running && a.debugPort == "" && len(a.launches) > 1 && len(a.tunnels()) > 0 {
+		if a.tunnelListings == a.exitAfterTunnel {
+			a.exitAfterTunnel = 0
+			a.event("exits by itself")
+			a.stop(false)
+		} else {
+			a.tunnelListings++
+		}
 	}
 	if a.running {
 		cmd := a.appPath + "/Contents/MacOS/Paseo"
