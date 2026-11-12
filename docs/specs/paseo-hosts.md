@@ -415,6 +415,7 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
 | 2026-11-12 | R-32 | spec | `21dcbc3c3e6c7d017ce23ed787ecbfe015b00e62` | claude-opus-4.8 | procedural | Four should-fix factual findings (a force-stopped lost window can drop a kept change; the force-stopped rollback case expects the wrong outcome; no case for a failed forward; an installer give-up after a lost window keeps no copy) and two factual nits (the installer-start case needs T41, the summary's AC-05 changes). Applied all six. |
 | 2026-11-12 | R-33 | spec | `e35b672a3e3af910d117154727562cf94ed55ca1` | unknown | procedural | Three should-fix factual findings (a step 5 force-stop is outside AC-05's bound and breaks the planned case; one rewrite does not cover two force-stopped lost windows; the every-reload case and a third-loss trigger cannot happen as written) and one factual nit (the Mac measurements are not cited by command and output). Applied all four. |
 | 2026-11-12 | R-34 | spec | `9a173efdc28ce3bffd65b632df3a1279b4f1bc62` | unknown | procedural | One should-fix factual finding (an app that exits by itself after a reload gets no rewrite) and four factual nits (AC-05 lacks the forward bound, the launch floor arrives after T40, no Sources section, no Terms rows for the backup and its copy), plus one judgement nit (the summary's length). Applied the factual findings and raised Q15. |
+| 2026-11-12 | R-35 | spec | `85cb9d40735f5124edfee01d625a4be52b28ca57` | unknown | procedural | One should-fix factual finding (AC-06 reads an app that exits by itself as a quit that was not graceful, so it excludes the Mac failure) and one factual nit (the summary's AC-05 clause lacks the forward bound). Applied both. |
 
 ### R-1
 
@@ -1744,6 +1745,22 @@ SEVERITY: nit
 WHERE: Context, Owner summary
 EVIDENCE: The Owner summary (lines 25-37) runs to 651 words, and its "What changed" paragraph (line 33) is 284 words. One sentence of that paragraph, starting "AC-05 now covers an update installed on quit", is 147 words long and walks through AC-05, AC-06, AC-16 and AC-17 together. The standard asks for "a few short paragraphs" and says 250 to 400 words is usually enough.
 PROPOSAL: Split that sentence into one short sentence per criterion, and leave the detailed bounds to the criteria themselves.
+
+### R-35
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-06; Design, Desktop app entry, lost-window paragraph; Test Plan, AC-05, AC-06, AC-16 and AC-17 row
+EVIDENCE: AC-06's bound (line 241) includes "each quit after a registry write completes gracefully within 20 seconds". This commit's lost-window paragraph (line 200) says that "Unless the CLI saw the app quit gracefully" the write may be lost, because "the app was force-stopped, or it had already exited by itself and the quit found no process". So by the Design's own terms, an app that exits by itself after a reload is not a graceful quit. That is the Mac failure R-23 measured in rollback runs: "the debug instance died right after the reload in both rollback runs" (R-23, line 131 of that subsection), and "the debug instance then vanished" after the app dropped the registry. Read literally, AC-06 now excludes the rollback failure this revision exists to fix. The live Mac rollbacks in manual step 5 and T44 also cannot be judged when the app exits by itself: such a run is neither clearly inside AC-06 nor clearly outside it. The only self-exit case in the Test Plan (line 262) is "a case whose page keeps the entry and whose app exits by itself right after the step 4 reload", which is a `link` that succeeds. No fake case puts a self-exit inside a rollback. In a rollback, the new rule also writes the rejected entry again when the read matches the backup.
+PROPOSAL: State in AC-06 and the lost-window paragraph that an app that exits by itself after a reload counts as a lost window within the limit of two, and that the "quit after a registry write" in the bound means the CLI's own quits. Add a fake rollback case in which the app exits by itself after the step 4 reload and loses its uncommitted writes. It should assert a non-zero exit, a second write, and the previous registry after the relaunch that ends the command.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary, "What changed" paragraph
+EVIDENCE: This commit added "each forward opens" to AC-05's bound (line 240: "as long as each forward opens and the quit in step 5 completes gracefully within 20 seconds"). The summary (line 33) still says "AC-05 now covers an update installed on quit, debug launch attempts that fail up to twice and a window lost up to twice, as long as the quit after the write is graceful". For AC-06 it does list "each forward opens".
+PROPOSAL: If Q15 keeps the bounds in the summary, add "each forward opens" to the AC-05 clause. If Q15 option A is chosen, the new AC-05 sentence covers this.
 
 ## Sources
 
