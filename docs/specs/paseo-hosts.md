@@ -401,6 +401,7 @@ None.
 | 2026-11-12 | R-29 | spec | `39e23fa90d04e2fa491e3681eee7fd556af59399` | unknown | procedural | Four should-fix factual findings (two cases that cannot fail first, AC-17 checked only through macOS `link`, an unclear debug-launch limit with no outcome for a page that never answers) and two factual nits (AC-17's rollback message, the name of the wait between launches). Applied all six. |
 | 2026-11-12 | R-30 | spec | `62c578b79e35bf46bf29ac2fc33450591595ffe8` | unknown | procedural | Two should-fix factual findings (a force-stop during a rollback is outside AC-06's bound and untested, and the Mac's 60-second commit delay is uncited; a window lost after a kept change is untested and unbounded) and two factual nits (the `unlink` case's placement, whether a quit before an attempt uses one). Applied all four. |
 | 2026-11-12 | R-31 | spec | `fcb3beaa0989eae085e3c123efe98b0422215801` | unknown | procedural | Three should-fix factual findings (the graceful-quit bound excluded every Windows run and the lost-window quit was unstated; the force-stopped rollback case could pass before the change; a failed relaunch after a window lost in step 4 had no outcome). Applied all three. |
+| 2026-11-12 | R-32 | spec | `21dcbc3c3e6c7d017ce23ed787ecbfe015b00e62` | claude-opus-4.8 | procedural | Four should-fix factual findings (a force-stopped lost window can drop a kept change; the force-stopped rollback case expects the wrong outcome; no case for a failed forward; an installer give-up after a lost window keeps no copy) and two factual nits (the installer-start case needs T41, the summary's AC-05 changes). Applied all six. |
 
 ### R-1
 
@@ -1612,3 +1613,47 @@ SEVERITY: should-fix
 WHERE: Design, Desktop app entry, step 2 and the lost-window paragraph; Acceptance Criteria, AC-05, AC-06 and AC-16
 EVIDENCE: The lost-window paragraph (line 198) says that after a window is lost after the step 4 reload, the CLI "debug-launches the app again and continues with the read that follows the reload". Step 2 (line 188) gives this debug launch up to three attempts. The Design gives an outcome when all three attempts fail in step 2 ("nothing has been written yet ... exits 1 with the host list unchanged") and inside a rollback ("Every rollback that ends without a confirmed restore, including ... a debug launch that fails three times and a failed forward, exits 1 with the message step 5 gives"). It also covers a third lost window in step 4. It gives no outcome when the relaunch after a window lost in step 4 fails all three attempts, or its forward does not open. At that point the registry has been written and the CLI does not know whether the app kept the change, so it is not a rollback. No criterion covers that end state. AC-05 is bounded to "up to two of the three attempts", AC-06 needs a change the app did not keep, and AC-16 names only an unconfirmed rollback or a third lost window. The Design itself reports early exits on the Mac in 3 of about 9 runs and a debug instance that died right after a reload (R-23 F-03), so this path is reachable. No Test Plan case covers it.
 PROPOSAL: State that a debug launch or forward that fails after a window lost in step 4 ends like a third loss, with the backup copy kept, named and exit 1. Add that path to AC-16's wording and add a fake case for it, for example a page that stops answering after the step 4 reload followed by three early exits.
+
+### R-32
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-05; Design, Desktop app entry, lost-window paragraph and step 4; Context, Owner summary
+EVIDENCE: AC-05 (line 238) says `link` succeeds "when its window stops answering after a reload at most twice". It does not require that the quit after that lost window is graceful. The lost-window paragraph (line 198) says: "On Windows, where `window.close()` needs the page, it stops the `Paseo` process, which counts as a force-stop." On macOS it uses the AppleScript quit "as in step 5", and step 5 force-stops the app when it has not quit after 20 seconds. Step 5 (line 191) says "only a graceful shutdown flushes pending writes" and gives the Mac's measured commit time as "between 0.25 and 60 seconds after the write". So after a force-stop that follows a lost window, the step 3 write can be gone. The CLI then "continues with the read that follows the reload", and step 4 (line 190) says that when the entry is gone it restores the previous value "and fail[s]". On Windows every lost window takes this path, and the result is a `link` that exits 1 inside AC-05's stated bound. AC-06 does not cover this path either: its bound now needs "each quit after a registry write" to be graceful, and on Windows a lost window always fails that bound. The Owner summary still says AC-06 applies "when the window is lost at most twice". No Test Plan case loses the window with a force-stop. The lost-window case where the page keeps the entry (line 260) runs on the macOS fake, which quits gracefully because `stuck` is unset (fakedevtools_test.go:79).
+PROPOSAL: Add "each quit after a registry write completes gracefully" to AC-05's bound and give the end state beyond it. Another option is for the Design to write the change again after a force-stopped lost window, instead of treating a missing entry as a rejection. In the Owner summary, say that on Windows a lost window falls outside AC-06.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-05, AC-06, AC-16 and AC-17 row
+EVIDENCE: The row (line 260) plans "A rollback with an app that ignores the graceful quit, and a fake commit delay longer than the CLI's wait so that each force-stop loses the restore". That case asserts "the unconfirmed message with the force-stop reason added and a kept copy holding the previous registry". In the fake, a launch copies the committed store (`a.live = maps.Clone(a.committed)`, fakedevtools_test.go:150). A kill commits nothing unless the last write is older than the commit delay (`if graceful || time.Since(a.lastWrite) >= a.commitDelay`, :163-164), and the page's own drop on reject counts as a write (:394, :401). So with a commit delay longer than the CLI's wait, the force-stop throws away the entry write, the app's drop and the restore together, and the stored value stays the list from before the command. The check after the restart (Design step 5, line 191) then reads a registry that matches the backup. It ends with the "previous host list is restored" message and no copy, and that check writes nothing, so its own force-stop loses nothing. A correct implementation would fail this case as written. The Test Plan does not say that the fake must commit the app's drop while losing the restore.
+PROPOSAL: Say how the fake keeps the app's drop and loses only the restore, for example by committing each write on its own after the delay, with the drop committed. Otherwise, assert the confirmed message with the force-stop reason and a second debug launch.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-16; Test Plan, AC-05, AC-06, AC-16 and AC-17 row
+EVIDENCE: AC-16 (line 249) names three triggers that happen before the CLI knows whether the app kept the change: it "loses the window a third time or cannot debug-launch the app or open its forward after a lost window". The Test Plan (line 260) covers the third lost window ("make the page stop answering after every reload") and the failed launch ("a window lost after the step 4 reload followed by three failed attempts"). No case makes the forward fail after a lost window, and no case makes any forward fail at all. A passing subset never upgrades a composite criterion, so an implementation review would have no check for that clause of AC-16.
+PROPOSAL: Add a fake case where the forward after a window lost in step 4 does not open, for example through a stand-in `ssh -L` that exits. Assert exit 1 and a named copy holding the previous registry. Otherwise, drop the forward clause from AC-16.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry, lost-window paragraph and quit and wait; Acceptance Criteria, AC-16 and AC-17
+EVIDENCE: The lost-window paragraph (line 198) says that after a window lost in step 4 "the CLI quits and waits". It lists the outcomes that "come before the CLI knows whether the app kept the change and end like an unconfirmed rollback": a third loss, a debug launch whose three attempts fail, and a forward that does not open. Quit and wait (line 194) can also give up on an installer at that point: "the command does not start the app and exits 1, saying to run it again". Only "during a rollback" does step 5 add a kept copy. So a window lost in step 4, followed by an update install longer than 2 minutes, leaves the app stopped in an unknown state, writes no copy and tells the owner to run the command again. AC-17 asks only for exit 1 and the stopped app, and AC-16 does not name this path. A re-run then overwrites `app-registry-<client>.backup.json` (step 3, line 189), which is the loss the kept copy was added to prevent (R-25 F-04).
+PROPOSAL: Add an installer give-up after a window lost in step 4 to the paths that end like an unconfirmed rollback. Name it in AC-16, or in AC-17 with the kept copy, and add a fake case for it.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T39, T40 and T41
+EVIDENCE: T39 (line 356) includes "an installer that starts the app as it ends". The Test Plan asserts "that the CLI quit the app again before its debug launch". T40 (line 357) needs "T39 and `go test -race ./...` pass". At 21dcbc3, `stop.sh` returns as soon as the main process is gone (snippets/stop.sh:13-20) and does not wait for an installer. The 3-second floor and the installer wait arrive only in T41 (line 358). So after T40 alone, the CLI debug-launches while the stand-in installer still runs. The fake starts the app with the debugging port, and the installer's later start is ignored because the app already runs (fakedevtools_test.go `handleLaunch`, `if !a.running`). The "quit again" assertion fails, so T40's done condition cannot hold until T41.
+PROPOSAL: Move the installer case to T41's done condition, or order T41 before T40.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary
+EVIDENCE: The summary (line 33) says "AC-05 now covers an update installed on quit". AC-05 (line 238) also gained two cases where `link` must still succeed: "when the app exits or does not answer on up to two of the three attempts of a debug launch, and when its window stops answering after a reload at most twice". The standard asks the summary to "Explain material changes since the last accepted scope".
+PROPOSAL: Add AC-05's debug-launch and lost-window cases to the summary sentence on what changed.
