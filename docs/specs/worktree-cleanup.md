@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Review R-16 fixes applied on 2026-11-12; awaiting a new independent spec review."
+status_description: "Review R-17 fixes applied on 2026-11-12; awaiting a new independent spec review."
 issue: null
 goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept; only commits that a branch worktree's HEAD reflog or a deleted branch's own reflog alone still names, such as copies from before a rebase or amend, go with them."
 covers:
@@ -73,7 +73,8 @@ a standing instruction to take the recommended option:
 - Detached worktrees and entries with a missing directory are included. A detached one needs its
   commit on the default branch; one on a branch needs that branch proven merged, which includes a
   merged PR head.
-- A detached worktree's age comes from its own HEAD reflog, so it measures creation, not last use.
+- A detached worktree's age comes from its own HEAD reflog, so it measures creation, not last use,
+  until Git's reflog expiry drops the oldest entries.
 - A detached entry whose directory is gone needs no minimum age.
 - Removal runs by default in sweeps and after merges.
 - The plan lists every kept worktree as its own record, by path.
@@ -107,8 +108,9 @@ when that is clean; the implement skill recreates the branch at the claim commit
 for a worktree to continue in. A branch created this week at an old commit with no reflog looks old by
 its commit date. A clean detached scratch checkout created more than seven
 days ago is removed even if it was used today. A detached worktree that was rebased or used for
-experiments keeps its old commits in its HEAD reflog, so it stays until the owner removes it by hand. A
-run that dies before closing leaves its worktrees locked, and the owner unlocks them by hand. Worktrees
+experiments keeps its old commits in its HEAD reflog, so it stays until Git's reflog expiry drops
+those entries, after 30 days by default for commits no branch holds, and is then treated like any
+other detached worktree; Git, not the helper, gives up those commits. A run that dies before closing leaves its worktrees locked, and the owner unlocks them by hand. Worktrees
 of runs already pending when this ships are not locked, so the owner locks any that must survive the
 first sweep. Branch worktrees are not checked for commits that only their HEAD reflog names. On
 2026-11-12 at least 15 Stackweaver branch worktrees held such commits, 72 in one, most likely copies
@@ -153,8 +155,9 @@ gaps, which are fixed. Spec review R-15 found that a branch checked out in two w
 `git worktree add --force` allows, could be deleted after only one of them was removed; it now waits
 for both. The document now also has a glossary. Spec review R-16 found that a moved worktree paused
 in a rebase no longer tied its branch to it, so the branch could be deleted mid-rebase; design item 3
-now reads that state for missing-directory entries too. A new independent review must pass before
-acceptance. Acceptance would authorize implementation on a feature branch; pushing, a PR, merging and
+now reads that state for missing-directory entries too. Spec review R-17 pointed out that Git's own
+reflog expiry limits how long the reflog guard lasts; the summary and item 3 now say so. A new
+independent review must pass before acceptance. Acceptance would authorize implementation on a feature branch; pushing, a PR, merging and
 releasing each still need their own approval.
 
 ### Background
@@ -291,8 +294,9 @@ item 1 keeps an entry for which it cannot be found.
    `git --git-dir=<admin dir> reflog show --date=unix --format='%H %gd' HEAD`. That command works with files
    and reftable storage and for `prunable` entries; reading `logs/HEAD` as a file would find nothing
    under reftable and let the checks below pass silently (R-10, F-01). When the command fails, the
-   worktree is kept with a reason. Its age is the oldest entry, which records its creation. When the
-   reflog has no entries, the age is the HEAD commit's committer date, as in item 2. Main, invoking and
+   worktree is kept with a reason. Its age is the oldest entry, which records its creation until
+   `git gc` expires it (R-17, F-01); after that the oldest remaining entry decides. When the reflog
+   has no entries, the age is the HEAD commit's committer date, as in item 2. Main, invoking and
    locked worktrees stay kept as today. A detached worktree, present or `prunable`, is also kept with
    a reason when its HEAD reflog names a commit that no local branch, and no remote-tracking ref of a
    branch the remote still has, contains: `git rev-list <every oid in that reflog> --not
