@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Review R-13 fixes applied on 2026-11-12; awaiting a new independent spec review."
+status_description: "Review R-14 fixes applied on 2026-11-12; awaiting a new independent spec review."
 issue: null
 goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept; only commits that a branch worktree's HEAD reflog or a deleted branch's own reflog alone still names, such as copies from before a rebase or amend, go with them."
 covers:
@@ -148,8 +148,10 @@ directory is found. Spec review R-12 moved the rule that keeps a worktree whose 
 cannot be pinned down into design item 1, made it cover a checkout moved over another's path, and
 kept linked worktrees on the default branch or an unborn branch. Spec review R-13 found that a
 removal could still delete the admin directory a moved checkout uses; item 1 now keeps any entry whose
-admin directory a present checkout points to. A new independent review must pass before acceptance. Acceptance would authorize implementation on a feature branch; pushing,
-a PR, merging and releasing each still need their own approval.
+admin directory another present checkout's `.git` points to. Spec review R-14 found two wording
+gaps, which are fixed. A new independent review must pass before acceptance. Acceptance would
+authorize implementation on a feature branch; pushing, a PR, merging and releasing each still need
+their own approval.
 
 ### Background
 
@@ -376,8 +378,9 @@ Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives wer
 ## Acceptance Criteria
 
 - [ ] AC-01: In a plan, a worktree on a proven-merged branch that has no changed or untracked files but
-      does hold ignored files is proposed for removal, with its ignored paths listed as Git prints them,
-      each with its file count and total bytes, also when `status.showUntrackedFiles=no` is set. Applying
+      does hold ignored files is proposed for removal, unless a rule in Design items 1 to 5 keeps it,
+      with its ignored paths listed as Git prints them, each with its file count and total bytes, also
+      when `status.showUntrackedFiles=no` is set. Applying
       the approved plan removes the worktree and its ignored files with plain `git worktree remove`, then
       deletes the branch.
 - [ ] AC-02: A worktree with a changed tracked file or an untracked file is never removed, even with
@@ -391,8 +394,8 @@ Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives wer
       with a ref under `refs/worktree/`, and a worktree with an assume-unchanged entry or
       a skip-worktree entry whose file exists. So is a worktree, present or with its directory
       missing, whose admin directory is not exactly one directory whose `gitdir` file names its path,
-      or is also the admin directory of another entry or the one a present checkout's `.git` points
-      to, and a linked worktree with the default branch or an unborn branch
+      or is also the admin directory of another entry or the one another present entry's `.git`
+      points to, and a linked worktree with the default branch or an unborn branch
       checked out. `apply` never deletes a branch that is still checked out
       in a worktree, including when that worktree's removal ended `changed`, when the worktree was
       added after the plan, or when it was moved after the plan.
