@@ -62,7 +62,7 @@ helper keeps them until the run closes and unlocks them.
 Out of scope: how Claude Code, Codex or other hosts create their worktrees, the `vh-adlc clean` binary,
 and anything outside Git worktrees and local branches.
 
-The owner settled twenty decisions on 2026-11-12, choosing option A each time, the last five under
+The owner settled twenty-one decisions on 2026-11-12, choosing option A each time, the last six under
 a standing instruction to take the recommended option:
 
 - Worktrees whose only extra files are ignored ones may go, and the plan lists those files first.
@@ -87,6 +87,7 @@ a standing instruction to take the recommended option:
   The worktree it runs from is both the `--repo` worktree and the one holding its working directory.
 - Commits that only a deleted branch's own reflog names go with the branch.
 - The audit ledger and maintenance report scripts create their worktrees already locked.
+- A worktree with a per-worktree ref under `refs/worktree/` is kept.
 
 A worktree whose directory was moved by hand looks missing to Git, so its entry can go while the files
 stay where they are. An entry whose directory still exists without its `.git` file, such as an empty
