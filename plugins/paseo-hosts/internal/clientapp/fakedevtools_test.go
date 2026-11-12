@@ -74,12 +74,38 @@ type fakeApp struct {
 	// regWrites holds every value the page wrote to the registry key, with
 	// removed for a removeItem.
 	regWrites []string
-	events    []event
-	launches  [][]string
-	launchAt  []time.Time
+	// installers are stand-in app update installer processes.
+	installers []*installer
+	events     []event
+	launches   [][]string
+	launchAt   []time.Time
 }
 
 const removed = "<removed>"
+
+// installer is a stand-in update installer process that runs until a
+// time and may start the app as it ends.
+type installer struct {
+	cmd       string
+	until     time.Time
+	startsApp bool
+}
+
+// forever is an installer end no test reaches.
+var forever = time.Now().Add(24 * time.Hour)
+
+// startInstaller starts a stand-in installer that runs for d.
+func (a *fakeApp) startInstaller(cmd string, d time.Duration, startsApp bool) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.install(cmd, time.Now().Add(d), startsApp)
+}
+
+// install starts a stand-in installer whose arguments are cmd. Call it
+// with mu held.
+func (a *fakeApp) install(cmd string, until time.Time, startsApp bool) {
+	a.installers = append(a.installers, &installer{cmd: cmd, until: until, startsApp: startsApp})
+}
 
 type event struct {
 	at   time.Time
@@ -235,6 +261,19 @@ func (a *fakeApp) handlePS(w http.ResponseWriter, _ *http.Request) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	procs := []testenv.Proc{}
+	a.installers = slices.DeleteFunc(a.installers, func(i *installer) bool {
+		if time.Now().Before(i.until) {
+			return false
+		}
+		if i.startsApp && !a.running {
+			a.launch(nil)
+			a.event("installer started the app")
+		}
+		return true
+	})
+	for n, i := range a.installers {
+		procs = append(procs, testenv.Proc{PID: 7000 + n, Cmd: i.cmd})
+	}
 	if a.running {
 		cmd := a.appPath + "/Contents/MacOS/Paseo"
 		if a.debugPort != "" {
@@ -598,4 +637,5 @@ func (a *fakeApp) calm() {
 	defer a.mu.Unlock()
 	a.stuck, a.stuckHung, a.reject, a.onReload, a.onQuit = false, false, nil, nil, nil
 	a.loseReloads, a.exitReloads, a.earlyExits, a.deafLaunches = 0, 0, 0, 0
+	a.installers = nil
 }

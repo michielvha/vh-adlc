@@ -1003,14 +1003,39 @@ func openMain(args []string) int {
 	return 0
 }
 
+var quitScript = regexp.MustCompile(`tell application id "[A-Za-z0-9.-]+" to quit`)
+
+// osascriptMain quits the fake app for a quit script that names the app
+// by any bundle identifier.
 func osascriptMain(args []string) int {
 	script := strings.Join(args, " ")
-	if !strings.Contains(script, `"sh.paseo.desktop"`) || !strings.Contains(script, "to quit") {
+	if !quitScript.MatchString(script) {
 		return fail(1, "testenv osascript: unsupported script %q", script)
 	}
 	if _, err := appRequest(callerDir(), http.MethodPost, "/quit", nil); err != nil {
 		return fail(1, "execution error: %v", err)
 	}
+	return 0
+}
+
+var bundleID = regexp.MustCompile(`<key>CFBundleIdentifier</key>\s*<string>([^<]*)</string>`)
+
+// plistBuddyMain prints CFBundleIdentifier from an XML property list, as
+// /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' <file> does.
+func plistBuddyMain(args []string) int {
+	if len(args) != 3 || args[0] != "-c" || args[1] != "Print CFBundleIdentifier" {
+		return fail(1, "testenv PlistBuddy: unsupported arguments %q", args)
+	}
+	data, err := os.ReadFile(args[2])
+	if err != nil {
+		fmt.Printf("File Doesn't Exist, Will Create: %s\n", args[2])
+		return fail(1, "Print: Entry, \":CFBundleIdentifier\", Does Not Exist")
+	}
+	m := bundleID.FindSubmatch(data)
+	if m == nil {
+		return fail(1, "Print: Entry, \":CFBundleIdentifier\", Does Not Exist")
+	}
+	fmt.Println(string(m[1]))
 	return 0
 }
 

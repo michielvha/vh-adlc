@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -17,6 +18,7 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/config"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/link"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/registry"
+	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/remote"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/report"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/runtime"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/testenv"
@@ -24,7 +26,7 @@ import (
 
 func TestMain(m *testing.M) {
 	if clientapp.CommitDelay != 8*time.Second || clientapp.QuitTimeout != 20*time.Second || clientapp.TunnelTimeout != 30*time.Second ||
-		clientapp.LaunchTimeout != 60*time.Second || clientapp.QuitFloor != 3*time.Second {
+		clientapp.LaunchTimeout != 60*time.Second || clientapp.QuitFloor != 3*time.Second || clientapp.InstallerTimeout != 120*time.Second {
 		panic("clientapp waits differ from the Design")
 	}
 	clientapp.CommitDelay = 300 * time.Millisecond
@@ -33,6 +35,7 @@ func TestMain(m *testing.M) {
 	clientapp.TunnelTimeout = 3 * time.Second
 	clientapp.LaunchTimeout = time.Second
 	clientapp.QuitFloor = quitFloor
+	clientapp.InstallerTimeout = 2 * time.Second
 	testenv.Main(m)
 }
 
@@ -671,4 +674,213 @@ func TestUnconfirmedRestoreKeepsACopy(t *testing.T) {
 		w.noKeptCopy(t)
 		w.check(t)
 	})
+}
+
+const (
+	paseoShipIt  = "/Users/me/Library/Caches/sh.paseo.desktop.ShipIt/ShipIt sh.paseo.desktop.ShipIt /Users/me/Library/Caches/sh.paseo.desktop.ShipIt/ShipItState.plist"
+	vscodeShipIt = "/Users/me/Library/Caches/com.microsoft.VSCode.ShipIt/ShipIt com.microsoft.VSCode.ShipIt /Users/me/Library/Caches/com.microsoft.VSCode.ShipIt/ShipItState.plist"
+	otherShipIt  = "/Users/me/Library/Caches/test.paseo.other.ShipIt/ShipIt test.paseo.other.ShipIt /Users/me/Library/Caches/test.paseo.other.ShipIt/ShipItState.plist"
+)
+
+func infoPlist(id string) string {
+	return `<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+	<key>CFBundleExecutable</key>
+	<string>Paseo</string>
+	<key>CFBundleIdentifier</key>
+	<string>` + id + `</string>
+</dict>
+</plist>
+`
+}
+
+func TestStopWaitsForTheAppsInstaller(t *testing.T) {
+	script, err := os.ReadFile("snippets/stop.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, plist, installer, id, source string
+	}{
+		{"installed identifier", "sh.paseo.desktop", paseoShipIt, "sh.paseo.desktop", "file"},
+		{"another identifier", "test.paseo.other", otherShipIt, "test.paseo.other", "file"},
+		{"no Info.plist", "", "", "sh.paseo.desktop", "fallback"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newWorld(t, 6767, "")
+			if tc.plist != "" {
+				w.mac.Write("Applications/Paseo.app/Contents/Info.plist", infoPlist(tc.plist), 0o644)
+			}
+			w.app.startInstaller(vscodeShipIt, time.Hour, false)
+			if tc.installer != "" {
+				w.app.startInstaller(tc.installer, 5*time.Second, false)
+			}
+			start := time.Now()
+			out, err := remote.Bash(context.Background(), "mac", string(script), remote.Vars{
+				"app": w.app.appPath, "wait_ms": "500", "fallback": "TERM", "floor_ms": "3000", "limit_ms": "120000",
+			})
+			took := time.Since(start)
+			if err != nil {
+				t.Fatalf("stop.sh: %v\n%s", err, out.Text)
+			}
+			if out.Values["INSTALLER"] != tc.id+".ShipIt" || out.Values["INSTALLER_SOURCE"] != tc.source {
+				t.Fatalf("INSTALLER=%q INSTALLER_SOURCE=%q, want %s.ShipIt and %s", out.Values["INSTALLER"], out.Values["INSTALLER_SOURCE"], tc.id, tc.source)
+			}
+			if out.Values["STOPPED"] != "graceful" || out.Values["INSTALLING"] != "" {
+				t.Fatalf("output %q", out.Text)
+			}
+			least := 3 * time.Second
+			if tc.installer != "" {
+				least = 5 * time.Second
+			}
+			if took < least || took > least+3*time.Second {
+				t.Fatalf("the quit took %v, want at least %v and no wait for the VS Code installer", took, least)
+			}
+			quits := w.e.CallsTo("osascript")
+			if len(quits) != 1 || !strings.Contains(strings.Join(quits[0].Args, " "), `tell application id "`+tc.id+`" to quit`) {
+				t.Fatalf("osascript calls %v", quits)
+			}
+		})
+	}
+}
+
+// installerRead is the part of stop.ps1 that reads the installer's name.
+func installerRead(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile("snippets/stop.ps1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, rest, ok1 := strings.Cut(string(data), "# installer read: begin\n")
+	read, _, ok2 := strings.Cut(rest, "# installer read: end\n")
+	if !ok1 || !ok2 {
+		t.Fatal("stop.ps1 has no installer read section")
+	}
+	return read
+}
+
+func TestStopPS1ReadsTheInstaller(t *testing.T) {
+	testenv.RequirePwsh(t)
+	for _, tc := range []struct {
+		name, yml, installer, source string
+	}{
+		{"app-update.yml", "provider: generic\nupdaterCacheDirName: 'test-updater'\npublisherName: Paseo\n", "test-updater", "file"},
+		{"double quotes", "updaterCacheDirName: \"test-updater\"\r\n", "test-updater", "file"},
+		{"no file", "", "@getpaseodesktop-updater", "fallback"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			local := t.TempDir()
+			if tc.yml != "" {
+				dir := filepath.Join(local, "Programs", "Paseo", "resources")
+				if err := os.MkdirAll(dir, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(dir, "app-update.yml"), []byte(tc.yml), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cmd := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", "iex ([Console]::In.ReadToEnd())")
+			cmd.Stdin = strings.NewReader("$ErrorActionPreference = 'Stop'\n" + installerRead(t))
+			cmd.Env = append(os.Environ(), "LOCALAPPDATA="+local)
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("pwsh: %v\n%s", err, out)
+			}
+			text := strings.ReplaceAll(string(out), "\r", "")
+			if !strings.Contains(text, "INSTALLER="+tc.installer+"\n") || !strings.Contains(text, "INSTALLER_SOURCE="+tc.source+"\n") {
+				t.Fatalf("output %q, want INSTALLER=%s and INSTALLER_SOURCE=%s", text, tc.installer, tc.source)
+			}
+		})
+	}
+}
+
+// leftStopped checks that the app is stopped and that no launch followed
+// its last stop.
+func (w *world) leftStopped(t *testing.T) {
+	t.Helper()
+	kinds := w.app.kinds()
+	lastLaunch := slices.Index(kinds, "launch")
+	lastStop := -1
+	for i, k := range kinds {
+		switch k {
+		case "launch":
+			lastLaunch = i
+		case "exit", "killed":
+			lastStop = i
+		}
+	}
+	if running, _, _ := w.app.state(); running || lastLaunch > lastStop {
+		t.Fatalf("the app was started after it last stopped: %q", kinds)
+	}
+}
+
+func mustSayRunAgain(t *testing.T, err error) {
+	t.Helper()
+	mustExit1(t, err)
+	if !strings.Contains(err.Error(), "run it again once the update has installed") {
+		t.Fatalf("error %q does not say to run it again once the update has installed", err)
+	}
+}
+
+func TestInstallerOutlivesTheLimit(t *testing.T) {
+	before := "[" + otherHost + "," + srvHost + "]"
+	t.Run("link", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.startInstaller(paseoShipIt, time.Hour, false)
+		mustSayRunAgain(t, w.add())
+		w.leftStopped(t)
+		w.restoredTo(t, before)
+	})
+	t.Run("unlink", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.startInstaller(paseoShipIt, time.Hour, false)
+		mustSayRunAgain(t, w.del())
+		w.leftStopped(t)
+		w.restoredTo(t, before)
+	})
+	t.Run("during a rollback", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.reject = rejectSrv
+		w.app.onQuit = func() {
+			if w.app.debugPort != "" && len(w.app.installers) == 0 {
+				w.app.install(paseoShipIt, forever, false)
+			}
+		}
+		err := w.add()
+		mustSayRunAgain(t, err)
+		if !strings.Contains(err.Error(), "previous host list") {
+			t.Fatalf("error %q is not one of the rollback messages", err)
+		}
+		w.leftStopped(t)
+	})
+	t.Run("after a window lost in step 4", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.loseReloads = 1
+		w.app.onReload = func(n int) {
+			if n == 1 {
+				w.app.install(paseoShipIt, forever, false)
+			}
+		}
+		err := w.add()
+		mustSayRunAgain(t, err)
+		w.keptCopy(t, err, before)
+		w.leftStopped(t)
+	})
+}
+
+func TestInstallerStartsTheAppAsItEnds(t *testing.T) {
+	w := newWorld(t, 6767, "["+otherHost+"]")
+	w.app.startInstaller(paseoShipIt, time.Second, true)
+	if err := w.add(); err != nil {
+		t.Fatalf("Add: %v\n%s", err, w.out)
+	}
+	w.linked(t)
+	kinds := w.app.kinds()
+	started := slices.Index(kinds, "installer started the app")
+	at := w.app.debugLaunches()
+	if started < 0 || len(at) == 0 || !w.app.happened("quit", w.app.eventTime("installer started the app"), at[0]) {
+		t.Fatalf("the CLI did not quit the app the installer started before its debug launch: %q", kinds)
+	}
+	w.check(t)
 }

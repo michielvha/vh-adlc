@@ -43,6 +43,9 @@ var (
 	// QuitFloor is the least time quit and wait takes, and so the wait
 	// between debug launch attempts.
 	QuitFloor = 3 * time.Second
+	// InstallerTimeout is how long quit and wait waits for an app update
+	// installer.
+	InstallerTimeout = 120 * time.Second
 	// AliveInterval is how often the CLI checks that the app runs while it
 	// waits for the window.
 	AliveInterval = 2 * time.Second
@@ -200,6 +203,14 @@ func unknown(format string, args ...any) error {
 	return &unknownError{reason: fmt.Sprintf(format, args...)}
 }
 
+// installingError reports that quit and wait gave up on an app update
+// installer; the command leaves the app stopped.
+type installingError struct{ client string }
+
+func (e *installingError) Error() string {
+	return fmt.Sprintf("an app update on %s was still installing after %v, so the app is left stopped; run it again once the update has installed", e.client, InstallerTimeout)
+}
+
 // errLost marks a window that does not answer.
 var errLost = errors.New("the app window does not answer")
 
@@ -227,6 +238,8 @@ type run struct {
 
 	rollingBack bool
 	reasons     []string
+	// installing reports that quit and wait gave up on an installer.
+	installing bool
 }
 
 // session runs Design steps 2 to 6 up to the tunnel check. It reports
@@ -235,6 +248,9 @@ func (a *App) session(ctx context.Context, c link.Client, ch change) (bool, erro
 	r := &run{a: a, c: c, ch: ch}
 	defer r.closeForward()
 	if err := r.quitAndWait(ctx); err != nil {
+		if r.installing {
+			return false, r.unchanged(ctx, err)
+		}
 		return false, err
 	}
 	if err := r.debugLaunch(ctx); err != nil {
@@ -255,6 +271,9 @@ func (a *App) session(ctx context.Context, c link.Client, ch change) (bool, erro
 		return false, err
 	}
 	if err := r.finish(ctx); err != nil {
+		if r.installing {
+			return false, report.Errorf(report.ExitFailed, "the app on %s kept the change, but %v", c.Alias, err)
+		}
 		return false, r.unconfirmed(ctx, &unknownError{reason: err.Error()})
 	}
 	if err := r.relaunch(ctx); err != nil {
@@ -332,13 +351,17 @@ func (r *run) rollBack(ctx context.Context) error {
 			return err
 		}
 		if r.matchesBackup(cur, ok) {
+			restored := fmt.Sprintf("the app on %s did not keep the change; its previous host list is restored", r.c.Alias)
 			if err := r.finish(ctx); err != nil {
+				if r.installing {
+					return report.Errorf(report.ExitFailed, "%s; %v", r.withReasons(restored), err)
+				}
 				return unknown("%v", err)
 			}
 			if err := r.relaunch(ctx); err != nil {
 				return err
 			}
-			return report.Errorf(report.ExitFailed, "%s", r.withReasons(fmt.Sprintf("the app on %s did not keep the change; its previous host list is restored", r.c.Alias)))
+			return report.Errorf(report.ExitFailed, "%s", r.withReasons(restored))
 		}
 		if _, err := r.restore(ctx); err != nil {
 			return err
@@ -439,16 +462,13 @@ func (r *run) recover(ctx context.Context) (bool, error) {
 		// window.close() needs the page, so Windows stops the process.
 		wait = "0"
 	}
-	stopped, err := r.a.stop(ctx, r.c, wait, "KILL")
+	stopped, err := r.stop(ctx, wait, "KILL")
 	r.closeForward()
-	if err != nil {
-		return false, unknown("%v", err)
-	}
 	if stopped == "KILL" {
 		r.forceStopped()
 	}
-	if err := sleep(ctx, QuitFloor); err != nil {
-		return false, err
+	if err != nil {
+		return false, unknown("%v", err)
 	}
 	if err := r.debugLaunch(ctx); err != nil {
 		return false, unknown("%v", err)
@@ -460,12 +480,28 @@ func (r *run) recover(ctx context.Context) (bool, error) {
 // window, in up to three attempts with a quit and wait between them.
 func (r *run) debugLaunch(ctx context.Context) error {
 	var last error
+	quit := true
 	for attempt := range 3 {
-		if attempt > 0 {
+		if !quit {
 			logger.Debug("debug launch failed", "client", r.c.Alias, "attempt", attempt, "error", last)
 			if err := r.quitAndWait(ctx); err != nil {
 				return err
 			}
+		}
+		quit = false
+		// An update install can start the app again after quit and wait.
+		alive, err := r.a.running(ctx, r.c)
+		if err != nil {
+			return err
+		}
+		if alive {
+			last = errors.New("the Paseo app started again before its debug launch")
+			logger.Debug("debug launch", "client", r.c.Alias, "attempt", attempt+1, "error", last)
+			if err := r.quitAndWait(ctx); err != nil {
+				return err
+			}
+			quit = true
+			continue
 		}
 		port := 20000 + rand.IntN(40000)
 		if err := r.a.launch(ctx, r.c, strconv.Itoa(port)); err != nil {
@@ -541,18 +577,15 @@ func (r *run) finish(ctx context.Context) error {
 		closeWindow(ctx, r.fwd.addr)
 	}
 	r.closePage()
-	stopped, err := r.a.stop(ctx, r.c, ms(QuitTimeout), "KILL")
+	stopped, err := r.stop(ctx, ms(QuitTimeout), "KILL")
 	r.closeForward()
-	if err != nil {
-		return err
-	}
 	if stopped == "KILL" {
 		r.a.Report.Partial("the app on %s did not quit within %v and was force-stopped", r.c.Alias, QuitTimeout)
 		r.forced = r.forced || r.wrote
 		r.forceStopped()
 	}
 	r.wrote = false
-	return sleep(ctx, QuitFloor)
+	return err
 }
 
 func (r *run) forceStopped() {
@@ -562,7 +595,18 @@ func (r *run) forceStopped() {
 	}
 }
 
-// quitAndWait quits the app as step 2 does and waits the floor.
+// stop quits the app and waits as quit and wait does. It reports how the
+// app stopped even when the wait gave up on an installer.
+func (r *run) stop(ctx context.Context, waitMS, fallback string) (string, error) {
+	stopped, installing, err := r.a.stop(ctx, r.c, waitMS, fallback)
+	if err == nil && installing {
+		r.installing = true
+		err = &installingError{client: r.c.Alias}
+	}
+	return stopped, err
+}
+
+// quitAndWait quits the app as step 2 does and waits.
 func (r *run) quitAndWait(ctx context.Context) error {
 	wait := ms(QuitTimeout)
 	if r.c.Kind == link.Windows {
@@ -570,10 +614,8 @@ func (r *run) quitAndWait(ctx context.Context) error {
 		wait = "0"
 	}
 	r.closePage()
-	if _, err := r.a.stop(ctx, r.c, wait, "TERM"); err != nil {
-		return err
-	}
-	return sleep(ctx, QuitFloor)
+	_, err := r.stop(ctx, wait, "TERM")
+	return err
 }
 
 // relaunch is step 6: start the app without the debugging port.
@@ -589,6 +631,9 @@ func (r *run) unchanged(ctx context.Context, cause error) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	if r.installing {
+		return report.Errorf(report.ExitFailed, "%v; the app's host list on %s is unchanged", cause, r.c.Alias)
+	}
 	_ = r.finish(ctx)
 	launchErr := r.relaunch(ctx)
 	if err := report.Errorf(report.ExitFailed, "%v; the app's host list on %s is unchanged", cause, r.c.Alias); launchErr == nil {
@@ -603,7 +648,9 @@ func (r *run) unconfirmed(ctx context.Context, u *unknownError) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	_ = r.finish(ctx)
+	if !r.installing {
+		_ = r.finish(ctx)
+	}
 	msg := fmt.Sprintf("the CLI could not tell whether the app on %s kept the change (%s)", r.c.Alias, u.reason)
 	if r.rollingBack {
 		msg = fmt.Sprintf("the app on %s did not keep the change, and the CLI could not confirm that its previous host list is restored (%s)", r.c.Alias, u.reason)
@@ -618,6 +665,9 @@ func (r *run) unconfirmed(ctx context.Context, u *unknownError) error {
 		}
 	} else {
 		msg += "; the app had no host list before the command, so there is no copy to restore"
+	}
+	if r.installing {
+		return report.Errorf(report.ExitFailed, "%s", msg)
 	}
 	if err := r.relaunch(ctx); err != nil {
 		msg += fmt.Sprintf("; %v", err)
@@ -749,14 +799,21 @@ func (a *App) keepCopy(client, raw string) (string, error) {
 }
 
 // stop quits the app: AppleScript on macOS, then fallback after wait_ms;
-// on Windows Stop-Process, at once when wait_ms is 0. It reports how the
-// app stopped: none, graceful or the fallback.
-func (a *App) stop(ctx context.Context, c link.Client, waitMS, fallback string) (string, error) {
-	out, err := c.Run(ctx, stopScript, stopPS, remote.Vars{"app": c.App, "wait_ms": waitMS, "fallback": fallback})
+// on Windows Stop-Process, at once when wait_ms is 0. Then it waits at
+// least QuitFloor and until no app update installer runs, for up to
+// InstallerTimeout. It reports how the app stopped, none, graceful or the
+// fallback, and whether an installer still ran at the end of the wait.
+func (a *App) stop(ctx context.Context, c link.Client, waitMS, fallback string) (string, bool, error) {
+	out, err := c.Run(ctx, stopScript, stopPS, remote.Vars{
+		"app": c.App, "wait_ms": waitMS, "fallback": fallback,
+		"floor_ms": ms(QuitFloor), "limit_ms": ms(InstallerTimeout),
+	})
 	if err != nil {
-		return "", remoteError("quitting the Paseo app", err)
+		return "", false, remoteError("quitting the Paseo app", err)
 	}
-	return out.Values["STOPPED"], nil
+	logger.Debug("quit and wait", "client", c.Alias, "stopped", out.Values["STOPPED"],
+		"installer", out.Values["INSTALLER"], "installer_source", out.Values["INSTALLER_SOURCE"])
+	return out.Values["STOPPED"], out.Values["INSTALLING"] == "yes", nil
 }
 
 // launch starts the app, with a debugging port unless debugPort is empty.

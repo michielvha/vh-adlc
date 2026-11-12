@@ -46,6 +46,7 @@ var standins = map[string]func([]string) int{
 	"paseo":      paseoMain,
 	"uname":      unameMain,
 	"osascript":  osascriptMain,
+	"PlistBuddy": plistBuddyMain,
 	"open":       openMain,
 	"pgrep":      pgrepMain,
 	"pkill":      pkillMain,
@@ -193,7 +194,7 @@ func (e *Env) Server(name string, o ServerOptions) *Host {
 func (e *Env) Client(name, kind string) *Host {
 	h := e.host(name, kind, "me")
 	if kind == Darwin {
-		for _, n := range []string{"uname", "osascript", "open", "pgrep", "pkill"} {
+		for _, n := range []string{"uname", "osascript", "PlistBuddy", "open", "pgrep", "pkill"} {
 			h.link(n)
 		}
 	}
