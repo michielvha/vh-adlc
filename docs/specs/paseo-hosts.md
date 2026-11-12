@@ -409,6 +409,7 @@ None.
 | 2026-11-12 | R-35 | spec | `85cb9d40735f5124edfee01d625a4be52b28ca57` | unknown | procedural | One should-fix factual finding (AC-06 reads an app that exits by itself as a quit that was not graceful, so it excludes the Mac failure) and one factual nit (the summary's AC-05 clause lacks the forward bound). Applied both. |
 | 2026-11-12 | R-36 | spec | `41f03025c0bac68f3ef33f0a395dd74768421f68` | unknown | procedural | One should-fix factual finding (the updater path and the ShipIt job name are not cited, and no live check reads the real ones) and two factual nits (AC-06 counts force-stops of an instance holding no writes; the summary's AC-06 bound predates R-35). Measured both values and applied all three. |
 | 2026-11-12 | R-37 | spec | `030bfc28d2977ee7a9ed07fae01cd94fee2e483b` | claude-opus-4.8 | procedural | Two factual nits (AC-05 counts attempts differently from the Design; step 9 reads the Mac job from a state file that may not exist) and one judgement nit (fixed installer names rather than reading them at run time). Applied the nits and raised Q16. |
+| 2026-11-12 | R-38 | spec | `1350926d925c2d9642f74670eb26b20d73109bf8` | unknown | procedural | One should-fix factual finding (no check tells the Windows installer read from its fallback, and YAML quotes could break it) and one judgement nit (the macOS quit keeps a fixed app id). Applied the finding and raised Q17. |
 
 ### R-1
 
@@ -1800,6 +1801,22 @@ SEVERITY: nit
 WHERE: Test Plan, manual step 9 (line 273); Tasks, T44 (line 363)
 EVIDENCE: T44 records "the updater directory and `ShipIt` job read from each installed app". Step 9 reads the Mac value from "the bundle identifier in `ShipItState.plist`", and that file is under `~/Library/Caches/sh.paseo.desktop.ShipIt/`, not in the installed app. In `SQRLShipItLauncher.m`, the launcher writes the state file and starts ShipIt only when an update is ready to install (`SQRLUpdater.m`, `_shipItLauncher`). A Mac with no update staged may not have the file, so the step cannot always be done as written. The label comes from the main bundle's identifier (`SQRLDirectoryManager.m:22`, `NSBundle.mainBundle.bundleIdentifier`), which is `CFBundleIdentifier` in `Paseo.app/Contents/Info.plist`.
 PROPOSAL: In step 9 and T44, read `CFBundleIdentifier` from the installed app's `Info.plist` on the Mac. Then cite `SQRLDirectoryManager.m` for how the label is derived, next to `SQRLShipItLauncher.m`.
+
+### R-38
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, manual step 9 and the AC-05, AC-06, AC-16, AC-17 row; Tasks, T41 and T44; Design, quit and wait
+EVIDENCE: Q16 was folded in as "the CLI reads the installer's name from the installed app on each run and uses today's value only when it cannot read it". The AC-05 row says "The Windows installer wait ... checked live only". The only check of the Windows read is step 9. That step places the stand-in "under `%LOCALAPPDATA%\@getpaseodesktop-updater\`", which is also the fallback value. If the `app-update.yml` read fails and the fallback is used, step 9 still passes, so no check can tell a working read from the fallback. Step 9 and T44 also require recording "that they are the values the stop snippets read". Nothing makes the snippets report the value they used. At 1350926, `internal/clientapp/clientapp.go` returns only `out.Values["STOPPED"]` from `stop.sh`/`stop.ps1`, and the only debug log of a remote call is `internal/remote/remote.go:87`, which logs the command and not the snippet's output. The Design cites the real file as `updaterCacheDirName: '@getpaseodesktop-updater'`, with single quotes. If the read keeps the quotes, the snippet gets a value that names no directory. That does not count as "cannot read it", so the fallback is never used. The wait then sees no installer, the R-23 race comes back, and no error is shown.
+PROPOSAL: Have both stop snippets print the installer name they used and where it came from (for example `INSTALLER=<name>` and `INSTALLER_SOURCE=file|fallback`). Have step 9 and T44 record `file` on each desktop. Say in Design that the snippet strips YAML quotes from `updaterCacheDirName`, and test that parse in a `pwsh` test of a stand-in `app-update.yml`, apart from the `Get-CimInstance` part.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Desktop app entry steps 2 and 5, and quit and wait
+EVIDENCE: Q16's reason is that a fixed name could go stale after an app update. The design now reads `CFBundleIdentifier` for the `ShipIt` match only. The macOS quit still uses a fixed id: `internal/clientapp/snippets/stop.sh:16` runs `osascript -e 'tell application id "sh.paseo.desktop" to quit'`. In `clientapp.go` `stop()`, the step 5 quit (wait > 0) falls back to `KILL`. If the identifier changed, the AppleScript quit would fail with no message, and every step 5 quit would become a force-stop after 20 seconds. `link` would then succeed only if the tunnel appears, and rollbacks would fall outside AC-06.
+PROPOSAL: Have `stop.sh` use the identifier it reads from `Info.plist`, with the same fallback, for the AppleScript quit too. Alternatively, record in Design that the quit keeps the fixed id and explain why.
 
 ## Sources
 
