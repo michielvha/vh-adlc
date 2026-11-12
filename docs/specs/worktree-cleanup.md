@@ -514,6 +514,7 @@ None.
 | 2026-11-12 | R-15 | spec | `bd8119770007c1db212d95a16a243a9c5c3ca99d` | unknown | procedural | One factual should-fix, one judgement nit and one factual nit; the reviewer did not report its model. |
 | 2026-11-12 | R-16 | spec | `6e6ee5b2a7db567416f541c91ec15512e5ec6dd2` | claude-opus-4.8 | procedural | One should-fix and one nit finding; model self-reported, no model was requested. |
 | 2026-11-12 | R-17 | spec | `3d2898240ace68bc33171a21b2291f732484e34c` | unknown | procedural | One nit finding; the reviewer did not report its model. |
+| 2026-11-12 | R-18 | spec | `71972bd391b8324a127557ace03d7cffdfee6141` | claude-opus-4.8 | procedural | One blocking finding; model self-reported, no model was requested. |
 
 ### R-1
 
@@ -1093,3 +1094,16 @@ With default settings, `git reflog expire --all --dry-run --verbose` also marked
 
 So the reflog guard protects reflog-only commits only until gc expires them, and the next sweep then removes the worktree. Git, not the helper, loses those commits. After expiry the oldest remaining entry no longer records creation. That errs toward keeping, so it is not a safety problem, but the summary's "stays until the owner removes it by hand" and "measures creation" are not true over time.
 PROPOSAL: In the trade-offs, say such a worktree is kept until Git's reflog expiry drops those entries, about 30 days by default, and is then treated like any other detached worktree. In the decisions bullet and in item 3, say the oldest entry records creation only until gc expires it, after which the age comes from the remaining entries or, when none remain, the HEAD commit's date.
+
+### R-18
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design item 3 (reflog guard and "Its age is the oldest entry, which records its creation until `git gc` expires it"), Owner summary trade-offs ("it stays until Git's reflog expiry drops those entries ... Git, not the helper, gives up those commits"), goal, AC-04, Test Plan AC-04 row
+EVIDENCE: The guard only checks the new value of each HEAD reflog entry: `git rev-list <every oid in that reflog> --not --branches ...`, with oids from `reflog show --format='%H %gd'`. A reflog entry also records an old value. Git keeps that commit alive, but `%H` never prints it, and `git reflog show` has no placeholder for it. Once gc expires older entries, the old value of the oldest remaining entry can be the only thing that still names a commit.
+
+I tested this in a scratch repository with Git 2.55.0. I created a detached worktree w at main dated 60 days ago. In w I committed X dated 40 days ago, then ran `git checkout --detach main` dated 10 days ago. Then I ran `git reflog expire --all` from the main worktree with default settings. The only remaining entry in w's HEAD reflog was `00f5417... checkout: moving from a12c27d... to main`, and `logs/HEAD` showed X as that entry's old value. `git rev-list $(git --git-dir=.git/worktrees/w reflog show --format=%H HEAD) --not --branches | wc -l` printed 0. After `git gc --prune=now`, `git cat-file -e X^{commit}` still succeeded, so Git was still keeping X. After `git worktree remove ../w` and another `git gc --prune=now`, X was gone. The oldest remaining entry is 10 days old, so under item 3 this clean worktree at a default-branch commit gets removed.
+
+So the helper loses an unmerged commit that Git still holds. That breaks the goal's "a worktree with ... unmerged commits is always kept" and its list of only two exceptions. It also contradicts the R-17 sentence "Git, not the helper, gives up those commits". It conflicts with AC-04 too, because the reflog still names X in both the entry's old value and its message. The exposure window lasts as long as the worktree stayed on X before leaving it. No fixture covers this case.
+PROPOSAL: Have the guard also include each entry's old value, at least for the oldest remaining entry, and keep the worktree when that value cannot be read, for example under reftable where `git reflog show` cannot print it. Alternatively, raise the window as an owner trade-off. Either way, correct the summary sentence and add an AC-04 fixture whose X entry has expired while the entry that left X remains.
