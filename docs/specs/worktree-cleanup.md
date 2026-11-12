@@ -487,6 +487,7 @@ None.
 | 2026-11-12 | R-12 | spec | `a0e8e8114909c19a61019ae389f6d6cf533ba88d` | unknown | procedural | One judgement should-fix, one factual nit and two further nit findings; the reviewer did not report its model. |
 | 2026-11-12 | R-13 | spec | `533cb53acc4327c09be13fcd0bae9f2fe5a55ad4` | unknown | procedural | One factual should-fix, one factual nit and one judgement nit; the reviewer did not report its model. |
 | 2026-11-12 | R-14 | spec | `703eeb294056f8f59f940ab041c83f96e645bda6` | unknown | procedural | One judgement nit and one factual nit; the reviewer did not report its model. |
+| 2026-11-12 | R-15 | spec | `bd8119770007c1db212d95a16a243a9c5c3ca99d` | unknown | procedural | One factual should-fix, one judgement nit and one factual nit; the reviewer did not report its model. |
 
 ### R-1
 
@@ -1012,3 +1013,26 @@ SEVERITY: nit
 WHERE: AC-02, Owner summary (R-13 sentence), Design item 1
 EVIDENCE: Design item 1 keeps an entry whose admin directory is also "the one another entry's admin directory or another present entry's `.git` file points to". AC-02 says instead "or is also the admin directory of another entry or the one a present checkout's `.git` points to". The Owner summary says "item 1 now keeps any entry whose admin directory a present checkout points to". In both places, "another" is missing from the present-checkout half. Every present worktree's own `.git` points to its own admin directory, so read literally, AC-02 and the summary keep every present worktree. "A present checkout" also covers checkouts outside `git worktree list`, which the helper cannot see. The Design limits the check to other entries. An implementation review compares behaviour with the exact text of AC-02.
 PROPOSAL: In AC-02, write "or the one another present entry's `.git` points to". In the summary, write "whose admin directory another present checkout's `.git` points to". Both then match Design item 1.
+
+### R-15
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design item 6, Design item 1 (shared admin rule context), AC-02, Test Plan AC-02 row
+EVIDENCE: AC-02 says "`apply` never deletes a branch that is still checked out in a worktree". Item 6 deletes the branch "when the worktree that had it checked out was removed with result `done` earlier in the same run". That wording assumes a branch has only one worktree, and `observe` picks the worktree with `trees.find(t => t.branch === branch)` (branches.ts:190). Git lets two linked worktrees hold the same branch through `git worktree add --force`, and the Design already expects `--force` setups for the default branch. I tested this in a scratch repository with Git 2.55.0. `git worktree add ../b2 B` failed with "already used by worktree", but `git worktree add --force ../b2 B` exited 0, and `git worktree list --porcelain` then showed `branch refs/heads/B` for both b1 and b2. I put an untracked file in b2, ran `git worktree remove ../b1` and then `git update-ref -d refs/heads/B <tip>`, and both exited 0. `git -C ../b2 status` then printed "On branch B / No commits yet". This leaves a worktree on a missing branch, which is the R-4 F-01 outcome. The Design does not say how a branch held by two worktrees is classified, and no Test Plan case covers it. Stackweaver has no such branch today (`git worktree list --porcelain | grep '^branch ' | sort | uniq -d` printed nothing).
+PROPOSAL: State that a branch checked out in more than one worktree is deleted only after every one of those worktrees is removed with `done` in the same run, or is kept with a reason. Add an AC-02 fixture that uses `git worktree add --force` to put a merged branch in a clean worktree and in a dirty one.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-02, Test Plan AC-02 row
+EVIDENCE: AC-02 keeps "a worktree with any directory the current user cannot read, enter or write". The row tests an untracked directory with `chmod 000`, a read-only directory under ignored `node_modules/`, and an ignored directory with `chmod 000`. An implementation that checks only whether a directory is writable keeps all three and passes the row, but it would miss a directory that can be read and written but not entered (mode 0600), or entered and written but not read (0300). I tested 0600 in a scratch repository with Git 2.55.0. I made `node_modules/pkg` mode 0600 under an ignored `node_modules/` on a clean worktree. `git status --porcelain --untracked-files=all --ignore-submodules=none` printed nothing and exited 0. `git worktree remove ../w1` exited 255 with "failed to delete ... Permission denied". `git worktree list` no longer listed w1, but the directory remained on disk. This is the orphan case that R-7 F-01 describes.
+PROPOSAL: Add AC-02 fixtures for a directory with mode 0600 and one with mode 0300, each under an ignored path. Expect both worktrees to be kept, with their entry and files still present after `apply`.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary, Design item 1, AC-08, Open Questions
+EVIDENCE: feature-documents.md at d8f07c9 says "User-facing terms the feature introduces or changes appear in a glossary row and are held to it by a criterion." This feature changes what "clean" means for a worktree: "A worktree counts as clean when it has no changed tracked files and no untracked files; ignored files go with it". Today, `references/branches.md:49-52` and `docs/user-guides/workflows.md:164` ("Clean worktrees are removed only when you ask") use the term for a worktree where `git status --porcelain --ignored` prints nothing. The pinned `conventions/delivery.md:26-27` says "only when it is clean". The feature also adds the `worktree` kept record and the plan's ignored-paths list, and readers see both. The document has no glossary. AC-08 says only that the guides "describe these removal rules".
+PROPOSAL: Add a glossary with rows for "clean worktree", "ignored paths" and the `worktree` kept record. Have AC-08 check that the named guides use those meanings.
