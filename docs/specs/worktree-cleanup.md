@@ -535,6 +535,7 @@ None.
 | 2026-11-12 | R-16 | spec | `6e6ee5b2a7db567416f541c91ec15512e5ec6dd2` | claude-opus-4.8 | procedural | One should-fix and one nit finding; model self-reported, no model was requested. |
 | 2026-11-12 | R-17 | spec | `3d2898240ace68bc33171a21b2291f732484e34c` | unknown | procedural | One nit finding; the reviewer did not report its model. |
 | 2026-11-12 | R-18 | spec | `71972bd391b8324a127557ace03d7cffdfee6141` | claude-opus-4.8 | procedural | One blocking finding; model self-reported, no model was requested. |
+| 2026-11-12 | R-19 | spec | `199df989b5f17783e19d0ce45e6f7e6ca7992fb4` | claude-opus-4.8 | procedural | Four nit findings; model self-reported, no model was requested. |
 
 ### R-1
 
@@ -1127,3 +1128,33 @@ I tested this in a scratch repository with Git 2.55.0. I created a detached work
 
 So the helper loses an unmerged commit that Git still holds. That breaks the goal's "a worktree with ... unmerged commits is always kept" and its list of only two exceptions. It also contradicts the R-17 sentence "Git, not the helper, gives up those commits". It conflicts with AC-04 too, because the reflog still names X in both the entry's old value and its message. The exposure window lasts as long as the worktree stayed on X before leaving it. No fixture covers this case.
 PROPOSAL: Have the guard also include each entry's old value, at least for the oldest remaining entry, and keep the worktree when that value cannot be read, for example under reftable where `git reflog show` cannot print it. Alternatively, raise the window as an owner trade-off. Either way, correct the summary sentence and add an AC-04 fixture whose X entry has expired while the entry that left X remains.
+
+### R-19
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary, trade-offs ("In a repository with reftable storage, detached worktrees with HEAD reflog entries are never removed, so the owner removes them by hand.")
+EVIDENCE: Design item 3 keeps a reftable detached worktree only while "its HEAD reflog has any entry". When the reflog has no entries, the HEAD commit's committer date decides its age. I tested this with Git 2.55.0 in a scratch repository made with `git init --ref-format=reftable`. I added a detached worktree tw3 at main and moved its HEAD twice, all with `GIT_COMMITTER_DATE` set to 100 days ago. `git --git-dir=.git/worktrees/tw3 reflog show --format='%H %gd' HEAD | wc -l` printed 3. After a plain `git gc -q` from the main worktree it printed 0, and tw3 was still in `git worktree list`. From then on the reftable rule no longer applies, and the next sweep removes the worktree under the commit-date rule. The owner does not have to remove it by hand. R-17 F-01 fixed the same overstatement for files storage.
+PROPOSAL: Say that in a reftable repository such a worktree is kept until Git's reflog expiry empties its HEAD reflog, after 90 days by default once its commits are on a branch. After that it is treated like any other detached worktree with no reflog.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design item 3 ("keeps the worktree when that file cannot be read or has a different number of entries than `reflog show` printed"), AC-04
+EVIDENCE: The R-18 fix makes the guard read `<admin dir>/logs/HEAD` under files storage, and that file can be missing. In scratch repositories with Git 2.55.0, I added a detached worktree in a non-bare repository with `core.logAllRefUpdates=false`. A second one was added from a bare clone with `git --git-dir=b.git worktree add --detach`. Neither admin directory had a `logs/` directory. `reflog show --format=%H HEAD` exited 0 and printed no entries. Read literally, the missing file "cannot be read", so every such worktree is kept for good. Item 3's own fallback, "When the reflog has no entries, the age is the HEAD commit's committer date", then never applies to them, even though both sources agree there are zero entries. Before R-18 these worktrees followed the commit-date rule. In Stackweaver, all 15 detached admin directories have `logs/HEAD`, and their line counts match `reflog show`, so AC-09 is not affected.
+PROPOSAL: Say whether a missing `logs/HEAD` counts as zero entries, which the count check then compares with `reflog show`, or keeps the worktree with a reason. If it keeps the worktree, add that case to the Owner summary trade-offs.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-04 row ("one whose HEAD reflog the test empties with `git reflog delete` follows the commit-date rule")
+EVIDENCE: The fixture names no commit date and no expected result. If its HEAD commit is dated now, the age rule keeps it. An implementation that wrongly keeps every reftable detached worktree, including one with an empty reflog, then passes as long as the test checks only that the worktree is kept. With Git 2.55.0 under reftable, repeated `git reflog delete 'HEAD@{0}'` in a linked worktree emptied its HEAD reflog, so the fixture can be built.
+PROPOSAL: Give this fixture a HEAD commit dated 8 days ago and expect `plan` to propose its removal. Alternatively, expect a kept reason that names the age rule and not the reftable rule.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-09 row ("`git rev-list` over the non-zero old and new oids in `<admin dir>/logs/HEAD`, after checking that their count matches `git --git-dir=<admin dir> reflog show --format=%H HEAD`")
+EVIDENCE: Design item 3 compares the number of entries, meaning lines, in `logs/HEAD` with the number of entries `reflog show` prints. In the row, "their" refers to the oids. Each entry holds up to two oids, so the oid count almost never equals the entry count. For example, Stackweaver's `runner-architecture` admin directory has 840 lines in `logs/HEAD` and 840 `reflog show` entries.
+PROPOSAL: Write "after checking that the number of entries in that file matches the number `git --git-dir=<admin dir> reflog show --format=%H HEAD` prints".
