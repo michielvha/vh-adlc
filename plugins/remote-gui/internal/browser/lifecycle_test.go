@@ -3,6 +3,7 @@ package browser
 import (
 	"bufio"
 	"context"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -264,5 +266,144 @@ func TestBrowserComponentsCrashAndExpire(t *testing.T) {
 			}
 			_, _ = session.Cleanup(context.Background(), home)
 		})
+	}
+}
+
+type clipboardDouble struct {
+	mu        sync.Mutex
+	failClear int
+	clears    int
+	sets      []string
+	onClear   func()
+}
+
+func (d *clipboardDouble) Set(_ context.Context, text string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.sets = append(d.sets, text)
+	return nil
+}
+
+func (d *clipboardDouble) Get(context.Context) (string, error) { return "", nil }
+func (d *clipboardDouble) Close() error                        { return nil }
+
+func (d *clipboardDouble) Clear(context.Context) error {
+	d.mu.Lock()
+	d.clears++
+	hook, fail := d.onClear, d.failClear > 0
+	if fail {
+		d.failClear--
+	}
+	d.mu.Unlock()
+	if hook != nil {
+		hook()
+	}
+	if fail {
+		return errors.New("clipboard-clear-unverified")
+	}
+	return nil
+}
+
+func (d *clipboardDouble) counts() (int, int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.clears, len(d.sets)
+}
+
+func TestFailedClipboardClearBlocksAgentLaunch(t *testing.T) {
+	c, id := setup(t)
+	// Any launch attempt fails at once and names itself.
+	t.Setenv("REMOTE_GUI_CHROMIUM", filepath.Join(t.TempDir(), "absent-chromium"))
+	profile := filepath.Join(c.Home, id, "profile")
+	if err := os.Mkdir(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	double := &clipboardDouble{failClear: 1}
+	r := &runtime{home: c.Home, id: id, profile: profile, clip: double, clipMode: "human"}
+	r.current.BrowserMode = "human"
+	ctx := context.Background()
+	var racing error
+	var marked bool
+	double.onClear = func() {
+		r.clipMu.Lock()
+		marked = r.clipSwitching
+		r.clipMu.Unlock()
+		_, racing = r.clipboard().Set(ctx, "racing-send", "human")
+	}
+	if _, err := r.handoff(ctx, "agent"); err == nil || err.Error() != "clipboard-clear-unverified" {
+		t.Fatalf("failed clear: %v", err)
+	}
+	if clears, sets := double.counts(); clears != 1 || sets != 0 || len(r.children) != 0 {
+		t.Fatalf("failed clear reached launch: clears=%d sets=%d children=%d", clears, sets, len(r.children))
+	}
+	if !marked || racing == nil || racing.Error() != "clipboard-busy" {
+		t.Fatalf("send during the switch: marked=%v %v", marked, racing)
+	}
+	r.clipMu.Lock()
+	switching, mode := r.clipSwitching, r.clipMode
+	r.clipMu.Unlock()
+	if switching || mode != "human" {
+		t.Fatalf("failed handoff left switching=%v mode=%q", switching, mode)
+	}
+	double.onClear = nil
+	_, err := r.handoff(ctx, "agent")
+	if err == nil || err.Error() != "browser-start-failed" {
+		t.Fatalf("retry did not reach the launch: %v", err)
+	}
+	if clears, _ := double.counts(); clears != 2 {
+		t.Fatalf("retry did not clear again before launch: clears=%d", clears)
+	}
+	r.clipMu.Lock()
+	switching = r.clipSwitching
+	r.clipMu.Unlock()
+	if switching {
+		t.Fatal("failed launch left the switch marked")
+	}
+}
+
+func TestClipboardSetRefusedDuringSwitchOrModeChange(t *testing.T) {
+	double := &clipboardDouble{}
+	r := &runtime{clip: double, clipMode: "human"}
+	ctx := context.Background()
+	r.clipSwitching = true
+	if _, err := r.clipboard().Set(ctx, "during-switch", "human"); err == nil || err.Error() != "clipboard-busy" {
+		t.Fatalf("send during switch: %v", err)
+	}
+	r.clipSwitching = false
+	if _, err := r.clipboard().Set(ctx, "stale-mode", "agent"); err == nil || err.Error() != "clipboard-busy" {
+		t.Fatalf("send for another mode: %v", err)
+	}
+	mode, err := r.clipboard().Set(ctx, "accepted", "human")
+	if err != nil || mode != "human" {
+		t.Fatalf("matching send: %q %v", mode, err)
+	}
+	if double.sets == nil || len(double.sets) != 1 || double.sets[0] != "accepted" {
+		t.Fatal("refused sends reached the helper")
+	}
+}
+
+func TestEveryHandoffExitClearsTheSwitchMark(t *testing.T) {
+	c, id := setup(t)
+	profile := filepath.Join(c.Home, id, "profile")
+	if err := os.Mkdir(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(profile, "SingletonLock"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	double := &clipboardDouble{}
+	r := &runtime{home: c.Home, id: id, profile: profile, clip: double, clipMode: "human"}
+	r.current.BrowserMode = "human"
+	if _, err := r.handoff(context.Background(), "agent"); err == nil {
+		t.Fatal("locked profile accepted")
+	}
+	r.clipMu.Lock()
+	switching := r.clipSwitching
+	r.clipMu.Unlock()
+	if switching {
+		t.Fatal("locked-profile exit left the switch marked")
+	}
+	if clears, _ := double.counts(); clears != 0 {
+		t.Fatal("clear ran although the old browser profile stayed locked")
 	}
 }
