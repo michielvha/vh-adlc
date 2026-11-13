@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Re-accepted by the owner at R-15 (e2e3de9); 34 tasks written, implementation next."
+status: in-progress
+status_description: "Claimed on feat/shared-development-loop; implementing T1 onward in the vh-adlc-shared-development-loop worktree."
 issue: https://github.com/michielvha/vh-adlc/issues/78
+branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-spec/
