@@ -72,3 +72,19 @@ describe("user guides", () => {
     expect(guides[1].text).toContain("No approval allows rewriting a commit that a Review Log row names");
   });
 });
+
+describe("plugin authority reference", () => {
+  const authority = readFileSync(join(repo, "plugins/vh-adlc/references/authority.md"), "utf8");
+
+  test("Preservation forbids rewriting a commit a Review Log row names, even with approval (AC-10)", () => {
+    const preservation = section(authority, "Preservation");
+    expect(preservation).toContain("rewrites a commit that a Review Log row names");
+    expect(preservation).toContain("even with the owner's approval");
+  });
+
+  test("the history-rewrite row carries the same exception (AC-10)", () => {
+    const row = authority.split("\n").find((line) => line.startsWith("| Destructive Git or data operations, history rewrites"));
+    expect(row).toBeDefined();
+    expect(row).toContain("never a commit a Review Log row names");
+  });
+});
