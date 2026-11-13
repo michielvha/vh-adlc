@@ -47,18 +47,20 @@ test("the normal history CLI binds original inputs and emits bounded read-only m
 }, 125000);
 
 
-test.each([{ name: "matching", attempt: "1", exit: 0 }, { name: "missing", attempt: undefined, exit: 2 },
+test.each([{ name: "matching", attempt: "1", exit: 0 }, { name: "matching-attempt-2", attempt: "2", exit: 0 }, { name: "missing", attempt: undefined, exit: 2 },
   { name: "wrong", attempt: "2", exit: 2 }])("the hosted CLI binds its independent native attempt: $name", async selected => {
   try {
-    const started = performance.now(), f = await hostedHistoryFixture(roots), before = captureRepositoryState(f.repo), env = environment(f);
+    const started = performance.now(), f = await hostedHistoryFixture(roots, selected.name === "matching-attempt-2" ? "matching-attempt-2" : "matching"), before = captureRepositoryState(f.repo), env = environment(f);
     env.GITHUB_RUN_ID = "101"; delete env.GITHUB_RUN_ATTEMPT;
     if (selected.attempt !== undefined) env.GITHUB_RUN_ATTEMPT = selected.attempt;
     expect(performance.now() - started).toBeLessThan(60000);
     const result = await invoke(f, "hosted", env, selected.exit);
     expect(result.history_collection.authority).toBe("none");
     if (selected.exit === 0) {
-      expect(result.history_collection).toMatchObject({ complete: true, hosted_run_attempt: 1, mode: "actions", context: { run_id: "101" } });
+      expect(result.history_collection).toMatchObject({ complete: true, hosted_run_attempt: Number(selected.attempt), mode: "actions", context: { run_id: "101" } });
       expect(Number(readFileSync(f.countPath, "utf8"))).toBe(2);
+      expect(readFileSync(f.endpointsPath, "utf8").trim().split("\n").map(line => JSON.parse(line)))
+        .toEqual(["repos/fixture/docs/actions/runs/101", "repos/fixture/docs/actions/runs/101/attempts/" + selected.attempt]);
     } else {
       expect(result.history_collection.complete).toBe(false);
       expect(result.diagnostics.map((item: { message: string }) => item.message).join("\n")).toContain("Current native scheduled run identity");

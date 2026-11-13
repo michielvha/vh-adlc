@@ -25,6 +25,14 @@ type Result = {
   diagnostics: string[]; details_omitted: boolean;
 };
 const originalSnapshots = new WeakMap<object, HistorySnapshot>();
+function readNativeRun(repository: ReturnType<typeof readNativeContext>["repository"], id: number, attempt?: number): WorkflowRunInput {
+  try { return repository.run(id, attempt); }
+  catch (error) {
+    if (error instanceof Error && ["github-read-repository-changed", "github-read-run-changed"].includes(error.message))
+      throw new PublicationScopeChanged("Current native scheduled run identity changed");
+    throw error;
+  }
+}
 function copySnapshot(snapshot: HistorySnapshot): HistorySnapshot {
   return { captured_at: snapshot.captured_at, diagnostics: [...snapshot.diagnostics],
     records: snapshot.records.map(record => ({ ...record, bytes: Buffer.from(record.bytes) })) };
@@ -65,15 +73,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
     const initial = native();
     if (initial.default_commit !== currentDefault || canonicalDigest(initial.identity) !== canonicalDigest(identity))
       throw new PublicationScopeChanged("Native history source or actor changed before collection");
-    let run: WorkflowRunInput | null = null;
-    if (options.entry === "hosted") {
-      try { run = initial.repository.run(Number(options.run)); }
-      catch (error) {
-        if (error instanceof Error && error.message === "github-read-repository-changed")
-          throw new PublicationScopeChanged("Current native scheduled run identity changed");
-        throw error;
-      }
-    }
+    const run = options.entry === "hosted" ? readNativeRun(initial.repository, Number(options.run)) : null;
     const runBinding = (selected: NonNullable<typeof run>) => {
       const { updated_at: _updated, ...binding } = selected;
       return canonicalDigest(binding);
@@ -97,7 +97,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
     } else snapshot = { captured_at, records: [], diagnostics: ["Report history is disabled by the adopted interactive policy; no earlier attention can be carried"] };
     const final = native();
     if (final.default_commit !== currentDefault || canonicalDigest(final.identity) !== canonicalDigest(identity)
-      || (run && runBinding(final.repository.run(run.id, run.run_attempt)) !== runBinding(run)))
+      || (run && runBinding(readNativeRun(final.repository, run.id, run.run_attempt)) !== runBinding(run)))
       throw new PublicationScopeChanged("Native history source, actor or invocation changed during collection");
     result.history = snapshot.records.map(({ bytes: _bytes, ...record }) => record);
     result.diagnostics.push(...snapshot.diagnostics); result.complete = true;

@@ -37,13 +37,17 @@ test.each(["disabled-history", "changed-source-proof", "missing-hosted-run", "mi
 test.each([...hostedHistoryFaults])("hosted history verifies the active native run and rechecks its stable identity: %s", async fault => {
   try {
     const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/history-collection"), f = await hostedHistoryFixture(roots, fault), { countPath } = f;
-    const before = captureRepositoryState(f.repo), result = await api.collectNativeReportHistory({ ...f.options, entry: "hosted", run: "101", hosted_run_attempt: 1 });
-    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(fault === "matching");
+    const expectedAttempt = fault === "matching-attempt-2" ? 2 : 1, matching = ["matching", "matching-attempt-2"].includes(fault);
+    const reread = matching || ["cancelled", "final-repository-id", "final-run-attempt"].includes(fault);
+    const before = captureRepositoryState(f.repo), result = await api.collectNativeReportHistory({ ...f.options, entry: "hosted", run: "101", hosted_run_attempt: expectedAttempt });
+    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(matching);
     expect(result.mode).toBe("actions"); expect(result.authority).toBe("none");
-    expect(Number(readFileSync(countPath, "utf8"))).toBe(["matching", "cancelled"].includes(fault) ? 2 : 1);
-    if (fault === "matching") {
+    expect(Number(readFileSync(countPath, "utf8"))).toBe(reread ? 2 : 1);
+    const endpoints = readFileSync(f.endpointsPath, "utf8").trim().split("\n").map(line => JSON.parse(line));
+    expect(endpoints).toEqual(["repos/fixture/docs/actions/runs/101", ...(reread ? ["repos/fixture/docs/actions/runs/101/attempts/" + expectedAttempt] : [])]);
+    if (matching) {
       expect(result.context?.run_id).toBe("101"); expect(api.readCollectedReportHistory(result).records).toEqual([]);
-      expect(result.hosted_run_attempt).toBe(1);
+      expect(result.hosted_run_attempt).toBe(expectedAttempt);
     } else {
       expect(result.scope_changed).toBe(true); expect(result.diagnostics.join("\n")).toContain(fault === "cancelled" ? "invocation changed" : "Current native scheduled run identity changed");
       expect(() => api.readCollectedReportHistory(result)).toThrow("Original native history collection required");
