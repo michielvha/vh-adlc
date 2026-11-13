@@ -707,6 +707,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-16 | spec | `236200bd18f7f23a23172f5a3e7ea107d44ff872` | gpt-6.1-sol | procedural | One blocking finding: the Codex implementation reviewer's writable sandbox conflicts with Stackweaver's read-only review rule. Four should-fix. A Codex attempt before it stayed pending on MODEL: unknown and is not recorded. |
 | 2026-11-13 | R-17 | spec | `0c6a7402a82142997f27e4c535ebd7b71c5f711f` | gpt-6.1-sol | procedural | One blocking finding: review policy is read from the live loop.yaml rather than the dispatched commit. One should-fix on chained symlinks escaping the export. |
 | 2026-11-13 | R-18 | spec | `ec582dcf7e43c0d83b5dd6fb953f0c83f799b785` | gpt-6.1-sol | procedural | No blocking findings; three should-fix: environment-clearing detached helpers, a detached HEAD at the same commit, and duplicate search across Stackweaver's findings homes. |
+| 2026-11-13 | R-18 | spec | `ec582dcf7e43c0d83b5dd6fb953f0c83f799b785` | n/a | n/a | accepted by owner |
 
 ### R-1
 
