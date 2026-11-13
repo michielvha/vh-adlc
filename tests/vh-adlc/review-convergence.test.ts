@@ -53,3 +53,22 @@ describe("resolved feature-document convention", () => {
     expect(section(convention, "Test plan")).toContain("lists its must-pass and must-fail examples in the row");
   });
 });
+
+describe("user guides", () => {
+  const guides = ["docs/get-started/first-feature.md", "docs/user-guides/workflows.md"].map((path) => ({
+    path,
+    text: readFileSync(join(repo, path), "utf8"),
+  }));
+
+  for (const guide of guides) {
+    test(`${guide.path} describes the severities, the nit rule and one revision per pass (AC-08)`, () => {
+      expect(guide.text).toContain("blocking, should-fix or nit");
+      expect(guide.text).toContain("never causes a revision on its own");
+      expect(guide.text).toContain("as one revision");
+    });
+  }
+
+  test("docs/user-guides/workflows.md says no approval allows rewriting a reviewed commit (AC-10, R-15 F-06)", () => {
+    expect(guides[1].text).toContain("No approval allows rewriting a commit that a Review Log row names");
+  });
+});
