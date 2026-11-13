@@ -253,7 +253,8 @@ func (r *runtime) stop() {
 		if r.clip != nil {
 			_ = r.clip.Close()
 		}
-		r.cleanupErr = r.drain()
+		// The drain fits the guard's five seconds for the supervisor.
+		r.cleanupErr = r.drain(time.Now().Add(4 * time.Second))
 		if r.cleanupErr == nil {
 			r.cleanupErr = state.ReleaseDisplay(r.display)
 		}
@@ -275,43 +276,59 @@ func (r *runtime) stop() {
 	})
 }
 
+// privateMembers enumerates the guard's private session; tests substitute it to
+// model a scan that misses a member.
+var privateMembers = session.PrivateMembers
+
 // drain ends the owned processes and every helper they started, so nothing
 // still writes the private files when stop removes them. Inside the guard's
 // private session, where production always stops a browser, every other member
 // of the session is ours: Chromium's zygotes, renderers and network service,
 // including helpers that were orphaned, fork late or lead their own process
-// group. Members are signalled until an enumeration finds none. A helper that
-// calls setsid itself leaves the session and is not seen. Outside a private
-// session only the direct children can be accounted for.
-// privateMembers enumerates the guard's private session; tests substitute it to
-// model a scan that misses a member.
-var privateMembers = session.PrivateMembers
-
-func (r *runtime) drain() error {
+// group. Members are signalled, SIGTERM first and SIGKILL in the final second
+// before limit, until two consecutive enumerations a moment apart find none,
+// because a member can fork and exit while one enumeration runs. A chain that
+// forks and exits during every enumeration could still be missed; Chromium's
+// helpers do not do that. A helper that calls setsid itself leaves the
+// session and is not seen. Without a readable record, or when the session
+// cannot be enumerated, nothing is proven and drain fails closed. Only a record
+// whose guard leads no session, as in plain tests, falls back to the direct
+// children.
+func (r *runtime) drain(limit time.Time) error {
+	pending := errors.New("browser-helper-cleanup-pending")
 	for i := len(r.children) - 1; i >= 0; i-- {
 		_ = state.Signal(r.children[i].identity, syscall.SIGTERM)
 	}
-	record, _ := state.Load(r.home, r.id)
-	if _, err := privateMembers(record); err != nil {
+	record, err := state.Load(r.home, r.id)
+	if err != nil {
+		return pending
+	}
+	if record.Guard.PID != 0 && record.Guard.Session != record.Guard.PID {
 		return r.drainChildren()
 	}
-	// Both deadlines fit the guard's five seconds for the supervisor.
-	start := time.Now()
+	kill := limit.Add(-time.Second)
 	terminated := map[state.Identity]bool{}
+	empty := false
 	for {
 		members, err := privateMembers(record)
 		if err != nil {
-			return errors.New("browser-helper-cleanup-pending")
+			return pending
 		}
 		if len(members) == 0 {
-			return nil
+			if empty {
+				return nil
+			}
+			empty = true
+			time.Sleep(50 * time.Millisecond)
+			continue
 		}
-		elapsed := time.Since(start)
-		if elapsed > 4*time.Second {
-			return errors.New("browser-helper-cleanup-pending")
+		empty = false
+		now := time.Now()
+		if now.After(limit) {
+			return pending
 		}
 		for _, id := range members {
-			if elapsed > 3*time.Second {
+			if now.After(kill) {
 				_ = state.Signal(id, syscall.SIGKILL)
 			} else if !terminated[id] {
 				terminated[id] = true

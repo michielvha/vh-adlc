@@ -103,6 +103,19 @@ func PrivateMembers(r state.Record) ([]state.Identity, error) {
 	return slices.DeleteFunc(members, func(id state.Identity) bool { return state.Equal(id, r.Guard) }), nil
 }
 
+// settledMembers returns the session's members, and none only when two
+// enumerations a moment apart both find none: a member can fork and exit while
+// one enumeration runs, which hides its child. A chain that forks and exits
+// during every enumeration could still be missed.
+func settledMembers(r state.Record) ([]state.Identity, error) {
+	members, err := sessionMembers(r)
+	if err != nil || len(members) > 0 {
+		return members, err
+	}
+	time.Sleep(50 * time.Millisecond)
+	return sessionMembers(r)
+}
+
 func stopMembers(r state.Record) error {
 	members, err := sessionMembers(r)
 	if err != nil {
@@ -112,7 +125,7 @@ func stopMembers(r state.Record) error {
 		_ = state.Signal(id, syscall.SIGTERM)
 	}
 	for range 12 {
-		members, err = sessionMembers(r)
+		members, err = settledMembers(r)
 		if err != nil {
 			return err
 		}
@@ -125,7 +138,7 @@ func stopMembers(r state.Record) error {
 		_ = state.Signal(id, syscall.SIGKILL)
 	}
 	for range 20 {
-		members, err = sessionMembers(r)
+		members, err = settledMembers(r)
 		if err != nil {
 			return err
 		}
