@@ -44,6 +44,7 @@ console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-o
       role: "reviewer", target_sha256: reviewTarget, runtime_sha256: hash("reviewer runtime") });
     expect(worker.complete, JSON.stringify(worker.diagnostics)).toBe(true); expect(reviewer.complete, JSON.stringify(reviewer.diagnostics)).toBe(true);
     const load = (result: typeof worker, name: "worker" | "reviewer", target: string) => readNativeRoleCapture({ source_repo: f.repo,
+      require_invocation: true, expected_cwd: f.repo,
       artifact_root: f.artifacts, reference: result.capture, policy: role,
       expected: { role: name, source_commit: source, runtime_sha256: hash(name + " runtime"), target_sha256: target } });
     const first = load(worker, "worker", workerTarget), second = load(reviewer, "reviewer", reviewTarget);

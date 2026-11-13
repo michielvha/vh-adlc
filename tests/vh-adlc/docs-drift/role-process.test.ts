@@ -45,6 +45,7 @@ test("owned role process retains actual launch/native/completion bytes and reloa
   expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true); expect(result.authority).toBe("none");
   expect(result.capture).not.toBeNull(); expect(result.process?.pid).toBeGreaterThan(0); expect(result.process?.reaped).toBe(true);
   const loaded = readNativeRoleCapture({ source_repo: f.repo, artifact_root: f.artifacts, reference: result.capture,
+    require_invocation: true, expected_cwd: f.repo,
     expected: { role: f.options.role, source_commit: f.options.source_commit, runtime_sha256: f.options.runtime_sha256,
       target_sha256: f.options.target_sha256 }, policy: role });
   expect(loaded.evidence.process.pid).toBe(result.process!.pid); expect(loaded.evidence.context_id).toBe(f.options.context_id);
@@ -96,23 +97,31 @@ test("launch-record failure still retains real completion and refuses a usable c
   } finally { fault.mockRestore(); }
 }));
 
-test.each(["native-context", "native-cwd", "later-finding", "invocation-target"])("reopened new capture rechecks native launch and actual final reply: %s", fault => preserveFailure(async () => {
+test.each(["native-context", "native-cwd", "later-finding", "invocation-target", "removed-invocation", "legacy-downgrade", "invocation-cwd"])("reopened new capture rechecks native launch and actual final reply: %s", fault => preserveFailure(async () => {
   const { captureNativeRoleProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-process");
   const f = fixture("none"), result = await captureNativeRoleProcess(f.options); expect(result.complete).toBe(true);
   const capture = JSON.parse(readFileSync(join(f.artifacts, result.capture!.path), "utf8"));
   const write = (ref: { path: string; sha256: string }, bytes: Uint8Array) => { writeFileSync(join(f.artifacts, ref.path), bytes, { mode: 0o600 }); return { path: ref.path, sha256: sha256(bytes) }; };
-  if (fault === "invocation-target") {
+  if (["removed-invocation", "legacy-downgrade"].includes(fault)) {
+    delete capture.invocation;
+    if (fault === "legacy-downgrade") capture.schema_version = 1;
+  } else if (fault === "invocation-target") {
     const invocation = JSON.parse(readFileSync(join(f.artifacts, capture.invocation.path), "utf8")); invocation.target_sha256 = hash("changed target");
     capture.invocation = write(capture.invocation, canonicalJSON(invocation));
   } else {
     const frames = readFileSync(join(f.artifacts, capture.artifacts.native.path), "utf8").trim().split("\n").map(line => JSON.parse(line));
     if (fault === "native-context") frames[0].data.sessionId = randomUUID();
-    if (fault === "native-cwd") frames[0].data.context.cwd = "/different/source";
+    if (["native-cwd", "invocation-cwd"].includes(fault)) frames[0].data.context.cwd = "/different/source";
+    if (fault === "invocation-cwd") {
+      const invocation = JSON.parse(readFileSync(join(f.artifacts, capture.invocation.path), "utf8")); invocation.cwd = "/different/source";
+      capture.invocation = write(capture.invocation, canonicalJSON(invocation));
+    }
     if (fault === "later-finding") frames.push({ type: "assistant.message", data: { model: "claude-opus-5.5", content: "MODEL: claude-opus-5.5\nA later finding\n" } });
     capture.artifacts.native = write(capture.artifacts.native, Buffer.from(frames.map(frame => JSON.stringify(frame)).join("\n") + "\n"));
     capture.binding.native_sha256 = capture.artifacts.native.sha256;
   }
   const reference = write(result.capture!, canonicalJSON(capture));
   expect(() => readNativeRoleCapture({ source_repo: f.repo, artifact_root: f.artifacts, reference, policy: role,
+    require_invocation: true, expected_cwd: f.repo,
     expected: { role: f.options.role, source_commit: f.options.source_commit, runtime_sha256: f.options.runtime_sha256, target_sha256: f.options.target_sha256 } })).toThrow();
 }));

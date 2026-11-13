@@ -28,6 +28,7 @@ function json(bytes: Uint8Array): unknown {
 /** Reload the original launch target and native artifacts. Execution origin remains owner-attested. */
 export function readNativeRoleCapture(options: {
   source_repo: string; candidate_repo?: string; artifact_root: string; reference: unknown; expected: Expected; policy: RolePolicy;
+  require_invocation?: boolean; expected_cwd?: string;
 }) {
   const secondary = artifactDirectoryScope(options.artifact_root, options.candidate_repo ?? options.source_repo);
   function outside(reference: unknown): void {
@@ -44,7 +45,10 @@ export function readNativeRoleCapture(options: {
   const raw = json(read(options.reference));
   const hasInvocation = raw !== null && typeof raw === "object" && Object.hasOwn(raw, "invocation");
   const capture = record(raw, ["schema_version", "kind", "role", "source_commit", "runtime_sha256", "launch", "binding", "artifacts", ...(hasInvocation ? ["invocation"] : [])]);
-  if (capture.schema_version !== 1 || capture.kind !== "docs-drift-role-capture" || capture.role !== expected.role
+  if (capture.schema_version === 2 && !hasInvocation) fail("modern invocation record required");
+  if (options.require_invocation && (capture.schema_version !== 2 || !hasInvocation)) fail("modern invocation capture required");
+  if (options.expected_cwd !== undefined && !hasInvocation) fail("invocation record required for expected working directory");
+  if ((capture.schema_version !== 1 && capture.schema_version !== 2) || capture.kind !== "docs-drift-role-capture" || capture.role !== expected.role
     || capture.source_commit !== expected.source_commit || capture.runtime_sha256 !== expected.runtime_sha256) throw new ArtifactChanged("docs-drift original role capture captured context changed");
   const launch = record(json(read(capture.launch)), ["schema_version", "kind", "role", "source_commit", "runtime_sha256", "target_sha256", "invocation_id", "context_id", "pid"]);
   if (launch.schema_version !== 1 || launch.kind !== "docs-drift-role-launch" || launch.role !== expected.role
@@ -69,6 +73,7 @@ export function readNativeRoleCapture(options: {
       throw new ArtifactChanged("docs-drift original role invocation changed");
     if (typeof invocation.cwd !== "string" || !isAbsolute(invocation.cwd) || invocation.cwd.includes("\0")
       || typeof invocation.argv_sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(invocation.argv_sha256)) fail("original invocation fields required");
+    if (options.expected_cwd !== undefined && invocation.cwd !== options.expected_cwd) throw new ArtifactChanged("docs-drift original role working directory changed");
     const decoded = decodeNativeRoleOutput({ provider: evidence.provider, native: evidence.native,
       expected_context: evidence.context_id, expected_cwd: invocation.cwd });
     if (!Buffer.from(decoded.returned).equals(Buffer.from(evidence.returned))) fail("returned reply differs from final native message");

@@ -83,11 +83,11 @@ export async function captureNativeRoleProcess(input: Options) {
       returned: decoded.returned, returned_sha256: returned.sha256, process: result.process };
     const { records: _records, ...binding } = verifyRoleIdentity(evidence, options.policy);
     unchanged();
-    const capture = retain("capture.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-role-capture", role: options.role,
+    const capture = retain("capture.json", canonicalJSON({ schema_version: 2, kind: "docs-drift-role-capture", role: options.role,
       source_commit: options.source_commit, runtime_sha256: options.runtime_sha256, invocation: result.artifacts.invocation, launch: result.artifacts.launch, binding,
       artifacts: { native: { path: relative(scope.directory, native), sha256: evidence.native_sha256 }, returned, process: completion } }));
     readNativeRoleCapture({ source_repo: repo, candidate_repo: candidate ?? undefined, artifact_root: scope.directory,
-      reference: capture, expected, policy: options.policy });
+      reference: capture, expected, policy: options.policy, require_invocation: true, expected_cwd: realpathSync(options.cwd) });
     unchanged(); result.capture = capture; result.complete = true;
   } catch (error) {
     result.scope_changed = error instanceof ArtifactChanged;

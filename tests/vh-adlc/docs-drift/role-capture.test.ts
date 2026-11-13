@@ -82,3 +82,11 @@ test.each(["matching", "role", "source", "runtime", "target", "launch-pid", "lau
   }
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
+
+test("legacy captures remain explicitly limited when a caller requires modern invocation or cwd proof", async () => {
+  const { readNativeRoleCapture } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-capture");
+  const f = fixture();
+  expect(readNativeRoleCapture(f.options).binding.context_id).toBe(f.original.context_id);
+  expect(() => readNativeRoleCapture({ ...f.options, require_invocation: true })).toThrow("modern invocation capture required");
+  expect(() => readNativeRoleCapture({ ...f.options, expected_cwd: f.repo })).toThrow("invocation record required for expected working directory");
+});

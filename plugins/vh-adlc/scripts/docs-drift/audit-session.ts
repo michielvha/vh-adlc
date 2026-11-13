@@ -10,7 +10,7 @@ import { parseDecisionPacket } from "./publication-decisions";
 import { collectWorkerInputs } from "./publication-worker";
 import { PublicationScopeChanged } from "./publish";
 import { canonicalDigest, canonicalJSON, freezeJSON, sha256 } from "./protocol";
-import { readAdoptedRolePolicy, roleRuntimeDigest } from "./role-capture";
+import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { buildCopilotRoleInvocation } from "./role-launch";
 import { captureNativeRoleProcess } from "./role-process";
 import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
@@ -86,11 +86,16 @@ export async function runAuditSession(input: Options) {
       "DOCS_DRIFT_REQUEST: " + JSON.stringify(workerRequest),
     ].join("\n");
     const common = { source_repo: repo, candidate_repo: cwd, source_commit: options.source, artifact_root: scope.directory, timeout_ms: timeout };
+    const reopen = (capture: Capture, role: "worker" | "reviewer", target: string) => readNativeRoleCapture({
+      source_repo: repo, candidate_repo: cwd, artifact_root: scope.directory, reference: capture.capture,
+      policy: role === "worker" ? workerPolicy : reviewerPolicy, require_invocation: true, expected_cwd: cwd,
+      expected: { role, source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, role), target_sha256: target } });
     result.worker = await captureNativeRoleProcess({ ...common,
       ...buildCopilotRoleInvocation({ runtime, role: "worker", cwd, artifact_root: scope.directory, prompt: workerPrompt, environment }),
       role: "worker", runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: current.worker_input_sha256, policy: workerPolicy });
     result.scope_changed ||= result.worker.scope_changed;
     if (!result.worker.complete || !result.worker.capture) { result.diagnostics.push(...result.worker.diagnostics); throw Error("Original audit worker execution incomplete"); }
+    reopen(result.worker, "worker", current.worker_input_sha256);
     recheckRequests();
     const target = await collectAssessmentReviewTarget({ ...options, worker_capture: result.worker.capture });
     result.scope_changed ||= target.scope_changed;
@@ -114,6 +119,7 @@ export async function runAuditSession(input: Options) {
       role: "reviewer", runtime_sha256: roleRuntimeDigest(runtime, "reviewer"), target_sha256: target.target_sha256, policy: reviewerPolicy });
     result.scope_changed ||= result.reviewer.scope_changed;
     if (!result.reviewer.complete || !result.reviewer.capture) { result.diagnostics.push(...result.reviewer.diagnostics); throw Error("Original audit reviewer execution incomplete"); }
+    reopen(result.worker, "worker", current.worker_input_sha256); reopen(result.reviewer, "reviewer", target.target_sha256);
     recheckRequests();
     result.report = await completeAuditReport(result.start, { worker_capture: result.worker.capture, reviewer_capture: result.reviewer.capture });
     result.scope_changed ||= result.report.scope_changed;
