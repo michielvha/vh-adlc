@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-8 findings applied and answered by the owner; waiting for a confirming review, then owner acceptance."
+status_description: "R-9 had no blocking findings; its should-fix and nit are applied. Waiting for a confirming review, then owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
@@ -102,8 +102,9 @@ should-fix items tightened the freshness wording, the signed release check, `cov
 files. R-7 found nothing blocking either; it settled that a merge with no workflow run counts as having no
 publication path, and that the final check runs on the merge commit. R-8 showed the first of those was
 unsafe, so an unmarked merge now always runs the watch, verification rungs trigger only by path, and
-feature PRs land by merge commit only when rungs or a watch are declared. A confirming review pass is
-next, then acceptance. Accepting this
+feature PRs land by merge commit only when rungs or a watch are declared. R-9 found nothing blocking;
+every E2E spec a Test Plan names now runs in kind whatever changed. A confirming review pass is next,
+then acceptance. Accepting this
 document authorizes implementation of the accepted scope on a feature branch. Publishing the vh-adlc
 release, merging either repository and retiring the native agents each still need their own approval.
 
@@ -338,7 +339,11 @@ a known failure (`agents/ship.md:136-137`). A failed rung blocks all three. A ru
 blocks them too, unless the owner allows that exact rung for that run, which the report records. Stackweaver declares `make verify` always,
 `make test-integration` for `backend/` and `core/`, the kind harness for `e2e/`, `deploy/` and
 `frontend/nginx.conf`, a browser pass with the summary table for `frontend/src/`, and both engines for
-the engine-sensitive paths its project procedure lists. Without rungs, the current
+the engine-sensitive paths its project procedure lists. Path conditions decide only which extra rungs
+apply: every E2E spec a criterion's Test Plan row names also runs in the kind harness before push and
+before completion, whatever paths changed, as `agents/implement.md:61-66` and Stackweaver
+`CLAUDE.md:184` require today. Stackweaver's project procedure states this rule and the parity map
+binds it to a contract test. Without rungs, the current
 behavior stays: read commands from `AGENTS.md`, ask if none.
 
 A declared `ci_trigger: manual` makes ship report CI as not triggered by policy instead of waiting for
@@ -346,7 +351,8 @@ a run or suggesting a dispatch. A declared `post_merge_watch` command (Stackweav
 `scripts/release/watch-merge.sh <merge-sha>`) must exit 0 before a feature whose merge can publish is
 reported delivered, matching the delivery convention's rule that a feature is delivered once every
 release path has published. Publication is decided by the merge commit itself, since Stackweaver's tag
-workflow runs on every push to `main` and `watch-merge.sh:143` reads the merge commit's own message.
+workflow runs on every unmarked push to `main` that passes its path filters and `watch-merge.sh:143`
+reads the merge commit's own message.
 When a delivery qualifies for the skip marker, the authorized merge uses a merge commit message that
 carries it. After the merge, ship reads the actual merge commit: if its message carries the marker and
 its diff against the first parent touches only skip-eligible paths, the feature is reported delivered
@@ -497,7 +503,7 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | AC-01 | `bun test tests/vh-adlc` cases for each supported role and route pair, refusal of a `command` route for `author` and `implementer`, resume taking the continued operation's route, a no-file case compared with `a7bfca99` behavior, and a grep test that fails on a model name in any agent or skill file. |
 | AC-02 | A fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, one that creates or moves a non-current branch or tag, one that overwrites an existing ignored configuration file, one that creates a new ignored file outside `review_scratch`, one that overwrites a tracked file already flagged assume-unchanged without changing the flag, one that writes only inside `review_scratch` (stored), and one that changes an index flag without changing the index tree; then one real Copilot CLI `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
 | AC-03 | Fixture specs that break a declared instruction and a declared lens; the reviewer must return a finding for each and none for a compliant control. |
-| AC-04 | Fixture changes that match some rungs and not others; a feature whose first commit changes `backend/` and whose last changes only documentation must still require the integration rung before push and completion; a pass recorded on an earlier commit must not count for a later one; after a merge, the delivery check over the merge commit against its first parent must still require the `backend/` rung once the default branch contains the feature; with rungs declared, a fast-forward landing of a feature whose earlier commit changed `backend/` must be refused; the report must list every rung with the right state; a failing command must leave no push, no completion commit and no delivered report even when an owner allowance is recorded; an unavailable procedure must do the same unless the owner allowance is recorded for that exact rung, and with it must proceed; a no-rung fixture must keep the current lookup. |
+| AC-04 | Fixture changes that match some rungs and not others; a feature whose first commit changes `backend/` and whose last changes only documentation must still require the integration rung before push and completion; a pass recorded on an earlier commit must not count for a later one; after a merge, the delivery check over the merge commit against its first parent must still require the `backend/` rung once the default branch contains the feature; with rungs declared, a fast-forward landing of a feature whose earlier commit changed `backend/` must be refused; in Stackweaver, a backend-only feature whose Test Plan names an unchanged E2E spec must not push or complete until that spec has passed in the kind harness; the report must list every rung with the right state; a failing command must leave no push, no completion commit and no delivered report even when an owner allowance is recorded; an unavailable procedure must do the same unless the owner allowance is recorded for that exact rung, and with it must proceed; a no-rung fixture must keep the current lookup. |
 | AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported), a watch stub that exits 1 then 0 (delivered only after 0), a skip-eligible feature merged with a marked merge commit (delivered with no publication path, watch never invoked), the same feature merged with an unmarked merge commit (watch invoked); a watch stub that fails because no workflow ran (reported blocked, never delivered); and a run that appears only after a delay (watch waits, no early verdict). |
 | AC-06 | Go tests in `internal/doc` for `**` at start, middle and end, compared with the docs-impact matcher on the same inputs; `internal/fresh` tests where a commit under a `**` entry makes the review stale, and separately a dirty file under it makes `feature_tree_clean` false without staling the review; the existing lint suite unchanged. |
 | AC-07 | Investigate fixtures with and without a duplicate analysis document and a duplicate open issue; the run must write the document and name the duplicate and the verdict. |
@@ -521,8 +527,8 @@ None yet; written once the document is planned.
 
 None. The owner answered Q1 to Q10, the three R-1 judgement findings (F-01, F-03, F-07) and the
 three R-2 judgement findings (F-02, F-03, F-04) the two R-3 judgement findings (F-01, F-04) the three
-R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, F-02) the R-6 judgement finding (F-01), the R-7 findings F-02 and F-03, and the R-8 judgement findings
-(F-01, F-03) on 2026-11-13; the answers are folded into Owner summary, Scope and Design.
+R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, F-02) the R-6 judgement finding (F-01), the R-7 findings F-02 and F-03, the R-8 judgement findings
+(F-01, F-03) and the R-9 judgement finding (F-01) on 2026-11-13; the answers are folded into Owner summary, Scope and Design.
 
 ## Review Log
 
