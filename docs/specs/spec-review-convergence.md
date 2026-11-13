@@ -460,6 +460,7 @@ that pass's blocking or should-fix findings. R-14 F-01 to F-06 are applied.
 | 2026-11-13 | R-14 | spec | `903314a` | claude-opus-5-5 | procedural | One blocking finding (F-01 the side-branch merge never runs when a fix also changes the baseline), four should-fix and one nit |
 | 2026-11-13 | R-15 | spec | `76f0480` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix and two nits |
 | 2026-11-13 | R-15 | spec | `76f0480` | n/a | n/a | accepted by owner |
+| 2026-11-13 | R-16 | spec | `12370b8` | claude-opus-5-5 | procedural | Clean drift re-review after PR 87: no blocking finding; one should-fix and two nits, listed for implementation |
 
 ### R-1
 
@@ -1316,3 +1317,26 @@ SEVERITY: nit
 WHERE: Design, Delivery (lines 301-304); Context, Background, Overlapping work (lines 141-146)
 EVIDENCE: Delivery says shared-development-loop "edits the same spec skill, protocol, `references/authority.md`, pin and manifests", and the second feature to land merges the first in "for every one of those files". Background, and that feature's covers (docs/specs/shared-development-loop.md:7-29 at b777df0 and 4bef34e), show it also covers the reviewer agent and `knowledge.md`, and covers `tests/vh-adlc/` at b777df0. This feature changes all three (T4, T3, T6, T9, T15). A git merge brings in the whole branch, so the list changes nothing in practice. It just disagrees with Background.
 PROPOSAL: Add the reviewer agent, `knowledge.md` and `tests/vh-adlc/scenarios/run.ts` to the Delivery list, or say "every file both features change".
+
+### R-16
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Severity definitions (lines 238-252); Design, Behaviors these rules touch (lines 181-187); Design, Nits are listed, not applied (lines 195-204); Tasks T4 (line 383); Acceptance Criteria AC-02 (lines 317-320); Test Plan AC-02 row (line 363)
+EVIDENCE: Since 2c9d3af (PR 87) the reviewer agent says "Apply each declared lens the dispatch lists as a check at its severity" (plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:40 at 12370b8). loop-settings.md defines `lenses` as "{name, check, severity}" with severity "`blocking`, `should-fix` or `nit`" (plugins/vh-adlc/references/loop-settings.md, Terms and fields table), the spec skill passes them to the reviewer (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:34), and tests/vh-adlc/loop/lenses.test.ts:33-54 declares lenses at `blocking`. This document's Design says "The reviewer agent tells the reviewer to rate with the definitions in the resolved convention" (line 251), and T4 adds that sentence beside the lens sentence. Nothing says which wins when a lens's declared severity disagrees with the definitions, for example a wording lens declared should-fix that the definitions call a nit, or a lens declared nit on a false claim the design depends on. The nit rule follows from the rating, so one implementer lists such a finding and another applies it. The Behaviors list, which "every rule below was checked against", predates lenses and has no lens or instruction-file finding, and the AC-02 trial dispatches no lens.
+PROPOSAL: State in Design and T4 whether a declared lens severity overrides the convention's definitions (and so decides whether the nit rule applies), add a lens finding to the Behaviors list, and add a lens case to the AC-02 trial.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 69-71); Context, Background, Overlapping work (lines 141-146); Design, Delivery (lines 301-304); Tasks T11 (line 388)
+EVIDENCE: The Owner summary says shared-development-loop "is in progress on its own feature branch, so whichever lands second merges the first in", and Delivery says it is "in progress on its feature branch". At 12370b8 that feature is merged into main by 2c9d3af (parents 3f01a9c and 8b8579b), and docs/specs/shared-development-loop.md:2 reads `status: complete`. This feature is therefore the second to land, and a feature branch cut from current main already holds the other feature, so the merge-in step and T11's "after merging shared-development-loop in if it has landed" are no-ops. Nothing built changes.
+PROPOSAL: Say in the Owner summary and Delivery that shared-development-loop landed at 2c9d3af and that this feature's branch starts from a main that contains it, and drop the merge-in clause from T11.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background, Pins (lines 136-139); Design, Delivery (lines 295-299); Acceptance Criteria AC-06 (lines 331-336); Test Plan AC-06 row (line 367); Tasks T3 (line 382)
+EVIDENCE: Background presents one docs SHA shared by the repository pin and the plugin. At 12370b8, AGENTS.md:4 and plugins/vh-adlc/references/security-settings.md:5 name d8f07c9dd69038375a535af8ad586086688f85ab, while plugins/vh-adlc/knowledge.md:5 and :7 name c70769ebf43ea03a4bdffb3cda51954eb05b35a7, moved alone by 2c9d3af. "The previous pin" in AC-06 and "the old pin" in its row and T3 now name two commits: the repository comparison restores d8f07c9 in AGENTS.md, while the old-pin fixture takes revision A from the plugin pin (tests/vh-adlc/fixtures/build.ts:112-117), which is c70769e. A diff of the cached pages shows conventions/feature-documents.md identical at both commits, so the rules block comparison passes either way.
+PROPOSAL: Note in Background that the plugin pin and the repository pin now differ, and name which commit "the previous pin" means in AC-06, its row and T3 (or say that both are compared).
