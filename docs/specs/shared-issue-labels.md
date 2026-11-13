@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Claimed on feat/shared-issue-labels after #78 merged; implementing T1 onward."
+status_description: "Claim 12370b8 was pushed while the spec review was stale from #87 (its gate failed on spec_review_fresh); a drift re-review runs before any implementation."
 issue: https://github.com/michielvha/vh-adlc/issues/83
 branch: feat/shared-issue-labels
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
@@ -115,15 +115,18 @@ approval of that exact plan.
   plus a type label (Stackweaver `agents/investigate.md:65-67`). vh-adlc's investigate only says to
   give an issue a short summary that links the findings document
   (`plugins/vh-adlc/skills/vh-adlc-investigate/SKILL.md:26-28`). Spec says creating an issue needs
-  explicit authority and says nothing about labels (`skills/vh-adlc-spec/SKILL.md:50`). Creating a
+  explicit authority and says nothing about labels (`skills/vh-adlc-spec/SKILL.md:60` at `2c9d3af`). Creating a
   tracking issue needs acceptance or a request (`references/authority.md:25`).
-- shared-development-loop (`docs/specs/shared-development-loop.md`, `in-progress` on
-  `feat/shared-development-loop`) covers `plugins/vh-adlc/skills/vh-adlc-investigate/` and plans a
+- shared-development-loop (`docs/specs/shared-development-loop.md`) was `in-progress` on
+  `feat/shared-development-loop` when this document was accepted, and merged to `main` as `2c9d3af`
+  (vh-adlc #87) on 2026-11-13. It covers `plugins/vh-adlc/skills/vh-adlc-investigate/` and plans a
   Stackweaver parity map with one row per legacy rule of `agents/investigate.md` (its task T25). Its
   document does not mention issue labels (`grep -n -i label` finds no issue-label rule). Its `covers`
   also lists `plugins/vh-adlc/skills/vh-adlc-spec/`, `plugins/vh-adlc/references/authority.md` and
   all of `tests/vh-adlc/` (`docs/specs/shared-development-loop.md:8-42` on
-  `feat/shared-development-loop` at `645882b`).
+  `feat/shared-development-loop` at `645882b`). Since that merge, vh-adlc's investigate ends with one
+  of the verdicts act now, track or reject, and keeps issue creation under `references/authority.md`
+  (`plugins/vh-adlc/skills/vh-adlc-investigate/SKILL.md` at `2c9d3af`, Loop routes section).
 - That parity map, on Stackweaver's `feat/vh-adlc-development-loop` at `bedc6b5d`, puts the labeling
   rule in row `investigate-files-issue` together with routine issue filing, and marks the whole row
   superseded by the rule that investigate files an issue only on request
