@@ -302,6 +302,7 @@ None.
 | 2026-11-13 | R-19 | spec | `ea7d8409c61ab422e9a8b60618692c7ecfbe42d1` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-20 | implementation | `f06ad96383682c216b6e8e5ed13d1dd6e137fa17` | gpt-6.1-sol | procedural | Fifteen criteria met with no findings; AC-02 and AC-16 not verified because host load stayed above 4 through every cookie run, though every cookie was kept. |
 | 2026-11-13 | R-21 | spec | `9a3c22310b1758ffab6f9695717afa4a95ab1166` | gpt-6.1-sol | procedural | No blocking findings; one should-fix finding: the holder-clear promise did not allow for a guard that exits once its record is gone. |
+| 2026-11-13 | R-22 | spec | `2a2a0ebc6f306b0f7086960f1e85b91e8a6b4750` | gpt-6.1-sol | procedural | No findings on the revision after R-21. |
 
 ### R-1
 
@@ -1194,6 +1195,11 @@ SEVERITY: should-fix
 WHERE: Owner summary; Design / Single writer and Compatibility; AC-16; Test Plan / AC-16
 EVIDENCE: The document unconditionally promises that a failed holder clear retains the lock until a retry clears metadata and records stopped or failed. At 9a3c223, daemon.go:271-292,397-399,437-439 instead exits when state.json is missing or no longer identifies the guard. finishProfile returns before releaseProfile in these cases, and the deferred held.Release at daemon.go:314 unlocks without clearing meta.json or updating last_used. state.go:112-120 prevents recreating a removed state root. This leaves stale holder metadata, but not a permanently busy profile: profile.go:311-313 reports in_use false once that guard dies, and session/profile.go:68-91 clears the stale holder on the next otherwise-permitted start and records recovery. Existing abandonment tests use service shares; TestFailedHolderClearKeepsProfileSessionPending retains the original record throughout.
 PROPOSAL: Qualify the retry and terminal-state promises on the record remaining present and identifying its controller, and explain abandonment, lock release and subsequent stale-holder recovery without promising immediate metadata cleanup. Add a profile-session proof for record removal and reassignment during holder-clear failure, checking controller exit, no signalling of replacement processes, no state-root recreation and successful reuse once metadata is usable.
+
+
+### R-22
+
+NO FINDINGS
 
 
 ## Sources
