@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Review R-20 fixes applied on 2026-11-12; awaiting a new independent spec review."
+status: planned
+status_description: "Accepted by the owner on 2026-11-13 after clean spec review R-21 at 5f2f2d1; tasks are next."
 issue: null
 goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept; only commits that a branch worktree's HEAD reflog or a deleted branch's own reflog alone still names, such as copies from before a rebase or amend, go with them."
 covers:
@@ -549,6 +549,7 @@ None.
 | 2026-11-12 | R-19 | spec | `199df989b5f17783e19d0ce45e6f7e6ca7992fb4` | claude-opus-4.8 | procedural | Four nit findings; model self-reported, no model was requested. |
 | 2026-11-12 | R-20 | spec | `7fc0022511b727c3828d94875357fbd4b66141a4` | claude-opus-4.8 | procedural | One should-fix finding; model self-reported, no model was requested. |
 | 2026-11-12 | R-21 | spec | `5f2f2d1f71c1fd673596a34a87cac7f80089f7f5` | unknown | procedural | No findings; the reviewer did not report its model. |
+| 2026-11-13 | R-21 | spec | `5f2f2d1f71c1fd673596a34a87cac7f80089f7f5` | n/a | n/a | accepted by owner |
 
 ### R-1
 
