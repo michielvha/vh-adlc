@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +11,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,13 +25,22 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
 
+// runToken names the environment variable that marks the session controllers
+// started by one test run. Controllers inherit it from the test process.
+const runToken = "REMOTE_GUI_TEST_RUN"
+
 func TestMain(m *testing.M) {
 	if handled, code := Internal(os.Args[1:]); handled {
 		os.Exit(code)
 	}
+	token := rand.Text()
+	if err := os.Setenv(runToken, token); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	code := m.Run()
 	if os.Getenv("REMOTE_GUI_TEST_DAEMON_HOME") == "" {
-		if leaked := survivingControllers(5 * time.Second); len(leaked) > 0 {
+		if leaked := survivingControllers(token, 5*time.Second); len(leaked) > 0 {
 			fmt.Fprintf(os.Stderr, "session controllers outlived the tests and were killed: %s\n", strings.Join(leaked, "; "))
 			code = 1
 		}
@@ -36,15 +48,12 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// survivingControllers waits up to limit for the guards and supervisors this
-// test binary started to exit, then kills and lists those still running. Each
-// test run builds its binary at a fresh path, so a controller running that
-// executable belongs to this run.
-func survivingControllers(limit time.Duration) []string {
-	executable, err := os.Executable()
-	if err != nil {
-		return []string{"test executable unavailable: " + err.Error()}
-	}
+// survivingControllers waits up to limit for the guards and supervisors that
+// inherited this run's token to exit, then kills and lists those still
+// running. Each process's identity is captured before its metadata is read and
+// confirmed afterwards, so a reused PID is never matched or signalled.
+func survivingControllers(token string, limit time.Duration) []string {
+	marker := runToken + "=" + token
 	deadline := time.Now().Add(limit)
 	for {
 		var leaked []string
@@ -55,7 +64,8 @@ func survivingControllers(limit time.Duration) []string {
 			if err != nil {
 				continue
 			}
-			if exe, err := os.Readlink(filepath.Join("/proc", e.Name(), "exe")); err != nil || exe != executable {
+			id, err := state.Inspect(pid)
+			if err != nil {
 				continue
 			}
 			raw, err := os.ReadFile(filepath.Join("/proc", e.Name(), "cmdline"))
@@ -63,10 +73,12 @@ func survivingControllers(limit time.Duration) []string {
 			if err != nil || len(args) < 2 || (args[1] != "_guard" && args[1] != "_supervise") {
 				continue
 			}
-			if id, err := state.Inspect(pid); err == nil {
-				controllers = append(controllers, id)
-				leaked = append(leaked, strings.Join(args[1:], " "))
+			env, err := os.ReadFile(filepath.Join("/proc", e.Name(), "environ"))
+			if err != nil || !slices.Contains(strings.Split(string(env), "\x00"), marker) || !state.Alive(id) {
+				continue
 			}
+			controllers = append(controllers, id)
+			leaked = append(leaked, strings.Join(args[1:], " "))
 		}
 		if len(leaked) == 0 {
 			return nil
@@ -79,6 +91,52 @@ func survivingControllers(limit time.Duration) []string {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+// The leak check of one test run must never touch the controllers of another
+// run of the same binary: a guard that inherited a different run token is
+// neither listed nor signalled.
+func TestLeakCheckSparesAnotherRunsControllers(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// With no record to await, this real guard waits five seconds and exits.
+	fixture := exec.Command(executable, "_guard", filepath.Join(t.TempDir(), "state"), strings.Repeat("0", 32))
+	fixture.Env = append(os.Environ(), runToken+"=another-run")
+	if err = fixture.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { _ = fixture.Wait(); close(done) }()
+	t.Cleanup(func() { _ = fixture.Process.Kill(); <-done })
+	other, err := state.Inspect(fixture.Process.Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for !strings.Contains(environ(fixture.Process.Pid), runToken+"=another-run") && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if leaked := survivingControllers(os.Getenv(runToken), 0); len(leaked) > 0 {
+		t.Errorf("this run's leak check listed %v", leaked)
+	}
+	if !state.Alive(other) {
+		t.Fatal("this run's leak check signalled another run's guard")
+	}
+	if leaked := survivingControllers("another-run", 0); len(leaked) != 1 {
+		t.Fatalf("the other run's leak check listed %v", leaked)
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the other run's leak check did not stop its guard")
+	}
+}
+
+func environ(pid int) string {
+	raw, _ := os.ReadFile(filepath.Join("/proc", strconv.Itoa(pid), "environ"))
+	return string(raw)
 }
 
 // root returns a private state root that is removed when the test ends, after
