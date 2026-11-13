@@ -569,6 +569,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-8 | spec | `5a284fc1c6fac8656cf3494f5e79a0f094dcc5dd` | gpt-6.1-sol | procedural | One blocking finding: an empty workflow-run query right after merge does not prove no publication. Two should-fix and a nit. |
 | 2026-11-13 | R-9 | spec | `9378490b8c1681e81508506f61b467ba2456bb30` | gpt-6.1-sol | procedural | No blocking findings; one should-fix on reused E2E proofs and a wording nit. |
 | 2026-11-13 | R-10 | spec | `1d563f0e24e6ad57c1677374dd4f1ac9ac1afd01` | gpt-6.1-sol | procedural | No blocking findings; three should-fix: live slot pass and final full kind run, skipped subchecks inside make verify, glossary. |
+| 2026-11-13 | R-11 | spec | `fcc1245e2deda1fe8ef0d42d43f90954338f8cd3` | gpt-6.1-sol | procedural | One blocking finding: a file-only review reads the live worktree, not the target commit. Two should-fix. |
 
 ### R-1
 
@@ -876,6 +877,29 @@ SEVERITY: should-fix
 WHERE: Design / Model routing per role, Verification rungs and Stackweaver adoption; Acceptance Criteria
 EVIDENCE: The document introduces user-facing configuration and routing terms including loop roles, verification rungs and enrolled specs, but contains no glossary or criterion holding those terms to their definitions. The pinned conventions/feature-documents.md, Open questions section, requires user-facing terms introduced or changed by a feature to appear in a glossary row and be held to it by a criterion.
 PROPOSAL: Add glossary rows for the introduced user-facing terms and a criterion with proof that configuration documentation, adapters and reports use them consistently.
+
+### R-11
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design / External command route; AC-02 and its Test Plan
+EVIDENCE: The file-only spec reviewer reads the owning worktree, but the design neither exports the target commit's files nor requires its review inputs to match that commit. plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md, Review mode, commits the document without requiring unrelated files to be clean. An uncommitted instruction-file edit can therefore influence a review stored against X. Echoing TARGET and comparing before/after hashes do not establish that the reviewed contents belonged to X. I cannot run git or vh-adlc; this follows from reading the dispatch design and existing procedure.
+PROPOSAL: Give file-only reviews a read-only export of the target commit, or verify that every review input matches it before dispatch. Add a fixture proving that an uncommitted instruction change cannot clear a spec at the committed baseline.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Stackweaver adoption; AC-08, AC-17 and their Test Plan rows
+EVIDENCE: Stackweaver AGENTS.md:29-34 routes the loop directly through agents/spec.md, agents/tasks.md, agents/implement.md and agents/ship.md, explicitly for plain-language requests as well as slash commands. The adoption defines command adapters and tests adapted commands, but does not define an updated AGENTS.md route for plain-language invocation. Those requests can still enter the native loop for enrolled documents, or reference deleted agents after retirement.
+PROPOSAL: Update Stackweaver's repository entry instructions to use the same enrollment-aware dispatcher for plain-language and slash-command requests. Test both forms before retirement and their terminal-document refusal afterwards.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Skip-CI paths and Release path; AC-15
+EVIDENCE: The design enables extra skip paths after updating the plugin's knowledge.md pin. However, internal/knowledge/knowledge.go, pin(), gives repository pins precedence over that fallback, and plugins/vh-adlc/references/loop.md requires using the resolved revision and reporting conflicts. A consumer still pinned to d8f07c9 therefore reads conventions/delivery.md's documentation-only restriction while AC-15 unconditionally requires skipping deliveries containing declared tooling paths. I cannot execute knowledge or ship; the precedence is established by reading their source and instructions.
+PROPOSAL: Define how skip_ci_paths behaves when the resolved delivery convention does not support it, including a pin-update handoff or an explicitly authorized, reported exception. Add a repository-pin fixture so updating the plugin fallback cannot silently override the consumer's pinned rule.
 
 ## Sources
 
