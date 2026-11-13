@@ -1,5 +1,5 @@
 ---
-status: draft
+status: planned
 status_description: "Back to draft on feat/shared-development-loop: implementation reviews move to a private clone of the reviewed commit, after concurrent pushes tripped the shared-ref check."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
