@@ -413,6 +413,7 @@ completeness apply on any pin while the convention-dependent parts follow the re
 | 2026-11-13 | R-5 | spec | `f263bbd` | claude-opus-5-5 | procedural | One blocking finding (F-01 revision event resets on every applied fix), five should-fix and three nits; advance acceptance not met |
 | 2026-11-13 | R-6 | spec | `96fc16f` | claude-opus-5-5 | procedural | One blocking finding (F-01 in-session passes break the S7.7 check), three should-fix and three nits; advance acceptance not met |
 | 2026-11-13 | R-7 | spec | `b40d2ca` | claude-opus-5-5 | procedural | One blocking finding (F-01 Variants G and E assume stops the design does not make), four should-fix and three nits |
+| 2026-11-13 | R-8 | spec | `005f0f5` | claude-opus-5-5 | procedural | Clean: no blocking finding; four should-fix and three nits, listed for the owner and not applied |
 
 ### R-1
 
@@ -833,3 +834,54 @@ SEVERITY: nit
 WHERE: Test Plan AC-01 row (Variant E)
 EVIDENCE: "record streaks 1, 2 and 3 the loop ends at 3" is missing a conjunction between the two clauses.
 PROPOSAL: Write "record streaks 1, 2 and 3, and the loop ends at 3".
+
+### R-8
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (paragraph after step 7, lines 234-239); Acceptance Criteria AC-01 (resume clause); Test Plan AC-01 row (Variant G)
+EVIDENCE: Lines 235-238 say "Before it dispatches, a continued or resumed run checks the latest stored pass: if that pass is clean, below the ceiling and still fresh, and holds should-fix findings on the baseline, the author first applies or raises them as step 3 says". Being fresh is the only sign that the findings were not handled. Suppose the owner answers a judgement should-fix by keeping the current design. The question is folded and removed ("An answered question is folded into the document and removed", conventions/feature-documents.md:159), and Scope, Design, Acceptance Criteria and Test Plan stay unchanged. The review then stays fresh (feature-documents.md:300-301), so the next continued run finds a clean, fresh pass that holds a should-fix on the baseline and raises the same question again. The same happens when the author checks a factual should-fix and finds the reviewer was wrong, so applying it changes nothing. A literal implementation loops, and Variant G only covers a finding that was never applied.
+PROPOSAL: Limit the check to findings that have not been applied or answered, for example by recording the answered finding IDs where the folded answer is written and skipping them. Add a variant where the owner keeps the status quo on a judgement should-fix and the next run dispatches a pass without asking again.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-01 row (Variant E, "a second session continues after the owner's answer")
+EVIDENCE: The harness runs every prompt of one `session()` call as a resumed conversation: `resume: turns.at(-1)?.sessionId || undefined` (tests/vh-adlc/scenarios/run.ts:138). A second, independent conversation is a separate `session()` call, as S14.spec does with `turns.push(...session(g, [broken], [...]))` (run.ts:631). The row does not say which one it means. If the owner's answer is written as a second prompt in the same `session()` call, the conversation still remembers the revision. A skill that resets the count from session memory instead of from the stored rows, as Terminology requires (line 196), then passes Variant E. R-6 F-02 asked for this variant to prove that the count comes from the stored rows.
+PROPOSAL: State that the continuation runs in a separate `session()` call with no `resume`, so only the stored document carries the revision and the drift row.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Delivery (lines 317-322, S7.7 "Its first turn now continues in-session until the loop ends or a question waits"); Test Plan AC-01 row (Variant B and the S7.7 clause)
+EVIDENCE: Every scenario turn runs with `maxTurns: 80` (run.ts:138), which host.ts passes as `--max-turns` (tests/vh-adlc/scenarios/host.ts:82). A turn that ends with an error stops the session (`if (t.isError) break;`, run.ts:141). Under this Design one turn can now hold several full passes. Each pass means a dispatch, storing records, `review check`, a commit, applying findings, lint and a second commit. Variant B runs five passes in one turn because none of them raises an Open Question. S7.7 turn 1 uses the real reviewer and continues to streak 3 after any blocking pass. Neither the Delivery section nor the row states a turn budget, so a correct skill can be cut off partway, and the later checks then run against a half-finished loop.
+PROPOSAL: Say what turn budget these cases need and raise `maxTurns` for them, or arrange the canned passes so that the run stops between owner turns. Have the check fail, not pass vacuously, when a turn ends with `isError`.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope (lines 165-168 and 175-176); Design, Stopping rule (line 203); Design, Delivery (lines 306-309); Context, Owner summary (line 66); Acceptance Criteria; Test Plan
+EVIDENCE: Line 203 says "In the convention's Acceptance section, step 2 gains the rule", and the Owner summary says "The definitions, the stopping rule and the free-text rule go into `vhco-pro/docs`". AC-02 and AC-05 check the published page only for the severity definitions and the free-text example requirement, and AC-06 checks only pins, versions and lint, fresh and gate parity. No criterion or Test Plan row checks that the published Acceptance section states the stopping rule or the `streak <n> of 3` marker. None checks that `docs/get-started/first-feature.md` and `docs/user-guides/workflows.md` describe the stopping rule, saved nits and owner acceptance, as Scope and Delivery require. A companion change that adds only the definitions passes every criterion. The plugin then runs the new procedure, because it keys on the definitions alone (line 295-297), while the convention's Acceptance steps still describe the old one.
+PROPOSAL: Extend the AC-02 or AC-06 check in `tests/vh-adlc/review-convergence.test.ts` so it also asserts that the published Acceptance section states the stopping rule and the marker format. Add a criterion with a Test Plan row for the two user guides.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 43-44, "The author writes the count into each Review Log row"); Design, Terminology (Clean streak, line 196, "every spec review row it records"); Acceptance Criteria AC-01 (lines 330-331); Design, Stopping rule (step 7, lines 229-231)
+EVIDENCE: AC-01 says the author "writes `streak <n> of 3` into the Outcome of every spec review row it records", and Terminology says the same. Step 7 says "A drift pass records `drift` in place of a streak", and Variant H expects the drift row to record `drift`. The Owner summary says "each Review Log row", which also covers acceptance rows, and those carry no marker.
+PROPOSAL: Say "every spec review row other than a drift row" in Terminology and AC-01, and "each spec review row" in the Owner summary.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-01 row (Variants A and E)
+EVIDENCE: Variant A expects the summary to list "pass 3's IDs and the nits from all four passes". The row states content only for the first two clean passes, so the blocking pass and clean pass 3 have no stated nit or findings. Variant E begins "a `planned` document whose last row records `streak 3 of 3`, followed by an acceptance row and then a clean row marked `drift`". A row that two other rows follow is not the last row.
+PROPOSAL: State the canned records of the blocking pass and clean pass 3 in Variant A. In Variant E write "whose latest non-drift spec review row records `streak 3 of 3`".
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter `covers` (lines 18-20); Design, Delivery (lines 320-323)
+EVIDENCE: The AC-01 variants "run against a copy of the plugin whose reviewer agent returns canned records keyed by pass number". The Design does not say where the scripted reviewer definition and its canned records are stored. Under `tests/`, covers lists only `tests/vh-adlc/review-convergence.test.ts`, `tests/vh-adlc/scenarios/run.ts` and `tests/vh-adlc/evidence/review-convergence/`. If they live in a new file elsewhere, `feature_tree_clean` (conventions/feature-documents.md:316) does not see changes to it.
+PROPOSAL: Name the path of the scripted reviewer and its canned records, and add it to covers if none of the listed paths holds it.
