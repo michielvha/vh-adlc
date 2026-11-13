@@ -501,6 +501,7 @@ R-4 judgement findings (F-02, F-03, F-04) and the two R-5 judgement findings (F-
 | 2026-11-13 | R-3 | spec | `764df2fe8182152243a40b81e12a9168a88e5fa2` | gpt-6.1-sol | procedural | Two blocking findings: adapter must isolate implement from the live main checkout; domain plans routed to retired agents. Two should-fix. |
 | 2026-11-13 | R-4 | spec | `b777df0b6cc97a2d8b1410f3bedc73631ab504f5` | gpt-6.1-sol | procedural | Two blocking findings: routing criteria contradict for terminal documents; no-publication verdict not tied to the merge commit. Three should-fix. |
 | 2026-11-13 | R-5 | spec | `4f970d4d18078e7c3edbc81db9d941fbfb6116a1` | gpt-6.1-sol | procedural | One blocking finding: the release order needs a post-merge lock commit outside the single-feature lifecycle. Two should-fix. |
+| 2026-11-13 | R-6 | spec | `db426cbbe13abd8675d4365ad23903e59b94b7c0` | gpt-6.1-sol | procedural | No blocking findings; four should-fix on freshness wording, signed release verification, covers and assume-unchanged files. |
 
 ### R-1
 
@@ -686,6 +687,36 @@ SEVERITY: should-fix
 WHERE: Test Plan / AC-04
 EVIDENCE: Design says “A failed rung blocks all three” and permits an owner allowance only for a rung that could not run. AC-04 preserves that distinction. Its Test Plan instead says “a failing command and an unavailable procedure must each leave no push, no completion commit and no delivered report, unless the owner allowance is recorded for that rung”, allowing the exception to cover an observed failure too. Stackweaver CLAUDE.md requires verification before pushing, and agents/ship.md prohibits shipping over a known failure.
 PROPOSAL: Split the failure and unavailable-procedure cases. Require an observed failure to block publication and completion even with an allowance, and test the allowance only for the explicitly authorized unavailable rung.
+
+### R-6
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02
+EVIDENCE: docs/specs/shared-development-loop.md:248-254 hashes only modified, untracked and ignored files. A tracked file already marked assume-unchanged can be overwritten without entering those inventories, while its index flags, blob identity and refs remain unchanged. Comparing index flags does not establish that the working file's contents were preserved. AC-02 nevertheless requires rejecting any file-content change outside review_scratch. I cannot run Git or vh-adlc to execute this mutation fixture.
+PROPOSAL: Fingerprint tracked working files independently of status, including files with assume-unchanged or skip-worktree flags. Add a fixture with a pre-existing flag whose file is overwritten without changing that flag.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / covers globs; Test Plan / AC-06
+EVIDENCE: Design says an uncommitted covered change "makes reviews stale ... exactly as a plain entry does". internal/fresh/fresh.go:165-184 determines review staleness from committed diffs; lines 198-218 inspect dirty paths separately and affect only FeatureTree.Clean. A dirty covered file alone does not stale either review. I cannot run Git or vh-adlc; this distinction is established by reading the evaluator.
+PROPOSAL: Specify committed drift making the applicable review stale and uncommitted changes making feature_tree_clean false. Separate those proof cases and retain the existing freshness behavior for plain entries.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Order, step 2
+EVIDENCE: Step 2 assigns checking asset digests against signed checksums.txt to scripts/ensure-vh-adlc.sh. plugins/vh-adlc/scripts/ensure-vh-adlc.sh:45-61 reads expected digests from the plugin lock, and lines 117-126 compare the downloaded archive and binary with those digests. The script neither retrieves checksums.txt and its signature nor verifies a signing key; it also selects only the current platform. Running it cannot establish the stated signed-release verification.
+PROPOSAL: Define a separate procedure that verifies checksums.txt against an independently pinned signing key and checks every release archive before constructing the lock. Use ensure-vh-adlc.sh afterwards to verify installation against that lock.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter / covers
+EVIDENCE: The release inventory and AC-12 depend directly on .goreleaser.yml, .github/workflows/ci.yml and .github/workflows/release.yml, while Order step 2 depends on plugins/vh-adlc/scripts/ensure-vh-adlc.sh. None appears in covers. The pinned conventions/feature-documents.md requires covering every path whose change can affect the feature, and internal/fresh/fresh.go:186-195 excludes uncovered paths from review-freshness comparisons.
+PROPOSAL: Add these release and verification inputs to covers, together with the marketplace manifests named as publication inputs. Ensure changes to those inputs invalidate the corresponding reviewed release proof.
 
 ## Sources
 
