@@ -348,6 +348,7 @@ the last pass.
 | 2026-11-13 | R-1 | spec | `83ae24c` | claude-opus-5-5 | procedural | Two blocking findings (F-01 streak reset, F-02 blocking definition) and ten others |
 | 2026-11-13 | R-2 | spec | `c643cc0` | claude-opus-5-5 | procedural | Clean: no blocking finding; three should-fix and three nits |
 | 2026-11-13 | R-3 | spec | `cd193f3` | claude-opus-5-5 | procedural | Clean: no blocking finding; seven should-fix and three nits |
+| 2026-11-13 | R-4 | spec | `89afa41` | claude-opus-5-5 | procedural | One blocking finding (F-01 advance acceptance contradicts S7.7.accept), three should-fix and two nits |
 
 ### R-1
 
@@ -550,3 +551,47 @@ SEVERITY: nit
 WHERE: Context, Background, Model context (lines 125-126)
 EVIDENCE: "The owner is moving routine spec and review work off the most expensive model tier" has no citation, and the Context section is required to cite its claims (conventions/feature-documents.md:75-76). Nothing in this repository at cd193f3 records that move.
 PROPOSAL: Cite the source, for example the commit or settings that record the model move, or drop the sentence, since the paragraph's conclusion rests on the Review Log models.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context, Background, Existing scenarios (lines 125-129); Design, Delivery (line 274); Test Plan AC-01 row (last sentence, "S7.7, S7.7.accept and S7.9 still pass"); Design, Terminology (Advance acceptance, line 178); Open Questions (line 340, "early acceptance is honored only when given in advance")
+EVIDENCE: Background says S7.7, S7.7.accept and S7.9 are "All three ... acceptances given in advance of a single clean pass", and Delivery says they "keep their advance acceptance after one clean pass". The scenario harness sends turns one after another and resumes the session only after the previous turn ends (tests/vh-adlc/scenarios/run.ts:137-141). S7.7.accept stores a NO FINDINGS R-1 first (`accept(f, "NO FINDINGS", false)`, run.ts:577), then the owner says "I accept the document as reviewed in R-1" (run.ts:579) and the checks require "no second review was stored" (run.ts:591). That acceptance arrives after the pass returned, at a streak of one. S7.7 sends its conditional acceptance as a second turn (run.ts:532-535), after the first turn's review and whatever the author did after it. Terminology defines an advance acceptance as one given "before a pass returns", and the owner decided it is honored only then. A skill that follows the Design must keep going after R-1 in S7.7.accept, which fails that scenario's check, while the AC-01 row requires the scenario to keep passing. So either the proof fails a correct implementation, or the implementer honors a post-pass acceptance below three, which the Design and the owner's decision exclude. S14.spec (run.ts:626, "The owner accepts ... against R-1") is another post-pass acceptance the document does not mention.
+PROPOSAL: Decide whether an acceptance the owner gives after a clean pass, at a baseline unchanged since that pass, is honored below a streak of three, and state it in Terminology, the stopping rule, AC-01 and the Owner summary. Then correct the Background description of S7.7 and S7.7.accept, and either keep those scenarios as passing proof or say how they change.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (step 3, lines 190-193, "The author does not stop to ask whether to accept"); Scope (lines 146-156); frontmatter covers (lines 6-19)
+EVIDENCE: The rules block stays unchanged, so `vh-adlc next` returns `owner acceptance` once a fresh, clean spec review exists (conventions/feature-documents.md:279). After a clean pass below three that returns NO FINDINGS, or only saved nits and Context or Sources fixes, the baseline is unchanged and the review stays fresh, so `next` answers `owner acceptance`. The resume skill stops and asks the owner to accept on that answer (plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md:36-42), and plugins/vh-adlc/references/loop.md:136-138 presents the acceptance question "including through resume". Neither file is in covers or Scope. A resumed session would therefore ask for acceptance at a streak of one or two, which step 3 forbids, and nothing in the Test Plan exercises resume.
+PROPOSAL: Add the resume skill and loop.md to Scope and covers, and say that resume applies the stopping rule before acting on `owner acceptance` from `next`. Add a Test Plan variant that resumes a draft at a streak of one with a fresh clean review and passes only when another pass is requested instead of an acceptance question.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Clean streak, line 176); Context, Owner summary (lines 41-42, "and so does a revision of an accepted document"); Acceptance Criteria AC-01; Test Plan AC-01 row (Variant E)
+EVIDENCE: Terminology resets the streak only at "the latest commit that moved the document from `planned` or `in-progress` to `draft`". The rules block also allows `blocked: [draft, ...]` and `parked: [draft, ...]` (conventions/feature-documents.md:236-237). A planned document that moves to blocked and is then revised reaches draft from blocked, so no planned-to-draft commit exists and the pre-revision streak still counts. A document that has an acceptance row but is still draft (for example when the planned gate failed after the row was written) can have its baseline edited without any `gate draft` commit at all. In both cases the Owner summary's "a revision of an accepted document" resets the count, but the Terminology rule does not, so the first clean pass after the revision could end the loop. Variant E only covers planned to draft.
+PROPOSAL: Define the reset event so it covers every revision of an accepted document, for example any move to draft from another status, plus baseline changes after the latest acceptance row. Make the Owner summary and AC-01 use the same definition.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-04 (lines 300-302); Test Plan AC-04 row (line 322); Design, Failure-mode check (lines 229-232)
+EVIDENCE: AC-04 requires "a failure-mode finding for each of the four questions" the design leaves undefined. The first two fixtures state nothing about concurrency, or nothing about retry or replay, and each passes when it returns "a failure-mode finding on the undefined question", singular. The third fixture isolates upgrade and rollback. No fixture isolates partial failure, and the first two do not check that every undefined question is reported. A reviewer that never asks about partial failure, or that reports one question per design, passes the row while missing what AC-04 requires.
+PROPOSAL: Say in the row that each fixture passes only when the reviewer reports every question that fixture leaves undefined, and list those questions per fixture. Add a fixture that defines concurrency, retry and upgrade but leaves partial failure undefined.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 39-41); Design, Stopping rule (step 1, lines 186-187, and step 4, lines 194-196)
+EVIDENCE: The Owner summary says "After the third clean pass nothing more is applied". Step 1 lets findings confined to Context or Sources be applied "at any time", and step 4 limits only the normative baseline. Step 1 also covers only Context and Sources, so a nit on Tasks, Open Questions or other non-normative text is neither saved nor allowed.
+PROPOSAL: Have the Owner summary say that nothing on the normative baseline is applied after the third clean pass. In step 1, allow findings confined to any non-normative section.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-06 (lines 306-310); Test Plan AC-06 row (line 324)
+EVIDENCE: AC-06 says "every docs pin in the plugin points at the published docs commit" and "both manifests carry the same new version". The row also checks AGENTS.md, which is the repository pin and not part of the plugin (`git grep -n d8f07c9` lists AGENTS.md:4, plugins/vh-adlc/knowledge.md:5 and :7, plugins/vh-adlc/references/security-settings.md:5). It checks only that "both manifests match", not that the version changed from 0.16.1 (plugin.json:4, .claude-plugin/plugin.json:14).
+PROPOSAL: Name AGENTS.md in AC-06 as the repository pin, and have the row check that the two manifest versions match and are higher than the version current before the change.
