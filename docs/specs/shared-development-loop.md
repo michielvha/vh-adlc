@@ -543,6 +543,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-7 | spec | `1ae2a34e436fb057e4fe2793a04147143c539af1` | gpt-6.1-sol | procedural | No blocking findings; three should-fix on the moved Stackweaver checkout, merges with no publication workflow, and the post-merge verification range. |
 | 2026-11-13 | R-8 | spec | `5a284fc1c6fac8656cf3494f5e79a0f094dcc5dd` | gpt-6.1-sol | procedural | One blocking finding: an empty workflow-run query right after merge does not prove no publication. Two should-fix and a nit. |
 | 2026-11-13 | R-9 | spec | `9378490b8c1681e81508506f61b467ba2456bb30` | gpt-6.1-sol | procedural | No blocking findings; one should-fix on reused E2E proofs and a wording nit. |
+| 2026-11-13 | R-10 | spec | `1d563f0e24e6ad57c1677374dd4f1ac9ac1afd01` | gpt-6.1-sol | procedural | No blocking findings; three should-fix: live slot pass and final full kind run, skipped subchecks inside make verify, glossary. |
 
 ### R-1
 
@@ -827,6 +828,29 @@ SEVERITY: nit
 WHERE: Design / Verification rungs, CI policy and post-merge watch
 EVIDENCE: The statement that Stackweaver's tag workflow “runs on every push to main” contradicts .github/workflows/tag.yml:9-18, which declares paths-ignore. The same design section later acknowledges those exclusions.
 PROPOSAL: Qualify the statement to describe unmarked pushes that pass the workflow's path filters. Keep the subsequent blocked-delivery handling for unmarked merges that trigger no publication.
+
+### R-10
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Verification rungs, CI policy and post-merge watch; AC-04 and its Test Plan
+EVIDENCE: docs/specs/shared-development-loop.md:327-347 preserves path-conditioned rungs and named E2E execution, but does not explicitly require the live slot runtime pass that Stackweaver agents/implement.md:61-66 requires for anything with runtime behavior. It also omits CLAUDE.md:184's full detached kind run on the final head after targeted iteration. The generic references to a local verification ladder and parity map do not specify these stopping conditions, and AC-04's scenarios can pass without either check. Git, vh-adlc and test execution are unavailable; this finding is based on reading the current design and native instructions.
+PROPOSAL: Explicitly retain the live slot runtime pass and final full detached kind run in Stackweaver's project procedure and advancement rules. Add scenarios proving that applicable runtime work cannot advance without its live pass and targeted E2E success cannot replace the required final full run.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Verification rungs; AC-04 and its Test Plan
+EVIDENCE: The design declares make verify as an always-required rung but defines no handling for successful commands containing skipped mandatory checks. Stackweaver scripts/verify-local.sh:291-333 skips formatting, lint, tests and satellite builds when their tools are missing; lines 473-487 exit unsuccessfully only for FAIL entries, so skipped checks can accompany exit 0. The planned unavailable-rung fixture does not cover this partial-success result. Treating the aggregate command as passed would permit pushing or completion without the full verification the design claims to preserve. I cannot execute the command or vh-adlc; the exit behavior is established by source inspection.
+PROPOSAL: Define the make verify rung's pass condition to require all applicable mandatory subchecks, not merely command exit 0, with unavailable subchecks handled through the exact owner-allowance rule. Add an exit-0 fixture reporting a skipped mandatory subcheck and require advancement to stop without that allowance.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Model routing per role, Verification rungs and Stackweaver adoption; Acceptance Criteria
+EVIDENCE: The document introduces user-facing configuration and routing terms including loop roles, verification rungs and enrolled specs, but contains no glossary or criterion holding those terms to their definitions. The pinned conventions/feature-documents.md, Open questions section, requires user-facing terms introduced or changed by a feature to appear in a glossary row and be held to it by a criterion.
+PROPOSAL: Add glossary rows for the introduced user-facing terms and a criterion with proof that configuration documentation, adapters and reports use them consistently.
 
 ## Sources
 
