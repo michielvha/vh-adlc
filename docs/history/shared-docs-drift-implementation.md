@@ -367,3 +367,43 @@ WHERE: shared/plugins/vh-adlc/scripts/docs-drift/audit-session.ts, second oversi
 EVIDENCE: The delta changes the session omission branch to carry the remaining artifact diagnostics. The old code dropped them. context.md claims that session details are omitted before references, which are "last to go". The two new direct tests use the small failed() session. One makes the artifact diagnostics oversized and the other makes the reference path oversized. No test has oversized session details with ordinary references and artifact diagnostics, checking that the result keeps report_artifacts.files, directory and the audit-output diagnostics while audit_session is reduced to the placeholder. The red and green logs and the 20 case checkpoint only exercise the first branch and the final branch.
 PROPOSAL: Add one direct case to audit-session-output.test.ts. Give the session a diagnostics array large enough to exceed 2048 bytes and use artifacts(false) with short diagnostics. Assert that the output is within bounds and incomplete, that details_omitted is true, that audit_session.diagnostics holds the session placeholder, that report_artifacts.files.report_json equals the retained reference, and that the audit-output diagnostics are still in output.diagnostics.
 ```
+
+## Component diagnostic 109
+
+Exact local target: `9475dc2c1034a47fd6f211db12db282e5772698a`. Actual Copilot Opus 5.5; procedural isolation; all 99 required chunks read; no outside paths or private files sent. Two should-fix findings and two nits; this is not a clean or complete-feature review. Original return preserved before corrections.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: shared/plugins/vh-adlc/scripts/docs-drift/reviewed-publication.ts, the two readGit merge-base --is-ancestor calls after the native identity check, and the outer catch at the end of the verifier
+EVIDENCE: The verifier checks bindings.source_commit against current and native.head with readGit(repo, "merge-base", "--is-ancestor", ...). It uses the result only for its throw side effect and does not wrap it in fail(). When Git returns non-zero, the outer catch converts the error to a plain Error, "docs-drift retained publication original evidence unavailable", because it is not RetainedPublicationIneligible. That covers a source commit that exists in the owned store but is not an ancestor of the current default or the proposal head. That plan is ineligible data, yet it gets the same classification as the missing-source-object case, which the test pins to "original evidence unavailable". context.md states "Missing original Git evidence differs from ineligible plan data". On this path the two cases cannot be told apart, and no test covers an existing non-ancestor source.
+PROPOSAL: First confirm the source object exists, using rev-parse --verify on source_commit^{commit}, and let that failure stay as "evidence unavailable". Then run the ancestry check in a way that tells exit 1 (not an ancestor) apart from other Git failures, and call fail("original source is not an ancestor of the current default or proposal head") for exit 1. Add a direct case that uses a real commit off the ancestry path and asserts the RetainedPublicationIneligible reason.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: shared/tests/vh-adlc/docs-drift/reviewed-publication.test.ts, the fault list in "native retained-plan verification uses adopted source rather than self approval" and setup(); guards in reviewed-publication.ts
+EVIDENCE: Several refusal guards that context.md describes as implemented have no direct negative case:
+(a) The loop over plan.corrections, which compares inputs_sha256, postimage_sha256 and patch_sha256 and fails with "normalized correction bindings changed". No fault changes a correction field, and the absent-path postimage form canonicalDigest({path, absent:true}) is never exercised.
+(b) The pr-update branch of the effects filter, which checks payload.number and expected_head. Every fixture uses only pr-create.
+(c) The "candidate configuration changed" check on settings_sha256.
+(d) The effect body and draft filter on its own. changed-body mutates native.body_sha256, so it fails earlier, at native.body_sha256 !== sha256(proposal.body) in the identity check, and the effect payload body comparison is never the deciding check.
+A regression in any of these guards would leave all 14 direct cases and the 3 composition cases passing.
+PROPOSAL: Add focused faults that keep everything else matching. Change correction.postimage_sha256, patch_sha256 and inputs_sha256 one at a time. Add a deleted-path correction for the absent postimage. Add a pr-update effect for both the matching and the wrong expected_head cases. Add a candidate commit that edits the settings file. Add a plan whose pr-create body digest differs while native and proposal stay consistent.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: shared/tests/vh-adlc/docs-drift/reviewed-publication.test.ts, final else branch: expect(() => verify(packet, f.native)).toThrow(RetainedPublicationIneligible)
+EVIDENCE: Twelve refusal faults assert only the error class: unknown-adoption, trial, wrong-settings, wrong-requested-role, wrong-branch, foreign-repository, foreign-actor, wrong-tree, changed-body, foreign-ref, wrong-diff and malformed-plan. Each guard in the verifier has its own reason string, for example "original source bindings changed", "approved role policy changed", "reviewed policy or publication shape changed", "candidate tree or complete diff changed" and "exact reviewed proposal payload unavailable". A fault could therefore be refused by an earlier, unrelated guard and still pass. For example, wrong-branch could fail in validatePublicationShape or in the effects filter, and wrong-settings could fail at the stable bindings check or later. The test would not show which guard caught it, which weakens the claim that each listed mismatch is covered.
+PROPOSAL: Map each fault to its expected reason and assert toThrow with that reason text, or check error.message, alongside the class.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: shared/plugins/vh-adlc/scripts/docs-drift/audit-session.ts, auditSessionOutput, first trimming block (size() > limit && output.report_artifacts && artifact diagnostics longer than the summary)
+EVIDENCE: The first branch collapses report_artifacts.diagnostics into the single first-error summary whenever the total output exceeds the limit. It does not check whether the artifact diagnostics are what causes the overflow. When the session details are the oversize part, the artifact diagnostics are lost first. The second branch then drops the session details anyway, so the output can end up holding only the summary even though the full artifact diagnostics would fit once the session was removed. The "oversized session details preserve ordinary partial-output references" case uses short artifact diagnostics, so it does not exercise this order. References still go last, as context.md states, so this only loses diagnostics earlier than necessary.
+PROPOSAL: Drop the session details before collapsing the artifact diagnostics, or check after dropping the session details whether the full artifact diagnostics fit. Add a case with a large session and moderately long artifact diagnostics that fit on their own.
+```

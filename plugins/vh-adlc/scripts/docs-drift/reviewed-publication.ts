@@ -1,7 +1,7 @@
 import type { PullRequestInput } from "../github-read";
 import { readCompatibleAdoptionLineage } from "./adoption-lineage";
 import { readRecordedRoleModel, verifyRuntimeAdoption } from "./adoption";
-import { readGit } from "./git";
+import { isGitAncestor, readGit } from "./git";
 import { readRetainedPlan, readVerifiedPlan, type PlanPolicy, type SealedPlan } from "./journal";
 import { fullModel } from "./manifests";
 import { readOwnedPatch } from "./preparation";
@@ -43,11 +43,13 @@ export function createAdoptedPublicationVerifier(input: {
         || native.operation_id !== manifest.operation_id || native.ref !== currentSettings.publication.receipt_ref_prefix + manifest.operation_id
         || manifest.repository !== native.repository || manifest.repository_id !== native.repository_id || manifest.actor !== native.actor || manifest.actor_id !== native.actor_id)
         fail("native publication identity or receipt changed");
-      readGit(repo, "merge-base", "--is-ancestor", bindings.source_commit, current);
-      readGit(repo, "merge-base", "--is-ancestor", bindings.source_commit, native.head);
+      // These snapshots require complete owned histories before a negative ancestry verdict is meaningful.
+      const source = captureBareSnapshot(repo, bindings.source_commit), candidate = captureBareSnapshot(repo, native.head);
+      if (!isGitAncestor(repo, bindings.source_commit, current) || !isGitAncestor(repo, bindings.source_commit, native.head))
+        fail("original source is not an ancestor of the current default or proposal head");
       const adopted = verifyRuntimeAdoption({ repo, current_default: bindings.source_commit, identity });
       if (adopted.adoption_sha256 !== original.adoption_sha256) fail("original source adoption changed");
-      const source = captureBareSnapshot(repo, bindings.source_commit), stable = deriveSourceWorkerInputs(source);
+      const stable = deriveSourceWorkerInputs(source);
       for (const key of Object.keys(stable) as Array<keyof typeof stable>) if (bindings[key] !== stable[key]) fail("original source bindings changed");
       const settings = source.settings;
       const policies = Object.entries(settings.execution.entries).map(([entry, roles]) => {
@@ -78,7 +80,7 @@ export function createAdoptedPublicationVerifier(input: {
         && effect.payload.expected_head === native.head)).filter(effect => effect.payload.draft === proposal.draft
           && typeof effect.payload.body === "string" && sha256(Buffer.from(effect.payload.body)) === native.body_sha256);
       if (effects.length !== 1) fail("exact reviewed proposal payload unavailable");
-      const candidate = captureBareSnapshot(repo, native.head), postimages = new Map(candidate.blobs.map(blob => [blob.path, blob.bytes]));
+      const postimages = new Map(candidate.blobs.map(blob => [blob.path, blob.bytes]));
       if (candidate.settings_sha256 !== source.settings_sha256) fail("candidate configuration changed");
       const sourceInputs = canonicalDigest(resolutionSource(source));
       for (const correction of plan.corrections) {

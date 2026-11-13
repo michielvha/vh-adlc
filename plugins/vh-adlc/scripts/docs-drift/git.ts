@@ -1,4 +1,4 @@
-import { gitEnvironment, readGitWithEnvironment as nativeGit } from "../git-read";
+import { gitEnvironment, gitReadArguments, readGitWithEnvironment as nativeGit } from "../git-read";
 import { createYAMLReader } from "../settings-file";
 import type { CollectionReaders } from "../docs-impact/collection";
 import { decodeUTF8, protocolPath, sha256 } from "./protocol";
@@ -19,10 +19,30 @@ export function readGit(repo: string, ...args: string[]): Buffer {
 }
 
 export function readGitWithEnvironment(repo: string, args: string[], environment: Environment, input?: Uint8Array): Buffer {
-  return nativeGit(repo, [
+  return nativeGit(repo, fixedReadArguments(args), ordinaryGitEnvironment(environment), input);
+}
+
+function fixedReadArguments(args: string[]): string[] {
+  return [
     "--no-lazy-fetch", "--no-replace-objects", "-c", "credential.helper=", "-c", "http.extraHeader=",
     "-c", "core.hooksPath=/dev/null", ...args,
-  ], ordinaryGitEnvironment(environment), input);
+  ];
+}
+
+/** Distinguish Git's negative ancestry result from failed reads; callers verify complete history. */
+export function isGitAncestor(repo: string, source: string, descendant: string): boolean {
+  for (const commit of [source, descendant]) {
+    if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(commit)
+      || readGit(repo, "rev-parse", "--verify", "--end-of-options", commit + "^{commit}").toString().trim() !== commit)
+      throw Error("Exact Git ancestry commits required");
+  }
+  const result = Bun.spawnSync(gitReadArguments(fixedReadArguments(["merge-base", "--is-ancestor", source, descendant])), {
+    cwd: repo, env: gitEnvironment(ordinaryGitEnvironment({ PATH: process.env.PATH })), stdout: "pipe", stderr: "pipe",
+  });
+  if (result.signalCode || result.stdout.length || result.stderr.length) throw Error("Git ancestry collection failed");
+  if (result.exitCode === 0) return true;
+  if (result.exitCode === 1) return false;
+  throw Error("Git ancestry collection failed");
 }
 
 /** Read raw blobs in bounded batches. Large individual blobs keep the existing single-object path. */

@@ -4,14 +4,15 @@ import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:
 import { join } from "node:path";
 import { source, write, commit, portableRecord, deliverRecord, runtimeIdentity } from "./adoption-fixture";
 import { fixture, bindings, hash, role } from "./manifest-fixture";
-import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
+import { readGit, writeMetadataObject } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { captureRepositoryState, captureSnapshot, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { deriveWorkerInputs } from "../../../plugins/vh-adlc/scripts/docs-drift/publication-worker";
 import { readCandidatePatch, readOwnedPatch } from "../../../plugins/vh-adlc/scripts/docs-drift/preparation";
 import { correctionProjection, deliveryDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/report";
+import type { CorrectionInput } from "../../../plugins/vh-adlc/scripts/docs-drift/report";
 import { resolutionSource } from "../../../plugins/vh-adlc/scripts/docs-drift/resolve";
 import { publicationMarker, readReviewedProposal, type NativePublicationBinding } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
-import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
+import { effectMarker, validateReviewedManifest, type Effect, type Bindings } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { sealPlan, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import type { PullRequestInput } from "../../../plugins/vh-adlc/scripts/github-read";
@@ -69,6 +70,110 @@ console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
     }
     const calls: string[][] = readFileSync(callsPath, "utf8").trim().split("\n").map(line => JSON.parse(line));
     expect(calls.length).toBeGreaterThan(5); expect(calls.every(args => args[args.indexOf("--method") + 1] === "GET")).toBe(true);
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+function reseal(f: ReturnType<typeof setup>, mutate: (value: { bindings: Bindings; effects: Effect[]; corrections: CorrectionInput[] }) => void) {
+  const data = structuredClone({ bindings: f.plan.manifest.bindings, effects: f.plan.manifest.effects, corrections: f.plan.corrections });
+  mutate(data); data.bindings.delivery_sha256 = deliveryDigest(data.corrections, []);
+  const input = fixture(data.bindings, data.effects);
+  return sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, adoption_sha256: f.plan.adoption_sha256,
+    publication_kind: "advisory", context: "production", transport: "native", corrections: data.corrections, attention: [] });
+}
+
+test.each(["current", "head"])("an existing non-ancestor source is ineligible rather than unavailable: %s", async relation => {
+  try {
+    const { createAdoptedPublicationVerifier, RetainedPublicationIneligible } = await import("../../../plugins/vh-adlc/scripts/docs-drift/reviewed-publication");
+    const f = setup(); let current = f.current, source = f.native.head;
+    if (relation === "head") {
+      const tree = readGit(f.store.root, "rev-parse", f.current + "^{tree}").toString().trim();
+      current = writeMetadataObject(f.store.root, "commit", Buffer.from(`tree ${tree}\nparent ${f.current}\nauthor Fixture <fixture@example.invalid> 1 +0000\ncommitter Fixture <fixture@example.invalid> 1 +0000\n\nOwned sibling default\n`));
+      source = current;
+    }
+    const verify = createAdoptedPublicationVerifier({ store: f.store, current_default: current, identity: runtimeIdentity, proposal: f.proposal });
+    expect(verify(canonicalJSON(f.plan), f.native).corrections).toEqual([correctionProjection(f.correction)]);
+    const before = captureRepositoryState(f.repo), changed = reseal(f, value => { value.bindings.source_commit = source; });
+    let denied: unknown; try { verify(canonicalJSON(changed), f.native); } catch (error) { denied = error; }
+    expect(denied).toBeInstanceOf(RetainedPublicationIneligible);
+    expect((denied as Error).message).toBe("docs-drift retained publication original source is not an ancestor of the current default or proposal head");
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+test.each(["correction-postimage", "correction-patch", "correction-inputs", "effect-body", "observed-draft", "update-matching",
+  "update-number", "update-head", "deleted-matching", "deleted-absence", "candidate-settings"])("retained publication guard keeps a successful baseline and checks its exact payload: %s", async fault => {
+  try {
+    const { createAdoptedPublicationVerifier, RetainedPublicationIneligible } = await import("../../../plugins/vh-adlc/scripts/docs-drift/reviewed-publication");
+    const f = setup(), original = createAdoptedPublicationVerifier({ store: f.store, current_default: f.current, identity: runtimeIdentity, proposal: f.proposal });
+    expect(original(canonicalJSON(f.plan), f.native).corrections).toEqual([correctionProjection(f.correction)]);
+    const proposal = structuredClone(f.proposal), native = structuredClone(f.native);
+    if (fault.startsWith("deleted-")) readGit(f.repo, "rm", "--", "docs/guide.md");
+    if (fault === "candidate-settings") write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...f.configured,
+      detector_options: { ...f.configured.detector_options, [f.configured.required_detectors[0]]: { synthetic_change: true } } }));
+    if (fault.startsWith("deleted-") || fault === "candidate-settings") {
+      const head = commit(f.repo, "synthetic changed candidate for " + fault);
+      readGit(f.store.root, "-c", "protocol.file.allow=always", "fetch", "--no-write-fetch-head", "--no-tags", "--no-auto-maintenance", "--", f.repo, head);
+      proposal.head_sha = head; native.head = head; native.tree = readGit(f.store.root, "rev-parse", head + "^{tree}").toString().trim();
+    }
+    if (fault === "observed-draft") proposal.draft = !proposal.draft;
+    const plan = reseal(f, value => {
+      value.bindings.candidate_commit = native.head; value.bindings.candidate_tree = native.tree;
+      value.bindings.diff_sha256 = sha256(readOwnedPatch(f.store, f.configured.repository, f.current, native.head));
+      const push = value.effects.find(effect => effect.kind === "push")!; push.payload.head = native.head;
+      const pr = value.effects.find(effect => effect.kind === "pr-create")!;
+      if (fault === "effect-body") pr.payload.body = String(pr.payload.body) + "\nA different reviewed explanation";
+      if (fault.startsWith("update-")) {
+        const expected = { title: "Prior synthetic title", body: "Prior synthetic body", labels: [], draft: false };
+        pr.kind = "pr-update"; pr.payload = { number: fault === "update-number" ? 12 : 11,
+          expected_head: fault === "update-head" ? f.current : native.head, expected_payload: expected, expected_payload_sha256: canonicalDigest(expected),
+          title: pr.payload.title, body: pr.payload.body, labels: pr.payload.labels, draft: pr.payload.draft };
+      }
+      const correction = value.corrections[0];
+      if (fault.startsWith("deleted-")) {
+        correction.patch_sha256 = sha256(readOwnedPatch(f.store, f.configured.repository, f.current, native.head, [correction.path]));
+        correction.postimage_sha256 = fault === "deleted-absence" ? hash("invented deleted postimage") : canonicalDigest({ path: correction.path, absent: true });
+      }
+      if (fault === "correction-postimage") correction.postimage_sha256 = hash("changed postimage");
+      if (fault === "correction-patch") correction.patch_sha256 = hash("changed patch");
+      if (fault === "correction-inputs") correction.inputs_sha256 = hash("changed source inputs");
+    });
+    const before = captureRepositoryState(f.repo), verify = createAdoptedPublicationVerifier({ store: f.store, current_default: f.current, identity: runtimeIdentity, proposal });
+    if (["update-matching", "deleted-matching"].includes(fault)) {
+      expect(verify(canonicalJSON(plan), native).corrections).toEqual(plan.corrections.map(correctionProjection));
+    } else {
+      const reason = fault.startsWith("correction-") || fault === "deleted-absence" ? "normalized correction bindings changed"
+        : fault === "candidate-settings" ? "candidate configuration changed"
+        : fault === "update-head" ? "reviewed policy or publication shape changed" : "exact reviewed proposal payload unavailable";
+      let denied: unknown; try { verify(canonicalJSON(plan), native); } catch (error) { denied = error; }
+      expect(denied).toBeInstanceOf(RetainedPublicationIneligible); expect((denied as Error).message).toBe("docs-drift retained publication " + reason);
+    }
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+test.each(["shallow-history", "ancestry-command-failure"])("unavailable ancestry evidence cannot become an ineligible-plan verdict: %s", async fault => {
+  try {
+    const { createAdoptedPublicationVerifier, RetainedPublicationIneligible } = await import("../../../plugins/vh-adlc/scripts/docs-drift/reviewed-publication");
+    const f = setup(), verify = createAdoptedPublicationVerifier({ store: f.store, current_default: f.current, identity: runtimeIdentity, proposal: f.proposal });
+    expect(verify(canonicalJSON(f.plan), f.native).corrections).toEqual([correctionProjection(f.correction)]);
+    const before = captureRepositoryState(f.repo), oldPath = process.env.PATH;
+    let denied: unknown;
+    try {
+      if (fault === "shallow-history") writeFileSync(join(f.store.root, "shallow"), f.current + "\n", { mode: 0o600 });
+      else {
+        const git = Bun.which("git"), bin = join(f.artifacts, "ancestry-fault-bin"); if (!git) throw Error("Fixture Git unavailable");
+        mkdirSync(bin, { mode: 0o700 }); writeFileSync(join(bin, "git"), `#!${process.execPath}
+const args = process.argv.slice(2);
+if (args.includes("merge-base") && args.includes("--is-ancestor")) process.exit(2);
+const result = Bun.spawnSync([${JSON.stringify(git)}, ...args], { env: process.env, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+process.exit(result.exitCode);
+`, { mode: 0o700 }); process.env.PATH = bin + ":" + oldPath;
+      }
+      try { verify(canonicalJSON(f.plan), f.native); } catch (error) { denied = error; }
+    } finally { if (oldPath === undefined) delete process.env.PATH; else process.env.PATH = oldPath; }
+    expect(denied).toBeInstanceOf(Error); expect(denied).not.toBeInstanceOf(RetainedPublicationIneligible);
+    expect((denied as Error).message).toBe("docs-drift retained publication original evidence unavailable");
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { failed = true; throw error; }
 }, 90000);
@@ -154,7 +259,15 @@ test.each(["matching", "unknown-adoption", "trial", "wrong-settings", "wrong-req
       expect((denied as Error).message).toBe("docs-drift retained publication original evidence unavailable");
     } else {
       const packet = fault === "malformed-plan" ? Buffer.from('{"unreviewed":true}\n') : canonicalJSON(f.plan);
-      expect(() => verify(packet, f.native)).toThrow(RetainedPublicationIneligible);
+      const reasons: Record<string, string> = {
+        "unknown-adoption": "adoption is outside the approved compatible lineage", trial: "requires production native evidence",
+        "wrong-settings": "original source bindings changed", "wrong-requested-role": "approved role policy changed",
+        "wrong-branch": "exact reviewed proposal payload unavailable", "wrong-tree": "candidate tree or complete diff changed",
+        "wrong-diff": "candidate tree or complete diff changed", "malformed-plan": "invalid retained plan",
+      };
+      let denied: unknown; try { verify(packet, f.native); } catch (error) { denied = error; }
+      expect(denied).toBeInstanceOf(RetainedPublicationIneligible);
+      expect((denied as Error).message).toBe("docs-drift retained publication " + (reasons[fault] ?? "native publication identity or receipt changed"));
     }
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { failed = true; throw error; }

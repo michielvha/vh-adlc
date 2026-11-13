@@ -162,7 +162,9 @@ export function auditSessionOutput(result: Awaited<ReturnType<typeof runAuditSes
     details_omitted: false, audit_session: session, report_artifacts: artifacts ? structuredClone(artifacts) : null,
     diagnostics: [...session.diagnostics.map(message => ({ code: "audit-session", message })),
       ...(artifacts?.diagnostics ?? []).map(message => ({ code: "audit-output", message }))] };
-  const size = () => Buffer.byteLength(JSON.stringify(output) + "\n");
+  const size = (value: unknown = output) => Buffer.byteLength(JSON.stringify(value) + "\n");
+  const diagnosticsFor = (saved: AuditOutputArtifacts | null) => [...session.diagnostics.map(message => ({ code: "audit-session", message })),
+    ...(saved?.diagnostics ?? []).map(message => ({ code: "audit-output", message }))];
   let firstReason = "", encodedBytes = 0;
   for (const character of output.report_artifacts?.diagnostics[0] ?? "") {
     const bytes = Buffer.byteLength(JSON.stringify(character)) - 2;
@@ -170,19 +172,27 @@ export function auditSessionOutput(result: Awaited<ReturnType<typeof runAuditSes
     firstReason += character; encodedBytes += bytes;
   }
   const diagnosticSummary = "Output diagnostics truncated. First error: " + firstReason + "; inspect the selected artifact root and original records";
-  if (size() > limit && output.report_artifacts
-    && Buffer.byteLength(JSON.stringify(output.report_artifacts.diagnostics)) > Buffer.byteLength(JSON.stringify([diagnosticSummary]))) {
-    output.outcome = "incomplete"; output.details_omitted = true;
-    output.report_artifacts.diagnostics = [diagnosticSummary];
-    output.diagnostics = [...session.diagnostics.map(message => ({ code: "audit-session", message })),
-      { code: "audit-output", message: diagnosticSummary }];
+  const trimmedArtifacts = output.report_artifacts
+    && Buffer.byteLength(JSON.stringify(output.report_artifacts.diagnostics)) > Buffer.byteLength(JSON.stringify([diagnosticSummary]))
+    ? { ...output.report_artifacts, diagnostics: [diagnosticSummary] } : null;
+  if (size() > limit && trimmedArtifacts) {
+    const trimmed = { ...output, outcome: "incomplete" as const, details_omitted: true,
+      report_artifacts: trimmedArtifacts, diagnostics: diagnosticsFor(trimmedArtifacts) };
+    // Keep the complete session if trimming artifact diagnostics alone solves the overflow.
+    if (size(trimmed) <= limit) {
+      output.outcome = trimmed.outcome; output.details_omitted = true;
+      output.report_artifacts = trimmed.report_artifacts; output.diagnostics = trimmed.diagnostics;
+    }
   }
   if (size() > limit) {
     output.outcome = "incomplete"; output.details_omitted = true; session.complete = false;
     session.start = null; session.worker = null; session.reviewer = null; session.report = null;
     session.diagnostics = ["Audit session details exceed the retained entry bound; inspect the original source and native role records"];
-    output.diagnostics = [...session.diagnostics.map(message => ({ code: "audit-session", message })),
-      ...(output.report_artifacts?.diagnostics ?? []).map(message => ({ code: "audit-output", message }))];
+    output.diagnostics = diagnosticsFor(output.report_artifacts);
+    // After removing the oversized session, retain full artifact diagnostics whenever they fit.
+    if (size() > limit && trimmedArtifacts) {
+      output.report_artifacts = trimmedArtifacts; output.diagnostics = diagnosticsFor(trimmedArtifacts);
+    }
     if (size() > limit && output.report_artifacts) {
       output.report_artifacts = null;
       output.diagnostics.push({ code: "audit-output", message: "Retained artifact details exceed the command output bound; inspect the selected artifact root" });

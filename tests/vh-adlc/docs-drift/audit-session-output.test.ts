@@ -75,3 +75,13 @@ test("artifact paths too large for a failure summary can be omitted only with an
   expect(Buffer.byteLength(JSON.stringify(result) + "\n")).toBeLessThanOrEqual(2048);
   expect(retained.files.report_json!.path.length).toBe(6000);
 });
+test("omitting a large session preserves artifact diagnostics that then fit in full", () => {
+  const session = failed(); session.diagnostics = ["x".repeat(16000)]; const retained = artifacts(false);
+  retained.diagnostics = ["First: " + "a".repeat(130), "Second: " + "b".repeat(130)];
+  const result = auditSessionOutput(session, 2048, retained);
+  expect(result.outcome).toBe("incomplete"); expect(result.details_omitted).toBe(true);
+  expect(Buffer.byteLength(JSON.stringify(result) + "\n")).toBeLessThanOrEqual(2048);
+  expect(result.report_artifacts?.diagnostics).toEqual(retained.diagnostics);
+  for (const message of retained.diagnostics) expect(result.diagnostics).toContainEqual({ code: "audit-output", message });
+  expect(result.report_artifacts?.files).toEqual(retained.files);
+});
