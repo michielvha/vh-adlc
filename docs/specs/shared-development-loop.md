@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted by the owner at R-22 with the spec review route called read-only; T57 and a fresh implementation review remain."
+status: in-progress
+status_description: "Re-entered after the R-22 acceptance; T57 and a fresh implementation review remain."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
