@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Re-entered after the R-20 acceptance; T48 to T53 and a fresh implementation review remain."
+status: draft
+status_description: "Back to draft on feat/shared-development-loop: the spec review route is read-only rather than file-only, after R-21 found the Codex spec reviewer can run read-only commands."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
