@@ -13,7 +13,7 @@ afterAll(() => {
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-test.each(["matching", "changed-assessment", "wrong-review-target", "same-context", "should-fix"])("native reviewed assessment keeps original source and independent context: %s", async fault => {
+test.each(["matching", "nit", "changed-assessment", "wrong-review-target", "same-context", "should-fix"])("native reviewed assessment keeps original source and independent context: %s", async fault => {
   try {
     const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-review");
     const f = await assessmentReviewFixture(roots), options = { ...f.options, worker_capture: f.worker };
@@ -26,21 +26,23 @@ test.each(["matching", "changed-assessment", "wrong-review-target", "same-contex
     expect(Object.hasOwn(target.manifest!, "effects")).toBe(false);
     const same = await api.collectAssessmentReviewTarget(options);
     expect(same.target_sha256).toBe(target.target_sha256);
-    const original = evidence("independent-assessment-reviewer", fault === "wrong-review-target" ? "f".repeat(64) : target.target_sha256!, fault === "should-fix"
-      ? "FINDING: F-01\nKIND: factual\nSEVERITY: should-fix\nWHERE: finding assessment\nEVIDENCE: Source support is incomplete\nPROPOSAL: Reinspect the original source\n" : "NO FINDINGS\n");
+    const original = evidence("independent-assessment-reviewer", fault === "wrong-review-target" ? "f".repeat(64) : target.target_sha256!, ["should-fix", "nit"].includes(fault)
+      ? "FINDING: F-01\nKIND: factual\nSEVERITY: " + fault + "\nWHERE: finding assessment\nEVIDENCE: Wording needs clarification\nPROPOSAL: Reinspect the original source\n" : "NO FINDINGS\n");
     if (fault === "same-context") original.context_id = target.manifest!.worker.context_id;
     const reviewer = captureSyntheticRole(f.artifacts, f.source, "reviewer", target.reviewer_runtime_sha256!, original);
     if (fault === "changed-assessment") writeFileSync(join(f.artifacts, f.assessment.path), "Changed actual original assessment\n");
     const reviewed = await api.collectAssessmentReview({ ...options, reviewer_capture: reviewer });
-    expect(reviewed.complete, JSON.stringify(reviewed.diagnostics)).toBe(fault === "matching");
+    expect(reviewed.complete, JSON.stringify(reviewed.diagnostics)).toBe(["matching", "nit"].includes(fault));
     expect(reviewed.authority).toBe("none");
-    if (fault === "matching") {
+    if (["matching", "nit"].includes(fault)) {
       expect(reviewed.review?.target_sha256).toBe(target.target_sha256);
       expect(reviewed.review?.worker.invocation_id).toBe("original-assessment-worker");
       expect(reviewed.review?.reviewer.invocation_id).toBe("independent-assessment-reviewer");
       const output = api.assessmentReviewOutput("read-assessment-review", reviewed);
       expect(output.markdown).toContain("independently reviewed by claude-opus-5.5");
       expect(output.markdown).not.toContain("provisional pending independent review");
+      expect(reviewed.review?.nit_count).toBe(fault === "nit" ? 1 : 0);
+      if (fault === "nit") expect(output.markdown).toContain("1 minor review finding(s) remain in the original reviewer records");
       const { requireReviewedManifest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/manifests");
       expect(() => requireReviewedManifest(reviewed as unknown as Parameters<typeof requireReviewedManifest>[0])).toThrow("missing owned review result");
     } else {

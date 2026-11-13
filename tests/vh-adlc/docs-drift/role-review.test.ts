@@ -13,8 +13,17 @@ test("a native assessment review proves its exact independent targets without ef
   expect(result.worker.target_sha256).toBe(input.worker_target_sha256);
   expect(result.reviewer.target_sha256).toBe(input.reviewer_target_sha256);
   expect(result.worker.context_id).not.toBe(result.reviewer.context_id);
+  expect(result.nit_count).toBe(0);
   // A read-only review result is deliberately not the sealed effect-authorized plan type.
   expect(() => api.requireReviewedManifest(result as unknown as Parameters<typeof api.requireReviewedManifest>[0])).toThrow("missing owned review result");
+});
+
+test("accepted minor review findings remain visible in the read-only review result", async () => {
+  const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/manifests"), input = fixture();
+  input.reviewer = evidence("report-reviewer", input.reviewer_target_sha256,
+    "FINDING: F-01\nKIND: judgement\nSEVERITY: nit\nWHERE: report\nEVIDENCE: Minor wording needs clarification\nPROPOSAL: Keep the original note visible\n");
+  const result = api.verifyIndependentRoleReview(input);
+  expect(result.nit_count).toBe(1); expect(result.reviewer.records).toContain("Minor wording needs clarification");
 });
 
 test.each(["same-context", "same-invocation", "changed-worker-target", "changed-review-target", "should-fix"])("assessment review refuses reused or changed original proof: %s", async fault => {

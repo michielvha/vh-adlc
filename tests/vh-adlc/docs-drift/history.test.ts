@@ -60,6 +60,20 @@ test("the upload envelope never contains its future artifact ID, archive digest 
   expect(parsed).toMatchObject({ report_sha256: sha256(input.report_bytes), producer: { manifest_sha256: producer.manifest_sha256 } });
 });
 
+test.each(["matching", "missing-job", "missing-step", "wrong-step-result"])("protected split-job history requires every original collection step: %s", async fault => {
+  const input = fixture();
+  const bound: VerifiedProducer & { required_jobs: Array<{ name: string; steps: string[] }> } = { ...producer,
+    required_jobs: [{ name: producer.job_name, steps: [...producer.required_steps] }, { name: "Credential-free collection", steps: ["Read original corpus"] }] };
+  input.producer = bound;
+  input.provenance_bytes = createActionsEnvelope(input.report_bytes, { settings: input.settings, run: input.run, producer: bound });
+  input.archive = zip(input.report_bytes, input.provenance_bytes);
+  input.artifact = { ...input.artifact, size_in_bytes: input.archive.length, digest: "sha256:" + sha256(input.archive) };
+  if (fault !== "missing-job") input.jobs.push({ ...input.jobs[0], id: 302, name: "Credential-free collection", conclusion: "success",
+    steps: fault === "missing-step" ? [] : [{ number: 1, name: "Read original corpus", status: "completed", conclusion: fault === "wrong-step-result" ? "skipped" : "success" }] });
+  if (fault === "matching") expect((await verifyActionsReport(input)).record.sha256).toBe(sha256(input.report_bytes));
+  else await expect(verifyActionsReport(input)).rejects.toThrow("required producer job");
+});
+
 test("foreign workflow/repository/branch, fork, PR/dispatch/test context and unknown producer cannot carry", async () => {
   for (const change of [
     { workflow_id: 99 }, { path: ".github/workflows/foreign.yml" }, { event: "pull_request" }, { event: "workflow_dispatch" },

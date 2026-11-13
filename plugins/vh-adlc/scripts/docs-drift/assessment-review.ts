@@ -27,7 +27,7 @@ type Result = {
   schema_version: 1; kind: "docs-drift-assessment-review-target" | "docs-drift-assessment-review"; authority: "none";
   source_commit: string; complete: boolean; scope_changed: boolean; diagnostics: string[]; diagnostics_omitted: number; details_omitted: boolean;
   manifest: Manifest | null; target_sha256: string | null; reviewer_runtime_sha256: string | null;
-  review: { target_sha256: string; worker: RoleBinding; reviewer: RoleBinding } | null;
+  review: { target_sha256: string; worker: RoleBinding; reviewer: RoleBinding; nit_count: number } | null;
 };
 type Context = {
   runtime: NonNullable<Facts["runtime"]>; identity: NonNullable<Facts["identity"]>;
@@ -38,7 +38,8 @@ type Command = "collect-assessment-review-target" | "read-assessment-review";
 export function assessmentReviewOutput(command: Command, result: Result) {
   const markdown = command === "read-assessment-review" && result.kind === "docs-drift-assessment-review"
     && result.complete && result.review && result.manifest
-    ? renderAssessmentReport(result.manifest.assessment, ["Finding assessments independently reviewed by " + result.review.reviewer.model]) : undefined;
+    ? renderAssessmentReport(result.manifest.assessment, ["Finding assessments independently reviewed by " + result.review.reviewer.model,
+      ...(result.review.nit_count ? [result.review.nit_count + " minor review finding(s) remain in the original reviewer records"] : [])]) : undefined;
   return { schema_version: 1 as const, command, source_commit: result.source_commit,
     outcome: result.complete ? "collected" as const : "incomplete" as const,
     ...(command === "collect-assessment-review-target" ? { assessment_review_target: result } : { assessment_review: result }),
@@ -124,10 +125,10 @@ export async function collectAssessmentReview(input: Options & { reviewer_captur
     const reviewer = readNativeRoleCapture({ ...common, reference, policy: reviewerPolicy,
       expected: { role: "reviewer", source_commit: options.source, runtime_sha256: manifest.reviewer_runtime_sha256, target_sha256: result.target_sha256 } });
     if (!canonicalJSON(worker.binding).equals(canonicalJSON(manifest.worker))) throw Error("Original assessment worker binding changed");
-    verifyIndependentRoleReview({ worker: worker.evidence, reviewer: reviewer.evidence, policy: { worker: workerPolicy, reviewer: reviewerPolicy },
+    const verified = verifyIndependentRoleReview({ worker: worker.evidence, reviewer: reviewer.evidence, policy: { worker: workerPolicy, reviewer: reviewerPolicy },
       worker_target_sha256: workerInputsDigest(manifest.inputs), reviewer_target_sha256: result.target_sha256 });
     readBoundArtifact({ ...common, reference: manifest.assessment_reference });
-    result.review = { target_sha256: result.target_sha256, worker: worker.binding, reviewer: reviewer.binding };
+    result.review = { target_sha256: result.target_sha256, worker: worker.binding, reviewer: reviewer.binding, nit_count: verified.nit_count };
     result.complete = true;
   } catch (error) {
     result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;

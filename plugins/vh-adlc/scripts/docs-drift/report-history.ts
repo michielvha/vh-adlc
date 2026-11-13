@@ -15,6 +15,7 @@ export type HistoryContext = { repository: string; scope_sha256: string; run_id:
 export type VerifiedProducer = {
   source_commit: string; manifest_sha256: string; component_sha256: string; source_inputs_sha256: string;
   job_name: string; attention_step: string; required_steps: string[];
+  required_jobs?: Array<{ name: string; steps: string[] }>;
 };
 export type HistoryJob = JobInput;
 type HistoryRecord = HistorySnapshot["records"][number];
@@ -79,6 +80,17 @@ function producerIdentity(producer: VerifiedProducer): void {
   if (!Array.isArray(producer.required_steps) || !producer.required_steps.length
     || new Set(producer.required_steps).size !== producer.required_steps.length || !producer.required_steps.includes(producer.attention_step)) invalid("producer step policy");
   for (const step of producer.required_steps) text(step);
+  if (producer.required_jobs !== undefined) {
+    const required = producer.required_jobs;
+    if (!Array.isArray(required) || !required.length || new Set(required.map(job => text(job.name))).size !== required.length)
+      invalid("producer job policy");
+    for (const job of required) {
+      if (!Array.isArray(job.steps) || !job.steps.length || new Set(job.steps).size !== job.steps.length) invalid("producer job step policy");
+      for (const step of job.steps) text(step);
+    }
+    const selected = required.filter(job => job.name === producer.job_name);
+    if (selected.length !== 1 || !canonicalJSON(selected[0].steps).equals(canonicalJSON(producer.required_steps))) invalid("producer attention job policy");
+  }
 }
 function workflowMatches(settings: Settings, run: WorkflowRunInput): boolean {
   const path = settings.reports.workflow_path;
@@ -108,6 +120,15 @@ function nativeTerminal(run: WorkflowRunInput, jobs: HistoryJob[], producer: Ver
   if (run.conclusion !== expected || jobs.length === 0 || new Set(jobs.map(job => job.id)).size !== jobs.length) invalid("native terminal result");
   const selected = jobs.filter(job => job.name === producer.job_name);
   if (selected.length !== 1) invalid("producer job identity");
+  for (const required of producer.required_jobs ?? []) {
+    const native = jobs.filter(job => job.name === required.name);
+    if (native.length !== 1) invalid("required producer job missing or ambiguous");
+    for (const step of required.steps) {
+      const matched = native[0].steps.filter(item => item.name === step), attention = required.name === producer.job_name && step === producer.attention_step;
+      if (matched.length !== 1 || matched[0].status !== "completed" || matched[0].conclusion !== (attention ? expected : "success"))
+        invalid("required producer job step");
+    }
+  }
   for (const job of jobs) {
     if (job.run_id !== run.id || job.attempt !== run.run_attempt || job.head_sha !== run.head_sha || job.status !== "completed") invalid("native job binding");
     const target = job === selected[0];

@@ -272,9 +272,9 @@ export function verifyRoleIdentity(evidence: NativeRoleEvidence, policy: RolePol
   };
 }
 
-function cleanReview(records: string): void {
+function cleanReview(records: string): number {
   const lines = records.split("\n").filter(line => line.trim() !== "");
-  if (lines.length === 1 && lines[0] === "NO FINDINGS") return;
+  if (lines.length === 1 && lines[0] === "NO FINDINGS") return 0;
   const fields = ["FINDING", "KIND", "SEVERITY", "WHERE", "EVIDENCE", "PROPOSAL"];
   const ids = new Set<string>();
   let current: Record<string, string> | null = null;
@@ -299,6 +299,7 @@ function cleanReview(records: string): void {
     }
   }
   complete();
+  return ids.size;
 }
 
 /** Verify a read-only semantic review. Only validateReviewedManifest can authorize an effect plan. */
@@ -309,8 +310,8 @@ export function verifyIndependentRoleReview(input: {
   const worker = verifyRoleIdentity(input.worker, input.policy.worker), reviewer = verifyRoleIdentity(input.reviewer, input.policy.reviewer);
   if (worker.invocation_id === reviewer.invocation_id || worker.context_id === reviewer.context_id) invalid("independent review context");
   if (worker.target_sha256 !== input.worker_target_sha256 || reviewer.target_sha256 !== input.reviewer_target_sha256) invalid("review target");
-  cleanReview(reviewer.records);
-  return freezeJSON({ worker, reviewer });
+  const nit_count = cleanReview(reviewer.records);
+  return freezeJSON({ worker, reviewer, nit_count });
 }
 
 const reviewedInstances = new WeakSet<object>();
