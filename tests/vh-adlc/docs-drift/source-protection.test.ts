@@ -101,3 +101,24 @@ test("the normal check-edits command honors committed writers and preserves a di
   expect(report.edit_inspection.protection.edits[0].reason).toBe("other-current-writer");
   expect(captureRepositoryState(repo)).toEqual(before);
 }, 45000);
+
+test.each(["plan", "review", "evidence", "unknown"] as const)("committed ordinary classification cannot erase an explicit %s restriction", kind => {
+  const repo = fixture(true), document = "docs/guide.md", document_sha256 = sha256(readFileSync(join(repo, document)));
+  procedure(repo, { document_kinds: [{ document, document_sha256, kind: "ordinary" }] });
+  const source = commitAll(repo), before = captureRepositoryState(repo);
+  const result = inspectPreparation({ ...selected(repo, source), protection_context: { document_kinds: [{ document, document_sha256, kind }] } });
+  expect(result.complete).toBe(false);
+  expect(result.protection?.diagnostics).toContainEqual({ code: "project-protection", path: "docs/docs-procedure.md", message: "Conflicting project protection document kinds" });
+  expect(captureRepositoryState(repo)).toEqual(before);
+});
+
+test("identical document classifications agree while a committed restriction cannot be erased", () => {
+  for (const kind of ["ordinary", "plan"] as const) {
+    const repo = fixture(true), document = "docs/guide.md", document_sha256 = sha256(readFileSync(join(repo, document)));
+    procedure(repo, { document_kinds: [{ document, document_sha256, kind }] });
+    const source = commitAll(repo), result = inspectPreparation({ ...selected(repo, source),
+      protection_context: { document_kinds: [{ document, document_sha256, kind: "ordinary" }] } });
+    expect(result.complete).toBe(kind === "ordinary");
+    if (kind === "plan") expect(result.protection?.diagnostics[0].message).toBe("Conflicting project protection document kinds");
+  }
+});

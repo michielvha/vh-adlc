@@ -140,6 +140,12 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
       local_ranges: [...(committed.local_ranges ?? []), ...(context.local_ranges ?? [])],
       other_writers: [...(committed.other_writers ?? []), ...(context.other_writers ?? [])],
       document_kinds: [...(committed.document_kinds ?? []), ...(context.document_kinds ?? [])] };
+    const kinds = new Map<string, string>();
+    for (const row of context.document_kinds ?? []) {
+      const key = canonicalDigest([row.document, row.document_sha256]), previous = kinds.get(key);
+      if (previous !== undefined && previous !== row.kind) throw Error("Conflicting project protection document kinds");
+      kinds.set(key, row.kind);
+    }
   } catch (error) {
     gap("project-protection", snapshot.settings.project_procedure, error instanceof Error ? error.message : "Project protection unavailable");
     return result;
