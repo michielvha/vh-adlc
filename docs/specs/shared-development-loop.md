@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Back to draft to add the new code paths the design needs to covers; waiting for a review and the owner's re-acceptance."
+status: planned
+status_description: "Re-accepted by the owner at R-15 (e2e3de9) after the covers revision; task list next. R-14 and R-15 should-fix items go into the tasks."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
