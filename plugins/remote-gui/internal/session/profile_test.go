@@ -34,6 +34,9 @@ func init() {
 	if file := os.Getenv("REMOTE_GUI_TEST_STUBBORN"); file != "" {
 		os.Exit(stubbornBrowser(file))
 	}
+	if file := os.Getenv("REMOTE_GUI_TEST_SIGNAL_LOG"); file != "" {
+		os.Exit(signalLogger(file))
+	}
 	if dir := os.Getenv("REMOTE_GUI_TEST_FAKE_BROWSER"); dir != "" {
 		BrowserLauncher = func(ctx context.Context, c config.Config, id string) (BrowserHandle, error) {
 			return fakeBrowser(dir, c, id)
@@ -209,6 +212,25 @@ func stubbornBrowser(file string) int {
 		f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 		if err == nil {
 			_, _ = io.WriteString(f, strconv.FormatInt(time.Now().UnixNano(), 10)+"\n")
+			_ = f.Close()
+		}
+	}
+	return 0
+}
+
+// signalLogger stands in for an unrelated process a session record may come to
+// name. It logs every catchable signal it receives to file, and writes
+// file+".ready" once its handlers are installed.
+func signalLogger(file string) int {
+	signals := make(chan os.Signal, 8)
+	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGUSR1, syscall.SIGUSR2)
+	if err := os.WriteFile(file+".ready", nil, 0o600); err != nil {
+		return 1
+	}
+	for received := range signals {
+		f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if err == nil {
+			_, _ = io.WriteString(f, received.String()+"\n")
 			_ = f.Close()
 		}
 	}
@@ -1077,6 +1099,119 @@ func TestFailedHolderClearKeepsProfileSessionPending(t *testing.T) {
 				if time.Now().After(deadline) {
 					t.Fatal("the guard outlived the stopped session")
 				}
+			}
+		})
+	}
+}
+
+// A guard whose holder clear keeps failing retries only while its session
+// record exists and names it. Once the record is removed, or names another
+// guard, it exits without signalling anything and without recreating the
+// state root; the exit releases the lock and leaves the stale holder in
+// meta.json, which the next start on the profile clears and records.
+func TestAbandonedHolderClearIsRecoveredByTheNextStart(t *testing.T) {
+	for _, change := range []string{"removed", "reassigned"} {
+		t.Run(change, func(t *testing.T) {
+			f := newProfileFixture(t)
+			c := f.config(t, "work")
+			v, err := Start(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, err := state.Load(f.home, v.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			meta := filepath.Join(f.profiles, "work", "meta.json")
+			restore := func() { _ = os.Chmod(meta, 0o600) }
+			t.Cleanup(restore)
+			if err = os.Chmod(meta, 0); err != nil {
+				t.Fatal(err)
+			}
+			end, err := Stop(f.home, v.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if end.State != "cleanup-pending" || end.CleanupDiagnostic == "" || !state.Alive(record.Guard) || lockHeld(c) != "held" {
+				t.Fatalf("the holder clear did not leave the session pending under its guard: %+v", end)
+			}
+			var other state.Identity
+			log := filepath.Join(f.fake, "other-guard-signals")
+			if change == "removed" {
+				err = os.RemoveAll(f.home)
+			} else {
+				cmd := exec.Command(os.Args[0], "-test.run=^$")
+				cmd.Env = append(os.Environ(), "REMOTE_GUI_TEST_SIGNAL_LOG="+log)
+				if err = cmd.Start(); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+				for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+					if _, e := os.Stat(log + ".ready"); e == nil {
+						break
+					}
+					if time.Now().After(deadline) {
+						t.Fatal("the stand-in guard did not start")
+					}
+				}
+				if other, err = state.Inspect(cmd.Process.Pid); err != nil {
+					t.Fatal(err)
+				}
+				err = state.Update(context.Background(), f.home, v.ID, func(r *state.Record) { r.Guard = other })
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for deadline := time.Now().Add(5 * time.Second); state.Alive(record.Guard); time.Sleep(25 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatalf("the guard kept retrying after its record was %s", change)
+				}
+			}
+			if change == "removed" {
+				if _, e := os.Lstat(f.home); !os.IsNotExist(e) {
+					t.Fatal("the guard recreated the removed state root")
+				}
+			} else {
+				// Give a late signal time to arrive before checking.
+				time.Sleep(1500 * time.Millisecond)
+				if !state.Alive(other) {
+					t.Fatal("the guard ended the process its record now names")
+				}
+				if data, e := os.ReadFile(log); e == nil && len(data) > 0 {
+					t.Fatalf("the guard signalled the process its record now names: %q", data)
+				}
+				// Nothing may stop the stand-in through this record later.
+				if err = os.RemoveAll(filepath.Join(f.home, v.ID)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if lockHeld(c) != "free" {
+				t.Fatal("the abandoned guard's exit did not release the profile lock")
+			}
+			restore()
+			if holder := rawHolder(t, f, "work"); holder != v.ID {
+				t.Fatalf("holder %q after the guard exited, want the stale %q", holder, v.ID)
+			}
+			listed, err := profile.List(f.profiles)
+			if err != nil || len(listed) != 1 || listed[0].InUse {
+				t.Fatalf("profile list after the guard exited: %+v %v", listed, err)
+			}
+			next, err := Start(c)
+			if err != nil {
+				t.Fatalf("a start after the abandoned guard was refused: %v", err)
+			}
+			r, err := state.Load(f.home, next.ID)
+			if err != nil || !strings.Contains(r.ProfileRecovery, v.ID) {
+				t.Fatalf("stale holder recovery not recorded: %q %v", r.ProfileRecovery, err)
+			}
+			if holder := rawHolder(t, f, "work"); holder != next.ID {
+				t.Fatalf("holder %q after the next start, want %q", holder, next.ID)
+			}
+			if end, err = Stop(f.home, next.ID); err != nil || end.State != "stopped" {
+				t.Fatalf("the next session did not stop cleanly: %+v %v", end, err)
+			}
+			if lockHeld(c) != "free" || rawHolder(t, f, "work") != "" {
+				t.Fatal("the next session left the profile locked or held")
 			}
 		})
 	}
