@@ -442,6 +442,7 @@ concerns.
 | 2026-11-13 | R-11 | spec | `4c7e151` | claude-opus-5-5 | procedural | Clean: no blocking finding; eight should-fix and one nit |
 | 2026-11-13 | R-12 | spec | `d62c9f0` | claude-opus-5-5 | procedural | One blocking finding (F-01 same-day dates cannot order picks against acceptances), six should-fix and two nits |
 | 2026-11-13 | R-13 | spec | `a581e9c` | claude-opus-5-5 | procedural | One blocking finding (F-01 a stale after-owner-change row blocks the next owner change), five should-fix and one nit |
+| 2026-11-13 | R-14 | spec | `903314a` | claude-opus-5-5 | procedural | One blocking finding (F-01 the side-branch merge never runs when a fix also changes the baseline), four should-fix and one nit |
 
 ### R-1
 
@@ -1203,3 +1204,47 @@ SEVERITY: nit
 WHERE: Tasks T6 (line 502), T7 (line 503), T15 (line 496), T3 (line 499); Test Plan AC-01 row (Variant C2)
 EVIDENCE: T6 and T7 still end "(AC-01, AC-10)", although the AC-10 scenario cases now sit in T15 and the rule change sits in T13, and neither T6's nor T7's done condition names an AC-10 case. T15 says the side-branch case fails "because today's review mode only fast-forwards a side branch". SKILL.md:58 at 3963e25 runs `git merge --ff-only origin/<default branch>` on the default branch and gives no instruction for a side branch. T3's done condition compares "the final commit" with a scratch commit, but no final commit exists when T3 is committed. Variant C2's "same day" and "all on one date" are left over from the date-ordering rule this revision removed.
 PROPOSAL: Drop AC-10 from T6 and T7, say in T15 that today's step 1 has no side-branch case, have T3 compare its own commit with a scratch commit restoring the old pin, and remove the date wording from C2.
+
+### R-14
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Acceptance Criteria AC-10 (lines 340-342); Test Plan AC-10 row (line 359); Design, Commits a Review Log names are never rewritten (lines 214-227); Tasks T13, T15
+EVIDENCE: The Design adds the side-branch merge to review mode step 1 ("Review mode step 1 gains the case ...", lines 222-224). Step 1 merges only "When `vh-adlc fresh` shows the spec review stale from drift alone (covered changes on the default branch, an unchanged baseline)" (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:55-57 at 903314a). The AC-10 row starts each case "after a stored blocking pass", then moves the default branch "so the review is stale from drift, and the run continues to a second pass". Before that second pass the author applies the blocking finding as one revision (lines 199-212). That changes the normative baseline whenever the finding sits in Scope, Design, a criterion or the Test Plan (conventions/feature-documents.md:70-71), so `fresh` reports `baseline-changed` as well as drift, and step 1's "drift alone" condition is false. An author that follows the Design as written commits the revision and dispatches the second pass without merging, and both cases then fail "the working branch holds a merge of the default branch". AC-10 itself asks for more than the Design gives: the author brings default-branch work in by merge whenever the default branch moves "during a review loop". The row does not say where the fixture's blocking finding sits, which is the only thing that would keep drift alone.
+PROPOSAL: Say in Design when default-branch work comes in during a loop: either on any covered drift, including when the baseline also changed, with step 1's condition widened to match, or only on drift alone, with AC-10 narrowed to that. Make the AC-10 fixture agree, for example by placing the stored blocking finding outside the normative baseline if the narrow rule is kept.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Commits a Review Log names are never rewritten (lines 222-224); Acceptance Criteria AC-10; Test Plan AC-10 row (side-branch case); Tasks T13
+EVIDENCE: The design gives review mode a merge for "a document without a `branch` field that sits on a branch other than the default one". The same skill tells the author to avoid that state. Start step 3 says that without a `branch` field the author works "on the default branch in a worktree that holds it" (SKILL.md:36-38), and Committing and pushing says that while the document has no `branch` field it is committed "on the default branch" and pushed there (SKILL.md:106-109). T13 changes only Preservation and step 1, so the updated skill would both tell the author to move to the default branch and tell it how to merge on a side branch. In the side-branch scenario, an author that follows Start step 3 may switch to the default branch, where the fixture document does not exist, and never reach the merge the case checks.
+PROPOSAL: State whether a document without a `branch` field may be worked on a side branch. If it may, amend Start step 3 and Committing and pushing in T13 to allow it and name the branch to commit on. If it may not, replace the side-branch merge with what the author does when it finds such a document.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Commits a Review Log names are never rewritten (lines 216-226); Context, Owner summary (lines 59-60); Test Plan AC-10 row (authority.md check); Tasks T13, T14
+EVIDENCE: The Design says Preservation "says nothing about rewriting reviewed commits" (authority.md:72-78). The same file's authority table already covers the action: "Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action" (plugins/vh-adlc/references/authority.md:30). The design does not mention that row. The new rule says "no operation rebases, amends, squashes or otherwise rewrites" a reviewed commit, which leaves it open whether the owner's separate approval under line 30 still allows such a rewrite. One implementer adds an absolute ban that contradicts line 30. Another keeps line 30 and has the ban yield to approval, and the T14 check that authority.md "forbids rewriting a commit a Review Log row names" passes on either. The rebase this document cites as the trigger would already have needed that approval.
+PROPOSAL: Cite authority.md:30 in Design and decide whether the owner's separate approval can authorize rewriting a reviewed commit, for example by allowing it only with a warning that every review it names becomes stale. Make the Preservation text, line 30 and the T14 check say the same thing.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Nits are listed, not applied (lines 192-197); Acceptance Criteria AC-11 (lines 343-345); Test Plan AC-11 row (line 360); Context, Owner summary (lines 47-49)
+EVIDENCE: The rule lists "every nit of the latest pass" in the report and the owner-facing summary. The AC-11 case stores a blocking pass that holds a Design nit. After the blocking finding is applied the review is stale, and the design expects a run to continue to a second pass (the AC-10 row: "the run continues to a second pass"). Once that pass runs, the blocking pass is no longer the latest, so an author following the rule may leave out its Design nit, while the case requires that nit "with its ID in the report and the owner-facing summary". The row does not say whether the scripted reviewer returns a second pass or what it holds. More generally, a nit from any pass except the last one in a run is never reported, so the owner never sees it.
+PROPOSAL: Say whether the report lists the nits of every pass the run handled or only the last one, and use the same wording in Design, AC-11 and the Owner summary. In the AC-11 row, state how many canned passes the scripted reviewer returns and which nits the report must list.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Nits are listed, not applied (lines 192-197); Context, Owner summary (lines 47-49); Open Questions
+EVIDENCE: Under the rule, a nit on the normative baseline is never applied by any path. That holds even when the same pass's blocking or should-fix finding already changes the baseline in that commit, so a new pass happens anyway and holding back the nit saves no pass. A harmless wrong `file:line` in Design, which AC-02 requires to be rated nit, therefore stays in the document for good, although the convention asks Design to cite its claims (conventions/feature-documents.md:75). Now that the saved-nit list has moved to spec-review-stopping-rule.md, this document keeps no record of such nits beyond one run's report. The Owner summary gives the benefit ("they never trigger another pass") but not this cost, and the convention asks the summary to cover trade-offs (:80-83) and asks every trade-off the document settles to go to Open Questions (:154-157). The decision record says only that a "plain nit rule" replaced saved nits, not whether applying nits alongside a revision that is already happening was considered.
+PROPOSAL: Raise as an Open Question whether nits on the baseline may be applied in a commit that already revises the baseline for a blocking or should-fix finding. State the chosen behavior and its cost in the Owner summary.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 37-39)
+EVIDENCE: "R-4 to R-13 were each caused by the previous pass's narrow fix, all in the stopping rule it carried." The Review Log shows that R-8, R-9, R-10 and R-11 had no blocking finding (lines 437-442), and several findings in that range are outside the stopping rule: R-12 F-05 and F-06 concern Pins and the AC-06 row, and R-12 F-07 concerns Tasks T13 and T6 for AC-10 (lines 1121-1140). The claim holds for the blocking findings in R-4 to R-7, R-12 and R-13, not for every pass in the range.
+PROPOSAL: Say that the blocking findings in R-4 to R-7, R-12 and R-13 each traced to the previous pass's fix and all sat in the stopping rule.
