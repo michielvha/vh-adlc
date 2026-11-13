@@ -8,7 +8,7 @@ import { publishArtifact, syncDirectory } from "./journal";
 import { chmodSync, closeSync, constants, existsSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
-import { readGit } from "./git";
+import { mapGitBlobs, readGit } from "./git";
 import { canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
 
 type PayloadFile = { path: string; mode: "100644" | "100755"; sha256: string; size: number };
@@ -33,19 +33,21 @@ export function computeComponentIdentity(repo: string, sourceCommit: string): Co
   if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(sourceCommit)
     || readGit(repo, "rev-parse", "--verify", "--end-of-options", sourceCommit + "^{commit}").toString().trim() !== sourceCommit) fail("immutable source required");
   const prefix = "plugins/vh-adlc/";
-  const inventory = decodeUTF8(readGit(repo, "--literal-pathspecs", "ls-tree", "-r", "--full-tree", "-z", sourceCommit, "--", "plugins/vh-adlc"));
+  const inventory = decodeUTF8(readGit(repo, "--literal-pathspecs", "ls-tree", "-r", "--full-tree", "--long", "-z", sourceCommit, "--", "plugins/vh-adlc"));
   const entries = inventory.split("\0");
   if (entries.pop() !== "" || entries.length === 0) fail("complete component inventory required");
-  let version: string | undefined;
-  const files = entries.map(entry => {
+  const selected = entries.map(entry => {
     const tab = entry.indexOf("\t");
-    const fields = /^(100644|100755) blob ([a-f0-9]{40}(?:[a-f0-9]{24})?)$/u.exec(entry.slice(0, tab));
+    const fields = /^(100644|100755) blob ([a-f0-9]{40}(?:[a-f0-9]{24})?) +([0-9]+)$/u.exec(entry.slice(0, tab));
     const fullPath = entry.slice(tab + 1);
-    if (tab < 0 || !fields || !fullPath.startsWith(prefix)) fail("unsupported component entry");
-    const path = protocolPath(fullPath.slice(prefix.length));
-    const bytes = readGit(repo, "cat-file", "blob", fields[2]);
+    if (tab < 0 || !fields || !fullPath.startsWith(prefix) || !Number.isSafeInteger(Number(fields[3]))) fail("unsupported component entry");
+    return { path: protocolPath(fullPath.slice(prefix.length)), mode: fields[1] as PayloadFile["mode"], oid: fields[2], size: Number(fields[3]) };
+  });
+  let version: string | undefined;
+  const files = mapGitBlobs(repo, selected.map(({ oid, size }) => ({ oid, size })), (bytes, index) => {
+    const { path, mode } = selected[index];
     if (path === ".claude-plugin/plugin.json") version = pluginVersion(bytes);
-    return { path, mode: fields[1] as PayloadFile["mode"], sha256: sha256(bytes), size: bytes.length };
+    return { path, mode, sha256: sha256(bytes), size: bytes.length };
   }).sort((left, right) => compareUTF8(left.path, right.path));
   if (version === undefined) fail("plugin metadata missing");
   return freezeJSON({ schema_version: 1, source_commit: sourceCommit, plugin_version: version,

@@ -23,6 +23,29 @@ afterAll(() => {
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
+/** Keep test-control process diagnostics outside the immutable fixture and its artifact accounting. */
+async function captureTrialCommand(argv: string[], timeout: number) {
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "vh-trial-command-"))); roots.push(directory);
+  const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
+  const cwd = process.cwd();
+  writeFileSync(join(directory, "invocation.json"), canonicalJSON({ kind: "test-control", argv, cwd, timeout_ms: timeout }), { flag: "wx", mode: 0o600 });
+  try {
+    const result = await executeOwnedProcess({ argv, cwd,
+      env: Object.fromEntries(Object.entries(process.env).filter((pair): pair is [string, string] => typeof pair[1] === "string")),
+      capture: "memory", watched_outputs: [], timeout_ms: timeout, stdout: join(directory, "stdout"), stderr: join(directory, "stderr"),
+      started: pid => writeFileSync(join(directory, "started.json"), canonicalJSON({ kind: "test-control", pid }), { flag: "wx", mode: 0o600 }) });
+    const { captured, ...metadata } = result, stdout = Buffer.from(captured?.stdout ?? []), stderr = Buffer.from(captured?.stderr ?? []);
+    writeFileSync(join(directory, "stdout"), stdout, { flag: "wx", mode: 0o600 });
+    writeFileSync(join(directory, "stderr"), stderr, { flag: "wx", mode: 0o600 });
+    writeFileSync(join(directory, "process.json"), canonicalJSON(metadata), { flag: "wx", mode: 0o600 });
+    const diagnostic = JSON.stringify({ directory, ...metadata, stderr: stderr.toString().slice(0, 512) });
+    expect(result.reaped, diagnostic).toBe(true); expect(result.timed_out, diagnostic).toBe(false);
+    expect(result.output_limit, diagnostic).toBe(false); expect(result.cancelled, diagnostic).toBe(null);
+    expect(stdout.length, diagnostic).toBeGreaterThan(0);
+    return { stdout, stderr, exitCode: result.exit_code, process: metadata };
+  } catch (error) { preserveFailedTrialRoots = true; throw error; }
+}
+
 test("a report flag cannot authorize synthetic publication", () => {
   const f = syntheticTrialFixture(roots);
   const context = loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime });
@@ -98,10 +121,11 @@ test.each(["missing-native", "changed-native", "unreaped", "wrong-context", "esc
 }, 60000);
 
 test("the installed synthetic entry publishes and resumes through the common publisher", async () => {
+  try {
   const { f, context, path } = await publicationRequest();
   const entry = join(f.runtime, "scripts/docs-drift/trial-entry.ts");
   const args = ["--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--request", path];
-  const published = Bun.spawnSync([process.execPath, entry, "publish", ...args], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+  const published = await captureTrialCommand([process.execPath, entry, "publish", ...args], 45000);
   const report = JSON.parse(published.stdout.toString());
   expect(published.exitCode).toBe(0);
   expect(report.outcome).toBe("complete");
@@ -109,12 +133,12 @@ test("the installed synthetic entry publishes and resumes through the common pub
   expect(report.context_sha256).toBe(context.context_sha256);
   expect(report.data.request_sha256).toBe(sha256(readFileSync(path)));
   const tracker = readTrialTracker(context);
-  const resumed = Bun.spawnSync([process.execPath, entry, "resume-effects", ...args, "--journal", report.data.journal_directory],
-    { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+  const resumed = await captureTrialCommand([process.execPath, entry, "resume-effects", ...args, "--journal", report.data.journal_directory], 45000);
   expect(resumed.exitCode).toBe(0);
   expect(JSON.parse(resumed.stdout.toString()).data.state).toBe("complete");
   expect(readTrialTracker(context).commit).toBe(tracker.commit);
   expect(git(f.source, "status", "--porcelain")).toBe("");
+  } catch (error) { preserveFailedTrialRoots = true; throw error; }
 }, 90000);
 
 test("a changed original role artifact stops the next write and retains recovery refs", async () => {
@@ -139,11 +163,11 @@ test("a changed original role artifact stops the next write and retains recovery
 }, 60000);
 
 test("the installed synthetic entry resumes an interrupted applied creation without a duplicate", async () => {
+  try {
   const { f, context, path } = await publicationRequest();
   const entry = join(f.runtime, "scripts/docs-drift/trial-entry.ts");
   const args = ["--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--request", path];
-  const interrupted = Bun.spawnSync([process.execPath, entry, "publish", ...args, "--interrupt-after", "pr"],
-    { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+  const interrupted = await captureTrialCommand([process.execPath, entry, "publish", ...args, "--interrupt-after", "pr"], 45000);
   const report = JSON.parse(interrupted.stdout.toString());
   expect(interrupted.exitCode).toBe(2);
   expect(report.outcome).toBe("incomplete");
@@ -151,12 +175,12 @@ test("the installed synthetic entry resumes an interrupted applied creation with
   expect(report.data.interruption_effect_id).toBe("pr");
   const tracker = readTrialTracker(context);
   expect(tracker.resources.size).toBe(1);
-  const resumed = Bun.spawnSync([process.execPath, entry, "resume-effects", ...args, "--journal", report.data.journal_directory],
-    { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+  const resumed = await captureTrialCommand([process.execPath, entry, "resume-effects", ...args, "--journal", report.data.journal_directory], 45000);
   expect(resumed.exitCode).toBe(0);
   expect(JSON.parse(resumed.stdout.toString()).data.state).toBe("complete");
   expect(readTrialTracker(context).commit).toBe(tracker.commit);
   expect(git(f.source, "status", "--porcelain")).toBe("");
+  } catch (error) { preserveFailedTrialRoots = true; throw error; }
 }, 90000);
 
 test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "foreign-lease"] as const)("installed recovery presents an exact scope and preserves an edited delivery (%s)", async approval => {
@@ -180,7 +204,7 @@ test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "
   const entry = join(f.runtime, "scripts/docs-drift/trial-entry.ts");
   const args = ["--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--selection", selectionPath];
   const refs = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)"), trackerCommit = readTrialTracker(context).commit;
-  const prepared = Bun.spawnSync([process.execPath, entry, "prepare-acknowledgement", ...args], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+  const prepared = await captureTrialCommand([process.execPath, entry, "prepare-acknowledgement", ...args], 45000);
   const report = JSON.parse(prepared.stdout.toString());
   expect(prepared.exitCode).toBe(2);
   expect(report.data.state).toBe("pending");
@@ -208,8 +232,7 @@ test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "
   const ownerRequest = join(context.artifacts, "owner-current-request.json");
   writeFileSync(ownerRequest, canonicalJSON({ schema_version: 1, kind: "docs-drift-synthetic-owner-request",
     context_sha256: context.context_sha256, source: approval === "standing-procedure" ? "adopted-procedure" : "owner-current-request", scope_sha256: report.data.scope_sha256 }), { mode: 0o600 });
-  const acknowledged = Bun.spawnSync([process.execPath, entry, "acknowledge-delivery", ...args, "--owner-request", ownerRequest],
-    { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+  const acknowledged = await captureTrialCommand([process.execPath, entry, "acknowledge-delivery", ...args, "--owner-request", ownerRequest], 45000);
   const result = JSON.parse(acknowledged.stdout.toString());
   expect(acknowledged.exitCode).toBe(2);
   expect(result.outcome).toBe("incomplete");
@@ -236,8 +259,8 @@ test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "
   expect(await transport.ref(context.settings.publication.receipt_ref_prefix + options.plan.manifest.operation_id)).toEqual({ state: "present", object: interrupted.objects.receipt_object });
   expect(git(f.source, "status", "--porcelain")).toBe("");
   if (approval === "approved") {
-    const resumed = Bun.spawnSync([process.execPath, entry, "resume-effects", "--synthetic-trial", f.root, "--context-commit", f.contextCommit,
-      "--request", path, "--journal", interrupted.journal.directory], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+    const resumed = await captureTrialCommand([process.execPath, entry, "resume-effects", "--synthetic-trial", f.root, "--context-commit", f.contextCommit,
+      "--request", path, "--journal", interrupted.journal.directory], 45000);
     expect(resumed.exitCode).toBe(2);
     expect(JSON.parse(resumed.stdout.toString()).data.state).toBe("acknowledged");
     expect(readTrialTracker(context).commit).toBe(preserved);
@@ -287,9 +310,8 @@ test("installed recovery entries refuse outside, nested and linked journals with
           journal_directory: journal, acknowledge_effect_ids: ["pr"], retire_effect_ids: [] }));
       const args = command === "resume-effects" ? ["--request", path, "--journal", journal]
         : ["--selection", selection, ...(["acknowledge-delivery", "reconcile-publication"].includes(command) ? ["--owner-request", owner] : [])];
-      const result = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), command,
-        "--synthetic-trial", f.root, "--context-commit", f.contextCommit, ...args],
-        { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+      const result = await captureTrialCommand([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), command,
+        "--synthetic-trial", f.root, "--context-commit", f.contextCommit, ...args], 45000);
       const report = JSON.parse(result.stdout.toString());
       expect(result.exitCode).toBe(2);
       expect(report.outcome).toBe("refused");
@@ -321,7 +343,7 @@ test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed 
   const entry = join(f.runtime, "scripts/docs-drift/trial-entry.ts"), args = ["--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--selection", selection];
   const journalBefore = readJournal(pending.journal.directory, context.source), trackerBefore = readTrialTracker(context).commit;
   const refsBefore = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)");
-  const inspected = Bun.spawnSync([process.execPath, entry, "prepare-reconciliation", ...args], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+  const inspected = await captureTrialCommand([process.execPath, entry, "prepare-reconciliation", ...args], 45000);
   const report = JSON.parse(inspected.stdout.toString());
   expect(inspected.exitCode).toBe(2);
   expect(report.data, JSON.stringify(report)).toBeDefined();
@@ -338,8 +360,8 @@ test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed 
     scope_sha256s: report.data.scope_sha256s, origin: { kind: "owner-current-request", artifact: { path: "reconciliation-owner.txt", sha256: sha256(originBytes) } } }), { mode: 0o600 });
   if (approval === "foreign-lease") git(f.origin, "update-ref", context.settings.publication.lease_ref, f.sourceCommit);
   const beforeApply = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)");
-  const applied = Bun.spawnSync([process.execPath, entry, "reconcile-publication", ...args,
-    ...(approval === "missing" ? [] : ["--owner-request", authority])], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+  const applied = await captureTrialCommand([process.execPath, entry, "reconcile-publication", ...args,
+    ...(approval === "missing" ? [] : ["--owner-request", authority])], 45000);
   const result = JSON.parse(applied.stdout.toString());
   expect(applied.exitCode).toBe(2);
   if (approval === "missing") {
@@ -356,14 +378,13 @@ test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed 
   expect(readTrialTracker(context).commit).toBe(trackerBefore);
   if (approval === "approved") {
     expect(git(f.origin, "for-each-ref", "--format=%(refname)", context.settings.publication.lease_ref)).toBe("");
-    const repeated = Bun.spawnSync([process.execPath, entry, "reconcile-publication", ...args, "--owner-request", authority], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+    const repeated = await captureTrialCommand([process.execPath, entry, "reconcile-publication", ...args, "--owner-request", authority], 45000);
     expect(repeated.exitCode).toBe(2); expect(JSON.parse(repeated.stdout.toString()).data.state).toBe("retired");
   } else expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(beforeApply);
   if (approval === "wrong-purpose") {
     const corrected = JSON.parse(readFileSync(authority, "utf8")); corrected.purpose = "reconciliation";
     writeFileSync(authority, canonicalJSON(corrected));
-    const accepted = Bun.spawnSync([process.execPath, entry, "reconcile-publication", ...args, "--owner-request", authority],
-      { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+    const accepted = await captureTrialCommand([process.execPath, entry, "reconcile-publication", ...args, "--owner-request", authority], 45000);
     expect(accepted.exitCode).toBe(2);
     expect(JSON.parse(accepted.stdout.toString()).data.state).toBe("retired");
     expect(readTrialTracker(context).commit).toBe(trackerBefore);
@@ -516,10 +537,9 @@ test("installed retained inspection and restoration refuse a structurally valid 
     git(f.origin, "update-ref", context.settings.publication.receipt_ref_prefix + changed.manifest.operation_id, object.object);
     const refs = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)"), tracker = readTrialTracker(context).commit;
     for (const command of ["inspect-retained", "restore-retained"]) {
-      const result = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), command,
-        "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--operation-id", changed.manifest.operation_id, "--entry", "copilot"],
-        { stdout: "pipe", stderr: "pipe", timeout: 45000 });
-      expect(result.exitCode, JSON.stringify({ signal: result.signalCode, stderr: result.stderr.toString().slice(0, 512) })).toBe(2);
+      const result = await captureTrialCommand([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), command,
+        "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--operation-id", changed.manifest.operation_id, "--entry", "copilot"], 45000);
+      expect(result.exitCode, JSON.stringify({ process: result.process, stderr: result.stderr.toString().slice(0, 512) })).toBe(2);
       const report = JSON.parse(result.stdout.toString());
       expect(report.outcome).toBe("refused");
       expect(report.diagnostics[0].message).toBe("synthetic retained original context changed");
@@ -543,9 +563,9 @@ test("installed publish capacity refusal preserves the cause and creates no jour
       .toThrow("Configured output bound cannot retain trial recovery metadata");
     const before = readdirSync(context.artifacts), refs = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)");
     const tracker = readTrialTracker(context).commit;
-    const result = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), "publish",
-      "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--request", path], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
-    expect(result.exitCode, JSON.stringify({ signal: result.signalCode, stderr: result.stderr.toString() })).toBe(2);
+    const result = await captureTrialCommand([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), "publish",
+      "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--request", path], 45000);
+    expect(result.exitCode, JSON.stringify({ process: result.process, stderr: result.stderr.toString() })).toBe(2);
     const report = JSON.parse(result.stdout.toString());
     expect(report.outcome).toBe("refused");
     expect(report.diagnostics[0].message).toBe("Configured output bound cannot retain trial recovery metadata");

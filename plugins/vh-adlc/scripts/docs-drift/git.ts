@@ -18,11 +18,50 @@ export function readGit(repo: string, ...args: string[]): Buffer {
   return readGitWithEnvironment(repo, args, { PATH: process.env.PATH });
 }
 
-export function readGitWithEnvironment(repo: string, args: string[], environment: Environment): Buffer {
+export function readGitWithEnvironment(repo: string, args: string[], environment: Environment, input?: Uint8Array): Buffer {
   return nativeGit(repo, [
     "--no-lazy-fetch", "--no-replace-objects", "-c", "credential.helper=", "-c", "http.extraHeader=",
     "-c", "core.hooksPath=/dev/null", ...args,
-  ], ordinaryGitEnvironment(environment));
+  ], ordinaryGitEnvironment(environment), input);
+}
+
+/** Read raw blobs in bounded batches. Large individual blobs keep the existing single-object path. */
+export function mapGitBlobs<T>(repo: string, objects: ReadonlyArray<{ oid: string; size: number }>, map: (bytes: Buffer, index: number) => T): T[] {
+  if (!Array.isArray(objects) || typeof map !== "function") throw Error("Git blob batch request");
+  const requested = objects.map(row => {
+    if (row === null || typeof row !== "object" || Object.keys(row).sort().join(",") !== "oid,size"
+      || typeof row.oid !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(row.oid)
+      || !Number.isSafeInteger(row.size) || row.size < 0) throw Error("Git blob batch request");
+    return { oid: row.oid, size: row.size };
+  });
+  const limit = 4 * 1024 * 1024, result: T[] = [];
+  for (let start = 0; start < requested.length;) {
+    const first = requested[start];
+    if (first.size + 128 > limit) {
+      const bytes = readGit(repo, "cat-file", "blob", first.oid);
+      if (bytes.length !== first.size) throw Error("Git blob batch framing");
+      result.push(map(bytes, start++)); continue;
+    }
+    let end = start, estimated = 0;
+    while (end < requested.length && requested[end].size + 128 <= limit
+      && estimated + requested[end].size + 128 <= limit) estimated += requested[end++].size + 128;
+    const bytes = readGitWithEnvironment(repo, ["cat-file", "--batch"], { PATH: process.env.PATH },
+      Buffer.from(requested.slice(start, end).map(row => row.oid).join("\n") + "\n"));
+    let offset = 0;
+    for (let index = start; index < end; index++) {
+      const newline = bytes.indexOf(10, offset);
+      if (newline < 0) throw Error("Git blob batch framing");
+      const header = /^([a-f0-9]{40}(?:[a-f0-9]{24})?) blob (0|[1-9][0-9]*)$/u.exec(bytes.subarray(offset, newline).toString("ascii"));
+      const selected = requested[index];
+      if (!header || header[1] !== selected.oid || Number(header[2]) !== selected.size) throw Error("Git blob batch framing");
+      const boundary = newline + 1 + selected.size;
+      if (boundary >= bytes.length || bytes[boundary] !== 10) throw Error("Git blob batch framing");
+      result.push(map(bytes.subarray(newline + 1, boundary), index)); offset = boundary + 1;
+    }
+    if (offset !== bytes.length) throw Error("Git blob batch framing");
+    start = end;
+  }
+  return result;
 }
 
 export type CommittedInput = { path: string; mode: string; blob: string; bytes: Buffer; sha256: string };
