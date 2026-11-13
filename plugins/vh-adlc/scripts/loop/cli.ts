@@ -23,6 +23,7 @@ import { loopContext, type LoopContext } from "./procedure";
 import { applicableRungs, featureDelta, mayAdvance, runRungs } from "./rungs";
 import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, skipMarker } from "./delivery";
 import { claim, isolation } from "./claim";
+import { diffPaths, rangePaths } from "./git-paths";
 import { writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
@@ -97,10 +98,10 @@ export async function main(argv: string[]): Promise<number> {
   }
   if (command === "ci") { console.log(JSON.stringify(ciReport(settings))); return 0; }
   if (command === "skip") {
-    const names = (range: string[]) => execSync(`git diff --name-only ${range.join(" ")}`, { cwd: repo }).toString().split("\n").filter(Boolean);
     const base = execSync(`git merge-base ${need(options, "base")} HEAD`, { cwd: repo }).toString().trim();
     const supportsSkipPaths = conventionSupportsSkipPaths(need(options, "docs-revision"));
-    const result = skipMarker(settings, { commit: names(["HEAD^", "HEAD"]), pushRange: names([`${need(options, "remote-branch")}`, "HEAD"]), prDiff: names([base, "HEAD"]) },
+    // The push range counts every path any outgoing commit touched, so a change reverted later still counts.
+    const result = skipMarker(settings, { commit: diffPaths(repo, "HEAD^", "HEAD"), pushRange: rangePaths(repo, `${need(options, "remote-branch")}..HEAD`), prDiff: diffPaths(repo, base, "HEAD") },
       { supportsSkipPaths, featureRoot: need(options, "feature-root") });
     console.log(JSON.stringify(result)); return 0;
   }

@@ -9,6 +9,7 @@ import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync
 import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { runOwnedClient } from "../triage/owned-process";
+import { nulRecords, statusEntries } from "./git-paths";
 
 export type ReviewKind = "spec" | "implementation";
 export type ReviewOutcome =
@@ -70,13 +71,13 @@ function fileDigest(root: string, path: string): string {
  * flag-hidden tracked files. Scratch directories are left out.
  */
 export function snapshot(root: string, scratch: string[]): Record<string, string> {
-  const lines = (args: string[]) => git(root, args).toString().split("\n").filter(Boolean);
   const keep = (path: string) => !underScratch(path, scratch);
-  const status = lines(["status", "--porcelain=v1", "--untracked-files=all", "--ignored=no"]).filter(line => keep(line.slice(3)));
-  const changed = status.map(line => line.slice(3).replace(/^.* -> /, ""));
-  const ignored = lines(["ls-files", "--others", "--ignored", "--exclude-standard", "--directory"]).filter(keep);
-  const index = lines(["ls-files", "--stage", "-v"]);
-  const hidden = index.filter(line => /^[a-zS] /.test(line)).map(line => line.split("\t")[1]!).filter(keep);
+  const entries = statusEntries(root, ["--untracked-files=all", "--ignored=no"]).filter(entry => keep(entry.path));
+  const status = entries.map(entry => `${entry.xy}\0${entry.path}\0${entry.from ?? ""}`);
+  const changed = entries.flatMap(entry => entry.from ? [entry.path, entry.from] : [entry.path]);
+  const ignored = nulRecords(root, ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"]).filter(keep);
+  const index = nulRecords(root, ["ls-files", "--stage", "-v", "-z"]);
+  const hidden = index.filter(line => /^[a-zS] /.test(line)).map(line => line.slice(line.indexOf("\t") + 1)).filter(keep);
   const contents: string[] = [];
   for (const path of [...changed, ...hidden]) contents.push(`${path}\t${fileDigest(root, path)}`);
   for (const path of ignored) {

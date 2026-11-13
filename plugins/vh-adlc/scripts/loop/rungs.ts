@@ -3,6 +3,7 @@
 // always blocks; a rung that could not run blocks unless the owner allowed that exact rung, or that
 // exact skipped subcheck, for this run.
 import type { LoopSettings } from "./settings";
+import { diffPaths, statusEntries } from "./git-paths";
 
 export type Rung = { name: string; when: "always" | { paths: string[] }; command?: string; procedure?: string; skipped_pattern?: string };
 export type RungState = "passed" | "failed" | "not run";
@@ -13,7 +14,6 @@ function git(repo: string, args: string[]): string {
   if (run.exitCode !== 0) throw Error(`git ${args.join(" ")} failed: ${run.stderr.toString().trim()}`);
   return run.stdout.toString();
 }
-const lines = (text: string) => text.split("\n").map(line => line.trim()).filter(Boolean);
 
 /**
  * The paths a feature changes. Before merge: the branch against its merge base with `base`, plus every
@@ -23,12 +23,12 @@ const lines = (text: string) => text.split("\n").map(line => line.trim()).filter
 export function featureDelta(repo: string, from: { base?: string; merge?: string }): { paths: string[]; range: string } {
   if (from.merge) {
     const range = `${from.merge}^1..${from.merge}`;
-    return { paths: lines(git(repo, ["diff", "--name-only", `${from.merge}^1`, from.merge])), range };
+    return { paths: diffPaths(repo, `${from.merge}^1`, from.merge), range };
   }
   if (!from.base) throw Error("featureDelta needs a base branch or a merge commit");
   const mergeBase = git(repo, ["merge-base", from.base, "HEAD"]).trim();
-  const committed = lines(git(repo, ["diff", "--name-only", mergeBase, "HEAD"]));
-  const uncommitted = lines(git(repo, ["status", "--porcelain=v1", "--untracked-files=all"])).map(line => line.slice(3).replace(/^.* -> /, ""));
+  const committed = diffPaths(repo, mergeBase, "HEAD");
+  const uncommitted = statusEntries(repo, ["--untracked-files=all"]).flatMap(entry => entry.from ? [entry.path, entry.from] : [entry.path]);
   return { paths: [...new Set([...committed, ...uncommitted])], range: `${mergeBase}..HEAD+worktree` };
 }
 

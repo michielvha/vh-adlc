@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { LoopSettings } from "./settings";
+import { diffPaths } from "./git-paths";
 
 const SKIP = /\[(skip ci|ci skip|no ci|skip actions|actions skip)\]|^skip-checks: *true/im;
 const ONBOARDING = ["AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md"];
@@ -48,7 +49,7 @@ export function skipMarker(settings: LoopSettings, delivery: { commit: string[];
 
 export async function deliveryVerdict(settings: LoopSettings, repo: string, merge: string, options: { featureRoot: string; supportsSkipPaths: boolean; timeoutMs?: number }): Promise<DeliveryVerdict> {
   const message = git(repo, ["log", "-1", "--format=%B", merge]);
-  const paths = git(repo, ["diff", "--name-only", `${merge}^1`, merge]).split("\n").filter(Boolean);
+  const paths = diffPaths(repo, `${merge}^1`, merge);
   if (SKIP.test(message) && paths.length && paths.every(path => eligible(path, settings, options.featureRoot, options.supportsSkipPaths)))
     return { delivered: true, reason: "no publication path" };
   const watch = settings.post_merge_watch;
