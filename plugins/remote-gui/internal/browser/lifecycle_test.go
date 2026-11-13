@@ -56,6 +56,57 @@ func TestFailedHandoffRetainsRecoveryAfterOwnerClosesBrowser(t *testing.T) {
 	}
 }
 
+// Chromium's network service flushes its disk cache into the profile after the
+// browser process has exited. These scripts stand in for such helpers.
+func TestStopOutlastsBrowserHelpers(t *testing.T) {
+	for name, helper := range map[string]string{
+		// Writes once the browser is gone, then exits on its own.
+		"flushing": `while kill -0 "$parent" 2>/dev/null; do sleep 0.02; done; sleep 0.3; mkdir -p "$profile/Default/Cache"; : >"$profile/Default/Cache/index"; : >"$marker"`,
+		// Ignores the browser's exit until it is killed.
+		"stubborn": `trap '' TERM; mkdir -p "$profile/Default/Cache"; : >"$marker"; while :; do mkdir -p "$profile/Default/Cache"; sleep 0.02; done`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			c, id := setup(t)
+			profile := filepath.Join(c.Home, id, "profile")
+			if err := os.Mkdir(profile, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			dir := t.TempDir()
+			marker, pidFile := filepath.Join(dir, "helper-wrote"), filepath.Join(dir, "helper-pid")
+			script := `profile=$1 marker=$2; parent=$$; (sh -c 'echo $PPID' >"$3"; ` + helper + `) & exec sleep 30`
+			r := &runtime{home: c.Home, id: id, profile: profile}
+			if _, err := r.spawn("browser", "/bin/sh", []string{"-c", script, "sh", profile, marker, pidFile}, nil); err != nil {
+				t.Fatal(err)
+			}
+			var helper state.Identity
+			for deadline := time.Now().Add(5 * time.Second); helper.PID == 0; time.Sleep(10 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("helper did not start")
+				}
+				data, _ := os.ReadFile(pidFile)
+				if pid, e := strconv.Atoi(strings.TrimSpace(string(data))); e == nil {
+					helper, _ = state.Inspect(pid)
+				}
+			}
+			t.Cleanup(func() { _ = state.Signal(helper, syscall.SIGKILL) })
+			r.stop()
+			if r.cleanupErr != nil {
+				t.Fatal(r.cleanupErr)
+			}
+			if state.Alive(helper) {
+				t.Fatal("browser helper survived stop")
+			}
+			if _, err := os.Stat(marker); err != nil {
+				t.Fatal("helper never wrote the profile")
+			}
+			time.Sleep(500 * time.Millisecond)
+			if _, err := os.Stat(profile); !os.IsNotExist(err) {
+				t.Fatal("browser helper recreated the profile after stop")
+			}
+		})
+	}
+}
+
 func TestHandoffRetainsLockedProfile(t *testing.T) {
 	c, id := setup(t)
 	profile := filepath.Join(c.Home, id, "profile")
