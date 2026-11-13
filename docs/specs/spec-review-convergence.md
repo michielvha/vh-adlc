@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-7 findings are applied. Waiting for the owner to decide on spec review R-8."
+status: planned
+status_description: "Accepted by the owner at R-8 under an advance acceptance; R-8's seven findings are listed, not applied. Next: the task list."
 issue: null
 goal: "A spec review loop that finds blocking defects early and stops asking for passes after three consecutive passes without one."
 covers:
