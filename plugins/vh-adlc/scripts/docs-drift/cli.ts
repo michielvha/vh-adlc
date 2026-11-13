@@ -109,7 +109,7 @@ bun <plugin>/scripts/docs-drift/cli.ts collect-assessment-review-target|read-ass
   <the source/runtime/original-worker arguments of read-worker-preparation>
   --reviewer-capture <original-independent-capture> --reviewer-capture-sha256 <sha256> (read only)
 bun <plugin>/scripts/docs-drift/cli.ts collect-report-history
-  (same original source/decision/runtime flags as collect-worker-inputs; hosted runs bind GITHUB_RUN_ID)
+  (same original source/decision/runtime flags as collect-worker-inputs; hosted runs bind GITHUB_RUN_ID and GITHUB_RUN_ATTEMPT)
 bun <plugin>/scripts/docs-drift/cli.ts collect-worker-inputs --repo <assessment-repo> --source <full-commit>
   --artifact-root <private-external-directory> --cache-root <retained-cache>
   --entry <hosted|copilot|claude> --launcher <invoked-launcher> --settings <invoked-settings>
@@ -617,7 +617,9 @@ export async function main(argv: string[]): Promise<number> {
         source_verification: { path: options.source_verification, sha256: options.source_verification_sha256 },
         decisions: { path: options.decisions, sha256: options.decisions_sha256 } };
       if (historyCommands.includes(options.command)) {
-        report = historyCollectionOutput(await collectNativeReportHistory(input));
+        const attempt = process.env.GITHUB_RUN_ATTEMPT;
+        report = historyCollectionOutput(await collectNativeReportHistory({ ...input,
+          hosted_run_attempt: entry === "hosted" && attempt !== undefined && /^[1-9][0-9]*$/u.test(attempt) ? Number(attempt) : undefined }));
       } else if (assessmentReviewCommands.includes(options.command)) {
         const original = { ...input, worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 } };
         report = options.command === "collect-assessment-review-target"

@@ -1,4 +1,5 @@
 import { realpathSync } from "node:fs";
+import type { WorkflowRunInput } from "../github-read";
 import { ArtifactChanged } from "./evidence-input";
 import { createAdoptedProducerVerifier } from "./history-producer";
 import { OUTPUT_LIMIT } from "./owned-process";
@@ -12,13 +13,14 @@ import { captureRepositoryState, matchesRepositoryState } from "./snapshot";
 import { readNativeContext } from "./transport";
 
 type Options = WorkerCollectionOptions & {
+  hosted_run_attempt?: number;
   /** Original registry supplied by the local execution controller, never a CLI approval flag. */
   owned_local_invocations?: OwnedInvocation[];
 };
 type Result = {
   schema_version: 1; kind: "docs-drift-history-collection"; authority: "none"; source_commit: string;
   complete: boolean; scope_changed: boolean; mode: "actions" | "local-attestation" | "none" | null; captured_at: string;
-  context: HistoryContext | null; worker_input_sha256: string | null; current_default: string | null;
+  context: HistoryContext | null; hosted_run_attempt: number | null; worker_input_sha256: string | null; current_default: string | null;
   history: Array<{ kind: "report"; locator: string; sha256: string; expires_at: string }>; receipts: unknown[];
   diagnostics: string[]; details_omitted: boolean;
 };
@@ -39,14 +41,15 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
     decisions: structuredClone(input.decisions), owned_local_invocations: structuredClone(input.owned_local_invocations) };
   const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo)), captured_at = new Date().toISOString();
   const result: Result = { schema_version: 1, kind: "docs-drift-history-collection", authority: "none", source_commit: options.source,
-    complete: false, scope_changed: false, mode: null, captured_at, context: null, worker_input_sha256: null, current_default: null,
+    complete: false, scope_changed: false, mode: null, captured_at, context: null, hosted_run_attempt: null, worker_input_sha256: null, current_default: null,
     history: [], receipts: [], diagnostics: [], details_omitted: false };
   let snapshot: HistorySnapshot | null = null, limit = OUTPUT_LIMIT;
   try {
     const { settings } = loadCommittedSettings(repo, options.source);
     limit = Math.min(limit, settings.reports.max_entry_bytes);
     result.mode = options.entry === "hosted" ? settings.reports.hosted : settings.reports.interactive;
-    if (options.entry === "hosted" && (!/^[1-9][0-9]*$/u.test(options.run) || !Number.isSafeInteger(Number(options.run))))
+    if (options.entry === "hosted" && (!/^[1-9][0-9]*$/u.test(options.run) || !Number.isSafeInteger(Number(options.run))
+      || !Number.isSafeInteger(options.hosted_run_attempt) || typeof options.hosted_run_attempt !== "number" || options.hosted_run_attempt < 1))
       throw Error("Current native scheduled run identity required");
     const current = await collectWorkerInputs(options);
     result.scope_changed = current.scope_changed;
@@ -62,16 +65,25 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
     const initial = native();
     if (initial.default_commit !== currentDefault || canonicalDigest(initial.identity) !== canonicalDigest(identity))
       throw new PublicationScopeChanged("Native history source or actor changed before collection");
-    const run = options.entry === "hosted" ? initial.repository.run(Number(options.run)) : null;
+    let run: WorkflowRunInput | null = null;
+    if (options.entry === "hosted") {
+      try { run = initial.repository.run(Number(options.run)); }
+      catch (error) {
+        if (error instanceof Error && error.message === "github-read-repository-changed")
+          throw new PublicationScopeChanged("Current native scheduled run identity changed");
+        throw error;
+      }
+    }
     const runBinding = (selected: NonNullable<typeof run>) => {
       const { updated_at: _updated, ...binding } = selected;
       return canonicalDigest(binding);
     };
     if (run && (run.repository.id !== identity.repository_id || run.head_repository?.id !== identity.repository_id
-      || run.head_sha !== options.source || run.head_branch !== settings.default_branch || run.event !== "schedule" || run.status !== "in_progress"
+      || run.run_attempt !== options.hosted_run_attempt || run.head_sha !== options.source || run.head_branch !== settings.default_branch || run.event !== "schedule" || run.status !== "in_progress"
       || run.workflow_id !== settings.reports.workflow_id || ![settings.reports.workflow_path, settings.reports.workflow_path + "@" + settings.default_branch,
         settings.reports.workflow_path + "@refs/heads/" + settings.default_branch, settings.reports.workflow_path + "@" + options.source].includes(run.path)))
       throw new PublicationScopeChanged("Current native scheduled run identity changed");
+    result.hosted_run_attempt = run?.run_attempt ?? null;
     if (result.mode === "actions") {
       const collected = await collectActionsHistory({ repo, artifact_root: options.artifact_root, settings, context, reader: initial.repository,
         environment: { PATH: options.path, ...(settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com")

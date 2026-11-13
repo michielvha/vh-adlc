@@ -17,7 +17,7 @@ test("the history entry requires original source, decisions and retained runtime
     expect(result.diagnostics[0].message).toContain(flag);
 });
 test("the history entry rejects report-provided provenance or permission flags", () => {
-  for (const flag of ["--history", "--producer", "--authority", "--started-at", "--local-invocations"]) {
+  for (const flag of ["--history", "--producer", "--authority", "--started-at", "--local-invocations", "--hosted-run-attempt"]) {
     const result = invoke([flag, "untrusted.json"]);
     expect(result.diagnostics[0].message).toContain("unknown collect-report-history option");
   }
