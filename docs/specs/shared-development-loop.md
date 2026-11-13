@@ -569,6 +569,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-11 | spec | `fcc1245e2deda1fe8ef0d42d43f90954338f8cd3` | gpt-6.1-sol | procedural | One blocking finding: a file-only review reads the live worktree, not the target commit. Two should-fix. |
 | 2026-11-13 | R-12 | spec | `64503e5f5f95d49cc5dfcc717e616c964e68fbd5` | gpt-6.1-sol | procedural | One blocking finding: the reviewer CLI starts in the live checkout and can load its instruction files. Two should-fix. |
 | 2026-11-13 | R-13 | spec | `478dcab03f798ade50341adbd27273660fd0cb43` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on findings saved against an existing issue and reviewer helper processes outliving the review. |
+| 2026-11-13 | R-14 | spec | `d367673759c90a3b0b5da6a6e8b6884d99d18c6a` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on claiming from an unrelated branch and verifying process group cleanup. |
 
 ### R-1
 
@@ -938,6 +939,22 @@ SEVERITY: should-fix
 WHERE: Design / External command route; AC-02 and its Test Plan row
 EVIDENCE: The route specifies timeout handling and a preservation snapshot after the reply, but no requirement to terminate and reap the command's remaining processes before taking that snapshot. A successful reviewer process can leave a helper running that changes files after the review is stored. Existing plugins/vh-adlc/scripts/triage/owned-process.ts:1-16 explicitly owns a process group and terminates remaining helpers even after successful parent exit. AC-02's fixtures cover a hang, but not surviving descendants. Git, vh-adlc and CLI execution are unavailable, so these scenarios were not executed.
 PROPOSAL: Reuse the owned-process runner and require process cleanup before the final preservation check or record storage, reporting cleanup failures as review pending. Add successful-exit and timeout fixtures with a surviving helper and verify that it cannot modify the checkout afterward.
+
+### R-14
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Claiming from a host worktree; AC-13 and its Test Plan row
+EVIDENCE: Design permits claiming in "any worktree" at the fetched default-branch tip, including one on another branch name. Committing there advances that existing branch before git switch -c creates the feature branch. Neither AC-13 nor its fixtures distinguish a session-owned host branch from an unrelated branch. plugins/vh-adlc/references/authority.md:80-86 forbids repointing unrelated branches, and Stackweaver CLAUDE.md:127-137 treats worktrees as concurrent session resources. I cannot execute git or vh-adlc; this finding follows from the written procedure and preservation rules.
+PROPOSAL: Require a non-default branch and its worktree to belong to the current session or have an explicit owner handoff before claiming. Add a clean, tip-aligned unrelated-branch fixture that refuses without advancing that branch or changing its checkout.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / External command route; covers; AC-02 and its Test Plan row
+EVIDENCE: Design requires the reused owned-process runner to terminate and reap the entire reviewer group before preservation checks, leaving cleanup failures pending. plugins/vh-adlc/scripts/triage/owned-process.ts:5-12 swallows signal errors and defines reaped solely from child.exited, which observes the parent rather than surviving helpers. A successful parent can therefore produce exit_code: 0 and reaped: true despite failed group termination. The runner is absent from covers, and AC-02's proof has no cleanup-failure fixture. Process fixtures, git and vh-adlc could not be executed in this review.
+PROPOSAL: Require the runner or its review wrapper to distinguish an absent group from failed signalling and confirm that no live group members remain before storage. Cover the runner and add a cleanup-failure fixture that leaves the review pending even when the parent exits successfully.
 
 ## Sources
 
