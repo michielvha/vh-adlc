@@ -15,7 +15,7 @@ import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/r
 import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
 
 /** This creates no native-provider or historical observed-execution evidence. */
-export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean; bound_roles?: boolean; seed?: { repo: string; commit: string; objects: string[]; resources: [string, Record<string, unknown>][]; settings: ReturnType<typeof settingsFixture> } } = {}) {
+export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean; bound_roles?: boolean; max_entry_bytes?: number; seed?: { repo: string; commit: string; objects: string[]; resources: [string, Record<string, unknown>][]; settings: ReturnType<typeof settingsFixture> } } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-docs-trial-"))); roots.push(root);
   const names = ["source", "origin.git", "tracker.git", "artifacts", "objects", "evidence", "component-source", "runtime"];
   for (const name of names) mkdirSync(join(root, name), { mode: 0o700 });
@@ -29,6 +29,7 @@ export function syntheticTrialFixture(roots: string[], options: { legacy?: boole
     git(source, "switch", "-c", "main");
   } else populateRepository(source, false, scanner);
   const settings = structuredClone(options.seed?.settings ?? settingsFixture()); settings.hostname = "docs-drift.invalid";
+  if (options.max_entry_bytes !== undefined) settings.reports.max_entry_bytes = options.max_entry_bytes;
   if (options.bound_roles) {
     for (const entry of Object.values(settings.execution.entries)) {
       for (const selected of [entry.worker, entry.reviewer]) Object.assign(selected, { model: "claude-opus-5.5", identity_source: roleIdentitySource });

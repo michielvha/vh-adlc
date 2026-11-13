@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+import { encodeTrialEntryReport } from "./trial-output";
+import { OUTPUT_LIMIT } from "./owned-process";
 import { createTrialAdoptionGate } from "./adoption";
 import { PublicationExecutionError } from "./attempts";
 import { randomUUID } from "node:crypto";
@@ -50,6 +52,7 @@ function inputs(argv: string[]) {
 /** This executable is confined to explicit setup-owned synthetic contexts by its constructor. */
 export async function main(argv: string[]): Promise<number> {
   let report: Record<string, unknown>;
+  let encoded: Buffer;
   try {
     const options = inputs(argv);
     const context = loadTrialContext({ root: options.root, context_commit: options.contextCommit, runtime_directory: resolve(import.meta.dir, "../..") });
@@ -124,13 +127,16 @@ export async function main(argv: string[]): Promise<number> {
       command: options.command, outcome: complete ? "complete" : "incomplete", source_commit: context.source_commit,
       context_commit: context.context_commit, context_sha256: context.context_sha256,
       component_sha256: context.component.component_sha256, entry_sha256: entry.sha256, receipt_path: path, data };
+    encoded = encodeTrialEntryReport(report, Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes));
     publishArtifact(path, canonicalJSON(report));
   } catch (error) {
     report = { schema_version: 1, kind: "docs-drift-synthetic-entry", evidence_kind: "synthetic", transport: "collector",
       command: argv[0] ?? "", outcome: "refused", diagnostics: [{ code: "synthetic-setup-or-input",
         message: error instanceof Error ? error.message : "synthetic setup unavailable" }] };
+    // A too-small configured report emits the bounded generic setup handoff, as the production CLI does.
+    encoded = encodeTrialEntryReport(report, OUTPUT_LIMIT);
   }
-  writeSync(1, JSON.stringify(report) + "\n");
+  writeSync(1, encoded);
   return report.outcome === "complete" ? 0 : 2;
 }
 if (import.meta.main) process.exitCode = await main(process.argv.slice(2));

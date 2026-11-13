@@ -336,8 +336,14 @@ test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed 
     ...(approval === "missing" ? [] : ["--owner-request", authority])], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
   const result = JSON.parse(applied.stdout.toString());
   expect(applied.exitCode).toBe(2);
-  if (approval === "missing") expect(result.outcome).toBe("refused");
-  else expect(result.data.state, JSON.stringify(result)).toBe(approval === "approved" ? "retired" : "pending");
+  if (approval === "missing") {
+    expect(result.outcome).toBe("refused");
+    expect(result.diagnostics[0].message).toContain("owner request required");
+  } else {
+    expect(result.data.state, JSON.stringify(result)).toBe(approval === "approved" ? "retired" : "pending");
+    if (approval === "wrong-purpose") expect(result.data.reason).toBe("reconciliation-authority-or-evidence-unavailable");
+    if (approval === "foreign-lease") expect(result.data.reason).toBe("foreign-publication-lease");
+  }
   const journal = readJournal(pending.journal.directory, context.source);
   expect(journal.events.some(event => event.kind === "retired-absence" && event.effect_id === "pr")).toBe(approval === "approved");
   expect(journal.events.some(event => event.kind === "outcome" && event.effect_id === "pr")).toBe(false);
@@ -347,5 +353,14 @@ test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed 
     const repeated = Bun.spawnSync([process.execPath, entry, "reconcile-publication", ...args, "--owner-request", authority], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
     expect(repeated.exitCode).toBe(2); expect(JSON.parse(repeated.stdout.toString()).data.state).toBe("retired");
   } else expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(beforeApply);
+  if (approval === "wrong-purpose") {
+    const corrected = JSON.parse(readFileSync(authority, "utf8")); corrected.purpose = "reconciliation";
+    writeFileSync(authority, canonicalJSON(corrected));
+    const accepted = Bun.spawnSync([process.execPath, entry, "reconcile-publication", ...args, "--owner-request", authority],
+      { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+    expect(accepted.exitCode).toBe(2);
+    expect(JSON.parse(accepted.stdout.toString()).data.state).toBe("retired");
+    expect(readTrialTracker(context).commit).toBe(trackerBefore);
+  }
   expect(git(f.source, "status", "--porcelain")).toBe("");
 }, 180000);
