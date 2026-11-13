@@ -292,6 +292,7 @@ None.
 | 2026-11-13 | R-16 | spec | `69ba525642d043cc7576bf5d43ec7ba5ff69e9fd` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-17 | implementation | `82af2a909fad2af256253ae88dd93e9be4176a5a` | gpt-6.1-sol | procedural | Fourteen criteria met; AC-16 not met because a failed holder clear still reports stopped; AC-02 and AC-14 not verified under host load and without a Firefox build. |
 | 2026-11-13 | R-18 | spec | `bb8a80f9646b81c8e6f84268741dbdb06c15dd19` | gpt-6.1-sol | procedural | No blocking findings; two should-fix findings: Design and the Test Plan did not yet describe the merged helper drain, session sweep and holder-clear recovery. |
+| 2026-11-13 | R-19 | spec | `ea7d8409c61ab422e9a8b60618692c7ecfbe42d1` | gpt-6.1-sol | procedural | No findings on the revision after R-18. |
 
 ### R-1
 
@@ -1098,6 +1099,11 @@ SEVERITY: should-fix
 WHERE: Design / Single writer and Compatibility; Test Plan / AC-16; T26 and T27
 EVIDENCE: Compatibility says “cleanup behaves as today and does not touch profiles,” while T26 requires recovery that clears profile metadata. daemon.go:741-768 lets cleanup request a live guard's retry; finishProfile:232-247 calls releaseProfile before recording the terminal state, and profile.go:143-160 writes the cleared holder and last-used time. markPending:265-270 keeps a holder-clear failure in cleanup_diagnostic without creating a primary diagnostic. T26's eventual stopped outcome is therefore consistent for its otherwise clean sessions; an existing primary diagnostic still produces failed. The Design does not explain this distinction, and the AC-16 proof row omits the holder-clear failure and recovery scenario.
 PROPOSAL: Clarify that cleanup preserves reusable browser data but can request guard-owned metadata recovery, retaining the lock and cleanup-pending state until that succeeds. Document stopped versus failed according to the preserved primary diagnostic, and add T26's failure-and-retry scenario to the AC-16 proof row.
+
+
+### R-19
+
+NO FINDINGS
 
 
 ## Sources
