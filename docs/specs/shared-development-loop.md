@@ -85,7 +85,10 @@ A revision after the first acceptance only adds the code paths the design needs 
 
 A second revision, during implementation, follows Stackweaver's move of its GPT reviews from the
 Copilot CLI to the Codex CLI: the Design example and the AC-02 real-route proof now name `codex exec`.
-Scope, criteria and the generic route are unchanged.
+Scope and the generic route are unchanged. That first real Codex review then came back `MODEL: unknown`
+and stayed pending, as designed: Codex never tells its model its name, although its session log shows
+`gpt-6.1-sol` served the run. The owner chose to let a command route read the served model from the
+CLI's own record (`model_attestation: codex-session`); AC-02 and its proof now cover that.
 
 Validation so far is spec review only, nothing executed: thirteen `gpt-6.1-sol` passes. R-13 has no
 blocking findings; its two should-fix items (findings saved against an existing issue, and reviewer
@@ -255,11 +258,13 @@ A `command` route runs the reviewer outside the host, for example:
 spec_reviewer:
   route: command
   model: gpt-6.1-sol
-  argv: [/usr/bin/codex, exec, --skip-git-repo-check, -s, read-only, -m, "{model}", "{prompt}"]
+  model_attestation: codex-session
+  argv: [/usr/bin/codex, exec, --json, --skip-git-repo-check, -s, read-only, -m, "{model}", "{prompt}"]
 implementation_reviewer:
   route: command
   model: gpt-6.1-sol
-  argv: [/usr/bin/codex, exec, -s, workspace-write, -m, "{model}", "{prompt}"]
+  model_attestation: codex-session
+  argv: [/usr/bin/codex, exec, --json, -s, workspace-write, -m, "{model}", "{prompt}"]
 ```
 
 The operation writes the canonical reviewer instructions, document path, exact commit, kind, docs
@@ -277,6 +282,17 @@ the path of the same text for a CLI that reads files. The reply opens with `MODE
 `TARGET: <commit>`; the operation checks that `TARGET` equals the commit it dispatched, which proves the
 reviewer received the dispatch identity, and strips both header lines before storing the records. A
 command that is not given a read-only tool restriction is recorded with `procedural` isolation.
+
+A model may not know its own ID: Codex starts its model without naming it, so a `codex exec` reviewer
+answers `MODEL: unknown`, and the requested-model rule would leave every such review pending. A
+command route may therefore declare `model_attestation`, a way to read the served model from the CLI's
+own record instead of the reviewer's self-report. The first method is `codex-session`: the command runs
+with `--json`, the reply is the final agent message in that stream, and the served model is the `model`
+recorded in Codex's session log for the stream's thread id (`~/.codex/sessions/**/rollout-*-<thread
+id>.jsonl`). The attested model must match the requested one under the same alias and exact-ID rules; a
+missing log, no recorded model, several different models or a mismatch leaves the review pending. The
+Review Log then records the attested model. A reviewer self-report that names a different model also
+leaves the review pending. Without `model_attestation`, the reviewer's `MODEL:` line decides, as before.
 
 A spec review reads only, so its route may stay file-only. It does not read the live worktree: the
 operation exports the target commit with `git archive <commit>` into a fresh read-only directory and
@@ -528,7 +544,7 @@ published plugin is installed from the marketplace and exercised, and a rollback
 ## Acceptance Criteria
 
 - [ ] AC-01: A repository's `.vh-adlc/loop.yaml` names a route for each loop role, every SDD operation dispatches according to it, a `command` route is accepted only for the two reviewer roles, no vh-adlc agent or skill file names a model, and a repository without the file behaves as it does at `a7bfca99`.
-- [ ] AC-02: From a Claude Code session, a file-only spec review that reads only a read-only export of the target commit and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`; and a mismatched model or target, a missing header, a non-zero exit, a timeout, a failed process cleanup or any change outside the declared `review_scratch` directories to the worktree's `HEAD`, index entries, refs, status, file contents or ignored-file list leaves the review pending with no Review Log row.
+- [ ] AC-02: From a Claude Code session, a file-only spec review that reads only a read-only export of the target commit and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`, where a route with `model_attestation: codex-session` matches on the model Codex's session log records rather than the reviewer's self-report; and a mismatched model or target, a missing header, a non-zero exit, a timeout, a failed process cleanup or any change outside the declared `review_scratch` directories to the worktree's `HEAD`, index entries, refs, status, file contents or ignored-file list leaves the review pending with no Review Log row.
 - [ ] AC-03: Every SDD operation reads the declared project procedure and instruction files, and a spec review flags a document that contradicts a declared instruction file or lens.
 - [ ] AC-04: Implement and ship run each declared verification rung whose path condition holds over the whole feature delta, or that is declared always, and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
 - [ ] AC-05: With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, a feature whose actual merge commit carries the skip marker and touches only skip-eligible paths is reported delivered with no publication path and no watch run, every unmarked merge commit runs the watch, and a watch that fails only because no workflow ran leaves the feature reported blocked, not delivered.
@@ -552,7 +568,7 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | `bun test tests/vh-adlc` cases for each supported role and route pair, refusal of a `command` route for `author` and `implementer`, resume taking the continued operation's route, a no-file case compared with `a7bfca99` behavior, and a grep test that fails on a model name in any agent or skill file. |
-| AC-02 | A fixture where an uncommitted edit to an instruction file in the worktree contradicts the committed spec, and the file-only review must still see only the committed content (the export, not the worktree); in the real-route run, live startup instruction files (`AGENTS.md`, `.github/copilot-instructions.md`) changed before dispatch must not appear in the review or steer it; a fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, one that creates or moves a non-current branch or tag, one that exits successfully and one that times out while each leaves a helper running that would later write to the checkout (the helper is reaped first and the checkout stays unchanged), one that overwrites an existing ignored configuration file, one that creates a new ignored file outside `review_scratch`, one that overwrites a tracked file already flagged assume-unchanged without changing the flag, one that writes only inside `review_scratch` (stored), and one that changes an index flag without changing the index tree; then one real Codex CLI (`codex exec`) `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
+| AC-02 | A fixture where an uncommitted edit to an instruction file in the worktree contradicts the committed spec, and the file-only review must still see only the committed content (the export, not the worktree); in the real-route run, live startup instruction files (`AGENTS.md`, `.github/copilot-instructions.md`) changed before dispatch must not appear in the review or steer it; a fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, one that creates or moves a non-current branch or tag, one that exits successfully and one that times out while each leaves a helper running that would later write to the checkout (the helper is reaped first and the checkout stays unchanged), one that overwrites an existing ignored configuration file, one that creates a new ignored file outside `review_scratch`, one that overwrites a tracked file already flagged assume-unchanged without changing the flag, one that writes only inside `review_scratch` (stored), and one that changes an index flag without changing the index tree; Codex-style fixtures where the session log attests the requested model (stored even with `MODEL: unknown`), attests another model, has no recorded model, or is missing (all three pending); then one real Codex CLI (`codex exec`) `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
 | AC-03 | Fixture specs that break a declared instruction and a declared lens; the reviewer must return a finding for each and none for a compliant control. |
 | AC-04 | Fixture changes that match some rungs and not others; a feature whose first commit changes `backend/` and whose last changes only documentation must still require the integration rung before push and completion; a pass recorded on an earlier commit must not count for a later one; after a merge, the delivery check over the merge commit against its first parent must still require the `backend/` rung once the default branch contains the feature; with rungs declared, a fast-forward landing of a feature whose earlier commit changed `backend/` must be refused; in Stackweaver, a backend-only feature whose Test Plan names an unchanged E2E spec must not push or complete until that spec has passed in the kind harness, a runtime change must not advance without its live slot pass, targeted kind reruns must not stand in for the final full run, and a `make verify` run that exits 0 with a skipped mandatory subcheck must stop advancement unless the owner allowance names that subcheck; the report must list every rung with the right state; a failing command must leave no push, no completion commit and no delivered report even when an owner allowance is recorded; an unavailable procedure must do the same unless the owner allowance is recorded for that exact rung, and with it must proceed; a no-rung fixture must keep the current lookup. |
 | AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported), a watch stub that exits 1 then 0 (delivered only after 0), a skip-eligible feature merged with a marked merge commit (delivered with no publication path, watch never invoked), the same feature merged with an unmarked merge commit (watch invoked); a watch stub that fails because no workflow ran (reported blocked, never delivered); and a run that appears only after a delay (watch waits, no early verdict). |
