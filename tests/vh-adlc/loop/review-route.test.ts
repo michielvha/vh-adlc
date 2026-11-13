@@ -302,3 +302,26 @@ describe("pathnames Git quotes", () => {
     pending(await review(root, commit, stub("echo three > 'a b.txt'", ok(commit))), "changed");
   });
 });
+
+describe("private review clone", () => {
+  for (const kind of ["implementation", "spec"] as const)
+    test(`another session's commit to a different branch during a ${kind} review does not leave it pending`, async () => {
+      const { root, commit } = repository();
+      const concurrent = setTimeout(() => { git(root, "branch", "other-session", commit); git(root, "tag", "other-tag", commit); }, 400);
+      const outcome = await review(root, commit, stub("sleep 1.2", ok(commit)), { kind });
+      clearTimeout(concurrent);
+      expect(git(root, "branch", "--list", "other-session")).toContain("other-session");
+      expect(outcome.status).toBe("ready");
+    });
+
+  test("an implementation reviewer runs in its private clone, not the owning worktree", async () => {
+    const { root, commit } = repository();
+    const script = stub(`[ "$(pwd)" != "${root}" ] || exit 6\n[ "$(git rev-parse HEAD)" = "${commit}" ] || exit 7`, ok(commit));
+    expect((await review(root, commit, script)).status).toBe("ready");
+  });
+
+  test("a reviewer that edits the owning worktree from its private clone leaves the review pending", async () => {
+    const { root, commit } = repository();
+    pending(await review(root, commit, stub(`echo changed > "${root}/src/app.txt"`, ok(commit))), "changed");
+  });
+});
