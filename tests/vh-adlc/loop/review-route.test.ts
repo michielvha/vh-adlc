@@ -180,3 +180,51 @@ describe("file-only spec reviews read the committed export", () => {
     expect(readFileSync(join(live, "instructions.md"), "utf8")).toBe("live\n");
   });
 });
+
+describe("model attestation through the Codex session log", () => {
+  /** A Codex-style stub: prints a JSON stream with a thread id and the reply as the final agent message, and writes a session log. */
+  function codex(reply: string, sessionModel: string | null, home: string, writeLog = true) {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-codex-")));
+    made.push(dir);
+    const script = join(dir, "codex.sh"), thread = crypto.randomUUID();
+    const log = join(home, ".codex", "sessions", "2026", "11", "13", `rollout-2026-11-13T00-00-00-${thread}.jsonl`);
+    const meta = sessionModel === null ? '{"type":"session_meta","payload":{}}' : `{"type":"turn_context","payload":{"model":"${sessionModel}"}}`;
+    writeFileSync(script, `#!/bin/bash
+${writeLog ? `mkdir -p ${dirname(log)}; printf '%s\\n' '${meta}' > ${log}` : ""}
+printf '%s\\n' '{"type":"thread.started","thread_id":"${thread}"}'
+printf '%s\\n' '{"type":"turn.started"}'
+python3 -c 'import json,sys; print(json.dumps({"type":"item.completed","item":{"id":"i","type":"agent_message","text":sys.argv[1]}}))' ${JSON.stringify(reply)}
+printf '%s\\n' '{"type":"turn.completed"}'
+`);
+    chmodSync(script, 0o700);
+    return script;
+  }
+  async function attested(root: string, commit: string, script: string, home: string) {
+    return runReviewRoute({ repo: root, commit, kind: "implementation", document: "docs/specs/feature.md",
+      route: { model: "gpt-6.1-sol", argv: [script, "--json", "{prompt}"], model_attestation: "codex-session" },
+      prompt: "p", scratch: [], timeoutMs: 10_000, env: { HOME: home } });
+  }
+  const homeDir = () => { const dir = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-home-"))); made.push(dir); return dir; };
+
+  test("a session log that records the requested model lets a MODEL: unknown reply be stored, recording the attested model", async () => {
+    const { root, commit } = repository(), home = homeDir();
+    const outcome = await attested(root, commit, codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-6.1-sol", home), home);
+    expect(outcome).toMatchObject({ status: "ready", model: "gpt-6.1-sol", records: "NO FINDINGS\n" });
+  });
+  test("a session log that records another model leaves the review pending", async () => {
+    const { root, commit } = repository(), home = homeDir();
+    pending(await attested(root, commit, codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-5.3-codex", home), home), "attest");
+  });
+  test("a session log with no recorded model leaves the review pending", async () => {
+    const { root, commit } = repository(), home = homeDir();
+    pending(await attested(root, commit, codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, null, home), home), "attest");
+  });
+  test("a missing session log leaves the review pending", async () => {
+    const { root, commit } = repository(), home = homeDir();
+    pending(await attested(root, commit, codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-6.1-sol", home, false), home), "attest");
+  });
+  test("a self-report naming a different model leaves the review pending even when the log attests the requested one", async () => {
+    const { root, commit } = repository(), home = homeDir();
+    pending(await attested(root, commit, codex(`MODEL: claude-opus-5-5\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-6.1-sol", home), home), "model");
+  });
+});
