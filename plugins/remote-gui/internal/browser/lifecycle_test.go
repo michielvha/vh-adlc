@@ -169,26 +169,54 @@ func (h helperRun) stopAndCheck(t *testing.T) {
 }
 
 // A member can fork and exit between reading the /proc listing and inspecting
-// it, so one enumeration omits its live child. The double reports the first
-// enumeration after members were seen as empty, as such a scan would.
+// it, so one enumeration omits its live child. The scripted enumerations see a
+// member, omit it once, find it again on the confirming scan, then lose it for
+// good; drain must finish only after that. The fixture member's birth time is
+// not the test process's, so the pidfd signal refuses it.
 func TestStopConfirmsAnEmptySession(t *testing.T) {
-	if !privateSession(t) {
-		return
+	c, id := setup(t)
+	self, err := state.Inspect(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
 	}
-	h := startHelper(t, stubbornHelper, "")
+	guard := state.Identity{PID: self.PID, Start: "fixture-guard", Boot: self.Boot, Group: self.PID, Session: self.PID}
+	if err = state.Update(context.Background(), c.Home, id, func(record *state.Record) { record.Guard = guard }); err != nil {
+		t.Fatal(err)
+	}
+	profile := filepath.Join(c.Home, id, "profile")
+	if err = os.Mkdir(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	member := self
+	member.Start = "fixture-member"
+	script := [][]state.Identity{{member}, nil, {member}, nil, nil}
+	var calls int
 	original := privateMembers
 	t.Cleanup(func() { privateMembers = original })
-	seen, missed := false, false
 	privateMembers = func(record state.Record) ([]state.Identity, error) {
-		members, err := original(record)
-		if len(members) > 0 && seen && !missed {
-			missed = true
-			return nil, err
+		if !state.Equal(record.Guard, guard) {
+			t.Error("drain enumerated another session")
 		}
-		seen = seen || len(members) > 0
-		return members, err
+		calls++
+		if calls > len(script) {
+			return nil, nil
+		}
+		return script[calls-1], nil
 	}
-	h.stopAndCheck(t)
+	r := &runtime{home: c.Home, id: id, profile: profile}
+	r.stop()
+	if r.cleanupErr != nil {
+		t.Fatal(r.cleanupErr)
+	}
+	if calls < 3 {
+		t.Fatalf("drain finished after %d enumerations, before the confirming scan found the omitted member", calls)
+	}
+	if calls != len(script) {
+		t.Fatalf("drain finished after %d enumerations, want %d", calls, len(script))
+	}
+	if _, err = os.Stat(profile); !os.IsNotExist(err) {
+		t.Fatal("profile survived a confirmed empty session")
+	}
 }
 
 // A session whose record cannot be read cannot be drained, so stop keeps the
