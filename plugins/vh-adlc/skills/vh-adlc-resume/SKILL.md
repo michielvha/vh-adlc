@@ -28,6 +28,14 @@ Input: an issue, a feature document, a branch, or "continue". Follow `references
    blocker with the smallest decision that clears it, and the next operation `next` named with its reason.
    Missing committed state is a blocker, never a reason to restart the feature.
 
+## Loop routes
+
+This operation's loop role and route come from `.vh-adlc/loop.yaml` through
+`bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
+host default. Resume takes the route of the operation it continues
+(`--operation resume --continues <operation>`). Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
+files and its project procedure, whose local rules apply alongside this procedure. A `host` route that names a model runs with it as a requested model.
+
 ## Continue
 
 After the report, carry on with the step `next` named when your existing authority covers it, in the owning

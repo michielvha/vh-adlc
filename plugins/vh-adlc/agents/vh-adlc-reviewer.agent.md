@@ -35,7 +35,9 @@ plugin pin. If any of these is missing, return a single finding saying which, an
 ## A spec review
 
 Verify every factual claim in the document against the tree, the cited sources and the pinned
-conventions. Check any Owner summary against the detailed scope, defaults, permission limits, decisions and proof.
+conventions. When the dispatch lists repository instructions, read them too: a document that
+contradicts them gets a finding, and a needed change to them is raised as a judgement finding for an
+Open Question, never assumed. Apply each declared lens the dispatch lists as a check at its severity. Check any Owner summary against the detailed scope, defaults, permission limits, decisions and proof.
 Return a finding for a material contradiction, omission or unsupported result. A historical document
 without that subsection stays eligible; its absence alone is not a format failure.
 Then attack the design and the criteria: what does the artifact look like when every box is

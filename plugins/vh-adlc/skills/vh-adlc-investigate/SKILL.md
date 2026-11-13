@@ -32,3 +32,10 @@ Input: an issue, a failure, a question or a document. Follow `references/loop.md
 Edit the report with `guides/humanize-prose.md` at the resolved revision. Report the knowledge line, what
 was measured and how, the hypotheses still open, the smallest next decision, and the page and revision
 used to edit the prose.
+
+## Loop routes
+
+This operation's loop role and route come from `.vh-adlc/loop.yaml` through
+`bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
+host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
+files and its project procedure, whose local rules apply alongside this procedure. A `host` route that names a model runs with it as a requested model.

@@ -36,6 +36,13 @@ minimal doc corrections join that task's checks and commit. An incomplete
 assessment stops before ticking/committing; preserve edits and resolve its gap
 within scope or hand it off. Undeclared repositories retain their existing flow.
 
+## Loop routes
+
+This operation's loop role and route come from `.vh-adlc/loop.yaml` through
+`bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
+host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
+files and its project procedure, whose local rules apply alongside this procedure. A `host` route that names a model runs with it as a requested model.
+
 ## Start
 
 1. Get the binary and run `vh-adlc knowledge` with `conventions/feature-documents.md`,

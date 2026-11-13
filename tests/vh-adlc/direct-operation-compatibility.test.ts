@@ -16,13 +16,16 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
   let current = readFileSync(join(root, path), "utf8");
   // Loop settings (docs/specs/shared-development-loop.md) add one section; the rest of the body is unchanged.
   const loopStart = current.indexOf("## Loop routes\n");
-  if (loopStart >= 0) {
-    const loopEnd = current.indexOf("\n## ", loopStart + 1) + 1;
-    expect(loopEnd).toBeGreaterThan(loopStart);
+  expect(loopStart).toBeGreaterThan(0);
+  {
+    const next = current.indexOf("\n## ", loopStart + 1);
+    const loopEnd = next < 0 ? current.length : next + 1;
     const loop = current.slice(loopStart, loopEnd);
-    for (const phrase of [".vh-adlc/loop.yaml", "scripts/loop/cli.ts route", "references/loop-settings.md", "host default"]) expect(loop).toContain(phrase);
+    for (const phrase of [".vh-adlc/loop.yaml", "scripts/loop/cli.ts route", "references/loop-settings.md", "host default", "scripts/loop/cli.ts context", "project procedure"]) expect(loop).toContain(phrase);
+    if (name === "resume") expect(loop).toContain("--continues");
+    if (name === "spec") expect(loop).toContain("lenses");
     if (name === "spec" || name === "review") for (const phrase of ["scripts/loop/cli.ts review", "references/review-protocol.md", "pending", "requested model"]) expect(loop).toContain(phrase);
-    current = current.slice(0, loopStart) + current.slice(loopEnd);
+    current = (current.slice(0, loopStart) + current.slice(loopEnd)).replace(/\n+$/, "\n");
   }
   if (name === "implement" || name === "ship") {
     const start = current.indexOf("## Documentation impact\n"), end = current.indexOf("## Start\n", start);
