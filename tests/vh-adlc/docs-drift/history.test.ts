@@ -74,6 +74,17 @@ test.each(["matching", "missing-job", "missing-step", "wrong-step-result"])("pro
   else await expect(verifyActionsReport(input)).rejects.toThrow("required producer job");
 });
 
+test("a first-red report with attention last remains eligible under the complete protected job contract", async () => {
+  const input = fixture();
+  input.producer = { ...producer, required_jobs: [{ name: producer.job_name, steps: [...producer.required_steps] }] };
+  input.provenance_bytes = createActionsEnvelope(input.report_bytes, { settings: input.settings, run: input.run, producer: input.producer });
+  input.archive = zip(input.report_bytes, input.provenance_bytes);
+  input.artifact = { ...input.artifact, size_in_bytes: input.archive.length, digest: "sha256:" + sha256(input.archive) };
+  expect(input.jobs[0].steps.at(-1)?.name).toBe(input.producer.attention_step);
+  expect(input.run.conclusion).toBe("failure"); expect(JSON.parse(input.report_bytes.toString()).outcome).toBe("new-attention");
+  expect((await verifyActionsReport(input)).record.sha256).toBe(sha256(input.report_bytes));
+});
+
 test("foreign workflow/repository/branch, fork, PR/dispatch/test context and unknown producer cannot carry", async () => {
   for (const change of [
     { workflow_id: 99 }, { path: ".github/workflows/foreign.yml" }, { event: "pull_request" }, { event: "workflow_dispatch" },

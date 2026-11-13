@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { collectNativeReportHistory, historyCollectionOutput } from "./history-collection";
 import { assessmentReviewOutput, collectAssessmentReviewTarget, collectAssessmentReview } from "./assessment-review";
 import { readCoordinatedSelection } from "./coordination";
 import { collectNativeRetained } from "./retained-controller";
@@ -41,6 +42,7 @@ export type CLIReport = {
   retained_operation?: Awaited<ReturnType<typeof collectNativeRetained>>["retained_operation"];
   recovery_inspection?: Awaited<ReturnType<typeof inspectRecovery>>;
   recovery_effects?: ReturnType<typeof recoveryEffectsOutput>["recovery_effects"];
+  history_collection?: Awaited<ReturnType<typeof collectNativeReportHistory>>;
   assessment_review_target?: Awaited<ReturnType<typeof collectAssessmentReviewTarget>>;
   assessment_review?: Awaited<ReturnType<typeof collectAssessmentReview>>;
   assessment_report?: ReturnType<typeof readAssessmentReport>; markdown?: string;
@@ -106,6 +108,8 @@ bun <plugin>/scripts/docs-drift/cli.ts collect-publication-inputs --repo <assess
 bun <plugin>/scripts/docs-drift/cli.ts collect-assessment-review-target|read-assessment-review
   <the source/runtime/original-worker arguments of read-worker-preparation>
   --reviewer-capture <original-independent-capture> --reviewer-capture-sha256 <sha256> (read only)
+bun <plugin>/scripts/docs-drift/cli.ts collect-report-history
+  (same original source/decision/runtime flags as collect-worker-inputs; hosted runs bind GITHUB_RUN_ID)
 bun <plugin>/scripts/docs-drift/cli.ts collect-worker-inputs --repo <assessment-repo> --source <full-commit>
   --artifact-root <private-external-directory> --cache-root <retained-cache>
   --entry <hosted|copilot|claude> --launcher <invoked-launcher> --settings <invoked-settings>
@@ -298,6 +302,7 @@ function publicationOutcome(state: PublishResult["state"]): CLIReport["outcome"]
   return state === "acknowledged" || state === "retired" ? "attention" : "incomplete";
 }
 
+const historyCommands = ["collect-report-history"];
 const assessmentReviewCommands = ["collect-assessment-review-target", "read-assessment-review"];
 const retainedCommands = ["inspect-retained", "restore-retained"];
 const recoveryCommands = ["inspect-recovery", "acknowledge-delivery", "reconcile-publication"];
@@ -311,8 +316,8 @@ const selectionCommands = [...closureRoleCommands, "check-edits", "prepare", "co
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", ...assessmentReviewCommands, ...selectionCommands, ...recoveryCommands, ...retainedCommands].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", ...assessmentReviewCommands, ...selectionCommands, ...recoveryCommands, ...retainedCommands].includes(command);
+  if (!["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", ...historyCommands, ...assessmentReviewCommands, ...selectionCommands, ...recoveryCommands, ...retainedCommands].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", ...historyCommands, ...assessmentReviewCommands, ...selectionCommands, ...recoveryCommands, ...retainedCommands].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
@@ -323,9 +328,9 @@ function argumentsForCommand(argv: string[]) {
   if (candidateCommands.includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
   if (coordinationCommands.includes(command)) flags.push("--coordination", "--coordination-sha256");
   if (command === "check-verification") flags.push("--verification", "--verification-sha256");
-  if ([...assessmentReviewCommands, "collect-publication-inputs", ...publicationCommands, ...closureRoleCommands, "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
+  if ([...historyCommands, ...assessmentReviewCommands, "collect-publication-inputs", ...publicationCommands, ...closureRoleCommands, "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
   if ([...assessmentReviewCommands, ...closureEffectCommands, "collect-closure-review-target", "read-closure-review", "read-worker-preparation", "collect-review-target", "read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--worker-capture", "--worker-capture-sha256");
-  if ([...assessmentReviewCommands, "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256");
+  if ([...historyCommands, ...assessmentReviewCommands, "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256");
   if (publicationCommands.includes(command)) flags.push("--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256");
   if (["read-assessment-review", ...closureEffectCommands, "read-closure-review", "read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--reviewer-capture", "--reviewer-capture-sha256");
   if ([...finalPublicationCommands, ...closureEffectCommands].includes(command)) flags.push("--authority", "--authority-sha256");
@@ -354,6 +359,7 @@ function argumentsForCommand(argv: string[]) {
     "collect-review-target": ["--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256", "--worker-capture", "--worker-capture-sha256"],
     "bind-publication": ["--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256"],
   };
+  requiredReferences["collect-report-history"] = ["--cache-root", "--entry", "--launcher", "--settings", "--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256"];
   requiredReferences["collect-assessment-review-target"] = ["--cache-root", "--entry", "--launcher", "--settings", "--source-verification", "--source-verification-sha256",
     "--decisions", "--decisions-sha256", "--worker-capture", "--worker-capture-sha256"];
   requiredReferences["read-assessment-review"] = [...requiredReferences["collect-assessment-review-target"], "--reviewer-capture", "--reviewer-capture-sha256"];
@@ -600,16 +606,19 @@ export async function main(argv: string[]): Promise<number> {
         report = { schema_version: 1, command: options.command, outcome: edit_inspection.complete ? "collected" : "incomplete",
           source_commit: options.source, diagnostics: [...protection, ...edit_inspection.diagnostics.filter(message => !protectionMessages.has(message)).map(message => ({ code: "edit-inspection", message }))], edit_inspection };
       }
-    } else if ([...assessmentReviewCommands, "collect-worker-inputs", "read-worker-preparation"].includes(options.command)) {
+    } else if ([...historyCommands, ...assessmentReviewCommands, "collect-worker-inputs", "read-worker-preparation"].includes(options.command)) {
       const artifacts = privateArtifacts(options.artifacts, repo), entry = options.entry;
       if ((entry !== "hosted" && entry !== "copilot" && entry !== "claude") || !options.cache || !options.launcher || !options.settings)
         throw Error("worker input collection requires cache-root, entry, launcher and settings");
       const { settings } = loadCommittedSettings(repo, options.source);
-      const input: WorkerCollectionOptions = { repo, source: options.source, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(),
+      const input: WorkerCollectionOptions = { repo, source: options.source, artifact_root: artifacts.root, owner: artifacts.owner,
+        run: historyCommands.includes(options.command) && entry === "hosted" ? process.env.GITHUB_RUN_ID ?? "" : randomUUID(),
         credential: nativeCredential(settings.hostname), cache_directory: resolve(options.cache), entry, launcher_path: resolve(options.launcher), settings_path: resolve(options.settings),
         source_verification: { path: options.source_verification, sha256: options.source_verification_sha256 },
         decisions: { path: options.decisions, sha256: options.decisions_sha256 } };
-      if (assessmentReviewCommands.includes(options.command)) {
+      if (historyCommands.includes(options.command)) {
+        report = historyCollectionOutput(await collectNativeReportHistory(input));
+      } else if (assessmentReviewCommands.includes(options.command)) {
         const original = { ...input, worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 } };
         report = options.command === "collect-assessment-review-target"
           ? assessmentReviewOutput("collect-assessment-review-target", await collectAssessmentReviewTarget(original))

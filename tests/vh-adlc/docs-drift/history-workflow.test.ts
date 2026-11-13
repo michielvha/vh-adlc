@@ -60,3 +60,26 @@ test.each(["different-worker", "expression-caller", "second-caller", "not-reusab
   const bytes = fault === "not-reusable" ? Buffer.from(worker().toString().replace('"workflow_call":null', '"push":null')) : worker();
   expect(() => readHistoryWorkflowContract({ scheduled: caller, worker: bytes, worker_path: workerPath })).toThrow("incomplete docs-drift history workflow");
 });
+
+test.each(["after-attention", "dependent-job", "transitive-dependent-job", "conditional-job", "conditional-step", "ignored-job-failure", "ignored-step-failure"])("history refuses a layout that cannot complete a first-red report: %s", async fault => {
+  const { readHistoryWorkflowContract } = await import("../../../plugins/vh-adlc/scripts/docs-drift/history-workflow");
+  const parsed = JSON.parse(worker().toString()), job = parsed.jobs.report;
+  if (fault === "after-attention") job.steps.push({ name: "Runs too late", run: "synthetic-only" });
+  if (["dependent-job", "transitive-dependent-job"].includes(fault)) {
+    parsed.jobs.later = { needs: "report", "runs-on": "ubuntu-latest", steps: [{ name: "Late job", run: "synthetic-only" }] };
+    if (fault === "transitive-dependent-job") parsed.jobs.last = { needs: ["later"], "runs-on": "ubuntu-latest", steps: [{ name: "Last job", run: "synthetic-only" }] };
+  }
+  if (fault === "conditional-job") job.if = "${{ inputs.enabled }}";
+  if (fault === "conditional-step") job.steps[0].if = "${{ inputs.enabled }}";
+  if (fault === "ignored-job-failure") job["continue-on-error"] = true;
+  if (fault === "ignored-step-failure") job.steps[0]["continue-on-error"] = true;
+  expect(() => readHistoryWorkflowContract({ scheduled, worker: Buffer.from(JSON.stringify(parsed)), worker_path: workerPath })).toThrow("incomplete docs-drift history workflow");
+});
+
+test("mandatory diagnostic upload may use always() while attention remains last", async () => {
+  const { readHistoryWorkflowContract } = await import("../../../plugins/vh-adlc/scripts/docs-drift/history-workflow");
+  const parsed = JSON.parse(worker().toString());
+  parsed.jobs.report.if = "${{ always() }}";
+  parsed.jobs.report.steps[3].if = "always()";
+  expect(readHistoryWorkflowContract({ scheduled, worker: Buffer.from(JSON.stringify(parsed)), worker_path: workerPath }).attention_step).toBe("Drift attention");
+});
