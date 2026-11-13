@@ -62,6 +62,231 @@ func TestFailedHandoffRetainsRecoveryAfterOwnerClosesBrowser(t *testing.T) {
 	}
 }
 
+// privateSession reruns the calling test as a session leader, the way the guard
+// runs the supervisor that owns a browser, and reports whether the caller is
+// already that rerun and should continue.
+func privateSession(t *testing.T) bool {
+	t.Helper()
+	if self, err := state.Inspect(os.Getpid()); err == nil && self.Session == self.PID {
+		return true
+	}
+	cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.count=1", "-test.v")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	out, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(out), "--- PASS: "+t.Name()) {
+		t.Fatalf("private-session run failed: %v\n%s", err, out)
+	}
+	return false
+}
+
+// Chromium's network service flushes its disk cache into the profile after the
+// browser process has exited. These scripts stand in for such helpers.
+const (
+	// Writes once the browser is gone, then exits on its own. It ignores
+	// SIGTERM, as a helper that shuts down on its own schedule would.
+	flushingHelper = `trap '' TERM; while kill -0 "$parent" 2>/dev/null; do sleep 0.02; done; sleep 0.3; mkdir -p "$profile/Default/Cache"; : >"$profile/Default/Cache/index"; : >"$marker"`
+	// Ignores the browser's exit until it is killed.
+	stubbornHelper = `trap '' TERM; mkdir -p "$profile/Default/Cache"; : >"$marker"; while :; do mkdir -p "$profile/Default/Cache"; sleep 0.02; done`
+	// Keeps forking writers until it is killed.
+	forkingHelper = `trap '' TERM; while :; do (sleep 0.2; mkdir -p "$profile/Default/Cache"; : >"$marker") & sleep 0.01; done`
+)
+
+func TestStopOutlastsBrowserHelpers(t *testing.T) {
+	if !privateSession(t) {
+		return
+	}
+	t.Run("flushing", func(t *testing.T) { stopOutlastsHelper(t, flushingHelper, "", false) })
+	t.Run("stubborn", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, "", false) })
+	t.Run("late-fork", func(t *testing.T) { stopOutlastsHelper(t, forkingHelper, "", false) })
+	// A browser that crashed or was closed by its owner leaves helpers that are
+	// no longer its descendants, and a helper may lead its own process group.
+	t.Run("orphaned", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, "", true) })
+	t.Run("own-process-group", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, "set -m; ", true) })
+}
+
+// helperRun is a stand-in browser whose helper writes into its profile.
+type helperRun struct {
+	r                       *runtime
+	browser                 *child
+	helper                  state.Identity
+	home, id, profile, mark string
+}
+
+func startHelper(t *testing.T, helperScript, prefix string) helperRun {
+	t.Helper()
+	c, id := setup(t)
+	profile := filepath.Join(c.Home, id, "profile")
+	if err := os.Mkdir(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	marker, pidFile := filepath.Join(dir, "helper-wrote"), filepath.Join(dir, "helper-pid")
+	script := `profile=$1 marker=$2; parent=$$; ` + prefix + `(sh -c 'echo $PPID' >"$3"; ` + helperScript + `) & exec sleep 30`
+	r := &runtime{home: c.Home, id: id, profile: profile}
+	browser, err := r.spawn("browser", "/bin/bash", []string{"-c", script, "bash", profile, marker, pidFile}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var helper state.Identity
+	for deadline := time.Now().Add(5 * time.Second); helper.PID == 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("helper did not start")
+		}
+		data, _ := os.ReadFile(pidFile)
+		if pid, e := strconv.Atoi(strings.TrimSpace(string(data))); e == nil {
+			helper, _ = state.Inspect(pid)
+		}
+	}
+	t.Cleanup(func() { _ = state.Signal(helper, syscall.SIGKILL) })
+	return helperRun{r: r, browser: browser, helper: helper, home: c.Home, id: id, profile: profile, mark: marker}
+}
+
+func stopOutlastsHelper(t *testing.T, helperScript, prefix string, orphan bool) {
+	t.Helper()
+	h := startHelper(t, helperScript, prefix)
+	if prefix != "" && h.helper.Group == h.browser.identity.Group {
+		t.Fatal("helper did not lead its own process group")
+	}
+	if orphan {
+		if err := state.Signal(h.browser.identity, syscall.SIGKILL); err != nil {
+			t.Fatal(err)
+		}
+		<-h.browser.done
+	}
+	h.stopAndCheck(t)
+}
+
+func (h helperRun) stopAndCheck(t *testing.T) {
+	t.Helper()
+	h.r.stop()
+	if h.r.cleanupErr != nil {
+		t.Fatal(h.r.cleanupErr)
+	}
+	if state.Alive(h.helper) {
+		t.Fatal("browser helper survived stop")
+	}
+	if _, err := os.Stat(h.mark); err != nil {
+		t.Fatal("helper never wrote the profile")
+	}
+	time.Sleep(500 * time.Millisecond)
+	if _, err := os.Stat(h.profile); !os.IsNotExist(err) {
+		t.Fatal("browser helper recreated the profile after stop")
+	}
+}
+
+// A member can fork and exit between reading the /proc listing and inspecting
+// it, so one enumeration omits its live child. The scripted enumerations see a
+// member, omit it once, find it again on the confirming scan, then lose it for
+// good; drain must finish only after that. The fixture member's birth time is
+// not the test process's, so the pidfd signal refuses it.
+func TestStopConfirmsAnEmptySession(t *testing.T) {
+	c, id := setup(t)
+	self, err := state.Inspect(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard := state.Identity{PID: self.PID, Start: "fixture-guard", Boot: self.Boot, Group: self.PID, Session: self.PID}
+	if err = state.Update(context.Background(), c.Home, id, func(record *state.Record) { record.Guard = guard }); err != nil {
+		t.Fatal(err)
+	}
+	profile := filepath.Join(c.Home, id, "profile")
+	if err = os.Mkdir(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	member := self
+	member.Start = "fixture-member"
+	script := [][]state.Identity{{member}, nil, {member}, nil, nil}
+	var calls int
+	original := privateMembers
+	t.Cleanup(func() { privateMembers = original })
+	privateMembers = func(record state.Record) ([]state.Identity, error) {
+		if !state.Equal(record.Guard, guard) {
+			t.Error("drain enumerated another session")
+		}
+		calls++
+		if calls > len(script) {
+			return nil, nil
+		}
+		return script[calls-1], nil
+	}
+	r := &runtime{home: c.Home, id: id, profile: profile}
+	r.stop()
+	if r.cleanupErr != nil {
+		t.Fatal(r.cleanupErr)
+	}
+	if calls < 3 {
+		t.Fatalf("drain finished after %d enumerations, before the confirming scan found the omitted member", calls)
+	}
+	if calls != len(script) {
+		t.Fatalf("drain finished after %d enumerations, want %d", calls, len(script))
+	}
+	if _, err = os.Stat(profile); !os.IsNotExist(err) {
+		t.Fatal("profile survived a confirmed empty session")
+	}
+}
+
+// A session whose record cannot be read cannot be drained, so stop keeps the
+// profile and reports that a helper may be alive.
+func TestStopFailsClosedWithoutTheSessionRecord(t *testing.T) {
+	if !privateSession(t) {
+		return
+	}
+	h := startHelper(t, stubbornHelper, "")
+	if err := os.Chmod(filepath.Join(h.home, h.id, "state.json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.r.stop()
+	if h.r.cleanupErr == nil || h.r.cleanupErr.Error() != "browser-helper-cleanup-pending" {
+		t.Fatalf("stop without its session record: %v", h.r.cleanupErr)
+	}
+	if _, err := os.Stat(h.profile); err != nil {
+		t.Fatal("profile removed while a helper may be alive")
+	}
+}
+
+// A recorded guard whose PID now belongs to a foreign session leader must not
+// make that session's processes look like ours.
+func TestStopLeavesForeignSessionsAlone(t *testing.T) {
+	if !privateSession(t) {
+		return
+	}
+	foreign := exec.Command("/bin/sh", "-c", "/bin/sleep 30 & wait")
+	foreign.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := foreign.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = foreign.Process.Kill(); _ = foreign.Wait() })
+	leader, err := state.Inspect(foreign.Process.Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, id := setup(t)
+	stale := leader
+	stale.Start = "recycled"
+	if err = state.Update(context.Background(), c.Home, id, func(record *state.Record) { record.Guard = stale }); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	var members []state.Identity
+	entries, _ := os.ReadDir("/proc")
+	for _, e := range entries {
+		if pid, e := strconv.Atoi(e.Name()); e == nil {
+			if member, e := state.Inspect(pid); e == nil && member.Session == leader.PID {
+				members = append(members, member)
+			}
+		}
+	}
+	if len(members) < 2 {
+		t.Fatal("foreign session did not start")
+	}
+	(&runtime{home: c.Home, id: id}).stop()
+	for _, member := range members {
+		if !state.Alive(member) {
+			t.Fatal("stop signalled a process outside its session")
+		}
+	}
+}
+
 func TestHandoffRetainsLockedProfile(t *testing.T) {
 	c, id := setup(t)
 	profile := filepath.Join(c.Home, id, "profile")
@@ -131,7 +356,7 @@ func TestHandoffRejectsForeignBrowserIdentity(t *testing.T) {
 func TestMain(m *testing.M) {
 	// Helper roles re-execute this test binary in place of x11vnc and Chromium.
 	if file := os.Getenv("REMOTE_GUI_TEST_FAKE_VNC"); file != "" {
-		os.Exit(fakeVNC(file))
+		os.Exit(fakeVNCProcess(file))
 	}
 	if file := os.Getenv("REMOTE_GUI_TEST_STUBBORN"); file != "" {
 		os.Exit(stubbornBrowser(file))
@@ -285,9 +510,9 @@ func TestBrowserComponentsCrashAndExpire(t *testing.T) {
 	}
 }
 
-// fakeVNC accepts x11vnc's password handshake, ignores every key and logs
+// fakeVNCProcess accepts x11vnc's password handshake, ignores every key and logs
 // each key event to <file>.keys, so a test can prove that no key was sent.
-func fakeVNC(file string) int {
+func fakeVNCProcess(file string) int {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return 1
@@ -515,9 +740,10 @@ type standInClipboard struct {
 	conn   net.Conn
 }
 
-func (*standInClipboard) Set(context.Context, string) error   { return nil }
-func (*standInClipboard) Get(context.Context) (string, error) { return "", nil }
-func (*standInClipboard) Clear(context.Context) error         { return nil }
+func (*standInClipboard) Set(context.Context, string) error              { return nil }
+func (*standInClipboard) Get(context.Context) (string, error)            { return "", nil }
+func (*standInClipboard) Clear(context.Context) error                    { return nil }
+func (*standInClipboard) Menus(context.Context) (map[uint32]bool, error) { return nil, nil }
 func (h *standInClipboard) Close() error {
 	alive := state.Alive(h.chrome.identity)
 	_ = os.WriteFile(h.record, []byte(strconv.FormatBool(alive)+" "+strconv.FormatInt(time.Now().UnixNano(), 10)), 0o600)
@@ -956,8 +1182,9 @@ func (d *clipboardDouble) Set(_ context.Context, text string) error {
 	return nil
 }
 
-func (d *clipboardDouble) Get(context.Context) (string, error) { return "", nil }
-func (d *clipboardDouble) Close() error                        { return nil }
+func (d *clipboardDouble) Get(context.Context) (string, error)            { return "", nil }
+func (d *clipboardDouble) Close() error                                   { return nil }
+func (d *clipboardDouble) Menus(context.Context) (map[uint32]bool, error) { return nil, nil }
 
 func (d *clipboardDouble) Clear(context.Context) error {
 	d.mu.Lock()

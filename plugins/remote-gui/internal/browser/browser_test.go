@@ -132,6 +132,10 @@ func TestRealHumanBrowserHandoff(t *testing.T) {
 	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
 		t.Skip("requires existing GUI dependencies and disposable browser processes")
 	}
+	// Stop drains helpers only inside a private session, as in production.
+	if !privateSession(t) {
+		return
+	}
 	c, id := setup(t)
 	c.BrowserMode = "human"
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -170,6 +174,138 @@ func TestRealHumanBrowserHandoff(t *testing.T) {
 		t.Fatal("return to human mode lost its control boundary or viewer")
 	}
 	checkHumanProcess(t, human.Owned)
+}
+
+// typedMenus marks the quit's second menu query, which it makes only after
+// it wrote Alt+F to the display.
+type typedMenus struct {
+	clipboardHelper
+	calls atomic.Int32
+	typed chan struct{}
+}
+
+func (m *typedMenus) Menus(ctx context.Context) (map[uint32]bool, error) {
+	if m.calls.Add(1) == 2 {
+		close(m.typed)
+	}
+	return m.clipboardHelper.Menus(ctx)
+}
+
+// renderers returns the renderer processes that descend from the browser.
+func renderers(t *testing.T, browser int) []state.Identity {
+	t.Helper()
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parents := map[int]int{}
+	for _, entry := range entries {
+		pid, e := strconv.Atoi(entry.Name())
+		if e != nil {
+			continue
+		}
+		data, e := os.ReadFile("/proc/" + entry.Name() + "/stat")
+		if e != nil {
+			continue
+		}
+		fields := strings.Fields(string(data)[strings.LastIndexByte(string(data), ')')+1:])
+		if len(fields) > 1 {
+			parents[pid], _ = strconv.Atoi(fields[1])
+		}
+	}
+	var found []state.Identity
+	for pid := range parents {
+		ancestor := parents[pid]
+		for ancestor > 1 && ancestor != browser {
+			ancestor = parents[ancestor]
+		}
+		cmdline, e := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/cmdline")
+		if ancestor != browser || e != nil || !strings.Contains(string(cmdline), "--type=renderer") {
+			continue
+		}
+		if id, e := state.Inspect(pid); e == nil {
+			found = append(found, id)
+		}
+	}
+	if len(found) == 0 {
+		t.Fatal("no renderer process found")
+	}
+	return found
+}
+
+// A busy page delays Chromium's app menu: the browser opens it only after the
+// page's renderer declines Alt+F. Pausing the renderers until half a second
+// after Alt+F reached the display makes that delay deterministic, and the
+// Exit mnemonic must not reach the page while the menu is still closed.
+func TestRealHandoffWaitsForStalledBrowserMenu(t *testing.T) {
+	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
+		t.Skip("requires existing GUI dependencies and disposable browser processes")
+	}
+	// Stop drains helpers only inside a private session, as in production.
+	if !privateSession(t) {
+		return
+	}
+	menus := &typedMenus{typed: make(chan struct{})}
+	original := openClipboard
+	openClipboard = func(ctx context.Context, d xclip.Display) (clipboardHelper, error) {
+		real, err := original(ctx, d)
+		if err != nil {
+			return nil, err
+		}
+		menus.clipboardHelper = real
+		return menus, nil
+	}
+	t.Cleanup(func() { openClipboard = original })
+	c, id := setup(t)
+	c.BrowserMode = "human"
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	if err := state.Update(ctx, c.Home, id, func(record *state.Record) { record.Config = c }); err != nil {
+		t.Fatal(err)
+	}
+	h, err := Start(ctx, c, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Stop()
+	browser := 0
+	for _, process := range h.Owned {
+		if process.Role == "browser" {
+			browser = process.Identity.PID
+		}
+	}
+	paused := renderers(t, browser)
+	for _, renderer := range paused {
+		if err = state.Signal(renderer, syscall.SIGSTOP); err != nil {
+			t.Fatal(err)
+		}
+	}
+	resumed, returned := make(chan error, 1), make(chan struct{})
+	go func() {
+		select {
+		case <-menus.typed:
+			time.Sleep(500 * time.Millisecond)
+		case <-returned:
+		}
+		var failed error
+		for _, renderer := range paused {
+			if e := state.Signal(renderer, syscall.SIGCONT); e != nil {
+				failed = e
+			}
+		}
+		resumed <- failed
+	}()
+	agent, err := h.Handoff(ctx, "agent")
+	close(returned)
+	if e := <-resumed; e != nil {
+		t.Fatal(e)
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	if agent.CDPAddress == "" || agent.MarkerURL != h.MarkerURL {
+		t.Fatal("hand-back after a stalled page lost control or the marker")
+	}
 }
 
 func checkHumanProcess(t *testing.T, owned []state.Process) {
@@ -224,6 +360,10 @@ func TestDisplayAllocationPreservesForeignLock(t *testing.T) {
 func TestRealHeadedBrowser(t *testing.T) {
 	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
 		t.Skip("set REMOTE_GUI_BROWSER_E2E=1 with existing host GUI dependencies")
+	}
+	// Stop drains helpers only inside a private session, as in production.
+	if !privateSession(t) {
+		return
 	}
 	c, id := setup(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
@@ -1220,11 +1360,6 @@ func TestRealHandoffClearsTheRemoteClipboard(t *testing.T) {
 	go func() {
 		var err error
 		view, err = session.Handoff(s.home, s.id, "agent")
-		// A fresh human browser occasionally misses the native Exit menu, which the
-		// product reports as a retryable close failure; retry that once.
-		if err != nil && strings.Contains(err.Error(), "browser-close-needs-owner") {
-			view, err = session.Handoff(s.home, s.id, "agent")
-		}
 		done <- err
 	}()
 	statuses := map[int]int{}
@@ -1306,6 +1441,10 @@ func (f *failingClear) Clear(ctx context.Context) error {
 func TestRealFailedClearRetriesIntoAgentMode(t *testing.T) {
 	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
 		t.Skip("requires existing GUI dependencies and disposable browser processes")
+	}
+	// Stop drains helpers only inside a private session, as in production.
+	if !privateSession(t) {
+		return
 	}
 	var double *failingClear
 	original := openClipboard
