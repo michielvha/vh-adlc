@@ -1,6 +1,6 @@
 ---
 status: planned
-status_description: "Accepted by the owner at R-8 under an advance acceptance; R-8's seven findings are listed, not applied. Next: the task list."
+status_description: "Accepted by the owner at R-8 under an advance acceptance; R-8's seven findings are listed, not applied. Tasks written; next: implementation on a feature branch."
 issue: null
 goal: "A spec review loop that finds blocking defects early and stops asking for passes after three consecutive passes without one."
 covers:
@@ -378,7 +378,17 @@ reviewed revert of the docs and plugin edits and the pin.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/review-convergence.test.ts` - failing checks that the resolved `conventions/feature-documents.md` holds the three severity definitions and the free-text example requirement; they fail at the current pin because the page has neither (AC-02, AC-05)
+- [ ] T2 `docs/specs/spec-review-convergence.md` - the companion `vhco-pro/docs` change to `conventions/feature-documents.md` (severity definitions, the Acceptance stopping rule with the `streak <n> of 3` marker, the free-text rule) passes that repository's `npm run check` and an independent review with the rules block byte-for-byte unchanged; record its PR and published commit here (AC-02, AC-05, AC-06)
+- [ ] T3 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/references/security-settings.md` - move every docs pin to the published commit; T1 passes, and the rules block comparison and the three-spec lint, `fresh` and gate comparison from two committed-pin scratch clones show no difference (AC-06, AC-02, AC-05)
+- [ ] T4 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` - rate with the resolved definitions, ask the four failure-mode questions, return every finding in one pass and name every restatement; the AC-02, AC-03 reviewer, AC-04 and AC-05 trials pass with fixtures, returned records and reported model committed under `tests/vh-adlc/evidence/review-convergence/` (AC-02, AC-03, AC-04, AC-05)
+- [ ] T5 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` - author mode states the four failure-mode answers in Design or raises Open Questions, and sweeps every restatement in one commit; the AC-07 and AC-03 author trials pass with transcripts committed under `tests/vh-adlc/evidence/review-convergence/` (AC-03, AC-07)
+- [ ] T6 `tests/vh-adlc/scenarios/run.ts` - the scripted reviewer (a plugin copy whose canned records, keyed by pass number and starting with `MODEL: scripted-reviewer`, live under `tests/vh-adlc/evidence/review-convergence/`) and AC-01 Variants A to I, plus S7.7's check reading only the latest spec review's records; the variants fail because no streak marker is written yet (AC-01)
+- [ ] T7 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `plugins/vh-adlc/references/review-protocol.md` - review-mode steps 1 to 7, conditional on the resolved page holding the severity definitions: streak marker, saved nits, in-session dispatch, the resumed-pass check, owner and drift acceptance; T6 Variants A, B, C, D, D2, D3, F, H and I pass, and S7.7, S7.7.accept, S7.9 and S14.spec pass (AC-01)
+- [ ] T8 `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md`, `plugins/vh-adlc/references/loop.md` - apply the stopping rule before acting on `owner acceptance` from `vh-adlc next` and continue through review mode; T6 Variants E and G pass (AC-01)
+- [ ] T9 `tests/vh-adlc/scenarios/run.ts` - old-pin case: in a clone on the previous pin, review mode applies findings as today, writes no streak marker, the reviewer still reports a seeded failure-mode gap, and the report names the plugin's pin from `knowledge.md` (AC-06)
+- [ ] T10 `docs/get-started/first-feature.md`, `docs/user-guides/workflows.md` - describe the stopping rule, saved nits and owner acceptance; the plugin's documentation checks in `bun test tests/vh-adlc` pass (Design: Delivery)
+- [ ] T11 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - move both manifests together to one version above the version current at the time, rebased onto `shared-development-loop` if it has landed; the version-change check and the full `bun test tests/vh-adlc` pass (AC-06)
 
 ## Open Questions
 
