@@ -586,8 +586,10 @@ published plugin is installed from the marketplace and exercised, and a rollback
 - [ ] AC-01: A repository's `.vh-adlc/loop.yaml` names a route for each loop role, every SDD operation dispatches according to it, a `command` route is accepted only for the two reviewer roles, no vh-adlc agent or skill file names a model, and a repository without the file behaves as it does at `a7bfca99`.
       Evidence: R-23 at `0b5b5f23` returned not met.
 - [ ] AC-02: From a Claude Code session, a read-only spec review that reads only a read-only export of the target commit and writes nothing, and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; the route, instruction files and lenses come from `loop.yaml` at the reviewed commit; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`, where a route with `model_attestation: codex-session` matches on the model Codex's session log records rather than the reviewer's self-report; and a mismatched model or target, a missing header, a non-zero exit, a timeout, a failed process cleanup or any change outside the declared `review_scratch` directories to the private clone's `HEAD`, refs, index entries, status, file contents or ignored-file list, or to the owning worktree's `HEAD`, branch ref, index entries, status, file contents or ignored-file list, leaves the review pending, while another session's push to the shared refs during the review does not with no Review Log row.
+      Residual: https://github.com/michielvha/vh-adlc/issues/85
       Evidence: R-23 at `0b5b5f23` returned not verified.
 - [ ] AC-03: Every SDD operation reads the declared project procedure and instruction files, and a spec review flags a document that contradicts a declared instruction file or lens.
+      Residual: https://github.com/michielvha/vh-adlc/issues/85
       Evidence: R-23 at `0b5b5f23` returned not verified.
 - [ ] AC-04: Implement and ship run each declared verification rung whose path condition holds over the whole feature delta, or that is declared always, and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
       Evidence: R-23 at `0b5b5f23` returned not met.
@@ -596,9 +598,10 @@ published plugin is installed from the marketplace and exercised, and a rollback
 - [ ] AC-06: Feature-document lint accepts `covers` entries containing `**`, they match the same paths as the docs-impact matcher, and under such an entry a committed change makes the applicable review stale while an uncommitted change makes `feature_tree_clean` false, as for a plain entry.
       Evidence: R-23 at `0b5b5f23` returned met.
 - [ ] AC-07: With `findings_document: always`, investigate writes its findings document, or extends the existing analysis document that already covers the case without creating a second one, never leaves an issue holding the only copy of its findings, reports any duplicate analysis document or open issue it found, and ends with one of the three verdicts.
-      Residual: https://github.com/michielvha/vh-adlc/issues/78
+      Residual: https://github.com/michielvha/vh-adlc/issues/85
       Evidence: R-23 at `0b5b5f23` returned not verified.
 - [ ] AC-08: Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` and the matching plain-language requests through `AGENTS.md` run the installed vh-adlc operations with Stackweaver's settings for every enrolled spec and, until the native agents retire, the native agents for every unenrolled one (after retirement, AC-17's refusal applies to terminal unenrolled documents), new specs are written enrolled, and every row of the committed parity map passes its contract test.
+      Residual: https://github.com/michielvha/vh-adlc/issues/85
       Evidence: R-23 at `0b5b5f23` returned not verified.
 - [ ] AC-09: Every Stackweaver spec in the migration set (the draft specs, plus each planned, in-progress or parked spec the owner moved) passes `vh-adlc lint`, its gate results agree with a manual reading of the document, and each moved spec that was planned or in progress carries a fresh review and an owner acceptance row at its converted baseline.
       Evidence: R-23 at `0b5b5f23` returned met.
@@ -607,19 +610,22 @@ published plugin is installed from the marketplace and exercised, and a rollback
 - [ ] AC-11: A disposable Stackweaver checkout rolls back to the native loop and reapplies the adoption, with the docs index and unrelated workflow files byte-identical afterwards.
       Evidence: R-23 at `0b5b5f23` returned not met.
 - [ ] AC-12: On the feature branch, a GoReleaser snapshot build produces all four runtime archives, the plugin's `knowledge.md` pin names the merged vhco-pro/docs revision, and a candidate plugin installed from the branch in an isolated profile runs every adapted Stackweaver command through its entry points.
+      Residual: https://github.com/michielvha/vh-adlc/issues/85
       Evidence: R-23 at `0b5b5f23` returned not verified.
 - [ ] AC-13: Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on a branch this session created or was handed over, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops before writing anything, and when the push is rejected it keeps the local claim commit, creates no feature branch and reports the claim pending.
       Evidence: R-23 at `0b5b5f23` returned met.
 - [ ] AC-14: A Stackweaver feature taken through the adopted loop passes its completion gate in its owning worktree before merge, and after it lands by merge commit every commit its Review Log names is reachable from `main`.
+      Residual: https://github.com/michielvha/vh-adlc/issues/85
       Evidence: R-23 at `0b5b5f23` returned not verified.
 - [ ] AC-15: With `skip_ci_paths` declared and a resolved delivery convention that supports it, a feature delivery whose commit, push range and PR diff touch only feature documents, Markdown onboarding files or declared paths carries the skip marker, and any other change in the delivery leaves it off; when the resolved convention does not support it, the marker follows the documentation-only rule and the report says the setting was ignored and why.
       Evidence: R-23 at `0b5b5f23` returned met.
 - [ ] AC-16: In Stackweaver, `/spec review` never moves an enrolled spec to `planned` without an owner acceptance row, and `/spec` and `/investigate` create no issue without an explicit request or accepted scope.
       Evidence: R-23 at `0b5b5f23` returned met.
 - [ ] AC-17: Stackweaver's native spec, tasks, implement and reviewer agent files stay routable while any non-terminal spec, domain-extension plans included, is unenrolled, are retired only after none is, and after retirement an adapted command given a terminal unenrolled document refuses without running anything.
+      Residual: https://github.com/michielvha/vh-adlc/issues/85
       Evidence: R-23 at `0b5b5f23` returned not verified.
 - [ ] AC-18: With `implement_worktree: isolated`, implement started in the primary worktree continues in a host-created isolated worktree, or stops before writing on a host without a worktree tool, and the primary worktree's branch, `HEAD`, index and files are unchanged afterwards; without the setting, behavior is unchanged.
-      Residual: https://github.com/michielvha/vh-adlc/issues/78
+      Residual: https://github.com/michielvha/vh-adlc/issues/85
       Evidence: R-23 at `0b5b5f23` returned not verified.
 - [ ] AC-19: The settings reference, the operation reports and Stackweaver's adapters and project procedure use each glossary term with the meaning the Glossary gives it, and introduce no other name for those concepts.
       Evidence: R-23 at `0b5b5f23` returned met.
