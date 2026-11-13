@@ -94,7 +94,9 @@ The security reconciliation candidate adds normalized scanner packets, typed rep
 history comparison schema 2. Its development evidence and unrun surfaces are recorded in
 [the security reconciliation feature](../specs/maintenance-security-resolution.md). Existing
 settings/inventories/reports remain readable; older helpers reject a newly adopted `security_policy`
-key and require the documented settings rollback handoff. Candidate tests do not establish a released
+key and require the documented settings rollback handoff. They reject `security_settings` and
+`security_settings_keep_off` the same way; adopting either key needs plugin 0.16.0 or later.
+Candidate tests do not establish a released
 marketplace upgrade, automatic scanner collection or live advisory remediation.
 
 Triage reads `.vh-adlc/triage.yaml` and maintenance reads `.vh-adlc/maintenance.yaml`. YAML settings need
@@ -149,6 +151,8 @@ claiming that the whole scenario matrix passed.
 | Copilot CLI lifecycle intake and agent loop | Unsupported | [Copilot CLI evidence](../../tests/vh-adlc/evidence/copilot-cli/README.md) |
 | `vh-adlc-clean` host cleanup, plugin 0.13.0, Claude Code and Codex on Linux | Headless Claude Code 2.1.316 auto-mode and Codex CLI 0.163.0 `workspace-write` sessions and the real-host sequence passed on one Linux host with the operation as it stood at plugin 0.11.0, unchanged in 0.13.0; interactive sessions are not covered | [Host cleanup acceptance](../specs/host-cleanup.md); [AC-11 procedure](../../tests/vh-adlc/evidence/clean/procedure.md); [host cleanup](#host-cleanup) |
 | macOS arm64 | Core desktop GUI loop passed; other surfaces and full-matrix limits are listed separately | [Desktop GUI run](../../tests/vh-adlc/evidence/claude-desktop/gui-smoke.md), [binary and fixture checks](../../tests/vh-adlc/evidence/claude-code/S1.host.macos.md) |
+| Antigravity CLI 1.4.7 and the language server from standalone IDE 2.5.5 run headless, Linux x64, plugin 0.3.1 | Unsupported for workflows. Native GitHub installation passed and all seven skills of that version were discovered; the reviewer agent was skipped because Antigravity expects `tools` as a YAML list. No authenticated workflow ran | [Installation](../../tests/vh-adlc/evidence/antigravity/install-smoke.md); [reviewer fallback](../../tests/vh-adlc/evidence/antigravity/reviewer-fallback.md) |
+| Kiro CLI 1.26.0, Linux x64, reviewer file from plugin 0.3.1 (`6ea0ce5`), plugin not installed | An explicit read-only child profile reported reading the shared reviewer; the generic default child was not usable, and a trusted-shell child ran validation but could also create files, so read-only was not enforced | [Reviewer fallback probes](../../tests/vh-adlc/evidence/kiro/reviewer-fallback.md) |
 | Structural reviewer isolation | Unsupported: reviews record `procedural` | The reviewer has a shell, which can still write |
 | Choosing a specific reviewer model | Capability-dependent; a mismatch remains pending | A host must be able to pass the requested model and return a matching identity. A silently substituted model or an unavailable selector never counts as a match |
 

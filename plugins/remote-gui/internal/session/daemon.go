@@ -461,7 +461,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	if r.Kind == "share" {
 		connectionCheck = func(ctx context.Context, conn net.Conn) bool { return connectionOwned(ctx, r, conn) }
 	}
-	p, err := proxy.New(proxy.Options{OwnerLogin: ownerLogin, ServePeer: servePeer, ID: id, Origin: origin, Target: target, Deadline: r.Expires, UpstreamAlive: alive, UpstreamConnection: connectionCheck, ViewerAssets: bundle.Assets, ViewerPassword: bundle.Password})
+	p, err := proxy.New(proxy.Options{OwnerLogin: ownerLogin, ServePeer: servePeer, ID: id, Origin: origin, Target: target, Deadline: r.Expires, UpstreamAlive: alive, UpstreamConnection: connectionCheck, ViewerAssets: bundle.Assets, ViewerPassword: bundle.Password, Clipboard: bundle.Clipboard})
 	if err != nil {
 		return err
 	}

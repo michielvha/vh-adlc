@@ -8,6 +8,9 @@ export type SurfaceExpectation = {
   reason: string;
   evidence: string;
 };
+export const WRITABLE_SECURITY_SETTINGS = ["dependabot_alerts", "dependabot_security_updates", "secret_scanning", "secret_scanning_push_protection"] as const;
+export type WritableSecuritySetting = typeof WRITABLE_SECURITY_SETTINGS[number];
+export type SecurityKeepOff = { repository: string; settings: WritableSecuritySetting[]; reason: string };
 export type Settings = {
   schema_version: 1;
   root: string;
@@ -29,4 +32,6 @@ export type Settings = {
   project_procedure?: string;
   security_policy?: string;
   surface_expectations: SurfaceExpectation[];
+  security_settings?: "apply" | "check";
+  security_settings_keep_off?: SecurityKeepOff[];
 };

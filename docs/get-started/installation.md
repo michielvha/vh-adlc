@@ -87,6 +87,21 @@ Inside a Claude Code session, the equivalents are:
 
 Type `/vh-adlc` and choose an operation from the suggestions.
 
+## Antigravity
+
+With the [Antigravity CLI](https://antigravity.google/docs/cli/install/) (`agy`) installed, run:
+
+```sh
+agy plugin install https://github.com/michielvha/vh-adlc/tree/main/plugins/vh-adlc
+```
+
+The command installs the package from `main` globally. Antigravity is unsupported for vh-adlc
+workflows. Only installation and skill discovery have been checked, on plugin 0.3.1 with CLI 1.4.7 and
+the language server from IDE 2.5.5 run headless; no skill or workflow ran, and current versions are
+untested. Antigravity also skipped the reviewer agent because it expects the agent's `tools`
+frontmatter as a YAML list, so operations that dispatch the reviewer or the blog editor are not
+expected to work there. See [compatibility](../reference/compatibility.md#support-matrix).
+
 ## What the plugin installs
 
 The package contains fifteen skills: the generic `vh-adlc` entry, eleven engineering

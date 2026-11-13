@@ -98,19 +98,17 @@ checks release state and prepares drafts under its own requested scope.
 
 ## After an authorized merge
 
-Use trunk-based development. A separate owner-authorized merge ends the remote
-PR branch's lifetime. Enable GitHub's `delete_branch_on_merge` repository setting
-when the owner authorizes repository configuration, and verify that GitHub
-removed the merged branch. If it remains, fetch the default branch and compare
-the remote branch's current tip: delete it only when that tip is reachable from
-the default branch. A merged PR is insufficient if new commits were pushed to
-its branch afterward.
+Use trunk-based development. A separate owner-authorized merge ends the PR
+branch's lifetime, and the merge is not finished until that branch is gone.
+Merge without `--delete-branch`, then run `after-merge` for that PR as
+`references/branches.md` describes. It removes the remote branch, its stale
+tracking ref and the local branch, but only while their tips are contained in
+the merged PR head. A branch with commits pushed after the merge is kept.
 
-Never delete the default branch, a protected branch, an active PR branch, or
-unmerged work. Delete local merged branches only with `git branch -d`, after
-checking `git worktree list --porcelain` and confirming none owns that branch.
-Do not remove worktrees or force-delete branches to finish cleanup. Report
-preserved branches and the reason. A ship request alone does not authorize a
+Report every outcome and kept reason. A branch kept because a worktree holds it
+stays until the owner asks for worktree cleanup. When GitHub's
+`delete_branch_on_merge` setting is off, say so and suggest a branch-hygiene
+plan, which proposes enabling it. A ship request alone does not authorize a
 merge or repository-setting changes.
 
 ## Report

@@ -1,7 +1,7 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { relative, sep } from "node:path";
 import { origin, resolveInside } from "../triage/settings";
-import type { Dashboard, RelatedRepository, Settings, SurfaceExpectation } from "./types";
+import { WRITABLE_SECURITY_SETTINGS, type Dashboard, type RelatedRepository, type SecurityKeepOff, type Settings, type SurfaceExpectation, type WritableSecuritySetting } from "./types";
 import { settingsFile } from "../settings-file";
 
 function fail(field: string): never { throw Error(`invalid maintenance settings: ${field}`); }
@@ -28,7 +28,7 @@ function unique(values: string[], field: string): string[] {
 function strings(value: unknown, field: string): string[] {
   return unique(list(value, field).map(item => text(item, field)), field);
 }
-function repository(value: unknown, field: string): string {
+export function repository(value: unknown, field: string): string {
   const result = text(value, field).toLowerCase();
   if (!/^[a-z0-9][a-z0-9-]*\/[a-z0-9_.-]+$/.test(result) || result.split("/").some(p => p === "." || p === "..")) fail(field);
   return result;
@@ -46,6 +46,26 @@ function path(root: string, value: unknown, field: string, kind: "file" | "direc
   if (kind !== "file" && existsSync(resolved) && !statSync(resolved).isDirectory()) fail(`${field} must be a directory`);
   if (kind === "directory" && !existsSync(resolved)) fail(`${field} must reference a directory`);
   return relative(root, resolved).split(sep).join("/") || ".";
+}
+
+export const SETTINGS_KEYS = ["schema_version", "repository", "hostname", "repositories", "discovery_organizations", "excluded_repositories",
+  "bot_authors", "bot_inventory_terms", "dashboards", "generated_mirrors", "source_references", "backlog_references",
+  "report_dir", "history_dir", "project_procedure", "security_policy", "surface_expectations", "security_settings", "security_settings_keep_off"];
+
+/** Validates the two security settings keys against the repositories a settings file may name. */
+export function securitySettings(input: Record<string, unknown>, allowed: string[]): Pick<Settings, "security_settings" | "security_settings_keep_off"> {
+  if (input.security_settings !== undefined && input.security_settings !== "apply" && input.security_settings !== "check") fail("security_settings must be apply or check");
+  const rows: SecurityKeepOff[] = list(input.security_settings_keep_off, "security_settings_keep_off").map(value => {
+    const item = object(value, "security_settings_keep_off"); keys(item, ["repository", "settings", "reason"], "security_settings_keep_off");
+    const repo = repository(item.repository, "security_settings_keep_off repository");
+    if (!allowed.includes(repo)) fail("security_settings_keep_off repository outside configured scope");
+    const names = strings(item.settings, "security_settings_keep_off settings");
+    if (!names.length || names.some(name => !(WRITABLE_SECURITY_SETTINGS as readonly string[]).includes(name))) fail("security_settings_keep_off settings");
+    return { repository: repo, settings: names as WritableSecuritySetting[], reason: text(item.reason, "security_settings_keep_off reason") };
+  });
+  unique(rows.map(row => row.repository), "security_settings_keep_off");
+  return { ...(input.security_settings === undefined ? {} : { security_settings: input.security_settings }),
+    ...(input.security_settings_keep_off === undefined ? {} : { security_settings_keep_off: rows }) };
 }
 
 export function normalizeLogin(login: string): string {
@@ -66,9 +86,7 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
   const inside = (path: string) => { try { return resolveInside(root, path); } catch { fail("settings path"); } };
   const file = settingsFile({ root, name: "maintenance", settingsPath: options.settingsPath, inside, fail });
   const configured = file.configured, input = object(file.value, "settings object");
-  keys(input, ["schema_version", "repository", "hostname", "repositories", "discovery_organizations", "excluded_repositories",
-    "bot_authors", "bot_inventory_terms", "dashboards", "generated_mirrors", "source_references", "backlog_references",
-    "report_dir", "history_dir", "project_procedure", "security_policy", "surface_expectations"], "settings");
+  keys(input, SETTINGS_KEYS, "settings");
   if (configured && input.schema_version !== 1) fail("schema_version must be 1");
   if (input.repository !== undefined && repository(input.repository, "repository") !== identity.repository) fail("repository conflicts with origin");
   if (input.hostname !== undefined && hostname(input.hostname) !== identity.hostname) fail("hostname conflicts with origin");
@@ -123,5 +141,5 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
     report_dir, history_dir,
     ...(input.project_procedure === undefined ? {} : { project_procedure: path(root, input.project_procedure, "project_procedure", "file") }),
     ...(input.security_policy === undefined ? {} : { security_policy: path(root, input.security_policy, "security_policy", "file") }),
-    surface_expectations };
+    surface_expectations, ...securitySettings(input, allowed) };
 }

@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadSettings, normalizeLogin, classifyAuthor } from "../../../plugins/vh-adlc/scripts/maintenance/settings";
+import { resolveStanding } from "../../../plugins/vh-adlc/scripts/maintenance/authority";
 import { fixture, git } from "./fixtures";
 import { blockYAML } from "../settings-yaml";
 
@@ -139,4 +140,40 @@ test("symlinked output and reference paths cannot escape the checkout", () => {
     f.settings({ schema_version: 1, source_references: ["escape/secret"] });
     expect(() => loadSettings(f.root)).toThrow();
   } finally { rmSync(outside, { recursive: true, force: true }); }
+});
+
+test("security_settings takes apply or check and keep-off rows name scoped repositories and known settings", () => {
+  const f = project();
+  expect(loadSettings(f.root).security_settings ?? "check").toBe("check");
+  f.settings({ schema_version: 1, security_settings: "apply", repositories: [{ repository: "example/satellite", role: "independent" }],
+    security_settings_keep_off: [{ repository: "example/satellite", settings: ["secret_scanning", "dependabot_alerts"], reason: "Owner keeps alerts off here" }] });
+  const config = loadSettings(f.root);
+  expect(config.security_settings).toBe("apply");
+  expect(config.security_settings_keep_off).toEqual([{ repository: "example/satellite", settings: ["secret_scanning", "dependabot_alerts"], reason: "Owner keeps alerts off here" }]);
+  f.settings({ schema_version: 1, security_settings: "check" });
+  expect(loadSettings(f.root).security_settings).toBe("check");
+});
+
+test.each([
+  [{ security_settings: "maybe" }, "security_settings"],
+  [{ security_settings_keep_off: [{ repository: "example/project", settings: ["code_scanning"], reason: "x" }] }, "security_settings_keep_off settings"],
+  [{ security_settings_keep_off: [{ repository: "example/project", settings: ["secret_scanning"] }] }, "security_settings_keep_off reason"],
+  [{ security_settings_keep_off: [{ repository: "other/project", settings: ["secret_scanning"], reason: "x" }] }, "outside configured scope"],
+  [{ security_settings_keep_off: [{ repository: "example/project", settings: ["secret_scanning"], reason: "x" }, { repository: "example/project", settings: ["dependabot_alerts"], reason: "y" }] }, "security_settings_keep_off duplicates"],
+  [{ security_settings_keep_off: [{ repository: "example/project", settings: ["secret_scanning"], reason: "x", note: "extra" }] }, "unsupported fields"],
+] as const)("invalid security settings fail naming the field: %j", (data, field) => {
+  const f = project(); f.settings({ schema_version: 1, ...data });
+  expect(() => loadSettings(f.root)).toThrow(field);
+});
+
+test("committed security settings keys keep an adopted standing publication grant", () => {
+  const f = project();
+  f.write("AGENTS.md", "Use [maintenance settings](.vh-adlc/maintenance.yaml).\n");
+  f.settings({ schema_version: 1, report_dir: "reports", project_procedure: "maintenance-project.md", security_settings: "apply",
+    security_settings_keep_off: [{ repository: "example/project", settings: ["secret_scanning"], reason: "Owner choice" }] });
+  f.write("maintenance-project.md", "## Standing maintenance report publication\n\n| Field | Value |\n| --- | --- |\n| repository | example/project |\n| hostname | github.com |\n| branch | main |\n| publication_route | default-branch-checkout-ff-only |\n| report_dir | reports |\n| index_paths | [] |\n| initial_publication | commit-and-push-before-selection |\n| same_run_updates | commit-and-push |\n");
+  git(f.root, "add", "AGENTS.md", ".vh-adlc/maintenance.yaml", "maintenance-project.md"); git(f.root, "commit", "-qm", "docs: adopt");
+  const commit = git(f.root, "rev-parse", "HEAD"); git(f.root, "update-ref", "refs/remotes/origin/main", commit);
+  const standing = resolveStanding(loadSettings(f.root), { default_branch: "main", default_commit: commit });
+  expect(standing.status).toBe("adopted");
 });

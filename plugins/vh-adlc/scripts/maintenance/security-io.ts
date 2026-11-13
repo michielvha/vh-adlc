@@ -78,7 +78,7 @@ export function inventorySecurityInput(config:Settings,id:string,inventory:Inven
     policy:currentSecurityPolicy(config),policy_assessment:a.policy_assessment,coverage,observations,evidence:a.evidence,decisions:a.decisions,groups:a.groups});
 }
 
-export function reconcileSecurityPacket(config:Settings,id:string,packetPath:string):SecurityResult {
+export function reconcileSecurityPacket(config:Settings,id:string,packetPath:string,options:{before?:number}={}):SecurityResult {
   const absolute=resolve(packetPath),packetBytes=physicalFile(absolute),base=dirname(absolute),packet=v.record(JSON.parse(packetBytes.toString()),["schema_version","synthetic_input","inventory","analysis","scanner_packets","history","evidence_files","history_resolutions"]);
   if(packet.schema_version!==1)throw Error("unsupported security packet schema");
   const synthetic=v.flag(packet.synthetic_input);
@@ -103,21 +103,32 @@ export function reconcileSecurityPacket(config:Settings,id:string,packetPath:str
   const primary=inventory.repositories.find(r=>r.repository===config.repository),defaultBranch=primary?.identity?.default_branch??git(config.root,"symbolic-ref","--short","refs/remotes/origin/HEAD").replace(/^origin\//,"");
   const defaultCommit=git(config.root,"rev-parse",`refs/remotes/origin/${defaultBranch}`);
   const committed=readHistory(config,defaultCommit);
-  const history=[...committed.map(report=>({bytes:Buffer.from(report.text),entry:{sha256:report.digest},provenance:`commit:${report.commit}:${report.path}:${report.digest}`})),
-    ...v.list(packet.history).map(item=>{const file=reference(base,item);return{...file,provenance:`local:${file.entry.sha256}`};})];
-  const historySeen=new Set<string>();
-  for(const file of history){
-    if(historySeen.has(file.entry.sha256))continue;historySeen.add(file.entry.sha256);
-    const markdown=file.bytes.toString();
-    revisions.push(...readSecurityRevisions(markdown));
+  const ownPath=readRun(config,id).state.report?.relative_path;
+  const history=[...committed.map(report=>{const label=report.provenance==="published"?`commit:${report.commit}:${report.path}`:`local:${report.path}`;
+      return{bytes:Buffer.from(report.text),entry:{sha256:report.digest},own:typeof ownPath==="string"&&report.path===ownPath,label,provenance:`${label}:${report.digest}`};}),
+    ...v.list(packet.history).map(item=>{const file=reference(base,item),label=`local:${file.entry.sha256}`;return{...file,own:false,label,provenance:label};})];
+  // Verification replays the revisions that preceded the claimed one; later appends to this run's report are not its inputs.
+  const earlier=(r:SecurityRevision)=>r.run_id!==id||options.before===undefined||r.snapshot_revision<options.before;
+  // This run's recorded report changes with every append, so it contributes only its earlier revisions
+  // and its observations are referenced by path rather than by a digest that a later append replaces.
+  const parsed=history.map(file=>{const markdown=file.bytes.toString(),found=readSecurityRevisions(markdown),legacy=parseObservation(markdown),own=file.own&&legacy?.run_id===id;
+    return{...file,legacy,own,kept:own?found.filter(earlier):found};});
+  // A copy of this run's report may repeat a revision the report itself supplies; the same digest is one revision, not a fork.
+  const ownDigests=new Set(parsed.filter(file=>file.own).flatMap(file=>file.kept.map(r=>r.digest)));
+  const add=(found:SecurityRevision[])=>{for(const r of found)if(r.run_id!==id||!ownDigests.has(r.digest)||!revisions.some(o=>o.digest===r.digest))revisions.push(r);};
+  const historySeen=new Set<string>(),provenance:string[]=[];
+  for(const file of parsed){
+    if(historySeen.has(file.entry.sha256))continue;
+    const {legacy,own,kept}=file;
+    if(!own){historySeen.add(file.entry.sha256);provenance.push(file.provenance);}
+    add(kept);
     // Older reports remain evidence of outstanding observations, never proof of their resolution.
-    const legacy=parseObservation(markdown);
-    if(!readSecurityRevisions(markdown).length && legacy)for(const observation of legacy.observations){
+    if(!kept.length && legacy)for(const observation of legacy.observations){
       if(observation.hostname!==input.hostname||!input.scope.repositories.includes(observation.repository))continue;
       for(const alert of observation.alerts??[]){const identity=`${observation.hostname}/${observation.repository}/${alert.identity}`;
         if(!input.observations.some(o=>o.id===identity))input.observations.push({id:identity,hostname:observation.hostname,repository:observation.repository,surface:observation.surface,provider_id:String(alert.number),provider_state:"unknown",target:{kind:"source",reference:null,platform:"unknown"},
           package:alert.package,ecosystem:null,version:null,location:alert.manifest,severity:alert.severity,advisory_ids:[],affected_range:null,fixed_versions:[],relationship:null,dependency_scope:null,rule:null,observed_at:observation.observed_at,
-          raw_digest:digest(canonicalJSON(alert)),raw_reference:`${file.provenance}#${alert.identity}`,complete:false,synthetic:false,reactivated:false});}
+          raw_digest:digest(canonicalJSON(alert)),raw_reference:`${own?file.label:file.provenance}#${alert.identity}`,complete:false,synthetic:false,reactivated:false});}
     }
   }
   const sameRun=revisions.filter(r=>r.run_id===id),chain=selectSecurityChain(sameRun);
@@ -125,7 +136,7 @@ export function reconcileSecurityPacket(config:Settings,id:string,packetPath:str
   const overlay=(old:unknown[],fresh:unknown[])=>{const map=new Map(old.map(value=>{const row=v.record(value);return[v.text(row.id),row];}));for(const value of fresh){const row=v.record(value);map.set(v.text(row.id),row);}return[...map.values()];};
   input=parseSecurityInput({...input,decisions:overlay(input.decisions,v.list(analysis.decisions)),evidence:overlay(input.evidence,v.list(analysis.evidence)),groups:v.list(analysis.groups)});
   if(packet.history_resolutions!==undefined)input=mergeSecurityHistory({...input,history_gaps:[]},revisions,packet.history_resolutions).input;
-  input.history_provenance=[...new Set([...(input.history_provenance??[]),...history.map(file=>file.provenance)])].sort();
+  input.history_provenance=[...new Set([...(input.history_provenance??[]),...provenance])].sort();
   if(synthetic){input.observations=input.observations.map(o=>({...o,synthetic:true}));input.coverage=input.coverage.map(c=>({...c,synthetic:true}));input.evidence=input.evidence.map(e=>({...e,synthetic:true}));}
   for(const terminal of inventory.terminal??[]){
     const identity=`${terminal.hostname}/${terminal.repository}/${terminal.surface}:${terminal.number}`,observed=input.observations.find(o=>o.id===identity);
@@ -170,7 +181,7 @@ export function reconcileSecurityPacket(config:Settings,id:string,packetPath:str
 export function verifySecurityResult(config:Settings,id:string,value:unknown):SecurityResult{
   const row=v.record(value,["revision","validation"]),receipt=v.record(row.validation,["packet_path","packet_digest"]),path=v.text(receipt.packet_path);
   if(digest(physicalFile(path))!==v.hash(receipt.packet_digest))throw Error("security reconciliation packet changed");
-  const recomputed=reconcileSecurityPacket(config,id,path);
+  const recomputed=reconcileSecurityPacket(config,id,path,{before:v.integer(v.record(row.revision).snapshot_revision,1)});
   if(canonicalJSON(value)!==canonicalJSON(recomputed))throw Error("security reconciliation result changed or falsely reconciled");
   if(recomputed.revision.snapshot.findings.some(f=>f.exception?.expires_at && Date.parse(f.exception.expires_at)<=Date.now()))throw Error("security exception expired; reassessment required");
   return recomputed;

@@ -25,6 +25,8 @@ only repository, renovate/dependabot are the configured bots, and reports/histor
 | `report_dir`, `history_dir` | Contained report output and prior-Markdown read locations. History creates no second artifact. |
 | `project_procedure` | Existing contained Markdown with project ownership, managers/checks, report metadata/index generation and delivery rules. |
 | `surface_expectations` | Documented code-scanning unavailability, described below. |
+| `security_settings` | `apply` or `check`, default `check`. `apply` lets a sweep or onboarding turn on the free security settings in [security-settings.md](security-settings.md), and counts only from the committed default branch as described there. |
+| `security_settings_keep_off` | Rows of `{repository, settings, reason}`: a repository in declared scope, a non-empty list from `dependabot_alerts`, `dependabot_security_updates`, `secret_scanning` and `secret_scanning_push_protection`, and required reason text. Listed settings are never written. One row per repository. |
 
 Unknown keys, invalid types, duplicate/conflicting roles and mismatched identity fail visibly.
 Paths resolve inside the checkout, including existing symlink ancestors; required missing references
@@ -43,10 +45,16 @@ project_procedure: maintenance-project.md
 ```
 
 A surface expectation has `repository`, `surface: "code_scanning"`, numeric HTTP `status`, literal
-`message_contains`, explanatory `reason` and an existing local `evidence` file. Only the exact declared
+`message_contains`, explanatory `reason` and an existing local `evidence` file. The exact declared
 surface/status and matching message receive `complete-unavailable`, null count/alerts and n/a in the
-report. A bare 403/404 is unknown. Success collects findings even if an older expectation says the
-surface was disabled. Other failures stay incomplete; do not silently discard the surface.
+report. So does code scanning on github.com with reason `not-free-on-private` and the status, without
+an expectation, when the repository is private or internal, the caller is admin, neither
+`advanced_security` nor `code_security` is enabled, and the alerts read returns 403 or 404. Any other
+bare 403/404 is unknown. Success collects findings even if an older expectation says the surface was
+disabled. Other failures stay incomplete; do not silently discard the surface. A Dependabot surface is
+incomplete with a null count and the alerts it read, with reason `alerts-enabled-this-run`, when an
+accepted helper file shows an alerts write this run, and with reason `helper-receipt-missing` when
+`--applied-repository` names it but no helper file was accepted.
 
 ## Adopted report-publication declaration
 
@@ -95,20 +103,24 @@ consumer security rules; without it, the existing `project_procedure` can supply
 shared workflow supplies no deadline, severity threshold, accepted-risk policy or named owner. Bind
 the effective instructions/settings/source references by digest when assessing a security packet.
 Older readers reject this new key: follow the documented rollback preflight before dependent use.
+Older readers reject `security_settings` and `security_settings_keep_off` the same way; adopting
+either key needs plugin 0.16.0 or later on every host that reads the settings.
 
 Run `bun <plugin>/scripts/maintenance/cli.ts <operation> --repo <checkout>`.
-All flags take a value, including `true`/`false` booleans. Reject duplicate or unknown flags.
+All flags take a value, including `true`/`false` booleans. Reject duplicate or unknown flags, except
+`--security-settings` and `--applied-repository`, which may repeat.
 JSON inputs are explicit files; never interpolate PR text, settings or payloads into a shell command.
 
 | Operation | Inputs and result |
 | --- | --- |
 | `settings` | Optional `--settings`; resolved settings and validated identity. |
-| `collect` | Optional `--repository`, `--pull`, `--terminal`; fixed GET-only inventory and exact previously observed terminal identities on stdout. |
+| `collect` | Optional `--repository`, `--pull`, `--terminal`, `--run-id`, repeated `--security-settings` (needs `--run-id`) and repeated `--applied-repository`; fixed GET-only inventory and exact previously observed terminal identities on stdout. |
+| `security-settings-mode` | `--repository --default-branch --default-commit`, optional `--run-id`; the security-settings mode, `check` or `apply`, and its reason for that repository. |
 | `security-reconcile` | `--run-id --input`; validate an explicit versioned evidence packet and return typed security accounting plus its private receipt, without mutation. |
 | `start` | Optional narrowed scope and `--request`; new persisted run, or chat-only result when all filesystem writes are forbidden. |
 | `resume` | `--run-id`; validated journal state and changed source/settings flags. |
 | `checkpoint` | `--run-id --revision --digest --state`, optional `--kind`; compare-and-publish a journal snapshot. |
-| `report` | `--run-id --inventory --default-commit`, optional observed `--default-branch`, `--request`, `--metadata`, `--analysis`, `--report-output`; saved report and permission result. |
+| `report` | `--run-id --inventory --default-commit`, optional observed `--default-branch`, `--request`, `--metadata`, `--analysis`, `--report-output`, repeated `--security-settings`; saved report and permission result. |
 | `append` | `--run-id --update`, optional `--request`; compare-version update of an owned draft only. |
 | `history` | `--default-commit`, optional `--observations`; committed/local provenance and per-surface comparisons. |
 | `authority` | `--run-id --default-commit --default-branch`, optional `--request`, `--later-update`; scoped permission result without publication. |

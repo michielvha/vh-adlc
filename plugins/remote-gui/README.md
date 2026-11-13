@@ -46,6 +46,27 @@ A failed handoff preserves the viewer and profile until stop or expiry. Its diag
 
 Provider acceptance remains a separate check. If a provider rejects a genuine human browser, use its supported authentication route or keep that task human-only. Initial side-effect-free `ERR_NETWORK_CHANGED` navigation allows two retries in the same session. Credential submissions and provider rejections require a separate recovery decision.
 
+## Clipboard panel
+
+The **Clipboard** button in the browser viewer opens the clipboard panel. Text moves between the owner's device and the remote clipboard, the CLIPBOARD selection of the shared browser's display, only when the owner presses one of its buttons.
+
+1. To send text, paste it into **Text for the remote browser** with the device's normal paste gesture, then press **Send to remote browser**. Press Ctrl+V in the remote page to paste it there.
+2. To bring text back, copy it in the remote browser, then open the panel or press **Refresh**. **Copied in the remote browser** shows the text, unmasked, with its character count. Press **Copy to this device** to put it on the device's clipboard.
+3. **Clear** empties both panel areas and the remote clipboard.
+
+The panel shows whether the human or the agent controls the shared browser, as of its latest clipboard request. In agent mode it warns that sent text is readable by the agent, and every send confirmation names the mode. A send is refused while the browser is switching modes, or when the mode has changed since the panel showed it. The panel then shows the current mode and keeps the text in the field.
+
+Text up to 64 KiB moves in either direction, including characters outside Latin-1. Larger text is refused with a message in the panel. The panel carries plain text only: no files, images or formatting, and not the PRIMARY selection used by middle-click paste.
+
+The page never reads the device's clipboard. Pasting into the field uses the device's own paste and needs no permission. **Copy to this device** writes the clipboard only inside that click, which Chromium and Firefox allow without a prompt on the HTTPS tailnet origin and on a `127.0.0.1` loopback origin. If the browser still blocks the write, the panel selects the text and asks the owner to copy it with the device's shortcut.
+
+Privacy and clearing rules:
+
+- Clipboard text exists only in the viewer page's memory and in the supervisor's memory while it holds the remote clipboard. It never enters state records, diagnostics, command output or logs.
+- The page empties the panel after a send, on **Clear**, when the viewer disconnects or the page closes, and when the session ends. The send field is kept out of the browser's session-restore files; this is verified for Chromium and Firefox viewers only.
+- Every handoff to agent mode clears the remote clipboard, the PRIMARY selection and the root window's cut buffer after the human browser closes, and checks that all three are empty before the agent's browser starts. If the check fails, the handoff ends in `handoff-failed` with a `clipboard-` diagnostic and no agent browser, and a retry clears again. A handoff to human mode does not clear.
+- x11vnc runs with its own selection handling turned off, so only the supervisor's built-in clipboard helper changes the remote clipboard.
+
 ## Existing host tools
 
 The runtime supports Linux amd64 and the Go version declared in `go.mod`. The Bash helper builds the complete installed module in a private source-keyed cache with `GOTOOLCHAIN=local`, module downloads disabled and VCS stamping disabled. It works outside a Git checkout. If PATH selects an older Go launcher, set `REMOTE_GUI_GO` to the existing matching executable. Nothing is downloaded.

@@ -125,9 +125,9 @@ jobs:
           REMOTE_GUI_TEST_BINARY: ${{ github.workspace }}/plugins/remote-gui/remote-gui
         run: |
           cd plugins/remote-gui
-          go test -race ./internal/browser -count=1
+          go test -race ./internal/browser ./internal/xclip -count=1
           cd ../..
-          bun test tests/remote-gui/browser.e2e.test.ts
+          bun test tests/remote-gui/browser.e2e.test.ts tests/remote-gui/viewer-page.e2e.test.ts
 
   # Tags main, and a branch whose open PR has the release:preview label at this
   # commit. Every other run only calculates the version.
