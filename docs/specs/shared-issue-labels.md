@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Planned with tasks T1 to T19; implementation waits until #78 merges."
+status: in-progress
+status_description: "Claimed on feat/shared-issue-labels after #78 merged; implementing T1 onward."
 issue: https://github.com/michielvha/vh-adlc/issues/83
+branch: feat/shared-issue-labels
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
 covers:
   - plugins/vh-adlc/references/issues.md
