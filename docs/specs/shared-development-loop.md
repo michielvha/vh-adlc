@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Re-accepted by the owner at R-18 after the Codex, attestation, sandbox and policy-source revisions."
+status: in-progress
+status_description: "Re-entered on feat/shared-development-loop after the R-18 acceptance; T25 to T41 remain, with T24 reopened."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
