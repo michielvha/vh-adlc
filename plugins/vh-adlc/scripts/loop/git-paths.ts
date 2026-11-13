@@ -25,12 +25,12 @@ export function statusEntries(repo: string, extra: string[] = []): StatusEntry[]
   return entries;
 }
 
-/** Paths changed between two commits. */
+/** Paths changed between two commits; a rename counts as both its source and its destination. */
 export function diffPaths(repo: string, from: string, to: string): string[] {
-  return nulRecords(repo, ["diff", "--name-only", "-z", from, to]);
+  return nulRecords(repo, ["diff", "--no-renames", "--name-only", "-z", from, to]);
 }
 
-/** Every path any commit in `range` touched, so a change reverted later in the range still counts. */
+/** Every path any commit in `range` touched, rename sources included, so a change reverted later in the range still counts. */
 export function rangePaths(repo: string, range: string): string[] {
-  return [...new Set(nulRecords(repo, ["log", "--name-only", "-z", "--format=", range]).map(path => path.replace(/^\n+/, "")).filter(Boolean))];
+  return [...new Set(nulRecords(repo, ["log", "--no-renames", "--name-only", "-z", "--format=", range]).map(path => path.replace(/^\n+/, "")).filter(Boolean))];
 }

@@ -139,3 +139,28 @@ describe("the skip marker over a push range", () => {
     expect(JSON.parse(run.stdout.toString()).marker).toBe(false);
   });
 });
+
+describe("renames", () => {
+  const settings = () => base().replace("[agents/**, .claude/**]", "[agents/**, .claude/**, docs/**]");
+  test("an outgoing move from code into the feature root leaves the skip marker off", () => {
+    const remoteDir = scratch("vh-delivery-remote-"), remote = join(remoteDir, "r.git");
+    git(remoteDir, "init", "-q", "--bare", "-b", "main", remote);
+    const root = repository(settings());
+    git(root, "remote", "add", "origin", remote); git(root, "push", "-q", "origin", "main");
+    git(root, "mv", "src/app.go", "docs/specs/app.md"); git(root, "commit", "-q", "-m", "move");
+    const cli = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
+    const run = Bun.spawnSync([process.execPath, cli, "skip", "--repo", root, "--base", "origin/main", "--remote-branch", "origin/main", "--feature-root", "docs/specs/", "--docs-revision", "none"],
+      { stdout: "pipe", stderr: "pipe", env: { ...process.env, XDG_CONFIG_HOME: join(remoteDir, "cfg") } });
+    expect(JSON.parse(run.stdout.toString()).marker).toBe(false);
+  });
+  test("a marked merge that moves code into a skip-eligible path still runs the watch", async () => {
+    const stub = watch([1]);
+    const root = repository(settings() + `post_merge_watch:\n  argv: [${stub.script}, "{merge_sha}"]\n`);
+    git(root, "switch", "-q", "-c", "feat/move"); git(root, "mv", "src/app.go", "docs/app.md"); git(root, "commit", "-q", "-m", "move");
+    git(root, "switch", "-q", "main"); git(root, "merge", "-q", "--no-ff", "-m", "Merge move [skip ci]", "feat/move");
+    const merge = git(root, "rev-parse", "HEAD");
+    const verdict = await deliveryVerdict(loadLoopSettings(root, { overridePath: null }), root, merge, { featureRoot: "docs/specs/", supportsSkipPaths: true });
+    expect(verdict).toMatchObject({ delivered: false, state: "failed" });
+    expect(stub.calls()).toBe(1);
+  });
+});

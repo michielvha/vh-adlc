@@ -182,3 +182,17 @@ describe("checks after a merge", () => {
     expect(out.blocking).toContain("behavior");
   });
 });
+
+describe("renames", () => {
+  test("a committed move from code into documentation still selects the code rung", () => {
+    const { root, head } = feature("schema_version: 1\nverification_rungs:\n  - name: integration\n    when: { paths: [\"backend/**\"] }\n    command: \"exit 1\"\n");
+    git(root, "mv", "backend/app.go", "docs/app.md"); const moved = commitAll(root, "move");
+    expect(moved).not.toBe(head);
+    const cli = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
+    const run = Bun.spawnSync([process.execPath, cli, "rungs", "--repo", root, "--base", "main", "--run", "true"], { stdout: "pipe", stderr: "pipe",
+      env: { ...process.env, XDG_CONFIG_HOME: join(root, ".no-override") } });
+    const out = JSON.parse(run.stdout.toString());
+    expect(out.paths).toContain("backend/app.go");
+    expect([run.exitCode, out.applicable, out.advance]).toEqual([3, ["integration"], false]);
+  });
+});
