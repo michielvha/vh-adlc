@@ -17,6 +17,11 @@ covers:
   - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/scripts/settings-file.ts
+  - plugins/vh-adlc/scripts/loop/
+  - plugins/vh-adlc/scripts/triage/owned-process.ts
+  - plugins/vh-adlc/references/loop-settings.md
+  - cmd/vh-adlc/
+  - docs/reference/cli.md
   - plugins/vh-adlc/knowledge.md
   - plugins/vh-adlc/vh-adlc.lock.json
   - plugins/vh-adlc/plugin.json
@@ -72,6 +77,10 @@ final full kind run stay binding.
 
 Delivery follows an Order list after completion, as `host-cleanup.md` does: release, lock PR, marketplace
 install, then Stackweaver's adoption PR. Rollback is rehearsed on a disposable checkout.
+
+A revision after the first acceptance only adds the code paths the design needs to `covers`
+(`plugins/vh-adlc/scripts/loop/`, `scripts/triage/owned-process.ts`, `references/loop-settings.md`,
+`cmd/vh-adlc/`, `docs/reference/cli.md`) and names them in Design; scope and criteria are unchanged.
 
 Validation so far is spec review only, nothing executed: thirteen `gpt-6.1-sol` passes. R-13 has no
 blocking findings; its two should-fix items (findings saved against an existing issue, and reviewer
@@ -207,7 +216,10 @@ map at the then-current heads, so the counts below are a starting point, not the
 ### Model routing per role
 
 A new settings file, `.vh-adlc/loop.yaml`, read through the existing settings reader, declares a route
-for each role:
+for each role. Following the layout the other operations use, its reference is
+`plugins/vh-adlc/references/loop-settings.md`, the shared code that reads it and runs routes, rungs and
+delivery checks lives in `plugins/vh-adlc/scripts/loop/`, and any binary support for the new settings
+kind goes through `cmd/vh-adlc/` and is documented in `docs/reference/cli.md`:
 
 | Role | Used by |
 | --- | --- |
