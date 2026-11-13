@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { collectNativeRetained } from "./retained-controller";
 import { checkClosurePublication, publishClosure, resumeClosure } from "./closure-controller";
 import { collectClosureWorkerInputs, collectClosureReviewTarget, collectClosureReview, closureReviewTargetProjection, closureReviewProjection } from "./closure-worker";
 import { inspectRecovery, applyRecovery, recoveryInspectionOutput } from "./recovery-controller";
@@ -35,6 +36,7 @@ import { canonicalJSON, decodeUTF8, protocolPath } from "./protocol";
 type Diagnostic = { code: string; message: string };
 export type CLIReport = {
   schema_version: 1; command: string; outcome: "collected" | "attention" | "incomplete"; diagnostics: Diagnostic[];
+  retained_operation?: Awaited<ReturnType<typeof collectNativeRetained>>["retained_operation"];
   recovery_inspection?: Awaited<ReturnType<typeof inspectRecovery>>;
   recovery_effects?: ReturnType<typeof recoveryEffectsOutput>["recovery_effects"];
   assessment_report?: ReturnType<typeof readAssessmentReport>; markdown?: string;
@@ -67,6 +69,9 @@ export type CLIReport = {
   prepared?: Awaited<ReturnType<typeof prepareEdits>>;
 };
 const usage = `Documentation drift helper protocol 1
+bun <plugin>/scripts/docs-drift/cli.ts inspect-retained|restore-retained --repo <repo> --source <original-full-commit>
+  --artifact-root <new-private-external-directory> --operation-id <original-operation>
+  Restores observations only; grants no replay or cleanup and reconstructs no missing original approval.
 bun <plugin>/scripts/docs-drift/cli.ts scan --repo <repo> --source <full-commit>
   --artifact-root <private-external-directory>
 bun <plugin>/scripts/docs-drift/cli.ts assess-source --repo <repo> --source <full-commit>
@@ -278,6 +283,7 @@ function publicationOutcome(state: PublishResult["state"]): CLIReport["outcome"]
   return state === "acknowledged" || state === "retired" ? "attention" : "incomplete";
 }
 
+const retainedCommands = ["inspect-retained", "restore-retained"];
 const recoveryCommands = ["inspect-recovery", "acknowledge-delivery", "reconcile-publication"];
 const finalPublicationCommands = ["check-publication", "publish", "resume"];
 const publicationCommands = ["bind-publication", "collect-review-target", "read-candidate-review", ...finalPublicationCommands];
@@ -288,11 +294,12 @@ const selectionCommands = [...closureRoleCommands, "check-edits", "prepare", "co
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", ...selectionCommands, ...recoveryCommands].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", ...selectionCommands, ...recoveryCommands].includes(command);
+  if (!["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", ...selectionCommands, ...recoveryCommands, ...retainedCommands].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", ...selectionCommands, ...recoveryCommands, ...retainedCommands].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
+  if (retainedCommands.includes(command)) flags.push("--operation-id");
   if (recoveryCommands.includes(command)) flags.push("--cache-root", "--entry", "--journal-directory");
   if (["acknowledge-delivery", "reconcile-publication"].includes(command)) flags.push("--authority", "--authority-sha256");
   if ([...selectionCommands, ...recoveryCommands].includes(command)) flags.push("--selection", "--selection-sha256");
@@ -334,9 +341,10 @@ function argumentsForCommand(argv: string[]) {
   for (const name of closureEffectCommands) requiredReferences[name] = [...requiredReferences["read-closure-review"], "--authority", "--authority-sha256"];
   requiredReferences["resume-closure"].push("--journal-directory");
   for (const name of recoveryCommands) requiredReferences[name] = ["--cache-root", "--entry", "--journal-directory", "--selection", "--selection-sha256", ...(name === "inspect-recovery" ? [] : ["--authority", "--authority-sha256"])];
+  for (const name of retainedCommands) requiredReferences[name] = ["--operation-id"];
   const missing = (requiredReferences[command] ?? []).filter(flag => !values.has(flag));
   if (missing.length) throw Error(command + " requires " + missing.join(", "));
-  return { command, repo, source, artifacts, cache: values.get("--cache-root"), entry: values.get("--entry"),
+  return { command, repo, source, artifacts, operation: values.get("--operation-id"), cache: values.get("--cache-root"), entry: values.get("--entry"),
     launcher: values.get("--launcher"), settings: values.get("--settings"), definition: values.get("--trial-definition"),
     selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256"), candidate_repo: values.get("--candidate-repo"), candidate: values.get("--candidate"), resolution_record: values.get("--resolution-record"), resolution_sha256: values.get("--resolution-sha256"), verification: values.get("--verification"), verification_sha256: values.get("--verification-sha256"),
     source_verification: values.get("--source-verification"), source_verification_sha256: values.get("--source-verification-sha256"),
@@ -385,7 +393,12 @@ export async function main(argv: string[]): Promise<number> {
   let report: CLIReport;
   try {
     const options = argumentsForCommand(argv), repo = realpathSync(options.repo);
-    if (recoveryCommands.includes(options.command)) {
+    if (retainedCommands.includes(options.command)) {
+      const artifacts = privateArtifacts(options.artifacts, repo), { settings } = loadCommittedSettings(repo, options.source);
+      report = await collectNativeRetained({ repo, source: options.source, artifact_root: artifacts.root,
+        operation_id: options.operation!, owner: artifacts.owner, run: randomUUID(), credential: nativeCredential(settings.hostname),
+        ...(options.command === "restore-retained" ? { restore: true as const } : {}) });
+    } else if (recoveryCommands.includes(options.command)) {
       const artifacts = privateArtifacts(options.artifacts, repo), entry = options.entry;
       if (entry !== "hosted" && entry !== "copilot" && entry !== "claude") throw Error("Recovery requires a retained entry selection");
       const bytes = readBoundArtifact({ source_repo: repo, artifact_root: artifacts.root,
