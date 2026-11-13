@@ -1,5 +1,5 @@
 import { PublicationScopeChanged } from "./publish";
-import { projectClosureReader, type ClosureInventory } from "./closure-inventory";
+import { requireClosureInventoryScope, projectClosureReader, type ClosureInventory } from "./closure-inventory";
 import { collectClosureTarget } from "./closure";
 import { exactRecord } from "./publication-decisions";
 import { publicationMarker } from "./report-history";
@@ -30,7 +30,7 @@ type ResolutionCollectionResult = {
 
 type NativeCollectionOptions = {
   repo: string; source: string; artifact_root: string; selection: unknown; owner: string; run: string;
-  credential: string; path?: string; closure_inventory?: ClosureInventory;
+  credential: string; path?: string; closure_inventory?: ClosureInventory; closure_operation?: string;
 };
 
 /** The production collector selects the native reader and fixed authenticated fetch itself. */
@@ -95,6 +95,12 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
     || selection.source_commit !== options.source || typeof selection.consolidation !== "number"
     || !Number.isSafeInteger(selection.consolidation) || selection.consolidation < 1) throw Error("closure selection fields or source changed");
   const consolidation = selection.consolidation;
+  if (options.closure_inventory) {
+    const { settings } = loadCommittedSettings(options.repo, options.source);
+    const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    requireClosureInventoryScope(options.closure_inventory, { source_commit: options.source, operation_id: options.closure_operation,
+      consolidation, repository: settings.repository, repository_id: native.identity.repository_id });
+  }
   const result: ClosureCollectionResult = { scope_changed: false, complete: false, diagnostics: [], store: null, inputs: null };
   const before = canonicalDigest(captureRepositoryState(options.repo));
   try {
@@ -167,15 +173,15 @@ export async function collectNativeClosureTarget(input: NativeCollectionOptions)
     throw Error("Exact source and closure operation required");
   const { settings } = loadCommittedSettings(options.repo, options.source);
   publicationMarker(settings, selected.operation_id);
-  if (options.closure_inventory && (options.closure_inventory.operation_id !== selected.operation_id
-    || options.closure_inventory.original.closure.current_default !== options.source)) throw Error("Original closure inventory source and operation required");
   const result: ClosureTargetCollection = { authority: "none", scope_changed: false, complete: false, diagnostics: [], store: null, identity: null, target: null, target_sha256: null };
   const before = canonicalDigest(captureRepositoryState(options.repo)), limit = Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes);
   try {
     const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
     const context = native(); result.identity = context.identity;
+    if (options.closure_inventory) requireClosureInventoryScope(options.closure_inventory, { source_commit: options.source,
+      operation_id: selected.operation_id, consolidation: selected.consolidation, repository: settings.repository, repository_id: context.identity.repository_id });
     if (context.default_commit !== options.source) throw new PublicationScopeChanged("Closure target requires its observed current default source");
-    const collected = await collectNativeClosure({ ...options, selection: { schema_version: 1, source_commit: options.source, consolidation: selected.consolidation } });
+    const collected = await collectNativeClosure({ ...options, closure_operation: selected.operation_id, selection: { schema_version: 1, source_commit: options.source, consolidation: selected.consolidation } });
     result.store = collected.store; result.scope_changed = collected.scope_changed;
     if (!collected.complete || !collected.store || !collected.inputs?.consolidation) {
       result.diagnostics.push(...collected.diagnostics); throw Error("Complete native closure collection required for its model target");

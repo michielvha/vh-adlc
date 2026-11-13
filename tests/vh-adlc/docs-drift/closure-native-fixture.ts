@@ -7,7 +7,7 @@ import { closureFixture } from "./closure-fixture";
 import { commitAll, git, put } from "./repository-fixture";
 
 function nativePull(proposal: PullRequestInput) {
-  return { number: proposal.number, state: proposal.state, merged_at: proposal.merged_at, body: proposal.body, draft: proposal.draft,
+  return { id: 1000 + proposal.number, number: proposal.number, state: proposal.state, merged_at: proposal.merged_at, body: proposal.body, draft: proposal.draft,
     user: { login: proposal.actor, id: proposal.actor_id, type: proposal.actor_type },
     head: { sha: proposal.head_sha, ref: proposal.head_ref, repo: proposal.head_repository },
     base: { sha: proposal.base_sha, ref: proposal.base_ref, repo: proposal.base_repository } };

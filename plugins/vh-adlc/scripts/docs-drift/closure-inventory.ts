@@ -18,6 +18,17 @@ const ownedContexts = new WeakSet<object>();
 function changed(message: string): never { throw new PublicationScopeChanged(message); }
 function same(left: unknown, right: unknown): boolean { return canonicalJSON(left).equals(canonicalJSON(right)); }
 
+/** Every native collection accepting an own-effect context binds its entire requested scope. */
+export function requireClosureInventoryScope(context: ClosureInventory, scope: {
+  source_commit: string; operation_id: string | undefined; consolidation: unknown; repository: string; repository_id: number;
+}): void {
+  if (!ownedContexts.has(context)) throw Error("Original native closure inventory context required");
+  const original = context.original.closure;
+  if (scope.source_commit !== original.current_default || scope.operation_id !== context.operation_id
+    || scope.consolidation !== original.consolidation?.number || scope.repository !== original.repository
+    || scope.repository_id !== original.repository_id) changed("Original closure inventory scope changed");
+}
+
 /** Only an original journal and fresh native effect observation can normalize this batch's own changes. */
 export async function captureClosureInventory(input: {
   source_repo: string; artifact_root: string; journal_directory: string; original: unknown;

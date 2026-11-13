@@ -112,3 +112,14 @@ test("a PR-body change or a missing original prevents reusing a collected closur
   f.proposals.delete(1);
   expect(collectClosureInputs(f.collection).complete).toBe(false);
 });
+
+test("initial ineligible closure input and its later completion are incomplete without a prior scope change", async () => {
+  const f = await setup();
+  f.consolidation.merged = false;
+  const initial = collectClosureInputs(f.collection);
+  expect(initial.complete).toBe(false);
+  expect(initial.scope_changed ?? false).toBe(false);
+  f.consolidation.merged = true;
+  const fresh = recheckClosureInputs(initial, f.collection);
+  expect(fresh.fresh).toBe(false); expect(fresh.scope_changed ?? false).toBe(false);
+});

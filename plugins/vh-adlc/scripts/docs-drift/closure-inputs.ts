@@ -27,14 +27,14 @@ function changed(reason: string): never { throw new PublicationScopeChanged("inc
 function fail(reason: string): never { throw Error("incomplete closure " + reason); }
 function selectedRepository(proposal: PullRequestInput, settings: Settings, id: number): void {
   if (proposal.base_repository.id !== id || proposal.base_repository.full_name.toLowerCase() !== settings.repository
-    || proposal.base_ref !== settings.default_branch) changed("proposal repository scope");
+    || proposal.base_ref !== settings.default_branch) fail("proposal repository scope");
 }
 function nativeShape(proposal: ReturnType<Reader["mergedPull"]>, settings: Settings, id: number): void {
   selectedRepository(proposal, settings, id);
   if (proposal.merged !== true || proposal.state !== "closed" || proposal.merged_at === null || proposal.merge_commit_sha === null || proposal.draft
     || proposal.actor !== settings.publication.actor || proposal.head_repository?.id !== id
     || proposal.head_repository.full_name.toLowerCase() !== settings.repository
-    || !proposal.head_ref.startsWith(settings.publication.branch_prefix)) changed("actual merged consolidation identity");
+    || !proposal.head_ref.startsWith(settings.publication.branch_prefix)) fail("actual merged consolidation identity");
 }
 function nulPaths(bytes: Buffer): string[] {
   if (bytes.length === 0) return [];
@@ -97,19 +97,19 @@ export function collectClosureInputs(options: ClosureCollection): ClosureInputs 
   try {
     requireOwnedStore(options.store, options.settings.repository);
     const repository = options.reader.repository();
-    if (repository.full_name.toLowerCase() !== options.settings.repository || repository.default_branch !== options.settings.default_branch) changed("native repository changed");
+    if (repository.full_name.toLowerCase() !== options.settings.repository || repository.default_branch !== options.settings.default_branch) fail("native repository changed");
     result.repository_id = repository.id;
     const consolidation = options.reader.mergedPull(options.consolidation_id);
-    if (consolidation.number !== options.consolidation_id) changed("native consolidation changed");
+    if (consolidation.number !== options.consolidation_id) fail("native consolidation changed");
     nativeShape(consolidation, options.settings, repository.id);
     result.consolidation = consolidation;
     const mergeCommit = consolidation.merge_commit_sha;
     if (mergeCommit === null) fail("missing actual merge commit");
     const current = options.reader.ref("refs/heads/" + options.settings.default_branch);
-    if (current.ref !== "refs/heads/" + options.settings.default_branch) changed("default ref changed");
+    if (current.ref !== "refs/heads/" + options.settings.default_branch) fail("default ref changed");
     result.current_default = current.sha;
     const currentSnapshot = captureBareSnapshot(options.store.root, current.sha, { required_inputs: options.required_inputs });
-    if (!same(currentSnapshot.settings, options.settings)) changed("current committed settings changed");
+    if (!same(currentSnapshot.settings, options.settings)) fail("current committed settings changed");
     const merged = mergeCommit === current.sha ? currentSnapshot : captureBareSnapshot(options.store.root, mergeCommit);
     readGit(options.store.root, "merge-base", "--is-ancestor", mergeCommit, current.sha);
     const record = locateRecord(options, consolidation, repository.id);
@@ -154,6 +154,7 @@ export function collectClosureInputs(options: ClosureCollection): ClosureInputs 
 
 export function recheckClosureInputs(inputs: ClosureInputs, options: ClosureCollection): { fresh: boolean; scope_changed?: true; diagnostics: string[] } {
   const current = collectClosureInputs(options);
+  if (!inputs.complete) return { fresh: false, ...(inputs.scope_changed ? { scope_changed: true as const } : {}), diagnostics: ["Original complete closure inputs required"] };
   if (!current.complete) return { fresh: false, ...(current.scope_changed ? { scope_changed: true as const } : {}), diagnostics: current.diagnostics };
   if (!same(current, inputs)) return { fresh: false, scope_changed: true, diagnostics: ["Closure inputs changed"] };
   return { fresh: true, diagnostics: [] };

@@ -3,6 +3,7 @@ import { chmodSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { ArtifactChanged } from "../../../plugins/vh-adlc/scripts/docs-drift/evidence-input";
 import { verifyRoleIdentity } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { evidence, hash, role } from "./manifest-fixture";
 import { publicationFixture } from "./publication-fixture";
@@ -61,6 +62,23 @@ test.each(["matching", "role", "source", "runtime", "target", "launch-pid", "lau
     expect(loaded.evidence.native).toEqual(f.original.native);
     expect(loaded.evidence.returned).toEqual(f.original.returned);
     expect(loaded.launch.pid).toBe(f.original.process.pid);
-  } else expect(() => readNativeRoleCapture(options)).toThrow();
+  } else {
+    const changed = ["role", "source", "runtime", "target", "launch-target", "launch-runtime"].includes(scenario);
+    const messages: Record<string, string> = {
+      role: "docs-drift original role capture captured context changed", source: "docs-drift original role capture captured context changed",
+      runtime: "docs-drift original role capture captured context changed", target: "docs-drift original role capture original launch target or context changed",
+      "launch-target": "docs-drift original role capture original launch target or context changed", "launch-runtime": "docs-drift original role capture original launch target or context changed",
+      "launch-pid": "docs-drift original role capture original launch and native capture differ", "launch-context": "docs-drift original role capture original launch and native capture differ",
+      native: "docs-drift original evidence artifact changed", process: "docs-drift original role capture original launch and native capture differ",
+      "candidate-native": "incomplete docs-drift snapshot owned resource overlaps a caller checkout or Git directory",
+    };
+    expect(() => readNativeRoleCapture(options)).toThrow(messages[scenario]);
+    if (changed || scenario === "native") expect(() => readNativeRoleCapture(options)).toThrow(ArtifactChanged);
+    else {
+      let failure: unknown;
+      try { readNativeRoleCapture(options); } catch (error) { failure = error; }
+      expect(failure).toBeInstanceOf(Error); expect(failure).not.toBeInstanceOf(ArtifactChanged);
+    }
+  }
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });

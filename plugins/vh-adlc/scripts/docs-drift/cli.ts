@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { checkClosurePublication, publishClosure, resumeClosure } from "./closure-controller";
 import { collectClosureWorkerInputs, collectClosureReviewTarget, collectClosureReview, closureReviewTargetProjection, closureReviewProjection } from "./closure-worker";
 import { inspectRecovery, applyRecovery, recoveryInspectionOutput } from "./recovery-controller";
 import { recoveryEffectsOutput, publicationEffectsOutput } from "./recovery-output";
@@ -56,6 +57,7 @@ export type CLIReport = {
   source_assessment?: Awaited<ReturnType<typeof assessSource>>;
   candidate_inspection?: ReturnType<typeof inspectCandidate>;
   retained_resources?: { checkout: string | null; record_path: string | null };
+  closure_publication_check?: Awaited<ReturnType<typeof checkClosurePublication>>;
   closure_worker_inputs?: Awaited<ReturnType<typeof collectClosureWorkerInputs>>;
   closure_review_target?: ReturnType<typeof closureReviewTargetProjection>;
   closure_review?: ReturnType<typeof closureReviewProjection>;
@@ -159,6 +161,15 @@ bun <plugin>/scripts/docs-drift/cli.ts check-edits --repo <repo> --source <full-
 bun <plugin>/scripts/docs-drift/cli.ts collect-closure --repo <repo> --source <full-current-default-commit>
   --artifact-root <private-external-directory> --selection <relative-packet-path>
   --selection-sha256 <sha256>
+bun <plugin>/scripts/docs-drift/cli.ts <check-closure-publication|publish-closure|resume-closure>
+  --repo <repo> --source <full-current-default-commit> --artifact-root <private-external-directory>
+  --selection <relative-closure-target-packet> --selection-sha256 <sha256>
+  --cache-root <retained-cache> --entry <hosted|copilot|claude>
+  --launcher <invoked-launcher> --settings <invoked-settings>
+  --worker-capture <relative-original-capture-path> --worker-capture-sha256 <sha256>
+  --reviewer-capture <relative-original-capture-path> --reviewer-capture-sha256 <sha256>
+  --authority <relative-exact-authority-record> --authority-sha256 <sha256>
+  [--journal-directory <original-private-journal>]
 bun <plugin>/scripts/docs-drift/cli.ts <collect-closure-worker-inputs|collect-closure-review-target|read-closure-review>
   --repo <repo> --source <full-current-default-commit> --artifact-root <private-external-directory>
   --selection <relative-closure-target-packet> --selection-sha256 <sha256>
@@ -255,7 +266,10 @@ explanations and retained runtime before semantic assessment. Closure review-tar
 collection reloads the original worker's scoped current-source and asset evidence.
 Reading closure review requires its original independent reviewer at the exact
 manifest. These read-only commands supply authority none. Closure execution follows
-its separate effect grants and fresh publication checks.
+its separate effect grants and fresh publication checks. Closure publication and resume
+require the exact retained executing controller, original native roles and actual
+scoped authority. Original native journals bind same-operation recovery. The publisher
+rechecks exact own effects, fresh source and current permission before each action.
 Verification, review and publication follow their own fresh owned-checkout gates.
 `;
 
@@ -268,7 +282,8 @@ const recoveryCommands = ["inspect-recovery", "acknowledge-delivery", "reconcile
 const finalPublicationCommands = ["check-publication", "publish", "resume"];
 const publicationCommands = ["bind-publication", "collect-review-target", "read-candidate-review", ...finalPublicationCommands];
 const candidateCommands = ["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", ...publicationCommands];
-const closureRoleCommands = ["collect-closure-worker-inputs", "collect-closure-review-target", "read-closure-review"];
+const closureEffectCommands = ["check-closure-publication", "publish-closure", "resume-closure"];
+const closureRoleCommands = ["collect-closure-worker-inputs", "collect-closure-review-target", "read-closure-review", ...closureEffectCommands];
 const selectionCommands = [...closureRoleCommands, "check-edits", "prepare", "collect-resolution", "collect-closure", "collect-closure-target", ...candidateCommands];
 
 function argumentsForCommand(argv: string[]) {
@@ -284,12 +299,12 @@ function argumentsForCommand(argv: string[]) {
   if (candidateCommands.includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
   if (command === "check-verification") flags.push("--verification", "--verification-sha256");
   if (["collect-publication-inputs", ...publicationCommands, ...closureRoleCommands, "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
-  if (["collect-closure-review-target", "read-closure-review", "read-worker-preparation", "collect-review-target", "read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--worker-capture", "--worker-capture-sha256");
+  if ([...closureEffectCommands, "collect-closure-review-target", "read-closure-review", "read-worker-preparation", "collect-review-target", "read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--worker-capture", "--worker-capture-sha256");
   if (["collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256");
   if (publicationCommands.includes(command)) flags.push("--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256");
-  if (["read-closure-review", "read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--reviewer-capture", "--reviewer-capture-sha256");
-  if (finalPublicationCommands.includes(command)) flags.push("--authority", "--authority-sha256");
-  if (command === "resume") flags.push("--journal-directory");
+  if ([...closureEffectCommands, "read-closure-review", "read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--reviewer-capture", "--reviewer-capture-sha256");
+  if ([...finalPublicationCommands, ...closureEffectCommands].includes(command)) flags.push("--authority", "--authority-sha256");
+  if (["resume", "resume-closure"].includes(command)) flags.push("--journal-directory");
   if (command === "report-findings") flags.push("--source-verification", "--source-verification-sha256", "--assessment", "--assessment-sha256");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
@@ -316,6 +331,8 @@ function argumentsForCommand(argv: string[]) {
   };
   for (const name of finalPublicationCommands) requiredReferences[name] = [...requiredReferences["read-candidate-review"], "--authority", "--authority-sha256"];
   requiredReferences.resume.push("--journal-directory");
+  for (const name of closureEffectCommands) requiredReferences[name] = [...requiredReferences["read-closure-review"], "--authority", "--authority-sha256"];
+  requiredReferences["resume-closure"].push("--journal-directory");
   for (const name of recoveryCommands) requiredReferences[name] = ["--cache-root", "--entry", "--journal-directory", "--selection", "--selection-sha256", ...(name === "inspect-recovery" ? [] : ["--authority", "--authority-sha256"])];
   const missing = (requiredReferences[command] ?? []).filter(flag => !values.has(flag));
   if (missing.length) throw Error(command + " requires " + missing.join(", "));
@@ -487,7 +504,21 @@ export async function main(argv: string[]): Promise<number> {
           credential: nativeCredential(settings.hostname), cache_directory: resolve(options.cache), entry: options.entry as "hosted" | "copilot" | "claude",
           launcher_path: resolve(options.launcher), settings_path: resolve(options.settings) };
         const base = { schema_version: 1 as const, command: options.command, source_commit: options.source };
-        if (options.command === "collect-closure-worker-inputs") {
+        if (closureEffectCommands.includes(options.command)) {
+          const reviewed = { ...common, worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 },
+            reviewer_capture: { path: options.reviewer_capture, sha256: options.reviewer_capture_sha256 },
+            authority: { path: options.authority, sha256: options.authority_sha256 } };
+          if (options.command === "check-closure-publication") {
+            const value = await checkClosurePublication(reviewed);
+            report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_publication_check: value,
+              diagnostics: value.diagnostics.map(message => ({ code: "closure-publication-check", message })) };
+          } else {
+            const value = options.command === "publish-closure" ? await publishClosure(reviewed)
+              : await resumeClosure({ ...reviewed, journal_directory: options.journal_directory! });
+            report = publicationEffectsOutput({ command: options.command, source: options.source, outcome: publicationOutcome(value.state),
+              result: value, limit: Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes) });
+          }
+        } else if (options.command === "collect-closure-worker-inputs") {
           const value = await collectClosureWorkerInputs(common);
           report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_worker_inputs: value,
             diagnostics: value.diagnostics.map(message => ({ code: "closure-worker-inputs", message })) };

@@ -43,7 +43,10 @@ test.each(["unmerged", "open", "changed-original", "missing-original-ref", "requ
   expect(report.closure.complete).toBe(false);
   expect(report.closure.diagnostics.length).toBeGreaterThan(0);
   expect(new Set(report.closure.diagnostics).size).toBe(report.closure.diagnostics.length);
-  if (fault === "unmerged" || fault === "open") expect(report.closure.diagnostics).toContain("incomplete closure actual merged consolidation identity");
+  if (fault === "unmerged" || fault === "open") {
+    expect(report.closure.diagnostics).toContain("incomplete closure actual merged consolidation identity");
+    expect(report.closure.scope_changed).toBe(false);
+  }
   if (fault === "required-input") {
     expect(report.closure.diagnostics).toContain("Current observations for required closure inputs unavailable");
     expect(report.closure.inputs.record.value.source.required_inputs).toHaveLength(1);

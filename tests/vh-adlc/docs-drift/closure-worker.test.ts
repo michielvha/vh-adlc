@@ -5,6 +5,7 @@ import { afterAll, expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { collectClosureWorkerInputs, collectClosureReviewTarget, collectClosureReview } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-worker";
+import { collectNativeClosure } from "../../../plugins/vh-adlc/scripts/docs-drift/resolution-entry";
 import { captureClosureInventory } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-inventory";
 import { readNativeContext, createNativeTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
 import { appendIntent, appendOutcome, createJournal, writePublicationObjects, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
@@ -13,17 +14,14 @@ import { effectDigest, manifestDigest, validateReviewedManifest } from "../../..
 import { collectResolutionInputs } from "../../../plugins/vh-adlc/scripts/docs-drift/resolve-inputs";
 import { commitAll, git } from "./repository-fixture";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
-import { runtimeFixture } from "./runtime-fixture";
-import { nativeClosureFixture } from "./closure-native-fixture";
+import { closureRuntimeFixture, closureVerificationPacket as packet } from "./closure-runtime-fixture";
 import { evidence, role } from "./manifest-fixture";
 import { captureSyntheticRole, retainSyntheticArtifact } from "./original-publication-fixture";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 async function fixture(method: "merge" | "squash" | "rebase" = "merge", binary = false, nativeFault = "none") {
-  const adopted = await runtimeFixture(roots, true, false,
-    { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source }, true);
-  const f = await nativeClosureFixture(roots, method, nativeFault, adopted.repo, binary ? original => {
+  return closureRuntimeFixture(roots, method, nativeFault, binary ? original => {
     const bytes = Buffer.from([0, 255, 1]);
     git(original.repo, "switch", "-q", "docs-drift/one");
     writeFileSync(join(original.repo, "docs/asset.bin"), bytes);
@@ -41,19 +39,6 @@ async function fixture(method: "merge" | "squash" | "rebase" = "merge", binary =
       observe_verification: async scope => ({ inputs_sha256: scope.inputs_sha256, state: "passed", artifact_sha256: sha256(bytes),
         method: "Synthetic historical asset check", asset_checks: [sha256(bytes)] }) };
   } : undefined);
-  const options = { repo: f.repo, source: f.source, artifact_root: f.artifacts, owner: "closure-test", run: "closure-worker",
-    selection: { schema_version: 1, source_commit: f.source, consolidation: 20, operation_id: "closure-worker" },
-    credential: "synthetic-read-token", path: f.environment.PATH!, cache_directory: adopted.selection.cache_directory,
-    entry: "copilot" as const, launcher_path: adopted.selection.launcher_path, settings_path: join(f.repo, ".vh-adlc/docs-drift.yaml") };
-  return { ...f, adopted, options };
-}
-type AssetCheck = { path: string; sha256: string | null; artifact: { path: string; sha256: string } };
-function packet(f: Awaited<ReturnType<typeof fixture>>, current: Awaited<ReturnType<typeof collectClosureWorkerInputs>>) {
-  const blob = f.snapshot.blobs.find(blob => blob.path === "src/app.ts");
-  if (!blob) throw Error("Missing source fixture");
-  return { input_sha256: current.worker_input_sha256, verifications: current.target!.target!.verification_scopes.map(scope => ({
-    inputs_sha256: scope.inputs_sha256, state: "passed", method: "Native worker source assessment",
-    evidence: [{ path: blob.path, sha256: sha256(blob.bytes), start: 0, end: blob.bytes.length, quote_sha256: sha256(blob.bytes) }], asset_checks: [] as AssetCheck[] })) };
 }
 
 async function invoke(f: Awaited<ReturnType<typeof fixture>>, command: string, worker?: { path: string; sha256: string }, reviewer?: { path: string; sha256: string }) {
@@ -241,7 +226,16 @@ test("original closure roles survive freshly proven own explanation and closure 
   const other = await collectClosureWorkerInputs({ ...f.options, closure_inventory: context,
     selection: { ...f.options.selection, operation_id: "another-closure" } });
   expect(other.complete).toBe(false);
-  expect(other.diagnostics).toContain("Original closure inventory source and operation required");
+  expect(other.diagnostics).toContain("Original closure inventory scope changed");
+  const foreign = await collectClosureWorkerInputs({ ...f.options, closure_inventory: context,
+    selection: { ...f.options.selection, consolidation: 21 } });
+  expect(foreign.complete).toBe(false); expect(foreign.diagnostics).toContain("Original closure inventory scope changed");
+  const direct = { ...f.options, closure_inventory: context,
+    selection: { schema_version: 1, source_commit: f.source, consolidation: 20 } };
+  await expect(collectNativeClosure(direct)).rejects.toThrow("Original closure inventory scope changed");
+  await expect(collectNativeClosure({ ...direct, closure_operation: "another-closure" })).rejects.toThrow("Original closure inventory scope changed");
+  await expect(collectNativeClosure({ ...direct, closure_operation: f.options.selection.operation_id,
+    selection: { ...direct.selection, consolidation: 21 } })).rejects.toThrow("Original closure inventory scope changed");
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 180000);
 

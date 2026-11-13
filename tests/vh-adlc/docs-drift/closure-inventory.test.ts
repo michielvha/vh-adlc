@@ -2,9 +2,10 @@
 import { afterAll, expect, test } from "bun:test";
 import { writeFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { captureClosureInventory, projectClosureReader } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-inventory";
+import { captureClosureInventory, projectClosureReader, requireClosureInventoryScope } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-inventory";
 import { collectClosureTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/closure";
 import { appendIntent, appendOutcome, createJournal, sealPlan, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { PublicationScopeChanged } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { captureRepositoryState, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -20,7 +21,9 @@ afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force
 
 async function fixture(scenario: string) {
   const f = await closureFixture(roots), artifact_root = dirname(f.collection.store.record_path), source = f.merged;
-  const inputs = collectClosureInputs(f.collection), target = collectClosureTarget({ inputs, collection: f.collection, operation_id: "inventory-closure" });
+  const inputs = collectClosureInputs(f.collection);
+  expect(inputs.complete, JSON.stringify(inputs.diagnostics)).toBe(true);
+  const target = collectClosureTarget({ inputs, collection: f.collection, operation_id: "inventory-closure" });
   expect(target.complete, JSON.stringify(target.diagnostics)).toBe(true);
   const bytes = canonicalJSON({ source_commit: source, identity: runtimeIdentity, target }), original = { path: "original-target.json", sha256: sha256(bytes) };
   writeFileSync(join(artifact_root, original.path), bytes, { mode: 0o600 });
@@ -82,7 +85,33 @@ test.each(["comment", "closed"])("closure recovery normalizes exact observed own
 
 test.each(["no-intent", "changed-comment", "foreign-author", "extra-comment", "unknown", "conflict", "absent", "changed-close", "reopened", "merged"])("closure recovery refuses unproven or changed %s normalization", async scenario => {
   const f = await fixture(scenario), before = captureRepositoryState(f.repo);
-  await expect(captureClosureInventory({ source_repo: f.repo, artifact_root: f.artifact_root, journal_directory: f.journal.directory,
-    original: f.original, transport: f.transport, objects: f.objects, reader: f.collection.reader })).rejects.toThrow();
+  const result = captureClosureInventory({ source_repo: f.repo, artifact_root: f.artifact_root, journal_directory: f.journal.directory,
+    original: f.original, transport: f.transport, objects: f.objects, reader: f.collection.reader });
+  const messages: Record<string, string> = {
+    "no-intent": "Current closure comment inventory changed outside proven own effects",
+    "changed-comment": "Current own closure explanation changed", "foreign-author": "Current own closure explanation changed",
+    "extra-comment": "Current closure comment inventory changed outside proven own effects", unknown: "Current own closure effect proof unavailable",
+    conflict: "Current own closure effect changed", absent: "Current closure comment inventory changed outside proven own effects",
+    "changed-close": "Current own closed proposal changed outside its exact effect", reopened: "Current own closure effect disappeared",
+    merged: "Current own closed proposal changed outside its exact effect",
+  };
+  // no-intent and absent deliberately retain an own-looking comment that lacks usable proof.
+  await expect(result).rejects.toThrow(messages[scenario]);
+  await expect(result).rejects.toBeInstanceOf(scenario === "unknown" ? Error : PublicationScopeChanged);
+  if (scenario === "unknown") await expect(result).rejects.not.toBeInstanceOf(PublicationScopeChanged);
   expect(captureRepositoryState(f.repo)).toEqual(before);
+});
+
+
+test("closure inventory requires the exact source operation consolidation and native repository", async () => {
+  const f = await fixture("closed");
+  const context = await captureClosureInventory({ source_repo: f.repo, artifact_root: f.artifact_root, journal_directory: f.journal.directory,
+    original: f.original, transport: f.transport, objects: f.objects, reader: f.collection.reader });
+  const scope = { source_commit: f.merged, operation_id: "inventory-closure", consolidation: 20, repository: "fixture/docs", repository_id: 10 };
+  expect(() => requireClosureInventoryScope(context, scope)).not.toThrow();
+  for (const patch of [{ source_commit: "a".repeat(40) }, { operation_id: "another-closure" }, { consolidation: 21 },
+    { repository: "fixture/other" }, { repository_id: 11 }]) {
+    expect(() => requireClosureInventoryScope(context, { ...scope, ...patch })).toThrow("Original closure inventory scope changed");
+    expect(() => requireClosureInventoryScope(context, { ...scope, ...patch })).toThrow(PublicationScopeChanged);
+  }
 });
