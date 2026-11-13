@@ -337,6 +337,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-13 | R-1 | spec | `5381e51` | unknown | procedural | Changes needed: 3 blocking, 5 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
+| 2026-11-13 | R-2 | spec | `be943c8` | unknown | procedural | Changes needed: 1 blocking, 2 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
 
 ### R-1
 
@@ -396,3 +397,27 @@ SEVERITY: should-fix
 WHERE: Test Plan / AC-09
 EVIDENCE: docs/specs/shared-issue-labels.md:276 proposes before/after gh issue list --json number,labels snapshots to prove that no issue lost a label. Observed gh issue list --help states that the defaults select only open issues and limit the result to 30. The observed Stackweaver inventory contains 139 open issues, and the criterion also covers closed issues. The written procedure therefore checks only a subset.
 PROPOSAL: Specify complete, paginated snapshots of open and closed issues in each named repository, and compare label sets by issue number while reporting incomplete collection or concurrent changes.
+
+### R-2
+
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope; Design / The labels helper; Owner summary
+EVIDENCE: At be943c8, docs/specs/shared-issue-labels.md:152-153 excludes bot-owned labels and says they stay as their tools create them. Lines 226-234 allow any non-colliding mapped target and require correcting its metadata. For example, bug: dependencies passes the stated uniqueness rule but makes apply overwrite Dependabot's dependencies metadata with the bug color and description. This also contradicts the preservation promise at lines 51-52. The observed Stackweaver label inventory confirms dependencies exists with different metadata.
+PROPOSAL: Resolve whether mappings may claim bot-owned labels. Either refuse those targets before writing and test that refusal, or make the owner-approved exception explicit in Scope, the summary and the criteria.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria / AC-05 and AC-07; Test Plan
+EVIDENCE: docs/specs/shared-issue-labels.md:226-228 says operations apply mapped names, which includes spec. AC-07 at lines 301-305 and its proof at line 322 cover plan, triage and investigate only. The spec scenario at line 320 requires no mapping. These checks can pass while spec continues filing with bug when bug maps to defect, leaving the filing operations inconsistent.
+PROPOSAL: Include spec in the mapping criterion and add a spec filing scenario where only the mapped type label exists. Check both the preview and the created issue's labels.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria; Test Plan / plugin delivery
+EVIDENCE: Pinned conventions/delivery.md:85-89 requires naming affected artifacts and their build and publication paths, with verification through those paths. The document specifies a packaged helper but names no plugin delivery path or installed-helper check. Its Test Plan at docs/specs/shared-issue-labels.md:317-325 covers source fixtures and live label changes. The actual package is distributed through .claude-plugin/marketplace.json:17-20 and .agents/plugins/marketplace.json:17-22, with version metadata in plugins/vh-adlc/plugin.json and plugins/vh-adlc/.claude-plugin/plugin.json. Every proposed criterion can pass without establishing that an installed plugin contains the helper and vocabulary.
+PROPOSAL: Name the affected plugin payload and marketplace delivery paths, and add candidate installation verification that runs the installed helper against a fixture. Describe the later publication check while preserving its separate authorization requirement.
