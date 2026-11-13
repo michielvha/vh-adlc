@@ -11,6 +11,12 @@ no settings file, every loop role keeps the host default and no binary is needed
 | --- | --- |
 | Loop role | One of `author`, `implementer`, `spec_reviewer` and `implementation_reviewer`; each has a route. |
 | Route | How a role runs: `host` (in the current harness, optionally with a named model) or `command` (an external CLI, reviewer roles only). |
+| Enrolled spec | A spec whose Review Log uses the shared header; a consumer's adapted commands send it to the vh-adlc operations. |
+| Verification rung | A declared check with a path condition or `always`, which must pass before push, completion and delivery. |
+| Project procedure | The consumer's file of local rules that every SDD operation reads, named by `project_procedure`. |
+| Primary worktree | The first entry of `git worktree list`; with `implement_worktree: isolated`, implement never writes there. |
+| No publication path | The delivery verdict for a merge commit that carries the skip marker and touches only skip-eligible paths. |
+| Delivered | A feature whose release paths have all published, or whose merge has no publication path. |
 
 ## Roles
 
