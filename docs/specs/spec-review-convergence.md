@@ -566,6 +566,7 @@ withdraws the open questions of its pass into the listed findings. R-12 F-01 to 
 | 2026-11-13 | R-10 | spec | `57d866c` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-11 | spec | `4c7e151` | claude-opus-5-5 | procedural | Clean: no blocking finding; eight should-fix and one nit |
 | 2026-11-13 | R-12 | spec | `d62c9f0` | claude-opus-5-5 | procedural | One blocking finding (F-01 same-day dates cannot order picks against acceptances), six should-fix and two nits |
+| 2026-11-13 | R-13 | spec | `a581e9c` | claude-opus-5-5 | procedural | One blocking finding (F-01 a stale after-owner-change row blocks the next owner change), five should-fix and one nit |
 
 ### R-1
 
@@ -1276,3 +1277,54 @@ SEVERITY: nit
 WHERE: Design, Delivery (lines 384-387 and 392-393); Test Plan AC-01 row (final sentence)
 EVIDENCE: `session()` takes a fixed array of prompts and hardcodes `maxTurns: 80` with no option (tests/vh-adlc/scenarios/run.ts:133-141). Delivery says S7.7's "turn-2 prompt names the latest pass", but which pass that is becomes known only after turn 1 ends. It also says the multi-pass cases run with `maxTurns` 250. Both need `session()` to change: computed prompts and a turn limit option. Delivery and T6 do not say so.
 PROPOSAL: Say in Delivery or T6 that `session()` gains a `maxTurns` option and accepts a prompt computed from the document after the previous turn.
+
+### R-13
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Stopping rule (step 5, lines 259-266; paragraph after step 7, lines 275-280); Acceptance Criteria AC-01 (lines 430-431, 437-438); Context, Owner summary (lines 51-56)
+EVIDENCE: Step 5 says that after an owner change the author "makes the change ... and dispatches one pass", and that "a continued or resumed run that finds such a row as the latest one does the same" (asks). The paragraph after step 7 says "Before it dispatches, a continued or resumed run checks the latest stored pass: if its row carries `, after owner change`, the author asks as step 5 says". Only the other branch of that check requires the pass to be "still fresh". The suffix branch has no freshness or recency condition. Consider R-5 clean with `streak 4 of 3, after owner change`. The author asks. In the next turn, which is a continued run, the owner picks a finding or asks for another revision. The author applies it, and the review becomes stale (`baseline-changed`; `vh-adlc next` names `spec review`, as observed on this document at a581e9c). Before dispatching, the check finds R-5, still the latest stored pass, carrying the suffix, so the author asks for acceptance again and never dispatches the pass step 5 promises. A run interrupted after applying the change and then resumed does the same, because step 5 tells it to ask. The same thing happens when the owner accepts at a suffix row and later asks for a revision. An acceptance row is not a pass, so the suffix row stays the latest stored pass. Either way an acceptance at R-5 then fails `accepted` (conventions/feature-documents.md:309), because the baseline changed after it. So for any second owner change, AC-01's "after an owner change, runs one pass" and the suffix rule it also requires cannot both hold. Variants C, C2, C3 and C5 each have only one owner change, so a literal implementation passes all of them.
+PROPOSAL: Make the suffix branch apply only while that pass is still fresh, both in the paragraph after step 7 and in step 5's continued-or-resumed sentence. A stale suffix row then falls through to dispatching one pass. Add a variant with two owner changes in a row, and one that resumes after a second owner change was applied but before its pass was dispatched.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Owner change, line 232); Design, Stopping rule (steps 2, 3 and 5, lines 247-266); Context, Owner summary (lines 51-55); Test Plan AC-01 row (Variants A, E and J)
+EVIDENCE: Owner change is defined as "picks from a list the author gave, or any other revision the owner asks for", and the first clean pass after one records the suffix and asks for acceptance "whatever the count". An owner's answer to an Open Question is a change to the document that the owner directs. When the answer picks an option other than the current design, it is arguably a revision the owner asks for. The Test Plan treats folded answers as not an owner change. Variant A requires "no acceptance question comes before streak 3" although judgement findings are "asked and folded" after clean passes 1 and 2. Variant E requires post-revision clean passes "1, 2 and 3 without the suffix" after the owner answers a judgement should-fix. Neither Terminology nor the steps say that folded answers, or answers to a blocking pass's judgement findings, are excluded. R-12 F-03 asked how such a revision differs from folded answers, and the revision does not say. An implementer reading Terminology literally adds the suffix after every answered question and fails Variants A and E. Another reads it the way the Test Plan does.
+PROPOSAL: State in Terminology that folding the owner's answers to Open Questions raised from a pass is not an owner change, and say whether an answer that also asks for a further change is one. Use the same wording in step 5, AC-01 and the Owner summary.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Owner change, line 232; Clean streak, line 231); Design, Stopping rule (step 5, line 266); Context, Owner summary (lines 54-55); Test Plan AC-01 row (Variant C4)
+EVIDENCE: "When the owner asks for the full loop, the author leaves the suffix off." Without the suffix the count continues from the previous value, and only a blocking pass or an acceptance resets it (Terminology, line 231; Owner summary "A blocking finding sets the count to zero, and so does an acceptance"). In an unaccepted draft at `streak 3 of 3`, as in Variant C, an owner who asks for a scope change and the full loop gets a next clean pass at `streak 4 of 3`. Step 4 then lists its findings and asks after that single pass, which is what happens without the request. At `streak 2 of 3` the request gives one more pass, not three. Variant C4 covers the request only after an acceptance, where the count was already reset to 0. The owner is told "ask for the full loop instead", which reads as three clean passes, but outside the post-acceptance case the request changes nothing except the suffix. Under conventions/feature-documents.md:154-157 this is a trade-off the document settles without raising it.
+PROPOSAL: Decide whether a full-loop request resets the count to 0. If it does, record the request in the decision record so a resumed run can read it, and update Terminology. If it does not, say in the Owner summary that it only matters after an acceptance. Add a C4-style variant on an unaccepted draft at the ceiling.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (steps 5 and 6, lines 259-270); Design, Terminology (Owner acceptance, line 236); Design, Delivery (S7.9, lines 401-402); Test Plan AC-01 row (Variants C to D6)
+EVIDENCE: Step 5 says the clean first pass after an owner change records the suffix and the author "asks the owner again, whatever the count". Step 6 says that with an owner acceptance "the clean pass it names ends the loop whatever the streak". The design does not say which wins when the owner directs a change and accepts in advance for the pass that follows. S7.9 is that case: turn 1 asks for a revision, and turn 2 says "If it finds nothing blocking and leaves no open questions, I accept the revision" (tests/vh-adlc/scenarios/run.ts:1079 at 3963e25). That acceptance also names no `R-<n>`, although Terminology recognizes an advance acceptance only "for a named pass `R-<n>`". Delivery keeps S7.9's check accepting "either a draft still waiting or a re-acceptance" (run.ts:1097-1098). So an author that asks again and one that writes the acceptance row both pass, and no D variant combines an advance acceptance with an owner change.
+PROPOSAL: State that an advance acceptance covering the first pass after an owner change takes precedence over step 5's question, and say how the author records an unnamed conditional acceptance like S7.9's (as an advance acceptance for the next pass `R-<n>`, or not at all). Make S7.9's check expect the chosen path, or add a D variant for it.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-08 (lines 462-464); Test Plan AC-08 row; Tasks T2 (line 498), T12 (line 494); Design, Stopping rule (lines 241-242, 285)
+EVIDENCE: Design says "In the convention's Acceptance section, step 2 gains the rule". That rule is steps 1 to 7, which define the `, after owner change` suffix (step 5) and the `drift` and `drift, blocking` markers (step 7), and line 285 calls the count, the suffix and the drift markers "the only new text". Pins says "The plugin does not carry its own copy of the convention rules" (line 376). AC-08, its Test Plan row, T12's failing check and T2's change list name only "the stopping rule and the `streak <n> of 3` marker". A published convention that omits the suffix and the drift markers passes AC-08 and T12, while the plugin writes markers the shared convention never defines.
+PROPOSAL: Add the `, after owner change` suffix and the `drift` and `drift, blocking` markers to AC-08, the AC-08 Test Plan row, T12's check and T2's change list, or state in Design that they live only in the plugin and why.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-03 row (author trial); Test Plan AC-09 row (author trial); Tasks T5
+EVIDENCE: The AC-03 author trial applies "a finding that asks for a value none of the four copies hold", and the AC-09 author trial uses "a stored pass with two factual findings". Neither row states the findings' severity or the stored pass's state in the loop. Under the new stopping rule, a nit on the normative baseline is saved rather than applied (step 1), and a clean pass at or above the ceiling has nothing applied to the baseline (step 4). If either fixture's finding is a nit, or its stored pass records `streak 3 of 3`, a correct author applies nothing, and the trial fails it on "one commit leaves all four locations stating that value" or "one commit applies both". The design rates such a proof blocking ("a proof fails a correct implementation").
+PROPOSAL: State in both rows that the seeded findings are should-fix (or blocking) and that the stored pass is blocking or below the ceiling with no owner acceptance. Under the old pin, say the fixture is pinned to the new revision.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T6 (line 502), T7 (line 503), T15 (line 496), T3 (line 499); Test Plan AC-01 row (Variant C2)
+EVIDENCE: T6 and T7 still end "(AC-01, AC-10)", although the AC-10 scenario cases now sit in T15 and the rule change sits in T13, and neither T6's nor T7's done condition names an AC-10 case. T15 says the side-branch case fails "because today's review mode only fast-forwards a side branch". SKILL.md:58 at 3963e25 runs `git merge --ff-only origin/<default branch>` on the default branch and gives no instruction for a side branch. T3's done condition compares "the final commit" with a scratch commit, but no final commit exists when T3 is committed. Variant C2's "same day" and "all on one date" are left over from the date-ordering rule this revision removed.
+PROPOSAL: Drop AC-10 from T6 and T7, say in T15 that today's step 1 has no side-branch case, have T3 compare its own commit with a scratch commit restoring the old pin, and remove the date wording from C2.
