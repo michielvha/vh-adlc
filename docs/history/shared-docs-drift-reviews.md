@@ -1,7 +1,7 @@
 # Shared docs-drift review history
 
 Historical returned review records, preserved verbatim.
-The [current spec](../specs/shared-docs-drift.md) retains the full log table, accepted R-57 and latest R-60.
+The [current spec](../specs/shared-docs-drift.md) retains the full log table and deciding reviews.
 
 ### R-1
 

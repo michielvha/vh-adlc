@@ -8,6 +8,7 @@ import { hash, role } from "./manifest-fixture";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { readNativeRoleCapture } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
+import { ArtifactChanged } from "../../../plugins/vh-adlc/scripts/docs-drift/evidence-input";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
 const roots: string[] = []; let failed = false;
@@ -121,7 +122,17 @@ test.each(["native-context", "native-cwd", "later-finding", "invocation-target",
     capture.binding.native_sha256 = capture.artifacts.native.sha256;
   }
   const reference = write(result.capture!, canonicalJSON(capture));
-  expect(() => readNativeRoleCapture({ source_repo: f.repo, artifact_root: f.artifacts, reference, policy: role,
+  const reasons: Record<string, string> = {
+    "native-context": "Native role fresh context changed", "native-cwd": "Native role fresh context changed",
+    "later-finding": "docs-drift original role capture returned reply differs from final native message",
+    "invocation-target": "docs-drift original role invocation changed",
+    "removed-invocation": "docs-drift original role capture modern invocation record required",
+    "legacy-downgrade": "docs-drift original role capture modern invocation capture required",
+    "invocation-cwd": "docs-drift original role working directory changed",
+  };
+  const reopen = () => readNativeRoleCapture({ source_repo: f.repo, artifact_root: f.artifacts, reference, policy: role,
     require_invocation: true, expected_cwd: f.repo,
-    expected: { role: f.options.role, source_commit: f.options.source_commit, runtime_sha256: f.options.runtime_sha256, target_sha256: f.options.target_sha256 } })).toThrow();
+    expected: { role: f.options.role, source_commit: f.options.source_commit, runtime_sha256: f.options.runtime_sha256, target_sha256: f.options.target_sha256 } });
+  expect(reopen).toThrow(reasons[fault]);
+  if (["invocation-cwd", "invocation-target"].includes(fault)) expect(reopen).toThrow(ArtifactChanged);
 }));

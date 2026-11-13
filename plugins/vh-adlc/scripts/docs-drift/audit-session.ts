@@ -57,7 +57,7 @@ export async function runAuditSession(input: Options) {
     const runtime = facts.runtime;
     if (Bun.version !== "1.4.4" || realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/audit-session.ts"))
       throw Error("Audit session must execute through the selected retained component and declared toolchain");
-    const cwd = baseline.scan.checkout, canonicalizer = join(runtime.component.directory, "scripts/docs-drift/protocol.ts");
+    const cwd = realpathSync(baseline.scan.checkout), canonicalizer = join(runtime.component.directory, "scripts/docs-drift/protocol.ts");
     const nativePolicy = { repo: facts.store.root, current_default: facts.current_default, identity: facts.identity, runtime };
     const workerPolicy = readAdoptedRolePolicy({ ...nativePolicy, role: "worker" });
     const reviewerPolicy = readAdoptedRolePolicy({ ...nativePolicy, role: "reviewer" });
