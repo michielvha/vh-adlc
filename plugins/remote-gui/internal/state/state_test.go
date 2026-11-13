@@ -87,6 +87,29 @@ func TestLockHonorsContext(t *testing.T) {
 	}
 }
 
+// Only New creates the state root. A controller that outlives its removed
+// record must not recreate the root when it locks or updates state.
+func TestLockAndUpdateNeverRecreateTheRoot(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "sessions")
+	id, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	if release, e := Lock(context.Background(), root); e == nil {
+		release()
+		t.Fatal("locked a removed state root")
+	}
+	if err = Update(context.Background(), root, id, func(*Record) {}); err == nil {
+		t.Fatal("updated a removed record")
+	}
+	if _, err = os.Lstat(root); !os.IsNotExist(err) {
+		t.Fatal("removed state root was recreated")
+	}
+}
+
 func TestPrivateRejectsNonRegularRecord(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "record")
 	if err := syscall.Mkfifo(path, 0o600); err != nil {
