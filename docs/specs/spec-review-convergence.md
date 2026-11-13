@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-9 was clean; its seven findings and the owner's answers are applied. The owner accepts in advance if R-10 has no blocking finding."
+status: planned
+status_description: "Accepted by the owner at R-10 under an advance acceptance; R-10's eight findings are listed, not applied. Tasks written; next: implementation on a feature branch."
 issue: null
 goal: "A spec review loop that finds blocking defects early and stops asking for passes after three consecutive passes without one."
 covers:
