@@ -408,6 +408,7 @@ completeness apply on any pin while the convention-dependent parts follow the re
 | 2026-11-13 | R-4 | spec | `89afa41` | claude-opus-5-5 | procedural | One blocking finding (F-01 advance acceptance contradicts S7.7.accept), three should-fix and two nits |
 | 2026-11-13 | R-5 | spec | `f263bbd` | claude-opus-5-5 | procedural | One blocking finding (F-01 revision event resets on every applied fix), five should-fix and three nits; advance acceptance not met |
 | 2026-11-13 | R-6 | spec | `96fc16f` | claude-opus-5-5 | procedural | One blocking finding (F-01 in-session passes break the S7.7 check), three should-fix and three nits; advance acceptance not met |
+| 2026-11-13 | R-7 | spec | `b40d2ca` | claude-opus-5-5 | procedural | One blocking finding (F-01 Variants G and E assume stops the design does not make), four should-fix and three nits |
 
 ### R-1
 
@@ -770,3 +771,61 @@ SEVERITY: nit
 WHERE: Context, Owner summary (lines 66-68, "a consumer on an older pin keeps the current procedure"); Design, Pins and older consumers (lines 278-284)
 EVIDENCE: Only the stopping rule is made conditional on the resolved page having the severity definitions. Line 282 says "the new `SKILL.md` and protocol steps are written as conditional on that check". The failure-mode check and one-pass completeness go into the reviewer agent unconditionally ("The reviewer's spec section gains", line 251; line 261). The Design does not say whether the author-side failure-mode step and restatement sweep in SKILL.md fall under the conditional. On an older pin, the reviewer therefore changes behavior while the summary says the current procedure is kept. AC-06's old-pin check looks only for the streak marker.
 PROPOSAL: Say which changes apply on any pin and which only with the new convention, and make the Owner summary match.
+
+### R-7
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan AC-01 row (Variant G, "the report asks no acceptance question"; Variant E, "every post-revision pass runs in a fresh session"); Design, Stopping rule (step 3, lines 211-216, and lines 233-236); Acceptance Criteria AC-01 ("when resumed below the ceiling, continues the loop instead of asking for acceptance")
+EVIDENCE: Lines 233-234 say "In review mode the author dispatches each next pass itself, in the same session, while no Open Question is waiting for the owner", and step 3 says that when `next` reports `owner acceptance` below the ceiling the spec and resume operations "dispatch another pass instead of asking". Per step 2 a blocking pass does not stop the run either; only an Open Question does. Variant G resumes a draft at `streak 1 of 3` and passes "when a new spec row recording `streak 2 of 3` is stored and the report asks no acceptance question". A correct implementation does not stop at streak 2. It dispatches the next pass in the same session, and when the canned pass is clean it reaches `streak 3 of 3` and asks for acceptance under step 4, so the check fails it. Variant E requires every post-revision pass to run in a fresh session, but its passes hold only a factual baseline fix, which step 3 applies before continuing in the same session. The harness sends turns one after another and cannot end a session mid-run (tests/vh-adlc/scenarios/run.ts:137-141 at 3963e25), so the condition cannot be arranged without a stop that the row does not specify. This is the same class as R-6 F-01, and the document's own blocking definition covers it ("a proof fails a correct implementation or cannot be executed").
+PROPOSAL: Give Variant G and Variant E canned passes that hold a judgement should-fix, so each run stops on an Open Question that the next session's owner turn answers, and state that in the row. Alternatively, change Variant G's pass condition to "no acceptance question is asked before a row records `streak 3 of 3`", and drop the fresh-session requirement from Variant E in favor of a stop the design defines.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Clean streak, line 196); Design, Stopping rule (step 7, lines 227-231); Acceptance Criteria AC-01 ("counting from 0 after a revision of an accepted document", lines 328-329); Context, Owner summary (line 45, "a revision starts it again"); Test Plan AC-01 row (Variants E and H)
+EVIDENCE: Terminology resets the previous value to 0 only "when an acceptance row follows that row and the document's status is `draft`". Step 7 has a clean drift re-review of a `planned` or `in-progress` document record "the previous value plus one" in a new spec row and keep the acceptance, so no new acceptance row is written after it. Suppose the document is later revised: the latest spec review row is now the drift row, no acceptance row follows it, and its marker (for example `streak 4 of 3`) becomes the previous value. The first clean pass after the revision then records 5, and step 4 ends the loop after one post-revision pass. That contradicts AC-01 and the Owner summary. Drift re-reviews of accepted documents are routine here (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:55-61 at 3963e25). Variant E starts from a log whose last spec row precedes the acceptance row, and Variant H never revises afterward, so a skill that follows Terminology literally passes every listed check.
+PROPOSAL: Define the reset so that it survives a drift row, for example count from 0 when the document is `draft` and any acceptance row comes after the latest spec review row recorded while the document was `draft`, or reset at the latest acceptance row when the status is `draft`. Add a Variant E case where a clean drift row sits between the acceptance row and the revision.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-01 row (Variant B); Design, Stopping rule (step 1, lines 206-208); Design, Terminology (Saved nit, line 197)
+EVIDENCE: Variant B's passes are "clean, blocking, clean, clean, clean, each holding one nit on Design that later fixes leave in place", and it passes when "the findings of the first two clean passes after the blocking pass are applied, and the summary lists the last pass's findings and all five nits". If those passes hold only the stated nit, step 1 says nits on the normative baseline "become saved nits" and are not applied, so a correct skill applies nothing and the "applied" clause fails it. If the clause is read as vacuous, it checks nothing. Two test writers would build different canned records and checks.
+PROPOSAL: Either give the first two clean passes after the blocking pass a factual should-fix that must be applied, or replace the clause with "no nit is applied and the baseline nit text is unchanged".
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (step 3 and lines 233-237); Acceptance Criteria AC-01 (resume clause); Test Plan AC-01 row (Variant G)
+EVIDENCE: The spec skill stores and commits the records before changing anything (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:68-70 at 3963e25), then applies findings and commits again (:71). This repository's own log shows the two commits as separate ("record spec review R-6", then "apply spec review R-6", e588be7 and b40d2ca). A run interrupted between them leaves a clean pass whose factual should-fix findings were never applied, and the review stays fresh. Variant G resumes exactly that state ("a draft whose last row records `streak 1 of 3` with a fresh review"), and the design then dispatches another pass, so the unapplied findings are dropped unless the reviewer happens to find them again. The document's own failure-mode check asks about partial failure (lines 261-264), and Design leaves this path undefined.
+PROPOSAL: State that a resumed or continued run first checks the latest stored pass: if it is clean, below the ceiling, holds factual should-fix or judgement should-fix findings on the baseline, and the review is still fresh, the author applies or raises them as step 3 says before it dispatches the next pass. Give Variant G's stored pass a factual should-fix and expect it to be applied.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-06 row ("two scratch clones whose `AGENTS.md` names the old and the new pin")
+EVIDENCE: `owner-readable-specifications` lists `AGENTS.md` in its covers (`git show b40d2cab:docs/specs/owner-readable-specifications.md`, frontmatter line 15). In a scratch clone at b40d2cab, `vh-adlc fresh docs/specs/owner-readable-specifications.md` returned 12 findings with `feature_tree.clean: true`. After an uncommitted edit to `AGENTS.md`, it returned the same findings plus `feature-tree-dirty` and `"paths":["AGENTS.md"]`. After committing the edit, the findings matched the original exactly. A test writer who sets the pin by editing `AGENTS.md` in place in one clone gets a `findings` difference that the convention change did not cause, so the comparison fails a correct companion change. The row does not say whether the pin edit is committed.
+PROPOSAL: Say that each clone commits its `AGENTS.md` pin before running the commands, or that the clones are checked out at commits that already hold each pin.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Terminology (Saved nit, line 197); Acceptance Criteria AC-01; Test Plan AC-01 row (Variants A, B and E)
+EVIDENCE: A saved nit counts only while "its text still exists in the document". A finding record has no field for target text. A nit's EVIDENCE may quote a line, cite a line number, or ask for something to be added, so what "its text" means differs between implementers. Variant B avoids the question with nits that "later fixes leave in place", so no variant shows a nit being dropped.
+PROPOSAL: Say what the author compares, for example the quoted text in the nit's EVIDENCE, and that a nit with no quote is always listed. Add a variant where a later fix removes a nit's quoted text and that nit is not listed.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background, Overlapping work (lines 152-156)
+EVIDENCE: The overlap cites `docs/specs/shared-development-loop.md:7-23` at `b777df0`, but that document's covers continue to line 29 and include `tests/vh-adlc/` (`git show b777df0:docs/specs/shared-development-loop.md`, line 29). That path holds `tests/vh-adlc/scenarios/run.ts` and the new test files this feature edits. The paragraph also describes the feature as on `origin/main` at `b777df0`, but `origin/main` is now `9378490`, with that document at R-8.
+PROPOSAL: Cite `:7-29` and add `tests/vh-adlc/` to the overlap list, or say that the citation is as of `b777df0`.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-01 row (Variant E)
+EVIDENCE: "record streaks 1, 2 and 3 the loop ends at 3" is missing a conjunction between the two clauses.
+PROPOSAL: Write "record streaks 1, 2 and 3, and the loop ends at 3".
