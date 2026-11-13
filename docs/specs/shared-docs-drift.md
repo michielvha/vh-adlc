@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Accepted R57 scope is unchanged; upstream covered drift makes R61 stale pending local reconciliation and spec re-review. Normal audit receipt collection passes its frozen checkpoint. Copilot111 found a deletion race and incomplete-output fields; their regressions fail first and the corrections pass the frozen checkpoint. Main is merged locally; the conservative coverage reconciliation and unreleased candidate 0.18 pass the post-merge gate. Current-result verification, carried delivery, history/status/operator work and migration remain open."
+status_description: "Local receipt fixes and repository gates pass. Copilot R62 returns one owner choice about newly valid double-star feature coverage and three corrected prose nits. Main is reconciled locally; accepted normative scope remains unchanged pending that decision and spec re-review. Current-result verification, carried delivery and migration remain open."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -74,6 +74,8 @@ This moves whole-corpus documentation audits and stale audit-PR resolution into 
 - Execution uses retained component/client snapshots. Host upgrades cannot select a successor. Migration still needs actual installed/model/hosted results, paired consumer review and a verified cutover/rollback path. Shipment and live operations retain separate approvals.
 - The normal audit command saves bounded private JSON and Markdown. It now collects historical publication receipts without treating them as current verification or carried delivery. Missing required evidence keeps collection incomplete; changed inputs stop it. The ancestry fix and normal receipt phase pass their frozen checkpoint. Copilot found two further receipt-integrity defects; their corrections and added partial-output coverage pass the frozen checkpoint. Main is reconciled locally, and a fresh spec review remains required. Saved files confer no history provenance.
 - Per-PR result verification, retained delivery, final artifact/status reporting, operator verification and remaining closure/coordination acceptance stay open. Actual marketplace/provider/hosted/consumer migration stays open. All criteria remain unchecked; Tasks preserve the exact observed passes, failures and pending work.
+
+The new main accepts feature coverage such as `src/**`, meaning every nested file under `src`. This accepted docs-drift design still treats those patterns as an unsupported coverage gap. Copilot R-62 asks the owner to choose full gate parity or explicitly retain that narrower subset. Both preserve uncertain documents until the choice is accepted. I recommend full parity so valid feature coverage does not block documentation checks. This is a pending spec decision, not an implemented expansion.
 
 ### Terms used here
 
@@ -994,11 +996,13 @@ Code tasks add and run the regression before the behavior change. Each task is o
 
   The original successful full-input collector now retains its source, identity, proposal bindings, owned store and original artifact references in process. Serialized completeness flags cannot recreate that context. The new receipt collector reopens every full-input reference, recollects complete native metadata and rechecks repository, actor, default, proposal inventory and accepted receipt refs. It preserves every legacy proposal as unreviewed, permits an absent optional receipt ref as unreviewed, and keeps required missing inputs incomplete. Observed changes stop the collection. Its first positive attempt exposes a full-versus-core PR projection mismatch; the reader now gets its exact core input while full inventory comparison remains intact. A later eligible-receipt fixture initially violates the existing source-bound store contract and is corrected without weakening that contract. Final receipt controls establish the valid baseline before missing-ref, missing-blob, late-ref and original-input mutation faults: ten cases pass 126 assertions. These use owned Git objects and GET-only synthetic native responses, with no actual provider or GitHub write.
 
-  A frozen retained-session test first reproduces the missing normal report receipt phase. The report now runs that collector, exposes historical eligible counts and keeps every current result unverified. A direct genuine-receipt report case passes ten assertions: one old shared receipt is eligible, both current proposals remain unverified, and published/carried delivery stay empty. Semantic assessment does not become a verification or delivery grant. The complete frozen `t23-audit-receipts-report-checkpoint-result.json` passes: 93 focused controls with 545 assertions, two report integrations with 34 assertions, three binding neighbors with 26 assertions and three complete retained sessions with 98 assertions. Five other session cases are filtered, not claimed rerun. Strict types, Go tests/vet/lint/module checks, the reproducible bundle, 64 package cases and 34 registration cases pass. All measured files, HEAD and exact dirty state stay unchanged in the isolated copy. A read-only upstream fetch observes `a209280ec032fcb933f40e1522605005e71e1941`; its shared-loop changes are not in this measured checkpoint. The in-progress recheck now fails only `spec_review_fresh` for covered drift on main. Saving this already verified increment permits exact review; local main reconciliation and a fresh spec review must precede further implementation. The owner-accepted normative baseline is unchanged. Original failed logs and roots remain. The accepted normative baseline is unchanged. Manual documentation impact tracks this historical/current distinction, missing-proof diagnostics and normal report fields in T24/T26/T27. T23, T19 and all criteria remain unchecked.
+  A frozen retained-session test first reproduces the missing normal report receipt phase. The report now runs that collector, exposes historical eligible counts and keeps every current result unverified. A direct genuine-receipt report case passes ten assertions: one old shared receipt is eligible, both current proposals remain unverified, and published/carried delivery stay empty. Semantic assessment does not become a verification or delivery grant. The complete frozen `t23-audit-receipts-report-checkpoint-result.json` passes: 93 focused controls with 545 assertions, two report integrations with 34 assertions, three binding neighbors with 26 assertions and three complete retained sessions with 98 assertions. Five other session cases are filtered, not claimed rerun. Strict types, Go tests/vet/lint/module checks, the reproducible bundle, 64 package cases and 34 registration cases pass. All measured files, HEAD and exact dirty state stay unchanged in the isolated copy. A read-only upstream fetch observes `a209280ec032fcb933f40e1522605005e71e1941`; its shared-loop changes are not in this measured checkpoint. The in-progress recheck now fails only `spec_review_fresh` for covered drift on main. Saving this already verified increment permits exact review; local main reconciliation and a fresh spec review must precede further implementation. The owner-accepted normative baseline is unchanged. Original failed logs and roots remain. Manual documentation impact tracks this historical/current distinction, missing-proof diagnostics and normal report fields in T24/T26/T27. T23, T19 and all criteria remain unchecked.
 
   Upstream loop reconciliation and component111. The ordinary merge `13b789c09128b7f47b227fe6f2044017e751b9be` incorporates observed main `a209280ec032fcb933f40e1522605005e71e1941` without conflicts. Repository AGENTS keeps the accepted engineering pin; the newer plugin fallback pin does not replace it. The new Go matcher supports double-star patterns, while this accepted feature dialect retains conservative gaps. The sandbox parity command fails before test setup on a read-only Go cache; its native retry actually reproduces three mismatches. Shared fixtures now explicitly record the gate's added matches separately for those three invalid feature patterns. Every supported feature pattern must still match the gate without an override. No TypeScript matcher, protection policy or normative requirement changes. The first frozen post-merge gate passes 87 coverage/protection/compatibility cases with 321 assertions and the root stages, but package verification fails because default and feature both now say 0.17. Both feature manifests advance locally to unreleased candidate 0.18.0. The corrected post-merge checkpoint passes all stages, including 64 package cases and 34 registration cases, with unchanged frozen files, HEAD and status. This is no release or installed-payload claim.
 
   Actual requested Copilot Opus 5.5 qualifies all 105 required chunks at exact `e5a47925e03c7742fbbc4a9db01b116b84db36cf`, with no outside reads or private files sent. It returns two should-fix findings and one coverage nit. The original return is preserved verbatim under Component diagnostic 111 in the implementation history before correction; the pass is not recorded as clean. Three regressions first reproduce an existing receipt disappearing during its per-PR recheck and stale receipt fields remaining after later changes. All three fail with 32 assertions. A separate final-recheck deletion case first fails its scope-change assertion with eleven assertions. The collector now distinguishes initial optional absence from disappearance after observed evidence, including both recheck points; incomplete downgraded rows clear both reviewed metadata and their receipt. Original private/native evidence stays preserved. The partial-output CLI path receives its own green checkpoint obligation because it was filtered from the earlier three-session run. These are implementation/data projection corrections under the accepted contract. The first direct type command refuses the wrong Bun toolchain before compiling; the explicit declared toolchain check passes. The combined frozen `t23-component111-corrected-checkpoint-result.json` passes all stages: 83 receipt/history/coverage cases with 348 assertions, both report integrations with 34 assertions, three binding neighbors with 26 assertions, and matching plus actual partial-output CLI sessions with 70 assertions. Six other session cases are filtered; the earlier separate three-session result remains accurately scoped. Strict types, root Go/vet/lint/module checks, bundle, 64 package cases and 34 registration cases pass. Measured files, HEAD and exact dirty state stay unchanged in the owned copy. No full-plugin or actual provider/model acceptance is claimed. Fresh canonical spec review will cover current upstream compatibility and these scoped source fixes before further implementation. T23, T19 and all criteria remain unchecked.
+
+  Canonical R62. Actual requested Copilot Opus 5.5 reviews clean merged `ca5d3aba55c8543b164cf503dae66bf2d427d5ae` and qualifies all 157 required chunks, with no outside paths or private files sent. It returns one should-fix owner choice about the new gate's double-star support and three factual prose nits, with no further receipt-code findings in its supplied scope. Its original returned records are stored verbatim under R-62 before changes. An initial fenced wrapper fails `review check` equality; storing the plain original records passes without altering the return. The three prose nits are corrected. Q1 surfaces the coverage choice and the summary explains its effect; the accepted Scope/Design/criteria/Test Plan/covers remain unchanged. Further implementation waits for that actual decision and the required reviewed normative revision. Local verification remains green and is not a claim of migration readiness.
 
 - [ ] T24 `plugins/vh-adlc/skills/vh-adlc-docs-drift/SKILL.md, plugins/vh-adlc/references/docs-drift.md, plugins/vh-adlc/references/docs-drift-settings.md, plugins/vh-adlc/references/docs-drift-review.md` - Add discovery/procedure regressions before the new skill and canonical references. Document the exact accepted modes, review/authority boundaries, output distinctions and hosted setup. Discovery and procedure tests pass. Explain acknowledgement approval, persistent non-success and the original-ownership/settled-request requirements. (AC-01, AC-05, AC-06)
 - [ ] T25 `plugins/vh-adlc/references/lifecycle.md, plugins/vh-adlc/references/authority.md, plugins/vh-adlc/references/review-protocol.md, tests/vh-adlc/lifecycle/` - First fail ambiguous-doc-audit routing and effect-matrix cases. Integrate docs-drift intake and its explicit resource/effect permissions. Existing docs-impact, code-audit and other operation routes pass their regressions. State that delivery acknowledgement requires the owner's actual current approval of the exact presented lookup/evidence scope, excluding standing adopted procedures and unattended or general cleanup grants. (AC-01, AC-05)
@@ -1034,8 +1038,16 @@ Code tasks add and run the regression before the behavior change. Each task is o
 
 ## Open Questions
 
-None.
+### Q1: Should docs drift understand every coverage pattern the current shared feature gate accepts?
 
+**Recommendation:** Follow the current gate, including `**` for nested files. A valid feature such as `covers: [src/**]` should be understood by both the feature workflow and documentation checks.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Full current gate parity** | Valid nested coverage works in docs drift, while ownership/protection checks remain in force. | Revise the accepted matcher wording, independently review it and obtain renewed acceptance before implementation. |
+| B. Keep the conservative subset | Current matching stays unchanged; `**` declarations remain visible gaps. | Valid feature documents using those patterns can block the assessment; revise the parity promise to disclose that limitation, review and accept it. |
+
+**Why this is yours:** Main changed which feature declarations are valid after the earlier acceptance. Either choice changes what the accepted spec promises; the implementation cannot silently decide it.
 
 ## Review Log
 
@@ -1105,8 +1117,9 @@ None.
 | 2026-11-09 | R-59 | spec | `1798b2b3f2af026c406a75a22d0bd7753591749f` | claude-opus-5.5 | procedural | 1 should-fix summary correction and 1 archive-reference nit. Full 168-chunk read coverage. |
 | 2026-11-13 | R-60 | spec | `5b7aef0cbfc116dae02a193d81dd37524398b248` | claude-opus-5.5 | procedural | No blocking or should-fix findings; one cleanup-rule context nit. Full 178-chunk read coverage. |
 | 2026-11-13 | R-61 | spec | `f1e65008cc45cf999c3fbfae91d4d02a7f2d506b` | claude-opus-5.5 | procedural | 3 nits; full 150-chunk requested read; scoped native-format source check. |
+| 2026-11-13 | R-62 | spec | `ca5d3aba55c8543b164cf503dae66bf2d427d5ae` | claude-opus-5.5 | procedural | 1 should-fix owner choice on widened gate patterns and 3 nits; full 157-chunk read; scoped receipt corrections checked. |
 
-Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Accepted R-57 and latest R-60 remain below.
+Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Accepted R-57, R-60, R-61 and latest R-62 remain below.
 
 ### R-57
 
@@ -1153,6 +1166,36 @@ Review notes:
   - Package: 64 tests, 226 assertions. Registration: 34 tests.
   - Postmerge checkpoint: passed. History equivalence: R-57 and R-60 kept, 58 reviews archived.
 - Current fresh, next and gate output all request this spec review, because R-60 is stale (covered-drift on docs/reference/marketplace.md).
+
+### R-62
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Audit and preparation, the feature-dialect sentence (chunk 00181 line 9). Test Plan AC-03 (chunk 00458 line 19). Tasks T23, "Upstream loop reconciliation and component111" (chunk 00995 line 5). Open Questions ("None.").
+EVIDENCE: The accepted Design says the feature dialect is added "preserving the gate's `internal/doc/covers.go:MatchCovers` semantics". It calls double-star "unsupported" and reports it as a gap. AC-03 tests the feature dialect "against Go MatchCovers shared fixtures". After merge 13b789c, upstream MatchCovers matches `**` through compileDoubleStar, and lint now accepts valid `**` covers in feature documents. t23-upstream-loop-covers-native-first-red.log shows the Go matcher returning true for `src/**`, `src/**/` and `src/p**x.ts`. matching.ts still rejects them, and the reconciliation adds gate_matched overrides so that Go parity is asserted only for the non-`**` subset. So a feature document whose valid `**` covers pass the gate is now reported by docs drift as a coverage gap. The Design text still promises the gate's semantics. The reconciliation is test-only and keeps the accepted conservative behavior, which is sound. The only record of the divergence is T23 Task prose. Open Questions says "None." and the owner summary does not mention it. review-protocol.md routes judgement findings to Open Questions rather than to silent prose.
+PROPOSAL: Add an Open Question for the owner without editing the accepted normative text. Option (a): keep the conservative feature subset, and at the next re-acceptance revise the Design and AC-03 wording to say "the path.Match subset of MatchCovers; double-star patterns the gate accepts remain conservative gaps". Option (b): extend the feature dialect so valid `**` follows the gate's current semantics, giving full parity. Until the owner chooses, keep the gate_matched overrides and the current TS behavior. Mention the divergence in the Owner summary.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter status_description (chunk 00001 line 3).
+EVIDENCE: The text says "upstream covered drift makes R61 stale pending local reconciliation and spec re-review". It later says "Main is merged locally; the conservative coverage reconciliation and unreleased candidate 0.18 pass the post-merge gate." The reconciliation is therefore done, not pending. current-next.json shows only the spec review is outstanding.
+PROPOSAL: Change the opening to "upstream covered drift makes R61 stale pending spec re-review".
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Review Log, the sentence after the table (chunk 01048 line 62).
+EVIDENCE: The sentence reads "Accepted R-57 and latest R-60 remain below." The table already contains R-61 (f1e6500), and the R-61 subsection with its three nits sits below as well. R-61, not R-60, is the latest review.
+PROPOSAL: Change it to "Accepted R-57, R-60 and latest R-61 remain below", or name only the subsections that are actually kept.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T23, the audit receipt report paragraph (chunk 00995 line 3).
+EVIDENCE: The paragraph says "The owner-accepted normative baseline is unchanged. Original failed logs and roots remain. The accepted normative baseline is unchanged." The same claim appears twice, two sentences apart.
+PROPOSAL: Delete the second "The accepted normative baseline is unchanged." This is current task prose, not a returned record, so the change is permitted.
 
 ## Sources
 
