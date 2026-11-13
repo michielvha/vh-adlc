@@ -507,6 +507,52 @@ func TestReusableProfileLaunchPreparation(t *testing.T) {
 	}
 }
 
+// standInClipboard is the stand-in launcher's clipboard helper. Close records
+// whether the browser was still alive, then closes the helper's connection.
+type standInClipboard struct {
+	record string
+	chrome *child
+	conn   net.Conn
+}
+
+func (*standInClipboard) Set(context.Context, string) error   { return nil }
+func (*standInClipboard) Get(context.Context) (string, error) { return "", nil }
+func (*standInClipboard) Clear(context.Context) error         { return nil }
+func (h *standInClipboard) Close() error {
+	alive := state.Alive(h.chrome.identity)
+	_ = os.WriteFile(h.record, []byte(strconv.FormatBool(alive)+" "+strconv.FormatInt(time.Now().UnixNano(), 10)), 0o600)
+	if h.conn != nil {
+		return h.conn.Close()
+	}
+	return nil
+}
+
+// clipConnections accepts the stand-in helpers' connections on dir/clip.sock and
+// reports when each one closes.
+func clipConnections(t *testing.T, dir string) <-chan time.Time {
+	t.Helper()
+	listener, err := net.Listen("unix", filepath.Join(dir, "clip.sock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	closed := make(chan time.Time, 4)
+	go func() {
+		for {
+			conn, e := listener.Accept()
+			if e != nil {
+				return
+			}
+			go func() {
+				_, _ = io.Copy(io.Discard, conn)
+				closed <- time.Now()
+				_ = conn.Close()
+			}()
+		}
+	}()
+	return closed
+}
+
 // standInLauncher runs in the re-executed supervisor. It prepares the reusable
 // profile like a real launch, then runs the fake VNC and the stubborn browser
 // in place of x11vnc and Chromium.
@@ -549,6 +595,13 @@ func standInLauncher(_ context.Context, c config.Config, id string) (session.Bro
 	})}
 	go func() { _ = viewer.Serve(listener) }()
 	r.chrome, r.vncAddress, r.modeReady = chrome, address, true
+	clip := &standInClipboard{record: filepath.Join(dir, "clip-closed-"+id), chrome: chrome}
+	// Like the real helper, the stand-in holds a connection from inside the
+	// supervisor; the test observes when it closes.
+	if conn, e := net.Dial("unix", filepath.Join(dir, "clip.sock")); e == nil {
+		clip.conn = conn
+	}
+	r.clip = clip
 	r.current = session.BrowserHandle{BrowserMode: c.Mode(), Target: "http://" + listener.Addr().String() + "/vnc.html", Assets: dir, Password: "fixture"}
 	handle := r.snapshot()
 	handle.Stop = func() {
@@ -580,6 +633,7 @@ func TestReusableProfileStopAndExpiryWithStubbornBrowser(t *testing.T) {
 			}
 			t.Setenv("REMOTE_GUI_TEST_STANDIN", dir)
 			t.Setenv("REMOTE_GUI_CHROMIUM", version)
+			clipClosed := clipConnections(t, dir)
 			ttl := "1m"
 			if ending == "expiry" {
 				ttl = "4s"
@@ -635,6 +689,23 @@ func TestReusableProfileStopAndExpiryWithStubbornBrowser(t *testing.T) {
 			}
 			if keys, e := os.ReadFile(filepath.Join(dir, "vnc-"+v.ID+".keys")); e == nil {
 				t.Fatalf("%s sent keys to the display: %q", ending, keys)
+			}
+			closing, err := os.ReadFile(filepath.Join(dir, "clip-closed-"+v.ID))
+			if err != nil {
+				t.Fatalf("the clipboard helper was not closed on %s", ending)
+			}
+			alive, at, _ := strings.Cut(string(closing), " ")
+			if alive != "false" {
+				t.Fatalf("the clipboard helper closed while the browser was still running on %s", ending)
+			}
+			select {
+			case gone := <-clipClosed:
+				closedAt, _ := strconv.ParseInt(at, 10, 64)
+				if gone.Before(time.Unix(0, closedAt)) {
+					t.Fatalf("the helper's connection closed before its Close on %s", ending)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatalf("the clipboard helper's connection stayed open after %s", ending)
 			}
 			held, err := profile.Acquire(profiles, "work")
 			if err != nil {
@@ -746,6 +817,130 @@ func TestDelayedSupervisorLeavesChromiumToTheGuard(t *testing.T) {
 	}
 }
 
+// An expiry whose browser stop starts with less than two seconds of the guard's
+// five-second supervisor deadline left: the browser stop's SIGTERM comes first,
+// no key is sent, the guard kills the supervisor, which closes the clipboard
+// helper's connection, and its group stop then ends the browser before the
+// browser stop's own kill.
+func TestInterruptedReusableCloseEndsThroughTheGuard(t *testing.T) {
+	base, err := os.MkdirTemp("/tmp", "rg-standin-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(base) })
+	home, profiles, dir := filepath.Join(base, "s"), filepath.Join(base, "p"), filepath.Join(base, "d")
+	if err = os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	version := filepath.Join(dir, "chromium")
+	if err = os.WriteFile(version, []byte("#!/bin/sh\necho 'Chromium 151.0.7922.137'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	clipClosed := clipConnections(t, dir)
+	t.Setenv("REMOTE_GUI_TEST_STANDIN", dir)
+	t.Setenv("REMOTE_GUI_TEST_STOP_DELAY", "3600ms")
+	t.Setenv("REMOTE_GUI_CHROMIUM", version)
+	c, err := config.Parse([]string{"start", "--home", home, "--profile-home", profiles, "--profile", "work", "--transport", "loopback", "--ttl", "4s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := session.Start(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = session.Stop(home, v.ID) })
+	record, err := state.Load(home, v.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var chrome state.Identity
+	for _, p := range record.Owned {
+		if p.Role == "browser" {
+			chrome = p.Identity
+		}
+	}
+	watch := func(identity state.Identity) <-chan time.Time {
+		gone := make(chan time.Time, 1)
+		go func() {
+			for state.Alive(identity) {
+				time.Sleep(5 * time.Millisecond)
+			}
+			gone <- time.Now()
+		}()
+		return gone
+	}
+	died, supervisorDied := watch(chrome), watch(record.Supervisor)
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		end, e := session.Read(home, v.ID)
+		if e == nil && (end.State == "stopped" || end.State == "failed") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the interrupted close did not end the session: %+v %v", end, e)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if _, err = os.Stat(filepath.Join(dir, "stopped-"+v.ID)); err == nil {
+		t.Fatal("the browser stop finished although the guard's deadline cut it short")
+	}
+	if keys, e := os.ReadFile(filepath.Join(dir, "vnc-"+v.ID+".keys")); e == nil {
+		t.Fatalf("keys were sent to the display: %q", keys)
+	}
+	var death, supervisorDeath time.Time
+	select {
+	case death = <-died:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the browser survived the guard's group stop")
+	}
+	select {
+	case supervisorDeath = <-supervisorDied:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the supervisor survived the guard's deadline")
+	}
+	terms := termTimes(filepath.Join(dir, "term-"+v.ID))
+	if len(terms) < 2 {
+		t.Fatalf("want the browser stop's SIGTERM and then the group stop's, got %d", len(terms))
+	}
+	first, group := terms[0].Sub(record.Expires), terms[1].Sub(record.Expires)
+	t.Logf("browser stop SIGTERM %v, supervisor killed %v, group SIGTERM %v, browser death %v after expiry", first, supervisorDeath.Sub(record.Expires), group, death.Sub(record.Expires))
+	if first < 3*time.Second || first > 4800*time.Millisecond {
+		t.Fatalf("browser stop SIGTERM %v after expiry, want it with less than two seconds of the deadline left", first)
+	}
+	if group < 4900*time.Millisecond {
+		t.Fatalf("group SIGTERM %v after expiry, want it after the guard's five-second deadline", group)
+	}
+	// The browser stop's own kill was due two seconds after its SIGTERM, past
+	// the deadline; the supervisor that would send it was gone before the group
+	// stop began, so the group stop ended the browser.
+	if !supervisorDeath.Before(terms[1]) || !supervisorDeath.Before(terms[0].Add(2*time.Second)) {
+		t.Fatal("the supervisor outlived the point where its browser stop could kill the browser")
+	}
+	if death.Before(terms[1]) {
+		t.Fatal("the browser died before the group stop")
+	}
+	if _, e := os.Stat(filepath.Join(dir, "clip-closed-"+v.ID)); e == nil {
+		t.Fatal("the clipboard helper's Close ran although the supervisor was killed first")
+	}
+	select {
+	case gone := <-clipClosed:
+		if !gone.After(terms[0]) || !gone.Before(terms[1]) {
+			t.Fatalf("helper connection closed %v after expiry, want it between the browser stop and the group stop", gone.Sub(record.Expires))
+		}
+	default:
+		t.Fatal("the clipboard helper's connection stayed open after the supervisor was killed")
+	}
+	held, err := profile.Acquire(profiles, "work")
+	if err != nil {
+		t.Fatalf("profile still held: %v", err)
+	}
+	m, _, err := held.Meta()
+	held.Release()
+	if err != nil || m.HolderID != "" {
+		t.Fatalf("holder not cleared: %+v %v", m, err)
+	}
+}
+
 type clipboardDouble struct {
 	mu        sync.Mutex
 	failClear int
@@ -835,6 +1030,51 @@ func TestFailedClipboardClearBlocksAgentLaunch(t *testing.T) {
 	r.clipMu.Unlock()
 	if switching {
 		t.Fatal("failed launch left the switch marked")
+	}
+}
+
+func TestFailedClipboardClearBlocksAgentLaunchOnReusableProfile(t *testing.T) {
+	c, id := setup(t)
+	t.Setenv("REMOTE_GUI_CHROMIUM", filepath.Join(t.TempDir(), "absent-chromium"))
+	profiles := filepath.Join(t.TempDir(), "profiles")
+	held, err := profile.Acquire(profiles, "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	held.Release()
+	c.Profile, c.ProfileHome = "work", profiles
+	double := &clipboardDouble{failClear: 1}
+	r := &runtime{home: c.Home, id: id, clip: double, clipMode: "human"}
+	if err = r.prepare(c); err != nil {
+		t.Fatal(err)
+	}
+	// The session's first launch has already happened; the handoff relaunches.
+	r.generation.Store(1)
+	r.current.BrowserMode = "human"
+	ctx := context.Background()
+	if _, err = r.handoff(ctx, "agent"); err == nil || !strings.HasPrefix(err.Error(), "clipboard-") {
+		t.Fatalf("failed clear on a reusable profile: %v", err)
+	}
+	preferences := filepath.Join(r.profile, "Default", "Preferences")
+	if clears, _ := double.counts(); clears != 1 || len(r.children) != 0 {
+		t.Fatalf("failed clear reached launch: clears=%d children=%d", clears, len(r.children))
+	}
+	if _, e := os.Stat(preferences); e == nil {
+		t.Fatal("a refused agent launch prepared the reusable profile")
+	}
+	if _, err = r.handoff(ctx, "agent"); err == nil || err.Error() != "browser-start-failed" {
+		t.Fatalf("retry did not reach the launch: %v", err)
+	}
+	if clears, _ := double.counts(); clears != 2 {
+		t.Fatalf("retry did not clear again before launch: clears=%d", clears)
+	}
+	data, err := os.ReadFile(preferences)
+	if err != nil {
+		t.Fatal("the retried launch did not prepare the reusable profile")
+	}
+	var prefs map[string]any
+	if err = json.Unmarshal(data, &prefs); err != nil || prefs["session"].(map[string]any)["restore_on_startup"] != float64(1) {
+		t.Fatalf("the retried handoff did not use the reusable profile's handoff launch: %s", data)
 	}
 }
 
