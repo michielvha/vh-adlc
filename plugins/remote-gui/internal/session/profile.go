@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -130,17 +131,29 @@ func browserOwner(home string, pid int) string {
 	return ""
 }
 
+// errHolderClear marks a holder clear that failed. The session stays
+// cleanup-pending with the lock held until a later pass clears the holder;
+// the session itself ended normally, so that pass records stopped.
+var errHolderClear = errors.New("profile-holder-cleanup-pending")
+
 // releaseProfile clears the holder and updates last used before the lock is
-// released. Only the lock holder writes, so a released profile is left alone.
-func releaseProfile(held *profile.Held) {
+// released. When the metadata cannot be read or written it keeps the lock and
+// returns the failure, so the guard can retry. Only the lock holder writes, so
+// a released profile is left alone.
+func releaseProfile(held *profile.Held) error {
 	if held == nil || held.File == nil {
-		return
+		return nil
 	}
-	if m, exists, err := held.Meta(); err == nil && exists {
+	m, exists, err := held.Meta()
+	if err == nil && exists {
 		m.HolderID, m.HolderGuard, m.LastUsed = "", nil, time.Now().UTC()
-		_ = held.SaveMeta(m)
+		err = held.SaveMeta(m)
+	}
+	if err != nil {
+		return fmt.Errorf("%w: %v", errHolderClear, err)
 	}
 	held.Release()
+	return nil
 }
 
 // inheritProfile adopts the lock descriptor the CLI passed to the guard and

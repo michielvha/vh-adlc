@@ -157,7 +157,8 @@ func finish(home, id string, controller bool) error { return finishProfile(home,
 
 // finishProfile ends a session. Once its owned processes are gone, the guard
 // clears the profile holder and releases the lock before it records stopped,
-// so a start issued right after stop returns finds the profile free.
+// so a start issued right after stop returns finds the profile free. A failed
+// holder clear returns before anything is recorded, keeping the lock held.
 func finishProfile(home, id string, controller bool, held *profile.Held) error {
 	r, err := state.Load(home, id)
 	if err != nil {
@@ -200,7 +201,9 @@ func finishProfile(home, id string, controller bool, held *profile.Held) error {
 	if err = privateCleanup(home, id); err != nil {
 		return err
 	}
-	releaseProfile(held)
+	if err = releaseProfile(held); err != nil {
+		return err
+	}
 	return update(home, id, func(r *state.Record) {
 		if r.Diagnostic == "" {
 			r.State = "stopped"
@@ -232,7 +235,7 @@ func markPending(home, id string, err error) {
 	_ = update(home, id, func(r *state.Record) {
 		r.State = "cleanup-pending"
 		r.CleanupDiagnostic = err.Error()
-		if r.Diagnostic == "" {
+		if r.Diagnostic == "" && !errors.Is(err, errHolderClear) {
 			r.Diagnostic = err.Error()
 		}
 	})
