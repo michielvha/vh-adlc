@@ -5,25 +5,27 @@ import { bindingFixture } from "./binding-fixture";
 import { commitAll, git, put } from "./repository-fixture";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
-export const auditInputFaults = ["empty", "matching", "multiple", "partial-missing", "missing-objects", "changed-after-fetch", "oversized-inputs"] as const;
+export const auditInputFaults = ["empty", "matching", "multiple", "partial-missing", "early-missing", "oversized-first", "missing-objects", "changed-after-fetch", "oversized-inputs"] as const;
 export async function auditProposalInputsFixture(roots: string[], fault: typeof auditInputFaults[number]) {
   const f = await bindingFixture(roots, false, { mutableInventory: true });
     let head = f.head;
-    if (fault === "oversized-inputs") { put(f.candidate, "docs/guide.md", "# " + "x".repeat(600000) + "\n"); head = commitAll(f.candidate); }
+    if (fault === "oversized-inputs" || fault === "oversized-first") { put(f.candidate, "docs/guide.md", "# " + "x".repeat(600000) + "\n"); head = commitAll(f.candidate); }
+    const multiple = ["multiple", "partial-missing", "early-missing", "oversized-first"].includes(fault);
+    let legacyHead = head;
+    if (multiple) { put(f.candidate, "docs/guide.md", "# Distinct legacy candidate guide\n"); legacyHead = commitAll(f.candidate); }
     if (fault !== "empty") {
       const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
       const proposal = { number: 11, state: "open", merged_at: null, body: "Synthetic original proposal body", title: "Existing documentation correction", draft: false,
         labels: [{ id: 101, name: "documentation" }], user: { id: 20, login: "fixture-bot", type: "Bot" },
-        head: { sha: fault === "missing-objects" ? "f".repeat(40) : head, ref: "docs-drift/existing", repo: repository },
+        head: { sha: ["missing-objects", "early-missing"].includes(fault) ? "f".repeat(40) : head, ref: "docs-drift/existing", repo: repository },
         base: { sha: f.source, ref: "main", repo: repository } };
-      const multiple = ["multiple", "partial-missing"].includes(fault);
       const proposals = [proposal, ...(multiple ? [{ ...proposal, number: 12, body: "Synthetic legacy original proposal", user: { id: 21, login: "legacy-bot", type: "Bot" },
-        head: { ...proposal.head, sha: fault === "partial-missing" ? "e".repeat(40) : head, ref: "docs-audit/existing" } }] : [])];
+        head: { ...proposal.head, sha: fault === "partial-missing" ? "e".repeat(40) : legacyHead, ref: "docs-audit/existing" } }] : [])];
       writeFileSync(f.inventoryFile, canonicalJSON(proposals));
       if (fault !== "missing-objects") {
-        git(f.origin, "-c", "protocol.file.allow=always", "fetch", "--no-write-fetch-head", f.candidate, head);
-        git(f.origin, "update-ref", "refs/pull/11/head", head);
-        if (fault === "multiple") git(f.origin, "update-ref", "refs/pull/12/head", head);
+        git(f.origin, "-c", "protocol.file.allow=always", "fetch", "--no-write-fetch-head", f.candidate, multiple ? legacyHead : head);
+        if (fault !== "early-missing") git(f.origin, "update-ref", "refs/pull/11/head", head);
+        if (multiple && fault !== "partial-missing") git(f.origin, "update-ref", "refs/pull/12/head", legacyHead);
       }
       if (fault === "changed-after-fetch") {
         const path = join(f.root, "native-bin/git"), original = readFileSync(path, "utf8");
@@ -35,5 +37,5 @@ export async function auditProposalInputsFixture(roots: string[], fault: typeof 
         writeFileSync(path, original.replace("process.exit(result.exitCode);", edit + "process.exit(result.exitCode);"));
       }
     }
-  return f;
+  return { ...f, proposalHead: head, legacyHead };
 }

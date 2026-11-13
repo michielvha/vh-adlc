@@ -43,11 +43,15 @@ test.each(["multiple", "partial-missing"] as const)("the audit proposal CLI acco
     expect(result.audit_proposal_inputs).toMatchObject({ authority: "none", source_commit: f.source, required_proposals: 2,
       collected_proposals: fault === "multiple" ? 2 : 1, complete: fault === "multiple" });
     expect(result.audit_proposal_inputs.proposals.map((value: { number: number }) => value.number)).toEqual([11, 12]);
-    if (fault === "multiple") expect(result.audit_proposal_inputs.proposals.every((value: { files: number; hunks: number }) => value.files === 1 && value.hunks > 0)).toBe(true);
+    if (fault === "multiple") {
+      expect(result.audit_proposal_inputs.proposals.every((value: { files: number; hunks: number }) => value.files === 1 && value.hunks > 0)).toBe(true);
+      expect(result.audit_proposal_inputs.proposals.map((value: { head_sha: string }) => value.head_sha)).toEqual([f.proposalHead, f.legacyHead]);
+      expect(result.audit_proposal_inputs.proposals[0].binding_sha256).not.toBe(result.audit_proposal_inputs.proposals[1].binding_sha256);
+    }
     else expect(result.audit_proposal_inputs.proposals[1]).toMatchObject({ files: null, hunks: null, binding_sha256: null });
     const stdout = readFileSync(join(f.artifacts, "audit-proposal-cli-stdout"), "utf8");
     expect(stdout).not.toContain("Synthetic original proposal body"); expect(stdout).not.toContain("Synthetic legacy original proposal");
-    expect(stdout).not.toContain("Current candidate guide"); expect(stdout).not.toContain("after_base64");
+    expect(stdout).not.toContain("Current candidate guide"); expect(stdout).not.toContain("Distinct legacy candidate guide"); expect(stdout).not.toContain("after_base64");
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveRoots = true; throw error; }
 }, 125000);

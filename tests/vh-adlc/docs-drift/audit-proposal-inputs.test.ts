@@ -13,12 +13,18 @@ test.each(auditInputFaults)("audit proposal inputs collect every native full dif
     const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/audit-proposal-inputs"), f = await auditProposalInputsFixture(roots, fault);
     const before = captureRepositoryState(f.repo), result = await api.collectAuditProposalInputs(f.options);
     expect(result.complete, JSON.stringify(result.diagnostics)).toBe(["empty", "matching", "multiple"].includes(fault)); expect(result.authority).toBe("none");
-    expect(result.required_proposals).toBe(fault === "empty" ? 0 : ["multiple", "partial-missing"].includes(fault) ? 2 : 1);
-    expect(result.collected_proposals).toBe(fault === "multiple" ? 2 : ["matching", "partial-missing"].includes(fault) ? 1 : 0);
+    expect(result.required_proposals).toBe(fault === "empty" ? 0 : ["multiple", "partial-missing", "early-missing", "oversized-first"].includes(fault) ? 2 : 1);
+    expect(result.collected_proposals).toBe(fault === "multiple" ? 2 : ["matching", "partial-missing", "early-missing", "oversized-first"].includes(fault) ? 1 : 0);
     if (result.complete) {
       const originals = api.readCollectedAuditProposals(result);
       expect(result.required_proposals).toBe(originals.length);
-      if (fault === "multiple") expect(originals.map(proposal => proposal.number)).toEqual([11, 12]);
+      if (fault === "multiple") {
+        expect(originals.map(proposal => proposal.number)).toEqual([11, 12]);
+        expect(originals.map(proposal => proposal.head_sha)).toEqual([f.proposalHead, f.legacyHead]);
+        expect(originals[0].binding_sha256).not.toBe(originals[1].binding_sha256);
+        expect(Buffer.from(originals[0].hunks[0].after_base64 ?? "", "base64").toString()).toBe("# Current candidate guide\n");
+        expect(Buffer.from(originals[1].hunks[0].after_base64 ?? "", "base64").toString()).toBe("# Distinct legacy candidate guide\n");
+      }
       if (fault === "matching") {
         expect(originals[0].number).toBe(11); expect(originals[0].hunks.length).toBeGreaterThan(0);
         expect(originals[0].files.map(file => file.path)).toEqual(["docs/guide.md"]);
@@ -28,10 +34,14 @@ test.each(auditInputFaults)("audit proposal inputs collect every native full dif
     } else {
       expect(() => api.readCollectedAuditProposals(result)).toThrow("Original native audit proposal inputs required");
       if (fault === "changed-after-fetch") expect(result.scope_changed).toBe(true);
-      if (fault === "oversized-inputs") expect(result.diagnostics.join("\n")).toContain("retained entry bound");
+      if (fault === "oversized-inputs" || fault === "oversized-first") expect(result.diagnostics.join("\n")).toContain("retained entry bound");
       const unknown = result.proposals[fault === "partial-missing" ? 1 : 0];
       expect(unknown.files).toBe(null); expect(unknown.hunks).toBe(null);
       if (fault === "partial-missing") expect(result.proposals[0].files).toBe(1);
+      if (fault === "early-missing" || fault === "oversized-first") {
+        expect(result.proposals[1]).toMatchObject({ number: 12, head_sha: f.legacyHead, files: 1 });
+        expect(result.proposals[1].binding_sha256).not.toBe(null);
+      }
     }
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveRoots = true; throw error; }

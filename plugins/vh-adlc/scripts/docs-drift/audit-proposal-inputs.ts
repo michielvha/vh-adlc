@@ -54,19 +54,29 @@ export async function collectAuditProposalInputs(input: WorkerCollectionOptions)
     result.proposals = current.proposals.proposals.map(proposal => ({ number: proposal.number, head_sha: proposal.head_sha,
       base_sha: proposal.base_sha, binding_sha256: null, files: null, hunks: null }));
     originals = [];
+    let retainedBytes = 2;
     for (const [index, number] of selected.entries()) {
-      const collected = await collectPublicationOriginals({ snapshot, store, context: initial, selected: [number],
-        current_default: currentDefault, credential: options.credential, path: options.path });
-      if (!collected.inputs.complete) { result.diagnostics.push(...collected.inputs.diagnostics); throw Error("Required complete audit proposal inputs unavailable"); }
-      if (canonicalDigest(collected.observed) !== canonicalDigest(collected.inputs.proposals))
-        throw new PublicationScopeChanged("Original audit proposals changed during complete Git collection");
-      const next: ResolutionProposal[] = [...originals, ...collected.inputs.proposals];
-      if (Buffer.byteLength(JSON.stringify(next)) > limit) throw Error("Complete audit proposal inputs exceed the retained entry bound");
-      originals = next; result.collected_proposals = originals.length;
-      const proposal = collected.inputs.proposals[0];
-      if (!proposal) throw Error("Required complete audit proposal missing");
-      result.proposals[index] = { number: proposal.number, head_sha: proposal.head_sha, base_sha: proposal.base_sha,
-        binding_sha256: proposal.binding_sha256, files: proposal.files.length, hunks: proposal.hunks.length };
+      try {
+        const collected = await collectPublicationOriginals({ snapshot, store, context: initial, selected: [number],
+          current_default: currentDefault, credential: options.credential, path: options.path });
+        if (!collected.inputs.complete) {
+          result.diagnostics.push(...collected.inputs.diagnostics); throw Error("Required complete audit proposal inputs unavailable");
+        }
+        if (canonicalDigest(collected.observed) !== canonicalDigest(collected.inputs.proposals))
+          throw new PublicationScopeChanged("Original audit proposals changed during complete Git collection");
+        const proposal = collected.inputs.proposals[0];
+        if (!proposal || collected.inputs.proposals.length !== 1 || proposal.number !== number) throw Error("Required complete audit proposal missing");
+        const size = Buffer.byteLength(JSON.stringify(proposal));
+        if (size > limit) throw Error("Complete audit proposal inputs exceed the retained entry bound");
+        // Keep processing memory bounded while still inspecting later, smaller proposals after a failed entry.
+        if (retainedBytes + size + 1 > 64 * 1024 * 1024) throw Error("Complete audit proposal inputs exceed the aggregate processing bound");
+        retainedBytes += size + 1; originals.push(proposal); result.collected_proposals = originals.length;
+        result.proposals[index] = { number: proposal.number, head_sha: proposal.head_sha, base_sha: proposal.base_sha,
+          binding_sha256: proposal.binding_sha256, files: proposal.files.length, hunks: proposal.hunks.length };
+      } catch (error) {
+        if (error instanceof ArtifactChanged || error instanceof PublicationScopeChanged) throw error;
+        result.diagnostics.push("Proposal " + number + ": " + (error instanceof Error ? error.message : "Full native inputs unavailable"));
+      }
     }
     const final = native(), inventory = collectPublicationProposals(final.repository, settings);
     if (inventory.scope_changed) throw new PublicationScopeChanged("Native audit proposal changed during final collection");
@@ -77,8 +87,8 @@ export async function collectAuditProposalInputs(input: WorkerCollectionOptions)
     const settled = native();
     if (settled.default_commit !== currentDefault || canonicalDigest(settled.identity) !== canonicalDigest(identity))
       throw new PublicationScopeChanged("Native audit source or actor changed after proposal collection");
-    result.inputs_sha256 = canonicalDigest({ source_commit: options.source, worker_input_sha256: current.worker_input_sha256, originals });
-    result.complete = true;
+    result.complete = result.diagnostics.length === 0 && originals.length === selected.length;
+    if (result.complete) result.inputs_sha256 = canonicalDigest({ source_commit: options.source, worker_input_sha256: current.worker_input_sha256, originals });
   } catch (error) {
     result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Native audit proposal inputs unavailable");
