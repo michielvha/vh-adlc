@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner at R-15; its seven findings are listed and settled during implementation. Tasks written; next: implementation on a feature branch."
+status: in-progress
+status_description: "Claimed on feat/spec-review-convergence; implementing T1 onward in the vh-adlc-review-convergence worktree."
 issue: null
+branch: feat/spec-review-convergence
 goal: "Spec review rates findings consistently, finds failure-mode gaps and every restatement in one pass, applies each pass's findings as one revision without applying nits, and never rewrites reviewed commits."
 covers:
   - plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md
