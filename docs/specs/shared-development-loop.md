@@ -75,11 +75,22 @@ install, then Stackweaver's adoption PR. Rollback is rehearsed on a disposable c
 
 Validation so far is spec review only, nothing executed: thirteen `gpt-6.1-sol` passes. R-13 has no
 blocking findings; its two should-fix items (findings saved against an existing issue, and reviewer
-helper processes that outlive the review) are folded in, and a confirming pass precedes acceptance. The
-owner accepts on the condition that the move loses nothing useful from the native loop, which the
-parity map (AC-08) and the retained local rules (AC-10) enforce. Accepting authorizes implementation of
+helper processes that outlive the review) are folded in, and R-14 has no blocking findings either. Accepting authorizes implementation of
 this scope on a feature branch. Publishing releases, merging either repository and retiring the native
 agents each need separate approval.
+
+### Acceptance notes
+
+The owner accepted this document on 2026-11-13 at R-14 (`d367673`), on the condition that the move to
+vh-adlc loses nothing useful from the native loop. The parity map (AC-08) and the retained local rules
+(AC-10) are how implementation proves that condition; a legacy behavior with no home fails AC-08.
+
+R-14's two should-fix items stay within the accepted design and go into the task list: a claim made in
+a worktree on another branch name requires that branch to be the session's own or handed over, never an
+unrelated branch (`references/authority.md:80-86` already forbids repointing one); and the reviewer
+process wrapper confirms that no member of the process group is still alive before the final check,
+because `owned-process.ts` reports `reaped` from the parent alone. Both get fixtures under AC-02 and
+AC-13.
 
 ### Background
 
@@ -570,6 +581,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-12 | spec | `64503e5f5f95d49cc5dfcc717e616c964e68fbd5` | gpt-6.1-sol | procedural | One blocking finding: the reviewer CLI starts in the live checkout and can load its instruction files. Two should-fix. |
 | 2026-11-13 | R-13 | spec | `478dcab03f798ade50341adbd27273660fd0cb43` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on findings saved against an existing issue and reviewer helper processes outliving the review. |
 | 2026-11-13 | R-14 | spec | `d367673759c90a3b0b5da6a6e8b6884d99d18c6a` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on claiming from an unrelated branch and verifying process group cleanup. |
+| 2026-11-13 | R-14 | spec | `d367673759c90a3b0b5da6a6e8b6884d99d18c6a` | n/a | n/a | accepted by owner |
 
 ### R-1
 
