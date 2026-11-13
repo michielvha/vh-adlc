@@ -434,6 +434,7 @@ None.
 | 2026-11-12 | R-40 | spec | `d2726cca4b69656f5b3ecc7666d191087a8f54ad` | n/a | n/a | accepted by owner |
 | 2026-11-12 | R-41 | implementation | `4ae46e203d4d05d142ce9fa9bae004bc6bdeb01d` | unknown | procedural | One blocking factual finding (remote snippet calls have no deadline, so a Windows PowerShell bootstrap that never sees end of input hangs the command) and one should-fix factual finding (AC-12 has no residual line); AC-16 not met, AC-12 not verified, the rest met. |
 | 2026-11-13 | R-42 | spec | `09a17a644226f28d9db73d707142b302f9d25cac` | unknown | procedural | Four factual findings (the quit and wait deadline leaves out the force-stop wait, no open tasks, drift from main, warnings arrive as CLIXML) and two judgement findings (deadlines only on desktop app calls, timeout tests during a rollback); none blocking; model identity not attested. |
+| 2026-11-13 | R-43 | spec | `6a077d29dabfc1a7857dbeeaa1d25500043f315e` | unknown | procedural | Three factual findings (a probe that times out falls through to exit 4, T49 names a release build for the rollbacks, the macOS quit deadline leaves out the AppleScript reply wait) and one judgement finding (the debugging-port forward reads as a call with a 30-second deadline); none blocking; model identity not attested. |
 
 ### R-1
 
@@ -2051,6 +2052,36 @@ SEVERITY: nit
 WHERE: Test Plan, AC-18 row; Design deadline paragraph ("during a rollback or after a lost window it ends as an unconfirmed rollback does", "the error names the step")
 EVIDENCE: The AC-18 row tests two timeouts: a launch timeout on the first debug launch attempt, and a step 2 stop timeout. It does not test a timeout during a rollback or after a lost window, which the Design says must end as an unconfirmed rollback. It also does not assert that the error names the step. AC-18 and the Design require both.
 PROPOSAL: Add a clientapp case where a call during rollback, or after a lost window, never returns. It should assert the unconfirmed-rollback outcome. Every timeout case should also assert that the message names the step.
+
+### R-43
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, link probe paragraph ("any other answer or a failure leads to a PowerShell probe ... Anything else stops with exit 4") and Desktop app entry deadline paragraph ("A call whose snippet has no timer of its own gets 30 seconds: the platform probe ..."; "Any other call that times out fails the command as a failed snippet does at that point ... the command exits 1"); AC-18; Test Plan AC-18 row; T48
+EVIDENCE: plugins/paseo-hosts/internal/link/link.go lines 198 to 220 handle only ErrUnreachable from `uname -s` as a stop. Any other error, which includes a killed `ssh`, falls through to the PowerShell probe. When that probe returns no `OS=Windows_NT`, which is what a timed-out probe returns, the command exits with ExitUnsupported (4) and the message "client <c> is neither macOS nor Windows (uname -s: no answer)". That message drops the error. The PowerShell probe is the same kind of call that hung in R-41. The Design's probe rule makes a failed or timed-out probe stop with exit 4 and say nothing about a timeout. The deadline paragraph and AC-18 require exit 1 and an error that names the step and says it timed out. The two rules contradict each other for the probe, which runs first in `link`, `unlink` and `remove`. The Test Plan and T48 have no case where the probe never returns, so an implementation that keeps the current fallthrough passes every planned check while AC-18 fails for the probe.
+PROPOSAL: State in the probe paragraph that a `uname -s` or PowerShell probe call that passes its deadline stops at once with exit 1 and names the probe and the timeout. It must not fall through to the PowerShell probe or exit 4. Add a T48 and Test Plan case with a probe that never returns that asserts exit 1, the timeout message and an unchanged registry.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Desktop app entry deadline paragraph ("Every SSH call to a desktop client, in `link`, `unlink` and `remove` as well as in the steps above, has a deadline"); AC-18 ("Every SSH call to a desktop client that has not finished by its deadline, twice its snippet's own longest wait plus 30 seconds")
+EVIDENCE: The DevTools forward is an `ssh -N -L` process to the client (clientapp.go `forward`, lines 993 to 1034). It must stay open for the whole debug step, often longer than 30 seconds, and it runs no snippet. Today it is bounded only by `forwardTimeout` (20 seconds) while it opens. Read literally, the Design and AC-18 give it a deadline of 0 + 30 seconds. An implementer or reviewer could then kill it in the middle of a step, or count it as an unbounded call.
+PROPOSAL: Say that the formula covers snippet calls, and that the debugging-port forward is bounded by its 20-second open wait and is closed with its step.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T49 ("manual steps 6 and 9 on `win-main` with a release build")
+EVIDENCE: Manual step 6 repeats steps 4 and 5 for the Windows PC. Step 5 runs `link` three times "with a `paseotest` build and `PASEO_HOSTS_TEST_REJECT_ENTRY=1`", which a release build does not contain ("Release builds do not contain this code"). T44 ran the same steps with "three `paseotest` rollbacks on each desktop". As written, T49 asks for something step 6 cannot do.
+PROPOSAL: Have T49 name the `paseotest` build for the step 5 rollbacks within step 6, and the release build for step 4, step 9 and step 10.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Desktop app entry deadline paragraph ("Quit and wait gets twice the sum of its quit wait, its force-stop wait and the 120-second installer wait, plus 30 seconds ... 350 on macOS")
+EVIDENCE: stop.sh line 34 runs `osascript -e "tell application id ... to quit"` before the first `gone` loop. osascript waits for the app's reply to the quit event, up to AppleScript's default 2-minute timeout, and the derivation does not count that wait. The same paragraph does count `ssh` ConnectTimeout=10 among the "35 seconds of timers" in the Windows tunnel snippet. The worst case on macOS is about 120 + 30 + 30 + 121 = 301 seconds, using the measured 1.5 factor for each 20-second `gone` loop and the SECONDS-bounded installer loop. That still fits under 350, but with about 49 seconds of headroom rather than the doubling the paragraph gives as the reason.
+PROPOSAL: Count the AppleScript reply wait in the macOS quit derivation, or note that the deadline still covers it. That way, a later change to the quit or installer waits keeps the margin.
 
 ## Sources
 
