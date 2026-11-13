@@ -32,5 +32,7 @@ export function diffPaths(repo: string, from: string, to: string): string[] {
 
 /** Every path any commit in `range` touched, rename sources included, so a change reverted later in the range still counts. */
 export function rangePaths(repo: string, range: string): string[] {
-  return [...new Set(nulRecords(repo, ["log", "--no-renames", "--name-only", "-z", "--format=", range]).map(path => path.replace(/^\n+/, "")).filter(Boolean))];
+  // One read per commit: `git log -z` separates commits with a newline that a filename may also start with.
+  const commits = run(repo, ["rev-list", range]).split("\n").filter(Boolean);
+  return [...new Set(commits.flatMap(commit => nulRecords(repo, ["diff-tree", "--root", "--no-commit-id", "--no-renames", "--name-only", "-r", "-z", commit])))];
 }

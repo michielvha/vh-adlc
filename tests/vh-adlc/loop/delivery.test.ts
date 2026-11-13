@@ -164,3 +164,19 @@ describe("renames", () => {
     expect(stub.calls()).toBe(1);
   });
 });
+
+describe("filename bytes in the push range", () => {
+  test("a newline-prefixed code path added and removed in the range leaves the skip marker off", () => {
+    const remoteDir = scratch("vh-delivery-remote-"), remote = join(remoteDir, "r.git");
+    git(remoteDir, "init", "-q", "--bare", "-b", "main", remote);
+    const root = repository(base());
+    git(root, "remote", "add", "origin", remote); git(root, "push", "-q", "origin", "main");
+    write(root, { "\ndocs/specs/code.go.md": "x\n" }); git(root, "add", "-A"); git(root, "commit", "-q", "-m", "add");
+    git(root, "rm", "-q", "--", "\ndocs/specs/code.go.md"); git(root, "commit", "-q", "-m", "remove");
+    write(root, { "docs/specs/f.md": "# F3\n" }); git(root, "commit", "-q", "-am", "doc");
+    const cli = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
+    const run = Bun.spawnSync([process.execPath, cli, "skip", "--repo", root, "--base", "origin/main", "--remote-branch", "origin/main", "--feature-root", "docs/specs/", "--docs-revision", "none"],
+      { stdout: "pipe", stderr: "pipe", env: { ...process.env, XDG_CONFIG_HOME: join(remoteDir, "cfg") } });
+    expect(JSON.parse(run.stdout.toString()).marker).toBe(false);
+  });
+});
