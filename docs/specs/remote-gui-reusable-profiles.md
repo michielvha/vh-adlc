@@ -279,6 +279,7 @@ None.
 | 2026-11-13 | R-13 | spec | `6ea4aa823e0107ad1e5d7e3e90eefebfb3b6e817` | gpt-6.1-sol | procedural | No blocking findings after the clipboard merge; four should-fix findings on cookie persistence, the two-second grace, clipboard coverage and the owner summary. |
 | 2026-11-13 | R-14 | spec | `a5165431340556b1c090516955d8cfa082c14679` | gpt-6.1-sol | procedural | Blocking: the normative revision must return to draft with every criterion reset; three should-fix findings on pasted text in site storage, helper shutdown in an interrupted close and load sampling. |
 | 2026-11-13 | R-15 | spec | `2ff1a62336717a4a6d43d75dc857749c6b06042e` | gpt-6.1-sol | procedural | No blocking findings; one should-fix finding on how an interrupted close ends the clipboard helper. |
+| 2026-11-13 | R-16 | spec | `69ba525642d043cc7576bf5d43ec7ba5ff69e9fd` | gpt-6.1-sol | procedural | No findings on the revision after R-13 to R-15. |
 
 ### R-1
 
@@ -985,6 +986,11 @@ SEVERITY: should-fix
 WHERE: Design (Lifecycle), AC-17, Test Plan (AC-17), Tasks (T24)
 EVIDENCE: docs/specs/remote-gui-reusable-profiles.md:137 says interrupted teardown ends the clipboard helper through the group stop, "with the X server after Chromium". The helper runs inside the supervisor (browser.go:435). On expiry, daemon.go:334-338 kills and waits for that supervisor before invoking finishProfile, so the helper's connection ends before the group stop. stopMembers at daemon.go:90-110 signals every remaining member without waiting for Chromium to exit before terminating Xvfb. AC-17, its proof row and T24 repeat the incorrect helper teardown mechanism.
 PROPOSAL: Describe interrupted teardown as supervisor death closing the helper connection, followed by group cleanup with no browser-before-X-server ordering guarantee. Align AC-17 and T24 with those observable events, retaining ordered helper closure only for a completed supervisor close.
+
+
+### R-16
+
+NO FINDINGS
 
 
 ## Sources
