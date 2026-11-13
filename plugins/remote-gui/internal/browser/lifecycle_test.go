@@ -56,6 +56,23 @@ func TestFailedHandoffRetainsRecoveryAfterOwnerClosesBrowser(t *testing.T) {
 	}
 }
 
+// privateSession reruns the calling test as a session leader, the way the guard
+// runs the supervisor that owns a browser, and reports whether the caller is
+// already that rerun and should continue.
+func privateSession(t *testing.T) bool {
+	t.Helper()
+	if self, err := state.Inspect(os.Getpid()); err == nil && self.Session == self.PID {
+		return true
+	}
+	cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.count=1", "-test.v")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	out, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(out), "--- PASS: "+t.Name()) {
+		t.Fatalf("private-session run failed: %v\n%s", err, out)
+	}
+	return false
+}
+
 // Chromium's network service flushes its disk cache into the profile after the
 // browser process has exited. These scripts stand in for such helpers.
 const (
@@ -63,31 +80,24 @@ const (
 	flushingHelper = `while kill -0 "$parent" 2>/dev/null; do sleep 0.02; done; sleep 0.3; mkdir -p "$profile/Default/Cache"; : >"$profile/Default/Cache/index"; : >"$marker"`
 	// Ignores the browser's exit until it is killed.
 	stubbornHelper = `trap '' TERM; mkdir -p "$profile/Default/Cache"; : >"$marker"; while :; do mkdir -p "$profile/Default/Cache"; sleep 0.02; done`
+	// Keeps forking writers until it is killed.
+	forkingHelper = `trap '' TERM; while :; do (sleep 0.2; mkdir -p "$profile/Default/Cache"; : >"$marker") & sleep 0.01; done`
 )
 
 func TestStopOutlastsBrowserHelpers(t *testing.T) {
-	t.Run("flushing", func(t *testing.T) { stopOutlastsHelper(t, flushingHelper, false) })
-	t.Run("stubborn", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, false) })
-}
-
-// A browser that crashed or was closed by its owner leaves helpers that are
-// no longer its descendants. Inside the guard's private session they remain
-// provable members, so this test reruns itself as a session leader.
-func TestStopDrainsHelpersOrphanedBeforeStop(t *testing.T) {
-	if os.Getenv("REMOTE_GUI_PRIVATE_SESSION_TEST") == "1" {
-		stopOutlastsHelper(t, stubbornHelper, true)
+	if !privateSession(t) {
 		return
 	}
-	cmd := exec.Command(os.Args[0], "-test.run=^TestStopDrainsHelpersOrphanedBeforeStop$", "-test.count=1", "-test.v")
-	cmd.Env = append(os.Environ(), "REMOTE_GUI_PRIVATE_SESSION_TEST=1")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	out, err := cmd.CombinedOutput()
-	if err != nil || !strings.Contains(string(out), "--- PASS: TestStopDrainsHelpersOrphanedBeforeStop") {
-		t.Fatalf("private-session run failed: %v\n%s", err, out)
-	}
+	t.Run("flushing", func(t *testing.T) { stopOutlastsHelper(t, flushingHelper, "", false) })
+	t.Run("stubborn", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, "", false) })
+	t.Run("late-fork", func(t *testing.T) { stopOutlastsHelper(t, forkingHelper, "", false) })
+	// A browser that crashed or was closed by its owner leaves helpers that are
+	// no longer its descendants, and a helper may lead its own process group.
+	t.Run("orphaned", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, "", true) })
+	t.Run("own-process-group", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, "set -m; ", true) })
 }
 
-func stopOutlastsHelper(t *testing.T, helperScript string, orphan bool) {
+func stopOutlastsHelper(t *testing.T, helperScript, prefix string, orphan bool) {
 	t.Helper()
 	c, id := setup(t)
 	profile := filepath.Join(c.Home, id, "profile")
@@ -96,9 +106,9 @@ func stopOutlastsHelper(t *testing.T, helperScript string, orphan bool) {
 	}
 	dir := t.TempDir()
 	marker, pidFile := filepath.Join(dir, "helper-wrote"), filepath.Join(dir, "helper-pid")
-	script := `profile=$1 marker=$2; parent=$$; (sh -c 'echo $PPID' >"$3"; ` + helperScript + `) & exec sleep 30`
+	script := `profile=$1 marker=$2; parent=$$; ` + prefix + `(sh -c 'echo $PPID' >"$3"; ` + helperScript + `) & exec sleep 30`
 	r := &runtime{home: c.Home, id: id, profile: profile}
-	browser, err := r.spawn("browser", "/bin/sh", []string{"-c", script, "sh", profile, marker, pidFile}, nil)
+	browser, err := r.spawn("browser", "/bin/bash", []string{"-c", script, "bash", profile, marker, pidFile}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,6 +123,9 @@ func stopOutlastsHelper(t *testing.T, helperScript string, orphan bool) {
 		}
 	}
 	t.Cleanup(func() { _ = state.Signal(helper, syscall.SIGKILL) })
+	if prefix != "" && helper.Group == browser.identity.Group {
+		t.Fatal("helper did not lead its own process group")
+	}
 	if orphan {
 		if err = state.Signal(browser.identity, syscall.SIGKILL); err != nil {
 			t.Fatal(err)
@@ -132,6 +145,49 @@ func stopOutlastsHelper(t *testing.T, helperScript string, orphan bool) {
 	time.Sleep(500 * time.Millisecond)
 	if _, err := os.Stat(profile); !os.IsNotExist(err) {
 		t.Fatal("browser helper recreated the profile after stop")
+	}
+}
+
+// A recorded guard whose PID now belongs to a foreign session leader must not
+// make that session's processes look like ours.
+func TestStopLeavesForeignSessionsAlone(t *testing.T) {
+	if !privateSession(t) {
+		return
+	}
+	foreign := exec.Command("/bin/sh", "-c", "/bin/sleep 30 & wait")
+	foreign.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := foreign.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = foreign.Process.Kill(); _ = foreign.Wait() })
+	leader, err := state.Inspect(foreign.Process.Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, id := setup(t)
+	stale := leader
+	stale.Start = "recycled"
+	if err = state.Update(context.Background(), c.Home, id, func(record *state.Record) { record.Guard = stale }); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	var members []state.Identity
+	entries, _ := os.ReadDir("/proc")
+	for _, e := range entries {
+		if pid, e := strconv.Atoi(e.Name()); e == nil {
+			if member, e := state.Inspect(pid); e == nil && member.Session == leader.PID {
+				members = append(members, member)
+			}
+		}
+	}
+	if len(members) < 2 {
+		t.Fatal("foreign session did not start")
+	}
+	(&runtime{home: c.Home, id: id}).stop()
+	for _, member := range members {
+		if !state.Alive(member) {
+			t.Fatal("stop signalled a process outside its session")
+		}
 	}
 }
 
