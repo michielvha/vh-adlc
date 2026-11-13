@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted by the owner against R-22 on 2026-11-13; T30 and fresh evidence for every criterion come next."
+status: in-progress
+status_description: "Implementation resumed at T30 after the owner accepted R-22; every criterion needs fresh evidence."
 branch: feat/remote-gui-reusable-profiles
 issue: https://github.com/michielvha/vh-adlc/issues/62
 goal: "An owner can opt in to a named browser profile bound to their identity, so provider sessions survive the end of a remote-gui session, while credential entry stays human-only and agent control of a signed-in profile always rests on the owner's confirmation."
