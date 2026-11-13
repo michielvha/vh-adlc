@@ -594,6 +594,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-10 | spec | `1d563f0e24e6ad57c1677374dd4f1ac9ac1afd01` | gpt-6.1-sol | procedural | No blocking findings; three should-fix: live slot pass and final full kind run, skipped subchecks inside make verify, glossary. |
 | 2026-11-13 | R-11 | spec | `fcc1245e2deda1fe8ef0d42d43f90954338f8cd3` | gpt-6.1-sol | procedural | One blocking finding: a file-only review reads the live worktree, not the target commit. Two should-fix. |
 | 2026-11-13 | R-12 | spec | `64503e5f5f95d49cc5dfcc717e616c964e68fbd5` | gpt-6.1-sol | procedural | One blocking finding: the reviewer CLI starts in the live checkout and can load its instruction files. Two should-fix. |
+| 2026-11-13 | R-13 | spec | `478dcab03f798ade50341adbd27273660fd0cb43` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on findings saved against an existing issue and reviewer helper processes outliving the review. |
 
 ### R-1
 
@@ -947,6 +948,22 @@ SEVERITY: should-fix
 WHERE: Design / Claiming from a host worktree; AC-13 and its Test Plan row
 EVIDENCE: docs/specs/shared-development-loop.md:298-304 requires comparison with the freshly fetched default-branch tip, then promises a stale-tip refusal before anything is written and with the repository unchanged. The AC-13 proof additionally requires the repository to remain byte-identical. plugins/vh-adlc/references/loop.md requires git fetch before fresh and gate; fetching can update remote-tracking refs and FETCH_HEAD before the stale-tip refusal. I cannot run git or vh-adlc; this is a contradiction between the required procedure and its preservation contract, not an observed test failure.
 PROPOSAL: Explicitly permit the required fetch effects while forbidding changes to the document, local branches, HEAD, index and worktree on pre-claim refusal. Make the stale-tip fixture advance the remote and verify that precise boundary instead of whole-repository byte identity.
+
+### R-13
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Investigation defaults; AC-07 and its Test Plan row
+EVIDENCE: Design permits investigate to record findings against an existing issue instead of writing a document. AC-07 still requires writing or extending an analysis document. Stackweaver CLAUDE.md:295-299 forbids an issue from carrying the only copy of substantive reasoning, as does the pinned conventions/documentation.md under Findings and issues. The duplicate-issue case therefore has conflicting artifact requirements.
+PROPOSAL: Require an existing issue to point to an analysis document that investigate creates or extends; issue updates remain summaries and links. Test an existing issue without a covering document and require the findings to be saved in a document without creating another issue.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02 and its Test Plan row
+EVIDENCE: The route specifies timeout handling and a preservation snapshot after the reply, but no requirement to terminate and reap the command's remaining processes before taking that snapshot. A successful reviewer process can leave a helper running that changes files after the review is stored. Existing plugins/vh-adlc/scripts/triage/owned-process.ts:1-16 explicitly owns a process group and terminates remaining helpers even after successful parent exit. AC-02's fixtures cover a hang, but not surviving descendants. Git, vh-adlc and CLI execution are unavailable, so these scenarios were not executed.
+PROPOSAL: Reuse the owned-process runner and require process cleanup before the final preservation check or record storage, reporting cleanup failures as review pending. Add successful-exit and timeout fixtures with a surviving helper and verify that it cannot modify the checkout afterward.
 
 ## Sources
 
