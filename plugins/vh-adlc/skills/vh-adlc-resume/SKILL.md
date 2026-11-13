@@ -34,7 +34,9 @@ This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
 host default. Resume takes the route of the operation it continues
 (`--operation resume --continues <operation>`). Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
-files and its project procedure, whose local rules apply alongside this procedure. A `host` route that names a model runs with it as a requested model.
+files and its project procedure, whose local rules apply alongside this procedure. A `host` route that names a model runs with it as a requested model. A claim that is pending after a rejected push is retried from a worktree at the new
+default-branch tip with `bun scripts/loop/cli.ts claim`, or handed over; never advance an unrelated branch
+to recover it.
 
 ## Continue
 

@@ -23,6 +23,8 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     const loop = current.slice(loopStart, loopEnd);
     for (const phrase of [".vh-adlc/loop.yaml", "scripts/loop/cli.ts route", "references/loop-settings.md", "host default", "scripts/loop/cli.ts context", "project procedure"]) expect(loop).toContain(phrase);
     if (name === "resume") expect(loop).toContain("--continues");
+    if (name === "implement") for (const phrase of ["cli.ts isolation", "enter-host-worktree", "cli.ts claim", "unrelated"]) expect(loop).toContain(phrase);
+    if (name === "resume") expect(loop).toContain("cli.ts claim");
     if (name === "investigate") for (const phrase of ["findings_document: always", "extend a covering document", "only copy of the findings", "act now, track", "primary sources"]) expect(loop).toContain(phrase);
     if (name === "spec") expect(loop).toContain("lenses");
     if (name === "implement" || name === "ship") for (const phrase of ["verification rungs", "scripts/loop/cli.ts rungs"]) expect(loop).toContain(phrase);

@@ -56,3 +56,22 @@ describe("review", () => {
     expect(run.json).toMatchObject({ role: "spec_reviewer", status: "ready", model: "gpt-6.1-sol", target: commit, records: "NO FINDINGS\n" });
   });
 });
+
+describe("claim", () => {
+  test("claims a planned document from a detached worktree at the tip and writes the claim into its frontmatter", () => {
+    const remoteDir = realpathSync(mkdtempSync(join(tmpdir(), "vh-loop-cli-remote-")));
+    made.push(remoteDir);
+    const remote = join(remoteDir, "r.git");
+    git(remoteDir, "init", "-q", "--bare", "-b", "main", remote);
+    const { root } = repo({ "docs/specs/f.md": "---\nstatus: planned\nstatus_description: \"Accepted.\"\nissue: null\ngoal: \"g\"\n---\n# F\n" });
+    git(root, "remote", "add", "origin", remote); git(root, "push", "-q", "origin", "main");
+    const host = join(realpathSync(mkdtempSync(join(tmpdir(), "vh-loop-cli-host-"))), "wt");
+    made.push(dirname(host));
+    git(root, "worktree", "add", "-q", "--detach", host, "origin/main");
+    const run = cli("claim", "--repo", host, "--document", "docs/specs/f.md", "--feature-branch", "feat/f", "--default-branch", "main",
+      "--status-description", "Claimed on feat/f.", "--message", "docs(specs): claim f [skip ci]");
+    expect(run.json).toMatchObject({ status: "claimed", branch: "feat/f" });
+    expect(git(host, "show", "HEAD:docs/specs/f.md")).toContain("status: in-progress\nstatus_description: \"Claimed on feat/f.\"\nissue: null\nbranch: feat/f\n");
+    expect(git(remote, "log", "-1", "--format=%s", "main")).toBe("docs(specs): claim f [skip ci]");
+  });
+});

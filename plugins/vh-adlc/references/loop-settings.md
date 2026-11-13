@@ -83,6 +83,21 @@ go in a document, and an issue update, where investigate has authority to make o
 link. An investigation ends with one verdict: act now, track (with the conditions that would change
 it), or reject.
 
+## Claiming and isolation
+
+| Field | Value |
+| --- | --- |
+| `implement_worktree` | `shared` (default) or `isolated`. With `isolated`, implement never claims or edits in the primary worktree, the first entry of `git worktree list`. |
+
+`bun scripts/loop/cli.ts claim` claims a planned feature from any worktree at the freshly fetched
+default-branch tip with no tracked change, whether `HEAD` is detached, on the default branch or on a
+branch this session created or was handed (`--owned`). It refuses an unrelated branch, a stale tip or a
+stray change before writing anything; the fetch may move only remote-tracking refs. It pushes the claim
+with `git push origin HEAD:<default branch>` and then creates the feature branch in that worktree. A
+rejected push keeps the local claim commit, creates no feature branch and reports the claim pending.
+`bun scripts/loop/cli.ts isolation --host-worktree-tool true|false` says whether to continue, to ask the
+host's own worktree tool for a worktree, or to stop before writing.
+
 `bun scripts/loop/cli.ts context --repo <dir>` prints the reading list (instruction files, then the
 project procedure) and the lenses.
 

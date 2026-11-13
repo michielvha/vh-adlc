@@ -6,6 +6,9 @@
 //   bun scripts/loop/cli.ts ci       --repo <dir>
 //   bun scripts/loop/cli.ts skip     --repo <dir> --base <branch> --remote-branch <ref> --feature-root <dir> --docs-revision <sha>
 //   bun scripts/loop/cli.ts delivery --repo <dir> --merge <sha> --feature-root <dir> --docs-revision <sha>
+//   bun scripts/loop/cli.ts isolation --repo <dir> --host-worktree-tool true|false
+//   bun scripts/loop/cli.ts claim    --repo <dir> --document <doc> --feature-branch <b> --default-branch <b> --status-description <text>
+//                                    --message <text> [--owned <branch>[,<branch>...]]
 //   bun scripts/loop/cli.ts review --repo <dir> --document <doc> --commit <sha> --kind spec|implementation
 //                                  --docs-revision <sha> --binary <path> --plugin-pin <pin> [--timeout-ms <n>]
 //
@@ -19,6 +22,8 @@ import { runReviewRoute } from "./review-route";
 import { loopContext, type LoopContext } from "./procedure";
 import { applicableRungs, featureDelta, mayAdvance, runRungs } from "./rungs";
 import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, skipMarker } from "./delivery";
+import { claim, isolation } from "./claim";
+import { writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
 const PLUGIN = join(import.meta.dir, "..", "..");
@@ -73,6 +78,22 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
   if (command === "context") { console.log(JSON.stringify(loopContext(settings))); return 0; }
+  if (command === "isolation") { console.log(JSON.stringify(isolation(settings, repo, { hostWorktreeTool: options["host-worktree-tool"] === "true" }))); return 0; }
+  if (command === "claim") {
+    const document = need(options, "document"), featureBranch = need(options, "feature-branch"), description = need(options, "status-description");
+    const result = await claim(repo, { document, featureBranch, defaultBranch: need(options, "default-branch"), message: need(options, "message"),
+      ownedBranches: options.owned ? options.owned.split(",") : [],
+      edit: root => {
+        const path = join(root, document), text = readFileSync(path, "utf8");
+        const end = text.indexOf("\n---\n", 4);
+        if (!text.startsWith("---\n") || end < 0 || !/^status: planned$/m.test(text.slice(0, end))) throw Error("the document is not a planned feature document");
+        let front = text.slice(0, end).replace(/^status: planned$/m, "status: in-progress")
+          .replace(/^status_description: .*$/m, `status_description: ${JSON.stringify(description)}`);
+        front = /^branch: /m.test(front) ? front : front.replace(/^(issue: .*)$/m, `$1\nbranch: ${featureBranch}`);
+        writeFileSync(path, front + text.slice(end));
+      } });
+    console.log(JSON.stringify(result)); return result.status === "claimed" ? 0 : 3;
+  }
   if (command === "ci") { console.log(JSON.stringify(ciReport(settings))); return 0; }
   if (command === "skip") {
     const names = (range: string[]) => execSync(`git diff --name-only ${range.join(" ")}`, { cwd: repo }).toString().split("\n").filter(Boolean);
@@ -110,7 +131,7 @@ export async function main(argv: string[]): Promise<number> {
     console.log(JSON.stringify({ role: route.role, ...outcome }));
     return outcome.status === "ready" ? 0 : 3;
   }
-  throw Error(`unknown command ${command ?? ""}; use route, context, rungs, ci, skip, delivery or review`);
+  throw Error(`unknown command ${command ?? ""}; use route, context, rungs, ci, skip, delivery, isolation, claim or review`);
 }
 
 if (import.meta.main) {

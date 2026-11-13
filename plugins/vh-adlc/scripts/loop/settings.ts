@@ -46,10 +46,12 @@ export type LoopSettings = {
   /** `always` makes invoking investigate the request to write its findings document. */
   findings_document: "on_request" | "always";
   analysis_dir: string;
+  /** `isolated` keeps implement out of the primary worktree. */
+  implement_worktree: "shared" | "isolated";
 };
 export type Lens = { name: string; check: string; severity: "blocking" | "should-fix" | "nit" };
 
-export const LOOP_SETTINGS_KEYS = ["schema_version", "roles", "review_scratch", "project_procedure", "instruction_files", "lenses", "verification_rungs", "ci_trigger", "post_merge_watch", "skip_ci_paths", "findings_document", "analysis_dir"];
+export const LOOP_SETTINGS_KEYS = ["schema_version", "roles", "review_scratch", "project_procedure", "instruction_files", "lenses", "verification_rungs", "ci_trigger", "post_merge_watch", "skip_ci_paths", "findings_document", "analysis_dir", "implement_worktree"];
 const PLACEHOLDERS = ["{model}", "{prompt}", "{prompt_file}", "{export_dir}"];
 
 function fail(field: string): never { throw Error(`invalid loop settings: ${field}`); }
@@ -211,6 +213,7 @@ export function loadLoopSettings(root: string, options: { settingsPath?: string;
     instruction_files, lenses: lenses(input.lenses), verification_rungs: rungs(input.verification_rungs),
     ...(input.post_merge_watch === undefined ? {} : { post_merge_watch: watch(input.post_merge_watch) }),
     ci_trigger: input.ci_trigger === undefined ? "automatic" : input.ci_trigger === "manual" || input.ci_trigger === "automatic" ? input.ci_trigger : fail("ci_trigger must be automatic or manual"),
+    implement_worktree: input.implement_worktree === undefined ? "shared" : input.implement_worktree === "isolated" || input.implement_worktree === "shared" ? input.implement_worktree : fail("implement_worktree must be shared or isolated"),
     findings_document: input.findings_document === undefined ? "on_request" : input.findings_document === "always" || input.findings_document === "on_request" ? input.findings_document : fail("findings_document must be on_request or always"),
     analysis_dir: input.analysis_dir === undefined ? "docs/analysis" : (() => { const dir = text(input.analysis_dir, "analysis_dir").replace(/\/+$/, ""); try { resolveInside(root, dir); } catch { fail("analysis_dir"); } return dir; })(),
     skip_ci_paths: input.skip_ci_paths === undefined ? [] : (Array.isArray(input.skip_ci_paths) ? input.skip_ci_paths.map((p, i) => text(p, `skip_ci_paths[${i}]`)) : fail("skip_ci_paths")) };

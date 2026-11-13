@@ -43,7 +43,13 @@ This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
 files and its project procedure, whose local rules apply alongside this procedure. With declared verification rungs, each task's verification step runs
 `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` in place of the `AGENTS.md`
-command lookup, and a task is not ticked unless every applicable rung passed at its commit. A `host` route that names a model runs with it as a requested model.
+command lookup, and a task is not ticked unless every applicable rung passed at its commit. A `host` route that names a model runs with it as a requested model. To claim, first run `bun scripts/loop/cli.ts isolation --repo <dir> --host-worktree-tool <true|false>`:
+on `enter-host-worktree`, enter a worktree with the host's own worktree tool and continue there; on `stop`,
+report its reason and stop. A planned feature may then be claimed from a worktree at the default-branch
+tip that is detached or on a branch this session created or was handed, with
+`bun scripts/loop/cli.ts claim` (`references/loop-settings.md`, Claiming and isolation); it refuses an
+unrelated branch, a stale tip or a stray change before writing, and a rejected push leaves the claim
+pending with no feature branch.
 
 ## Start
 
