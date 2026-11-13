@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { markedProcesses, runOwnedClient } from "../../../plugins/vh-adlc/scripts/triage/owned-process";
+import { markedProcesses, pidNamespaceAvailable, runOwnedClient } from "../../../plugins/vh-adlc/scripts/triage/owned-process";
 
 const made: string[] = [];
 afterAll(() => { for (const dir of made) rmSync(dir, { recursive: true, force: true }); });
@@ -15,9 +15,16 @@ function probingAllowed(): boolean {
   const child = Bun.spawn(["sleep", "2"], { detached: true, stdout: "ignore", stderr: "ignore" });
   try { process.kill(-child.pid, 0); return true; } catch { return false; } finally { try { process.kill(-child.pid, "SIGKILL"); } catch { /* gone */ } }
 }
-const PROBING = probingAllowed();
+/** The marker scan needs to read this host's own children's environments (some sandboxes hide /proc). */
+function markerVisible(): boolean {
+  const marker = `probe-${crypto.randomUUID()}`;
+  const child = Bun.spawn(["sleep", "2"], { env: { ...process.env, VH_ADLC_OWNED_PROCESS: marker }, stdout: "ignore", stderr: "ignore" });
+  try { return markedProcesses(marker).includes(child.pid); } finally { child.kill("SIGKILL"); }
+}
+const PROBING = probingAllowed() && markerVisible();
 const confirmable = PROBING ? test : test.skip;
-if (!PROBING) console.warn("owned-process: this host forbids probing process groups, so confirmed-cleanup fixtures are skipped; cleanup reports unconfirmed here.");
+if (!PROBING) console.warn("owned-process: this host forbids probing process groups or hides its children's environments, so confirmed-cleanup fixtures are skipped; cleanup reports unconfirmed here.");
+const namespaced = PROBING && pidNamespaceAvailable() ? test : test.skip;
 
 describe("cleanup", () => {
   confirmable("a successful client leaves nothing running and cleanup is confirmed", async () => {
@@ -54,7 +61,7 @@ describe("cleanup", () => {
 });
 
 describe("the PID namespace boundary", () => {
-  confirmable("a detached helper that cleared its environment is stopped when the client exits", async () => {
+  namespaced("a detached helper that cleared its environment is stopped when the client exits", async () => {
     const dir = scratch(), late = join(dir, "late"), ready = join(dir, "ready");
     const script = `setsid env -i /bin/bash -c 'echo $$ > ${ready}; sleep 1; echo x > ${late}' </dev/null >/dev/null 2>&1 &\nwhile [ ! -s ${ready} ]; do sleep 0.05; done`;
     const result = await runOwnedClient(["bash", "-c", script], { cwd: dir, env: env(), stdout: join(dir, "o"), stderr: join(dir, "e"), pidNamespace: true }, limits);
@@ -63,7 +70,7 @@ describe("the PID namespace boundary", () => {
     expect(existsSync(late)).toBe(false);
   });
 
-  confirmable("the same helper after a timeout is stopped too", async () => {
+  namespaced("the same helper after a timeout is stopped too", async () => {
     const dir = scratch(), late = join(dir, "late"), ready = join(dir, "ready");
     const script = `setsid env -i /bin/bash -c 'echo $$ > ${ready}; sleep 1; echo x > ${late}' </dev/null >/dev/null 2>&1 &\nwhile [ ! -s ${ready} ]; do sleep 0.05; done\nsleep 30`;
     const result = await runOwnedClient(["bash", "-c", script], { cwd: dir, env: env(), stdout: join(dir, "o"), stderr: join(dir, "e"), pidNamespace: true }, { ...limits, timeout_ms: 500 });
