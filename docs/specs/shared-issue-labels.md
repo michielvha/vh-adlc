@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-2 applied, including the owner's answer on spec mappings; waits for a new spec review."
+status_description: "R-3 returned no findings; waits for owner acceptance."
 issue: null
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
 covers:
@@ -366,6 +366,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-13 | R-1 | spec | `5381e51` | unknown | procedural | Changes needed: 3 blocking, 5 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-13 | R-2 | spec | `be943c8` | unknown | procedural | Changes needed: 1 blocking, 2 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
+| 2026-11-13 | R-3 | spec | `cfc2f2d` | unknown | procedural | No findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
 
 ### R-1
 
@@ -449,3 +450,7 @@ SEVERITY: should-fix
 WHERE: Design; Acceptance Criteria; Test Plan / plugin delivery
 EVIDENCE: Pinned conventions/delivery.md:85-89 requires naming affected artifacts and their build and publication paths, with verification through those paths. The document specifies a packaged helper but names no plugin delivery path or installed-helper check. Its Test Plan at docs/specs/shared-issue-labels.md:317-325 covers source fixtures and live label changes. The actual package is distributed through .claude-plugin/marketplace.json:17-20 and .agents/plugins/marketplace.json:17-22, with version metadata in plugins/vh-adlc/plugin.json and plugins/vh-adlc/.claude-plugin/plugin.json. Every proposed criterion can pass without establishing that an installed plugin contains the helper and vocabulary.
 PROPOSAL: Name the affected plugin payload and marketplace delivery paths, and add candidate installation verification that runs the installed helper against a fixture. Describe the later publication check while preserving its separate authorization requirement.
+
+### R-3
+
+NO FINDINGS
