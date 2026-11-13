@@ -351,10 +351,8 @@ var scanProcesses = func() []processRow {
 // such as the helpers a browser starts. A process is found only while its parent
 // is alive: once the parent exits, the kernel hands it to another reaper.
 func Descendants(roots []Identity) []Identity {
-	live := map[int]Identity{}
 	children := map[int][]Identity{}
 	for _, row := range scanProcesses() {
-		live[row.id.PID] = row.id
 		children[row.parent] = append(children[row.parent], row.id)
 	}
 	var found []Identity
@@ -362,7 +360,10 @@ func Descendants(roots []Identity) []Identity {
 	for len(queue) > 0 {
 		p := queue[0]
 		queue = queue[1:]
-		if got, ok := live[p.PID]; !ok || !Equal(got, p) {
+		// The parent is verified after its children's rows were read. Alive
+		// now, it held its PID when they were read, so no reused PID can lend
+		// it a foreign child; a parent that changed contributes none.
+		if len(children[p.PID]) == 0 || !Alive(p) {
 			continue
 		}
 		found = append(found, children[p.PID]...)
