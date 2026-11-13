@@ -45,12 +45,20 @@ async function currentState(options: Options, inventory?: ClosureInventory, expe
   const policyOptions = { repo: facts.store.root, current_default: options.source, identity: facts.identity, runtime };
   const workerPolicy = readAdoptedRolePolicy({ ...policyOptions, role: "worker" }), reviewerPolicy = readAdoptedRolePolicy({ ...policyOptions, role: "reviewer" });
   const common = { source_repo: options.repo, artifact_root: options.artifact_root };
-  const worker = readNativeRoleCapture({ ...common, reference: options.worker_capture, policy: workerPolicy,
-    expected: { role: "worker", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: workerInputDigest(manifest.bindings) } });
-  const reviewer = readNativeRoleCapture({ ...common, reference: options.reviewer_capture, policy: reviewerPolicy,
-    expected: { role: "reviewer", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "reviewer"), target_sha256: manifestDigest(manifest) } });
-  const authority = readPublicationAuthority({ ...common, reference: options.authority, manifest,
-    adopted_procedure: { repo: facts.store.root, current_default: options.source, path: settings.project_procedure } });
+  let worker: ReturnType<typeof readNativeRoleCapture>;
+  let reviewer: ReturnType<typeof readNativeRoleCapture>;
+  let authority: ReturnType<typeof readPublicationAuthority>;
+  try {
+    worker = readNativeRoleCapture({ ...common, reference: options.worker_capture, policy: workerPolicy,
+      expected: { role: "worker", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: workerInputDigest(manifest.bindings) } });
+    reviewer = readNativeRoleCapture({ ...common, reference: options.reviewer_capture, policy: reviewerPolicy,
+      expected: { role: "reviewer", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "reviewer"), target_sha256: manifestDigest(manifest) } });
+    authority = readPublicationAuthority({ ...common, reference: options.authority, manifest,
+      adopted_procedure: { repo: facts.store.root, current_default: options.source, path: settings.project_procedure } });
+  } catch (error) {
+    if (error instanceof ArtifactChanged) throw new PublicationScopeChanged(error.message);
+    throw error;
+  }
   const review: PublicationGate["review"] = { manifest, current: manifest, worker: worker.evidence, reviewer: reviewer.evidence,
     policy: { worker: workerPolicy, reviewer: reviewerPolicy }, grants: authority.grants };
   const policy: PlanPolicy = { adoption_sha256: runtime.adoption_sha256, context: "production", transport: "native", publication_kind: "resolve",
@@ -80,7 +88,7 @@ function readInvocation(options: Options, plan: SealedPlan) {
   const value = exactRecord(JSON.parse(decodeUTF8(bytes)), ["schema_version", "kind", "plan_sha256", "inputs_sha256", "original_target"], "Original closure controller fields changed");
   if (!canonicalJSON(value).equals(bytes) || value.schema_version !== 1 || value.kind !== "docs-drift-closure-controller"
     || value.plan_sha256 !== sha256(canonicalJSON(plan)) || value.inputs_sha256 !== invocationDigest(options))
-    throw new PublicationScopeChanged("Original closure controller inputs changed");
+    throw Error("Original closure controller inputs changed");
   return value;
 }
 
@@ -126,7 +134,7 @@ export async function publishClosure(input: Options) {
 export async function resumeClosure(input: Options & { journal_directory: string }) {
   const options = structuredClone(input);
   if (dirname(realpathSync(options.journal_directory)) !== realpathSync(options.artifact_root)) throw Error("Original closure journal artifact root required");
-  const journal = readJournal(options.journal_directory, options.repo);
+  const journal = readJournal(options.journal_directory, options.repo), invocation = readInvocation(options, journal.plan);
   const { settings } = loadCommittedSettings(options.repo, journal.plan.manifest.bindings.source_commit);
   const manifest = journal.plan.manifest;
   const runtime = await selectRecoveryRuntime({ repo: options.repo, source_commit: manifest.bindings.source_commit,
@@ -134,7 +142,6 @@ export async function resumeClosure(input: Options & { journal_directory: string
     cache_directory: options.cache_directory, entry: options.entry, adoption_sha256: journal.plan.adoption_sha256 });
   requireExecutingRuntime(runtime);
   try {
-    const invocation = readInvocation(options, journal.plan);
     const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
     if (native.default_commit !== options.source || native.identity.repository_id !== journal.plan.manifest.repository_id
       || native.identity.actor_id !== journal.plan.manifest.actor_id || native.identity.actor !== journal.plan.manifest.actor)

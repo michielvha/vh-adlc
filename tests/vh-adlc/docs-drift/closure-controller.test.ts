@@ -189,3 +189,63 @@ test("normal retained closure publish and resume commands keep bounded summaries
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveFailedRoots = true; throw error; }
 }, 600000);
+
+test("a mistaken closure resume selection leaves its pending journal unchanged and correct resume can finish", async () => {
+  try {
+    const { spyOn } = await import("bun:test"), { canonicalDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/protocol");
+    const f = await originalClosureFixture(roots), before = captureRepositoryState(f.repo);
+    const controller = await import(join(f.adopted.retained.directory, "scripts/docs-drift/closure-controller.ts"));
+    const journal = await import(join(f.adopted.retained.directory, "scripts/docs-drift/journal.ts")), original = journal.appendOutcome;
+    let interrupted = false;
+    const fault = spyOn(journal, "appendOutcome").mockImplementation((current: unknown, id: string, outcome: unknown) => {
+      if (id === "close-1" && !interrupted) { interrupted = true; throw Error("Synthetic lost local close outcome"); }
+      return original(current, id, outcome);
+    });
+    let pending;
+    try { pending = await controller.publishClosure(f.publication); }
+    finally { fault.mockRestore(); }
+    expect(interrupted).toBe(true); expect(pending.state).toBe("pending");
+    const options = { ...f.publication, journal_directory: pending.journal.directory };
+    const journalBefore = canonicalDigest(journal.readJournal(options.journal_directory, f.repo));
+    await expect(controller.resumeClosure({ ...options, selection: { ...f.options.selection, consolidation: 999 } }))
+      .rejects.toThrow("Original closure controller inputs changed");
+    expect(canonicalDigest(journal.readJournal(options.journal_directory, f.repo))).toBe(journalBefore);
+    const resumed = await controller.resumeClosure(options);
+    expect(resumed.state, JSON.stringify(resumed.reason)).toBe("complete");
+    expect(JSON.parse(readFileSync(f.service.statePath, "utf8")).comments["1"]).toHaveLength(1);
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { preserveFailedRoots = true; throw error; }
+}, 600000);
+
+test.each(["authority", "origin"])("changed closure %s bytes persistently invalidate the batch before another effect", async kind => {
+  try {
+    const { spyOn } = await import("bun:test"), { writeFileSync } = await import("node:fs");
+    const f = await originalClosureFixture(roots), before = captureRepositoryState(f.repo);
+    const controller = await import(join(f.adopted.retained.directory, "scripts/docs-drift/closure-controller.ts"));
+    const journal = await import(join(f.adopted.retained.directory, "scripts/docs-drift/journal.ts")), original = journal.appendOutcome;
+    const authority = JSON.parse(readFileSync(join(f.artifacts, f.publication.authority.path), "utf8"));
+    const path = join(f.artifacts, kind === "authority" ? f.publication.authority.path : authority.origin.artifact.path), bytes = readFileSync(path);
+    let changed = false;
+    const fault = spyOn(journal, "appendOutcome").mockImplementation((current: unknown, id: string, outcome: unknown) => {
+      const appended = original(current, id, outcome);
+      if (id === "lease" && !changed) { changed = true; writeFileSync(path, Buffer.concat([bytes, Buffer.from("\n")])); }
+      return appended;
+    });
+    let pending;
+    try { pending = await controller.publishClosure(f.publication); }
+    finally { fault.mockRestore(); }
+    expect(changed).toBe(true); expect(pending.state).toBe("pending");
+    expect(pending.journal.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(true);
+    const state = JSON.parse(readFileSync(f.service.statePath, "utf8"));
+    expect(state.comments).toEqual({}); expect(state.prs[0].state).toBe("open");
+    writeFileSync(path, bytes);
+    const callsBefore = readFileSync(f.service.calls, "utf8"), resumed = await controller.resumeClosure({ ...f.publication, journal_directory: pending.journal.directory });
+    expect(resumed.state).toBe("pending"); expect(resumed.reason).toBe("reconciliation-only-no-replay");
+    const later = readFileSync(f.service.calls, "utf8").slice(callsBefore.length).trim().split("\n").filter(Boolean)
+      .map(line => JSON.parse(line) as { program: string; args: string[] });
+    expect(later.some(call => call.program === "git" && call.args.includes("push") || call.program === "gh"
+      && call.args.some(arg => arg.startsWith("repos/")) && call.args.some(arg => ["POST", "PATCH", "PUT", "DELETE"].includes(arg)))).toBe(false);
+    expect(JSON.parse(readFileSync(f.service.statePath, "utf8")).comments).toEqual({});
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { preserveFailedRoots = true; throw error; }
+}, 600000);
