@@ -1,3 +1,5 @@
+import { collectAuditProposalInputs } from "./audit-proposal-inputs";
+import { readProposalAssessment, renderProposalAssessment, type ProposalAssessment } from "./proposal-assessment";
 import { realpathSync } from "node:fs";
 import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
 import { PublicationScopeChanged } from "./publish";
@@ -22,6 +24,7 @@ type Manifest = {
   source_verification: Reference; assessment_reference: Reference; worker_capture: Reference; worker: RoleBinding;
   worker_runtime_sha256: string; reviewer_runtime_sha256: string;
   selection: NonNullable<Preparation["selection"]>; publication_proposal: Preparation["publication"]; assessment: AssessmentReport;
+  proposal_assessment: ProposalAssessment | null; proposal_inputs: Array<{ number: number; binding_sha256: string; inputs_reference: Reference }> | null;
 };
 type Result = {
   schema_version: 1; kind: "docs-drift-assessment-review-target" | "docs-drift-assessment-review"; authority: "none";
@@ -36,10 +39,11 @@ type Context = {
 type Command = "collect-assessment-review-target" | "read-assessment-review";
 
 export function assessmentReviewOutput(command: Command, result: Result) {
-  const markdown = command === "read-assessment-review" && result.kind === "docs-drift-assessment-review"
+  let markdown = command === "read-assessment-review" && result.kind === "docs-drift-assessment-review"
     && result.complete && result.review && result.manifest
     ? renderAssessmentReport(result.manifest.assessment, ["Finding assessments independently reviewed by " + result.review.reviewer.model,
       ...(result.review.nit_count ? [result.review.nit_count + " minor review finding(s) remain in the original reviewer records"] : [])]) : undefined;
+  if (markdown && result.manifest?.proposal_assessment) markdown += "\n" + renderProposalAssessment(result.manifest.proposal_assessment, "Proposal assessments independently reviewed");
   return { schema_version: 1 as const, command, source_commit: result.source_commit,
     outcome: result.complete ? "collected" as const : "incomplete" as const,
     ...(command === "collect-assessment-review-target" ? { assessment_review_target: result } : { assessment_review: result }),
@@ -83,18 +87,39 @@ async function currentTarget(options: Options): Promise<{ result: Result; contex
     if (workerInputsDigest(current.inputs) !== current.worker_input_sha256
       || !canonicalJSON(current.source_verification.evidence).equals(canonicalJSON(assessment.source_verification)))
       throw Error("Original assessment inputs changed");
+    let proposalAssessment: ProposalAssessment | null = null, proposalInputs: Manifest["proposal_inputs"] = null;
+    if (preparation.proposal_assessment_reference) {
+      const originals = await collectAuditProposalInputs(options);
+      result.scope_changed ||= originals.scope_changed;
+      if (originals.complete && originals.worker_input_sha256 !== current.worker_input_sha256)
+        throw new PublicationScopeChanged("Original proposal assessment worker inputs changed");
+      if (!originals.complete) { result.diagnostics.push(...originals.diagnostics); throw Error("Complete original proposal inputs required for independent review"); }
+      const reference = preparation.proposal_assessment_reference;
+      const recheck = () => readBoundArtifact({ source_repo: repo, artifact_root: options.artifact_root, reference });
+      recheck();
+      proposalAssessment = readProposalAssessment({ repo, source: options.source, artifact_root: options.artifact_root,
+        inputs: originals, reference });
+      recheck();
+      if (!proposalAssessment.complete || !proposalAssessment.collection_complete || proposalAssessment.details_omitted) {
+        result.diagnostics.push(...proposalAssessment.diagnostics); throw Error("Complete original worker proposal assessment required");
+      }
+      proposalInputs = originals.proposals.map(proposal => {
+        if (!proposal.binding_sha256 || !proposal.inputs_reference) throw Error("Complete model-readable original proposal inputs required");
+        return { number: proposal.number, binding_sha256: proposal.binding_sha256, inputs_reference: proposal.inputs_reference };
+      });
+    }
     const runtime = facts.runtime;
     const manifest: Manifest = { schema_version: 1, kind: "docs-drift-finding-assessment", source_commit: options.source,
       identity: facts.identity, inputs: current.inputs, source_verification: current.source_verification.evidence,
       assessment_reference: assessment.assessment_reference, worker_capture: options.worker_capture as Reference, worker: preparation.worker.binding,
       worker_runtime_sha256: roleRuntimeDigest(runtime, "worker"), reviewer_runtime_sha256: roleRuntimeDigest(runtime, "reviewer"),
-      selection: preparation.selection, publication_proposal: preparation.publication, assessment };
+      selection: preparation.selection, publication_proposal: preparation.publication, assessment, proposal_assessment: proposalAssessment, proposal_inputs: proposalInputs };
     result.manifest = manifest; result.target_sha256 = canonicalDigest(manifest); result.reviewer_runtime_sha256 = manifest.reviewer_runtime_sha256;
     // Fresh proposal snapshot paths are presentation locators; inputs bind their stable original bytes.
     context = { runtime, identity: facts.identity, store: facts.store, current_default: facts.current_default };
     result.complete = true;
   } catch (error) {
-    result.scope_changed = error instanceof ArtifactChanged || error instanceof PublicationScopeChanged || Boolean(preparation?.scope_changed);
+    result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged || Boolean(preparation?.scope_changed);
     result.diagnostics.push(error instanceof Error ? error.message : "Original assessment review target unavailable");
   }
   if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during assessment target collection"); }
@@ -128,6 +153,8 @@ export async function collectAssessmentReview(input: Options & { reviewer_captur
     const verified = verifyIndependentRoleReview({ worker: worker.evidence, reviewer: reviewer.evidence, policy: { worker: workerPolicy, reviewer: reviewerPolicy },
       worker_target_sha256: workerInputsDigest(manifest.inputs), reviewer_target_sha256: result.target_sha256 });
     readBoundArtifact({ ...common, reference: manifest.assessment_reference });
+    if (manifest.proposal_assessment?.assessment_reference) readBoundArtifact({ ...common, reference: manifest.proposal_assessment.assessment_reference });
+    for (const proposal of manifest.proposal_inputs ?? []) readBoundArtifact({ ...common, reference: proposal.inputs_reference });
     result.review = { target_sha256: result.target_sha256, worker: worker.binding, reviewer: reviewer.binding, nit_count: verified.nit_count };
     result.complete = true;
   } catch (error) {

@@ -1,14 +1,16 @@
+import { join } from "node:path";
 import { realpathSync } from "node:fs";
-import { ArtifactChanged } from "./evidence-input";
+import { publishArtifact } from "./journal";
+import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
 import { OUTPUT_LIMIT } from "./owned-process";
-import { canonicalDigest, freezeJSON } from "./protocol";
+import { canonicalDigest, canonicalJSON, sha256, freezeJSON } from "./protocol";
 import { collectPublicationOriginals } from "./publication-originals";
 import { collectWorkerInputs, type WorkerCollectionOptions } from "./publication-worker";
 import { collectPublicationProposals } from "./proposals";
 import { PublicationScopeChanged } from "./publish";
 import type { ResolutionProposal } from "./resolve-inputs";
 import { loadCommittedSettings } from "./settings";
-import { captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { readNativeContext } from "./transport";
 
 type Result = {
@@ -16,7 +18,7 @@ type Result = {
   complete: boolean; scope_changed: boolean; details_omitted: boolean; diagnostics: string[];
   worker_input_sha256: string | null; inputs_sha256: string | null; object_store: string | null;
   required_proposals: number | null; collected_proposals: number;
-  proposals: Array<{ number: number; head_sha: string; base_sha: string; binding_sha256: string | null; files: number | null; hunks: number | null }>;
+  proposals: Array<{ number: number; head_sha: string; base_sha: string; binding_sha256: string | null; files: number | null; hunks: number | null; inputs_reference: { path: string; sha256: string } | null }>;
 };
 const originalInputs = new WeakMap<object, ResolutionProposal[]>();
 export function auditProposalInputsOutput(result: Result) {
@@ -35,6 +37,7 @@ export async function collectAuditProposalInputs(input: WorkerCollectionOptions)
   let originals: ResolutionProposal[] = [], limit = OUTPUT_LIMIT;
   try {
     limit = Math.min(limit, loadCommittedSettings(repo, options.source).settings.reports.max_entry_bytes);
+    const scope = artifactDirectoryScope(options.artifact_root, repo);
     if (options.inventory_context !== undefined) throw Error("Audit proposal inputs must be collected before publication");
     const current = await collectWorkerInputs(options);
     result.scope_changed = current.scope_changed;
@@ -52,7 +55,7 @@ export async function collectAuditProposalInputs(input: WorkerCollectionOptions)
     const selected = current.proposals.proposals.map(proposal => proposal.number);
     result.required_proposals = selected.length; result.worker_input_sha256 = current.worker_input_sha256; result.object_store = store.root;
     result.proposals = current.proposals.proposals.map(proposal => ({ number: proposal.number, head_sha: proposal.head_sha,
-      base_sha: proposal.base_sha, binding_sha256: null, files: null, hunks: null }));
+      base_sha: proposal.base_sha, binding_sha256: null, files: null, hunks: null, inputs_reference: null }));
     originals = [];
     let retainedBytes = 2;
     for (const [index, number] of selected.entries()) {
@@ -66,13 +69,18 @@ export async function collectAuditProposalInputs(input: WorkerCollectionOptions)
           throw new PublicationScopeChanged("Original audit proposals changed during complete Git collection");
         const proposal = collected.inputs.proposals[0];
         if (!proposal || collected.inputs.proposals.length !== 1 || proposal.number !== number) throw Error("Required complete audit proposal missing");
-        const size = Buffer.byteLength(JSON.stringify(proposal));
+        const bytes = canonicalJSON(proposal), size = bytes.length;
         if (size > limit) throw Error("Complete audit proposal inputs exceed the retained entry bound");
         // Keep processing memory bounded while still inspecting later, smaller proposals after a failed entry.
         if (retainedBytes + size + 1 > 64 * 1024 * 1024) throw Error("Complete audit proposal inputs exceed the aggregate processing bound");
+        const digest = sha256(bytes), reference = { path: "audit-proposal-input-" + digest + ".json", sha256: digest };
+        const read = () => readBoundArtifact({ source_repo: repo, artifact_root: scope.directory, reference });
+        try { publishArtifact(join(scope.directory, reference.path), bytes); }
+        catch (error) { if (!read().equals(bytes)) throw error; }
+        read();
         retainedBytes += size + 1; originals.push(proposal); result.collected_proposals = originals.length;
         result.proposals[index] = { number: proposal.number, head_sha: proposal.head_sha, base_sha: proposal.base_sha,
-          binding_sha256: proposal.binding_sha256, files: proposal.files.length, hunks: proposal.hunks.length };
+          binding_sha256: proposal.binding_sha256, files: proposal.files.length, hunks: proposal.hunks.length, inputs_reference: reference };
       } catch (error) {
         if (error instanceof ArtifactChanged || error instanceof PublicationScopeChanged) throw error;
         result.diagnostics.push("Proposal " + number + ": " + (error instanceof Error ? error.message : "Full native inputs unavailable"));

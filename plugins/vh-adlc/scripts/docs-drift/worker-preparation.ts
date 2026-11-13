@@ -20,6 +20,7 @@ type Preparation = {
   worker: Omit<ReturnType<typeof readNativeRoleCapture>, "evidence"> | null;
   selection: { schema_version: 1; source_commit: string; edits: Edit[] } | null;
   assessment: ReturnType<typeof readAssessmentReport> | null;
+  proposal_assessment_reference: ReturnType<typeof parseWorkerHandoff>["proposal_assessment_reference"];
   publication: ReturnType<typeof parseWorkerHandoff>["publication"]; inspection: ReturnType<typeof inspectPreparation> | null;
 };
 
@@ -28,7 +29,7 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
   const options = { ...input, source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), worker_capture: structuredClone(input.worker_capture) };
   const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
   const result: Preparation = { schema_version: 1, kind: "docs-drift-worker-preparation", authority: "none", complete: false, scope_changed: false, diagnostics: [],
-    worker_inputs: null, worker: null, selection: null, assessment: null, publication: null, inspection: null };
+    worker_inputs: null, worker: null, selection: null, assessment: null, proposal_assessment_reference: null, publication: null, inspection: null };
   try {
     result.worker_inputs = await collectWorkerInputs(options);
     if (!result.worker_inputs.complete) { result.diagnostics.push(...result.worker_inputs.diagnostics); throw Error("Current worker inputs incomplete"); }
@@ -46,6 +47,8 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
     const decisions = parseDecisionPacket(readBoundArtifact({ source_repo: repo, artifact_root: options.artifact_root, reference: options.decisions }), snapshot);
     if (decisions.mode === "advisory") validateAdvisorySelection(decisions, result.selection);
     result.publication = handoff.publication;
+    // This is original worker data; only the separate assessment reviewer validates its full proposal judgments.
+    result.proposal_assessment_reference = handoff.proposal_assessment_reference;
     const coordinated = readCoordinatedSelection({ repo, source: options.source, artifact_root: options.artifact_root,
       selection: result.selection, reference: decisions.coordination });
     result.inspection = inspectPreparation({ repo, source: options.source, selection: result.selection, protection_context: { coordinated } });

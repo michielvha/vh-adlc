@@ -33,3 +33,13 @@ test.each(["authority", "wrong-target", "reference-field", "reference-path", "re
   const input = options(value); if (fault === "too-large") input.max_entry_bytes = 10;
   expect(() => parseWorkerHandoff(input)).toThrow();
 });
+
+test("original worker handoffs bind proposal assessments separately from finding assessments", async () => {
+  const { parseWorkerHandoff } = await import("../../../plugins/vh-adlc/scripts/docs-drift/worker-handoff");
+  const reference = { path: "proposal-assessment.json", sha256: target };
+  const result = parseWorkerHandoff(options({ ...packet(), proposal_assessment: reference }));
+  expect(result.proposal_assessment_reference).toEqual(reference);
+  expect(result.assessment_reference).toBe(null); expect(result.publication).toBe(null);
+  for (const value of [{ ...reference, approved: true }, { ...reference, path: "../proposals.json" }, { ...reference, sha256: "wrong" }])
+    expect(() => parseWorkerHandoff(options({ ...packet(), proposal_assessment: value }))).toThrow();
+});
