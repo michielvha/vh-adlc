@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Complete at R-27: eleven criteria met; AC-02, AC-03, AC-07, AC-08, AC-12, AC-14, AC-17 and AC-18 carry owner residuals tracked in issue 85. The release and Stackweaver adoption Order steps follow."
+status_description: "Complete at R-28: eleven criteria met; AC-02, AC-03, AC-07, AC-08, AC-12, AC-14, AC-17 and AC-18 carry owner residuals tracked in issue 85. The release and Stackweaver adoption Order steps follow."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
@@ -584,51 +584,51 @@ published plugin is installed from the marketplace and exercised, and a rollback
 ## Acceptance Criteria
 
 - [x] AC-01: A repository's `.vh-adlc/loop.yaml` names a route for each loop role, every SDD operation dispatches according to it, a `command` route is accepted only for the two reviewer roles, no vh-adlc agent or skill file names a model, and a repository without the file behaves as it does at `a7bfca99`.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 - [ ] AC-02: From a Claude Code session, a read-only spec review that reads only a read-only export of the target commit and writes nothing, and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; the route, instruction files and lenses come from `loop.yaml` at the reviewed commit; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`, where a route with `model_attestation: codex-session` matches on the model Codex's session log records rather than the reviewer's self-report; and a mismatched model or target, a missing header, a non-zero exit, a timeout, a failed process cleanup or any change outside the declared `review_scratch` directories to the private clone's `HEAD`, refs, index entries, status, file contents or ignored-file list, or to the owning worktree's `HEAD`, branch ref, index entries, status, file contents or ignored-file list, leaves the review pending, while another session's push to the shared refs during the review does not with no Review Log row.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-27 at `67c4664e` returned not verified.
+      Evidence: R-28 at `15e095bf` returned not met.
 - [ ] AC-03: Every SDD operation reads the declared project procedure and instruction files, and a spec review flags a document that contradicts a declared instruction file or lens.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-27 at `67c4664e` returned not verified.
+      Evidence: R-28 at `15e095bf` returned not verified.
 - [x] AC-04: Implement and ship run each declared verification rung whose path condition holds over the whole feature delta, or that is declared always, and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 - [x] AC-05: With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, a feature whose actual merge commit carries the skip marker and touches only skip-eligible paths is reported delivered with no publication path and no watch run, every unmarked merge commit runs the watch, and a watch that fails only because no workflow ran leaves the feature reported blocked, not delivered.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 - [x] AC-06: Feature-document lint accepts `covers` entries containing `**`, they match the same paths as the docs-impact matcher, and under such an entry a committed change makes the applicable review stale while an uncommitted change makes `feature_tree_clean` false, as for a plain entry.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 - [ ] AC-07: With `findings_document: always`, investigate writes its findings document, or extends the existing analysis document that already covers the case without creating a second one, never leaves an issue holding the only copy of its findings, reports any duplicate analysis document or open issue it found, and ends with one of the three verdicts.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-27 at `67c4664e` returned not verified.
+      Evidence: R-28 at `15e095bf` returned not verified.
 - [ ] AC-08: Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` and the matching plain-language requests through `AGENTS.md` run the installed vh-adlc operations with Stackweaver's settings for every enrolled spec and, until the native agents retire, the native agents for every unenrolled one (after retirement, AC-17's refusal applies to terminal unenrolled documents), new specs are written enrolled, and every row of the committed parity map passes its contract test.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-27 at `67c4664e` returned not verified.
+      Evidence: R-28 at `15e095bf` returned not verified.
 - [x] AC-09: Every Stackweaver spec in the migration set (the draft specs, plus each planned, in-progress or parked spec the owner moved) passes `vh-adlc lint`, its gate results agree with a manual reading of the document, and each moved spec that was planned or in progress carries a fresh review and an owner acceptance row at its converted baseline.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 - [x] AC-10: Stackweaver's local behaviors stay available with unchanged invocation: worktree slots, direct-to-main non-feature shipping through its own `/ship`, `[skip ci]` rules, `watch-merge.sh`, the triad and satellite lenses, the browser-pass summary table, and `/implement` handing straight to ship.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 - [x] AC-11: A disposable Stackweaver checkout rolls back to the native loop and reapplies the adoption, with the docs index and unrelated workflow files byte-identical afterwards.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 - [ ] AC-12: On the feature branch, a GoReleaser snapshot build produces all four runtime archives, the plugin's `knowledge.md` pin names the merged vhco-pro/docs revision, and a candidate plugin installed from the branch in an isolated profile runs every adapted Stackweaver command through its entry points.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-27 at `67c4664e` returned not verified.
+      Evidence: R-28 at `15e095bf` returned not verified.
 - [x] AC-13: Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on a branch this session created or was handed over, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops before writing anything, and when the push is rejected it keeps the local claim commit, creates no feature branch and reports the claim pending.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 - [ ] AC-14: A Stackweaver feature taken through the adopted loop passes its completion gate in its owning worktree before merge, and after it lands by merge commit every commit its Review Log names is reachable from `main`.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-27 at `67c4664e` returned not verified.
+      Evidence: R-28 at `15e095bf` returned not verified.
 - [x] AC-15: With `skip_ci_paths` declared and a resolved delivery convention that supports it, a feature delivery whose commit, push range and PR diff touch only feature documents, Markdown onboarding files or declared paths carries the skip marker, and any other change in the delivery leaves it off; when the resolved convention does not support it, the marker follows the documentation-only rule and the report says the setting was ignored and why.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 - [x] AC-16: In Stackweaver, `/spec review` never moves an enrolled spec to `planned` without an owner acceptance row, and `/spec` and `/investigate` create no issue without an explicit request or accepted scope.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 - [ ] AC-17: Stackweaver's native spec, tasks, implement and reviewer agent files stay routable while any non-terminal spec, domain-extension plans included, is unenrolled, are retired only after none is, and after retirement an adapted command given a terminal unenrolled document refuses without running anything.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-27 at `67c4664e` returned not verified.
+      Evidence: R-28 at `15e095bf` returned not verified.
 - [ ] AC-18: With `implement_worktree: isolated`, implement started in the primary worktree continues in a host-created isolated worktree, or stops before writing on a host without a worktree tool, and the primary worktree's branch, `HEAD`, index and files are unchanged afterwards; without the setting, behavior is unchanged.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-27 at `67c4664e` returned not verified.
+      Evidence: R-28 at `15e095bf` returned not verified.
 - [x] AC-19: The settings reference, the operation reports and Stackweaver's adapters and project procedure use each glossary term with the meaning the Glossary gives it, and introduce no other name for those concepts.
-      Evidence: R-27 at `67c4664e` returned met.
+      Evidence: R-28 at `15e095bf` returned met.
 
 ## Test Plan
 
@@ -837,6 +837,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-25 | implementation | `1b51c4f0be850c1cdf2ead49e9de0436d5337455` | gpt-6.1-sol | procedural | Ten criteria met, AC-15 not met, eight not verified (residualised); one should-fix on newline-prefixed paths in the push range. Ran in a private clone. |
 | 2026-11-13 | R-26 | implementation | `9268f6a75b8c9e606a039136ffd72a9bd5d4f244` | gpt-6.1-sol | procedural | Eight criteria met, AC-04, AC-06 and AC-15 not met, eight not verified (residualised); three should-fix findings on merge-only range changes, newline paths in Go covers and unreported rungs. Ran in a private clone. |
 | 2026-11-13 | R-27 | implementation | `67c4664e4aa0486ee8ff66871d03f953019c4705` | gpt-6.1-sol | procedural | Eleven criteria met; the eight residualised criteria not verified; no findings. Ran in a private clone. |
+| 2026-11-13 | R-28 | implementation | `15e095bf9bda082aa7b8cf55bc8ed868cfa697b5` | gpt-6.1-sol | procedural | Eleven criteria met; the eight residualised criteria not verified; one should-fix on a same-size, mtime-restored tracked-file rewrite under core.trustctime=false, deferred to issue 85. Ran in a private clone. |
 
 ### R-1
 
@@ -1935,6 +1936,91 @@ EVIDENCE: Isolation and claim fixtures passed at 67c4664e. A fresh host-created 
 CRITERION: AC-19 The settings reference, the operation reports and Stackweaver's adapters and project procedure use each glossary term with the meaning the Glossary gives it, and introduce no other name for those concepts.
 VERDICT: met
 EVIDENCE: At 67c4664e, glossary.test.ts passed. Inspected the accepted Glossary, settings Terms table, CLI reports and Stackweaver a56f5c97 adapters and project procedure; their uses preserve the declared meanings.
+
+### R-28
+
+CRITERION: AC-01 A repository's `.vh-adlc/loop.yaml` names a route for each loop role, every SDD operation dispatches according to it, a `command` route is accepted only for the two reviewer roles, no vh-adlc agent or skill file names a model, and a repository without the file behaves as it does at `a7bfca99`.
+VERDICT: met
+EVIDENCE: At the target, `bun test tests/vh-adlc/loop/ --timeout 60000` returned 127 pass, 5 skip, 0 fail. Settings, operation mapping, resume, default routes and model-free guards passed. Inspection confirmed routing instructions in all seven operations.
+
+CRITERION: AC-02 From a Claude Code session, a read-only spec review that reads only a read-only export of the target commit and writes nothing, and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; the route, instruction files and lenses come from `loop.yaml` at the reviewed commit; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`, where a route with `model_attestation: codex-session` matches on the model Codex's session log records rather than the reviewer's self-report; and a mismatched model or target, a missing header, a non-zero exit, a timeout, a failed process cleanup or any change outside the declared `review_scratch` directories to the private clone's `HEAD`, refs, index entries, status, file contents or ignored-file list, or to the owning worktree's `HEAD`, branch ref, index entries, status, file contents or ignored-file list, leaves the review pending, while another session's push to the shared refs during the review does not with no Review Log row.
+VERDICT: not met
+EVIDENCE: A temporary-fixture probe using the target's `runReviewRoute` returned `ready` after the reviewer changed an owning-worktree tracked file outside scratch, with `core.trustctime=false`, equal-size replacement and restored mtime. See F-01.
+
+CRITERION: AC-03 Every SDD operation reads the declared project procedure and instruction files, and a spec review flags a document that contradicts a declared instruction file or lens.
+VERDICT: not verified
+EVIDENCE: Context and lens fixtures passed at the target. Complete agent execution and the instruction-contradiction scenario were not observed in this review.
+
+CRITERION: AC-04 Implement and ship run each declared verification rung whose path condition holds over the whole feature delta, or that is declared always, and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
+VERDICT: met
+EVIDENCE: The target's rung and CLI fixtures passed for whole-feature changes, dirty paths, allowances, skipped subchecks, stale results, procedure results and merge handling. Inspection confirmed implement and ship consume the advancement verdict. Stackweaver settings retain its named-E2E, live-slot and final-kind requirements.
+
+CRITERION: AC-05 With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, a feature whose actual merge commit carries the skip marker and touches only skip-eligible paths is reported delivered with no publication path and no watch run, every unmarked merge commit runs the watch, and a watch that fails only because no workflow ran leaves the feature reported blocked, not delivered.
+VERDICT: met
+EVIDENCE: Delivery fixtures passed at the target for manual CI, marked and unmarked merges, failed and successful watches, delayed completion and no-workflow blocking. The CLI against Stackweaver returned `state: not triggered`, `reason: manual CI policy`, `dispatch: false`.
+
+CRITERION: AC-06 Feature-document lint accepts `covers` entries containing `**`, they match the same paths as the docs-impact matcher, and under such an entry a committed change makes the applicable review stale while an uncommitted change makes `feature_tree_clean` false, as for a plain entry.
+VERDICT: met
+EVIDENCE: At the target, `go test ./internal/doc/ ./internal/fresh/` and the Bun matcher-parity fixture passed. Candidate lint accepted all 14 migrated drafts. Full Go verification encountered Bubblewrap timeouts and clean-command expectations incompatible with this PID namespace; the relevant doc and fresh packages passed.
+
+CRITERION: AC-07 With `findings_document: always`, investigate writes its findings document, or extends the existing analysis document that already covers the case without creating a second one, never leaves an issue holding the only copy of its findings, reports any duplicate analysis document or open issue it found, and ends with one of the three verdicts.
+VERDICT: not verified
+EVIDENCE: Findings-plan and verdict fixtures passed at the target. They establish planning decisions, not completed investigation writes; the full scenarios were not executed here.
+
+CRITERION: AC-08 Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` and the matching plain-language requests through `AGENTS.md` run the installed vh-adlc operations with Stackweaver's settings for every enrolled spec and, until the native agents retire, the native agents for every unenrolled one (after retirement, AC-17's refusal applies to terminal unenrolled documents), new specs are written enrolled, and every row of the committed parity map passes its contract test.
+VERDICT: not verified
+EVIDENCE: Stackweaver at a56f5c979c8608a23e00e28f07414b39be9b7763 passed 169 adoption tests against the target plugin. The complete installed-command and plain-language execution matrix was not run here.
+
+CRITERION: AC-09 Every Stackweaver spec in the migration set (the draft specs, plus each planned, in-progress or parked spec the owner moved) passes `vh-adlc lint`, its gate results agree with a manual reading of the document, and each moved spec that was planned or in progress carries a fresh review and an owner acceptance row at its converted baseline.
+VERDICT: met
+EVIDENCE: The target-built candidate passed lint for all 14 Stackweaver migration documents. Planned-gate failures matched their questions, missing current reviews and missing acceptance rows. Inspection of conversion commit 56eef13f confirmed every migrated document was draft beforehand; no planned or in-progress conversion required acceptance inspection.
+
+CRITERION: AC-10 Stackweaver's local behaviors stay available with unchanged invocation: worktree slots, direct-to-main non-feature shipping through its own `/ship`, `[skip ci]` rules, `watch-merge.sh`, the triad and satellite lenses, the browser-pass summary table, and `/implement` handing straight to ship.
+VERDICT: met
+EVIDENCE: Stackweaver adoption contracts passed against the target plugin. Inspection confirmed the listed behaviors in settings, adapters and `agents/loop-project.md`. Slot and worktree-dev usage paths and watch-merge help ran without provisioning resources.
+
+CRITERION: AC-11 A disposable Stackweaver checkout rolls back to the native loop and reapplies the adoption, with the docs index and unrelated workflow files byte-identical afterwards.
+VERDICT: met
+EVIDENCE: Reran `tests/agent-loop/rehearse.sh` from Stackweaver a56f5c979c8608a23e00e28f07414b39be9b7763 in its disposable clone. Rollback matched main across 63 adoption paths; reapply restored tree 58dbafafae4590ff003fe25fa402d9c8696d98fc. Unrelated files and docs-index hashes stayed identical.
+
+CRITERION: AC-12 On the feature branch, a GoReleaser snapshot build produces all four runtime archives, the plugin's `knowledge.md` pin names the merged vhco-pro/docs revision, and a candidate plugin installed from the branch in an isolated profile runs every adapted Stackweaver command through its entry points.
+VERDICT: not verified
+EVIDENCE: At the target, the snapshot produced all four archives, then failed signing because `GPG_FINGERPRINT` was unset. The installed-profile command matrix was not executed here.
+
+CRITERION: AC-13 Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on a branch this session created or was handed over, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops before writing anything, and when the push is rejected it keeps the local claim commit, creates no feature branch and reports the claim pending.
+VERDICT: met
+EVIDENCE: Claim and CLI fixtures passed at the target for detached and owned branches, unrelated-branch refusal, stale tips, tracked stray changes and rejected pushes. Inspection confirmed the design's tracked-file cleanliness boundary and feature-branch creation only after successful push.
+
+CRITERION: AC-14 A Stackweaver feature taken through the adopted loop passes its completion gate in its owning worktree before merge, and after it lands by merge commit every commit its Review Log names is reachable from `main`.
+VERDICT: not verified
+EVIDENCE: Inspected retained trial artifacts, but did not execute the adopted claim-to-merge flow or independently observe its completion gate and post-merge ancestry in this review.
+
+CRITERION: AC-15 With `skip_ci_paths` declared and a resolved delivery convention that supports it, a feature delivery whose commit, push range and PR diff touch only feature documents, Markdown onboarding files or declared paths carries the skip marker, and any other change in the delivery leaves it off; when the resolved convention does not support it, the marker follows the documentation-only rule and the report says the setting was ignored and why.
+VERDICT: met
+EVIDENCE: The target's delivery fixtures passed for declared-only paths, mixed code, earlier outgoing code, reverted code, rename sources, unusual filenames and unsupported conventions. Inspected CLI path collection and the ignored-setting report.
+
+CRITERION: AC-16 In Stackweaver, `/spec review` never moves an enrolled spec to `planned` without an owner acceptance row, and `/spec` and `/investigate` create no issue without an explicit request or accepted scope.
+VERDICT: met
+EVIDENCE: Adoption acceptance and issue contracts passed against the target plugin. Inspected enrolled routing, shared spec acceptance steps and authority rules. All 14 migrated drafts' executed planned gates refused advancement without acceptance.
+
+CRITERION: AC-17 Stackweaver's native spec, tasks, implement and reviewer agent files stay routable while any non-terminal spec, domain-extension plans included, is unenrolled, are retired only after none is, and after retirement an adapted command given a terminal unenrolled document refuses without running anything.
+VERDICT: not verified
+EVIDENCE: Retirement contracts passed at Stackweaver a56f5c979c8608a23e00e28f07414b39be9b7763, including retained domain plans. Actual post-retirement command refusal was not executed.
+
+CRITERION: AC-18 With `implement_worktree: isolated`, implement started in the primary worktree continues in a host-created isolated worktree, or stops before writing on a host without a worktree tool, and the primary worktree's branch, `HEAD`, index and files are unchanged afterwards; without the setting, behavior is unchanged.
+VERDICT: not verified
+EVIDENCE: Isolation fixtures passed at the target for enabled, disabled and unavailable-host-tool cases. A complete Claude Code implementation run from the primary checkout was not executed here.
+
+CRITERION: AC-19 The settings reference, the operation reports and Stackweaver's adapters and project procedure use each glossary term with the meaning the Glossary gives it, and introduce no other name for those concepts.
+VERDICT: met
+EVIDENCE: Glossary fixtures passed at the target. Inspected settings definitions, CLI reports, shared procedures and Stackweaver adapters against the glossary; their uses preserve the defined meanings.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/loop/review-route.ts:74-85
+EVIDENCE: `bun /tmp/vh-review-preservation-probe.ts` exercised the target's route in disposable fixtures. The owning repository had `core.trustctime=false` and a clean tracked file containing `app\n`. The reviewer replaced it with `bad\n`, preserving size and restoring mtime. Git status remained empty and the route returned `ready`, although the changed contents remained outside scratch. The snapshot hashes changed, hidden and ignored files, omitting ordinary tracked files Git reports clean.
+PROPOSAL: Hash every tracked file outside scratch in both preservation snapshots without relying on Git's stat cache. Add a fixture for equal-size tracked-file replacement with restored mtime and `core.trustctime=false`; it must leave the review pending.
 
 ## Sources
 
