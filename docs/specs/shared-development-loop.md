@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-9 had no blocking findings; its should-fix and nit are applied. Waiting for a confirming review, then owner acceptance."
+status_description: "R-10 had no blocking findings; its three should-fix items are applied at the owner's direction. Waiting for a final confirming review, then owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
@@ -103,8 +103,9 @@ files. R-7 found nothing blocking either; it settled that a merge with no workfl
 publication path, and that the final check runs on the merge commit. R-8 showed the first of those was
 unsafe, so an unmarked merge now always runs the watch, verification rungs trigger only by path, and
 feature PRs land by merge commit only when rungs or a watch are declared. R-9 found nothing blocking;
-every E2E spec a Test Plan names now runs in kind whatever changed. A confirming review pass is next,
-then acceptance. Accepting this
+every E2E spec a Test Plan names now runs in kind whatever changed. R-10 found nothing blocking either;
+the live slot pass, the final full kind run and skipped subchecks inside `make verify` are now binding,
+and a Glossary holds the new terms. A final confirming review pass is next, then acceptance. Accepting this
 document authorizes implementation of the accepted scope on a feature branch. Publishing the vh-adlc
 release, merging either repository and retiring the native agents each still need their own approval.
 
@@ -189,6 +190,19 @@ Out of scope:
 - Codex and Copilot as authoring hosts for Stackweaver. The external route covers reviews only.
 
 ## Design
+
+### Glossary
+
+| Term | Meaning |
+| --- | --- |
+| Loop role | One of `author`, `implementer`, `spec_reviewer` and `implementation_reviewer`; each has a route in `loop.yaml`. |
+| Route | How a role runs: `host` (in the current harness, optionally with a named model) or `command` (an external CLI, reviewer roles only). |
+| Enrolled spec | A spec whose Review Log uses the shared header; adapted commands send it to the vh-adlc operations. |
+| Verification rung | A declared check with a path condition or `always`, which must pass before push, completion and delivery. |
+| Project procedure | The consumer's file of local rules that every SDD operation reads, named in `loop.yaml`. |
+| Primary worktree | The first entry of `git worktree list`; with `implement_worktree: isolated`, implement never writes there. |
+| No publication path | The delivery verdict for a merge commit that carries the skip marker and touches only skip-eligible paths. |
+| Delivered | A feature whose release paths have all published, or whose merge has no publication path. |
 
 ### Comparison baseline
 
@@ -336,14 +350,23 @@ and report each as passed, failed or not run with a reason. Every applicable run
 branch is pushed, and again before the feature is marked complete or reported delivered, matching
 Stackweaver's rules to verify fully before any push (Stackweaver `CLAUDE.md:153`) and never to ship over
 a known failure (`agents/ship.md:136-137`). A failed rung blocks all three. A rung that could not run
-blocks them too, unless the owner allows that exact rung for that run, which the report records. Stackweaver declares `make verify` always,
+blocks them too, unless the owner allows that exact rung for that run, which the report records. A
+rung's exit status alone does not make it pass: a rung may declare how its output reports skipped
+subchecks, and a skipped mandatory subcheck counts as a subcheck that could not run, under the same
+owner-allowance rule. Stackweaver's `make verify` prints a `skipped` count and the skipped names
+(`scripts/verify-local.sh:475-477`), and can exit 0 with skips when a tool is missing, so its rung
+passes only with no skipped mandatory subcheck. Stackweaver declares `make verify` always,
 `make test-integration` for `backend/` and `core/`, the kind harness for `e2e/`, `deploy/` and
 `frontend/nginx.conf`, a browser pass with the summary table for `frontend/src/`, and both engines for
 the engine-sensitive paths its project procedure lists. Path conditions decide only which extra rungs
 apply: every E2E spec a criterion's Test Plan row names also runs in the kind harness before push and
 before completion, whatever paths changed, as `agents/implement.md:61-66` and Stackweaver
-`CLAUDE.md:184` require today. Stackweaver's project procedure states this rule and the parity map
-binds it to a contract test. Without rungs, the current
+`CLAUDE.md:184` require today. Two more Stackweaver rules stay binding the same way: a live runtime
+pass on the feature's worktree slot for any change with runtime behavior (`backend/`, `core/`,
+`frontend/src/`, `deploy/`), as `agents/implement.md:61-66` requires, and, whenever any kind rung
+applied, one full detached kind run on the final feature head; targeted reruns may be used to iterate
+but never replace it (`CLAUDE.md:184`). Stackweaver's project procedure states these rules and the
+parity map binds each to a contract test. Without rungs, the current
 behavior stays: read commands from `AGENTS.md`, ask if none.
 
 A declared `ci_trigger: manual` makes ship report CI as not triggered by policy instead of waiting for
@@ -495,6 +518,7 @@ published plugin is installed from the marketplace and exercised, and a rollback
 - [ ] AC-16: In Stackweaver, `/spec review` never moves an enrolled spec to `planned` without an owner acceptance row, and `/spec` and `/investigate` create no issue without an explicit request or accepted scope.
 - [ ] AC-17: Stackweaver's native spec, tasks, implement and reviewer agent files stay routable while any non-terminal spec, domain-extension plans included, is unenrolled, are retired only after none is, and after retirement an adapted command given a terminal unenrolled document refuses without running anything.
 - [ ] AC-18: With `implement_worktree: isolated`, implement started in the primary worktree continues in a host-created isolated worktree, or stops before writing on a host without a worktree tool, and the primary worktree's branch, `HEAD`, index and files are unchanged afterwards; without the setting, behavior is unchanged.
+- [ ] AC-19: The settings reference, the operation reports and Stackweaver's adapters and project procedure use each glossary term with the meaning the Glossary gives it, and introduce no other name for those concepts.
 
 ## Test Plan
 
@@ -503,7 +527,7 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | AC-01 | `bun test tests/vh-adlc` cases for each supported role and route pair, refusal of a `command` route for `author` and `implementer`, resume taking the continued operation's route, a no-file case compared with `a7bfca99` behavior, and a grep test that fails on a model name in any agent or skill file. |
 | AC-02 | A fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, one that creates or moves a non-current branch or tag, one that overwrites an existing ignored configuration file, one that creates a new ignored file outside `review_scratch`, one that overwrites a tracked file already flagged assume-unchanged without changing the flag, one that writes only inside `review_scratch` (stored), and one that changes an index flag without changing the index tree; then one real Copilot CLI `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
 | AC-03 | Fixture specs that break a declared instruction and a declared lens; the reviewer must return a finding for each and none for a compliant control. |
-| AC-04 | Fixture changes that match some rungs and not others; a feature whose first commit changes `backend/` and whose last changes only documentation must still require the integration rung before push and completion; a pass recorded on an earlier commit must not count for a later one; after a merge, the delivery check over the merge commit against its first parent must still require the `backend/` rung once the default branch contains the feature; with rungs declared, a fast-forward landing of a feature whose earlier commit changed `backend/` must be refused; in Stackweaver, a backend-only feature whose Test Plan names an unchanged E2E spec must not push or complete until that spec has passed in the kind harness; the report must list every rung with the right state; a failing command must leave no push, no completion commit and no delivered report even when an owner allowance is recorded; an unavailable procedure must do the same unless the owner allowance is recorded for that exact rung, and with it must proceed; a no-rung fixture must keep the current lookup. |
+| AC-04 | Fixture changes that match some rungs and not others; a feature whose first commit changes `backend/` and whose last changes only documentation must still require the integration rung before push and completion; a pass recorded on an earlier commit must not count for a later one; after a merge, the delivery check over the merge commit against its first parent must still require the `backend/` rung once the default branch contains the feature; with rungs declared, a fast-forward landing of a feature whose earlier commit changed `backend/` must be refused; in Stackweaver, a backend-only feature whose Test Plan names an unchanged E2E spec must not push or complete until that spec has passed in the kind harness, a runtime change must not advance without its live slot pass, targeted kind reruns must not stand in for the final full run, and a `make verify` run that exits 0 with a skipped mandatory subcheck must stop advancement unless the owner allowance names that subcheck; the report must list every rung with the right state; a failing command must leave no push, no completion commit and no delivered report even when an owner allowance is recorded; an unavailable procedure must do the same unless the owner allowance is recorded for that exact rung, and with it must proceed; a no-rung fixture must keep the current lookup. |
 | AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported), a watch stub that exits 1 then 0 (delivered only after 0), a skip-eligible feature merged with a marked merge commit (delivered with no publication path, watch never invoked), the same feature merged with an unmarked merge commit (watch invoked); a watch stub that fails because no workflow ran (reported blocked, never delivered); and a run that appears only after a delay (watch waits, no early verdict). |
 | AC-06 | Go tests in `internal/doc` for `**` at start, middle and end, compared with the docs-impact matcher on the same inputs; `internal/fresh` tests where a commit under a `**` entry makes the review stale, and separately a dirty file under it makes `feature_tree_clean` false without staling the review; the existing lint suite unchanged. |
 | AC-07 | Investigate fixtures with and without a duplicate analysis document and a duplicate open issue; the run must write the document and name the duplicate and the verdict. |
@@ -518,6 +542,7 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | AC-16 | Stackweaver parity contract tests for the acceptance and issue rules, plus a disposable spec review run that ends with the spec still `draft` until an acceptance row exists. |
 | AC-17 | A scripted check over `docs/internal/plans/` that lists every non-terminal unenrolled spec, domain-extension plans included; while the list is non-empty the native command routes must resolve and the retirement commit is refused; after retirement, each adapted command given a terminal unenrolled document must refuse with no write. |
 | AC-18 | Fixtures with the setting on and off; a Claude Code run of the adopted Stackweaver `/implement` started on a clean main checkout, comparing that checkout's branch, `HEAD`, `git write-tree` and file hashes before and after while the feature proceeds in the host worktree; a host without a worktree tool must stop before any write. |
+| AC-19 | A test that greps the plugin's settings reference, report templates and Stackweaver's adapters and project procedure for each glossary term and a list of rejected synonyms, plus a reviewer read of those files against the Glossary. |
 
 ## Tasks
 
@@ -528,7 +553,7 @@ None yet; written once the document is planned.
 None. The owner answered Q1 to Q10, the three R-1 judgement findings (F-01, F-03, F-07) and the
 three R-2 judgement findings (F-02, F-03, F-04) the two R-3 judgement findings (F-01, F-04) the three
 R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, F-02) the R-6 judgement finding (F-01), the R-7 findings F-02 and F-03, the R-8 judgement findings
-(F-01, F-03) and the R-9 judgement finding (F-01) on 2026-11-13; the answers are folded into Owner summary, Scope and Design.
+(F-01, F-03) the R-9 judgement finding (F-01) and the R-10 findings on 2026-11-13; the answers are folded into Owner summary, Scope and Design.
 
 ## Review Log
 
