@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-4 had one blocking finding; all six R-4 findings are applied. The owner accepts in advance if R-5 has no blocking finding."
+status_description: "R-5 had a blocking finding, so the advance acceptance did not apply. Waiting for the owner to choose how to continue."
 issue: null
 goal: "A spec review loop that finds blocking defects early and stops asking for passes after three consecutive passes without one."
 covers:
@@ -370,6 +370,7 @@ no blocking finding.
 | 2026-11-13 | R-2 | spec | `c643cc0` | claude-opus-5-5 | procedural | Clean: no blocking finding; three should-fix and three nits |
 | 2026-11-13 | R-3 | spec | `cd193f3` | claude-opus-5-5 | procedural | Clean: no blocking finding; seven should-fix and three nits |
 | 2026-11-13 | R-4 | spec | `89afa41` | claude-opus-5-5 | procedural | One blocking finding (F-01 advance acceptance contradicts S7.7.accept), three should-fix and two nits |
+| 2026-11-13 | R-5 | spec | `f263bbd` | claude-opus-5-5 | procedural | One blocking finding (F-01 revision event resets on every applied fix), five should-fix and three nits; advance acceptance not met |
 
 ### R-1
 
@@ -616,3 +617,68 @@ SEVERITY: nit
 WHERE: Acceptance Criteria AC-06 (lines 306-310); Test Plan AC-06 row (line 324)
 EVIDENCE: AC-06 says "every docs pin in the plugin points at the published docs commit" and "both manifests carry the same new version". The row also checks AGENTS.md, which is the repository pin and not part of the plugin (`git grep -n d8f07c9` lists AGENTS.md:4, plugins/vh-adlc/knowledge.md:5 and :7, plugins/vh-adlc/references/security-settings.md:5). It checks only that "both manifests match", not that the version changed from 0.16.1 (plugin.json:4, .claude-plugin/plugin.json:14).
 PROPOSAL: Name AGENTS.md in AC-06 as the repository pin, and have the row check that the two manifest versions match and are higher than the version current before the change.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Terminology (Clean streak, line 188); Design, Stopping rule (lines 223-224, "the document's Git history for the latest `gate draft` commit"); Context, Owner summary (lines 43-44, "and so does a revision of an accepted document"); Acceptance Criteria AC-01 (lines 302-303); Test Plan AC-01 row (Variants E and F)
+EVIDENCE: Line 188 counts only rows "whose reviewed commit descends from the latest revision event", and a revision event includes "any commit after the latest acceptance row that changes the normative baseline". The same line then says "Applying the findings of clean passes does not reset it". Take a planned document that is revised, as in S7.9 (tests/vh-adlc/scenarios/run.ts:1066, where plan() stores an acceptance row first, tests/vh-adlc/fixtures/build.ts:387-391). Its acceptance row stays the latest one during the revision. Clean pass A holds a factual should-fix, and step 3 (line 204) applies it in commit Y. Y comes after the latest acceptance row and changes the baseline, so Y becomes the latest revision event, pass A no longer descends from it, and the next clean pass is streak one again. Every clean pass that carries a baseline fix moves the event forward, so for a revised accepted document the streak cannot reach three and the churn the feature removes comes back. The definition also over-resets elsewhere: a never-accepted draft that goes draft to blocked to draft with no baseline change resets the streak, because "any commit that moves the document to draft from another status" counts, while the Owner summary limits the reset to "a revision of an accepted document". Line 223-224 says the skill finds the reset from "the latest `gate draft` commit", which does not detect the baseline-commit clause at all. Variant E checks only the first clean pass after the revision, so a skill that resets on every applied fix passes it. Variant F stores an acceptance row and expects streak three, which is only true if the fixture reaches a new pass without any baseline change after that row; the row does not say how.
+PROPOSAL: Define the revision event once as the earliest commit after the latest acceptance row that changes the baseline or moves the document to draft from planned or in-progress, so later fixes from clean passes never move it, and use the same wording on line 188, lines 223-224, the Owner summary and AC-01. Extend Variant E to run to the third clean pass after the revision with a baseline fix applied after each of the first two, and say in Variant F that the new pass is a drift-only re-review with the baseline unchanged since the acceptance row.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (step 3, lines 206-208); Context, Owner summary (lines 46-47, "The author never stops to ask before the ceiling, including in a resumed session"); Context, Background, Existing scenarios (lines 128-132); Design, Delivery (lines 290-291); Test Plan AC-01 row (Variant G and the S7.7 sentence)
+EVIDENCE: Step 3 says the spec and resume operations "request another pass instead of asking", but never says whether that means dispatching the reviewer again in the same session or ending the turn with a report that another pass is needed. Today review mode dispatches once per invocation (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:62-75 at 3963e25). The two readings behave differently in S7.7, whose first turn is `/vh-adlc-spec review` and whose second turn is the conditional acceptance (run.ts:529-532). With in-session dispatch, turn 1 runs real reviewer passes until the ceiling and the turn-2 acceptance names the third pass. With a report-and-stop reading, turn 2 is an owner acceptance at R-1, or an advance acceptance for R-2 if R-1's fixes changed the baseline. Background and Delivery say S7.7 keeps passing because its acceptance "names a clean pass whose baseline is unchanged", which holds only for one reading. Variant G passes "when another pass is requested", which a test cannot observe until the meaning is fixed: a reviewer dispatch in the trace, a new Review Log row, or a line in the report.
+PROPOSAL: State whether the spec operation dispatches the next pass itself in the same session, and whether resume does. Make Variant G check that observable, for example a new stored spec row and no acceptance question in the report, and say which path S7.7 takes under the new rule.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Owner acceptance, line 190); Design, Stopping rule (step 6, lines 215-218); Scope (lines 159-160); Test Plan AC-01 row (Variant D)
+EVIDENCE: Terminology defines an advance acceptance as one given "before a pass returns, conditioned on that pass being clean", which binds it to one pass. Step 6 and Scope honor it at "the first clean pass that meets its condition", which can be a later pass. If the pass after the owner's advance acceptance is blocking, step 2 applies its fixes to the baseline, and under step 6 the next clean pass is accepted on the owner's behalf with content the owner never saw. Under the Terminology reading the acceptance lapses at the blocking pass and the loop continues. Two careful implementers would build different skills, and the difference decides what the owner's acceptance authorizes. Variant D starts with a clean pass, so both skills pass it. This document's own status line relies on the same rule ("The owner accepts in advance if R-5 has no blocking finding", line 3).
+PROPOSAL: State whether an advance acceptance survives an intervening blocking pass and its fixes, use the same wording in Terminology, step 6 and Scope, and add a Variant D case with a blocking pass before the first clean pass that checks the chosen behavior.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Free-text checks (lines 262-267); Design, Severity definitions (should-fix, lines 235-236); Acceptance Criteria AC-05; Test Plan AC-05 row
+EVIDENCE: A row "has passed review once a clean pass's records hold no finding whose `WHERE` names that row". A clean pass whose reviewed commit predates the row, or predates the row's current pattern, also holds no finding naming it, so a newly added or rewritten pattern is treated as already reviewed and any request to widen it becomes a nit at once. Any `NO FINDINGS` pass makes every row in the document count as passed. The should-fix definition says "a proof could pass on a wrong implementation", which is exactly what a missed wrong output is, and the definitions as written carry no exception for it, so the convention would state two ratings for the same case in two places. The AC-05 fixture has one stored clean pass and an unchanged row, so it does not exercise either case.
+PROPOSAL: Count a row as passed only when the clean pass's reviewed commit already holds the row's current text, and name the free-text exception inside the should-fix definition. Add an AC-05 case where the row changes after the stored clean pass and a widening finding must then stay should-fix.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Pins and older consumers (lines 271-274); Design, Stopping rule (lines 195-196); Acceptance Criteria AC-06; Test Plan AC-06 row (old-pin clone)
+EVIDENCE: Line 195-196 puts the stopping rule into `SKILL.md` review mode steps 4 and 5 and the protocol's Records paragraph, so the plugin text carries the rule. Line 274 says "The plugin does not carry its own copy of the rules", and line 272-273 says that with an older pin "the current procedure runs, and the spec report says the stopping rule needs a pin at or after the companion commit". The design never says how the skill decides that the resolved page predates the companion change (for example, whether the page has the severity definitions or the new Acceptance step 2 text), nor where it gets the commit it names in the report. The binary cache holds pages at one SHA with no docs history (`ls ~/.cache/vh-adlc/docs/d8f07c9.../` shows only page files), so an ancestry check is not available. One implementer tests for text, another hard-codes a SHA, a third always runs the new steps from SKILL.md; the AC-06 old-pin run only checks the report wording.
+PROPOSAL: Name the check the skill uses to choose the procedure (for example, the presence of the severity definitions in the resolved feature-documents page) and say that the needed pin it reports is the plugin's own pin from knowledge.md. Write the new SKILL.md and protocol steps as conditional on that check.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Saved nit, line 189); Design, Stopping rule (steps 1, 4 and 6, lines 198-200, 209-211, 215-217, and line 223, "Nothing new is stored"); Acceptance Criteria AC-01; Test Plan AC-01 row (Variants A, B and F)
+EVIDENCE: Step 4 lists "every saved nit" and line 223 says the skill reads everything from the Review Log rows and records. The design does not say which stored nits count as saved. Passes stored before the update count toward the streak (line 221-222), but under the old procedure their nits were usually applied already; blog-visual-reading has 47 such passes. Nits from passes before a blocking reset or a revision may refer to text that later fixes rewrote. The records do not show whether a nit was applied, so one implementer lists every baseline nit in the log, another only those in the current streak, another only post-update ones. Variant A has no reset, and Variants B and F do not say whether their passes hold nits or which must be listed.
+PROPOSAL: Define the saved nits as the baseline nits in passes recorded after the plugin adopts the rule and after the latest reset, or state another rule, and add an expected nit list to Variants B and F.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 41-42, "unless they only touch Context or Sources"); Design, Stopping rule (step 1, lines 198-200)
+EVIDENCE: Step 1 allows applying findings "confined to sections outside the normative baseline" at any time, which also covers Tasks, Open Questions and the title paragraph. The Owner summary still names only Context and Sources.
+PROPOSAL: Have the Owner summary say that nits outside the normative baseline may still be applied.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Scope (In scope, first bullet, lines 158-160)
+EVIDENCE: Scope says the author "honors an acceptance the owner gave in advance at the first clean pass that meets it". After R-4 the owner also decided that an acceptance given after a clean pass, with the baseline unchanged since, is honored (Open Questions, lines 361-362), and Terminology line 190, step 6 and AC-01 include it. Scope omits that case.
+PROPOSAL: Add the after-pass acceptance with an unchanged baseline to the first Scope bullet.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background, Overlapping work (lines 146-149)
+EVIDENCE: The plugin pin bump in shared-development-loop's Scope is at lines 150-151 at b777df0, not `:154` (`git show b777df0:docs/specs/shared-development-loop.md | grep -n "pin bump"` gives 151). That feature's covers also list `plugins/vh-adlc/skills/vh-adlc-resume/` and `plugins/vh-adlc/references/loop.md` (lines 13 and 16 at b777df0), which this feature now edits too, but Background does not name them in the overlap.
+PROPOSAL: Cite `:150-151` and add the resume skill and loop.md to the overlap list.
