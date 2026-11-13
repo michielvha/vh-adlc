@@ -1,0 +1,64 @@
+import { randomUUID } from "node:crypto";
+import { isAbsolute, join } from "node:path";
+import type { selectApprovedRuntime } from "./bootstrap";
+import { freezeJSON } from "./protocol";
+
+type Runtime = Awaited<ReturnType<typeof selectApprovedRuntime>>;
+type SelectedRole = Pick<Runtime["worker"], "executable" | "profile_directory" | "model" | "argv"> & { client: { provider: string } };
+type LaunchRuntime = { component: { directory: string }; worker: SelectedRole; reviewer: SelectedRole;
+  loader: Pick<Runtime["loader"], "provider" | "argv" | "credential_references"> };
+const fixed = new Set(["--no-auto-update", "--no-custom-instructions", "--disable-builtin-mcps", "--no-ask-user", "--disallow-temp-dir"]);
+const tuning = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+const credentials = new Set(["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"]);
+const inherited = ["PATH", "LANG", "LC_ALL", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "all_proxy", "no_proxy", "NODE_EXTRA_CA_CERTS"];
+function fail(reason: string): never { throw Error("docs-drift native role setup required: " + reason); }
+function absolute(value: string) { return typeof value === "string" && isAbsolute(value) && !value.includes("\0"); }
+
+function roleArguments(argv: string[]): string[] {
+  const result: string[] = [], seen = new Set<string>();
+  for (let index = 0; index < argv.length; index++) {
+    const value = argv[index];
+    if (fixed.has(value)) continue;
+    if (value !== "--reasoning-effort" || seen.has(value) || !tuning.has(argv[index + 1])) fail("unsupported protected role argv");
+    seen.add(value); result.push(value, argv[++index]);
+  }
+  return result;
+}
+
+/** Build invocation data from a selected runtime; selection, origin and effect permission remain separate. */
+export function buildCopilotRoleInvocation(input: {
+  runtime: LaunchRuntime; role: "worker" | "reviewer"; cwd: string; artifact_root: string; prompt: string;
+  environment: Record<string, string | undefined>;
+}) {
+  const options = structuredClone(input), runtime = options.runtime, selected = runtime[options.role];
+  if (!selected || runtime.loader.provider !== "copilot" || selected.client.provider !== "copilot") fail("unsupported selected native backend");
+  if (![options.cwd, options.artifact_root, runtime.component.directory, selected.profile_directory, selected.executable].every(absolute)
+    || typeof selected.model !== "string" || !selected.model.trim() || selected.model.includes("\0")
+    || typeof options.prompt !== "string" || !options.prompt.trim() || options.prompt.includes("\0") || Buffer.byteLength(options.prompt) > 65536)
+    fail("bounded paths, model and prompt required");
+  if (runtime.loader.argv.length !== 2 || runtime.loader.argv[0] !== "--plugin-dir" || runtime.loader.argv[1] !== runtime.component.directory)
+    fail("unsupported protected component loader argv");
+  if (runtime.loader.credential_references.some(name => !credentials.has(name))
+    || new Set(runtime.loader.credential_references).size !== runtime.loader.credential_references.length) fail("unsupported native credential reference");
+  const args = roleArguments(selected.argv), context = randomUUID(), profile = selected.profile_directory;
+  const env: Record<string, string> = {};
+  for (const key of [...inherited, ...runtime.loader.credential_references]) {
+    const value = options.environment[key];
+    if (value !== undefined) {
+      if (typeof value !== "string" || value.includes("\0")) fail("invalid native environment value");
+      env[key] = value;
+    }
+  }
+  Object.assign(env, { HOME: profile, COPILOT_HOME: profile, COPILOT_CACHE_HOME: join(profile, "cache"),
+    XDG_CACHE_HOME: join(profile, "xdg-cache"), XDG_CONFIG_HOME: join(profile, "xdg-config"), XDG_STATE_HOME: join(profile, "xdg-state"),
+    TMPDIR: options.artifact_root, COPILOT_AUTO_UPDATE: "false", COPILOT_PLUGIN_DIR_ONLY: "1",
+    GH_PROMPT_DISABLED: "1", GIT_TERMINAL_PROMPT: "0", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_COUNT: "2", GIT_CONFIG_KEY_0: "credential.helper", GIT_CONFIG_VALUE_0: "", GIT_CONFIG_KEY_1: "http.extraHeader", GIT_CONFIG_VALUE_1: "" });
+  const tools = options.role === "reviewer" ? "view,grep,glob" : "view,grep,glob,bash,create,edit";
+  const argv = [selected.executable, "--no-auto-update", "--no-custom-instructions", "--disable-builtin-mcps", "--no-ask-user", "--disallow-temp-dir",
+    "--sync-session=off", "--session-id", context, "--model", selected.model, ...runtime.loader.argv, ...args,
+    "--available-tools", tools, "--allow-tool", "read", ...(options.role === "worker" ? ["--allow-tool", "write", "--allow-tool", "shell"] : []),
+    "--add-dir", options.artifact_root, "--output-format", "json", "--stream", "on", "--log-dir", join(options.artifact_root, "native-role-logs-" + context),
+    "--prompt", options.prompt];
+  return freezeJSON({ authority: "none" as const, provider: "copilot", context_id: context, argv, cwd: options.cwd, env });
+}

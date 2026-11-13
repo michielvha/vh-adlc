@@ -20,7 +20,7 @@ export function commit(repo: string, message: string) {
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", message);
   return readGit(repo, "rev-parse", "HEAD").toString().trim();
 }
-export function source(roots: string[], options: { pin?: ReturnType<typeof pin>; client?: ReturnType<typeof settingsFixture>["clients"]["copilot-linux"]; hostname?: string; bounded?: boolean; legacy_ids?: number[]; role?: { model: string; identity_source: IdentitySource | null; native_model?: string } } = {}) {
+export function source(roots: string[], options: { pin?: ReturnType<typeof pin>; client?: ReturnType<typeof settingsFixture>["clients"]["copilot-linux"]; hostname?: string; bounded?: boolean; legacy_ids?: number[]; role?: { model: string; identity_source: IdentitySource | null; native_model?: string; argv?: string[] } } = {}) {
   const f = publicationFixture(roots), settings = { ...settingsFixture(),
     ...(options.bounded ? { verification_commands: [], generation_commands: [], read_set: { source_roots: ["src"], reference_roots: ["references"] } } : {}),
     component_pin: ".vh-adlc/docs-drift-components/shared.yaml", publication: { ...settingsFixture().publication, mode: "adopted" },
@@ -32,7 +32,8 @@ export function source(roots: string[], options: { pin?: ReturnType<typeof pin>;
     provider: "copilot", event_type: "assistant.message", field_path: ["data", "model"] } };
   for (const entry of Object.values(settings.execution.entries)) {
     const { model, identity_source } = selectedRole;
-    Object.assign(entry.worker, { model, identity_source }); Object.assign(entry.reviewer, { model, identity_source });
+    const argv = options.role?.argv ? { argv: options.role.argv } : {};
+    Object.assign(entry.worker, { model, identity_source, ...argv }); Object.assign(entry.reviewer, { model, identity_source, ...argv });
   }
   write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings));
   write(f.repo, settings.component_pin, canonicalJSON(options.pin ?? pin()));

@@ -18,9 +18,16 @@ export function decodeNativeRoleOutput(options: {
   let context: string | null = null, returned: Buffer | null = null;
   for (const line of decodeUTF8(options.native).split("\n")) {
     if (!line.trim()) continue;
-    const event = object(JSON.parse(line));
+    let parsed: unknown;
+    try { parsed = JSON.parse(line); } catch { throw Error("Native role event JSON required"); }
+    const event = object(parsed);
     if (typeof event.type !== "string" || !event.type) throw Error("Native role event type required");
-    if (event.type === "session.error") throw Error("Native role execution failed");
+    if (event.type === "session.error") {
+      const data = object(event.data), type = data.errorType ?? data.code;
+      // Keep free-form messages in the private native artifact; expose only a bounded machine type.
+      const detail = typeof type === "string" && /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/u.test(type) ? " (" + type + ")" : "";
+      throw Error("Native role execution failed" + detail);
+    }
     if (event.type === "session.start") {
       const data = object(event.data), launch = object(data.context);
       if (context !== null || data.sessionId !== options.expected_context || launch.cwd !== options.expected_cwd || data.alreadyInUse !== false)

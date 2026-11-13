@@ -21,7 +21,7 @@ export function outputSize(path: string): number {
 /** Own one process group, including helpers left behind after its parent exits. */
 export async function executeOwnedProcess(options: {
   argv: string[]; cwd: string; env: Record<string, string>; watched_outputs: string[];
-  stdout: string; stderr: string; capture?: "memory"; timeout_ms: number; max_output_bytes?: number; started: (pid: number) => void;
+  stdout: string; stderr: string; capture?: "memory"; timeout_ms: number; max_output_bytes?: number; started: (pid: number) => void | false;
 }): Promise<OwnedProcess> {
   const { argv, cwd, env, watched_outputs, stdout, stderr, timeout_ms: timeout, started } = options;
   const limit = options.max_output_bytes ?? OUTPUT_LIMIT;
@@ -77,7 +77,7 @@ export async function executeOwnedProcess(options: {
   try {
     let reap: ReturnType<typeof setTimeout> | undefined;
     try {
-      started(child.pid);
+      if (started(child.pid) === false) { result.cancelled = "startup-capture"; stop(); }
       result.exit_code = await Promise.race([
         child.exited,
         new Promise<null>(resolve => { reap = setTimeout(() => resolve(null), timeout + 2500); }),

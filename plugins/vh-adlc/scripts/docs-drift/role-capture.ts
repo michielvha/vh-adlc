@@ -1,12 +1,13 @@
 import { readRecordedRoleModel, verifyRuntimeAdoption } from "./adoption";
 import type { selectApprovedRuntime } from "./bootstrap";
 import type { PublicationIdentity } from "./transport";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { ArtifactChanged, readBoundArtifact, readNativeRoleArtifacts } from "./evidence-input";
 import type { SealedPlan } from "./journal";
 import { fullModel, modelMatches, type RolePolicy } from "./manifests";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
 import { artifactDirectoryScope } from "./snapshot";
+import { decodeNativeRoleOutput } from "./native-role-output";
 
 type Role = "worker" | "reviewer";
 type Expected = { role: Role; source_commit: string; runtime_sha256: string; target_sha256: string };
@@ -40,7 +41,9 @@ export function readNativeRoleCapture(options: {
   const expected = options.expected;
   if (!["worker", "reviewer"].includes(expected.role) || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(expected.source_commit)
     || ![expected.target_sha256, expected.runtime_sha256].every(value => /^[a-f0-9]{64}$/u.test(value))) fail("expected bindings required");
-  const capture = record(json(read(options.reference)), ["schema_version", "kind", "role", "source_commit", "runtime_sha256", "launch", "binding", "artifacts"]);
+  const raw = json(read(options.reference));
+  const hasInvocation = raw !== null && typeof raw === "object" && Object.hasOwn(raw, "invocation");
+  const capture = record(raw, ["schema_version", "kind", "role", "source_commit", "runtime_sha256", "launch", "binding", "artifacts", ...(hasInvocation ? ["invocation"] : [])]);
   if (capture.schema_version !== 1 || capture.kind !== "docs-drift-role-capture" || capture.role !== expected.role
     || capture.source_commit !== expected.source_commit || capture.runtime_sha256 !== expected.runtime_sha256) throw new ArtifactChanged("docs-drift original role capture captured context changed");
   const launch = record(json(read(capture.launch)), ["schema_version", "kind", "role", "source_commit", "runtime_sha256", "target_sha256", "invocation_id", "context_id", "pid"]);
@@ -56,6 +59,20 @@ export function readNativeRoleCapture(options: {
     references: artifacts, binding, policy: options.policy });
   if (evidence.target_sha256 !== expected.target_sha256 || launch.invocation_id !== evidence.invocation_id
     || launch.context_id !== evidence.context_id || launch.pid !== evidence.process.pid) fail("original launch and native capture differ");
+  if (hasInvocation) {
+    const invocation = record(json(read(capture.invocation)), ["schema_version", "kind", "role", "source_commit", "runtime_sha256", "target_sha256",
+      "invocation_id", "provider", "context_id", "cwd", "argv_sha256"]);
+    if (invocation.schema_version !== 1 || invocation.kind !== "docs-drift-role-invocation" || invocation.role !== expected.role
+      || invocation.source_commit !== expected.source_commit || invocation.runtime_sha256 !== expected.runtime_sha256
+      || invocation.target_sha256 !== expected.target_sha256 || invocation.invocation_id !== evidence.invocation_id
+      || invocation.provider !== evidence.provider || invocation.context_id !== evidence.context_id)
+      throw new ArtifactChanged("docs-drift original role invocation changed");
+    if (typeof invocation.cwd !== "string" || !isAbsolute(invocation.cwd) || invocation.cwd.includes("\0")
+      || typeof invocation.argv_sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(invocation.argv_sha256)) fail("original invocation fields required");
+    const decoded = decodeNativeRoleOutput({ provider: evidence.provider, native: evidence.native,
+      expected_context: evidence.context_id, expected_cwd: invocation.cwd });
+    if (!Buffer.from(decoded.returned).equals(Buffer.from(evidence.returned))) fail("returned reply differs from final native message");
+  }
   return { evidence, binding: freezeJSON(binding), launch: freezeJSON(launch as Launch) };
 }
 
