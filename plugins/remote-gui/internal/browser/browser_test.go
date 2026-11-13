@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -156,6 +157,50 @@ func TestRealHumanBrowserHandoff(t *testing.T) {
 		t.Fatal("return to human mode lost its control boundary or viewer")
 	}
 	checkHumanProcess(t, human.Owned)
+}
+
+// A busy host can delay Chromium's handling of the Exit keys. Pausing the
+// browser process while they are typed makes that delay deterministic: the
+// menu opens only after the pause, and its Exit mnemonic must not arrive first.
+func TestRealHandoffWaitsForStalledBrowserMenu(t *testing.T) {
+	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
+		t.Skip("requires existing GUI dependencies and disposable browser processes")
+	}
+	c, id := setup(t)
+	c.BrowserMode = "human"
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	if err := state.Update(ctx, c.Home, id, func(record *state.Record) { record.Config = c }); err != nil {
+		t.Fatal(err)
+	}
+	h, err := Start(ctx, c, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Stop()
+	var browser state.Identity
+	for _, process := range h.Owned {
+		if process.Role == "browser" {
+			browser = process.Identity
+		}
+	}
+	if err = state.Signal(browser, syscall.SIGSTOP); err != nil {
+		t.Fatal(err)
+	}
+	resumed := make(chan struct{})
+	go func() {
+		defer close(resumed)
+		time.Sleep(time.Second)
+		_ = state.Signal(browser, syscall.SIGCONT)
+	}()
+	agent, err := h.Handoff(ctx, "agent")
+	<-resumed
+	if err != nil {
+		t.Fatal(err)
+	}
+	if agent.CDPAddress == "" || agent.MarkerURL != h.MarkerURL {
+		t.Fatal("hand-back after a stalled browser lost control or the marker")
+	}
 }
 
 func checkHumanProcess(t *testing.T, owned []state.Process) {
