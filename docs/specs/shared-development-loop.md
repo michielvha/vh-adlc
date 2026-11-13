@@ -61,7 +61,7 @@ implementation review, binary-checked gates, claim commits, handoff, resume) and
 
 The shared side gains: per-role model routing in a committed `.vh-adlc/loop.yaml`; a generic external
 command route for the two reviewer roles, so a Claude session gets a `gpt-6.1-sol` review through the
-Copilot CLI that is stored and checked like any other (file-only spec reviews read a read-only export of
+Codex CLI that is stored and checked like any other (file-only spec reviews read a read-only export of
 the exact commit; implementation reviews get shell, guarded by a before-and-after check of refs, index
 and files); a project procedure and declared review lenses read by every SDD operation; verification
 rungs by path that must pass before push, completion and delivery; manual-CI reporting, a post-merge
@@ -82,6 +82,10 @@ install, then Stackweaver's adoption PR. Rollback is rehearsed on a disposable c
 A revision after the first acceptance only adds the code paths the design needs to `covers`
 (`plugins/vh-adlc/scripts/loop/`, `scripts/triage/owned-process.ts`, `references/loop-settings.md`,
 `cmd/vh-adlc/`, `docs/reference/cli.md`) and names them in Design; scope and criteria are unchanged.
+
+A second revision, during implementation, follows Stackweaver's move of its GPT reviews from the
+Copilot CLI to the Codex CLI: the Design example and the AC-02 real-route proof now name `codex exec`.
+Scope, criteria and the generic route are unchanged.
 
 Validation so far is spec review only, nothing executed: thirteen `gpt-6.1-sol` passes. R-13 has no
 blocking findings; its two should-fix items (findings saved against an existing issue, and reviewer
@@ -127,6 +131,8 @@ independent route. Copilot CLI 1.0.109 lists `gpt-6.1-sol` among its models
 (`copilot help config`). Stackweaver has used this route before: on 2026-10-29 `gpt-6-astra` ran
 through Copilot CLI with only `view` and `glob` tools available, for one premium request
 (`docs/internal/analysis/evidence/multi-tool/2026-10-29-copilot-gpt-6-astra-full-review.json`).
+Stackweaver commit `119d2ae4` then moved those reviews to the Codex CLI:
+`/usr/bin/codex exec -s read-only -m gpt-6.1-sol "<prompt>"` (Stackweaver `CLAUDE.md:202`).
 
 Settings hooks. Triage, maintenance and audit read `.vh-adlc/*.yaml` with a `project_procedure`
 companion. A grep of the SDD skills for `settings`, `project_procedure` and `.vh-adlc/` finds nothing:
@@ -249,15 +255,11 @@ A `command` route runs the reviewer outside the host, for example:
 spec_reviewer:
   route: command
   model: gpt-6.1-sol
-  argv: [/home/linuxbrew/.linuxbrew/bin/copilot, --model, "{model}", --available-tools, view, glob,
-         --allow-all-tools, --no-ask-user, --no-custom-instructions, --disable-builtin-mcps,
-         --add-dir, "{export_dir}", -p, "{prompt}"]
+  argv: [/usr/bin/codex, exec, --skip-git-repo-check, -s, read-only, -m, "{model}", "{prompt}"]
 implementation_reviewer:
   route: command
   model: gpt-6.1-sol
-  argv: [/home/linuxbrew/.linuxbrew/bin/copilot, --model, "{model}", --available-tools, view, glob, shell,
-         --allow-all-tools, --no-ask-user, --no-custom-instructions, --disable-builtin-mcps,
-         -p, "{prompt}"]
+  argv: [/usr/bin/codex, exec, -s, workspace-write, -m, "{model}", "{prompt}"]
 ```
 
 The operation writes the canonical reviewer instructions, document path, exact commit, kind, docs
@@ -270,7 +272,7 @@ runs the command from the owning worktree, with no worktree creation. A file-onl
 from the export described below, so the CLI discovers no instruction files in the live checkout. The route is generic: `argv` is any command with
 placeholders, so Copilot, Codex or another CLI needs only settings. `{export_dir}` is the read-only
 export of the target commit, `{model}` is the role's model,
-`{prompt}` is the whole prompt text as one argument (what Copilot's `-p` takes), and `{prompt_file}` is
+`{prompt}` is the whole prompt text as one argument (what `codex exec` and Copilot's `-p` take), and `{prompt_file}` is
 the path of the same text for a CLI that reads files. The reply opens with `MODEL:` and then
 `TARGET: <commit>`; the operation checks that `TARGET` equals the commit it dispatched, which proves the
 reviewer received the dispatch identity, and strips both header lines before storing the records. A
@@ -279,9 +281,10 @@ command that is not given a read-only tool restriction is recorded with `procedu
 A spec review reads only, so its route may stay file-only. It does not read the live worktree: the
 operation exports the target commit with `git archive <commit>` into a fresh read-only directory and
 points the reviewer there, launching the command from that directory with the CLI's automatic
-instruction loading turned off (Copilot's `--no-custom-instructions`, as the existing
-`tests/vh-adlc/triage/copilot-trial.ts:8` already does), so uncommitted edits, to instruction files or
-anything else, cannot shape a review recorded against that commit. Any other repository the review needs is exported the same way at
+instruction loading turned off or confined to the export (Copilot's `--no-custom-instructions`, as the
+existing `tests/vh-adlc/triage/copilot-trial.ts:8` does; `codex exec` reads `AGENTS.md` from its working
+directory, which is the export), so uncommitted edits, to instruction files or anything else, cannot
+shape a review recorded against that commit. Any other repository the review needs is exported the same way at
 a named commit. An implementation review must observe the
 checks it relies on, because the standard counts only executed evidence the review saw as `met`, so its
 route has shell access. Before dispatch the operation records `HEAD`, the index tree (`git write-tree`),
@@ -549,7 +552,7 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | `bun test tests/vh-adlc` cases for each supported role and route pair, refusal of a `command` route for `author` and `implementer`, resume taking the continued operation's route, a no-file case compared with `a7bfca99` behavior, and a grep test that fails on a model name in any agent or skill file. |
-| AC-02 | A fixture where an uncommitted edit to an instruction file in the worktree contradicts the committed spec, and the file-only review must still see only the committed content (the export, not the worktree); in the real-route run, live startup instruction files (`AGENTS.md`, `.github/copilot-instructions.md`) changed before dispatch must not appear in the review or steer it; a fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, one that creates or moves a non-current branch or tag, one that exits successfully and one that times out while each leaves a helper running that would later write to the checkout (the helper is reaped first and the checkout stays unchanged), one that overwrites an existing ignored configuration file, one that creates a new ignored file outside `review_scratch`, one that overwrites a tracked file already flagged assume-unchanged without changing the flag, one that writes only inside `review_scratch` (stored), and one that changes an index flag without changing the index tree; then one real Copilot CLI `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
+| AC-02 | A fixture where an uncommitted edit to an instruction file in the worktree contradicts the committed spec, and the file-only review must still see only the committed content (the export, not the worktree); in the real-route run, live startup instruction files (`AGENTS.md`, `.github/copilot-instructions.md`) changed before dispatch must not appear in the review or steer it; a fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, one that creates or moves a non-current branch or tag, one that exits successfully and one that times out while each leaves a helper running that would later write to the checkout (the helper is reaped first and the checkout stays unchanged), one that overwrites an existing ignored configuration file, one that creates a new ignored file outside `review_scratch`, one that overwrites a tracked file already flagged assume-unchanged without changing the flag, one that writes only inside `review_scratch` (stored), and one that changes an index flag without changing the index tree; then one real Codex CLI (`codex exec`) `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
 | AC-03 | Fixture specs that break a declared instruction and a declared lens; the reviewer must return a finding for each and none for a compliant control. |
 | AC-04 | Fixture changes that match some rungs and not others; a feature whose first commit changes `backend/` and whose last changes only documentation must still require the integration rung before push and completion; a pass recorded on an earlier commit must not count for a later one; after a merge, the delivery check over the merge commit against its first parent must still require the `backend/` rung once the default branch contains the feature; with rungs declared, a fast-forward landing of a feature whose earlier commit changed `backend/` must be refused; in Stackweaver, a backend-only feature whose Test Plan names an unchanged E2E spec must not push or complete until that spec has passed in the kind harness, a runtime change must not advance without its live slot pass, targeted kind reruns must not stand in for the final full run, and a `make verify` run that exits 0 with a skipped mandatory subcheck must stop advancement unless the owner allowance names that subcheck; the report must list every rung with the right state; a failing command must leave no push, no completion commit and no delivered report even when an owner allowance is recorded; an unavailable procedure must do the same unless the owner allowance is recorded for that exact rung, and with it must proceed; a no-rung fixture must keep the current lookup. |
 | AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported), a watch stub that exits 1 then 0 (delivered only after 0), a skip-eligible feature merged with a marked merge commit (delivered with no publication path, watch never invoked), the same feature merged with an unmarked merge commit (watch invoked); a watch stub that fails because no workflow ran (reported blocked, never delivered); and a run that appears only after a delay (watch waits, no early verdict). |
@@ -630,7 +633,7 @@ Stackweaver adoption, on a Stackweaver feature branch against the candidate plug
 - [ ] T31 Stackweaver `CLAUDE.md` - merge commits for feature PRs, the shared spec style, and model routing pointing at `loop.yaml`; `make verify` passes (AC-08, AC-14)
 - [ ] T32 Stackweaver `tests/agent-loop/README.md` - the rollback and reapply procedure, rehearsed on a disposable checkout with matching hashes for the docs index and unrelated workflow files (AC-11)
 - [ ] T33 Stackweaver `tests/agent-loop/evidence/` - a candidate plugin and binary in an isolated Claude Code profile run every adapted command and its plain-language form on enrolled and unenrolled disposable specs, start `/implement` on a clean main checkout, and take one disposable feature from claim to a merge-commit landing (AC-08, AC-12, AC-14, AC-18)
-- [ ] T34 `tests/vh-adlc/evidence/loop-review-route/` - one real Copilot `gpt-6.1-sol` file-only spec review and one shell implementation review that returns `met` on a disposable feature, with transcripts and stored records (AC-02)
+- [ ] T34 `tests/vh-adlc/evidence/loop-review-route/` - one real Codex CLI `gpt-6.1-sol` file-only spec review and one shell implementation review that returns `met` on a disposable feature, with transcripts and stored records (AC-02)
 
 ## Open Questions
 
