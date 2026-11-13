@@ -22,6 +22,8 @@ export type ReviewRequest = {
   scratch?: string[]; timeoutMs?: number; env?: Record<string, string>;
   /** Test seam: replaces the confirmation of process cleanup. */
   cleanup?: Cleanup;
+  /** Test seam: `unavailable` simulates a host without a PID namespace boundary. */
+  boundary?: "auto" | "unavailable";
 };
 
 const QUIET_GIT = { GIT_OPTIONAL_LOCKS: "0" };
@@ -206,13 +208,14 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     const env = Object.fromEntries(Object.entries({ ...process.env, ...request.env }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
     let result;
     try {
-      result = await runOwnedClient(argv, { cwd: exportDir ?? repo, env, stdout, stderr },
+      result = await runOwnedClient(argv, { cwd: exportDir ?? repo, env, stdout, stderr, pidNamespace: request.boundary !== "unavailable" },
         { timeout_ms: request.timeoutMs ?? 15 * 60_000, grace_ms: 500, reap_ms: 2_000 });
     } catch (error) { return { status: "pending", reason: `the reviewer command could not start: ${(error as Error).message}` }; }
     const cleanup = request.cleanup ? await request.cleanup(result) : result;
     const raw = readFileSync(stdout, "utf8");
     const attestation = request.route.model_attestation === "codex-session" ? codexSession(raw, request.env?.HOME ?? process.env.HOME ?? homedir()) : undefined;
     const reply = attestation ? attestation.reply : raw;
+    if (result.boundary !== "pid-namespace") return { status: "pending", reason: "no process boundary on this host could confirm that every reviewer process stopped (a PID namespace through unshare is required)", reply: readFileSync(stdout, "utf8") };
     if (!cleanup.confirmed) return { status: "pending", reason: `process cleanup could not confirm every reviewer process stopped (${cleanup.survivors.join(", ") || "group"})`, reply };
     const after = snapshot(repo, scratch);
     const changed = Object.keys(before).filter(key => before[key] !== after[key]);

@@ -274,3 +274,23 @@ describe("review policy comes from the reviewed commit", () => {
     expect(outcome).toMatchObject({ status: "ready", records: "NO FINDINGS\n" });
   });
 });
+
+describe("environment-clearing helpers", () => {
+  test("an implementation reviewer's detached helper that cleared its environment cannot write after the review", async () => {
+    const { root, commit } = repository();
+    const marker = join(root, "src/late.txt");
+    const ready = join(realpathSync(mkdtempSync(join(tmpdir(), "vh-review-envclear-"))), "detached");
+    made.push(dirname(ready));
+    const body = `setsid env -i /bin/bash -c 'echo $$ > ${ready}; sleep 1; echo late > ${marker}' </dev/null >/dev/null 2>&1 &\nwhile [ ! -s ${ready} ]; do sleep 0.05; done`;
+    expect((await review(root, commit, stub(body, ok(commit)))).status).toBe("ready");
+    await Bun.sleep(1_500);
+    expect(existsSync(marker)).toBe(false);
+  });
+
+  test("without a process boundary on the host the review stays pending", async () => {
+    const { root, commit } = repository();
+    const outcome = await runReviewRoute({ repo: root, commit, kind: "implementation", document: "docs/specs/feature.md",
+      route: { model: "gpt-6.1-sol", argv: [stub("", ok(commit)), "{model}", "{prompt_file}"] }, prompt: "p", scratch: [], timeoutMs: 5_000, boundary: "unavailable" });
+    pending(outcome, "process boundary");
+  });
+});

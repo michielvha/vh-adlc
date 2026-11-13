@@ -12,7 +12,19 @@ export type SignalRecord = { signal: Signal; accepted: boolean; error?: string }
 export type OwnedResult = {
   exit_code: number; timed_out: boolean; reaped: boolean; signals: SignalRecord[];
   group_absent: boolean; survivors: number[]; confirmed: boolean;
+  /** `pid-namespace` when the client ran in its own PID namespace, whose every process the kernel stops when the client exits. */
+  boundary: "pid-namespace" | "marker";
 };
+
+let namespaceProbe: boolean | undefined;
+/** Whether this host can run a client in an unprivileged PID namespace (Linux with user namespaces). */
+export function pidNamespaceAvailable(): boolean {
+  if (namespaceProbe === undefined) {
+    const probe = Bun.spawnSync(["unshare", "--user", "--map-current-user", "--pid", "--fork", "--kill-child", "true"], { stdout: "ignore", stderr: "ignore" });
+    namespaceProbe = probe.exitCode === 0;
+  }
+  return namespaceProbe;
+}
 
 export const OWNER_MARKER_VARIABLE = "VH_ADLC_OWNED_PROCESS";
 
@@ -40,9 +52,13 @@ function groupAlive(pgid: number): boolean {
   try { process.kill(-pgid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
 }
 
-export async function runOwnedClient(argv: string[], options: { cwd: string; env: Record<string, string>; stdout: string; stderr: string; started?: (pid: number) => void; marker?: string },
+export async function runOwnedClient(argv: string[], options: { cwd: string; env: Record<string, string>; stdout: string; stderr: string; started?: (pid: number) => void; marker?: string; pidNamespace?: boolean },
   limits = { timeout_ms: 12 * 60_000, grace_ms: 500, reap_ms: 2000 }): Promise<OwnedResult> {
   const marker = options.marker ?? `${process.pid}-${crypto.randomUUID()}`;
+  // In a PID namespace the client is its init process: when it exits, the kernel kills every process left
+  // in the namespace, including helpers that left the group and cleared their environment.
+  const boundary = options.pidNamespace && pidNamespaceAvailable() ? "pid-namespace" as const : "marker" as const;
+  if (boundary === "pid-namespace") argv = ["unshare", "--user", "--map-current-user", "--pid", "--fork", "--kill-child", "--", ...argv];
   const child = Bun.spawn(argv, { cwd: options.cwd, env: { ...options.env, [OWNER_MARKER_VARIABLE]: marker },
     stdout: Bun.file(options.stdout), stderr: Bun.file(options.stderr), stdin: "ignore", detached: true });
   const signals: SignalRecord[] = [];
@@ -82,5 +98,5 @@ export async function runOwnedClient(argv: string[], options: { cwd: string; env
   if (groupGone) groupAbsent = true;
   const failedSignal = signals.some(record => !record.accepted && record.error !== "ESRCH");
   return { exit_code: final?.exit ?? -1, timed_out: timedOut, reaped: final !== null, signals,
-    group_absent: groupAbsent, survivors, confirmed: final !== null && groupGone && survivors.length === 0 && !failedSignal };
+    group_absent: groupAbsent, survivors, confirmed: final !== null && groupGone && survivors.length === 0 && !failedSignal, boundary };
 }

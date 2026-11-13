@@ -111,6 +111,10 @@ project procedure) and the lenses.
 Only `spec_reviewer` and `implementation_reviewer` accept a `command` route; settings that give one to
 `author` or `implementer` are refused, naming the role. Agent and skill files never name a model.
 
+A command route runs its CLI in its own PID namespace (`unshare --user --pid`), so every process it
+started, even one that left its group and cleared its environment, stops when the CLI exits. On a host
+without that boundary, a command-route review stays pending.
+
 ## Per-user override
 
 The executable path in `argv` is machine-specific. A file outside every repository,

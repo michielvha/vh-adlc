@@ -44,3 +44,23 @@ describe("cleanup", () => {
     for (const record of result.signals.filter(s => !s.accepted)) expect(record.error).toBe("ESRCH");
   });
 });
+
+describe("the PID namespace boundary", () => {
+  test("a detached helper that cleared its environment is stopped when the client exits", async () => {
+    const dir = scratch(), late = join(dir, "late"), ready = join(dir, "ready");
+    const script = `setsid env -i /bin/bash -c 'echo $$ > ${ready}; sleep 1; echo x > ${late}' </dev/null >/dev/null 2>&1 &\nwhile [ ! -s ${ready} ]; do sleep 0.05; done`;
+    const result = await runOwnedClient(["bash", "-c", script], { cwd: dir, env: env(), stdout: join(dir, "o"), stderr: join(dir, "e"), pidNamespace: true }, limits);
+    expect(result).toMatchObject({ confirmed: true, boundary: "pid-namespace" });
+    await Bun.sleep(1_300);
+    expect(existsSync(late)).toBe(false);
+  });
+
+  test("the same helper after a timeout is stopped too", async () => {
+    const dir = scratch(), late = join(dir, "late"), ready = join(dir, "ready");
+    const script = `setsid env -i /bin/bash -c 'echo $$ > ${ready}; sleep 1; echo x > ${late}' </dev/null >/dev/null 2>&1 &\nwhile [ ! -s ${ready} ]; do sleep 0.05; done\nsleep 30`;
+    const result = await runOwnedClient(["bash", "-c", script], { cwd: dir, env: env(), stdout: join(dir, "o"), stderr: join(dir, "e"), pidNamespace: true }, { ...limits, timeout_ms: 500 });
+    expect(result).toMatchObject({ timed_out: true, confirmed: true, boundary: "pid-namespace" });
+    await Bun.sleep(1_300);
+    expect(existsSync(late)).toBe(false);
+  });
+});
