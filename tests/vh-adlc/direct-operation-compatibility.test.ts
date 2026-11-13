@@ -25,7 +25,7 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     if (name === "resume") expect(loop).toContain("--continues");
     if (name === "spec") expect(loop).toContain("lenses");
     if (name === "implement" || name === "ship") for (const phrase of ["verification rungs", "scripts/loop/cli.ts rungs"]) expect(loop).toContain(phrase);
-    if (name === "ship") expect(loop).toContain("--merge");
+    if (name === "ship") for (const phrase of ["--merge", "cli.ts ci", "cli.ts skip", "cli.ts delivery"]) expect(loop).toContain(phrase);
     if (name === "spec" || name === "review") for (const phrase of ["scripts/loop/cli.ts review", "references/review-protocol.md", "pending", "requested model"]) expect(loop).toContain(phrase);
     current = (current.slice(0, loopStart) + current.slice(loopEnd)).replace(/\n+$/, "\n");
   }

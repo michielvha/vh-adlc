@@ -54,6 +54,22 @@ lands by merge commit only. Without rungs, operations keep reading verification 
 `AGENTS.md`. `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` reports the
 delta, the applicable rungs, each result and whether the feature may advance.
 
+## Delivery
+
+| Field | Value |
+| --- | --- |
+| `ci_trigger` | `automatic` (default) or `manual`. With `manual`, ship reports CI as not triggered by policy and never dispatches a run. |
+| `skip_ci_paths` | Optional globs of extra skip-eligible paths for feature deliveries, honoured only when the resolved delivery convention allows them; otherwise ship reports them ignored and names the pin update. |
+| `post_merge_watch.argv` | A command run after a merge; it must contain `{merge_sha}`. Exit 0 means every release path published. |
+| `post_merge_watch.no_publication_pattern` | Optional regular expression for watch output that means no workflow ran at all. |
+
+After a merge, ship reads the actual merge commit. If its message carries the skip marker and its diff
+against the first parent touches only skip-eligible paths, the feature is delivered with no publication
+path and the watch does not run. Every other merge runs the watch: exit 0 means delivered; a failure
+whose output matches `no_publication_pattern` leaves the feature blocked until the owner confirms
+delivery; any other failure leaves it not delivered. Commands: `cli.ts ci`, `cli.ts skip` and
+`cli.ts delivery`.
+
 `bun scripts/loop/cli.ts context --repo <dir>` prints the reading list (instruction files, then the
 project procedure) and the lenses.
 

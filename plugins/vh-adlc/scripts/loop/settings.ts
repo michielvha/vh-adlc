@@ -38,12 +38,15 @@ export type LoopSettings = {
   instruction_files: string[];
   lenses: Lens[];
   verification_rungs: Rung[];
-  /** The command run after a merge before a publishing feature is reported delivered (T16). */
-  post_merge_watch?: string[];
+  /** The command run after a merge before a publishing feature is reported delivered. */
+  post_merge_watch?: { argv: string[]; no_publication_pattern?: string };
+  ci_trigger: "automatic" | "manual";
+  /** Extra skip-eligible paths for feature deliveries, honoured only when the resolved delivery convention allows them. */
+  skip_ci_paths: string[];
 };
 export type Lens = { name: string; check: string; severity: "blocking" | "should-fix" | "nit" };
 
-export const LOOP_SETTINGS_KEYS = ["schema_version", "roles", "review_scratch", "project_procedure", "instruction_files", "lenses", "verification_rungs"];
+export const LOOP_SETTINGS_KEYS = ["schema_version", "roles", "review_scratch", "project_procedure", "instruction_files", "lenses", "verification_rungs", "ci_trigger", "post_merge_watch", "skip_ci_paths"];
 const PLACEHOLDERS = ["{model}", "{prompt}", "{prompt_file}", "{export_dir}"];
 
 function fail(field: string): never { throw Error(`invalid loop settings: ${field}`); }
@@ -123,6 +126,19 @@ function rungs(value: unknown): Rung[] {
   return out;
 }
 
+function watch(value: unknown): LoopSettings["post_merge_watch"] {
+  if (value === undefined) return undefined;
+  const item = object(value, "post_merge_watch");
+  keys(item, ["argv", "no_publication_pattern"], "post_merge_watch");
+  if (!Array.isArray(item.argv) || !item.argv.length) fail("post_merge_watch.argv");
+  const argv = item.argv.map((part, index) => text(part, `post_merge_watch.argv[${index}]`));
+  if (!argv.some(part => part.includes("{merge_sha}"))) fail("post_merge_watch.argv needs {merge_sha}");
+  if (item.no_publication_pattern !== undefined) {
+    try { new RegExp(text(item.no_publication_pattern, "post_merge_watch.no_publication_pattern")); } catch { fail("post_merge_watch.no_publication_pattern"); }
+  }
+  return { argv, ...(item.no_publication_pattern === undefined ? {} : { no_publication_pattern: item.no_publication_pattern as string }) };
+}
+
 function route(role: LoopRole, value: unknown): RoleRoute {
   const field = `roles.${role}`, item = object(value, field);
   if (item.route !== "host" && item.route !== "command") fail(`${field}.route must be host or command`);
@@ -189,7 +205,10 @@ export function loadLoopSettings(root: string, options: { settingsPath?: string;
   })();
   return { schema_version: 1, root, configured: settingsRead.configured, settings_path: settingsRead.path, roles, review_scratch,
     ...(input.project_procedure === undefined ? {} : { project_procedure: file(root, input.project_procedure, "project_procedure") }),
-    instruction_files, lenses: lenses(input.lenses), verification_rungs: rungs(input.verification_rungs) };
+    instruction_files, lenses: lenses(input.lenses), verification_rungs: rungs(input.verification_rungs),
+    ...(input.post_merge_watch === undefined ? {} : { post_merge_watch: watch(input.post_merge_watch) }),
+    ci_trigger: input.ci_trigger === undefined ? "automatic" : input.ci_trigger === "manual" || input.ci_trigger === "automatic" ? input.ci_trigger : fail("ci_trigger must be automatic or manual"),
+    skip_ci_paths: input.skip_ci_paths === undefined ? [] : (Array.isArray(input.skip_ci_paths) ? input.skip_ci_paths.map((p, i) => text(p, `skip_ci_paths[${i}]`)) : fail("skip_ci_paths")) };
 }
 
 /** The role and route an operation runs on. Resume follows the operation it continues. */

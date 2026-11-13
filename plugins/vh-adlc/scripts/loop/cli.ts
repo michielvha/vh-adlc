@@ -3,6 +3,9 @@
 //   bun scripts/loop/cli.ts route   --repo <dir> --operation <op> [--continues <op>]
 //   bun scripts/loop/cli.ts context --repo <dir>
 //   bun scripts/loop/cli.ts rungs   --repo <dir> (--base <branch> | --merge <sha>) [--allow <rung>[,<rung/subcheck>...]] [--run true]
+//   bun scripts/loop/cli.ts ci       --repo <dir>
+//   bun scripts/loop/cli.ts skip     --repo <dir> --base <branch> --remote-branch <ref> --feature-root <dir> --docs-revision <sha>
+//   bun scripts/loop/cli.ts delivery --repo <dir> --merge <sha> --feature-root <dir> --docs-revision <sha>
 //   bun scripts/loop/cli.ts review --repo <dir> --document <doc> --commit <sha> --kind spec|implementation
 //                                  --docs-revision <sha> --binary <path> --plugin-pin <pin> [--timeout-ms <n>]
 //
@@ -15,6 +18,7 @@ import { loadLoopSettings, routeFor, type LoopOperation } from "./settings";
 import { runReviewRoute } from "./review-route";
 import { loopContext, type LoopContext } from "./procedure";
 import { applicableRungs, featureDelta, mayAdvance, runRungs } from "./rungs";
+import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, skipMarker } from "./delivery";
 import { execSync } from "node:child_process";
 
 const PLUGIN = join(import.meta.dir, "..", "..");
@@ -69,6 +73,19 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
   if (command === "context") { console.log(JSON.stringify(loopContext(settings))); return 0; }
+  if (command === "ci") { console.log(JSON.stringify(ciReport(settings))); return 0; }
+  if (command === "skip") {
+    const names = (range: string[]) => execSync(`git diff --name-only ${range.join(" ")}`, { cwd: repo }).toString().split("\n").filter(Boolean);
+    const base = execSync(`git merge-base ${need(options, "base")} HEAD`, { cwd: repo }).toString().trim();
+    const supportsSkipPaths = conventionSupportsSkipPaths(need(options, "docs-revision"));
+    const result = skipMarker(settings, { commit: names(["HEAD^", "HEAD"]), pushRange: names([`${need(options, "remote-branch")}`, "HEAD"]), prDiff: names([base, "HEAD"]) },
+      { supportsSkipPaths, featureRoot: need(options, "feature-root") });
+    console.log(JSON.stringify(result)); return 0;
+  }
+  if (command === "delivery") {
+    const verdict = await deliveryVerdict(settings, repo, need(options, "merge"), { featureRoot: need(options, "feature-root"), supportsSkipPaths: conventionSupportsSkipPaths(need(options, "docs-revision")) });
+    console.log(JSON.stringify(verdict)); return verdict.delivered ? 0 : 3;
+  }
   if (command === "rungs") {
     const declared = settings.verification_rungs.length > 0;
     const delta = featureDelta(repo, options.merge ? { merge: options.merge } : { base: need(options, "base") });
@@ -93,7 +110,7 @@ export async function main(argv: string[]): Promise<number> {
     console.log(JSON.stringify({ role: route.role, ...outcome }));
     return outcome.status === "ready" ? 0 : 3;
   }
-  throw Error(`unknown command ${command ?? ""}; use route, context, rungs or review`);
+  throw Error(`unknown command ${command ?? ""}; use route, context, rungs, ci, skip, delivery or review`);
 }
 
 if (import.meta.main) {
