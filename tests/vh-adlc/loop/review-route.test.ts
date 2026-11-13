@@ -27,7 +27,7 @@ function repository(extra: (root: string) => void = () => {}) {
     "README.md": "readme\n", ".gitignore": ".env\nbuild/\n",
   };
   for (const [path, text] of Object.entries(files)) { mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text); }
-  git(root, "init", "-q", "-b", "main");
+  git(root, "init", "-q", "-b", "main"); git(root, "config", "user.name", "t"); git(root, "config", "user.email", "t@example.invalid");
   extra(root);
   git(root, "add", "-A");
   git(root, "commit", "-q", "-m", "fixture");
@@ -99,7 +99,7 @@ describe("the owning worktree is preserved", () => {
     ["a touched clean file", () => {}, "echo changed > src/app.txt"],
     ["a rewrite that keeps the status line", root => writeFileSync(join(root, "src/app.txt"), "dirty one\n"), "echo dirty two > src/app.txt"],
     ["a new branch", () => {}, "git branch sneaky"],
-    ["a moved tag", root => git(root, "tag", "v1"), "git tag -f v1 HEAD~0 >/dev/null 2>&1; git commit -q --allow-empty -m x; git tag -f v1 >/dev/null"],
+    ["a moved tag", root => git(root, "tag", "v1"), "git tag -f v1 HEAD~0 >/dev/null 2>&1; git -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m x; git tag -f v1 >/dev/null"],
     ["an overwritten ignored file", () => {}, "echo SECRET=2 > .env"],
     ["a new ignored file outside the scratch directories", () => {}, "echo x > other.env; printf 'other.env\\n' >> .git/info/exclude"],
     ["an index flag change", () => {}, "git update-index --assume-unchanged README.md"],

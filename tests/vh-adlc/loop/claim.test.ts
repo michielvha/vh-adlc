@@ -22,7 +22,7 @@ function setup(state: "detached" | "owned" | "unrelated", settings = "schema_ver
   const remote = join(scratch("vh-claim-remote-"), "r.git");
   git(dirname(remote), "init", "-q", "--bare", "-b", "main", remote);
   const primary = scratch("vh-claim-primary-");
-  git(primary, "init", "-q", "-b", "main");
+  git(primary, "init", "-q", "-b", "main"); git(primary, "config", "user.name", "t"); git(primary, "config", "user.email", "t@example.invalid");
   for (const [path, text] of Object.entries({ [DOC]: "---\nstatus: planned\n---\n# F\n", ".vh-adlc/loop.yaml": settings, "README.md": "r\n" })) {
     mkdirSync(dirname(join(primary, path)), { recursive: true }); writeFileSync(join(primary, path), text);
   }

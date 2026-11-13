@@ -20,7 +20,7 @@ function repo(files: Record<string, string>) {
   for (const [path, text] of Object.entries({ "docs/specs/f.md": "# F\n", ...files })) {
     mkdirSync(dirname(join(root, path)), { recursive: true }); writeFileSync(join(root, path), text);
   }
-  git(root, "init", "-q", "-b", "main"); git(root, "add", "-A"); git(root, "commit", "-q", "-m", "f");
+  git(root, "init", "-q", "-b", "main"); git(root, "config", "user.name", "t"); git(root, "config", "user.email", "t@example.invalid"); git(root, "add", "-A"); git(root, "commit", "-q", "-m", "f");
   return { root, commit: git(root, "rev-parse", "HEAD") };
 }
 function cli(...args: string[]) {
