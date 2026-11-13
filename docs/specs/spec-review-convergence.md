@@ -438,6 +438,7 @@ owner accepted at R-8 under an advance acceptance, then picked all seven R-8 fin
 | 2026-11-13 | R-7 | spec | `b40d2ca` | claude-opus-5-5 | procedural | One blocking finding (F-01 Variants G and E assume stops the design does not make), four should-fix and three nits |
 | 2026-11-13 | R-8 | spec | `005f0f5` | claude-opus-5-5 | procedural | Clean: no blocking finding; four should-fix and three nits, listed for the owner and not applied |
 | 2026-11-13 | R-8 | spec | `005f0f5` | n/a | n/a | accepted by owner |
+| 2026-11-13 | R-9 | spec | `67a08db` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix and two nits |
 
 ### R-1
 
@@ -909,3 +910,54 @@ SEVERITY: nit
 WHERE: Frontmatter `covers` (lines 18-20); Design, Delivery (lines 320-323)
 EVIDENCE: The AC-01 variants "run against a copy of the plugin whose reviewer agent returns canned records keyed by pass number". The Design does not say where the scripted reviewer definition and its canned records are stored. Under `tests/`, covers lists only `tests/vh-adlc/review-convergence.test.ts`, `tests/vh-adlc/scenarios/run.ts` and `tests/vh-adlc/evidence/review-convergence/`. If they live in a new file elsewhere, `feature_tree_clean` (conventions/feature-documents.md:316) does not see changes to it.
 PROPOSAL: Name the path of the scripted reviewer and its canned records, and add it to covers if none of the listed paths holds it.
+
+### R-9
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-06 row (line 385, "In the old-pin clone, run the updated spec skill's review mode"); Tasks T9 (line 400); frontmatter covers
+EVIDENCE: T9 puts the old-pin case in `tests/vh-adlc/scenarios/run.ts`. The AC-06 row puts it in one of the two scratch clones of this repository, which use the real binary and cache. Those are two different harnesses. Scenarios call the binary through `tests/vh-adlc/shim/vh-adlc`, which always adds `--docs-source "$docs"` (shim line 16). Here `$docs` is the fixture docs repository that `tests/vh-adlc/fixtures/build.ts:112-117` builds with a depth-1 fetch of the plugin pin read from `knowledge.md`. Revisions B, C and D all derive from that commit. After T3, then, the fixture holds only the new pin. Running `vh-adlc knowledge --repo <clone> --plugin-pin d8f07c9dd69038375a535af8ad586086688f85ab --docs-source <repo without that commit>` returned `"result":"unreachable"` with "the docs source has no commit d8f07c9dd69038375a535af8ad586086688f85ab"; `lint` returned the same. A run.ts scenario "in a clone on the previous pin" therefore gets `unreachable`, not the current procedure, unless the previous docs commit is first added to the fixture. Neither the row nor T9 says so, and `tests/vh-adlc/fixtures/build.ts` is in neither covers nor any task.
+PROPOSAL: Say which harness runs the old-pin case. If it is run.ts, state that the scenario adds the previous pin's docs commit to the fixture docs repository, and if that change goes in `tests/vh-adlc/fixtures/build.ts`, add the file to covers and to T9.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-01 row (Variants D2, D3 and F); Design, Stopping rule (paragraph after step 7, line 234)
+EVIDENCE: Line 234 says "the author dispatches each next pass itself, in the same session, while no Open Question is waiting for the owner". Variant D2 has the owner accept "after a clean pass holding only nits" and passes when "no further pass runs". A nits-only clean pass below the ceiling raises no question, so a correct author keeps dispatching passes in the same turn. If the scripted reviewer runs that pass in turn 1, the owner's turn arrives only after more passes, and the check fails a correct skill. The check holds only if the fixture stores the pass before the owner's turn, as S7.7.accept does with `accept(f, "NO FINDINGS", false)` (run.ts:577), and the row does not say so. Variants D3 and F check one row ("the next clean pass records `streak 1 of 3`"), but a correct run keeps dispatching after it. The row gives no canned records for later passes and no point where the run stops. Variant F also gives no document status: if the document is `planned` after its acceptance row, step 7 records `drift`, not `streak 1 of 3`.
+PROPOSAL: State that D2's clean pass is stored by the fixture before the owner's turn. For D3 and F, give the canned records of every later pass up to the stop, or a judgement should-fix that stops the run, and give F's status as `draft`.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-01 (lines 340-341, "ends the loop at a drift re-review of an accepted document without applying its findings"); Design, Stopping rule (step 7, lines 230-232); Design, Terminology (Clean streak, line 196, "rows marked `drift`"); Test Plan AC-01 row (Variant H)
+EVIDENCE: Step 7 says "A blocking drift pass records `drift, blocking` and is handled as today, through a revision, which then counts from 0". AC-01 has no clean qualifier on its drift clause. Read literally, it requires the loop to end without applying findings even after a blocking drift pass, which contradicts step 7. Variant H covers only a drift pass with a factual should-fix, and no variant has a blocking drift pass. A skill that writes `drift` on a blocking drift pass, keeps the acceptance and only lists the findings passes every listed check. Terminology skips "rows marked `drift`" without saying whether `drift, blocking` counts as marked.
+PROPOSAL: Limit AC-01's drift clause to a clean drift re-review, add the `drift, blocking` branch to AC-01, and add a variant. In it a blocking drift pass records `drift, blocking`, the document goes through `vh-adlc gate draft`, and the first clean pass after the revision records `streak 1 of 3`. Say in Terminology that `drift, blocking` rows are skipped too.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Owner acceptance, line 198); Design, Stopping rule (step 3, lines 215-216, and paragraph after step 7, lines 234-243); Acceptance Criteria AC-01 (resume clause); Test Plan AC-01 row (Variant G)
+EVIDENCE: Owner acceptance includes one given "in advance for the next pass", but the design does not say whether an advance acceptance given in one session still holds in a later session that runs that pass. Recorded advance acceptances are common practice: this document's Open Questions say the owner "accepted in advance if R-5 has no blocking finding" (lines 416-417), and `docs/specs/shared-development-loop.md` at `d367673` has status_description "the owner accepts once a confirming review has no blocking findings". Under the design, an interrupted run continues through the resume skill (Variant G path). One implementer honors the recorded acceptance and writes the acceptance row at the next clean pass. Another ignores it, because the convention has the owner accept in session (conventions/feature-documents.md:216), and continues to the ceiling. Step 3's "no owner acceptance exists" test means different things under each reading, and no variant covers it.
+PROPOSAL: State whether an advance acceptance recorded in the document carries into a later session, and use the same wording in Terminology, step 3 and AC-01. Add a variant where a resumed run meets a recorded advance acceptance and the chosen behavior is checked.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (lines 31-79)
+EVIDENCE: The document was accepted at R-8 (Review Log line 440), then moved back to draft when the owner picked R-8 F-01 to F-07 (Open Questions lines 424-426). The convention asks the summary to "Explain material changes since the last accepted scope" (conventions/feature-documents.md:87-88). The summary does not mention the new AC-08 (the convention's Acceptance text and the two user guides). It also leaves out the rule that the author names answered or rejected findings in the decision record and that the resumed-pass check skips them (lines 239-240), Variant J, the separate-session Variant E, and the 250-turn budget. It does not mention the two user guides at all, although Scope and AC-08 now require them.
+PROPOSAL: Add a short paragraph to the Owner summary that lists what changed since the R-8 acceptance, and name the user guides among what the feature changes.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Terminology (Saved nit, line 197); Design, Stopping rule (step 5, lines 220-222, and lines 239-240); Test Plan AC-01 row (Variant C)
+EVIDENCE: A saved nit is listed "unless its `EVIDENCE` quotes text that no longer exists in the document; a nit that quotes nothing is always listed". Only folded answers and rejected factual findings are named in the decision record (lines 239-240), not findings the owner picks in step 5. A nit with no quote that the owner picks and the author applies is therefore listed again at the next acceptance question. Variant C does not check that.
+PROPOSAL: Have the author name step 5 picks in the decision record too, and leave named findings out of the saved-nit list.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Terminology (lines 191-199); Design, Stopping rule (step 7, lines 227-232)
+EVIDENCE: The convention requires that "User-facing terms the feature introduces or changes appear in a glossary row" (conventions/feature-documents.md:156-158). The `drift` and `drift, blocking` Outcome markers and the "drift row" that Terminology, Scope and AC-01 refer to are defined only in step 7. Step 7 also treats every new pass on a `planned` or `in-progress` document with a standing acceptance as a drift pass, even when the owner asks for it without any default-branch change.
+PROPOSAL: Add a Terminology row for a drift pass and its two markers, and say whether an owner-requested re-review of an accepted document with no drift is also recorded as `drift`.
