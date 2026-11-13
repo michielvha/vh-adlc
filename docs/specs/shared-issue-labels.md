@@ -288,3 +288,63 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-13 | R-1 | spec | `5381e51` | unknown | procedural | Changes needed: 3 blocking, 5 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
+
+### R-1
+
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design / The labels helper; AC-03 and its Test Plan row
+EVIDENCE: docs/specs/shared-issue-labels.md:189-202 names the repository and actor in the plan, but apply explicitly rechecks only the digest and repository labels. It does not require matching the current repository and actor to the plan or binding the vocabulary and label_map to the approved write payloads. A changed mapping or plugin vocabulary can therefore change the intended writes while the plan bytes and remote labels remain unchanged. The cited projects helper explicitly validates target scope in plugins/vh-adlc/scripts/projects/apply.ts:17-27.
+PROPOSAL: Bind approval to the host, repository, actor, effective label names and exact before/after payloads, and require apply to validate those bindings before writing. Add refusal scenarios for another target or actor and changed vocabulary or mappings.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design / The labels helper; AC-03 and AC-07
+EVIDENCE: plugins/vh-adlc/scripts/triage/settings.ts:92-94 accepts arbitrary label_map names and nonempty values. Under docs/specs/shared-issue-labels.md:197-199, ready: blocked makes ready and the unmapped blocked label share one GitHub label, although the vocabulary requires different colors and descriptions. Mapping bug to dependencies also conflicts with the explicit exclusion of bot-owned labels at lines 132-134. AC-07 requires currently accepted settings to keep passing, but no collision or ownership policy resolves these cases.
+PROPOSAL: Define effective-name uniqueness and protected-label handling, including case-insensitive collisions with unmapped defaults. Preserve settings readability where required while refusing unsafe label operations, and test these cases before any write.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: covers; Test Plan
+EVIDENCE: The committed covers lists only tests/vh-adlc/labels/ among test paths. The Test Plan at docs/specs/shared-issue-labels.md:272-274 explicitly requires changes under tests/vh-adlc/lifecycle/, tests/vh-adlc/triage/execution.test.ts, tests/vh-adlc/triage/settings.test.ts and tests/vh-adlc/settings-file.test.ts. These paths are outside covers. The pinned conventions/feature-documents.md requires covers to list every path whose change can affect the feature; freshness and feature-tree checks use that declaration.
+PROPOSAL: Add the planned test paths to covers so changes to the feature's proof invalidate its reviews and participate in the feature-tree check.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary
+EVIDENCE: docs/specs/shared-issue-labels.md:48-49 says investigate and spec give every issue a type label and a state label. Design at lines 179-180 and 210-211, and AC-05 at lines 251-252, explicitly require spec-created issues to have no state label. The owner summary therefore describes a different filing default from the normative sections.
+PROPOSAL: Correct the summary to distinguish investigate's state label from spec's type-only labeling.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / The standard label set; Scope; Acceptance Criteria
+EVIDENCE: docs/specs/shared-issue-labels.md:178 requires one type label on every issue a vh-adlc operation files, but the filing changes and scenarios cover investigate and spec only. Triage also creates issues: plugins/vh-adlc/scripts/triage/github.ts:140-141 sends an empty labels array for create-request, whose schema has no labels field in scripts/triage/execute.ts:15. Every stated criterion can pass while that operation continues creating unlabeled issues.
+PROPOSAL: Either limit the universal rule to investigate and spec or specify and test compatible labeling for triage-created issues, preserving the neutral-request authority boundary.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Operations; AC-04 and its Test Plan row
+EVIDENCE: docs/specs/shared-issue-labels.md:206-209 says investigate applies the state label its verdict names, then gives track three possible labels without selection rules. The cited Stackweaver agents/investigate.md:35-40 uses the verdicts act now, track and reject, and lines 71-73 permit a requested issue for a reject verdict. The prerequisite shared-development-loop design at 645882b retains those three verdicts. The proposed contract leaves their mapping incomplete.
+PROPOSAL: Define the label outcome for each verdict and the conditions distinguishing blocked from needs-decision, including requested tracking of rejected work. Give those outcomes explicit scenario pass conditions.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / The standard label set
+EVIDENCE: docs/specs/shared-issue-labels.md:172-173 says the colors and first four descriptions match current labels in both repositories. Observed gh label list --json name,color,description reads show Stackweaver's refactor description is empty and security has color ededed, whereas the proposed table gives refactor a description and security color d93f0b. The vh-adlc repository currently has neither refactor nor security.
+PROPOSAL: Describe those entries as additions or intentional metadata changes, and correct the claim about which existing values match.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan / AC-09
+EVIDENCE: docs/specs/shared-issue-labels.md:276 proposes before/after gh issue list --json number,labels snapshots to prove that no issue lost a label. Observed gh issue list --help states that the defaults select only open issues and limit the result to 30. The observed Stackweaver inventory contains 139 open issues, and the criterion also covers closed issues. The written procedure therefore checks only a subset.
+PROPOSAL: Specify complete, paginated snapshots of open and closed issues in each named repository, and compare label sets by issue number while reporting incomplete collection or concurrent changes.
