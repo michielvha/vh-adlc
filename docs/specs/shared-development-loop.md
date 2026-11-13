@@ -758,6 +758,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-18 | spec | `ec582dcf7e43c0d83b5dd6fb953f0c83f799b785` | gpt-6.1-sol | procedural | No blocking findings; three should-fix: environment-clearing detached helpers, a detached HEAD at the same commit, and duplicate search across Stackweaver's findings homes. |
 | 2026-11-13 | R-18 | spec | `ec582dcf7e43c0d83b5dd6fb953f0c83f799b785` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-19 | spec | `3b0bb40b0ba12bb8d7cca26e1bbd4d05c6ba8538` | gpt-6.1-sol | procedural | No blocking findings after the private-clone revision; three should-fix. A Codex attempt before it stayed pending because other sessions pushed during it. |
+| 2026-11-13 | R-20 | spec | `cdfde05bbfd7391a4702a2cf171e5418a560611b` | gpt-6.1-sol | procedural | No blocking findings; one should-fix on calling the Codex read-only spec review file-only. |
 
 ### R-1
 
@@ -1258,6 +1259,15 @@ SEVERITY: should-fix
 WHERE: Context / Owner summary
 EVIDENCE: The summary says T24 remains open and T25-T39 are not done. Tasks marks those tasks complete, records a later passing T24 suite, and includes stored T34 outcomes under tests/vh-adlc/evidence/loop-review-route/. It also describes implementation reviews as operating against shared refs rather than explaining the new private-clone boundary. Git, vh-adlc and tests cannot be executed with the available tools; these contradictions follow from the document and stored files.
 PROPOSAL: Refresh the summary against the current task records, distinguish recorded results from independently verified execution, and explain the private-clone preservation boundary and remaining work before renewed acceptance.
+
+### R-20
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02 and T34
+EVIDENCE: AC-02 requires a file-only spec review, but its Codex example restricts filesystem writes rather than removing shell access. tests/vh-adlc/evidence/loop-review-route/spec-outcome.json explicitly reports “I ran bun test”. The recorded real-route proof therefore does not establish file-only operation. I cannot execute Git, Codex or vh-adlc; this follows from the committed invocation and reply.
+PROPOSAL: Distinguish a shell-capable spec review of a read-only export from a genuinely file-only route. Either obtain acceptance for the former contract or enforce file-only tools and repeat the real-route proof.
 
 ## Sources
 
