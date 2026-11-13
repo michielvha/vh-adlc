@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft with all ten owner answers folded in; waiting for an independent spec review."
+status_description: "R-1 factual findings applied and its three judgement findings answered by the owner; waiting for a fresh independent spec review."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
@@ -18,6 +18,8 @@ covers:
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/scripts/settings-file.ts
   - internal/doc/
+  - internal/fresh/
+  - plugins/vh-adlc/scripts/docs-impact/
   - internal/settings/
   - schema/vh-adlc.schema.json
   - tests/vh-adlc/
@@ -53,7 +55,7 @@ files, but its review protocol only knows an in-host subagent or a manual handof
 model routing per role, declared in settings, plus an external command route, so a Claude session can
 get a read-only GPT review that is stored and checked like any other.
 
-The owner settled three questions on 2026-11-13. Model routes live in a committed
+The owner settled its open questions on 2026-11-13. Model routes live in a committed
 `.vh-adlc/loop.yaml`, with only the reviewer CLI's binary path overridable per user. A feature is
 claimed from the session's own host worktree when it sits at the tip of the default branch, as
 Stackweaver sessions work today, and vh-adlc gains that as a shared behavior because Claude Code and
@@ -61,7 +63,9 @@ Codex both start work in worktrees they create. Feature PRs land by merge commit
 follow-ups; squash and amend stay for non-feature and bot PRs. The external review route is generic:
 any CLI described by a command template. Stackweaver keeps two standing behaviors: `/implement` hands
 straight to ship under a written grant, and small non-feature fixes keep shipping through Stackweaver's
-own `/ship`. The 58 non-terminal specs move to the shared format and finished ones stay as history.
+own `/ship`. Draft specs move to the shared format now; planned, in-progress and parked specs finish
+under the native loop unless the owner moves one, which then goes back through draft, a fresh review and
+acceptance. Finished specs stay as history.
 Stackweaver adopts vh-adlc's acceptance, completion and issue rules and its document style. A consumer
 may declare extra paths that still skip CI for a feature, which needs a small revision to the central
 delivery convention in vhco-pro/docs.
@@ -71,8 +75,10 @@ adapters, a `.vh-adlc/loop.yaml` settings file and one project procedure, behind
 if any legacy rule has no new home. Rollback is rehearsed on a disposable checkout. Active Stackweaver
 specs move to the shared format.
 
-Nothing here is reviewed yet and no question is open; the next step is an independent spec review on
-the GPT route. Accepting this
+Review R-1 on `gpt-6.1-sol` found four blocking problems. The factual ones are fixed and the owner
+answered the judgement ones: implementation reviews get shell access with a worktree-unchanged check,
+active specs finish natively, and the route passes the prompt text explicitly. A fresh review pass is
+next. Accepting this
 document authorizes implementation of the accepted scope on a feature branch. Publishing the vh-adlc
 release, merging either repository and retiring the native agents each still need their own approval.
 
@@ -135,7 +141,8 @@ In scope:
   paths, and the plugin pin bump that adopts it.
 - Stackweaver adoption: thin adapters for `/spec`, `/tasks`, `/implement`, `/ship` (feature path),
   `/investigate` and spec review; `.vh-adlc/loop.yaml`; one project procedure; a committed parity map
-  with contract tests; migration of the 58 non-terminal specs; rollback rehearsal.
+  with contract tests; migration of draft specs, and of any planned, in-progress or parked spec the
+  owner chooses; rollback rehearsal.
 - Roadmap row D-05 in `shared-workflow-migration.md`, pointing here.
 
 Out of scope:
@@ -145,7 +152,11 @@ Out of scope:
 - TFE compatibility and provider-fork workflows (roadmap D-04), docs drift (vh-adlc #59), docs truth.
 - Stackweaver product code, its dev-stack scripts (`agent-slot.sh`, `worktree-dev.sh`,
   `watch-merge.sh`) and its CI workflows. These are called, never changed.
-- Converting terminal Stackweaver specs (complete, abandoned, superseded, archived).
+- Converting terminal Stackweaver specs (complete, abandoned, superseded, archived), or converting a
+  planned, in-progress or parked spec without the owner choosing it.
+- The domain-extension plans that roadmap D-04 keeps local, such as
+  `docs/internal/plans/features/terraform/terraform-provider-stackweaver-plan.md` and
+  `TFE_COMPATIBILITY_MASTER_PLAN.md`.
 - A shared non-feature delivery. Stackweaver's own `/ship` keeps that path.
 - Codex and Copilot as authoring hosts for Stackweaver. The external route covers reviews only.
 
@@ -194,14 +205,31 @@ A `command` route runs the reviewer outside the host, for example:
 spec_reviewer:
   route: command
   model: gpt-6.1-sol
-  argv: [/home/linuxbrew/.linuxbrew/bin/copilot, --model, "{model}", --available-tools, "view,glob", -p, "{prompt_file}"]
+  argv: [/home/linuxbrew/.linuxbrew/bin/copilot, --model, "{model}", --available-tools, view, glob,
+         --allow-all-tools, --no-ask-user, -p, "{prompt}"]
+implementation_reviewer:
+  route: command
+  model: gpt-6.1-sol
+  argv: [/home/linuxbrew/.linuxbrew/bin/copilot, --model, "{model}", --available-tools, view, glob, shell,
+         --allow-all-tools, --no-ask-user, -p, "{prompt}"]
 ```
 
 The operation writes the canonical reviewer instructions, document path, exact commit, kind, docs
 revision, binary path and plugin pin into a prompt file, runs the command from the owning worktree with
 no worktree creation, and reads the reply. The route is generic: `argv` is any command with
-`{model}` and `{prompt_file}` placeholders, so Copilot, Codex or another CLI needs only settings. A
-command that is not given a read-only tool restriction is recorded with `procedural` isolation. The reply must open with `MODEL:`, then carry records in the
+placeholders, so Copilot, Codex or another CLI needs only settings. `{model}` is the role's model,
+`{prompt}` is the whole prompt text as one argument (what Copilot's `-p` takes), and `{prompt_file}` is
+the path of the same text for a CLI that reads files. The reply opens with `MODEL:` and then
+`TARGET: <commit>`; the operation checks that `TARGET` equals the commit it dispatched, which proves the
+reviewer received the dispatch identity, and strips both header lines before storing the records. A
+command that is not given a read-only tool restriction is recorded with `procedural` isolation.
+
+A spec review reads only, so its route may stay file-only. An implementation review must observe the
+checks it relies on, because the standard counts only executed evidence the review saw as `met`, so its
+route has shell access. Before dispatch the operation records `HEAD` and `git status --porcelain
+--untracked-files=all` of the owning worktree; after the reply it records them again. Any difference
+leaves the review pending, stores nothing and reports what changed. Such a review is recorded with
+`procedural` isolation. The reply must open with `MODEL:`, then carry records in the
 standard's format. The same requested-model rule applies: a missing, mismatched or `unknown` model, a
 non-zero exit or a timeout leaves the review pending, writes no Review Log row, and puts the raw reply
 and the command's exit status in the handoff. Records are stored byte for byte and pass
@@ -215,11 +243,12 @@ the model, the arguments and the role mapping always come from the committed fil
 Implement may make the claim commit in any worktree whose `HEAD` equals the freshly fetched default
 branch tip and whose tracked files are clean, whether `HEAD` is detached or on a branch with another
 name. It pushes the claim with `git push origin HEAD:<default branch>`, creates the feature branch at the
-claim commit with `git switch -c`, and that worktree becomes the owning worktree. Any staged or
-unstaged change that does not belong to the claim stops the step, as today. The plugin still never
-creates, moves, prunes or resets a worktree. When the push is rejected because the default branch moved,
-the step stops with the local commit kept, as the current procedure already says; a retry starts from a
-worktree at the new tip. Today's path, a worktree that has the default branch checked out, keeps working.
+claim commit with `git switch -c`, and that worktree becomes the owning worktree. The plugin still never
+creates, moves, prunes or resets a worktree. Two failures are kept apart. A stale tip, or any staged or
+unstaged change that does not belong to the claim, is found before anything is written, and the step
+stops with the repository unchanged. A rejected push happens after the claim commit exists: as the
+current procedure says, the local claim commit stays, no feature branch is created, and the report marks
+the claim pending and names the retry or handoff the owner can choose. Today's path, a worktree that has the default branch checked out, keeps working.
 
 For Stackweaver this is the normal start: a session's host worktree is created from a fresh `main`
 (Stackweaver `.claude/settings.json:9` sets `worktree.baseRef: "fresh"`), so the live main checkout is
@@ -255,9 +284,12 @@ behavior stays: read commands from `AGENTS.md`, ask if none.
 
 A declared `ci_trigger: manual` makes ship report CI as not triggered by policy instead of waiting for
 a run or suggesting a dispatch. A declared `post_merge_watch` command (Stackweaver:
-`scripts/release/watch-merge.sh <merge-sha>`) must exit 0 before the feature is reported delivered,
-matching the delivery convention's rule that a feature is delivered once every release path has
-published.
+`scripts/release/watch-merge.sh <merge-sha>`) must exit 0 before a feature whose merge can publish is
+reported delivered, matching the delivery convention's rule that a feature is delivered once every
+release path has published. A feature delivery that carries the skip marker publishes nothing, and
+Stackweaver's watcher does not follow a merge with a skip directive (`watch-merge.sh:21,143`). Such a
+feature is reported delivered once its merge is on the default branch, with the reason "no publication
+path", and the watch is not run.
 
 ### Skip-CI paths
 
@@ -279,9 +311,12 @@ keeps vh-adlc's authority rule: only on request or as part of acceptance.
 
 ### `covers` globs
 
-Feature-document lint accepts `**` with the meaning the docs-impact matcher already gives it, so one
-`covers` vocabulary serves both. The match code is shared, not copied, and existing documents without
-`**` keep their results.
+Feature-document lint accepts `**` with the meaning the docs-impact matcher
+(`plugins/vh-adlc/scripts/docs-impact/matching.ts`) already gives it, so one `covers` vocabulary serves
+both. `doc.MatchCovers` in `internal/doc/covers.go` gains the same semantics, and because
+`internal/fresh/fresh.go:189` uses it for review staleness and dirty-tree checks, a committed or
+uncommitted change under a `**` entry makes reviews stale and the feature tree dirty exactly as a plain
+entry does. Existing documents without `**` keep their results.
 
 ### Stackweaver adoption
 
@@ -296,9 +331,14 @@ Context, `issue: null`, full issue URLs, `AC-01` IDs, `file:line` citations in D
 internal docs keep the symbol-name rule. `/spec review` no longer moves a spec to `planned` by itself,
 and `/spec` and `/investigate` file issues only on request or with acceptance. A committed parity
 map, shaped like `tests/agent-audit/parity.json`, lists each legacy behavior with its legacy source
-excerpt hash, its new home and a contract test; a legacy rule with no row fails the test. The 58 specs
-under `docs/internal/plans/` with a non-terminal status (draft, planned, in-progress, blocked or parked)
-move to the shared format in one migration; terminal specs stay as written. The native agent files are retired only after the
+excerpt hash, its new home and a contract test; a legacy rule with no row fails the test. Draft specs under
+`docs/internal/plans/` (12 at `7861b9dc`) move to the shared format in one migration. The 43 planned or
+in-progress specs and 3 parked ones finish under the native loop, whose agent files stay in place for
+them. When the owner moves one over, it goes to `draft` under the standard's revision rule, its ticks,
+evidence and residuals reset (history stays in Git), any active writer hands it over first, and it needs
+a fresh independent review and the owner's acceptance before work resumes. The native spec, tasks,
+implement and reviewer agents retire once no non-terminal spec outside the domain-extension plans still
+uses the native format. Terminal specs stay as written. The native agent files are retired only after the
 published plugin is installed from the marketplace and exercised, and a rollback to them is rehearsed.
 
 ### Conflicts and their homes
@@ -320,42 +360,44 @@ published plugin is installed from the marketplace and exercised, and a rollback
 ## Acceptance Criteria
 
 - [ ] AC-01: A repository's `.vh-adlc/loop.yaml` names a route for each loop role, every SDD operation dispatches according to it, no vh-adlc agent or skill file names a model, and a repository without the file behaves as it does at `a7bfca99`.
-- [ ] AC-02: From a Claude Code session, a spec review and an implementation review run through a declared command route on `gpt-6.1-sol` against an exact commit with read-only tools; a matching reply is stored verbatim and passes `review check`, and a mismatched model, missing `MODEL:` line, non-zero exit or timeout leaves the review pending with no Review Log row.
+- [ ] AC-02: From a Claude Code session, a file-only spec review and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`; and a mismatched model or target, a missing header, a non-zero exit, a timeout or any change to the worktree's `HEAD` or status leaves the review pending with no Review Log row.
 - [ ] AC-03: Every SDD operation reads the declared project procedure and instruction files, and a spec review flags a document that contradicts a declared instruction file or lens.
 - [ ] AC-04: Implement and ship run each declared verification rung whose condition holds and report every rung as passed, failed or not run with a reason; with no rungs declared they keep the current command lookup.
-- [ ] AC-05: With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature is reported delivered only after that command exits 0.
-- [ ] AC-06: Feature-document lint accepts `covers` entries containing `**` and matches them as the docs-impact matcher does.
+- [ ] AC-05: With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, and a skip-marked feature is reported delivered with no publication path and no watch run.
+- [ ] AC-06: Feature-document lint accepts `covers` entries containing `**`, they match the same paths as the docs-impact matcher, and `vh-adlc fresh` treats a committed or uncommitted change under such an entry as covered.
 - [ ] AC-07: With `findings_document: always`, investigate writes its findings document, reports any duplicate analysis document or open issue it found, and ends with one of the three verdicts.
 - [ ] AC-08: Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` run the installed vh-adlc operations with Stackweaver's settings, and every row of the committed parity map passes its contract test.
-- [ ] AC-09: Every Stackweaver spec under `docs/internal/plans/` with a non-terminal status passes `vh-adlc lint`, and its gate results agree with a manual reading of the document.
+- [ ] AC-09: Every Stackweaver spec in the migration set (the draft specs, plus each planned, in-progress or parked spec the owner moved) passes `vh-adlc lint`, its gate results agree with a manual reading of the document, and each moved spec that was planned or in progress carries a fresh review and an owner acceptance row at its converted baseline.
 - [ ] AC-10: Stackweaver's local behaviors stay available with unchanged invocation: worktree slots, direct-to-main non-feature shipping through its own `/ship`, `[skip ci]` rules, `watch-merge.sh`, the triad and satellite lenses, the browser-pass summary table, and `/implement` handing straight to ship.
 - [ ] AC-11: A disposable Stackweaver checkout rolls back to the native loop and reapplies the adoption, with the docs index and unrelated workflow files byte-identical afterwards.
 - [ ] AC-12: The shared changes are installed from the published marketplace in an isolated profile and exercised through their entry points before Stackweaver's native agent files are retired.
-- [ ] AC-13: Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on another branch name, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops and changes nothing.
-- [ ] AC-14: A Stackweaver feature taken through the adopted loop and merged keeps every commit its Review Log names reachable from `main`, and its completion gate passes there.
+- [ ] AC-13: Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on another branch name, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops before writing anything, and when the push is rejected it keeps the local claim commit, creates no feature branch and reports the claim pending.
+- [ ] AC-14: A Stackweaver feature taken through the adopted loop passes its completion gate in its owning worktree before merge, and after it lands by merge commit every commit its Review Log names is reachable from `main`.
 - [ ] AC-15: With `skip_ci_paths` declared, a feature delivery whose commit, push range and PR diff touch only feature documents, Markdown onboarding files or declared paths carries the skip marker, and any other change in the delivery leaves it off.
 - [ ] AC-16: In Stackweaver, `/spec review` never moves a spec to `planned` without an owner acceptance row, and `/spec` and `/investigate` create no issue without an explicit request or accepted scope.
+- [ ] AC-17: Stackweaver's native spec, tasks, implement and reviewer agent files stay routable while any non-terminal spec outside the domain-extension plans uses the native format, and are retired only after none does.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | `bun test tests/vh-adlc` cases for each role and route kind, a no-file case compared with `a7bfca99` behavior, and a grep test that fails on a model name in any agent or skill file. |
-| AC-02 | A fixture repository with a stub command that returns a matching reply, a wrong model, no `MODEL:` line, exit 1 and a hang; then one real Copilot CLI `gpt-6.1-sol` spec review and one implementation review on a disposable feature, with transcripts and the stored records kept as evidence. |
+| AC-02 | A fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, and one that touches a file during review; then one real Copilot CLI `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
 | AC-03 | Fixture specs that break a declared instruction and a declared lens; the reviewer must return a finding for each and none for a compliant control. |
 | AC-04 | Fixture changes that match some rungs and not others; the report must list every rung with the right state, and a no-rung fixture must keep the current lookup. |
-| AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported) and a watch stub that exits 1 then 0 (delivered only after 0). |
-| AC-06 | Go tests in `internal/doc` for `**` at start, middle and end, compared with the docs-impact matcher on the same inputs, plus the existing lint suite unchanged. |
+| AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported), a watch stub that exits 1 then 0 (delivered only after 0), and a skip-eligible feature merge combined with Stackweaver's watch policy (delivered with no publication path, watch never invoked). |
+| AC-06 | Go tests in `internal/doc` for `**` at start, middle and end, compared with the docs-impact matcher on the same inputs; `internal/fresh` tests where a commit and a dirty file under a `**` entry make the review stale and `feature_tree_clean` false; the existing lint suite unchanged. |
 | AC-07 | Investigate fixtures with and without a duplicate analysis document and a duplicate open issue; the run must write the document and name the duplicate and the verdict. |
 | AC-08 | Stackweaver parity contract tests, plus one real run of each adapted command on a disposable Stackweaver feature, checking the operation reached and the settings read. |
-| AC-09 | `vh-adlc lint` and `vh-adlc gate` over the migration set, and a manual check of five specs chosen at random where the gate result is compared with the document. |
+| AC-09 | `vh-adlc lint` and `vh-adlc gate` over the migration set, a manual check of five specs chosen at random where the gate result is compared with the document, and for each moved planned or in-progress spec an inspection of its Review Log for a post-conversion review and acceptance row. |
 | AC-10 | A scripted check that each listed local behavior's entry point still exists and runs in dry-run or help mode, and a review of `agents/loop-project.md` against the parity map. |
 | AC-11 | The rollback and reapply procedure on a disposable checkout, comparing file hashes before and after. |
 | AC-12 | Isolated Claude Code profile install from the marketplace, payload digest check, and one spec review through the command route at the published revision. |
-| AC-13 | Fixture repositories with a detached worktree at the tip, a worktree on another branch at the tip, one behind the tip, one with a stray change, and a rejected push; only the first two claim, and the others leave the repository unchanged. |
-| AC-14 | One disposable Stackweaver feature taken from claim to merge by merge commit, then `vh-adlc fresh` and `vh-adlc gate complete` run on `main`. |
+| AC-13 | Fixture repositories with a detached worktree at the tip and a worktree on another branch at the tip (both claim); one behind the tip and one with a stray change (both leave the repository byte-identical); and a rejected push (one local claim commit, no feature branch, a pending report). |
+| AC-14 | One disposable Stackweaver feature taken from claim to merge: `vh-adlc gate complete` passes in the owning worktree before the PR merges, then `git merge-base --is-ancestor <commit> origin/main` holds for every Review Log commit after a merge-commit landing. |
 | AC-15 | Ship fixtures whose delivery touches only declared paths, declared paths plus code, and declared paths with an earlier code commit in the push range; only the first carries the marker. |
 | AC-16 | Stackweaver parity contract tests for the acceptance and issue rules, plus a disposable spec review run that ends with the spec still `draft` until an acceptance row exists. |
+| AC-17 | A scripted check over `docs/internal/plans/` that lists non-terminal native-format specs outside the domain-extension plans; while the list is non-empty the native command routes must resolve, and the retirement commit is refused unless it is empty. |
 
 ## Tasks
 
@@ -363,8 +405,8 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None. The owner answered Q1 to Q10 on 2026-11-13; the answers are folded into Owner summary, Scope and
-Design.
+None. The owner answered Q1 to Q10 and the three R-1 judgement findings (F-01, F-03, F-07) on
+2026-11-13; the answers are folded into Owner summary, Scope and Design.
 
 ## Review Log
 
