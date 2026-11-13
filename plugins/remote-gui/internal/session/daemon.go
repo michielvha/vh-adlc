@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 	"syscall"
@@ -56,7 +57,13 @@ func awaitRole(ctx context.Context, home, id, role string) (state.Record, error)
 	return state.Record{}, errors.New("daemon-ownership-record-unavailable")
 }
 
-func groupMembers(r state.Record) ([]state.Identity, error) {
+// sessionMembers returns the live processes in the guard's private session
+// other than the caller. The guard was started with setsid, so the session ID
+// is its PID. The caller must be the recorded guard or supervisor and belong to
+// that session; the ID then stays reserved while the caller lives, so every
+// process carrying it descends from the guard, whatever its process group. A
+// process that calls setsid itself leaves the session and is not found.
+func sessionMembers(r state.Record) ([]state.Identity, error) {
 	self, err := state.Inspect(os.Getpid())
 	if err != nil {
 		return nil, err
@@ -64,8 +71,8 @@ func groupMembers(r state.Record) ([]state.Identity, error) {
 	if !state.Equal(self, r.Guard) && !state.Equal(self, r.Supervisor) {
 		return nil, errors.New("controller-ownership-changed")
 	}
-	if self.Group != r.Guard.Group || self.Session != r.Guard.Session || r.Guard.Group != r.Guard.PID || r.Guard.Session != r.Guard.PID {
-		return nil, errors.New("private-process-group-not-owned")
+	if self.Session != r.Guard.PID || r.Guard.Session != r.Guard.PID {
+		return nil, errors.New("private-session-not-owned")
 	}
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
@@ -78,15 +85,39 @@ func groupMembers(r state.Record) ([]state.Identity, error) {
 			continue
 		}
 		id, err := state.Inspect(pid)
-		if err == nil && id.Group == self.Group && id.Session == self.Session {
+		if err == nil && id.Session == self.Session {
 			members = append(members, id)
 		}
 	}
 	return members, nil
 }
 
+// PrivateMembers returns the members of the guard's private session other than
+// the caller and the guard, or an error unless that session is provably the
+// caller's own.
+func PrivateMembers(r state.Record) ([]state.Identity, error) {
+	members, err := sessionMembers(r)
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(members, func(id state.Identity) bool { return state.Equal(id, r.Guard) }), nil
+}
+
+// settledMembers returns the session's members, and none only when two
+// enumerations a moment apart both find none: a member can fork and exit while
+// one enumeration runs, which hides its child. A chain that forks and exits
+// during every enumeration could still be missed.
+func settledMembers(r state.Record) ([]state.Identity, error) {
+	members, err := sessionMembers(r)
+	if err != nil || len(members) > 0 {
+		return members, err
+	}
+	time.Sleep(50 * time.Millisecond)
+	return sessionMembers(r)
+}
+
 func stopMembers(r state.Record) error {
-	members, err := groupMembers(r)
+	members, err := sessionMembers(r)
 	if err != nil {
 		return err
 	}
@@ -94,7 +125,7 @@ func stopMembers(r state.Record) error {
 		_ = state.Signal(id, syscall.SIGTERM)
 	}
 	for range 12 {
-		members, err = groupMembers(r)
+		members, err = settledMembers(r)
 		if err != nil {
 			return err
 		}
@@ -107,7 +138,7 @@ func stopMembers(r state.Record) error {
 		_ = state.Signal(id, syscall.SIGKILL)
 	}
 	for range 20 {
-		members, err = groupMembers(r)
+		members, err = settledMembers(r)
 		if err != nil {
 			return err
 		}

@@ -120,6 +120,10 @@ func TestRealHumanBrowserHandoff(t *testing.T) {
 	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
 		t.Skip("requires existing GUI dependencies and disposable browser processes")
 	}
+	// Stop drains helpers only inside a private session, as in production.
+	if !privateSession(t) {
+		return
+	}
 	c, id := setup(t)
 	c.BrowserMode = "human"
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -224,6 +228,10 @@ func renderers(t *testing.T, browser int) []state.Identity {
 func TestRealHandoffWaitsForStalledBrowserMenu(t *testing.T) {
 	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
 		t.Skip("requires existing GUI dependencies and disposable browser processes")
+	}
+	// Stop drains helpers only inside a private session, as in production.
+	if !privateSession(t) {
+		return
 	}
 	menus := &typedMenus{typed: make(chan struct{})}
 	original := openClipboard
@@ -340,6 +348,10 @@ func TestDisplayAllocationPreservesForeignLock(t *testing.T) {
 func TestRealHeadedBrowser(t *testing.T) {
 	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
 		t.Skip("set REMOTE_GUI_BROWSER_E2E=1 with existing host GUI dependencies")
+	}
+	// Stop drains helpers only inside a private session, as in production.
+	if !privateSession(t) {
+		return
 	}
 	c, id := setup(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
@@ -645,6 +657,10 @@ func (f *failingClear) Clear(ctx context.Context) error {
 func TestRealFailedClearRetriesIntoAgentMode(t *testing.T) {
 	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
 		t.Skip("requires existing GUI dependencies and disposable browser processes")
+	}
+	// Stop drains helpers only inside a private session, as in production.
+	if !privateSession(t) {
+		return
 	}
 	var double *failingClear
 	original := openClipboard
