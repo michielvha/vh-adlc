@@ -1,6 +1,6 @@
 // The external command route for the two reviewer roles (references/loop-settings.md,
 // references/review-protocol.md). It runs a reviewer CLI on one exact commit and decides whether its
-// reply may be stored. A file-only spec review reads a read-only `git archive` export of the commit
+// reply may be stored. A read-only spec review reads a read-only `git archive` export of the commit
 // and is launched from it; an implementation review runs in the owning worktree, which must be
 // unchanged afterwards outside the declared scratch directories. Every outcome that is not `ready`
 // is `pending`: nothing is stored.
