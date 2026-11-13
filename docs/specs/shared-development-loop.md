@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Back to draft on feat/shared-development-loop: the spec review route is read-only rather than file-only, after R-21 found the Codex spec reviewer can run read-only commands."
+status: planned
+status_description: "Accepted by the owner at R-22 with the spec review route called read-only; T57 and a fresh implementation review remain."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
@@ -786,6 +786,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-20 | spec | `cdfde05bbfd7391a4702a2cf171e5418a560611b` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-21 | implementation | `b44d2f58cfc411efe1c537b458b2231297848be6` | gpt-6.1-sol | procedural | Six criteria met, AC-02 not met, twelve not verified; seven should-fix findings. Ran in a private clone. |
 | 2026-11-13 | R-22 | spec | `df8ce7cf4aefb6850d7c72142ed7c3590263a180` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on the stale owner summary and T34's file-only wording. |
+| 2026-11-13 | R-22 | spec | `df8ce7cf4aefb6850d7c72142ed7c3590263a180` | n/a | n/a | accepted by owner |
 
 ### R-1
 
