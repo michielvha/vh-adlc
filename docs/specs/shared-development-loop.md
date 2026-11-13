@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Back to draft on feat/shared-development-loop to prove the real review route through the Codex CLI, which Stackweaver now uses; waiting for a review and the owner's re-acceptance."
+status: planned
+status_description: "Re-accepted by the owner at R-18 after the Codex, attestation, sandbox and policy-source revisions."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
