@@ -516,6 +516,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-4 | spec | `b777df0b6cc97a2d8b1410f3bedc73631ab504f5` | gpt-6.1-sol | procedural | Two blocking findings: routing criteria contradict for terminal documents; no-publication verdict not tied to the merge commit. Three should-fix. |
 | 2026-11-13 | R-5 | spec | `4f970d4d18078e7c3edbc81db9d941fbfb6116a1` | gpt-6.1-sol | procedural | One blocking finding: the release order needs a post-merge lock commit outside the single-feature lifecycle. Two should-fix. |
 | 2026-11-13 | R-6 | spec | `db426cbbe13abd8675d4365ad23903e59b94b7c0` | gpt-6.1-sol | procedural | No blocking findings; four should-fix on freshness wording, signed release verification, covers and assume-unchanged files. |
+| 2026-11-13 | R-7 | spec | `1ae2a34e436fb057e4fe2793a04147143c539af1` | gpt-6.1-sol | procedural | No blocking findings; three should-fix on the moved Stackweaver checkout, merges with no publication workflow, and the post-merge verification range. |
 
 ### R-1
 
@@ -731,6 +732,29 @@ SEVERITY: should-fix
 WHERE: Frontmatter / covers
 EVIDENCE: The release inventory and AC-12 depend directly on .goreleaser.yml, .github/workflows/ci.yml and .github/workflows/release.yml, while Order step 2 depends on plugins/vh-adlc/scripts/ensure-vh-adlc.sh. None appears in covers. The pinned conventions/feature-documents.md requires covering every path whose change can affect the feature, and internal/fresh/fresh.go:186-195 excludes uncovered paths from review-freshness comparisons.
 PROPOSAL: Add these release and verification inputs to covers, together with the marketplace manifests named as publication inputs. Ensure changes to those inputs invalidate the corresponding reviewed release proof.
+
+### R-7
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Background; Design / Comparison baseline
+EVIDENCE: The supplied Stackweaver checkout is no longer at dbd4d7a4. /home/m/code/stackweaver/.git/HEAD names refs/heads/main, whose file contains 0271650330e79e98acbad8aa58e6470b4d06996c. Its HEAD reflog ends with a fast-forward from dbd4d7a4 to that commit for docs/tfe-destroy-delete-parity-spec. I cannot run Git to establish the complete difference from the cited baseline, or execute vh-adlc to reproduce the document's binary results.
+PROPOSAL: Provide a stable read-only snapshot at the supplied Stackweaver revision, or establish the intervening file differences before counting this review as verification of its baseline claims. Recheck the migration inventory against the selected adoption head.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Verification rungs, CI policy and post-merge watch; AC-05 and its Test Plan
+EVIDENCE: Design says Stackweaver's tag workflow runs on every push to main and sends every unmarked merge through the watcher. Stackweaver .github/workflows/tag.yml:9-18 instead path-ignores Markdown and docs. sync-frontend.yml:13-14 excludes docs/internal/, and the other inspected sync triggers do not select agents/*.md. An unmarked merge changing only agents/spec.md and its internal feature document therefore has no automatic publication path. scripts/release/watch-merge.sh:188-191 exits 1 when a path-ignored merge has no push-triggered sync. The specified unmarked-merge test checks only that the watcher is invoked, so it misses this delivery dead end. This follows from reading the workflows and script; Git and binary execution are unavailable.
+PROPOSAL: Distinguish unmarked publishing merges from merges whose paths trigger no publication workflow. Add the latter scenario and obtain the owner's decision on whether it receives a verified no-publication verdict or an explicit policy-blocked result with a recovery procedure.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Verification rungs; AC-04 and its Test Plan
+EVIDENCE: Rung applicability is calculated from the feature branch against its merge base with the default branch, while applicable rungs must pass again before delivery and earlier-commit results cannot count for a new commit. After the feature lands and the default branch is fetched, the feature tip is its ancestor, so that comparison no longer contains the feature's changed paths. Backend, UX and engine-sensitive rungs can consequently become inapplicable during the delivery check, even though the merge created a new commit. The Test Plan covers earlier feature commits but not this post-merge collapse of the comparison range. I cannot execute the Git scenario.
+PROPOSAL: Preserve an explicit feature-delta identity through delivery and define which commit the final verification establishes, such as the actual merge commit against its first parent. Add a merged-feature scenario proving that mandatory path-conditioned rungs cannot disappear when the default branch advances to contain the feature.
 
 ## Sources
 
