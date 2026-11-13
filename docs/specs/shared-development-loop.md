@@ -661,6 +661,8 @@ Shared vh-adlc work, on the feature branch:
 - [ ] T37 `tests/vh-adlc/loop/review-route.test.ts`, `plugins/vh-adlc/scripts/loop/review-route.ts` - files inside ignored directories outside `review_scratch` are content-hashed, not compared by size and modification time; a fixture that swaps a file for same-size content with its original modification time stays pending (AC-02)
 - [ ] T38 `tests/vh-adlc/loop/review-route.test.ts`, `plugins/vh-adlc/scripts/loop/cli.ts`, `plugins/vh-adlc/scripts/loop/settings.ts` - the review policy (route, instruction files, lenses) is read from `loop.yaml` at the dispatched commit; a fixture that edits the live file after committing still gets the committed policy (AC-02)
 - [ ] T39 `tests/vh-adlc/loop/review-route.test.ts`, `plugins/vh-adlc/scripts/loop/review-route.ts` - export symlink containment follows intermediate links; a chained `d/back -> ..`, `leak -> d/back/../outside.txt` export stays pending (AC-02)
+- [ ] T40 `tests/vh-adlc/loop/owned-process.test.ts`, `tests/vh-adlc/loop/review-route.test.ts`, `plugins/vh-adlc/scripts/triage/owned-process.ts` - cleanup also stops a detached helper that cleared its environment, through an ownership boundary that survives that, and leaves the review pending when it cannot confirm termination; success and timeout fixtures with such a helper (AC-02, R-18 F-01)
+- [ ] T41 `tests/vh-adlc/loop/review-route.test.ts`, `plugins/vh-adlc/scripts/loop/review-route.ts` - the preservation snapshot includes HEAD's symbolic target or detached state; a reviewer that detaches HEAD at the same commit leaves the review pending (AC-02, R-18 F-02)
 Stackweaver adoption, on a Stackweaver feature branch against the candidate plugin:
 
 - [ ] T25 Stackweaver `tests/agent-loop/parity.json` - one row per legacy behavior of `agents/spec.md`, `tasks.md`, `implement.md`, `ship.md`, `investigate.md`, `reviewer.md` and the loop rules in `CLAUDE.md` and `AGENTS.md`, with excerpt hashes, home and contract; the schema test fails on an unmapped legacy rule (AC-08, AC-10)
@@ -704,6 +706,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-15 | spec | `e2e3de959b09950f8c9d17dbf1a74413523af7ea` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-16 | spec | `236200bd18f7f23a23172f5a3e7ea107d44ff872` | gpt-6.1-sol | procedural | One blocking finding: the Codex implementation reviewer's writable sandbox conflicts with Stackweaver's read-only review rule. Four should-fix. A Codex attempt before it stayed pending on MODEL: unknown and is not recorded. |
 | 2026-11-13 | R-17 | spec | `0c6a7402a82142997f27e4c535ebd7b71c5f711f` | gpt-6.1-sol | procedural | One blocking finding: review policy is read from the live loop.yaml rather than the dispatched commit. One should-fix on chained symlinks escaping the export. |
+| 2026-11-13 | R-18 | spec | `ec582dcf7e43c0d83b5dd6fb953f0c83f799b785` | gpt-6.1-sol | procedural | No blocking findings; three should-fix: environment-clearing detached helpers, a detached HEAD at the same commit, and duplicate search across Stackweaver's findings homes. |
 
 ### R-1
 
@@ -1158,6 +1161,29 @@ SEVERITY: should-fix
 WHERE: Acceptance notes; Tasks / T7; Design / External command route
 EVIDENCE: T7 claims export symlink containment is implemented, but plugins/vh-adlc/scripts/loop/review-route.ts:103-107 checks targets with lexical resolve(), without following intermediate symlinks. With committed links d/back -> .. and leak -> d/back/../outside.txt, both lexical targets remain inside the export, while opening leak reaches outside.txt in the export's parent. The direct escaping-symlink fixture does not cover this case, so live content can still enter the supposedly committed-only review. I cannot execute the Git or reviewer fixture; this counterexample follows from the path-resolution code.
 PROPOSAL: Check fully resolved symlink destinations, including intermediate links, and leave the review pending when containment cannot be established. Add the chained-link case before treating T7's containment claim as proved.
+
+### R-18
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / External command route; Tasks / T6; AC-02 Test Plan
+EVIDENCE: Design promises that no reviewer helper outlives the final preservation check, and T6 claims detached-descendant cleanup is complete. plugins/vh-adlc/scripts/triage/owned-process.ts identifies escaped descendants solely through an inherited environment marker. A helper launched with a cleared environment into a new session is outside both detection mechanisms; cleanup can report confirmed while that helper remains able to write after the snapshot. The fixtures retain the marker. Process fixtures, Git and vh-adlc cannot be executed with the available tools; this counterexample follows from reading the cleanup code.
+PROPOSAL: Add successful-exit and timeout fixtures whose detached helper clears its environment. Establish cleanup through an ownership boundary that survives environment clearing, and leave the review pending when termination cannot be confirmed.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / External command route; Tasks / T7; AC-02 Test Plan
+EVIDENCE: AC-02 rejects changes to the owning worktree's HEAD, but plugins/vh-adlc/scripts/loop/review-route.ts:70-88 snapshots only HEAD's resolved commit and refs' resolved object IDs. A reviewer executing git switch --detach HEAD changes the checkout's branch attachment without changing those values, status, index entries or file contents. The route can therefore accept a review after changing the owning checkout. The preservation fixtures do not cover this case. Git and vh-adlc execution are unavailable; this follows from reading the snapshot fields.
+PROPOSAL: Include HEAD's symbolic target or detached state in the preservation identity. Add a fixture that detaches HEAD at the same commit and require a pending outcome with no stored review.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Investigation defaults; AC-07 and its Test Plan
+EVIDENCE: Stackweaver agents/investigate.md:50-51 searches all of docs/internal/ and extends an existing covering document. CLAUDE.md:297 names analysis, bug-report, research and plan homes. The proposed search covers only analysis documents and open issues; plugins/vh-adlc/scripts/loop/investigate.ts likewise searches only analysis_dir. An already documented defect under docs/internal/bug-reports/ without an open issue can consequently acquire a second analysis document while every AC-07 scenario passes. This narrows a native capability despite the stated parity requirement.
+PROPOSAL: Preserve duplicate discovery across Stackweaver's existing findings homes, independently of the destination for new investigations. Add a covering bug-report or research-document scenario that reuses the existing artifact rather than creating another.
 
 ## Sources
 
