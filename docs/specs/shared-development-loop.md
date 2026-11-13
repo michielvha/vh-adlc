@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-6 and R-7 had no blocking findings; their should-fix items are applied and answered. Waiting for a confirming review, then owner acceptance."
+status_description: "R-8 findings applied and answered by the owner; waiting for a confirming review, then owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
@@ -100,8 +100,10 @@ flags. R-5 led to an Order list after completion, the way `host-cleanup.md` deli
 lock PR, and to the reviewer worktree check catching new ignored files. R-6 found nothing blocking; its
 should-fix items tightened the freshness wording, the signed release check, `covers` and flagged tracked
 files. R-7 found nothing blocking either; it settled that a merge with no workflow run counts as having no
-publication path, and that the final check runs on the merge commit. A confirming review pass is next,
-then acceptance. Accepting this
+publication path, and that the final check runs on the merge commit. R-8 showed the first of those was
+unsafe, so an unmarked merge now always runs the watch, verification rungs trigger only by path, and
+feature PRs land by merge commit only when rungs or a watch are declared. A confirming review pass is
+next, then acceptance. Accepting this
 document authorizes implementation of the accepted scope on a feature branch. Publishing the vh-adlc
 release, merging either repository and retiring the native agents each still need their own approval.
 
@@ -137,9 +139,9 @@ returns `malformed` with `review-log-header`, `test-plan-header` and one `covers
 per `**` entry (binary 0.9.0; the same check is `internal/doc/lint.go:69` at `a7bfca99`). Stackweaver
 writes criteria as `AC1`. The rules block matches only `AC-\d{2,}`, so those lines are invisible to the
 binary, and a scratch repository showed `test_plan_complete` passing with a criterion that had no Test
-Plan row. `vh-adlc find --slug` does locate Stackweaver specs in category subfolders. 55 plan documents
-under `docs/internal/plans/` carry a non-terminal status and 48 have a Review Log
-(`git grep -l` at `7861b9dc`).
+Plan row. `vh-adlc find --slug` does locate Stackweaver specs in category subfolders. 58 plan documents
+under `docs/internal/plans/` carry a non-terminal status (12 draft, 15 planned, 28 in-progress, 3
+parked; 55 without the parked ones) and 48 have a Review Log (`git grep -l` at `7861b9dc`).
 
 Worktrees. `skills/vh-adlc-implement/SKILL.md:56-57,69-72` claims from a worktree holding the default
 branch, then runs `git switch -c` in it, and otherwise stops without creating a worktree. Stackweaver's
@@ -189,7 +191,8 @@ Out of scope:
 
 ### Comparison baseline
 
-Two read-only comparison passes at Stackweaver `7861b9dc` and vh-adlc `a7bfca99` (plugin 0.16.1,
+Two read-only comparison passes over Stackweaver (labelled `20e38a94` in their output; `7861b9dc`
+changes only the model lines, which the parity document flags) and vh-adlc `a7bfca99` (plugin 0.16.1,
 binary lock 0.19.0) mapped each native behavior to its vh-adlc counterpart. The authoring, review and
 investigation slice has 62 rows; the tasks, implement, ship and resume slice has 58. The full row tables
 are kept in Stackweaver as an internal analysis document. Task T1 turns them into a committed parity
@@ -298,7 +301,10 @@ claim needs, and the live, bind-mounted main checkout is never switched.
 
 ### Feature PR history
 
-Feature PRs land by merge commit or fast-forward, as the delivery convention requires. Follow-ups on a
+Feature PRs land by merge commit or fast-forward, as the delivery convention allows. When a repository
+declares verification rungs or a post-merge watch, feature PRs land by merge commit only, because the
+final delivery check reads the merge commit against its first parent, and a fast-forward of several
+commits would leave earlier feature commits outside that range. Stackweaver declares both. Follow-ups on a
 feature branch are new commits, and drift from the default branch is merged in, never rebased, so every
 commit a Review Log row names stays reachable. Stackweaver's project procedure and `CLAUDE.md` change
 to match for features: the amend, force-push and rebase-onto-`origin/main` guidance (Stackweaver
@@ -318,7 +324,8 @@ checking every execution path. The procedure stays local; the hook is shared.
 ### Verification rungs, CI policy and post-merge watch
 
 `loop.yaml` may declare verification rungs, each with a command or written procedure and a condition: a
-changed-path glob, a criterion kind, or always. A path condition is evaluated over the whole feature
+changed-path glob or always. Rungs do not depend on classifying criteria, so none can be skipped by a
+missing classification. A path condition is evaluated over the whole feature
 delta: the feature branch against its merge base with the default branch, plus uncommitted changes the
 feature owns. A passing result counts only for the exact commit it ran on, so a new commit needs the
 rung again. After the merge, the final check before the feature is reported delivered evaluates the
@@ -328,9 +335,10 @@ and report each as passed, failed or not run with a reason. Every applicable run
 branch is pushed, and again before the feature is marked complete or reported delivered, matching
 Stackweaver's rules to verify fully before any push (Stackweaver `CLAUDE.md:153`) and never to ship over
 a known failure (`agents/ship.md:136-137`). A failed rung blocks all three. A rung that could not run
-blocks them too, unless the owner allows that exact rung for that run, which the report records. Stackweaver declares `make verify`,
-`make test-integration` for `backend/` and `core/`, the kind harness for E2E specs, a browser pass with
-the summary table for UX paths, and both engines for engine-sensitive paths. Without rungs, the current
+blocks them too, unless the owner allows that exact rung for that run, which the report records. Stackweaver declares `make verify` always,
+`make test-integration` for `backend/` and `core/`, the kind harness for `e2e/`, `deploy/` and
+`frontend/nginx.conf`, a browser pass with the summary table for `frontend/src/`, and both engines for
+the engine-sensitive paths its project procedure lists. Without rungs, the current
 behavior stays: read commands from `AGENTS.md`, ask if none.
 
 A declared `ci_trigger: manual` makes ship report CI as not triggered by policy instead of waiting for
@@ -342,12 +350,12 @@ workflow runs on every push to `main` and `watch-merge.sh:143` reads the merge c
 When a delivery qualifies for the skip marker, the authorized merge uses a merge commit message that
 carries it. After the merge, ship reads the actual merge commit: if its message carries the marker and
 its diff against the first parent touches only skip-eligible paths, the feature is reported delivered
-with the reason "no publication path" and the watch is not run. A merge commit without the marker whose diff
-also touches only skip-eligible paths can still trigger nothing, since Stackweaver's tag workflow
-path-ignores Markdown and `docs/` (`.github/workflows/tag.yml:9-18`) and `watch-merge.sh:188-191` fails
-when no sync follows. For such a merge, ship asks GitHub for push-triggered workflow runs on that exact
-commit; when there are none, the feature is reported delivered with "no publication path" and the watch
-is not run. Every other merge commit runs the watch like any publishing merge.
+with the reason "no publication path" and the watch is not run. Every merge commit without the marker runs the watch like any publishing merge,
+since a run can appear some time after the push (`watch-merge.sh:29-30,78-88`). An unmarked merge can
+still trigger nothing, because Stackweaver's tag workflow path-ignores Markdown and `docs/`
+(`.github/workflows/tag.yml:9-18`) and `watch-merge.sh:188-191` then fails when no sync follows. When
+the watch fails for that reason alone, ship reports the feature blocked with that reason and the merge
+commit, and the owner confirms delivery by hand; ship never reports it delivered by itself.
 
 ### Skip-CI paths
 
@@ -466,8 +474,8 @@ published plugin is installed from the marketplace and exercised, and a rollback
 - [ ] AC-01: A repository's `.vh-adlc/loop.yaml` names a route for each loop role, every SDD operation dispatches according to it, a `command` route is accepted only for the two reviewer roles, no vh-adlc agent or skill file names a model, and a repository without the file behaves as it does at `a7bfca99`.
 - [ ] AC-02: From a Claude Code session, a file-only spec review and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`; and a mismatched model or target, a missing header, a non-zero exit, a timeout or any change outside the declared `review_scratch` directories to the worktree's `HEAD`, index entries, refs, status, file contents or ignored-file list leaves the review pending with no Review Log row.
 - [ ] AC-03: Every SDD operation reads the declared project procedure and instruction files, and a spec review flags a document that contradicts a declared instruction file or lens.
-- [ ] AC-04: Implement and ship run each declared verification rung whose condition holds over the whole feature delta and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
-- [ ] AC-05: With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, and a feature whose actual merge commit carries the skip marker and touches only skip-eligible paths is reported delivered with no publication path and no watch run, an unmarked merge commit touching only skip-eligible paths with no push-triggered workflow run is reported the same way, and every other merge commit runs the watch.
+- [ ] AC-04: Implement and ship run each declared verification rung whose path condition holds over the whole feature delta, or that is declared always, and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
+- [ ] AC-05: With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, a feature whose actual merge commit carries the skip marker and touches only skip-eligible paths is reported delivered with no publication path and no watch run, every unmarked merge commit runs the watch, and a watch that fails only because no workflow ran leaves the feature reported blocked, not delivered.
 - [ ] AC-06: Feature-document lint accepts `covers` entries containing `**`, they match the same paths as the docs-impact matcher, and under such an entry a committed change makes the applicable review stale while an uncommitted change makes `feature_tree_clean` false, as for a plain entry.
 - [ ] AC-07: With `findings_document: always`, investigate writes its findings document, reports any duplicate analysis document or open issue it found, and ends with one of the three verdicts.
 - [ ] AC-08: Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` run the installed vh-adlc operations with Stackweaver's settings for every enrolled spec and, until the native agents retire, the native agents for every unenrolled one (after retirement, AC-17's refusal applies to terminal unenrolled documents), new specs are written enrolled, and every row of the committed parity map passes its contract test.
@@ -489,8 +497,8 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | AC-01 | `bun test tests/vh-adlc` cases for each supported role and route pair, refusal of a `command` route for `author` and `implementer`, resume taking the continued operation's route, a no-file case compared with `a7bfca99` behavior, and a grep test that fails on a model name in any agent or skill file. |
 | AC-02 | A fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, one that creates or moves a non-current branch or tag, one that overwrites an existing ignored configuration file, one that creates a new ignored file outside `review_scratch`, one that overwrites a tracked file already flagged assume-unchanged without changing the flag, one that writes only inside `review_scratch` (stored), and one that changes an index flag without changing the index tree; then one real Copilot CLI `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
 | AC-03 | Fixture specs that break a declared instruction and a declared lens; the reviewer must return a finding for each and none for a compliant control. |
-| AC-04 | Fixture changes that match some rungs and not others; a feature whose first commit changes `backend/` and whose last changes only documentation must still require the integration rung before push and completion; a pass recorded on an earlier commit must not count for a later one; after a merge, the delivery check over the merge commit against its first parent must still require the `backend/` rung once the default branch contains the feature; the report must list every rung with the right state; a failing command must leave no push, no completion commit and no delivered report even when an owner allowance is recorded; an unavailable procedure must do the same unless the owner allowance is recorded for that exact rung, and with it must proceed; a no-rung fixture must keep the current lookup. |
-| AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported), a watch stub that exits 1 then 0 (delivered only after 0), a skip-eligible feature merged with a marked merge commit (delivered with no publication path, watch never invoked), the same feature merged with an unmarked merge commit that triggered no workflow run (delivered with no publication path, watch never invoked), and an unmarked merge commit that did trigger a run (watch invoked). |
+| AC-04 | Fixture changes that match some rungs and not others; a feature whose first commit changes `backend/` and whose last changes only documentation must still require the integration rung before push and completion; a pass recorded on an earlier commit must not count for a later one; after a merge, the delivery check over the merge commit against its first parent must still require the `backend/` rung once the default branch contains the feature; with rungs declared, a fast-forward landing of a feature whose earlier commit changed `backend/` must be refused; the report must list every rung with the right state; a failing command must leave no push, no completion commit and no delivered report even when an owner allowance is recorded; an unavailable procedure must do the same unless the owner allowance is recorded for that exact rung, and with it must proceed; a no-rung fixture must keep the current lookup. |
+| AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported), a watch stub that exits 1 then 0 (delivered only after 0), a skip-eligible feature merged with a marked merge commit (delivered with no publication path, watch never invoked), the same feature merged with an unmarked merge commit (watch invoked); a watch stub that fails because no workflow ran (reported blocked, never delivered); and a run that appears only after a delay (watch waits, no early verdict). |
 | AC-06 | Go tests in `internal/doc` for `**` at start, middle and end, compared with the docs-impact matcher on the same inputs; `internal/fresh` tests where a commit under a `**` entry makes the review stale, and separately a dirty file under it makes `feature_tree_clean` false without staling the review; the existing lint suite unchanged. |
 | AC-07 | Investigate fixtures with and without a duplicate analysis document and a duplicate open issue; the run must write the document and name the duplicate and the verdict. |
 | AC-08 | Stackweaver parity contract tests; one real run of each adapted command on a disposable enrolled feature, checking the operation reached and the settings read; and, before retirement, the same commands on a disposable unenrolled spec, which must reach the native agents through a native re-review and completion. Post-retirement refusal is tested under AC-17. |
@@ -513,7 +521,8 @@ None yet; written once the document is planned.
 
 None. The owner answered Q1 to Q10, the three R-1 judgement findings (F-01, F-03, F-07) and the
 three R-2 judgement findings (F-02, F-03, F-04) the two R-3 judgement findings (F-01, F-04) the three
-R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, F-02) the R-6 judgement finding (F-01) and the R-7 findings F-02 and F-03 on 2026-11-13; the answers are folded into Owner summary, Scope and Design.
+R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, F-02) the R-6 judgement finding (F-01), the R-7 findings F-02 and F-03, and the R-8 judgement findings
+(F-01, F-03) on 2026-11-13; the answers are folded into Owner summary, Scope and Design.
 
 ## Review Log
 
