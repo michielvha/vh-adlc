@@ -309,3 +309,45 @@ func TestDefaultBranch(t *testing.T) {
 		})
 	}
 }
+
+// TestDoubleStarCovers: a committed change under a covers entry with ** stales the review, and an
+// uncommitted one makes the feature tree dirty without staling it, exactly as a plain entry does.
+func TestDoubleStarCovers(t *testing.T) {
+	t.Run("committed change stales the review", func(t *testing.T) {
+		f := newFixture(t, false)
+		f.edit("  - src/\n", "  - src/**/*.go\n")
+		f.repo.Commit("double-star covers")
+		f.reviewed()
+		f.repo.Write("src/deep/b.go", "package deep\n")
+		f.repo.Commit("covered change")
+		res, _ := f.compute()
+		if !res.SpecReview.Stale {
+			t.Fatalf("spec review = %+v, want stale after a committed change under src/**/*.go", res.SpecReview)
+		}
+	})
+	t.Run("uncommitted change dirties the tree only", func(t *testing.T) {
+		f := newFixture(t, false)
+		f.edit("  - src/\n", "  - src/**/*.go\n")
+		f.repo.Commit("double-star covers")
+		f.reviewed()
+		f.repo.Write("src/deep/c.go", "package deep\n")
+		res, _ := f.compute()
+		if res.SpecReview.Stale {
+			t.Fatalf("spec review = %+v, want fresh with only an uncommitted change", res.SpecReview)
+		}
+		if res.FeatureTree.Clean || !slices.Equal(res.FeatureTree.Paths, []string{"src/deep/c.go"}) {
+			t.Fatalf("feature tree = %+v, want dirty with src/deep/c.go", res.FeatureTree)
+		}
+	})
+	t.Run("an untracked covered file with a newline in its name dirties the tree", func(t *testing.T) {
+		f := newFixture(t, false)
+		f.edit("  - src/\n", "  - src/**\n")
+		f.repo.Commit("double-star covers")
+		f.reviewed()
+		f.repo.Write("src/\nfile.go", "package src\n")
+		res, _ := f.compute()
+		if res.FeatureTree.Clean || !slices.Equal(res.FeatureTree.Paths, []string{"src/\nfile.go"}) {
+			t.Fatalf("feature tree = %+v, want dirty with src/\\nfile.go", res.FeatureTree)
+		}
+	})
+}

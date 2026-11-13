@@ -35,7 +35,9 @@ plugin pin. If any of these is missing, return a single finding saying which, an
 ## A spec review
 
 Verify every factual claim in the document against the tree, the cited sources and the pinned
-conventions. Check any Owner summary against the detailed scope, defaults, permission limits, decisions and proof.
+conventions. When the dispatch lists repository instructions, read them too: a document that
+contradicts them gets a finding, and a needed change to them is raised as a judgement finding for an
+Open Question, never assumed. Apply each declared lens the dispatch lists as a check at its severity. Check any Owner summary against the detailed scope, defaults, permission limits, decisions and proof.
 Return a finding for a material contradiction, omission or unsupported result. A historical document
 without that subsection stays eligible; its absence alone is not a format failure.
 Then attack the design and the criteria: what does the artifact look like when every box is
@@ -54,6 +56,7 @@ Then add finding records for any defect you found.
 
 Start with one line, `MODEL: <id>`, giving the exact model ID your system prompt says you run on, or
 `MODEL: unknown` if it names none. The dispatching session cannot see which model ran, so it records this
-line. After it, return only records, in the standard's formats and nothing else. Write their text plainly,
+line. When the dispatch asks for a TARGET line, give `TARGET: <commit>` on the next line, with the exact
+commit you reviewed. After that, return only records, in the standard's formats and nothing else. Write their text plainly,
 as `guides/humanize-prose.md` at the revision asks, with no em dashes or en dashes; your records are
 stored exactly as you return them.

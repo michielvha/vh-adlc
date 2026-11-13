@@ -15,6 +15,16 @@ with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
 Input: a feature document, its issue, or its slug, and optionally the model to review with. Follow
 `references/loop.md`, `references/authority.md` and `references/review-protocol.md`.
 
+## Loop routes
+
+This operation's loop role and route come from `.vh-adlc/loop.yaml` through
+`bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
+host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
+files and its project procedure, whose local rules apply alongside this procedure. A reviewer role's `command` route runs through `bun scripts/loop/cli.ts review` in place
+of the host dispatch described below, as `references/review-protocol.md` (Routes) describes: a `ready`
+outcome is stored like a host reviewer's records, and a `pending` outcome leaves the review pending. A
+`host` route that names a model dispatches with it as a requested model.
+
 ## Start
 
 1. Get the binary and run `vh-adlc knowledge` with `conventions/feature-documents.md`,
