@@ -211,6 +211,16 @@ test.each(["generation-passed", "generation-failed", "generation-mutates"])("dec
     expect(() => readCandidateVerificationArtifacts({ ...options, reference: { ...result.evidence!, sha256: sha256(changedVector) } }))
       .toThrow("configured generation vector changed");
     payload.commands[0].argv = ["node", "scripts/generate.js"];
+    payload.commands[1].argv = ["node", "scripts/unapproved-check.js"];
+    const changedVerification = canonicalJSON(payload); writeFileSync(result.record_path!, changedVerification);
+    expect(() => readCandidateVerificationArtifacts({ ...options, reference: { ...result.evidence!, sha256: sha256(changedVerification) } }))
+      .toThrow("configured verification vector changed");
+    payload.commands[1].argv = ["node", "scripts/check.js"];
+    const start = payload.commands[0].start; payload.commands[0].start = null;
+    const missingGenerationStart = canonicalJSON(payload); writeFileSync(result.record_path!, missingGenerationStart);
+    expect(() => readCandidateVerificationArtifacts({ ...options, reference: { ...result.evidence!, sha256: sha256(missingGenerationStart) } }))
+      .toThrow("original generation start and completion required");
+    payload.commands[0].start = start;
     payload.commands = payload.commands.slice(1);
     const bytes = canonicalJSON(payload); writeFileSync(result.record_path!, bytes);
     expect(() => readCandidateVerificationArtifacts({ ...options, reference: { ...result.evidence!, sha256: sha256(bytes) } }))

@@ -19,6 +19,7 @@ type PublicationInputs = {
 export async function collectPublicationInputs(input: {
   repo: string; source: string; candidate_repo: string; candidate: string; selection: unknown; resolution_record?: { path: string; sha256: string };
   artifact_root: string; owner: string; run: string; credential: string; path?: string;
+  protection_context?: Parameters<typeof inspectCandidate>[0]["protection_context"];
   object_store?: OwnedObjectStore; cache_directory: string; entry: "hosted" | "copilot" | "claude"; launcher_path: string; settings_path: string;
 }): Promise<PublicationInputs> {
   const options = { ...input, object_store: input.object_store ? { ...input.object_store } : undefined, selection: structuredClone(input.selection), resolution_record: structuredClone(input.resolution_record), path: input.path ?? process.env.PATH };
@@ -32,7 +33,7 @@ export async function collectPublicationInputs(input: {
     externalArtifactDirectory(options.cache_directory, repo);
     externalArtifactDirectory(options.cache_directory, candidateRepo);
     result.candidate = inspectCandidate({ repo, source: options.source, selection: options.selection, candidate_repo: candidateRepo, candidate: options.candidate,
-      resolution_record: options.resolution_record, object_store: options.object_store, artifact_root: root, owner: options.owner, run: options.run });
+      resolution_record: options.resolution_record, protection_context: options.protection_context, object_store: options.object_store, artifact_root: root, owner: options.owner, run: options.run });
     if (!result.candidate.complete) { result.diagnostics.push(...result.candidate.diagnostics); throw Error("Committed publication candidate incomplete"); }
     const { settings } = loadCommittedSettings(repo, options.source);
     const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });

@@ -38,6 +38,8 @@ export function mapGitBlobs<T>(repo: string, objects: ReadonlyArray<{ oid: strin
   for (let start = 0; start < requested.length;) {
     const first = requested[start];
     if (first.size + 128 > limit) {
+      const metadata = readGitWithEnvironment(repo, ["cat-file", "--batch-check"], { PATH: process.env.PATH }, Buffer.from(first.oid + "\n"));
+      if (!metadata.equals(Buffer.from(first.oid + " blob " + first.size + "\n"))) throw Error("Git blob batch framing");
       const bytes = readGit(repo, "cat-file", "blob", first.oid);
       if (bytes.length !== first.size) throw Error("Git blob batch framing");
       result.push(map(bytes, start++)); continue;

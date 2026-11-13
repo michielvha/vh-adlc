@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { readCoordinatedSelection } from "./coordination";
 import { collectNativeRetained } from "./retained-controller";
 import { checkClosurePublication, publishClosure, resumeClosure } from "./closure-controller";
 import { collectClosureWorkerInputs, collectClosureReviewTarget, collectClosureReview, closureReviewTargetProjection, closureReviewProjection } from "./closure-worker";
@@ -275,6 +276,11 @@ its separate effect grants and fresh publication checks. Closure publication and
 require the exact retained executing controller, original native roles and actual
 scoped authority. Original native journals bind same-operation recovery. The publisher
 rechecks exact own effects, fresh source and current permission before each action.
+Local edit/candidate commands accept an optional --coordination <relative-record>
+with --coordination-sha256 <sha256>. The record binds an original current-owner
+request to the exact source and selected actions. Claimed feature documents remain
+protected. Worker and publication commands reopen coordination through their
+original bound decision packet; a loose command option cannot grant it.
 Verification, review and publication follow their own fresh owned-checkout gates.
 `;
 
@@ -290,6 +296,7 @@ const publicationCommands = ["bind-publication", "collect-review-target", "read-
 const candidateCommands = ["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", ...publicationCommands];
 const closureEffectCommands = ["check-closure-publication", "publish-closure", "resume-closure"];
 const closureRoleCommands = ["collect-closure-worker-inputs", "collect-closure-review-target", "read-closure-review", ...closureEffectCommands];
+const coordinationCommands = ["check-edits", "prepare", "check-candidate", "verify-candidate", "check-verification", "collect-publication-inputs"];
 const selectionCommands = [...closureRoleCommands, "check-edits", "prepare", "collect-resolution", "collect-closure", "collect-closure-target", ...candidateCommands];
 
 function argumentsForCommand(argv: string[]) {
@@ -304,6 +311,7 @@ function argumentsForCommand(argv: string[]) {
   if (["acknowledge-delivery", "reconcile-publication"].includes(command)) flags.push("--authority", "--authority-sha256");
   if ([...selectionCommands, ...recoveryCommands].includes(command)) flags.push("--selection", "--selection-sha256");
   if (candidateCommands.includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
+  if (coordinationCommands.includes(command)) flags.push("--coordination", "--coordination-sha256");
   if (command === "check-verification") flags.push("--verification", "--verification-sha256");
   if (["collect-publication-inputs", ...publicationCommands, ...closureRoleCommands, "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
   if ([...closureEffectCommands, "collect-closure-review-target", "read-closure-review", "read-worker-preparation", "collect-review-target", "read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--worker-capture", "--worker-capture-sha256");
@@ -342,12 +350,14 @@ function argumentsForCommand(argv: string[]) {
   requiredReferences["resume-closure"].push("--journal-directory");
   for (const name of recoveryCommands) requiredReferences[name] = ["--cache-root", "--entry", "--journal-directory", "--selection", "--selection-sha256", ...(name === "inspect-recovery" ? [] : ["--authority", "--authority-sha256"])];
   for (const name of retainedCommands) requiredReferences[name] = ["--operation-id"];
+  if (values.has("--coordination") !== values.has("--coordination-sha256")) throw Error("Coordinated selection path and digest are required together");
   const missing = (requiredReferences[command] ?? []).filter(flag => !values.has(flag));
   if (missing.length) throw Error(command + " requires " + missing.join(", "));
   return { command, repo, source, artifacts, operation: values.get("--operation-id"), cache: values.get("--cache-root"), entry: values.get("--entry"),
     launcher: values.get("--launcher"), settings: values.get("--settings"), definition: values.get("--trial-definition"),
     selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256"), candidate_repo: values.get("--candidate-repo"), candidate: values.get("--candidate"), resolution_record: values.get("--resolution-record"), resolution_sha256: values.get("--resolution-sha256"), verification: values.get("--verification"), verification_sha256: values.get("--verification-sha256"),
     source_verification: values.get("--source-verification"), source_verification_sha256: values.get("--source-verification-sha256"),
+    coordination: values.get("--coordination"), coordination_sha256: values.get("--coordination-sha256"),
     assessment: values.get("--assessment"), assessment_sha256: values.get("--assessment-sha256"),
     candidate_verification: values.get("--candidate-verification"), candidate_verification_sha256: values.get("--candidate-verification-sha256"),
     decisions: values.get("--decisions"), decisions_sha256: values.get("--decisions-sha256"),
@@ -433,6 +443,9 @@ export async function main(argv: string[]): Promise<number> {
         selection = JSON.parse(decodeUTF8(bytes));
         if (!canonicalJSON(selection).equals(bytes)) throw Error("noncanonical selection");
       } catch { throw Error("invalid canonical selection JSON"); }
+      const protection_context = coordinationCommands.includes(options.command) ? { coordinated: readCoordinatedSelection({ repo,
+        source: options.source, artifact_root: artifacts.root, candidate_repo: candidate?.repo, selection,
+        reference: options.coordination === undefined ? undefined : { path: options.coordination, sha256: options.coordination_sha256 } }) } : undefined;
       if (candidate) {
         if ((options.resolution_record === undefined) !== (options.resolution_sha256 === undefined)) throw Error("resolution record path and digest are required together");
         const resolution = options.resolution_record !== undefined && options.resolution_sha256 !== undefined
@@ -443,7 +456,7 @@ export async function main(argv: string[]): Promise<number> {
             throw Error("publication input collection requires cache-root, entry, launcher and settings");
           const { settings } = loadCommittedSettings(repo, options.source);
           const input: Parameters<typeof collectPublicationInputs>[0] = { repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit,
-            resolution_record: resolution, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(), credential: nativeCredential(settings.hostname),
+            resolution_record: resolution, protection_context, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(), credential: nativeCredential(settings.hostname),
             cache_directory: resolve(options.cache), entry, launcher_path: resolve(options.launcher), settings_path: resolve(options.settings) };
           if (finalPublicationCommands.includes(options.command)) {
             const publication = { ...input,
@@ -495,17 +508,17 @@ export async function main(argv: string[]): Promise<number> {
           }
         } else if (options.command === "verify-candidate") {
           const verification = await verifyCandidate({ repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit,
-            resolution_record: resolution, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
+            resolution_record: resolution, protection_context, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
           report = { schema_version: 1, command: options.command, outcome: verification.complete ? "collected" : "incomplete",
             source_commit: options.source, verification, diagnostics: verification.diagnostics.map(message => ({ code: "candidate-verification", message })) };
         } else if (options.command === "check-verification") {
           const verification = readCandidateVerificationArtifacts({ repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit,
-            resolution_record: resolution, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(),
+            resolution_record: resolution, protection_context, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(),
             reference: { path: options.verification, sha256: options.verification_sha256 } });
           report = { schema_version: 1, command: options.command, outcome: "collected", source_commit: options.source, verification, diagnostics: [] };
         } else {
           const candidate_inspection = inspectCandidate({ repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit, resolution_record: resolution,
-            artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
+            protection_context, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
           report = { schema_version: 1, command: options.command, outcome: candidate_inspection.complete ? "collected" : "incomplete",
             source_commit: options.source, candidate_inspection, diagnostics: candidate_inspection.diagnostics.map(message => ({ code: "candidate-inspection", message })) };
         }
@@ -565,11 +578,11 @@ export async function main(argv: string[]): Promise<number> {
             source_commit: options.source, resolution };
         }
       } else if (options.command === "prepare") {
-        const prepared = await prepareEdits({ repo, source: options.source, selection, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
+        const prepared = await prepareEdits({ repo, source: options.source, selection, protection_context, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
         report = { schema_version: 1, command: options.command, outcome: prepared.state === "incomplete" ? "incomplete" : "collected",
           source_commit: options.source, diagnostics: prepared.diagnostics.map(message => ({ code: "preparation", message })), prepared };
       } else {
-        const edit_inspection = inspectPreparation({ repo, source: options.source, selection });
+        const edit_inspection = inspectPreparation({ repo, source: options.source, selection, protection_context });
         const protection = edit_inspection.protection?.diagnostics ?? [], protectionMessages = new Set(protection.map(item => item.message));
         report = { schema_version: 1, command: options.command, outcome: edit_inspection.complete ? "collected" : "incomplete",
           source_commit: options.source, diagnostics: [...protection, ...edit_inspection.diagnostics.filter(message => !protectionMessages.has(message)).map(message => ({ code: "edit-inspection", message }))], edit_inspection };

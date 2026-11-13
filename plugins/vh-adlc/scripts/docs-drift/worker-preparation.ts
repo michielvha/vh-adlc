@@ -1,3 +1,4 @@
+import { readCoordinatedSelection } from "./coordination";
 import { PublicationScopeChanged } from "./publish";
 import { parseWorkerPublication } from "./publication-proposal";
 import { realpathSync } from "node:fs";
@@ -45,7 +46,9 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
     const decisions = parseDecisionPacket(readBoundArtifact({ source_repo: repo, artifact_root: options.artifact_root, reference: options.decisions }), snapshot);
     if (decisions.mode === "advisory") validateAdvisorySelection(decisions, result.selection);
     result.publication = publication;
-    result.inspection = inspectPreparation({ repo, source: options.source, selection: result.selection });
+    const coordinated = readCoordinatedSelection({ repo, source: options.source, artifact_root: options.artifact_root,
+      selection: result.selection, reference: decisions.coordination });
+    result.inspection = inspectPreparation({ repo, source: options.source, selection: result.selection, protection_context: { coordinated } });
     if (!result.inspection.complete) { result.diagnostics.push(...result.inspection.diagnostics); throw Error("Original worker preparation incomplete"); }
     // Keep the exact parsed worker postimages; preparation and publication have separate grants.
     if (!canonicalJSON(packet.edits).equals(canonicalJSON(edits))) throw Error("Original worker edit representation changed");

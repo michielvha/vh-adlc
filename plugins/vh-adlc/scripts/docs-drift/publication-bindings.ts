@@ -1,3 +1,4 @@
+import { readCoordinatedSelection } from "./coordination";
 import { PublicationScopeChanged } from "./publish";
 import { projectCurrentProposals, type PublicationInventory } from "./publication-inventory";
 import { parseDecisionPacket, projectAttentionProposals, validateAdvisorySelection } from "./publication-decisions";
@@ -58,7 +59,10 @@ export async function collectPublicationBindings(input: Options): Promise<Result
     if (result.mode === "advisory" && (selected.length > 0 || options.resolution_record)) throw Error("Advisory decision packet contains a resolution selection");
     if (result.mode === "resolve" && (selected.length === 0 || !options.resolution_record)) throw Error("Resolve decision packet needs selected originals and its exact record");
     if (result.mode === "advisory") validateAdvisorySelection(packet, options.selection);
-    const common = { repo, source: options.source, artifact_root: secondary.directory, owner: options.owner, run: options.run };
+    const coordinated = readCoordinatedSelection({ repo, source: options.source, artifact_root: secondary.directory,
+      candidate_repo: candidateRepo, selection: options.selection, reference: packet.coordination });
+    const common = { repo, source: options.source, artifact_root: secondary.directory, owner: options.owner, run: options.run,
+      protection_context: { coordinated } };
     result.source_verification = readSourceAssessmentArtifacts({ ...common, candidate_repo: candidateRepo, reference: options.source_verification });
     const baseline = result.source_verification;
     const verified = readPublicationCandidateProof({ ...common, candidate_repo: candidateRepo, candidate: options.candidate,

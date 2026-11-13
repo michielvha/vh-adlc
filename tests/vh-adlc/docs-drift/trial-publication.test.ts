@@ -184,6 +184,7 @@ test("the installed synthetic entry resumes an interrupted applied creation with
 }, 90000);
 
 test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "foreign-lease"] as const)("installed recovery presents an exact scope and preserves an edited delivery (%s)", async approval => {
+  try {
   const { f, context, options, path } = await publicationRequest("resolve");
   const publication = readTrialPublication(context, path), execute = publication.transport.execute;
   expect(publication.plan.publication_kind).toBe("resolve");
@@ -265,6 +266,7 @@ test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "
     expect(JSON.parse(resumed.stdout.toString()).data.state).toBe("acknowledged");
     expect(readTrialTracker(context).commit).toBe(preserved);
   }
+  } catch (error) { preserveFailedTrialRoots = true; throw error; }
 }, 120000);
 
 test("publication receipts bind the validated request and a same-plan request change stops the gate", async () => {
@@ -286,6 +288,7 @@ test("a request publication kind must match its sealed plan", async () => {
 });
 
 test("installed recovery entries refuse outside, nested and linked journals without changing fixture state", async () => {
+  try {
   const { f, context, path } = await publicationRequest();
   const publication = await publish(readTrialPublication(context, path));
   expect(publication.state).toBe("complete");
@@ -327,9 +330,11 @@ test("installed recovery entries refuse outside, nested and linked journals with
     expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
   }
   expect(git(f.source, "status", "--porcelain")).toBe("");
+  } catch (error) { preserveFailedTrialRoots = true; throw error; }
 }, 180000);
 
 test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed trial reconciliation uses the common recovery authority and preserves non-success: %s", async approval => {
+  try {
   const { f, context, path } = await publicationRequest(), publication = readTrialPublication(context, path), execute = publication.transport.execute;
   publication.transport.execute = async (...args) => {
     if (args[1].id === "pr") throw new PublicationExecutionError(false, true);
@@ -390,6 +395,7 @@ test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed 
     expect(readTrialTracker(context).commit).toBe(trackerBefore);
   }
   expect(git(f.source, "status", "--porcelain")).toBe("");
+  } catch (error) { preserveFailedTrialRoots = true; throw error; }
 }, 180000);
 
 

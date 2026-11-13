@@ -1,11 +1,11 @@
 import { parseEdit } from "./resolve";
-import { canonicalJSON, decodeUTF8 } from "./protocol";
+import { canonicalJSON, decodeUTF8, protocolPath } from "./protocol";
 import { attentionProjection, type AttentionInput, type AttentionProjection } from "./report";
 import type { Snapshot } from "./snapshot";
 
 export type DecisionPacket = {
   schema_version: 1; kind: "docs-drift-decisions"; mode: "advisory" | "resolve"; source_commit: string;
-  selected_proposals: number[]; decisions: unknown[]; attention: unknown[];
+  selected_proposals: number[]; decisions: unknown[]; attention: unknown[]; coordination?: { path: string; sha256: string } | null;
 };
 
 export function exactRecord(value: unknown, fields: string[], reason: string): Record<string, unknown> {
@@ -21,11 +21,16 @@ export function parseDecisionPacket(bytes: Uint8Array, snapshot: Snapshot): Deci
   if (!canonicalJSON(parsed).equals(bytes)
     || parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw Error("Canonical bounded decision packet required");
   const packet = parsed as Record<string, unknown>, fields = ["schema_version", "kind", "mode", "source_commit", "selected_proposals", "decisions", "attention"];
-  if (Object.keys(packet).length !== fields.length || fields.some(field => !Object.hasOwn(packet, field)) || packet.schema_version !== 1
+  if (Object.keys(packet).some(field => ![...fields, "coordination"].includes(field)) || fields.some(field => !Object.hasOwn(packet, field)) || packet.schema_version !== 1
     || packet.kind !== "docs-drift-decisions" || !["advisory", "resolve"].includes(String(packet.mode)) || packet.source_commit !== snapshot.source_commit
     || !Array.isArray(packet.decisions) || !Array.isArray(packet.attention) || !Array.isArray(packet.selected_proposals)
     || packet.selected_proposals.length > 1000 || packet.selected_proposals.some(id => typeof id !== "number" || !Number.isSafeInteger(id) || id < 1)
     || new Set(packet.selected_proposals).size !== packet.selected_proposals.length) throw Error("Decision packet fields or source changed");
+  if (packet.coordination !== undefined && packet.coordination !== null) {
+    const reference = exactRecord(packet.coordination, ["path", "sha256"], "Coordinated selection reference required");
+    protocolPath(reference.path);
+    if (typeof reference.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(reference.sha256)) throw Error("Coordinated selection digest required");
+  }
   return packet as DecisionPacket;
 }
 

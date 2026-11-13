@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { captureRepositoryState, captureSnapshot, checkFreshness, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { captureBareSnapshot, captureRepositoryState, captureSnapshot, checkFreshness, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
 
@@ -74,6 +74,43 @@ test.each(["references/previously-absent.md", "src/new.ts", "docs/new.md", "scri
   const result = checkFreshness(snapshot, commitAll(repo));
   expect(result.fresh).toBe(false);
   expect(result.material_paths).toContain(path);
+});
+
+test.each(["plans/new.md", "plans/nested/new.md"])("bounded freshness binds future feature claims outside documentation roots (%s)", path => {
+  const { repo, commit } = fixture(true), snapshot = captureSnapshot(repo, commit);
+  expect(snapshot.read_set.mode).toBe("bounded");
+  put(repo, path, "---\nstatus: in-progress\nbranch: feat/another-writer\ncovers: [docs/guide.md]\n---\n# Active claim\n");
+  const changed = commitAll(repo), before = captureRepositoryState(repo), result = checkFreshness(snapshot, changed);
+  expect(result.fresh).toBe(false);
+  expect(result.material_paths).toContain(path);
+  expect(captureRepositoryState(repo)).toEqual(before);
+});
+
+test("bounded feature-root reads use original committed policy in source and bare stores", () => {
+  const { repo, commit } = fixture(true), storeRoot = temporary();
+  git(storeRoot, "clone", "--bare", "--no-local", repo, "objects.git");
+  const bare = join(storeRoot, "objects.git"), original = captureSnapshot(repo, commit), originalBare = captureBareSnapshot(bare, commit);
+  expect(originalBare.read_set).toEqual(original.read_set);
+  put(repo, "AGENTS.md", "Feature documents: newly-selected/\n");
+  const changedPolicy = commitAll(repo);
+  put(repo, "AGENTS.md", "Feature documents: dirty-overlay/\n");
+  const before = captureRepositoryState(repo), old = captureSnapshot(repo, commit), current = captureSnapshot(repo, changedPolicy);
+  expect(old.read_set.prefixes).toContain("plans");
+  expect(current.read_set.prefixes).toContain("newly-selected");
+  expect(current.read_set.prefixes).not.toContain("dirty-overlay");
+  expect(checkFreshness(old, changedPolicy).fresh).toBe(false);
+  expect(captureRepositoryState(repo)).toEqual(before);
+});
+
+test("bounded freshness binds default feature roots and refuses malformed committed classification", () => {
+  const { repo } = fixture(true);
+  put(repo, "AGENTS.md", "# No feature-root override\n");
+  const source = commitAll(repo), snapshot = captureSnapshot(repo, source);
+  expect(snapshot.read_set.prefixes).toContain("docs/internal/plans");
+  put(repo, "AGENTS.md", "Feature documents: ../outside/\n");
+  const invalid = commitAll(repo), before = captureRepositoryState(repo);
+  expect(() => captureSnapshot(repo, invalid)).toThrow("repository-relative path");
+  expect(captureRepositoryState(repo)).toEqual(before);
 });
 
 test("reverted relevant paths still change required history and time inputs remain material", () => {

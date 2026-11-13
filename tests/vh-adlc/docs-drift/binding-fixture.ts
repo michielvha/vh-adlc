@@ -3,13 +3,14 @@ import { expect } from "bun:test";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { WorkerCollectionOptions } from "../../../plugins/vh-adlc/scripts/docs-drift/publication-worker";
+import { readCoordinatedSelection } from "../../../plugins/vh-adlc/scripts/docs-drift/coordination";
 import { verifyCandidate } from "../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { nativeReader, runtimeFixture } from "./runtime-fixture";
 import { commitAll, git, put } from "./repository-fixture";
 
 export async function bindingFixture(roots: string[], incompleteInventory: boolean, options: {
-  sourceInsideCandidate?: boolean; sourceCheckNeedsRepair?: boolean; mutableInventory?: boolean; fullComponent?: boolean; legacy_ids?: number[]; role?: Parameters<typeof runtimeFixture>[3];
+  coordinated?: boolean; sourceInsideCandidate?: boolean; sourceCheckNeedsRepair?: boolean; mutableInventory?: boolean; fullComponent?: boolean; legacy_ids?: number[]; role?: Parameters<typeof runtimeFixture>[3];
   beforeCandidate?: (input: { repo: string; source: string; artifacts: string; baseline: Awaited<ReturnType<typeof verifyCandidate>>; selection: unknown; decisions: Uint8Array; worker_options: WorkerCollectionOptions }) => void | Promise<void>;
 } = {}) {
   const { sourceInsideCandidate = false, sourceCheckNeedsRepair = false, beforeCandidate } = options;
@@ -20,6 +21,11 @@ export async function bindingFixture(roots: string[], incompleteInventory: boole
   put(repo, "tests/docs/fixture.test.ts", sourceCheckNeedsRepair
     ? `import { expect, test } from "bun:test";\ntest("guide repaired", () => expect(require("node:fs").readFileSync("docs/guide.md", "utf8")).toBe("# Current candidate guide\\n"));\n`
     : `import { expect, test } from "bun:test";\ntest("guide exists", () => expect(require("node:fs").existsSync("docs/guide.md")).toBe(true));\n`);
+  if (options.coordinated) {
+    const template = readFileSync(join(import.meta.dir, "../../../internal/testrepo/testdata/docs/conforming.md"), "utf8");
+    put(repo, "docs/internal/plans/active.md", template.replace("status: draft", "status: in-progress\nbranch: feat/other-writer")
+      .replace("  - src/\n  - config.yml", "  - docs/guide.md"));
+  }
   const source = commitAll(repo), candidate = join(f.root, "binding-candidate"), origin = join(f.root, "binding-origin"), artifacts = sourceInsideCandidate ? f.root : join(f.root, "binding-artifacts");
   if (!sourceInsideCandidate) mkdirSync(artifacts, { mode: 0o700 });
   git(f.root, "clone", "--no-local", "--no-checkout", repo, origin); git(origin, "update-ref", "refs/heads/main", source);
@@ -45,8 +51,17 @@ export async function bindingFixture(roots: string[], incompleteInventory: boole
     writeFileSync(baseline.record_path, bytes, { mode: 0o600 });
     baseline.evidence = { path: relative(artifacts, baseline.record_path), sha256: sha256(bytes) };
   }
+  let coordination: { path: string; sha256: string } | undefined;
+  if (options.coordinated) {
+    const request = Buffer.from("Synthetic current owner coordinates exactly this ordinary guide edit with the active writer.\n");
+    writeFileSync(join(artifacts, "coordination-owner.txt"), request, { mode: 0o600 });
+    const bytes = canonicalJSON({ schema_version: 1, kind: "docs-drift-coordinated-selection", repository: "fixture/docs", source_commit: source,
+      selection_sha256: sha256(canonicalJSON(selection)), overlaps: [{ kind: "feature", owner: "docs/internal/plans/active.md", document: "docs/guide.md" }],
+      origin: { kind: "owner-current-request", artifact: { path: "coordination-owner.txt", sha256: sha256(request) } } });
+    writeFileSync(join(artifacts, "coordination.json"), bytes, { mode: 0o600 }); coordination = { path: "coordination.json", sha256: sha256(bytes) };
+  }
   const decisions = { schema_version: 1, kind: "docs-drift-decisions", mode: "advisory", source_commit: source,
-    selected_proposals: [], decisions: [{ id: "guide-fix", reason: "Synthetic source-based candidate" }], attention: [] };
+    ...(coordination ? { coordination } : {}), selected_proposals: [], decisions: [{ id: "guide-fix", reason: "Synthetic source-based candidate" }], attention: [] };
   const decisionBytes = canonicalJSON(decisions); writeFileSync(join(artifacts, "decisions.json"), decisionBytes, { mode: 0o600 });
   const inventoryFile = join(f.root, "binding-native-inventory.json");
   if (options.mutableInventory) writeFileSync(inventoryFile, "[]", { mode: 0o600 });
@@ -67,7 +82,8 @@ const result = Bun.spawnSync([${JSON.stringify(executable)}, ...args], { stdout:
     git(f.root, "clone", "--no-local", "--no-checkout", repo, candidate); git(candidate, "checkout", "--detach", source);
     put(candidate, "docs/guide.md", replacement.toString()); head = commitAll(candidate);
   }
-  const verified = await verifyCandidate({ ...common, repo, source, candidate_repo: candidate, candidate: head, selection });
+  const verified = await verifyCandidate({ ...common, repo, source, candidate_repo: candidate, candidate: head, selection,
+    protection_context: { coordinated: readCoordinatedSelection({ repo, source, artifact_root: artifacts, candidate_repo: candidate, selection, reference: coordination }) } });
   const { assessSource } = await import("../../../plugins/vh-adlc/scripts/docs-drift/source-assessment");
   const assessment = sourceCheckNeedsRepair ? await assessSource({ ...common, repo, source }) : null;
   expect(baseline.complete, JSON.stringify({ stage: "source", diagnostics: baseline.diagnostics, scan: baseline.scan?.process })).toBe(!sourceCheckNeedsRepair);

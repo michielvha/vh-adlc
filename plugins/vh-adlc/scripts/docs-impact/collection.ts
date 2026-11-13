@@ -122,22 +122,32 @@ class Snapshot {
   }
 }
 
+/** Resolve feature ownership from the same committed policy bytes in every consumer. */
+export function readFeatureClassification(bytes: Uint8Array | null): Pick<Policy, "feature_root" | "local_format"> {
+  const result = { feature_root: "docs/internal/plans", local_format: false };
+  let featureDeclared = false;
+  for (const line of bytes === null ? [] : decode(bytes).split(/\r?\n/u)) {
+    // Preserve the existing feature resolver's grammar, including declarations in fences.
+    const feature = line.match(/^Feature documents: `?([^`\s]+)`?$/u);
+    if (feature && !featureDeclared) { result.feature_root = repositoryPath(feature[1]); featureDeclared = true; }
+    if (line === "Feature document format: local") result.local_format = true;
+  }
+  return result;
+}
+
 function policy(snapshot: Snapshot): RootsReport {
   const report: RootsReport = {
     schema_version: 1, protocol: 1, command: "roots", head: snapshot.head, outcome: "absent", roots: [],
-    policy: { view: "HEAD", sha256: null, excluded_dirty: snapshot.dirty.includes("AGENTS.md"), feature_root: "docs/internal/plans", local_format: false }, diagnostics: snapshot.diagnostics,
+    policy: { view: "HEAD", sha256: null, excluded_dirty: snapshot.dirty.includes("AGENTS.md"), ...readFeatureClassification(null) }, diagnostics: snapshot.diagnostics,
   };
   if (!snapshot.head) { report.outcome = "incomplete"; return report; }
   if (!snapshot.tree.has("AGENTS.md")) return report;
   try {
     const bytes = snapshot.headBytes("AGENTS.md"); report.policy.sha256 = hash(bytes);
-    let fence: string | undefined, featureDeclared = false;
+    Object.assign(report.policy, readFeatureClassification(bytes));
+    let fence: string | undefined;
     const declarations: string[] = [];
     for (const line of decode(bytes).split(/\r?\n/u)) {
-      // Match the existing feature resolver exactly; roots have their own fence-aware grammar.
-      const feature = line.match(/^Feature documents: `?([^`\s]+)`?$/u);
-      if (feature && !featureDeclared) { report.policy.feature_root = repositoryPath(feature[1]); featureDeclared = true; }
-      if (line === "Feature document format: local") report.policy.local_format = true;
       const fenced = line.match(/^ {0,3}(`{3,}|~{3,})/u);
       if (fence) { if (fenced && fenced[1][0] === fence[0] && fenced[1].length >= fence.length && new RegExp(`^ {0,3}${fenced[1]}\\s*$`, "u").test(line)) fence = undefined; continue; }
       if (fenced) { fence = fenced[1]; continue; }

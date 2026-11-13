@@ -1,3 +1,4 @@
+import { readFeatureClassification } from "../docs-impact/collection";
 import { randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
@@ -78,7 +79,7 @@ function sorted(values: string[]): string[] {
   return [...new Set(values)].sort(compareUTF8);
 }
 
-function readSetFor(settings: Settings): ReadSet {
+function readSetFor(settings: Settings, featureRoot: string): ReadSet {
   const omitted = settings.read_set.source_roots === null || settings.read_set.reference_roots === null;
   // Arbitrary project commands can read implicit inputs. Retain the conservative fallback
   // until their complete dependency sets can be established by the selected verification.
@@ -94,7 +95,7 @@ function readSetFor(settings: Settings): ReadSet {
   return {
     mode: bounded ? "bounded" : "whole-repository",
     reason: omitted ? "omitted-read-bound" : commandInputsUnknown ? "command-inputs-unbounded" : null,
-    prefixes: bounded ? sorted([...settings.roots, ...(settings.read_set.source_roots ?? []), ...(settings.read_set.reference_roots ?? [])]) : ["."],
+    prefixes: bounded ? sorted([...settings.roots, featureRoot, ...(settings.read_set.source_roots ?? []), ...(settings.read_set.reference_roots ?? [])]) : ["."],
     always_paths: sorted(alwaysPaths),
   };
 }
@@ -134,7 +135,9 @@ function snapshotAt(repo: string, sourceCommit: string, options: { required_inpu
   completeHistory(repo, sourceCommit);
   const loaded = loadCommittedSettings(repo, sourceCommit);
   const blobs = readCommittedTree(repo, sourceCommit);
-  const readSet = readSetFor(loaded.settings);
+  const policy = blobs.find(blob => blob.path === "AGENTS.md");
+  const classification = readFeatureClassification(policy?.bytes ?? null);
+  const readSet = readSetFor(loaded.settings, classification.feature_root);
   for (const blob of blobs) {
     if (isBound(blob.path, readSet) && !["100644", "100755"].includes(blob.mode)) incomplete("nonregular required source input");
   }
