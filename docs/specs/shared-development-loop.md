@@ -94,14 +94,14 @@ A fourth revision, during implementation, moves implementation reviews into a pr
 reviewed commit: the first Codex implementation review stayed pending because another session pushed to
 the shared refs while it ran.
 
-Validation so far: sixteen spec reviews on `gpt-6.1-sol`; the shared tasks T1 to T23 are implemented on
-`feat/shared-development-loop` with their targeted suites passing, and the full local run at T24 passed
-except one fixture that this host fails for an unrelated binary on its `PATH`, so T24 stays open. The
-real-route proof (T34), model attestation (T35, T36), the ignored-directory hashing fix (T37), reading
-the review policy from the reviewed commit (T38), chained-symlink containment (T39) and the
-whole Stackweaver adoption (T25 to T33) are not yet done. Accepting authorizes continuing the
-implementation on its branch. Publishing releases, merging either repository and retiring the native
-agents each need separate approval.
+Validation so far: nineteen spec reviews on `gpt-6.1-sol`. Every task through T47 is implemented on the two
+feature branches with its checks recorded; the full local suite passed at T24; real Codex reviews
+(T34), routing trials and a claim-to-merge flow (T33) are recorded. The first Codex implementation
+review found five defects, now fixed (T43 to T47), but could not be stored because other sessions pushed
+to the shared refs while it ran, which this revision addresses with a private review clone. Still to do:
+the private clone (T48, T49), the lean evidence runs (T50 to T53), and a fresh implementation review.
+Accepting authorizes continuing the implementation on its branches. Publishing releases, merging either
+repository and retiring the native agents each need separate approval.
 
 ### Acceptance notes
 
@@ -280,7 +280,7 @@ owned process group through the existing runner in `plugins/vh-adlc/scripts/tria
 which signals the whole group after the parent exits, so no helper outlives the review. The group is
 terminated and reaped before the final preservation check and before any record is stored; if cleanup
 fails, the review stays pending. An implementation review
-runs the command from the owning worktree, with no worktree creation. A file-only spec review runs it
+runs the command from its private clone of the reviewed commit, described below; the plugin creates no worktree. A file-only spec review runs it
 from the export described below, so the CLI discovers no instruction files in the live checkout. The route is generic: `argv` is any command with
 placeholders, so Copilot, Codex or another CLI needs only settings. `{export_dir}` is the read-only
 export of the target commit, `{model}` is the role's model,
@@ -461,7 +461,9 @@ docs pin of its own, so it follows the plugin pin.
 
 A `findings_document: always` setting makes invoking investigate the request to write the document,
 in the consumer's declared analysis home. Investigate also searches existing analysis documents and
-open issues for duplicates before writing, and when an analysis document already covers the case it extends that
+open issues for duplicates before writing (a consumer's project procedure may widen the search to its other
+findings homes, as Stackweaver's does for its bug-report and research folders, owner decision on
+2026-11-13), and when an analysis document already covers the case it extends that
 document instead of creating a second one. An existing issue never holds the only copy of the findings:
 investigate writes or extends the analysis document and, where it has authority to touch the issue,
 adds only a summary and a link to it (Stackweaver `CLAUDE.md:295-299`), states that conclusions come from primary sources read in
@@ -755,6 +757,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-17 | spec | `0c6a7402a82142997f27e4c535ebd7b71c5f711f` | gpt-6.1-sol | procedural | One blocking finding: review policy is read from the live loop.yaml rather than the dispatched commit. One should-fix on chained symlinks escaping the export. |
 | 2026-11-13 | R-18 | spec | `ec582dcf7e43c0d83b5dd6fb953f0c83f799b785` | gpt-6.1-sol | procedural | No blocking findings; three should-fix: environment-clearing detached helpers, a detached HEAD at the same commit, and duplicate search across Stackweaver's findings homes. |
 | 2026-11-13 | R-18 | spec | `ec582dcf7e43c0d83b5dd6fb953f0c83f799b785` | n/a | n/a | accepted by owner |
+| 2026-11-13 | R-19 | spec | `3b0bb40b0ba12bb8d7cca26e1bbd4d05c6ba8538` | gpt-6.1-sol | procedural | No blocking findings after the private-clone revision; three should-fix. A Codex attempt before it stayed pending because other sessions pushed during it. |
 
 ### R-1
 
@@ -1232,6 +1235,29 @@ SEVERITY: should-fix
 WHERE: Design / Investigation defaults; AC-07 and its Test Plan
 EVIDENCE: Stackweaver agents/investigate.md:50-51 searches all of docs/internal/ and extends an existing covering document. CLAUDE.md:297 names analysis, bug-report, research and plan homes. The proposed search covers only analysis documents and open issues; plugins/vh-adlc/scripts/loop/investigate.ts likewise searches only analysis_dir. An already documented defect under docs/internal/bug-reports/ without an open issue can consequently acquire a second analysis document while every AC-07 scenario passes. This narrows a native capability despite the stated parity requirement.
 PROPOSAL: Preserve duplicate discovery across Stackweaver's existing findings homes, independently of the destination for new investigations. Add a covering bug-report or research-document scenario that reuses the existing artifact rather than creating another.
+
+### R-19
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / External command route
+EVIDENCE: This section says an implementation review “runs the command from the owning worktree, with no worktree creation”, then requires it to run from a private clone checked out at the reviewed commit. These prescribe different execution locations for the same route.
+PROPOSAL: Remove the owning-worktree launch requirement and consistently name the private clone in the dispatch prompt, command working directory and preservation fixtures.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Investigation defaults; AC-07 and its Test Plan
+EVIDENCE: The proposed duplicate search covers analysis documents and open issues. Stackweaver agents/investigate.md:50-51 searches all of docs/internal/ and extends an existing covering document; CLAUDE.md also names bug-report, research and plan homes. A covering bug report without an open issue can therefore acquire a duplicate analysis document while AC-07 passes. The current scripts/loop/investigate.ts searches only analysis_dir.
+PROPOSAL: Preserve duplicate discovery across Stackweaver’s existing findings homes, independently of the destination for new documents. Add a covering bug-report or research-document case that extends the existing artifact.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary
+EVIDENCE: The summary says T24 remains open and T25-T39 are not done. Tasks marks those tasks complete, records a later passing T24 suite, and includes stored T34 outcomes under tests/vh-adlc/evidence/loop-review-route/. It also describes implementation reviews as operating against shared refs rather than explaining the new private-clone boundary. Git, vh-adlc and tests cannot be executed with the available tools; these contradictions follow from the document and stored files.
+PROPOSAL: Refresh the summary against the current task records, distinguish recorded results from independently verified execution, and explain the private-clone preservation boundary and remaining work before renewed acceptance.
 
 ## Sources
 
