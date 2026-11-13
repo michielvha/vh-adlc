@@ -775,6 +775,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-20 | spec | `cdfde05bbfd7391a4702a2cf171e5418a560611b` | gpt-6.1-sol | procedural | No blocking findings; one should-fix on calling the Codex read-only spec review file-only. |
 | 2026-11-13 | R-20 | spec | `cdfde05bbfd7391a4702a2cf171e5418a560611b` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-21 | implementation | `b44d2f58cfc411efe1c537b458b2231297848be6` | gpt-6.1-sol | procedural | Six criteria met, AC-02 not met, twelve not verified; seven should-fix findings. Ran in a private clone. |
+| 2026-11-13 | R-22 | spec | `df8ce7cf4aefb6850d7c72142ed7c3590263a180` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on the stale owner summary and T34's file-only wording. |
 
 ### R-1
 
@@ -1411,6 +1412,22 @@ SEVERITY: should-fix
 WHERE: plugins/vh-adlc/scripts/loop/cli.ts:112-121; scripts/loop/rungs.ts:43-44
 EVIDENCE: The CLI always regenerates procedure-rung results as not run and accepts only owner allowances, with no input for a completed procedure's recorded result. The passing unit test manually replaces that result in memory before calling mayAdvance. Stackweaver declares named-e2e as an always-applicable procedure, and its stored rungs2.json still reports advance false after verification passed. The operation instructions require an advancing result before push.
 PROPOSAL: Provide and document a way to combine executed procedure results with command results at the exact commit. Test advancement through the supported entry point after a procedure passes, without representing that pass as an owner allowance.
+
+### R-22
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary
+EVIDENCE: docs/specs/shared-development-loop.md:97-102 still lists the private clone and T50-T53 runs as future work. plugins/vh-adlc/scripts/loop/review-route.ts:211-215 implements the clone, and Stackweaver tests/agent-loop/evidence/t52-t53-attempts.md records unsuccessful investigation and isolation trials with deferred proof for AC-07 and AC-18. The summary omits those limitations and the current revision's change from file-only to read-only review.
+PROPOSAL: Refresh the summary before acceptance to explain this revision, the completed clone implementation, and the outstanding proof and residual decisions. Distinguish recorded attempts from verified outcomes.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks / T34
+EVIDENCE: docs/specs/shared-development-loop.md:716-717 still claims a completed file-only spec review. tests/vh-adlc/evidence/loop-review-route/run.sh:34 configures read-only filesystem access, while spec-outcome.json:6 records the reviewer's statement that it ran bun test. This supports the revised read-only contract, but does not establish file-only operation.
+PROPOSAL: Correct T34's description and evidence wording, together with the evidence README and runner comment, to describe the read-only review actually configured. Preserve the returned reviewer records verbatim.
 
 ## Sources
 
