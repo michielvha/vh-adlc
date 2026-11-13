@@ -11,8 +11,8 @@ Before dispatching, read the reviewer role's route:
   --kind <spec|implementation> --docs-revision <sha> --binary <path> --plugin-pin <pin>`. It runs the
   configured CLI with the canonical reviewer instructions and the dispatch identity, as
   `references/loop-settings.md` describes: a spec review reads a read-only export of X and is launched
-  from it; an implementation review runs in the owning worktree, which must be unchanged afterwards
-  outside `review_scratch`. A route with `model_attestation: codex-session` takes the served model from
+  from it; an implementation review runs in a private clone of X. Afterwards the clone, and the owning
+  worktree's files, index, HEAD and branch, must be unchanged outside `review_scratch`. A route with `model_attestation: codex-session` takes the served model from
   Codex's own session log, so a `MODEL: unknown` self-report is accepted only when that attested model
   matches the request. Its JSON `status` is `ready` or `pending`. On `ready`, store its `records`
   under `### R-<n>` with a Review Log row naming its `model` and isolation `procedural`, then run

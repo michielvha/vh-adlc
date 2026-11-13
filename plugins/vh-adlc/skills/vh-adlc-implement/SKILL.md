@@ -49,7 +49,8 @@ report its reason and stop. A planned feature may then be claimed from a worktre
 tip that is detached or on a branch this session created or was handed, with
 `bun scripts/loop/cli.ts claim` (`references/loop-settings.md`, Claiming and isolation); it refuses an
 unrelated branch, a stale tip or a stray change before writing, and a rejected push leaves the claim
-pending with no feature branch.
+pending with no feature branch. When loop settings exist, these instructions replace Enter steps 1 and 6: the claim may be made from a host
+worktree at the default-branch tip through `cli.ts claim`, and that worktree becomes the owning worktree.
 
 ## Start
 

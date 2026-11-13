@@ -3,6 +3,7 @@
 //   bun scripts/loop/cli.ts route   --repo <dir> --operation <op> [--continues <op>]
 //   bun scripts/loop/cli.ts context --repo <dir>
 //   bun scripts/loop/cli.ts rungs   --repo <dir> (--base <branch> | --merge <sha>) [--allow <rung>[,<rung/subcheck>...]] [--run true]
+//                                   [--record <rung>=passed|failed:<what was observed>[;<rung>=...]]
 //   bun scripts/loop/cli.ts ci       --repo <dir>
 //   bun scripts/loop/cli.ts skip     --repo <dir> --base <branch> --remote-branch <ref> --feature-root <dir> --docs-revision <sha>
 //   bun scripts/loop/cli.ts delivery --repo <dir> --merge <sha> --feature-root <dir> --docs-revision <sha>
@@ -113,7 +114,17 @@ export async function main(argv: string[]): Promise<number> {
     const declared = settings.verification_rungs.length > 0;
     const delta = featureDelta(repo, options.merge ? { merge: options.merge } : { base: need(options, "base") });
     const applicable = applicableRungs(settings, delta.paths);
-    const results = options.run === "true" ? (await runRungs(repo, applicable)).map(({ output, ...rest }) => ({ ...rest, output_tail: output?.slice(-2000) })) : [];
+    // A procedure rung's result is recorded by the operation that performed it, at the current head.
+    const recorded = new Map((options.record ?? "").split(";").filter(Boolean).map(entry => {
+      const match = /^([a-z0-9-]+)=(passed|failed):(.+)$/.exec(entry);
+      if (!match) throw Error(`--record expects <rung>=passed|failed:<what was observed>, got ${entry}`);
+      return [match[1]!, { state: match[2] as "passed" | "failed", reason: `recorded: ${match[3]}` }] as const;
+    }));
+    const results = options.run === "true" ? (await runRungs(repo, applicable)).map(({ output, ...rest }) => {
+      const record = recorded.get(rest.name);
+      const procedure = applicable.find(rung => rung.name === rest.name)?.procedure !== undefined;
+      return { ...rest, ...(record && procedure ? record : {}), output_tail: output?.slice(-2000) };
+    }) : [];
     const head = execSync("git rev-parse HEAD", { cwd: repo }).toString().trim();
     const verdict = options.run === "true" ? mayAdvance(results, { head, declared, allowances: options.allow ? options.allow.split(",") : [] })
       : { advance: !declared, lookup: declared ? "rungs" : "agents-md", blocking: applicable.map(r => r.name) };
@@ -128,7 +139,7 @@ export async function main(argv: string[]): Promise<number> {
     const route = routeFor(policy, kind === "spec" ? "spec review" : "review");
     if (route.route !== "command" || !route.argv) { console.log(JSON.stringify({ status: "host", ...route })); return 0; }
     const document = need(options, "document"), commit = need(options, "commit");
-    const prompt = reviewPrompt({ repository: kind === "spec" ? "the current directory, a read-only export of the commit" : repo,
+    const prompt = reviewPrompt({ repository: kind === "spec" ? "the current directory, a read-only export of the commit" : "the current directory, a private clone of the reviewed commit",
       document, commit, kind, docsRevision: need(options, "docs-revision"), binary: need(options, "binary"), pluginPin: need(options, "plugin-pin") }, loopContext(policy));
     const outcome = await runReviewRoute({ repo, commit, kind, document, route: { model: route.model!, argv: route.argv, ...(route.model_attestation ? { model_attestation: route.model_attestation } : {}) }, prompt,
       scratch: policy.review_scratch, timeoutMs: options["timeout-ms"] ? Number(options["timeout-ms"]) : undefined });

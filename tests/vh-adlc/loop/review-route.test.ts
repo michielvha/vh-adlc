@@ -210,7 +210,8 @@ printf '%s\\n' '{"type":"turn.completed"}'
   test("a session log that records the requested model lets a MODEL: unknown reply be stored, recording the attested model", async () => {
     const { root, commit } = repository(), home = homeDir();
     const outcome = await attested(root, commit, codex(`MODEL: unknown\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-6.1-sol", home), home);
-    expect(outcome).toMatchObject({ status: "ready", model: "gpt-6.1-sol", records: "NO FINDINGS\n" });
+    // Since T55 records keep their exact bytes; this stub's reply has no final newline.
+    expect(outcome).toMatchObject({ status: "ready", model: "gpt-6.1-sol", records: "NO FINDINGS" });
   });
   test("a session log that records another model leaves the review pending", async () => {
     const { root, commit } = repository(), home = homeDir();

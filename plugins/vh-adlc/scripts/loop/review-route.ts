@@ -135,16 +135,23 @@ export function removeExport(dir: string) {
 
 /** Splits a reply into its two header lines and the records after them. */
 export function parseReply(reply: string): { model: string; target: string; records: string } | { error: string } {
-  const lines = reply.replace(/\r\n/g, "\n").split("\n");
-  let index = 0;
-  const next = () => { while (index < lines.length && !lines[index]!.trim()) index++; return lines[index++] ?? ""; };
-  const modelLine = next();
-  const model = /^MODEL: (\S+)$/.exec(modelLine.trim());
+  // Only the two header lines and the blank lines around them are removed; the records keep their bytes.
+  let at = 0;
+  const line = (): string | undefined => {
+    while (at < reply.length) {
+      const end = reply.indexOf("\n", at), stop = end < 0 ? reply.length : end + 1, text = reply.slice(at, stop);
+      at = stop;
+      if (text.trim()) return text.trim();
+    }
+    return undefined;
+  };
+  const model = /^MODEL: (\S+)$/.exec(line() ?? "");
   if (!model) return { error: "the reply does not open with a MODEL: line" };
-  const target = /^TARGET: ([0-9a-f]{7,40})$/.exec(next().trim());
+  const target = /^TARGET: ([0-9a-f]{7,40})$/.exec(line() ?? "");
   if (!target) return { error: "the reply has no TARGET: line after MODEL:" };
-  const records = lines.slice(index).join("\n").replace(/^\n+/, "").replace(/\s+$/, "") + "\n";
-  return { model: model[1]!, target: target[1]!, records };
+  let rest = reply.slice(at);
+  while (/^\r?\n/.test(rest)) rest = rest.replace(/^\r?\n/, "");
+  return { model: model[1]!, target: target[1]!, records: rest };
 }
 
 function substitute(argv: string[], values: Record<string, string>): string[] {
