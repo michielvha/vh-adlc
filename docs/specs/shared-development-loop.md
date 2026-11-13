@@ -572,7 +572,8 @@ published plugin is installed from the marketplace and exercised, and a rollback
 
 Shared vh-adlc work, on the feature branch:
 
-- [ ] T1 `tests/vh-adlc/loop/settings.test.ts` - failing tests for `.vh-adlc/loop.yaml`: a route per role, `command` refused for `author` and `implementer`, resume taking the continued operation's route, the per-user override limited to `argv[0]`, and no file meaning today's behavior; fails because no reader exists (AC-01)
+- [x] T1 `tests/vh-adlc/loop/settings.test.ts` - failing tests for `.vh-adlc/loop.yaml`: a route per role, `command` refused for `author` and `implementer`, resume taking the continued operation's route, the per-user override limited to `argv[0]`, and no file meaning today's behavior; fails because no reader exists (AC-01)
+      Evidence: `bun test tests/vh-adlc/loop/settings.test.ts` on the feature branch fails with `Cannot find module '../../../plugins/vh-adlc/scripts/loop/settings'`, the reader T3 adds.
 - [ ] T2 `schema/vh-adlc.schema.json`, `internal/settings/`, `cmd/vh-adlc/`, `docs/reference/cli.md` - a `loop` settings kind for `vh-adlc settings read`, documented; `go test ./...` passes with valid and refused fixtures (AC-01)
 - [ ] T3 `plugins/vh-adlc/scripts/loop/settings.ts`, `plugins/vh-adlc/references/loop-settings.md` - the TypeScript reader and the settings reference, using the Glossary terms; T1 passes (AC-01, AC-19)
 - [ ] T4 `tests/vh-adlc/loop/model-free.test.ts` - a guard that fails on any model name in an agent or skill file; passes on the current tree and fails on a planted name (AC-01)
