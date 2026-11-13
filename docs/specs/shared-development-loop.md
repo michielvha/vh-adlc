@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-3 findings applied and its judgement findings answered by the owner; waiting for a fresh independent spec review."
+status_description: "R-4 findings applied and its judgement findings answered by the owner; waiting for a fresh independent spec review."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
@@ -86,8 +86,10 @@ blocking gap, how each command picks the native or shared loop, now settled per 
 Its other answers: failed checks block completion and delivery, the reviewer worktree check compares file
 contents, and only reviewer roles may use a command route. R-3 led to worktree isolation becoming a
 shared opt-in setting that Stackweaver turns on, refs joining the reviewer worktree check, no push over a
-failing check, and the native agents staying until even the domain plans are enrolled or finished. A
-fresh review pass is next. Accepting this
+failing check, and the native agents staying until even the domain plans are enrolled or finished.
+R-4 added the release path inventory and settled that the merge commit decides publication, that checks
+apply over the whole feature delta, and that the reviewer worktree check covers ignored files and index
+flags. A fresh review pass is next. Accepting this
 document authorizes implementation of the accepted scope on a feature branch. Publishing the vh-adlc
 release, merging either repository and retiring the native agents each still need their own approval.
 
@@ -140,6 +142,7 @@ force-pushes and squash-merges (Stackweaver `CLAUDE.md:169,172,279`).
 
 In scope:
 
+- A vh-adlc runtime release and plugin release through the paths in Design.
 - Shared vh-adlc changes: per-role model routing in settings, an external command route for reviews,
   claiming a feature from a host worktree at the default branch tip, an opt-in setting that keeps
   implement out of the primary checkout, a settings file and project
@@ -239,8 +242,9 @@ command that is not given a read-only tool restriction is recorded with `procedu
 A spec review reads only, so its route may stay file-only. An implementation review must observe the
 checks it relies on, because the standard counts only executed evidence the review saw as `met`, so its
 route has shell access. Before dispatch the operation records `HEAD`, the index tree (`git write-tree`),
-every ref (`git for-each-ref`), `git status --porcelain --untracked-files=all`, and a content hash of every modified and untracked file
-in the owning worktree; after the reply it records them again. Any difference, including a changed file
+every ref (`git for-each-ref`), `git status --porcelain --untracked-files=all`, a content hash of every modified, untracked and pre-existing ignored file, and the
+index entries with their flags (`git ls-files --stage --debug`) in the owning worktree, leaving out only
+build-output directories listed under `review_scratch` in `loop.yaml`; after the reply it records them again. Any difference, including a changed file
 whose status line stayed the same, leaves the review pending, stores nothing and reports what changed. Such a review is recorded with
 `procedural` isolation. The reply must open with `MODEL:`, then carry records in the
 standard's format. The same requested-model rule applies: a missing, mismatched or `unknown` model, a
@@ -300,7 +304,10 @@ checking every execution path. The procedure stays local; the hook is shared.
 ### Verification rungs, CI policy and post-merge watch
 
 `loop.yaml` may declare verification rungs, each with a command or written procedure and a condition: a
-changed-path glob, a criterion kind, or always. Implement and ship run every rung whose condition holds
+changed-path glob, a criterion kind, or always. A path condition is evaluated over the whole feature
+delta: the feature branch against its merge base with the default branch, plus uncommitted changes the
+feature owns. A passing result counts only for the exact commit it ran on, so a new commit needs the
+rung again. Implement and ship run every rung whose condition holds
 and report each as passed, failed or not run with a reason. Every applicable rung must pass before the feature
 branch is pushed, and again before the feature is marked complete or reported delivered, matching
 Stackweaver's rules to verify fully before any push (Stackweaver `CLAUDE.md:153`) and never to ship over
@@ -314,10 +321,13 @@ A declared `ci_trigger: manual` makes ship report CI as not triggered by policy 
 a run or suggesting a dispatch. A declared `post_merge_watch` command (Stackweaver:
 `scripts/release/watch-merge.sh <merge-sha>`) must exit 0 before a feature whose merge can publish is
 reported delivered, matching the delivery convention's rule that a feature is delivered once every
-release path has published. A feature delivery that carries the skip marker publishes nothing, and
-Stackweaver's watcher does not follow a merge with a skip directive (`watch-merge.sh:21,143`). Such a
-feature is reported delivered once its merge is on the default branch, with the reason "no publication
-path", and the watch is not run.
+release path has published. Publication is decided by the merge commit itself, since Stackweaver's tag
+workflow runs on every push to `main` and `watch-merge.sh:143` reads the merge commit's own message.
+When a delivery qualifies for the skip marker, the authorized merge uses a merge commit message that
+carries it. After the merge, ship reads the actual merge commit: if its message carries the marker and
+its diff against the first parent touches only skip-eligible paths, the feature is reported delivered
+with the reason "no publication path" and the watch is not run. Any other merge commit, including a
+qualifying delivery merged without the marker, runs the watch like any publishing merge.
 
 ### Skip-CI paths
 
@@ -345,6 +355,23 @@ both. `doc.MatchCovers` in `internal/doc/covers.go` gains the same semantics, an
 `internal/fresh/fresh.go:189` uses it for review staleness and dirty-tree checks, a committed or
 uncommitted change under a `**` entry makes reviews stale and the feature tree dirty exactly as a plain
 entry does. Existing documents without `**` keep their results.
+
+### Release path
+
+The shared change publishes through four paths, in this order:
+
+| Artifact | Build and publication path |
+| --- | --- |
+| vhco-pro/docs `conventions/delivery.md` revision (skip-CI paths) | A reviewed vhco-pro/docs merge; its commit becomes the new docs pin |
+| `vh-adlc` runtime: four platform `tar.gz` archives, `checksums.txt` and its signature | Merge to main; the `version` job in `.github/workflows/ci.yml` (vhco-pro/version-workflow) tags it; `.github/workflows/release.yml` on the `v*.*.*` tag runs vhco-pro/go-release-workflow with `.goreleaser.yml` |
+| Plugin lock and pin: `plugins/vh-adlc/vh-adlc.lock.json`, `plugins/vh-adlc/knowledge.md` | A follow-up commit that points the lock at the published runtime release and its archive checksums, and moves the docs pin |
+| Plugin payload: `plugins/vh-adlc/`, versioned by `plugin.json` and `.claude-plugin/plugin.json` | Served from the default branch through `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json` |
+
+Before each merge, a check rebuilds what that path builds: a GoReleaser snapshot build of all four
+archives from `.goreleaser.yml`, `bun test tests/vh-adlc` over the plugin payload, and
+`scripts/ensure-vh-adlc.sh` verifying the lock against the published release assets once they exist.
+The feature is delivered only when the docs revision, the runtime release, the plugin lock and payload
+are all published, the marketplace install sees them, and Stackweaver's adoption has merged.
 
 ### Stackweaver adoption
 
@@ -395,17 +422,17 @@ published plugin is installed from the marketplace and exercised, and a rollback
 ## Acceptance Criteria
 
 - [ ] AC-01: A repository's `.vh-adlc/loop.yaml` names a route for each loop role, every SDD operation dispatches according to it, a `command` route is accepted only for the two reviewer roles, no vh-adlc agent or skill file names a model, and a repository without the file behaves as it does at `a7bfca99`.
-- [ ] AC-02: From a Claude Code session, a file-only spec review and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`; and a mismatched model or target, a missing header, a non-zero exit, a timeout or any change to the worktree's `HEAD`, index, refs, status or file contents leaves the review pending with no Review Log row.
+- [ ] AC-02: From a Claude Code session, a file-only spec review and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`; and a mismatched model or target, a missing header, a non-zero exit, a timeout or any change to the worktree's `HEAD`, index entries, refs, status or file contents, ignored files included, leaves the review pending with no Review Log row.
 - [ ] AC-03: Every SDD operation reads the declared project procedure and instruction files, and a spec review flags a document that contradicts a declared instruction file or lens.
-- [ ] AC-04: Implement and ship run each declared verification rung whose condition holds and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
-- [ ] AC-05: With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, and a skip-marked feature is reported delivered with no publication path and no watch run.
+- [ ] AC-04: Implement and ship run each declared verification rung whose condition holds over the whole feature delta and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
+- [ ] AC-05: With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, and a feature whose actual merge commit carries the skip marker and touches only skip-eligible paths is reported delivered with no publication path and no watch run, while an unmarked merge commit runs the watch.
 - [ ] AC-06: Feature-document lint accepts `covers` entries containing `**`, they match the same paths as the docs-impact matcher, and `vh-adlc fresh` treats a committed or uncommitted change under such an entry as covered.
 - [ ] AC-07: With `findings_document: always`, investigate writes its findings document, reports any duplicate analysis document or open issue it found, and ends with one of the three verdicts.
-- [ ] AC-08: Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` run the installed vh-adlc operations with Stackweaver's settings for every enrolled spec and the native agents for every unenrolled one, new specs are written enrolled, and every row of the committed parity map passes its contract test.
+- [ ] AC-08: Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` run the installed vh-adlc operations with Stackweaver's settings for every enrolled spec and, until the native agents retire, the native agents for every unenrolled one (after retirement, AC-17's refusal applies to terminal unenrolled documents), new specs are written enrolled, and every row of the committed parity map passes its contract test.
 - [ ] AC-09: Every Stackweaver spec in the migration set (the draft specs, plus each planned, in-progress or parked spec the owner moved) passes `vh-adlc lint`, its gate results agree with a manual reading of the document, and each moved spec that was planned or in progress carries a fresh review and an owner acceptance row at its converted baseline.
 - [ ] AC-10: Stackweaver's local behaviors stay available with unchanged invocation: worktree slots, direct-to-main non-feature shipping through its own `/ship`, `[skip ci]` rules, `watch-merge.sh`, the triad and satellite lenses, the browser-pass summary table, and `/implement` handing straight to ship.
 - [ ] AC-11: A disposable Stackweaver checkout rolls back to the native loop and reapplies the adoption, with the docs index and unrelated workflow files byte-identical afterwards.
-- [ ] AC-12: The shared changes are installed from the published marketplace in an isolated profile and exercised through their entry points before Stackweaver's native agent files are retired.
+- [ ] AC-12: The docs revision, a signed runtime release whose archives and checksums match the plugin lock, and the plugin payload are each published through their release paths, and the plugin is installed from the published marketplace in an isolated profile and exercised through its entry points before Stackweaver adopts it.
 - [ ] AC-13: Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on another branch name, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops before writing anything, and when the push is rejected it keeps the local claim commit, creates no feature branch and reports the claim pending.
 - [ ] AC-14: A Stackweaver feature taken through the adopted loop passes its completion gate in its owning worktree before merge, and after it lands by merge commit every commit its Review Log names is reachable from `main`.
 - [ ] AC-15: With `skip_ci_paths` declared, a feature delivery whose commit, push range and PR diff touch only feature documents, Markdown onboarding files or declared paths carries the skip marker, and any other change in the delivery leaves it off.
@@ -418,17 +445,17 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | `bun test tests/vh-adlc` cases for each supported role and route pair, refusal of a `command` route for `author` and `implementer`, resume taking the continued operation's route, a no-file case compared with `a7bfca99` behavior, and a grep test that fails on a model name in any agent or skill file. |
-| AC-02 | A fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, and one that creates or moves a non-current branch or tag; then one real Copilot CLI `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
+| AC-02 | A fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, one that creates or moves a non-current branch or tag, one that overwrites an existing ignored configuration file, and one that changes an index flag without changing the index tree; then one real Copilot CLI `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
 | AC-03 | Fixture specs that break a declared instruction and a declared lens; the reviewer must return a finding for each and none for a compliant control. |
-| AC-04 | Fixture changes that match some rungs and not others; the report must list every rung with the right state; a failing command and an unavailable procedure must each leave no push, no completion commit and no delivered report, unless the owner allowance is recorded for that rung; a no-rung fixture must keep the current lookup. |
-| AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported), a watch stub that exits 1 then 0 (delivered only after 0), and a skip-eligible feature merge combined with Stackweaver's watch policy (delivered with no publication path, watch never invoked). |
+| AC-04 | Fixture changes that match some rungs and not others; a feature whose first commit changes `backend/` and whose last changes only documentation must still require the integration rung before push and completion; a pass recorded on an earlier commit must not count for a later one; the report must list every rung with the right state; a failing command and an unavailable procedure must each leave no push, no completion commit and no delivered report, unless the owner allowance is recorded for that rung; a no-rung fixture must keep the current lookup. |
+| AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported), a watch stub that exits 1 then 0 (delivered only after 0), a skip-eligible feature merged with a marked merge commit (delivered with no publication path, watch never invoked), and the same feature merged with an unmarked merge commit (watch invoked). |
 | AC-06 | Go tests in `internal/doc` for `**` at start, middle and end, compared with the docs-impact matcher on the same inputs; `internal/fresh` tests where a commit and a dirty file under a `**` entry make the review stale and `feature_tree_clean` false; the existing lint suite unchanged. |
 | AC-07 | Investigate fixtures with and without a duplicate analysis document and a duplicate open issue; the run must write the document and name the duplicate and the verdict. |
-| AC-08 | Stackweaver parity contract tests; one real run of each adapted command on a disposable enrolled feature, checking the operation reached and the settings read; and the same commands on a disposable unenrolled spec, which must reach the native agents through a native re-review and completion. |
+| AC-08 | Stackweaver parity contract tests; one real run of each adapted command on a disposable enrolled feature, checking the operation reached and the settings read; and, before retirement, the same commands on a disposable unenrolled spec, which must reach the native agents through a native re-review and completion. Post-retirement refusal is tested under AC-17. |
 | AC-09 | `vh-adlc lint` and `vh-adlc gate` over the migration set, a manual reading of every migrated spec that records the expected and observed result of each gate condition at its converted baseline, and for each moved planned or in-progress spec an inspection of its Review Log for a post-conversion review and acceptance row. |
 | AC-10 | A scripted check that each listed local behavior's entry point still exists and runs in dry-run or help mode, and a review of `agents/loop-project.md` against the parity map. |
 | AC-11 | The rollback and reapply procedure on a disposable checkout, comparing file hashes before and after. |
-| AC-12 | Isolated Claude Code profile install from the marketplace, payload digest check, a check that the installed `knowledge.md` pin and `vh-adlc.lock.json` binary version equal the reviewed source, and one spec review through the command route at the published revision. |
+| AC-12 | A GoReleaser snapshot build before the runtime merge; after release, the tag, the four archives, `checksums.txt` and a signature that verifies against the release key, compared with the lock's checksums; the vhco-pro/docs commit equal to the new `knowledge.md` pin; then an isolated Claude Code profile install from the marketplace, payload digest check, installed pin and lock equal to the reviewed source, and one spec review through the command route at the published revision. |
 | AC-13 | Fixture repositories with a detached worktree at the tip and a worktree on another branch at the tip (both claim); one behind the tip and one with a stray change (both leave the repository byte-identical); and a rejected push (one local claim commit, no feature branch, a pending report). |
 | AC-14 | One disposable Stackweaver feature taken from claim to merge: `vh-adlc gate complete` passes in the owning worktree before the PR merges, then `git merge-base --is-ancestor <commit> origin/main` holds for every Review Log commit after a merge-commit landing. |
 | AC-15 | Ship fixtures whose delivery touches only declared paths, declared paths plus code, and declared paths with an earlier code commit in the push range; only the first carries the marker. |
@@ -443,8 +470,8 @@ None yet; written once the document is planned.
 ## Open Questions
 
 None. The owner answered Q1 to Q10, the three R-1 judgement findings (F-01, F-03, F-07) and the
-three R-2 judgement findings (F-02, F-03, F-04) and the two R-3 judgement findings (F-01, F-04) on
-2026-11-13; the answers are folded into Owner summary, Scope and Design.
+three R-2 judgement findings (F-02, F-03, F-04) the two R-3 judgement findings (F-01, F-04) and the three
+R-4 judgement findings (F-02, F-03, F-04) on 2026-11-13; the answers are folded into Owner summary, Scope and Design.
 
 ## Review Log
 
