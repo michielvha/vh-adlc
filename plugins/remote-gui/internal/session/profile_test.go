@@ -973,3 +973,111 @@ func TestRefusedFirstStartLeavesNoProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// rawHolder reads the holder straight from meta.json, which profile.ReadMeta
+// refuses while the profile directory is not private.
+func rawHolder(t *testing.T, f profileFixture, name string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(f.profiles, name, "meta.json"))
+	var m profile.Meta
+	if err == nil {
+		err = json.Unmarshal(data, &m)
+	}
+	if err != nil {
+		t.Fatalf("reading the holder: %v", err)
+	}
+	return m.HolderID
+}
+
+// When the guard cannot clear the holder from the profile's metadata at stop
+// or expiry, here because the profile directory is not writable or meta.json
+// is not readable, the session stays cleanup-pending with a diagnostic and
+// its guard keeps the profile locked. Once the cause is gone a later cleanup
+// clears the holder and releases the lock, and only then the session reports
+// stopped.
+func TestFailedHolderClearKeepsProfileSessionPending(t *testing.T) {
+	for _, ending := range []string{"stop", "expiry"} {
+		t.Run(ending, func(t *testing.T) {
+			f := newProfileFixture(t)
+			c := f.config(t, "work", "--ttl", map[string]string{"stop": "1m", "expiry": "3s"}[ending])
+			v, err := Start(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, err := state.Load(f.home, v.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dir := filepath.Join(f.profiles, "work")
+			meta := filepath.Join(dir, "meta.json")
+			restore := func() {
+				_ = os.Chmod(dir, 0o700)
+				_ = os.Chmod(meta, 0o600)
+			}
+			t.Cleanup(restore)
+			if ending == "stop" {
+				err = os.Chmod(dir, 0o500)
+			} else {
+				err = os.Chmod(meta, 0)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var end View
+			if ending == "stop" {
+				if end, err = Stop(f.home, v.ID); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				time.Sleep(time.Until(record.Expires))
+				end = waitEnd(t, f.home, v.ID)
+			}
+			if end.State != "cleanup-pending" || end.CleanupDiagnostic == "" {
+				t.Fatalf("%s reported %+v while the holder clear failed", ending, end)
+			}
+			// The guard retries every second; a broken profile keeps failing.
+			time.Sleep(1500 * time.Millisecond)
+			if current, e := Read(f.home, v.ID); e != nil || current.State != "cleanup-pending" || current.CleanupDiagnostic == "" {
+				t.Fatalf("the session left cleanup-pending while the holder clear failed: %+v %v", current, e)
+			}
+			if lockHeld(c) != "held" || !state.Alive(record.Guard) || !holdsFile(record.Guard.PID, filepath.Join(dir, ".lock")) {
+				t.Fatal("the guard released the profile lock before the holder was cleared")
+			}
+			if ending == "stop" {
+				if holder := rawHolder(t, f, "work"); holder != v.ID {
+					t.Fatalf("holder %q while cleanup is pending, want %q", holder, v.ID)
+				}
+			}
+			restore()
+			for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+				views, e := Cleanup(context.Background(), f.home)
+				if e != nil {
+					t.Fatal(e)
+				}
+				if len(views) == 1 && views[0].State != "cleanup-pending" {
+					if views[0].State != "stopped" {
+						t.Fatalf("cleanup ended the session %+v, want stopped", views[0])
+					}
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatalf("cleanup left the session pending: %+v", views)
+				}
+			}
+			held, err := profile.Acquire(f.profiles, "work")
+			if err != nil {
+				t.Fatalf("lock still held after the session reported stopped: %v", err)
+			}
+			m, _, err := held.Meta()
+			held.Release()
+			if err != nil || m.HolderID != "" || m.HolderGuard != nil {
+				t.Fatalf("holder not cleared before stopped: %+v %v", m, err)
+			}
+			for deadline := time.Now().Add(3 * time.Second); state.Alive(record.Guard); time.Sleep(20 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("the guard outlived the stopped session")
+				}
+			}
+		})
+	}
+}
