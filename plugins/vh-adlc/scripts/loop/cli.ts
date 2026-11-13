@@ -130,7 +130,12 @@ export async function main(argv: string[]): Promise<number> {
     const head = execFileSync("git", ["rev-parse", "--verify", `${options.merge ?? "HEAD"}^{commit}`], { cwd: repo }).toString().trim();
     const verdict = options.run === "true" ? mayAdvance(results, { head, declared, allowances: options.allow ? options.allow.split(",") : [] })
       : { advance: !declared, lookup: declared ? "rungs" : "agents-md", blocking: applicable.map(r => r.name) };
-    console.log(JSON.stringify({ declared, range: delta.range, paths: delta.paths, applicable: applicable.map(r => r.name), results, ...verdict }));
+    // Every declared rung is reported; one whose path condition does not hold is listed as not run with
+    // that reason, and takes no part in the verdict above.
+    const report = options.run === "true" ? settings.verification_rungs.map(rung => results.find(result => result.name === rung.name) ?? {
+      name: rung.name, state: "not run" as const, commit: head,
+      reason: `its path condition does not hold for this feature (${rung.when === "always" ? "always" : rung.when.paths.join(", ")})` }) : [];
+    console.log(JSON.stringify({ declared, range: delta.range, paths: delta.paths, applicable: applicable.map(r => r.name), results: report, ...verdict }));
     return verdict.advance ? 0 : 3;
   }
   if (command === "review") {

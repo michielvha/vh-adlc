@@ -59,7 +59,8 @@ subcheck, blocks unless the owner allows that exact rung (`<rung>`) or subcheck 
 that run, and the report records the allowance. With rungs or a post-merge watch declared, a feature
 lands by merge commit only. Without rungs, operations keep reading verification commands from
 `AGENTS.md`. `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` reports the
-delta, the applicable rungs, each result and whether the feature may advance. A written procedure rung
+delta, the applicable rungs, a result for every declared rung and whether the feature may advance; a
+rung whose path condition does not hold is listed as not run with that reason and does not block. A written procedure rung
 counts only through `--record <rung>=passed|failed:<what was observed>`, given by the operation that
 performed it, at the current head.
 

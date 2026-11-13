@@ -196,3 +196,17 @@ describe("renames", () => {
     expect([run.exitCode, out.applicable, out.advance]).toEqual([3, ["integration"], false]);
   });
 });
+
+describe("the rung report", () => {
+  test("a declared rung whose path condition does not hold is reported as not run with that reason, and does not block", () => {
+    const { root, head } = feature();
+    const cli = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
+    const run = Bun.spawnSync([process.execPath, cli, "rungs", "--repo", root, "--base", "main", "--run", "true"], { stdout: "pipe", stderr: "pipe",
+      env: { ...process.env, XDG_CONFIG_HOME: join(root, ".no-override") } });
+    const out = JSON.parse(run.stdout.toString());
+    expect(out.applicable).toEqual(["verify", "integration"]);
+    expect(out.results.map((r: { name: string; state: string }) => [r.name, r.state])).toEqual([["verify", "passed"], ["integration", "passed"], ["kind", "not run"]]);
+    expect(out.results.find((r: { name: string }) => r.name === "kind")).toMatchObject({ reason: "its path condition does not hold for this feature (e2e/**)", commit: head });
+    expect([run.exitCode, out.advance, out.blocking]).toEqual([0, true, []]);
+  });
+});
