@@ -64,3 +64,12 @@ describe("the PID namespace boundary", () => {
     expect(existsSync(late)).toBe(false);
   });
 });
+
+describe("hosts that forbid probing process groups", () => {
+  test("cleanup reports unconfirmed, never confirmed, when the group cannot be probed", async () => {
+    const { groupProbe } = await import("../../../plugins/vh-adlc/scripts/triage/owned-process");
+    expect(groupProbe("EPERM")).toBe("unknown");
+    expect(groupProbe("ESRCH")).toBe("gone");
+    expect(groupProbe(undefined)).toBe("alive");
+  });
+});

@@ -123,3 +123,19 @@ describe("delivery after merge", () => {
       .toEqual({ delivered: false, state: "manual", reason: "no post-merge watch declared; check each release path the feature document names" });
   });
 });
+
+describe("the skip marker over a push range", () => {
+  test("a code change that a later commit reverts still leaves the marker off", () => {
+    const remoteDir = scratch("vh-delivery-remote-"), remote = join(remoteDir, "r.git");
+    git(remoteDir, "init", "-q", "--bare", "-b", "main", remote);
+    const root = repository(base());
+    git(root, "remote", "add", "origin", remote); git(root, "push", "-q", "origin", "main");
+    write(root, { "src/app.go": "changed\n" }); git(root, "commit", "-q", "-am", "code");
+    write(root, { "src/app.go": "a\n" }); git(root, "commit", "-q", "-am", "revert");
+    write(root, { "docs/specs/f.md": "# F2\n" }); git(root, "commit", "-q", "-am", "doc");
+    const cli = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
+    const run = Bun.spawnSync([process.execPath, cli, "skip", "--repo", root, "--base", "origin/main", "--remote-branch", "origin/main", "--feature-root", "docs/specs/", "--docs-revision", "none"],
+      { stdout: "pipe", stderr: "pipe", env: { ...process.env, XDG_CONFIG_HOME: join(remoteDir, "cfg") } });
+    expect(JSON.parse(run.stdout.toString()).marker).toBe(false);
+  });
+});

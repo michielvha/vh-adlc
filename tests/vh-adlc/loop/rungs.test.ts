@@ -149,3 +149,20 @@ describe("landing", () => {
     expect(landingAllowed(loadLoopSettings(feature("schema_version: 1\n").root, { overridePath: null }), "fast-forward")).toEqual({ allowed: true });
   });
 });
+
+describe("status parsing", () => {
+  test("an unstaged change to a tracked file keeps its path, so its rung still applies", () => {
+    const { root } = feature("schema_version: 1\nverification_rungs:\n  - name: integration\n    when: { paths: [\"backend/**\"] }\n    command: \"true\"\n");
+    git(root, "switch", "-q", "main"); git(root, "switch", "-q", "-c", "feat/y");
+    write(root, { "backend/app.go": "package app\n// unstaged\n" });
+    const delta = featureDelta(root, { base: "main" });
+    expect(delta.paths).toContain("backend/app.go");
+    expect(applicableRungs(loadLoopSettings(root, { overridePath: null }), delta.paths).map(r => r.name)).toEqual(["integration"]);
+  });
+
+  test("a path Git quotes is matched by its real name", () => {
+    const { root } = feature("schema_version: 1\nverification_rungs:\n  - name: spaced\n    when: { paths: [\"docs/my notes/**\"] }\n    command: \"true\"\n");
+    write(root, { "docs/my notes/a b.md": "x\n" });
+    expect(featureDelta(root, { base: "main" }).paths).toContain("docs/my notes/a b.md");
+  });
+});

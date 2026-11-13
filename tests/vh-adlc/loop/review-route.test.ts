@@ -294,3 +294,11 @@ describe("environment-clearing helpers", () => {
     pending(outcome, "process boundary");
   });
 });
+
+describe("pathnames Git quotes", () => {
+  test("a reviewer rewriting an already modified file whose name Git quotes leaves the review pending", async () => {
+    const { root, commit } = repository(dir => writeFileSync(join(dir, "a b.txt"), "one\n"));
+    writeFileSync(join(root, "a b.txt"), "two\n");
+    pending(await review(root, commit, stub("echo three > 'a b.txt'", ok(commit))), "changed");
+  });
+});
