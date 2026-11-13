@@ -62,7 +62,7 @@ if (receiptData[endpoint] !== undefined) {
   if (endpoint === ${JSON.stringify(refEndpoint)}) {
     const path = ${JSON.stringify(countPath)}, count = receiptFS.existsSync(path) ? Number(receiptFS.readFileSync(path, "utf8")) : 0;
     receiptFS.writeFileSync(path, String(count + 1), { mode: 0o600 });
-    if (receiptFault.missing_ref) { console.log("HTTP/2.0 404 Not Found\\r\\n\\r\\n{}"); process.exit(1); }
+    if (receiptFault.missing_ref || (receiptFault.late_missing_ref && count >= receiptFault.late_missing_ref)) { console.log("HTTP/2.0 404 Not Found\\r\\n\\r\\n{}"); process.exit(1); }
     if (receiptFault.late_ref && count >= 2) value = { ref: value.ref, object: { type: "commit", sha: "f".repeat(40) } };
   }
   if (endpoint === ${JSON.stringify(blobEndpoint)}) {

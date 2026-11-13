@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { constants, closeSync, mkdirSync, writeFileSync, fstatSync, lstatSync, openSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { join, relative, isAbsolute } from "node:path";
-import type { ArtifactInput, JobInput, PullRequestInput, RepositoryReader, WorkflowRunInput } from "../github-read";
+import { GitHubReadError, type ArtifactInput, type JobInput, type PullRequestInput, type RepositoryReader, type WorkflowRunInput } from "../github-read";
 import { ArchiveSetupError, readReportArchive } from "./archive";
 import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, protocolPath, sha256 } from "./protocol";
 import { reportTime } from "./report";
@@ -430,7 +430,13 @@ export async function readReviewedProposal(options: {
   for (const item of reviewed.attention) {
     if (item.version !== 1 || hash(item.sha256) !== canonicalDigest(item.binding)) invalid("reviewed attention projection");
   }
-  if (reader.ref(ref).sha !== nativeRef.sha || canonicalDigest(reader.pull(current.number)) !== canonicalDigest(current))
+  let recheckedRef: ReturnType<RepositoryReader["ref"]>;
+  try { recheckedRef = reader.ref(ref); }
+  catch (error) {
+    if (error instanceof GitHubReadError && error.status === 404) throw new PublicationEvidenceChanged("native publication disappeared during read");
+    throw error;
+  }
+  if (recheckedRef.sha !== nativeRef.sha || canonicalDigest(reader.pull(current.number)) !== canonicalDigest(current))
     throw new PublicationEvidenceChanged("native publication changed during read");
   return { reviewed: { actor: reviewed.actor, head: reviewed.head, body_sha256: reviewed.body_sha256,
     corrections: reviewed.corrections, attention: reviewed.attention },

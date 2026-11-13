@@ -85,8 +85,16 @@ export async function collectAuditPublicationReceipts(input: { repo: string; sou
       }
     }
     const final = native(); requireInventory(final);
-    for (const entry of result.proposals) if (entry.receipt && final.repository.ref(entry.receipt.ref).sha !== entry.receipt.object)
-      throw new PublicationScopeChanged("Native reviewed-publication ref changed after audit collection");
+    for (const entry of result.proposals) if (entry.receipt) {
+      try {
+        if (final.repository.ref(entry.receipt.ref).sha !== entry.receipt.object)
+          throw new PublicationScopeChanged("Native reviewed-publication ref changed after audit collection");
+      } catch (error) {
+        if (error instanceof GitHubReadError && error.status === 404)
+          throw new PublicationScopeChanged("Native reviewed-publication ref disappeared after audit collection");
+        throw error;
+      }
+    }
     requireContext(native()); recheckReferences();
     if (unavailable) throw Error("Required native audit receipt collection incomplete");
     result.complete = true;
@@ -99,7 +107,7 @@ export async function collectAuditPublicationReceipts(input: { repo: string; sou
   }
   if (!result.complete) {
     result.reviewed_proposals = 0;
-    for (const entry of result.proposals) if (entry.eligibility === "reviewed") { entry.eligibility = "unavailable"; entry.reviewed = null; }
+    for (const entry of result.proposals) if (entry.eligibility === "reviewed") { entry.eligibility = "unavailable"; entry.reviewed = null; entry.receipt = null; }
   }
   if (Buffer.byteLength(JSON.stringify(result) + "\n") > limit) {
     result.complete = false; result.details_omitted = true; result.reviewed_proposals = 0; result.proposals = [];

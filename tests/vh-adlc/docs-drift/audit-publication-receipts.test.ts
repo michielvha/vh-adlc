@@ -48,7 +48,7 @@ test.each(["matching", "serialized", "changed-body", "changed-input-record", "un
   } catch (error) { failed = true; throw error; }
 }, 180000);
 
-test.each(["matching", "missing-ref", "missing-blob", "late-ref", "changed-input-during-read"])("audit receipt collection retains original native eligibility without inventing current delivery: %s", async fault => {
+test.each(["matching", "missing-ref", "missing-blob", "late-ref", "late-missing-ref", "final-missing-ref", "changed-input-during-read"])("audit receipt collection retains original native eligibility without inventing current delivery: %s", async fault => {
   try {
     const { collectAuditPublicationReceipts, readCollectedAuditPublicationReceipts } = await import("../../../plugins/vh-adlc/scripts/docs-drift/audit-publication-receipts");
     const f = await auditReceiptFixture(roots), original = await collectAuditProposalInputs(f.options);
@@ -62,13 +62,16 @@ test.each(["matching", "missing-ref", "missing-blob", "late-ref", "changed-input
       writeFileSync(f.receipt.countPath, "0");
       const input = original.proposals[0].inputs_reference!;
       writeFileSync(f.receipt.faultsPath, JSON.stringify({ missing_ref: fault === "missing-ref", missing_blob: fault === "missing-blob",
-        late_ref: fault === "late-ref", input_path: fault === "changed-input-during-read" ? join(f.artifacts, input.path) : undefined }), { mode: 0o600 });
+        late_ref: fault === "late-ref", late_missing_ref: fault === "late-missing-ref" ? 1 : fault === "final-missing-ref" ? 2 : undefined, input_path: fault === "changed-input-during-read" ? join(f.artifacts, input.path) : undefined }), { mode: 0o600 });
       const result = await collectAuditPublicationReceipts(options);
       expect(result.complete, JSON.stringify(result.diagnostics)).toBe(fault === "missing-ref"); expect(result.reviewed_proposals).toBe(0);
       if (fault === "missing-ref") { expect(result.proposals[0].eligibility).toBe("unreviewed"); expect(result.scope_changed).toBe(false); }
       else {
         expect(() => readCollectedAuditPublicationReceipts(result)).toThrow("Original native audit publication receipts required");
-        expect(result.scope_changed).toBe(fault === "late-ref" || fault === "changed-input-during-read");
+        expect(result.scope_changed).toBe(fault === "late-ref" || fault === "late-missing-ref" || fault === "final-missing-ref" || fault === "changed-input-during-read");
+        expect(result.proposals.every(row => row.reviewed === null && row.receipt === null)).toBe(true);
+        if (fault === "late-missing-ref") expect(result.diagnostics.join("\n")).toContain("Native reviewed publication changed during audit collection");
+        if (fault === "final-missing-ref") expect(result.diagnostics.join("\n")).toContain("Native reviewed-publication ref disappeared after audit collection");
         if (fault === "missing-blob") expect(result.proposals.map(row => row.number)).toEqual([11, 12]);
         if (fault === "changed-input-during-read") expect(readFileSync(join(f.artifacts, input.path), "utf8")).toContain("Preserve the changed original input during lookup");
       }

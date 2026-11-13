@@ -277,21 +277,24 @@
     "pattern": "src/**",
     "path": "src/a.ts",
     "valid": false,
-    "matched": false
+    "matched": false,
+    "gate_matched": true
   },
   {
     "name": "unsupported directory doublestar",
     "pattern": "src/**/",
     "path": "src/**/a.ts",
     "valid": false,
-    "matched": false
+    "matched": false,
+    "gate_matched": true
   },
   {
     "name": "unsupported middle doublestar",
     "pattern": "src/p**x.ts",
     "path": "src/px.ts",
     "valid": false,
-    "matched": false
+    "matched": false,
+    "gate_matched": true
   },
   {
     "name": "unclosed class",
