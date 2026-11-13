@@ -5,6 +5,7 @@ import { bindingFixture } from "./binding-fixture";
 import { evidence, role } from "./manifest-fixture";
 import { captureSyntheticRole, retainSyntheticArtifact } from "./original-publication-fixture";
 import { git, put } from "./repository-fixture";
+import { collectAuditProposalInputs } from "../../../plugins/vh-adlc/scripts/docs-drift/audit-proposal-inputs";
 import { collectWorkerInputs } from "../../../plugins/vh-adlc/scripts/docs-drift/publication-worker";
 import { roleRuntimeDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -17,9 +18,9 @@ afterAll(() => {
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-test.each(["matching", "changed-bytes", "wrong-source", "candidate-artifact"])("original worker assessment is source-bound and externally retained: %s", async fault => {
+test.each(["matching", "changed-bytes", "wrong-source", "candidate-artifact", "candidate-proposal-artifact"])("original worker assessment is source-bound and externally retained: %s", async fault => {
   try {
-    let worker: { path: string; sha256: string } | null = null, assessmentBytes: Buffer | null = null;
+    let worker: { path: string; sha256: string } | null = null, assessmentBytes: Buffer | null = null, proposalBytes: Buffer | null = null;
     const f = await bindingFixture(roots, false, { role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source },
       beforeCandidate: async input => {
         const current = await collectWorkerInputs(input.worker_options);
@@ -29,17 +30,23 @@ test.each(["matching", "changed-bytes", "wrong-source", "candidate-artifact"])("
         const assessment = fault === "candidate-artifact"
           ? { path: "secondary-candidate/finding-assessment.json", sha256: sha256(assessmentBytes) }
           : retainSyntheticArtifact(input.artifacts, "finding-assessment.json", assessmentBytes);
+        let proposalAssessment: { path: string; sha256: string } | null = null;
+        if (fault === "candidate-proposal-artifact") {
+          const inputs = await collectAuditProposalInputs(input.worker_options); expect(inputs.complete, JSON.stringify(inputs.diagnostics)).toBe(true);
+          proposalBytes = canonicalJSON({ schema_version: 1, kind: "docs-drift-proposal-assessment", source_commit: input.source, inputs_sha256: inputs.inputs_sha256, proposals: [] });
+          proposalAssessment = { path: "secondary-candidate/proposal-assessment.json", sha256: sha256(proposalBytes) };
+        }
         const original = evidence("assessment-author", current.worker_input_sha256!, canonicalJSON({ input_sha256: current.worker_input_sha256,
-          edits: (input.selection as { edits: unknown[] }).edits, publication: null, assessment }).toString());
+          edits: (input.selection as { edits: unknown[] }).edits, publication: null, assessment, ...(proposalAssessment ? { proposal_assessment: proposalAssessment } : {}) }).toString());
         worker = captureSyntheticRole(input.artifacts, input.source, "worker", roleRuntimeDigest(current.facts!.runtime!, "worker"), original);
       } });
     if (!worker || !assessmentBytes) throw Error("Missing original synthetic assessment capture");
     let candidate = f.candidate;
     if (fault === "changed-bytes") writeFileSync(join(f.artifacts, "finding-assessment.json"), "Changed original assessment\n");
-    if (fault === "candidate-artifact") {
+    if (fault === "candidate-artifact" || fault === "candidate-proposal-artifact") {
       candidate = join(f.artifacts, "secondary-candidate");
       git(f.root, "clone", "--no-local", "--no-checkout", f.repo, candidate); git(candidate, "checkout", "--detach", f.source);
-      writeFileSync(join(candidate, "finding-assessment.json"), assessmentBytes, { mode: 0o600 });
+      writeFileSync(join(candidate, fault === "candidate-artifact" ? "finding-assessment.json" : "proposal-assessment.json"), fault === "candidate-artifact" ? assessmentBytes : proposalBytes!, { mode: 0o600 });
     }
     put(f.repo, "docs/guide.md", "Keep the caller's draft\n");
     const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(candidate);

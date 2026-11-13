@@ -19,8 +19,9 @@ export function parseWorkerHandoff(options: Options) {
   if (!canonicalJSON(packet.edits).equals(canonicalJSON(edits))) throw Error("Original worker edit representation changed");
   function reference(key: "assessment" | "proposal_assessment"): { path: string; sha256: string } | null {
     if (!has(key)) return null;
-    const value = exactRecord(packet[key], ["path", "sha256"], "Original worker assessment reference required"), path = protocolPath(value.path);
-    if (typeof value.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.sha256)) throw Error("Original worker assessment digest required");
+    const name = key === "assessment" ? "finding assessment" : "proposal assessment";
+    const value = exactRecord(packet[key], ["path", "sha256"], "Original worker " + name + " reference required"), path = protocolPath(value.path);
+    if (typeof value.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.sha256)) throw Error("Original worker " + name + " digest required");
     return { path, sha256: value.sha256 };
   }
   return freezeJSON({ selection: { schema_version: 1 as const, source_commit: options.source, edits }, publication,

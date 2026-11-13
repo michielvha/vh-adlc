@@ -225,3 +225,10 @@ test("invalid calendar dates and duplicate identities cannot establish carried e
   duplicate.attention = [attention(), attention()];
   expect(() => buildReport(duplicate)).toThrow("duplicate attention");
 });
+
+test("a failed assessment does not present an empty recorded decision list as a clean result", () => {
+  const value = input(); value.failures = [{ code: "audit-review-incomplete", message: "Finding judgments unavailable" }];
+  const report = buildReport(value), markdown = renderReport(report);
+  expect(report.outcome).toBe("failed"); expect(markdown).not.toContain("No unresolved content decisions.\n");
+  expect(markdown).toContain("No unresolved content decisions are recorded in this failed report.");
+});

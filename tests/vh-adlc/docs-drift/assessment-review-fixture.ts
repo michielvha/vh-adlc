@@ -12,14 +12,16 @@ import { collectAuditProposalInputs, readCollectedAuditProposals } from "../../.
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
-export async function assessmentReviewFixture(roots: string[], options: { large?: boolean; largeReport?: boolean; proposals?: boolean; proposalAssessments?: boolean } = {}) {
+export async function assessmentReviewFixture(roots: string[], options: { large?: boolean; largeReport?: boolean; proposals?: boolean; proposalAssessments?: boolean; extraProposalHunk?: boolean; proposalVerdicts?: ("supported" | "fixed-differently" | "unsupported" | "unknown")[] } = {}) {
   let worker: { path: string; sha256: string } | null = null, assessment: { path: string; sha256: string } | null = null, proposalAssessment: { path: string; sha256: string } | null = null;
   const f = await bindingFixture(roots, false, { mutableInventory: options.proposals, scannerCase: options.large || options.largeReport ? "finding" : "none", role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source },
     beforeCandidate: async input => {
       if (options.proposals) {
         const root = dirname(input.artifacts), candidate = join(root, "original-audit-proposal"), origin = join(root, "binding-origin");
         git(root, "clone", "--no-local", "--no-checkout", input.repo, candidate); git(candidate, "checkout", "--detach", input.source);
-        put(candidate, "docs/guide.md", "# Full existing native proposal\n"); const head = commitAll(candidate);
+        put(candidate, "docs/guide.md", "# Full existing native proposal\n");
+        if (options.extraProposalHunk) put(candidate, "docs/extra.md", "# Additional proposal content\n");
+        const head = commitAll(candidate);
         git(origin, "-c", "protocol.file.allow=always", "fetch", "--no-write-fetch-head", candidate, head); git(origin, "update-ref", "refs/pull/11/head", head);
         const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
         writeFileSync(join(root, "binding-native-inventory.json"), canonicalJSON([{ number: 11, state: "open", merged_at: null, body: "Synthetic existing audit proposal",
@@ -38,8 +40,11 @@ export async function assessmentReviewFixture(roots: string[], options: { large?
         proposalAssessment = retainSyntheticArtifact(input.artifacts, "original-proposal-assessment.json", canonicalJSON({ schema_version: 1,
           kind: "docs-drift-proposal-assessment", source_commit: input.source, inputs_sha256: inputs.inputs_sha256,
           proposals: readCollectedAuditProposals(inputs).map(proposal => ({ number: proposal.number, binding_sha256: proposal.binding_sha256,
-            hunks: proposal.hunks.map(hunk => ({ id: hunk.id, verdict: "supported", reason: "Synthetic current-source support assessment",
-              recommendation: "Verify the full proposed result and retained delivery before carrying it", evidence: [quote] })) })) }));
+            hunks: proposal.hunks.map((hunk, index) => {
+              const verdict = options.proposalVerdicts?.[index % options.proposalVerdicts.length] ?? "supported";
+              return { id: hunk.id, verdict, reason: "Synthetic current-source support assessment",
+                recommendation: "Verify the full proposed result and retained delivery for " + hunk.id + " before carrying it", evidence: verdict === "unknown" ? [] : [quote] };
+            }) })) }));
       }
       const edits = structuredClone((input.selection as { edits: Array<{ replacement_base64: string }> }).edits);
       if (options.large) edits[0].replacement_base64 = Buffer.alloc(307500, "x").toString("base64");

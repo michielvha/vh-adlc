@@ -247,7 +247,7 @@ export function renderReport(report: Report): string {
     if (entry.carried_from.length) lines.push(`  Previously surfaced in ${entry.carried_from.map(prose).join(", ")}.`);
     if (entry.item.links.length) lines.push(`  Evidence ${entry.item.links.map(prose).join(", ")}.`);
   }
-  if (!count) lines.push("No unresolved content decisions.");
+  if (!count) lines.push(report.outcome === "failed" ? "No unresolved content decisions are recorded in this failed report." : "No unresolved content decisions.");
   lines.push("", "## Recommendations", "");
   if (report.failures.length) for (const failure of report.failures) lines.push(`- Resolve ${prose(failure.code)}. ${prose(failure.message)}.`);
   else if (count) lines.push("Use the listed owner actions to select the next assessment.");

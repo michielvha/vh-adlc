@@ -6,9 +6,10 @@ import { commitAll, git, put } from "./repository-fixture";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
 export const auditInputFaults = ["empty", "matching", "multiple", "partial-missing", "early-missing", "oversized-first", "missing-objects", "changed-after-fetch", "oversized-inputs"] as const;
-export async function auditProposalInputsFixture(roots: string[], fault: typeof auditInputFaults[number]) {
+export async function auditProposalInputsFixture(roots: string[], fault: typeof auditInputFaults[number], options: { multiHunks?: boolean } = {}) {
   const f = await bindingFixture(roots, false, { mutableInventory: true });
     let head = f.head;
+    if (options.multiHunks) { put(f.candidate, "docs/extra.md", "# A second independent proposal hunk\n"); head = commitAll(f.candidate); }
     if (fault === "oversized-inputs" || fault === "oversized-first") { put(f.candidate, "docs/guide.md", "# " + "x".repeat(600000) + "\n"); head = commitAll(f.candidate); }
     const multiple = ["multiple", "partial-missing", "early-missing", "oversized-first"].includes(fault);
     let legacyHead = head;

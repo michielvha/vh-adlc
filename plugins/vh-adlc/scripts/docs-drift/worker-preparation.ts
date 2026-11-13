@@ -49,6 +49,11 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
     result.publication = handoff.publication;
     // This is original worker data; only the separate assessment reviewer validates its full proposal judgments.
     result.proposal_assessment_reference = handoff.proposal_assessment_reference;
+    if (handoff.proposal_assessment_reference) {
+      const secondary = artifactDirectoryScope(options.artifact_root, options.candidate_repo ?? repo), reference = handoff.proposal_assessment_reference;
+      secondary.assertExternal(join(secondary.directory, protocolPath(reference.path)));
+      readBoundArtifact({ source_repo: repo, artifact_root: secondary.directory, reference });
+    }
     const coordinated = readCoordinatedSelection({ repo, source: options.source, artifact_root: options.artifact_root,
       selection: result.selection, reference: decisions.coordination });
     result.inspection = inspectPreparation({ repo, source: options.source, selection: result.selection, protection_context: { coordinated } });

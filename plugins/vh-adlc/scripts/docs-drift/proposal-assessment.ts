@@ -1,17 +1,18 @@
+import { join } from "node:path";
 import { realpathSync } from "node:fs";
 import { readBoundArtifact } from "./evidence-input";
 import { readCollectedAuditProposals, type collectAuditProposalInputs } from "./audit-proposal-inputs";
 import { exactRecord } from "./publication-decisions";
-import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON } from "./protocol";
+import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
 import { matchesSourceQuote, parseSourceQuote } from "./resolve";
-import { captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { escapeReportText } from "./report";
 import { OUTPUT_LIMIT } from "./owned-process";
 
 type Verdict = "supported" | "fixed-differently" | "unsupported" | "unknown";
 type Hunk = { id: string; assessed: boolean; verdict: Verdict; reason: string; recommendation: string; evidence: ReturnType<typeof parseSourceQuote>[] };
 type Proposal = { number: number; binding_sha256: string; assessed: boolean;
-  assessment: "supported" | "fixed-differently" | "unsupported" | "unverifiable"; hunks: Hunk[] };
+  assessment: "supported" | "fixed-differently" | "unsupported" | "unverifiable" | "mixed"; hunks: Hunk[] };
 export type ProposalAssessment = {
   schema_version: 1; kind: "docs-drift-proposal-assessment-report"; authority: "none"; origin: "caller-assessment";
   source_commit: string; inputs_sha256: string | null; assessment_reference: { path: string; sha256: string } | null;
@@ -25,18 +26,20 @@ function text(value: unknown): string {
   return value;
 }
 function assessment(hunks: Hunk[]): Proposal["assessment"] {
-  if (!hunks.length || hunks.some(hunk => !hunk.assessed || hunk.verdict === "unknown")) return "unverifiable";
-  if (hunks.some(hunk => hunk.verdict === "unsupported")) return "unsupported";
-  if (hunks.every(hunk => hunk.verdict === "supported")) return "supported";
-  return hunks.every(hunk => hunk.verdict === "fixed-differently") ? "fixed-differently" : "unverifiable";
+  if (!hunks.length || hunks.some(hunk => !hunk.assessed)) return "unverifiable";
+  const verdicts = new Set(hunks.map(hunk => hunk.verdict));
+  if (verdicts.size > 1) return "mixed";
+  const verdict = hunks[0].verdict;
+  return verdict === "unknown" ? "unverifiable" : verdict;
 }
 
 /** Validate complete full-diff accounting and current quotes. Judgments remain provisional until independent review. */
 export function readProposalAssessment(options: {
   repo: string; source: string; artifact_root: string; inputs: Awaited<ReturnType<typeof collectAuditProposalInputs>>;
-  reference: unknown;
+  reference: unknown; candidate_repo?: string;
 }): ProposalAssessment {
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo)), candidate = options.candidate_repo ? realpathSync(options.candidate_repo) : repo;
+  const candidateBefore = candidate === repo ? before : canonicalDigest(captureRepositoryState(candidate));
   const result: ProposalAssessment = { schema_version: 1, kind: "docs-drift-proposal-assessment-report", authority: "none", origin: "caller-assessment",
     source_commit: options.source, inputs_sha256: null, assessment_reference: null, complete: false, collection_complete: false, details_omitted: false, diagnostics: [],
     counts: { required_proposals: null, assessed_proposals: null, unassessed_proposals: null, required_hunks: null, assessed_hunks: null, unknown_hunks: null, unassessed_hunks: null }, proposals: [] };
@@ -49,7 +52,9 @@ export function readProposalAssessment(options: {
     result.proposals = originals.map(proposal => ({ number: proposal.number, binding_sha256: proposal.binding_sha256, assessed: false, assessment: "unverifiable",
       hunks: proposal.hunks.map(hunk => ({ id: hunk.id, assessed: false, verdict: "unknown", reason: "This complete original hunk has no recorded assessment",
         recommendation: "Inspect the full proposal and current source", evidence: [] })) }));
-    const raw = readBoundArtifact({ source_repo: repo, artifact_root: options.artifact_root, reference: options.reference });
+    const scope = artifactDirectoryScope(options.artifact_root, candidate);
+    scope.assertExternal(join(scope.directory, protocolPath((options.reference as { path?: unknown })?.path)));
+    const raw = readBoundArtifact({ source_repo: repo, artifact_root: scope.directory, reference: options.reference });
     if (raw.length > limit) throw Error("Proposal assessment exceeds the retained entry bound");
     const packet = exactRecord(JSON.parse(decodeUTF8(raw)), ["schema_version", "kind", "source_commit", "inputs_sha256", "proposals"], "Proposal assessment fields changed");
     if (!canonicalJSON(packet).equals(raw) || packet.schema_version !== 1 || packet.kind !== "docs-drift-proposal-assessment"
@@ -83,6 +88,7 @@ export function readProposalAssessment(options: {
     result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Current proposal assessment unavailable"); }
   if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during proposal assessment"); }
+  if (candidate !== repo && !matchesRepositoryState(candidate, candidateBefore)) { result.complete = false; result.diagnostics.push("Candidate changed during proposal assessment"); }
   if (result.collection_complete) {
     const hunks = result.proposals.flatMap(proposal => proposal.hunks);
     result.counts = { required_proposals: result.proposals.length, assessed_proposals: result.proposals.filter(proposal => proposal.assessed).length,

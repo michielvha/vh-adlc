@@ -13,7 +13,7 @@ import { collectWorkerPreparation } from "./worker-preparation";
 import type { WorkerCollectionOptions } from "./publication-worker";
 import { renderAssessmentReport, type AssessmentReport } from "./assessment-report";
 
-type Options = WorkerCollectionOptions & { worker_capture: unknown };
+type Options = WorkerCollectionOptions & { worker_capture: unknown; candidate_repo?: string };
 type Preparation = Awaited<ReturnType<typeof collectWorkerPreparation>>;
 type Facts = NonNullable<NonNullable<Preparation["worker_inputs"]>["facts"]>;
 type RoleBinding = ReturnType<typeof readNativeRoleCapture>["binding"];
@@ -63,7 +63,7 @@ function bounded(result: Result, command: Command, limit: number): Result {
 }
 
 function copiedOptions(input: Options): Options {
-  return { repo: input.repo, source: input.source, artifact_root: input.artifact_root, owner: input.owner, run: input.run,
+  return { repo: input.repo, source: input.source, artifact_root: input.artifact_root, owner: input.owner, run: input.run, candidate_repo: input.candidate_repo,
     credential: input.credential, path: input.path ?? process.env.PATH, inventory_context: input.inventory_context, cache_directory: input.cache_directory,
     entry: input.entry, launcher_path: input.launcher_path, settings_path: input.settings_path,
     source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), worker_capture: structuredClone(input.worker_capture) };
@@ -98,7 +98,7 @@ async function currentTarget(options: Options): Promise<{ result: Result; contex
       const recheck = () => readBoundArtifact({ source_repo: repo, artifact_root: options.artifact_root, reference });
       recheck();
       proposalAssessment = readProposalAssessment({ repo, source: options.source, artifact_root: options.artifact_root,
-        inputs: originals, reference });
+        inputs: originals, reference, candidate_repo: options.candidate_repo });
       recheck();
       if (!proposalAssessment.complete || !proposalAssessment.collection_complete || proposalAssessment.details_omitted) {
         result.diagnostics.push(...proposalAssessment.diagnostics); throw Error("Complete original worker proposal assessment required");
@@ -144,7 +144,7 @@ export async function collectAssessmentReview(input: Options & { reviewer_captur
     const { runtime, identity, store, current_default } = current.context, manifest = result.manifest;
     const policy = { repo: store.root, current_default, identity, runtime };
     const workerPolicy = readAdoptedRolePolicy({ ...policy, role: "worker" }), reviewerPolicy = readAdoptedRolePolicy({ ...policy, role: "reviewer" });
-    const common = { source_repo: repo, artifact_root: options.artifact_root };
+    const common = { source_repo: repo, artifact_root: options.artifact_root, candidate_repo: options.candidate_repo };
     const worker = readNativeRoleCapture({ ...common, reference: options.worker_capture, policy: workerPolicy,
       expected: { role: "worker", source_commit: options.source, runtime_sha256: manifest.worker_runtime_sha256, target_sha256: workerInputsDigest(manifest.inputs) } });
     const reviewer = readNativeRoleCapture({ ...common, reference, policy: reviewerPolicy,
