@@ -339,4 +339,15 @@ func TestDoubleStarCovers(t *testing.T) {
 			t.Fatalf("feature tree = %+v, want dirty with src/deep/c.go", res.FeatureTree)
 		}
 	})
+	t.Run("an untracked covered file with a newline in its name dirties the tree", func(t *testing.T) {
+		f := newFixture(t, false)
+		f.edit("  - src/\n", "  - src/**\n")
+		f.repo.Commit("double-star covers")
+		f.reviewed()
+		f.repo.Write("src/\nfile.go", "package src\n")
+		res, _ := f.compute()
+		if res.FeatureTree.Clean || !slices.Equal(res.FeatureTree.Paths, []string{"src/\nfile.go"}) {
+			t.Fatalf("feature tree = %+v, want dirty with src/\\nfile.go", res.FeatureTree)
+		}
+	})
 }

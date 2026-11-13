@@ -58,7 +58,8 @@ func compileDoubleStar(pattern string) (*regexp.Regexp, bool, error) {
 	}
 	chars := []rune(pattern)
 	var b strings.Builder
-	b.WriteString("^")
+	// (?s): Git paths may contain newlines, and ** and * must match them as the docs-impact matcher does.
+	b.WriteString("(?s)^")
 	for at := 0; at < len(chars); {
 		char := chars[at]
 		at++
