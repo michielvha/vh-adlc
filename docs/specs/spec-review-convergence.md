@@ -299,6 +299,7 @@ applied before a further pass.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-13 | R-1 | spec | `83ae24c` | claude-opus-5-5 | procedural | Two blocking findings (F-01 streak reset, F-02 blocking definition) and ten others |
 | 2026-11-13 | R-2 | spec | `c643cc0` | claude-opus-5-5 | procedural | Clean: no blocking finding; three should-fix and three nits |
+| 2026-11-13 | R-3 | spec | `cd193f3` | claude-opus-5-5 | procedural | Clean: no blocking finding; seven should-fix and three nits |
 
 ### R-1
 
@@ -429,3 +430,75 @@ SEVERITY: nit
 WHERE: Design, Delivery (lines 227-228); Acceptance Criteria AC-06 ("the plugin points at the published docs commit")
 EVIDENCE: The docs SHA appears in three places, not two: AGENTS.md:4, plugins/vh-adlc/knowledge.md:5 and :7, and plugins/vh-adlc/references/security-settings.md:5, which links conventions/repository-security.md at d8f07c9dd69038375a535af8ad586086688f85ab (`git grep -n d8f07c9 c643cc0`). The last pin move (ff8d7fe, "Both docs pins move to d8f07c9") left security-settings.md alone. Delivery names only AGENTS.md and knowledge.md, so after this feature security-settings.md would still point at the old revision, and it is unclear whether that meets "the plugin points at the published docs commit".
 PROPOSAL: Say whether references/security-settings.md moves with the pin. If it stays, narrow AC-06 to the knowledge.md and AGENTS.md pins.
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (steps 1 and 4, lines 168-170 and 177-180); Context, Owner summary (lines 40-42, "you can still accept after any clean pass, as today"); Acceptance Criteria AC-01; Test Plan AC-01 row (Variant D)
+EVIDENCE: Step 1 says that after a clean pass below three the author "applies its factual findings, turns its judgement findings into Open Questions, and puts them to the owner". Step 4 says the owner may accept after any clean pass, and the author then applies none of that pass's findings and writes the acceptance row at it. The design never says whether the author offers that choice before carrying out step 1. If step 1 runs first and commits a normative fix, an acceptance the owner gives afterwards cannot be written at that pass, because `accepted` needs "a clean spec review whose commit has the current normative baseline" (conventions/feature-documents.md:309). So one implementer pauses after every clean pass to ask "accept now or continue", adding an owner round trip to each pass. Another applies at once and honors only an acceptance the owner gave in advance, as S7.7 and S7.9 do (tests/vh-adlc/scenarios/run.ts:534, :1078). Variant D scripts the acceptance, so both skills pass it. Under the second reading, the summary's "you can still accept after any clean pass" holds only for an acceptance given in advance.
+PROPOSAL: Say when the author offers acceptance relative to step 1. For example: only an acceptance the owner has already given, or gives before the author starts applying, triggers step 4; otherwise step 1 runs. Use the same wording in the Owner summary and AC-01, and add a Variant D check that matches the chosen timing.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Background; Design, Delivery (lines 229-242); Acceptance Criteria AC-06; frontmatter covers
+EVIDENCE: At cd193f3, docs/specs/shared-development-loop.md (status draft) covers plugins/vh-adlc/skills/vh-adlc-spec/, plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md, plugins/vh-adlc/references/review-protocol.md and tests/vh-adlc/ (`git show HEAD:docs/specs/shared-development-loop.md`, lines 7-15 and 23). On origin/main (b777df0) it also covers knowledge.md and both plugin.json manifests, and its Scope includes "the plugin pin bump that adopts it" (line 151). It also changes `/spec review` acceptance behavior (line 359). This spec edits the same review-mode steps, moves the same pin, and says "both manifests move from 0.16.1" (line 235). It never mentions the other feature. Whichever lands second will find the version and pin already moved and the SKILL.md review steps rewritten, and AC-06's "every docs pin in the plugin points at the published docs commit" then depends on which docs commit the other feature published.
+PROPOSAL: Name shared-development-loop in Background and say how the two sequence. For example: whichever lands second rebases its SKILL.md and protocol edits onto the first, and bumps the version and pin from whatever is current then. Rephrase "move from 0.16.1" as "move from the current version".
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Severity definitions (line 202); Design, Delivery (lines 229-242); Scope, Out of scope ("Moving any consumer repository's pin")
+EVIDENCE: The definitions and the free-text rule go only into the convention at the new docs revision, and the reviewer agent "tells the reviewer to rate with these definitions". plugins/vh-adlc/knowledge.md:8-9 says "`vh-adlc knowledge` decides whether the repository's own pin or this one applies", and a repository pin wins (`lint` here reports `"source":"repository","pin_files":["AGENTS.md"]`). A consumer that keeps an older pin, which this feature deliberately leaves alone, would run the updated reviewer and skill against a convention page that has no severity definitions, no free-text rule and the old Acceptance step 2. The page exists, so the `missing-page` stop in references/loop.md:86-87 does not fire. This is the upgrade question the document's own failure-mode check asks (lines 206-209), and Design does not answer it.
+PROPOSAL: State the behavior for a repository whose pin predates the companion change. For example: the reviewer agent and skill carry the definitions and the stopping rule themselves, or the skill reports that the pin is too old and falls back to the current procedure. Add a check for that case to AC-06.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-01; Test Plan AC-01 row (Variants A and B); Design, Terminology (Clean streak, line 160); Design, Stopping rule (lines 183-186)
+EVIDENCE: Variant B is "blocking finding in the second clean position; pass when the count restarts". Nothing stores the count, so "restarts" is observable only through what the author does on later passes, and the row does not say how many passes follow the blocking one. A skill that counts all clean passes in total, without resetting, passes a run that ends one or two passes after the blocking pass. The owner's R-1 decisions are that acceptance rows and `+dirty` rows do not count and that passes stored before the update do count (lines 291-293, Design lines 160 and 184-185). AC-01 does not state them and no variant contains any of those rows, so a skill that counts a `+dirty` row as a clean pass, or ignores stored passes, passes every listed check.
+PROPOSAL: Give Variant B a full sequence, for example clean, blocking, clean, clean, clean, and pass it only when the findings of the first two clean passes after the blocking pass are applied and only the third is listed. Add a variant whose stored log has a `+dirty` clean row, an acceptance row and pre-update clean passes, with an expected streak, and add those counting rules to AC-01.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Failure-mode check (lines 206-212); Scope ("A failure-mode check in the reviewer's spec section and the author's instructions"); Acceptance Criteria AC-04 (lines 260-263); Test Plan AC-04 row (line 278)
+EVIDENCE: Design and Scope add the check to the author's mode too: "state the behavior for each of the four questions in Design". No criterion or Test Plan row covers the author side, so a skill without that step meets every criterion. AC-04 lists four questions, but the two positive fixtures only exercise concurrent updates (shared counter) and retry or replay (remote API). No fixture leaves partial failure or upgrade and rollback undefined while defining the rest, so a reviewer that never asks about upgrade or rollback passes. Design names "runs concurrently" and "process boundary" as triggers; AC-04 names only shared state and network boundary. By this document's own definition (line 197), a proof that can pass on a wrong implementation is should-fix.
+PROPOSAL: Add a criterion and an author trial for the authoring step, for example an author drafting a fixture feature that crosses a boundary and stating behavior for all four questions in Design. Add a reviewer fixture that defines concurrency and retry but leaves upgrade and rollback undefined, and pass it only when the reviewer returns a failure-mode finding on upgrade or rollback.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Free-text checks (lines 221-227); Design, Stopping rule (step 1, lines 168-170); Context, Background (blog-visual-reading cascade, lines 114-117)
+EVIDENCE: The stopping rule never looks at should-fix versus nit. Step 1 applies every factual finding and asks every judgement finding as an Open Question, whatever its severity, and only blocking affects the streak. So demoting a widening request from should-fix to nit changes nothing the author does. A widening request in clean pass 1 or 2 is still applied or asked. If the widened pattern then rejects a correct output, that is blocking and resets the streak. That is the R-39 to R-40 to R-44 to R-45 sequence that Background cites (docs/specs/blog-visual-reading.md:1411, :1524, :1547). The Owner summary presents the rule as part of the churn fix (lines 48-49), but as written it only changes a label.
+PROPOSAL: Either give nits a different handling in steps 1 and 3 (for example, nits on an already reviewed row are listed rather than applied), or say plainly that the rule only standardizes ratings and does not change the loop.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-05 (lines 264-266); Test Plan AC-05 row (line 279); Design, Free-text checks (lines 224-225)
+EVIDENCE: The row says "pass when a seeded request to widen it for more wrong outputs is rated nit". A reviewer reviews a spec and raises its own findings; a fixture spec cannot contain a request for it to rate. The row does not say what makes the pattern "reviewed" in the fixture. Design defines that as "a clean pass's records hold no finding whose `WHERE` names that row", so the fixture needs a stored clean pass. The row also does not say what happens when the reviewer does not raise the widening at all. A reviewer that never mentions the gap either passes or fails, depending on how the trial runner reads the row.
+PROPOSAL: Specify the fixture: a Review Log with a stored clean pass that names no Test Plan row, a pattern row whose listed examples omit one stated wrong output, and a correct output the pattern rejects. Pass only when the reviewer returns a nit for the missed wrong output and a blocking finding for the rejected correct output, and fail the trial if either finding is missing.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-01 row ("a scripted reviewer"); Design, Delivery (lines 238-239)
+EVIDENCE: tests/vh-adlc/scenarios/run.ts dispatches the real reviewer subagent (for example S7.7 at :532-535, and the trace checks at :201-207 and :1193-1196). The harness has no mechanism for a scripted reviewer. A scripted reviewer has to return set records with a `MODEL:` line on each of up to five passes in one session, and the skill must accept it under references/review-protocol.md, which prefers the registered `vh-adlc-reviewer` agent. The document does not say how that substitution works, for example a plugin copy whose reviewer agent returns canned records keyed by pass number, as S14 copies the plugin (:600-603).
+PROPOSAL: Name the scripted-reviewer mechanism in Delivery and say what its returned `MODEL:` line is, so the scenario evidence can be reproduced.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Stopping rule (steps 2 and 4, lines 171-173 and 177-180)
+EVIDENCE: Steps 2 and 4 have the author apply nothing, so the acceptance stays valid. The convention puts only Scope, Design, Acceptance Criteria, Test Plan and covers in the normative baseline (conventions/feature-documents.md:70-71), and `fresh` only reports `baseline-changed` for those. A finding confined to Context, the Owner summary or Sources could be applied without making the accepted review stale, yet the design leaves even a known false citation in Context unfixed unless the owner picks it.
+PROPOSAL: Either allow findings confined to non-normative sections to be applied at steps 2 and 4, or say that leaving them unapplied is intended.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background, Model context (lines 125-126)
+EVIDENCE: "The owner is moving routine spec and review work off the most expensive model tier" has no citation, and the Context section is required to cite its claims (conventions/feature-documents.md:75-76). Nothing in this repository at cd193f3 records that move.
+PROPOSAL: Cite the source, for example the commit or settings that record the model move, or drop the sentence, since the paragraph's conclusion rests on the Review Log models.
