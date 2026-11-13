@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "All tasks T1 to T30 are done and every criterion has fresh evidence at 62c6eea, with the AC-02 and AC-16 cookie runs below load 4; implementation review is next."
+status: complete
+status_description: "Implemented and reviewed: implementation review R-23 met every criterion. Ready to ship in one PR with the 0.3.0 bump; publication and merge wait for the owner."
 branch: feat/remote-gui-reusable-profiles
 issue: https://github.com/michielvha/vh-adlc/issues/62
 goal: "An owner can opt in to a named browser profile bound to their identity, so provider sessions survive the end of a remote-gui session, while credential entry stays human-only and agent control of a signed-in profile always rests on the owner's confirmation."
