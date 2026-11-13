@@ -326,3 +326,11 @@ describe("private review clone", () => {
     pending(await review(root, commit, stub(`echo changed > "${root}/src/app.txt"`, ok(commit))), "changed");
   });
 });
+
+describe("reply bytes", () => {
+  test("records keep their bytes after the two header lines: trailing spaces and CRLF survive", async () => {
+    const { parseReply } = await import("../../../plugins/vh-adlc/scripts/loop/review-route");
+    expect(parseReply("MODEL: m\nTARGET: abcdef1\n\nNO FINDINGS   \n")).toEqual({ model: "m", target: "abcdef1", records: "NO FINDINGS   \n" });
+    expect(parseReply("MODEL: m\r\nTARGET: abcdef1\r\n\r\nFINDING: F-01\r\nKIND: factual\r\n")).toEqual({ model: "m", target: "abcdef1", records: "FINDING: F-01\r\nKIND: factual\r\n" });
+  });
+});

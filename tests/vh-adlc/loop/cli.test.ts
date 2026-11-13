@@ -75,3 +75,28 @@ describe("claim", () => {
     expect(git(remote, "log", "-1", "--format=%s", "main")).toBe("docs(specs): claim f [skip ci]");
   });
 });
+
+describe("implementation dispatch", () => {
+  test("the implementation reviewer's prompt names the private clone it runs in", () => {
+    const stubDir = realpathSync(mkdtempSync(join(tmpdir(), "vh-loop-cli-impl-")));
+    made.push(stubDir);
+    const stub = join(stubDir, "reviewer.sh");
+    writeFileSync(stub, `#!/bin/bash\nprompt="$2"; commit=$(grep -o 'Commit: [0-9a-f]*' <<<"$prompt" | cut -d' ' -f2)\ngrep -q 'Repository directory: the current directory, a private clone of the reviewed commit' <<<"$prompt" || exit 9\nprintf 'MODEL: %s\\nTARGET: %s\\n\\nNO FINDINGS\\n' "$1" "$commit"\n`);
+    chmodSync(stub, 0o700);
+    const { root, commit } = repo({ ".vh-adlc/loop.yaml": `schema_version: 1\nroles:\n  implementation_reviewer:\n    route: command\n    model: gpt-6.1-sol\n    argv: [${stub}, "{model}", "{prompt}"]\n` });
+    const run = cli("review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "implementation", "--docs-revision", "abc", "--binary", "/bin/false", "--plugin-pin", "def");
+    expect(run.json).toMatchObject({ status: "ready" });
+  });
+});
+
+describe("recorded procedure rungs", () => {
+  test("a procedure rung's recorded result at the head counts through the CLI", () => {
+    const { root } = repo({ ".vh-adlc/loop.yaml": "schema_version: 1\nverification_rungs:\n  - name: unit\n    when: always\n    command: \"true\"\n  - name: browser\n    when: always\n    procedure: Record the browser pass.\n" });
+    const without = cli("rungs", "--repo", root, "--base", "main", "--run", "true");
+    expect(without.json).toMatchObject({ advance: false, blocking: ["browser"] });
+    const withRecord = cli("rungs", "--repo", root, "--base", "main", "--run", "true", "--record", "browser=passed:summary table recorded");
+    expect(withRecord.json).toMatchObject({ advance: true, blocking: [] });
+    const failed = cli("rungs", "--repo", root, "--base", "main", "--run", "true", "--record", "browser=failed:page broke");
+    expect(failed.json).toMatchObject({ advance: false, blocking: ["browser"] });
+  });
+});
