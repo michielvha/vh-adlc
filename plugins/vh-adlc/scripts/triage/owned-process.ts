@@ -48,8 +48,13 @@ export function markedProcesses(marker: string): number[] {
   });
 }
 
-function groupAlive(pgid: number): boolean {
-  try { process.kill(-pgid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code === "EPERM"; }
+/** What a signal-0 probe of a process group tells: `unknown` when the host forbids the probe (EPERM). */
+export function groupProbe(errorCode: string | undefined): "alive" | "gone" | "unknown" {
+  if (errorCode === undefined) return "alive";
+  return errorCode === "ESRCH" ? "gone" : "unknown";
+}
+function probeGroup(pgid: number): "alive" | "gone" | "unknown" {
+  try { process.kill(-pgid, 0); return groupProbe(undefined); } catch (error) { return groupProbe((error as NodeJS.ErrnoException).code ?? "unknown"); }
 }
 
 export async function runOwnedClient(argv: string[], options: { cwd: string; env: Record<string, string>; stdout: string; stderr: string; started?: (pid: number) => void; marker?: string; pidNamespace?: boolean },
@@ -94,7 +99,8 @@ export async function runOwnedClient(argv: string[], options: { cwd: string; env
   if (signal("SIGTERM")) { await Bun.sleep(limits.grace_ms); signal("SIGKILL"); }
   const final = first ?? await wait(limits.reap_ms);
   const survivors = await stopMarked();
-  const groupGone = !groupAlive(child.pid);
+  // Only a probe that saw the group gone confirms it; a forbidden probe never does.
+  const groupGone = probeGroup(child.pid) === "gone";
   if (groupGone) groupAbsent = true;
   const failedSignal = signals.some(record => !record.accepted && record.error !== "ESRCH");
   return { exit_code: final?.exit ?? -1, timed_out: timedOut, reaped: final !== null, signals,
