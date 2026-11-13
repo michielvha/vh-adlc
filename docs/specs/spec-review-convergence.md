@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-14 findings and the owner's three answers are applied in one revision. Waiting for spec review R-15."
+status: planned
+status_description: "Accepted by the owner at R-15; its seven findings are listed and settled during implementation. Tasks written; next: implementation on a feature branch."
 issue: null
 goal: "Spec review rates findings consistently, finds failure-mode gaps and every restatement in one pass, applies each pass's findings as one revision without applying nits, and never rewrites reviewed commits."
 covers:
