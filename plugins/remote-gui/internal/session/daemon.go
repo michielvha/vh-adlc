@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"sync"
 	"syscall"
@@ -83,6 +84,18 @@ func groupMembers(r state.Record) ([]state.Identity, error) {
 		}
 	}
 	return members, nil
+}
+
+// PrivateMembers returns the live members of the session's private process
+// group other than the caller and the guard. The caller must be the session's
+// guard or supervisor, and the guard must lead its own group and session, so
+// every member is provably this session's; otherwise it returns an error.
+func PrivateMembers(r state.Record) ([]state.Identity, error) {
+	members, err := groupMembers(r)
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(members, func(id state.Identity) bool { return state.Equal(id, r.Guard) }), nil
 }
 
 func stopMembers(r state.Record) error {

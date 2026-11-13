@@ -253,45 +253,7 @@ func (r *runtime) stop() {
 		if r.clip != nil {
 			_ = r.clip.Close()
 		}
-		helpers := map[int]state.Identity{}
-		r.track(helpers)
-		for i := len(r.children) - 1; i >= 0; i-- {
-			_ = state.Signal(r.children[i].identity, syscall.SIGTERM)
-		}
-		deadline := time.Now().Add(3 * time.Second)
-		for time.Now().Before(deadline) {
-			r.track(helpers)
-			live := anyAlive(helpers)
-			for _, c := range r.children {
-				live = live || state.Alive(c.identity)
-			}
-			if !live {
-				break
-			}
-			time.Sleep(20 * time.Millisecond)
-		}
-		for _, h := range helpers {
-			if state.Alive(h) {
-				_ = state.Signal(h, syscall.SIGKILL)
-			}
-		}
-		settled := time.Now().Add(time.Second)
-		for _, c := range r.children {
-			if state.Alive(c.identity) {
-				_ = state.Signal(c.identity, syscall.SIGKILL)
-			}
-			select {
-			case <-c.done:
-			case <-time.After(time.Second):
-				r.cleanupErr = errors.New(c.role + "-cleanup-pending")
-			}
-		}
-		for anyAlive(helpers) && time.Now().Before(settled) {
-			time.Sleep(20 * time.Millisecond)
-		}
-		if r.cleanupErr == nil && anyAlive(helpers) {
-			r.cleanupErr = errors.New("browser-helper-cleanup-pending")
-		}
+		r.cleanupErr = r.drain()
 		if r.cleanupErr == nil {
 			r.cleanupErr = state.ReleaseDisplay(r.display)
 		}
@@ -313,11 +275,61 @@ func (r *runtime) stop() {
 	})
 }
 
-// track adds the live descendants of the owned processes to helpers. Chromium's
-// zygotes, renderers and network service are not this runtime's children, and
-// the network service still writes the profile after the browser has exited.
-// They are tracked while their parents live, because an orphan is reparented.
-func (r *runtime) track(helpers map[int]state.Identity) {
+// drain ends the owned processes and every helper they started, so nothing
+// still writes the private files when stop removes them. It reports a process
+// that may still be alive.
+func (r *runtime) drain() error {
+	record, _ := state.Load(r.home, r.id)
+	helpers := map[int]state.Identity{}
+	r.track(helpers, record)
+	for i := len(r.children) - 1; i >= 0; i-- {
+		_ = state.Signal(r.children[i].identity, syscall.SIGTERM)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		r.track(helpers, record)
+		live := anyAlive(helpers)
+		for _, c := range r.children {
+			live = live || state.Alive(c.identity)
+		}
+		if !live {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	for _, h := range helpers {
+		if state.Alive(h) {
+			_ = state.Signal(h, syscall.SIGKILL)
+		}
+	}
+	var err error
+	settled := time.Now().Add(time.Second)
+	for _, c := range r.children {
+		if state.Alive(c.identity) {
+			_ = state.Signal(c.identity, syscall.SIGKILL)
+		}
+		select {
+		case <-c.done:
+		case <-time.After(time.Second):
+			err = errors.New(c.role + "-cleanup-pending")
+		}
+	}
+	for anyAlive(helpers) && time.Now().Before(settled) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if err == nil && anyAlive(helpers) {
+		err = errors.New("browser-helper-cleanup-pending")
+	}
+	return err
+}
+
+// track adds the helpers the owned processes started. Chromium's zygotes,
+// renderers and network service are not this runtime's children, and the
+// network service still writes the profile after the browser has exited.
+// Descendants are found only while their parents live, so inside the guard's
+// private session every other member is added too: that also covers helpers
+// orphaned when the browser crashed or its owner closed it.
+func (r *runtime) track(helpers map[int]state.Identity, record state.Record) {
 	roots := make([]state.Identity, 0, len(r.children)+len(helpers))
 	for _, c := range r.children {
 		roots = append(roots, c.identity)
@@ -327,6 +339,11 @@ func (r *runtime) track(helpers map[int]state.Identity) {
 	}
 	for _, id := range state.Descendants(roots) {
 		helpers[id.PID] = id
+	}
+	if members, err := session.PrivateMembers(record); err == nil {
+		for _, id := range members {
+			helpers[id.PID] = id
+		}
 	}
 }
 
