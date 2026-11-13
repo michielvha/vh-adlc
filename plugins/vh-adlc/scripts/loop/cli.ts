@@ -26,7 +26,7 @@ import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, skipMarker } fr
 import { claim, isolation } from "./claim";
 import { diffPaths, rangePaths } from "./git-paths";
 import { writeFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 
 const PLUGIN = join(import.meta.dir, "..", "..");
 
@@ -125,7 +125,9 @@ export async function main(argv: string[]): Promise<number> {
       const procedure = applicable.find(rung => rung.name === rest.name)?.procedure !== undefined;
       return { ...rest, ...(record && procedure ? record : {}), output_tail: output?.slice(-2000) };
     }) : [];
-    const head = execSync("git rev-parse HEAD", { cwd: repo }).toString().trim();
+    // After a merge the checks must have run at that merge itself: results from any other checkout
+    // (a later repair on the default branch, say) block rather than stand in for it.
+    const head = execFileSync("git", ["rev-parse", "--verify", `${options.merge ?? "HEAD"}^{commit}`], { cwd: repo }).toString().trim();
     const verdict = options.run === "true" ? mayAdvance(results, { head, declared, allowances: options.allow ? options.allow.split(",") : [] })
       : { advance: !declared, lookup: declared ? "rungs" : "agents-md", blocking: applicable.map(r => r.name) };
     console.log(JSON.stringify({ declared, range: delta.range, paths: delta.paths, applicable: applicable.map(r => r.name), results, ...verdict }));

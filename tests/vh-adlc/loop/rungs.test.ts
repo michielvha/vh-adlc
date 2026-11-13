@@ -166,3 +166,19 @@ describe("status parsing", () => {
     expect(featureDelta(root, { base: "main" }).paths).toContain("docs/my notes/a b.md");
   });
 });
+
+describe("checks after a merge", () => {
+  test("a later passing HEAD does not stand in for a requested merge that fails its checks", () => {
+    const { root } = feature("schema_version: 1\nverification_rungs:\n  - name: behavior\n    when: always\n    command: \"grep -q good behavior.txt\"\n");
+    write(root, { "behavior.txt": "bad\n" }); commitAll(root, "bad behavior");
+    git(root, "switch", "-q", "main"); git(root, "merge", "-q", "--no-ff", "-m", "merge feat/x", "feat/x");
+    const merge = git(root, "rev-parse", "HEAD");
+    write(root, { "behavior.txt": "good\n" }); commitAll(root, "repair");
+    const cli = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
+    const run = Bun.spawnSync([process.execPath, cli, "rungs", "--repo", root, "--merge", merge, "--run", "true"], { stdout: "pipe", stderr: "pipe",
+      env: { ...process.env, XDG_CONFIG_HOME: join(root, ".no-override") } });
+    const out = JSON.parse(run.stdout.toString());
+    expect([run.exitCode, out.advance]).toEqual([3, false]);
+    expect(out.blocking).toContain("behavior");
+  });
+});

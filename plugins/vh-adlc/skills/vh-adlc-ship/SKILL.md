@@ -47,7 +47,8 @@ host default. Before acting, read every file `bun scripts/loop/cli.ts context` l
 files and its project procedure, whose local rules apply alongside this procedure. With declared verification rungs, ship runs
 `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` before pushing and never
 pushes or reports the feature complete unless it may advance at HEAD; after the merge, the delivery check
-runs the same command with `--merge <merge commit>`. The feature lands by merge commit only. With `ci_trigger: manual`, report CI with
+runs the same command with `--merge <merge commit>` from a checkout of that merge commit; results from any other
+commit block. The feature lands by merge commit only. With `ci_trigger: manual`, report CI with
 `bun scripts/loop/cli.ts ci` and dispatch nothing; decide the skip marker with `cli.ts skip`, and after the
 merge report delivery with `cli.ts delivery` (`references/loop-settings.md`, Delivery). A `host` route that names a model runs with it as a requested model. When loop settings exist, `cli.ts skip` replaces the documentation-only skip-marker rule in Deliver,
 including its report when the resolved convention does not support declared paths.
