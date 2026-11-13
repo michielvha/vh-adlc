@@ -34,8 +34,8 @@ function explanation(options: Omit<ClosureOptions, "observe_verification">, oper
   const decisions = record.value.dispositions.filter(item => item.proposal === number);
   const preview = decisions.slice(0, 20).map(item => `- \`${item.hunk_id}\` ${item.disposition}`).join("\n");
   const remainder = decisions.length > 20 ? `\n\nThe linked resolve record contains all ${decisions.length} dispositions.` : "";
-  return `Superseded after consolidation #${consolidation.number} merged. [Merged consolidation](${url})\n\n`
-    + `Fresh closure checks used default \`${current}\` and record \`${record.sha256}\`. [Resolve record](${recordURL})\n\n`
+  return `Superseded after [the consolidation](${url}) merged.\n\n`
+    + `Fresh closure checks used [the default commit](${base}/commit/${current}) and record \`${record.sha256}\`. [Resolve record](${recordURL})\n\n`
     + `Recorded decisions\n\n${preview}${remainder}\n\n${publicationMarker(settings, operationId)}\n${effectMarker(id)}\n`;
 }
 

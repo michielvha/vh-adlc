@@ -30,7 +30,7 @@ for (const method of ["merge", "squash", "rebase"] as const) {
     expect(result.complete).toBe(true);
     expect(result.effects.map(effect => effect.kind)).toEqual(["lease-acquire", "receipt-retain", "comment-create", "pr-close", "lease-release"]);
     expect(result.effects[2].payload.body).toContain("https://github.com/fixture/docs/pull/20");
-    expect(result.effects[2].payload.body).toContain(f.state.current);
+    expect(result.effects[2].payload.body).toContain("https://github.com/fixture/docs/commit/" + f.state.current);
     expect(result.effects[2].payload.body).toContain(f.recordValue.dispositions[0].hunk_id);
     expect(result.effects[3].payload.expected_head).toBe(f.recordValue.originals[0].head_sha);
     expect(result.verification).toHaveLength(f.recordValue.dispositions.length);

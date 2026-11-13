@@ -179,7 +179,7 @@ test("normal retained closure publish and resume commands keep bounded summaries
       const text = Buffer.from(captured?.stdout ?? []).toString(), report = JSON.parse(text);
       expect(completion.exit_code, JSON.stringify(report.diagnostics)).toBe(0);
       expect(report.command).toBe(command); expect(report.publication_effects.state).toBe("complete");
-      expect(text).not.toContain("Superseded after consolidation");
+      expect(text).not.toContain("Superseded after ");
       return report;
     }
     const published = await invoke("publish-closure"), directory = published.publication_effects.journal.directory;
