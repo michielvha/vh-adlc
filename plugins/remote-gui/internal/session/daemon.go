@@ -57,7 +57,13 @@ func awaitRole(ctx context.Context, home, id, role string) (state.Record, error)
 	return state.Record{}, errors.New("daemon-ownership-record-unavailable")
 }
 
-func groupMembers(r state.Record) ([]state.Identity, error) {
+// sessionMembers returns the live processes in the guard's private session
+// other than the caller. The guard was started with setsid, so the session ID
+// is its PID. The caller must be the recorded guard or supervisor and belong to
+// that session; the ID then stays reserved while the caller lives, so every
+// process carrying it descends from the guard, whatever its process group. A
+// process that calls setsid itself leaves the session and is not found.
+func sessionMembers(r state.Record) ([]state.Identity, error) {
 	self, err := state.Inspect(os.Getpid())
 	if err != nil {
 		return nil, err
@@ -65,8 +71,8 @@ func groupMembers(r state.Record) ([]state.Identity, error) {
 	if !state.Equal(self, r.Guard) && !state.Equal(self, r.Supervisor) {
 		return nil, errors.New("controller-ownership-changed")
 	}
-	if self.Group != r.Guard.Group || self.Session != r.Guard.Session || r.Guard.Group != r.Guard.PID || r.Guard.Session != r.Guard.PID {
-		return nil, errors.New("private-process-group-not-owned")
+	if self.Session != r.Guard.PID || r.Guard.Session != r.Guard.PID {
+		return nil, errors.New("private-session-not-owned")
 	}
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
@@ -79,19 +85,18 @@ func groupMembers(r state.Record) ([]state.Identity, error) {
 			continue
 		}
 		id, err := state.Inspect(pid)
-		if err == nil && id.Group == self.Group && id.Session == self.Session {
+		if err == nil && id.Session == self.Session {
 			members = append(members, id)
 		}
 	}
 	return members, nil
 }
 
-// PrivateMembers returns the live members of the session's private process
-// group other than the caller and the guard. The caller must be the session's
-// guard or supervisor, and the guard must lead its own group and session, so
-// every member is provably this session's; otherwise it returns an error.
+// PrivateMembers returns the members of the guard's private session other than
+// the caller and the guard, or an error unless that session is provably the
+// caller's own.
 func PrivateMembers(r state.Record) ([]state.Identity, error) {
-	members, err := groupMembers(r)
+	members, err := sessionMembers(r)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +104,7 @@ func PrivateMembers(r state.Record) ([]state.Identity, error) {
 }
 
 func stopMembers(r state.Record) error {
-	members, err := groupMembers(r)
+	members, err := sessionMembers(r)
 	if err != nil {
 		return err
 	}
@@ -107,7 +112,7 @@ func stopMembers(r state.Record) error {
 		_ = state.Signal(id, syscall.SIGTERM)
 	}
 	for range 12 {
-		members, err = groupMembers(r)
+		members, err = sessionMembers(r)
 		if err != nil {
 			return err
 		}
@@ -120,7 +125,7 @@ func stopMembers(r state.Record) error {
 		_ = state.Signal(id, syscall.SIGKILL)
 	}
 	for range 20 {
-		members, err = groupMembers(r)
+		members, err = sessionMembers(r)
 		if err != nil {
 			return err
 		}

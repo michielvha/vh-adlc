@@ -76,8 +76,9 @@ func privateSession(t *testing.T) bool {
 // Chromium's network service flushes its disk cache into the profile after the
 // browser process has exited. These scripts stand in for such helpers.
 const (
-	// Writes once the browser is gone, then exits on its own.
-	flushingHelper = `while kill -0 "$parent" 2>/dev/null; do sleep 0.02; done; sleep 0.3; mkdir -p "$profile/Default/Cache"; : >"$profile/Default/Cache/index"; : >"$marker"`
+	// Writes once the browser is gone, then exits on its own. It ignores
+	// SIGTERM, as a helper that shuts down on its own schedule would.
+	flushingHelper = `trap '' TERM; while kill -0 "$parent" 2>/dev/null; do sleep 0.02; done; sleep 0.3; mkdir -p "$profile/Default/Cache"; : >"$profile/Default/Cache/index"; : >"$marker"`
 	// Ignores the browser's exit until it is killed.
 	stubbornHelper = `trap '' TERM; mkdir -p "$profile/Default/Cache"; : >"$marker"; while :; do mkdir -p "$profile/Default/Cache"; sleep 0.02; done`
 	// Keeps forking writers until it is killed.

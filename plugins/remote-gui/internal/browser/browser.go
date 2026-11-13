@@ -276,19 +276,54 @@ func (r *runtime) stop() {
 }
 
 // drain ends the owned processes and every helper they started, so nothing
-// still writes the private files when stop removes them. It reports a process
-// that may still be alive.
+// still writes the private files when stop removes them. Inside the guard's
+// private session, where production always stops a browser, every other member
+// of the session is ours: Chromium's zygotes, renderers and network service,
+// including helpers that were orphaned, fork late or lead their own process
+// group. Members are signalled until an enumeration finds none. A helper that
+// calls setsid itself leaves the session and is not seen. Outside a private
+// session only the direct children can be accounted for.
 func (r *runtime) drain() error {
-	record, _ := state.Load(r.home, r.id)
-	helpers := map[int]state.Identity{}
-	r.track(helpers, record)
 	for i := len(r.children) - 1; i >= 0; i-- {
 		_ = state.Signal(r.children[i].identity, syscall.SIGTERM)
 	}
+	record, _ := state.Load(r.home, r.id)
+	if _, err := session.PrivateMembers(record); err != nil {
+		return r.drainChildren()
+	}
+	// Both deadlines fit the guard's five seconds for the supervisor.
+	start := time.Now()
+	terminated := map[state.Identity]bool{}
+	for {
+		members, err := session.PrivateMembers(record)
+		if err != nil {
+			return errors.New("browser-helper-cleanup-pending")
+		}
+		if len(members) == 0 {
+			return nil
+		}
+		elapsed := time.Since(start)
+		if elapsed > 4*time.Second {
+			return errors.New("browser-helper-cleanup-pending")
+		}
+		for _, id := range members {
+			if elapsed > 3*time.Second {
+				_ = state.Signal(id, syscall.SIGKILL)
+			} else if !terminated[id] {
+				terminated[id] = true
+				_ = state.Signal(id, syscall.SIGTERM)
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// drainChildren waits for the direct children, which tests use outside a
+// private session.
+func (r *runtime) drainChildren() error {
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		r.track(helpers, record)
-		live := anyAlive(helpers)
+		live := false
 		for _, c := range r.children {
 			live = live || state.Alive(c.identity)
 		}
@@ -297,13 +332,7 @@ func (r *runtime) drain() error {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	for _, h := range helpers {
-		if state.Alive(h) {
-			_ = state.Signal(h, syscall.SIGKILL)
-		}
-	}
 	var err error
-	settled := time.Now().Add(time.Second)
 	for _, c := range r.children {
 		if state.Alive(c.identity) {
 			_ = state.Signal(c.identity, syscall.SIGKILL)
@@ -314,46 +343,7 @@ func (r *runtime) drain() error {
 			err = errors.New(c.role + "-cleanup-pending")
 		}
 	}
-	for anyAlive(helpers) && time.Now().Before(settled) {
-		time.Sleep(20 * time.Millisecond)
-	}
-	if err == nil && anyAlive(helpers) {
-		err = errors.New("browser-helper-cleanup-pending")
-	}
 	return err
-}
-
-// track adds the helpers the owned processes started. Chromium's zygotes,
-// renderers and network service are not this runtime's children, and the
-// network service still writes the profile after the browser has exited.
-// Descendants are found only while their parents live, so inside the guard's
-// private session every other member is added too: that also covers helpers
-// orphaned when the browser crashed or its owner closed it.
-func (r *runtime) track(helpers map[int]state.Identity, record state.Record) {
-	roots := make([]state.Identity, 0, len(r.children)+len(helpers))
-	for _, c := range r.children {
-		roots = append(roots, c.identity)
-	}
-	for _, h := range helpers {
-		roots = append(roots, h)
-	}
-	for _, id := range state.Descendants(roots) {
-		helpers[id.PID] = id
-	}
-	if members, err := session.PrivateMembers(record); err == nil {
-		for _, id := range members {
-			helpers[id.PID] = id
-		}
-	}
-}
-
-func anyAlive(ids map[int]state.Identity) bool {
-	for _, id := range ids {
-		if state.Alive(id) {
-			return true
-		}
-	}
-	return false
 }
 
 func Start(ctx context.Context, c config.Config, id string) (session.BrowserHandle, error) {
