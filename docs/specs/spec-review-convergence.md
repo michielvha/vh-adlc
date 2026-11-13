@@ -374,7 +374,8 @@ reviewed revert of the docs and plugin edits and the pin.
 
 ## Tasks
 
-- [ ] T1 `tests/vh-adlc/review-convergence.test.ts` - failing checks that the resolved `conventions/feature-documents.md` holds the three severity definitions, the nit rule and the free-text example requirement; they fail at the current pin because the page has none of them (AC-02, AC-05, AC-08)
+- [x] T1 `tests/vh-adlc/review-convergence.test.ts` - failing checks that the resolved `conventions/feature-documents.md` holds the three severity definitions, the nit rule and the free-text example requirement; they fail at the current pin because the page has none of them (AC-02, AC-05, AC-08)
+      Evidence: `bun test tests/vh-adlc/review-convergence.test.ts` on feat/spec-review-convergence, 0 pass 3 fail; each failure shows the resolved d8f07c9 page lacking the severity definitions, the nit rule and the free-text example requirement.
 - [ ] T12 `tests/vh-adlc/review-convergence.test.ts` - failing checks that the two user guides describe the severities, the nit rule and the one-revision rule; they fail now because the guides do not (AC-08)
 - [ ] T14 `tests/vh-adlc/review-convergence.test.ts` - the failing check that Preservation and the history-rewrite row in `references/authority.md` forbid rewriting a commit a Review Log row names; it fails because neither says so (AC-10)
 - [ ] T15 `tests/vh-adlc/scenarios/run.ts` - the scripted reviewer (a plugin copy whose canned records, keyed by pass number and starting with `MODEL: scripted-reviewer`, live under `tests/vh-adlc/evidence/review-convergence/`) and the AC-10 drift case, a guard that passes on today's merge path (AC-10)
