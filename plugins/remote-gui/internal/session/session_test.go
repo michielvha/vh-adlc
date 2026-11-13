@@ -3,6 +3,7 @@ package session
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -24,17 +26,109 @@ func TestMain(m *testing.M) {
 	if handled, code := Internal(os.Args[1:]); handled {
 		os.Exit(code)
 	}
-	os.Exit(m.Run())
+	code := m.Run()
+	if os.Getenv("REMOTE_GUI_TEST_DAEMON_HOME") == "" {
+		if leaked := survivingControllers(5 * time.Second); len(leaked) > 0 {
+			fmt.Fprintf(os.Stderr, "session controllers outlived the tests and were killed: %s\n", strings.Join(leaked, "; "))
+			code = 1
+		}
+	}
+	os.Exit(code)
 }
 
+// survivingControllers waits up to limit for the guards and supervisors this
+// test binary started to exit, then kills and lists those still running. Each
+// test run builds its binary at a fresh path, so a controller running that
+// executable belongs to this run.
+func survivingControllers(limit time.Duration) []string {
+	executable, err := os.Executable()
+	if err != nil {
+		return []string{"test executable unavailable: " + err.Error()}
+	}
+	deadline := time.Now().Add(limit)
+	for {
+		var leaked []string
+		var controllers []state.Identity
+		entries, _ := os.ReadDir("/proc")
+		for _, e := range entries {
+			pid, err := strconv.Atoi(e.Name())
+			if err != nil {
+				continue
+			}
+			if exe, err := os.Readlink(filepath.Join("/proc", e.Name(), "exe")); err != nil || exe != executable {
+				continue
+			}
+			raw, err := os.ReadFile(filepath.Join("/proc", e.Name(), "cmdline"))
+			args := strings.Split(strings.TrimRight(string(raw), "\x00"), "\x00")
+			if err != nil || len(args) < 2 || (args[1] != "_guard" && args[1] != "_supervise") {
+				continue
+			}
+			if id, err := state.Inspect(pid); err == nil {
+				controllers = append(controllers, id)
+				leaked = append(leaked, strings.Join(args[1:], " "))
+			}
+		}
+		if len(leaked) == 0 {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			for _, id := range controllers {
+				_ = state.Signal(id, syscall.SIGKILL)
+			}
+			return leaked
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// root returns a private state root that is removed when the test ends, after
+// its sessions are stopped and their controllers have exited.
 func root(t *testing.T) string {
 	t.Helper()
 	p, err := os.MkdirTemp("/tmp", "rg-session-")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.RemoveAll(p) })
-	return filepath.Join(p, "state")
+	home := filepath.Join(p, "state")
+	t.Cleanup(func() { removeRoot(t, p, home) })
+	return home
+}
+
+// removeRoot stops every session under home whose controllers still run, removes
+// dir and fails the test if a controller outlives its record. A record that
+// names this test process as a controller is never stopped.
+func removeRoot(t *testing.T, dir, home string) {
+	t.Helper()
+	self, err := state.Inspect(os.Getpid())
+	if err != nil {
+		t.Error(err)
+	}
+	var controllers []state.Identity
+	ids, _ := state.IDs(home)
+	for _, id := range ids {
+		r, err := state.Load(home, id)
+		if err != nil || state.Equal(r.Guard, self) || state.Equal(r.Supervisor, self) {
+			continue
+		}
+		if state.Alive(r.Guard) || state.Alive(r.Supervisor) {
+			controllers = append(controllers, r.Guard, r.Supervisor)
+			_, _ = Stop(home, id)
+		}
+	}
+	_ = os.RemoveAll(dir)
+	deadline := time.Now().Add(5 * time.Second)
+	for _, c := range controllers {
+		for state.Alive(c) && time.Now().Before(deadline) {
+			time.Sleep(25 * time.Millisecond)
+		}
+		if state.Alive(c) {
+			t.Errorf("session controller %d outlived its test", c.PID)
+			_ = state.Signal(c, syscall.SIGKILL)
+		}
+	}
+	if err = os.RemoveAll(dir); err != nil {
+		t.Error(err)
+	}
 }
 
 func options(t *testing.T, home, target, ttl string) config.Config {
