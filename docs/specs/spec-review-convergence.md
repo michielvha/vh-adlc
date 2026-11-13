@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Split at R-13: the stopping rule moved to spec-review-stopping-rule; this document keeps the seven settled parts. Waiting for spec review R-14."
+status_description: "R-14 findings and the owner's three answers are applied in one revision. Waiting for spec review R-15."
 issue: null
 goal: "Spec review rates findings consistently, finds failure-mode gaps and every restatement in one pass, applies each pass's findings as one revision without applying nits, and never rewrites reviewed commits."
 covers:
@@ -34,8 +34,9 @@ complete, get applied once, and stop driving extra passes.
 Four recent specs needed 36 to 47 spec review passes before their first acceptance, although most of
 those passes had no blocking finding. One of them had none at all. A thorough reviewer finds one or two
 new items on every pass, the procedure applies them and asks again, and several late blocking findings
-were caused by fixing earlier non-blocking ones. This spec's own review repeated that: R-4 to R-13 were
-each caused by the previous pass's narrow fix, all in the stopping rule it carried. That rule now lives
+were caused by fixing earlier non-blocking ones. This spec's own review repeated that: the blocking findings
+in R-4 to R-7, R-12 and R-13 each traced to the previous pass's fix, and all sat in the stopping rule it
+carried. That rule now lives
 in its own draft, `docs/specs/spec-review-stopping-rule.md`, parked until `shared-development-loop`
 lands.
 
@@ -44,9 +45,11 @@ This feature changes spec review in seven ways, written into vh-adlc so every ad
 - The shared convention defines blocking, should-fix and nit. Blocking is reserved for defects that
   change what gets built, what a proof checks or how the binary reads the document, or that make a
   criterion impossible to meet. A harmless citation slip is a nit.
-- Nits on the normative baseline are no longer applied. The author lists the latest pass's nits in its
-  report and owner-facing summary, so they never trigger another pass. Findings outside the baseline,
-  such as in Context, may still be applied.
+- Nits on the normative baseline never trigger a revision on their own. When a pass's blocking or
+  should-fix finding changes the baseline anyway, the same commit fixes that pass's nits; otherwise the
+  author lists them, from every pass the run handled, in its report and owner-facing summary. Findings
+  outside the baseline, such as in Context, may be applied at any time. The cost: a nit on a pass with
+  nothing else to apply stays in the document unless you pick it.
 - The reviewer and the author check designs that change state, run concurrently, or cross a process or
   network boundary for concurrent access, partial failure, retry or replay, and upgrade or rollback.
 - The reviewer returns every finding it can establish in one pass and names every restatement of an
@@ -56,8 +59,8 @@ This feature changes spec review in seven ways, written into vh-adlc so every ad
   findings first, then applies the factual findings and your answers in one commit. It removes a
   mechanism rather than adding one when both behave the same, asks you when they differ, and revisits a
   previous change instead of patching on top of it.
-- No operation rebases, amends or otherwise rewrites a commit a Review Log row names; default-branch work
-  comes in by merge, also when a document without a `branch` field sits on a side branch.
+- No operation rebases, amends or otherwise rewrites a commit a Review Log row names, even with
+  approval; default-branch work comes in by merge.
 - Widening a reviewed free-text pattern is a nit when it only catches more wrong output.
 
 The severity definitions, the nit rule and the free-text rule go into `vhco-pro/docs` as a companion
@@ -68,7 +71,9 @@ plugin edits overlap with `shared-development-loop`, which is in progress on its
 whichever lands second merges the first in.
 
 Since the acceptance at R-10, this revision adds the one-revision and no-rewrite rules, moves the
-stopping rule into its own draft, and replaces the saved-nit bookkeeping with the plain nit rule above.
+stopping rule into its own draft, replaces the saved-nit bookkeeping with the plain nit rule above, and
+drops the side-branch merge proposed at R-11, because the skill already keeps a document without a
+`branch` field on the default branch.
 
 Validation is planned, not observed: reviewer and author trials on committed fixtures, scenario cases
 for the nit rule and the no-rewrite rule, a rules block comparison, lint and gate runs on named
@@ -152,8 +157,8 @@ In scope:
 - A failure-mode check in the reviewer's spec section and the author's instructions.
 - One-pass completeness for the reviewer and a same-commit restatement sweep for the author.
 - A one-revision rule for applying a pass's findings, in the spec skill.
-- A rule in `references/authority.md` that no operation rewrites a commit a Review Log row names, and
-  the matching merge in review mode for a document without a `branch` field on a side branch.
+- A rule in `references/authority.md` that no operation rewrites a commit a Review Log row names, even
+  with approval.
 - A free-text check rule in the convention's Test plan section.
 - The pin and version moves that adopt the published convention, the two user guides that describe
   spec review, and scenario coverage for the new rules.
@@ -177,8 +182,8 @@ Out of scope, by name:
 
 Every rule below was checked against each of these: a first draft's review; a blocking pass; a clean
 pass; a pass holding both factual and judgement findings; a revision of an accepted document; a drift
-re-review; an interrupted or resumed run; a document on a feature branch and one without a `branch`
-field on a side branch; a repository on an older pin; and the existing scenarios S7.7, S7.7.accept, S7.9
+re-review; an interrupted or resumed run; a document on a feature branch and one on the default branch;
+a repository on an older pin; and the existing scenarios S7.7, S7.7.accept, S7.9
 and S14.spec, whose single-pass acceptance none of these rules changes.
 
 ### Terminology
@@ -190,8 +195,10 @@ and S14.spec, whose single-pass acceptance none of these rules changes.
 ### Nits are listed, not applied (convention and procedure)
 
 The convention's Review log section, beside the severity definitions, gains: a nit on the normative
-baseline is not applied; the author lists every nit of the latest pass, with its ID and one line, in the
-run's report and the owner-facing summary. A finding confined to sections outside the normative baseline
+baseline never causes a revision on its own. When the author applies a pass's blocking or should-fix
+findings to the baseline, the same commit fixes that pass's nits. Every nit it does not apply, from every
+pass the run handled, is listed with its ID and one line in the run's report and the owner-facing
+summary. A finding confined to sections outside the normative baseline
 may be applied at any time, because it does not make the review stale. The spec skill's review mode and
 the protocol's Records paragraph follow it. Today the skill applies every factual finding whatever its
 severity (`plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:71-72`).
@@ -214,17 +221,19 @@ skill applies findings one by one with no such step (`plugins/vh-adlc/skills/vh-
 ### Commits a Review Log names are never rewritten (authority)
 
 `references/authority.md` Preservation gains: no operation rebases, amends, squashes or otherwise
-rewrites a commit that a Review Log row names, or any commit before it on that branch, because the
-binary then reports the review `commit-unreachable` and stale. Default-branch work comes in with
-`git merge`, as review mode already does for drift on a feature branch
+rewrites a commit that a Review Log row names, or any commit before it on that branch, even with the
+owner's approval, because the binary then reports every such review `commit-unreachable` and stale.
+The authority table's row for destructive Git operations and history rewrites, which today allows them
+with separate approval (`plugins/vh-adlc/references/authority.md:30`), gains that exception. Default-branch
+work comes in with `git merge`, as review mode already does for drift on a feature branch
 (`plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:57-58`), and as the delivery convention already requires
 of feature PRs, which "never squash, so the commits its Review Log cites stay reachable"
-(`conventions/delivery.md:79`). Review mode step 1 gains the case today's text has no instruction for: a
-document without a `branch` field that sits on a branch other than the default one merges the default
-branch in too (`SKILL.md:58` only covers the default branch, with `git merge --ff-only`). Preservation
-today forbids stash, reset and overwrite of others' changes but says nothing about rewriting reviewed
-commits (`plugins/vh-adlc/references/authority.md:72-78`). This document's own review met the gap: a
-rebase of its branch made every stored review `commit-unreachable` until it was undone.
+(`conventions/delivery.md:79`). A document without a `branch` field stays on the default branch, as the
+skill already says (`SKILL.md:36-38`, `:106-109`), so no new merge path is needed. Preservation today
+forbids stash, reset and overwrite of others' changes but says nothing about rewriting reviewed commits
+(`authority.md:72-78`). This document's own review met the gap: it was worked on a side branch against
+the skill's instruction, and a rebase of that branch made every stored review `commit-unreachable` until
+it was undone.
 
 ### Severity definitions (convention)
 
@@ -275,7 +284,7 @@ the no-rewrite rule, in the reviewer agent, the spec skill and `references/autho
 pin, because they rely on no convention text. The severity definitions, the nit rule and the free-text
 rule need the new convention. The skill decides by whether the resolved
 `conventions/feature-documents.md` contains the severity definitions, and the nit rule's review-mode and
-protocol text is written as conditional on that check. Without them, nits are applied as today, and the
+protocol text is written as conditional on that check. Without them, nits are handled as today, and the
 spec report says those parts need the plugin's own pin from `plugins/vh-adlc/knowledge.md`. The plugin
 does not carry its own copy of the convention rules.
 
@@ -294,7 +303,7 @@ severities, the nit rule and the one-revision rule.
 every one of those files, then moves the pin and version from whatever is current; AC-06 is checked
 against the docs commit this feature publishes, or a later one that contains it.
 
-The AC-10 and AC-11 cases are new scenario cases in `tests/vh-adlc/scenarios/run.ts` that run against a
+The AC-10 and AC-11 cases are scenario cases in `tests/vh-adlc/scenarios/run.ts` that run against a
 copy of the plugin whose reviewer agent returns canned records keyed by pass number, each starting with
 `MODEL: scripted-reviewer`. The scripted reviewer definition, its canned records, the transcripts, and the
 fixture specs and returned records of every reviewer and author trial are committed under
@@ -337,12 +346,15 @@ reviewed revert of the docs and plugin edits and the pin.
       one when both behave the same, revisits a previous revision's change when a finding traces to it,
       and lists the behaviors and checks it walked in its report; a reviewer following the updated agent
       says in `EVIDENCE` when a finding traces to the previous revision's change.
-- [ ] AC-10: No vh-adlc operation rewrites a commit a Review Log row names: when the default branch moves
-      during a review loop, on a feature branch or on a side branch holding a document without a `branch`
-      field, the author brings it in by merge and every reviewed commit stays reachable.
-- [ ] AC-11: With the new convention, an author following the updated skill applies no nit on the
-      normative baseline, lists every nit of the latest pass with its ID in the run's report and
-      owner-facing summary, and may apply a finding confined to sections outside the normative baseline.
+- [ ] AC-10: `references/authority.md` forbids rewriting a commit a Review Log row names, with no
+      approval exception, in both Preservation and its history-rewrite row; and when the default branch
+      moves during a review loop on a feature branch, the author brings it in by merge and every
+      reviewed commit stays reachable.
+- [ ] AC-11: With the new convention, an author following the updated skill makes no commit that
+      changes the normative baseline only to fix nits; fixes a pass's nits in the same commit that applies
+      its blocking or should-fix findings to the baseline; lists every nit it did not apply, from every
+      pass the run handled, with its ID in the run's report and owner-facing summary; and may apply a
+      finding confined to sections outside the normative baseline.
 
 ## Test Plan
 
@@ -352,24 +364,24 @@ reviewed revert of the docs and plugin edits and the pin.
 | AC-03 | Reviewer trial on a fixture spec that states one limit in Scope, Design, a criterion and the Owner summary, with one copy different; pass when one finding names all four locations. Author trial on a stored blocking pass whose factual should-fix finding asks for a value none of the four copies hold; pass when one commit leaves all four locations stating that value. Fixtures and records go under `tests/vh-adlc/evidence/review-convergence/`. |
 | AC-04 | Reviewer trial on five fixture specs: a counter in a shared file updated by parallel runs that defines partial failure, retry and upgrade but not concurrent updates; a remote API call that defines concurrency, partial failure and upgrade but not retry or replay; a design that defines concurrency, partial failure and retry but not upgrade or rollback; a design that defines concurrency, retry and upgrade but not partial failure; and a wording-only guide edit. Pass when each of the first four returns a failure-mode finding on exactly the question it leaves undefined, and the fifth returns no failure-mode finding. Fixtures and records go under `tests/vh-adlc/evidence/review-convergence/`. |
 | AC-05 | `tests/vh-adlc/review-convergence.test.ts` checks the published convention page for the example requirement. Reviewer trial on a scratch repository whose history holds a stored clean pass at a commit already holding the free-text pattern row's current text, with no finding naming the Test Plan; the row lists examples that omit one wrong output stated in Design and reject one correct output stated there. Pass only when the reviewer returns a nit for the missed wrong output and a blocking finding for the rejected correct output; fail if either is missing. A second scratch repository adds a later commit that changes the row; pass when the missed wrong output is rated should-fix. Fixtures and records go under `tests/vh-adlc/evidence/review-convergence/`. |
-| AC-06 | Compare the rules block at the old and new pins byte for byte. For `shared-docs-drift`, `seo-assessment` and `owner-readable-specifications`, run `vh-adlc lint`, `fresh` and `gate planned` from two scratch clones that differ only in the pin: one at the T3 commit, and one at a scratch commit on top of it that restores the old pin in `AGENTS.md`, each with a clean tree; assert `knowledge.revision` equals the clone's pin, and compare only `result`, `failing` and `findings`. Two scenario cases in `tests/vh-adlc/scenarios/run.ts`, whose fixture docs repository first gains the previous pin's docs commit (`tests/vh-adlc/fixtures/build.ts`), run on a fixture spec pinned to the previous revision. The procedure case uses the scripted reviewer with one blocking pass holding a nit on Design; pass when the nit is applied as today and the report names the plugin's pin from `knowledge.md`. The reviewer case uses the real reviewer on a fixture with a seeded failure-mode gap; pass when the returned records include a failure-mode finding. Check `AGENTS.md`, `knowledge.md` and `references/security-settings.md` name the published docs commit or a later one containing it, and both manifests match and are higher than the version before the change. Run `bun test tests/vh-adlc` and the docs repository's `npm run check`. |
+| AC-06 | Compare the rules block at the old and new pins byte for byte. For `shared-docs-drift`, `seo-assessment` and `owner-readable-specifications`, run `vh-adlc lint`, `fresh` and `gate planned` from two scratch clones that differ only in the pin: one at the T3 commit, and one at a scratch commit on top of it that restores the old pin in `AGENTS.md`, each with a clean tree; assert `knowledge.revision` equals the clone's pin, and compare only `result`, `failing` and `findings`. Two scenario cases in `tests/vh-adlc/scenarios/run.ts`, whose fixture docs repository first gains the previous pin's docs commit (`tests/vh-adlc/fixtures/build.ts`), run on a fixture spec pinned to the previous revision. The procedure case uses the scripted reviewer with one clean pass holding only a factual nit on Design, which the new rule would leave unapplied; pass when the nit is applied as today and the report names the plugin's pin from `knowledge.md`. The reviewer case uses the real reviewer on a fixture with a seeded failure-mode gap; pass when the returned records include a failure-mode finding. Check `AGENTS.md`, `knowledge.md` and `references/security-settings.md` name the published docs commit or a later one containing it, and both manifests match and are higher than the version before the change. Run `bun test tests/vh-adlc` and the docs repository's `npm run check`. |
 | AC-07 | Author trial: the updated skill drafts a fixture feature that adds a webhook call to a remote service. Pass when its Design states behavior for all four questions or the document raises an Open Question for each one it leaves open. Commit the transcript and draft under `tests/vh-adlc/evidence/review-convergence/`. |
 | AC-08 | `tests/vh-adlc/review-convergence.test.ts` checks the published `conventions/feature-documents.md` for the nit rule beside the severity definitions, and checks `docs/get-started/first-feature.md` and `docs/user-guides/workflows.md` for the severities, the nit rule and the one-revision rule. |
 | AC-09 | Author trial on a scratch repository holding a fixture spec whose Test Plan names a scenario check script, and a stored blocking pass with two factual should-fix findings: applying the first alone, in its narrowest form, would make the named check fail, and the second can be met by removing a mechanism or by adding one with the same behavior. Pass when one commit applies both, the named check script still passes on the result, the mechanism is removed rather than extended, and the report lists the behaviors and checks walked. A second trial adds a judgement should-fix to the stored pass; pass when the author raises it before changing the baseline and, after the owner's scripted answer, applies the factual findings and the answer in one commit. Reviewer trial on a scratch repository whose latest revision commit introduced a contradiction; pass when the returned finding's `EVIDENCE` says it traces to that revision's change. Fixtures, transcripts and records go under `tests/vh-adlc/evidence/review-convergence/`. |
-| AC-10 | `tests/vh-adlc/review-convergence.test.ts` checks that `plugins/vh-adlc/references/authority.md` forbids rewriting a commit a Review Log row names. Two scenario cases in `tests/vh-adlc/scenarios/run.ts` with the scripted reviewer: one on a fixture spec with a `branch` field, and one on a fixture spec without a `branch` field committed on a side branch; in each, after a stored blocking pass the fixture's default branch gains a commit that changes a path the spec covers, so the review is stale from drift, and the run continues to a second pass. Pass, in each, when the working branch holds a merge of the default branch, every commit the Review Log names is an ancestor of the branch tip, and `vh-adlc fresh` reports no `commit-unreachable`. |
-| AC-11 | Scenario case in `tests/vh-adlc/scenarios/run.ts` with the scripted reviewer and the new convention: a blocking pass holding a factual blocking finding on Design, a nit on Design and a nit on Context. Pass when the blocking finding is applied, the Design nit is not applied and appears with its ID in the report and the owner-facing summary, and the Context nit may be applied. S7.7, S7.7.accept, S7.9 and S14.spec still pass. |
+| AC-10 | `tests/vh-adlc/review-convergence.test.ts` checks that Preservation in `plugins/vh-adlc/references/authority.md` forbids rewriting a commit a Review Log row names and that the history-rewrite row states the same exception. Scenario case in `tests/vh-adlc/scenarios/run.ts` with the scripted reviewer, on a fixture spec with a `branch` field: after a stored `NO FINDINGS` pass, the fixture's default branch gains a commit that changes a path the spec covers, so the review is stale from drift alone, and the owner asks for a fresh review; pass when the feature branch holds a merge of the default branch, every commit the Review Log names is an ancestor of the branch tip, and `vh-adlc fresh` reports no `commit-unreachable`. |
+| AC-11 | Scenario case in `tests/vh-adlc/scenarios/run.ts` with the scripted reviewer and the new convention, which returns two passes: the first holds a factual blocking finding on Design, a nit on Design and a nit on Context; the second is clean with one nit on Scope. Pass when the first pass's blocking finding and both its nits are applied in one commit, the second pass's Scope nit is not applied, and the report and owner-facing summary list that nit with its ID. S7.7, S7.7.accept, S7.9 and S14.spec still pass. |
 
 ## Tasks
 
 - [ ] T1 `tests/vh-adlc/review-convergence.test.ts` - failing checks that the resolved `conventions/feature-documents.md` holds the three severity definitions, the nit rule and the free-text example requirement; they fail at the current pin because the page has none of them (AC-02, AC-05, AC-08)
 - [ ] T12 `tests/vh-adlc/review-convergence.test.ts` - failing checks that the two user guides describe the severities, the nit rule and the one-revision rule; they fail now because the guides do not (AC-08)
-- [ ] T14 `tests/vh-adlc/review-convergence.test.ts` - the failing check that `references/authority.md` forbids rewriting a commit a Review Log row names; it fails because the rule does not exist (AC-10)
-- [ ] T15 `tests/vh-adlc/scenarios/run.ts` - the scripted reviewer (a plugin copy whose canned records, keyed by pass number and starting with `MODEL: scripted-reviewer`, live under `tests/vh-adlc/evidence/review-convergence/`) and the two AC-10 scenario cases; the side-branch case fails because today's review mode step 1 has no instruction for a side branch (AC-10)
-- [ ] T13 `plugins/vh-adlc/references/authority.md`, `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` - the Preservation rule against rewriting a commit a Review Log row names, and review mode step 1's merge for a document without a `branch` field on a side branch; the T14 check and both T15 cases pass (AC-10)
+- [ ] T14 `tests/vh-adlc/review-convergence.test.ts` - the failing check that Preservation and the history-rewrite row in `references/authority.md` forbid rewriting a commit a Review Log row names; it fails because neither says so (AC-10)
+- [ ] T15 `tests/vh-adlc/scenarios/run.ts` - the scripted reviewer (a plugin copy whose canned records, keyed by pass number and starting with `MODEL: scripted-reviewer`, live under `tests/vh-adlc/evidence/review-convergence/`) and the AC-10 drift case, a guard that passes on today's merge path (AC-10)
+- [ ] T13 `plugins/vh-adlc/references/authority.md` - the Preservation rule against rewriting a commit a Review Log row names, even with approval, and the matching exception in the history-rewrite row; the T14 check passes (AC-10)
 - [ ] T2 `docs/specs/spec-review-convergence.md` - the companion `vhco-pro/docs` change to `conventions/feature-documents.md` (severity definitions, the nit rule, the free-text rule) passes that repository's `npm run check` and an independent review with the rules block byte-for-byte unchanged; record its PR and published commit here (AC-02, AC-05, AC-06, AC-08)
 - [ ] T3 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/references/security-settings.md` - move every docs pin to the published commit; the T1 checks pass, and the rules block comparison and the three-spec lint, `fresh` and gate comparison between this commit and a scratch commit restoring the old pin show no difference (AC-06, AC-02, AC-05)
 - [ ] T4 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` - rate with the resolved definitions, ask the four failure-mode questions, return every finding in one pass, name every restatement, and say when a finding traces to the previous revision's change; the AC-02, AC-03 reviewer, AC-04, AC-05 and AC-09 reviewer trials pass with fixtures, returned records and reported model committed under `tests/vh-adlc/evidence/review-convergence/` (AC-02, AC-03, AC-04, AC-05, AC-09)
-- [ ] T6 `tests/vh-adlc/scenarios/run.ts` - the AC-11 scenario case with the new convention; it fails because today's skill applies every factual finding, nits included (AC-11)
+- [ ] T6 `tests/vh-adlc/scenarios/run.ts` - the AC-11 scenario case with the new convention; it fails because today's skill applies the clean pass's factual nit on its own (AC-11)
 - [ ] T5 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `plugins/vh-adlc/references/review-protocol.md` - author mode states the four failure-mode answers in Design or raises Open Questions and sweeps every restatement in one commit; review mode applies a pass's findings as one revision after walking the behaviors and named checks, and lists rather than applies nits, conditional on the resolved convention; the AC-07, AC-03 author and AC-09 author trials pass with transcripts under `tests/vh-adlc/evidence/review-convergence/`, the T6 case passes, and S7.7, S7.7.accept, S7.9 and S14.spec pass (AC-03, AC-07, AC-09, AC-11)
 - [ ] T9 `tests/vh-adlc/fixtures/build.ts`, `tests/vh-adlc/scenarios/run.ts` - the fixture docs repository also holds the previous pin's commit, and the two old-pin cases: the procedure case with the scripted reviewer and the reviewer case with the real reviewer, as the AC-06 row states (AC-06)
 - [ ] T10 `docs/get-started/first-feature.md`, `docs/user-guides/workflows.md` - describe the severities, the nit rule and the one-revision rule; the T12 guide checks pass (AC-08)
@@ -421,7 +433,10 @@ the streak count, owner and advance acceptance rules, saved nits collected acros
 decision record moved to `docs/specs/spec-review-stopping-rule.md`, with criterion AC-01 and R-13 F-01
 to F-04, and this document keeps the other parts, with a plain nit rule in place of saved nits. AC-01 is
 retired here and its ID is not reused. R-13 F-06 and F-07 are applied here; F-05 moved with the markers it
-concerns.
+concerns. R-14 had a blocking finding in the side-branch merge added after R-11.
+After R-14, the owner dropped that side-branch merge, made the ban on rewriting reviewed commits absolute
+(no approval exception), and let a pass's nits be fixed in a commit that already changes the baseline for
+that pass's blocking or should-fix findings. R-14 F-01 to F-06 are applied.
 
 ## Review Log
 
