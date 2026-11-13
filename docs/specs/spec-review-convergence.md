@@ -517,6 +517,7 @@ quote-matching rule for saved nits in favor of a list that marks addressed nits.
 | 2026-11-13 | R-9 | spec | `67a08db` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix and two nits |
 | 2026-11-13 | R-10 | spec | `57d866c` | claude-opus-5-5 | procedural | Clean: no blocking finding; six should-fix and two nits, listed for the owner and not applied |
 | 2026-11-13 | R-10 | spec | `57d866c` | n/a | n/a | accepted by owner |
+| 2026-11-13 | R-11 | spec | `4c7e151` | claude-opus-5-5 | procedural | Clean: no blocking finding; eight should-fix and one nit |
 
 ### R-1
 
@@ -1097,3 +1098,68 @@ SEVERITY: nit
 WHERE: Test Plan AC-05 row; Design, Free-text checks (lines 297-300)
 EVIDENCE: A row "has passed review once a clean pass whose reviewed commit already held the row's current text has no finding whose `WHERE` names that row". The AC-05 trial needs "a stored clean pass, at a commit already holding the row's current text", and a second fixture that "changes the row after the stored clean pass". A reviewer can establish either only from Git history. The row describes the fixtures as files committed under `tests/vh-adlc/evidence/review-convergence/`. It does not say that the trial builds a repository whose history holds the stored pass's commit and, for the second fixture, a later commit that changes the row.
 PROPOSAL: State that each AC-05 fixture is a scratch repository whose history holds the stored pass's commit, plus a later commit that changes the row in the second fixture.
+
+### R-11
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (line 81, "whichever lands second rebases onto the first"); Design, Delivery (lines 364-367); Design, Commits a Review Log names are never rewritten (lines 291-297)
+EVIDENCE: The Owner summary says "The plugin edits overlap with the draft `shared-development-loop` feature, so whichever lands second rebases onto the first." Delivery says "Whichever feature lands second merges the first in", and the new Preservation rule says no operation "rebases, amends, squashes or otherwise rewrites a commit that a Review Log row names, or any commit before it on that branch". Both features carry Review Logs on their branches, so the summary tells the owner to do exactly what this revision forbids. This is the restatement drift AC-03 targets, introduced in the same revision as the no-rewrite rule.
+PROPOSAL: Change the summary sentence to say the feature that lands second merges the first in, matching Delivery and the Preservation rule.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (line 80, "the draft `shared-development-loop` feature"); Context, Background, Overlapping work (lines 166-170); Design, Delivery (lines 364-366)
+EVIDENCE: `git show 4bef34e:docs/specs/shared-development-loop.md` (origin/main tip) has `status: in-progress` and `branch: feat/shared-development-loop`; at HEAD 4c7e151 it is `status: planned` with "34 tasks written, implementation next". It is no longer a draft. Background lists its covers "as of `b777df0`" without `plugins/vh-adlc/references/authority.md`, yet `git show b777df0:docs/specs/shared-development-loop.md` has `plugins/vh-adlc/references/authority.md` at frontmatter line 17, and the current version's T22 edits `authority.md` (line 596). Delivery's overlap list ("the same skill steps, protocol, resume skill, `loop.md`, pin and manifests") also omits it. This revision adds an `authority.md` edit (T13), so the omitted file is now a real overlap with an in-progress feature.
+PROPOSAL: Describe `shared-development-loop` as in progress on its feature branch, add `references/authority.md` to the overlap in Background and Delivery, and say which feature merges the other in for that file.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (step 5, lines 248-253; step 3, lines 239-244); Context, Owner summary (lines 47-51); Acceptance Criteria AC-01; Test Plan AC-01 row (Variant C2)
+EVIDENCE: Step 5 lets the owner pick from a list given "at the ceiling or with an acceptance", says "The count continues from the last marker", and "When the new pass is clean, the author asks for acceptance again". An acceptance can come at any clean pass ("You can accept after any clean pass", Owner summary line 53; Terminology, Owner acceptance), including one recording `streak 1 of 3`. Picks from that list continue the count, so the next clean pass records `streak 2 of 3`. Step 3 then says "The author never asks the owner to accept below the ceiling" and the spec and resume operations "dispatch another pass instead of asking", while step 5 says ask. The Owner summary repeats both ("the author never asks you to accept before the ceiling"; "Picks ... after an acceptance, are applied and checked by one more pass"). Variant C2 covers only an acceptance at `streak 3 of 3`, so either reading passes every listed check.
+PROPOSAL: State which rule wins when picks follow an acceptance given below the ceiling (ask after the one pass, or continue to three), use the same wording in step 3, step 5, AC-01 and the Owner summary, and add a variant with an acceptance at `streak 1 of 3` followed by a pick.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Clean streak, line 221; Decision record, line 225); Design, Stopping rule (step 7, lines 257-259); Test Plan AC-01 row (Variants H2 and E)
+EVIDENCE: After an acceptance row with status `draft`, the previous value is the old marker "if the latest decision record entry is a pick revision, and 0 otherwise". The decision record names only findings "folded, rejected or applied at the owner's pick", not factual findings the author applies. Take a log where the owner picks at the ceiling (pick revision entry), the next pass records `streak 4 of 3`, and the owner accepts there. A later blocking drift pass is "handled as today, through a revision that counts from 0", but applying its factual blocking findings writes no decision record entry. The latest entry is still the old pick revision, so Terminology gives a previous value of 4 and the first clean pass records `streak 5 of 3`, while step 7 and Variant H2 expect `streak 1 of 3`. H2's and E's fixtures do not say what the decision record holds, so a skill following Terminology literally passes them.
+PROPOSAL: Tie the pick check to a pick revision recorded after the latest acceptance row, or require every revision to write a decision record entry saying whether it is a pick revision. Give H2 a decision record whose latest entry before the drift pass is an earlier pick revision.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-01 (lines 394-395, "counts from 0 after a revision that is not a pick revision"); Design, Terminology (Clean streak, line 221)
+EVIDENCE: The pinned convention says a change to Scope, Design, Acceptance Criteria, Test Plan or covers "is a revision" (conventions/feature-documents.md:70-71). Applying a clean pass's factual should-fix findings to the baseline is therefore a revision that is not a pick revision, and AC-01 read literally resets the count after it. Terminology says the opposite ("Applying the findings of clean passes does not change it") and limits the reset to the case where an acceptance row precedes and the status is `draft`. Variant A requires `streak 1 of 3` to `streak 3 of 3` across exactly those applied fixes, so the criterion text contradicts its own proof. This is the R-1 F-01 defect returning in the criterion an implementation review compares against.
+PROPOSAL: Reword the AC-01 clause to the event Terminology uses, for example "counts from 0 after a revision of an accepted document that is not a pick revision", so the criterion and Variant A agree.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Applying a pass's findings as one revision (lines 278-287); Design, Stopping rule (step 3, lines 239-242); Acceptance Criteria AC-09; Test Plan AC-09 row
+EVIDENCE: The new step "applies the pass's findings as one revision in one commit", and AC-09 requires "one revision in one commit". Step 3 and step 2 keep today's split: factual findings are applied and judgement findings go to the owner as Open Questions, "folded in before the next pass is dispatched". A pass holding both kinds cannot be applied in one commit unless the author first commits the questions alone and then applies the factual findings together with the answers, and nothing says which. The AC-09 trial's two findings have no stated KIND and the trial has no owner turn, so a correct author that turns one of them into an Open Question fails "one commit applies both".
+PROPOSAL: Say how the one-revision rule treats judgement findings (for example, the one revision holds every factual finding and every folded answer, committed after the owner answers), and state in the AC-09 row that both seeded findings are factual.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Applying a pass's findings as one revision (line 282, "Where a finding can be met by removing a mechanism or by adding one, it removes"); Acceptance Criteria AC-09; Test Plan AC-09 row
+EVIDENCE: The pinned convention says "Every trade-off the document settles is an open question, including one the author would answer the same way the owner would. A section that weighs options and keeps one ... raises that choice here instead of deciding it" (conventions/feature-documents.md:154-157). Choosing between removing a mechanism and adding one to meet a finding is such a trade-off, and the new rule has the author settle it alone. The AC-09 trial then passes only when "the mechanism is removed rather than extended", so an author that follows the convention and raises the choice as an Open Question fails the trial.
+PROPOSAL: Make removal the author's recommendation in an Open Question when the choice changes the design, or limit the rule to cases where both fixes produce the same behavior, and adjust the AC-09 pass condition to match.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-10; Test Plan AC-10 row; Design, Commits a Review Log names are never rewritten (lines 291-297); Tasks T6 and T13
+EVIDENCE: The AC-10 scenario uses "a fixture spec with a `branch` field", and review mode already handles that case with `git merge origin/<default branch>` (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:57-58 at 3963e25), so the scenario passes on today's skill and does not fail first as T6 claims. The case that produced the problem was different: this document has no `branch` field (`git show 4c7e151:docs/specs/spec-review-convergence.md | grep -c '^branch:'` prints 0) yet lives on `docs/review-convergence-spec`, where SKILL.md:58-59 only offers `git merge --ff-only` on the default branch. The reflog shows `rebase (start): checkout origin/main` at 2026-11-13 04:12:05 on that branch, and later `commit (amend)` of the R-8 revision at 04:13:41. With every box ticked, the uncovered no-branch-field side branch still has no instruction and no scenario.
+PROPOSAL: Add a scenario variant for a document on a non-default branch without a `branch` field, and state in Design what review mode does there (merge the default branch in, or stop). Cite the existing delivery rule that feature PRs "never squash, so the commits its Review Log cites stay reachable" (conventions/delivery.md:79) beside the new Preservation text.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Terminology (Saved nit, line 223); Test Plan AC-01 row (Variants D3, E and J)
+EVIDENCE: Saved nits come from "a marked spec review row", but Terminology defines markers only as `streak <n> of 3` and calls `drift` and `drift, blocking` rows drift rows "in place of a streak", so whether a clean drift row's nits are saved nits is open. Variant E has a clean `drift` row after the acceptance and checks that the summary lists "only nits recorded after the acceptance row" without saying whether that row holds a nit. Variant D3 does not state whether its blocking finding is factual or judgement (R-10 F-04 fixed this for B and H2). AC-01's "never raises one again" covers rejected factual findings, but only Variant J (an answered judgement finding) checks it.
+PROPOSAL: Say whether drift rows count as marked for saved nits and give Variant E's drift row a nit with the expected result, make D3's blocking finding factual, and add a rejected factual finding to Variant J or a new variant.
