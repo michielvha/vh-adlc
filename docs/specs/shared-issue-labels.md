@@ -55,7 +55,10 @@ first two repositories. Other adopters follow later, on your request per reposit
 You settled six questions on 2026-11-13, each at its recommendation. The set lives in the plugin.
 Repositories get it through the helper. It holds the nine labels above. Investigate may set a state
 label at filing. `label_map` maps a standard name to a repository's own name, so existing settings
-keep working. The feature stays separate from #78, and its investigate change lands after #78 merges.
+keep working. The feature stays separate from #78. Because #78 covers the investigate and spec skills,
+the authority reference and every vh-adlc test, this feature changes nothing but its own document
+until #78 merges; implementation starts after that. A handoff asks the #78 session to record
+Stackweaver's investigate labeling as moving here instead of superseded.
 
 Every check named here is planned; nothing has run yet. No spec review has happened. Accepting this
 document authorizes building it on a feature branch. Running the
@@ -94,7 +97,14 @@ helper's apply against any real repository still needs your approval of that exa
 - shared-development-loop (`docs/specs/shared-development-loop.md`, `in-progress` on
   `feat/shared-development-loop`) covers `plugins/vh-adlc/skills/vh-adlc-investigate/` and plans a
   Stackweaver parity map with one row per legacy rule of `agents/investigate.md` (its task T25). Its
-  document does not mention issue labels (`grep -n -i label` finds no issue-label rule).
+  document does not mention issue labels (`grep -n -i label` finds no issue-label rule). Its `covers`
+  also lists `plugins/vh-adlc/skills/vh-adlc-spec/`, `plugins/vh-adlc/references/authority.md` and
+  all of `tests/vh-adlc/` (`docs/specs/shared-development-loop.md:8-42` on
+  `feat/shared-development-loop` at `645882b`).
+- That parity map, on Stackweaver's `feat/vh-adlc-development-loop` at `bedc6b5d`, puts the labeling
+  rule in row `investigate-files-issue` together with routine issue filing, and marks the whole row
+  superseded by the rule that investigate files an issue only on request
+  (`tests/agent-loop/parity.json`, `agents/loop-project.md:61`). The labeling half has no home.
 - The projects helper already follows an inventory, digest and approved-apply pattern
   (`plugins/vh-adlc/references/projects.md:105-111`, `plugins/vh-adlc/scripts/projects/apply.ts`).
 - Seventeen distinct repositories under the `michielvha`, `vhco-pro` and `LowGok` owners have a local
@@ -211,10 +221,17 @@ exact plan digest for that repository.
 
 ### Order against shared-development-loop
 
-This stays a separate feature (owner, Q6). Tasks that edit `skills/vh-adlc-investigate/` wait until
-#78 merges, and this document reports
-the label rule to that feature's owner as the home for its parity row. Everything else can land
-first.
+This stays a separate feature (owner, Q6). shared-development-loop's `covers` overlaps this one on
+`plugins/vh-adlc/skills/vh-adlc-investigate/`, `plugins/vh-adlc/skills/vh-adlc-spec/`,
+`plugins/vh-adlc/references/authority.md` and `tests/vh-adlc/`. Two features writing those paths at
+once would make each other's reviews stale. So:
+
+- Until #78 merges, this feature changes only `docs/specs/shared-issue-labels.md`, which #78 does not
+  cover. Spec work and reviews continue on the default branch.
+- The claim commit and every task wait until #78 has merged to the default branch.
+- A handoff to the #78 session reports that the labeling half of its `investigate-files-issue` parity
+  row belongs to this feature. Whether and how that row changes is that session's decision; this
+  feature does not edit Stackweaver's parity map or #78's document.
 
 ## Acceptance Criteria
 
