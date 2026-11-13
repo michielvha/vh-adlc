@@ -322,6 +322,7 @@ None.
 | 2026-11-13 | R-21 | spec | `9a3c22310b1758ffab6f9695717afa4a95ab1166` | gpt-6.1-sol | procedural | No blocking findings; one should-fix finding: the holder-clear promise did not allow for a guard that exits once its record is gone. |
 | 2026-11-13 | R-22 | spec | `2a2a0ebc6f306b0f7086960f1e85b91e8a6b4750` | gpt-6.1-sol | procedural | No findings on the revision after R-21. |
 | 2026-11-13 | R-22 | spec | `2a2a0ebc6f306b0f7086960f1e85b91e8a6b4750` | n/a | n/a | accepted by owner |
+| 2026-11-13 | R-23 | implementation | `d92594e96a5675dbe763fcc4e79db700226b19a7` | gpt-6.1-sol | procedural | All seventeen criteria met with no findings. |
 
 ### R-1
 
@@ -1219,6 +1220,77 @@ PROPOSAL: Qualify the retry and terminal-state promises on the record remaining 
 ### R-22
 
 NO FINDINGS
+
+
+### R-23
+
+CRITERION: AC-01 Without `--profile`, browser sessions still start with a fresh profile that is deleted on stop and expiry, with unchanged command output and records.
+VERDICT: met
+EVIDENCE: Executed race tests against a scratch snapshot of d92594e96a5675dbe763fcc4e79db700226b19a7. TestStartWithoutProfileKeepsRecordsAndOutput, the real headed-browser and human-handoff tests, and all seven component crash/expiry scenarios passed. The browser-enabled Bun suite also passed its disposable-session journeys. Synthetic local fixtures; no live provider.
+
+CRITERION: AC-02 A persistent cookie set in one `--profile` session at least 30 seconds before that session stops is present in a later session on the same profile, in every run on a host whose one-minute load average stays below 4; under heavier load it is best effort. The first session's `downloads`, `Xauthority`, `vnc.passwd` and `control.sock` are gone and its stopped record remains.
+VERDICT: met
+EVIDENCE: At d92594e, TestRealReusableProfileAcrossSessions/stop passed with Chromium 156.0.8078.79: the cookie survived the 31-second wait and stop, all four private paths disappeared, and the stopped record remained. Its sampled maximum one-minute load was 1.95. The separate cookie-chain rerun added ten qualifying successful runs.
+
+CRITERION: AC-03 A later session on a reused profile opens with only the connection page: tabs and session-only cookies from the previous session are absent after a `stop`, an expiry and a SIGKILL of the previous session, while handoffs within a session still keep tabs, session cookies and tab storage.
+VERDICT: met
+EVIDENCE: At d92594e, all three TestRealReusableProfileAcrossSessions variants passed, including handoff preservation and subsequent-session tab/cookie removal. The real noVNC human-sign-in fixture also passed its tab-storage checks through both handoffs. These used synthetic loopback applications.
+
+CRITERION: AC-04 A second session cannot start on a profile while another live session holds it, gets `profile-in-use` naming the holder's session ID or `holder: starting`, and leaves no record or process behind, and `profile list` never causes a start to fail.
+VERDICT: met
+EVIDENCE: At d92594e, the session/profile race tests passed concurrent starts, holder diagnostics, absence of losing records/processes, repeated listing during startup, and lock inheritance across startup retries. The browser-enabled Bun profile fixture also passed its real competing-start scenario.
+
+CRITERION: AC-05 After the supervisor and Chromium of a profile session are killed with SIGKILL, or when the leftover lock names another hostname, a new session on the same profile starts and works, while a profile whose Chromium is still running is refused with `profile-browser-still-running`, however that browser spelled the profile directory, leaving no record or process and naming the owning session and a recovery that works.
+VERDICT: met
+EVIDENCE: At d92594e, the real SIGKILL recovery and still-running-browser tests passed, including relative and symlink spellings, the owning-session diagnostic, and successful recovery through cleanup. Profile race tests passed foreign-hostname singleton recovery and verified that refusals leave no new record/process. Local browsers only.
+
+CRITERION: AC-06 A session whose resolved owner differs from the profile owner, or of a different transport kind, cannot open the profile, no record or process is created, and Chromium never launches on a profile whose owner the supervisor has not matched.
+VERDICT: met
+EVIDENCE: At d92594e, TestProfileOwnerAndTransportBinding and TestSupervisorRechecksOwnerBeforeChromium passed under the race detector. Initial mismatches left no session record/process; a changed supervisor-resolved owner prevented browser launch. These tests use a fake LocalAPI and browser launcher, not a live tailnet.
+
+CRITERION: AC-07 Invalid profile names are refused before any file is touched, and a profile last opened by a newer Chromium major version is refused before launch.
+VERDICT: met
+EVIDENCE: At d92594e, config/profile/session race tests passed invalid-name cases with an untouched store, Chromium-version parsing and comparison, and newer-version startup refusal without a record or launched process. Version refusal uses a controlled Chromium executable.
+
+CRITERION: AC-08 The profile store's own paths are private to the runtime's OS account and not followed through symlinks, and the README states that a reusable profile is protected only by file permissions and the host account boundary.
+VERDICT: met
+EVIDENCE: At d92594e, TestStorePathsArePrivate and TestStoreRefusesSymlinksAndWideModes passed for the store, profile directory, metadata, lock and Chromium directory. Inspected README Protection at rest: it explicitly states permissions-only protection and readability by the OS account or root.
+
+CRITERION: AC-09 A download in a later session lands in that session's own download directory, and preferences Chromium saved in the profile survive across sessions.
+VERDICT: met
+EVIDENCE: At d92594e, TestRealReusableProfileAcrossSessions/stop passed its later-session download and retained bookmark-bar preference assertions with real Chromium. TestPreferencesMerge also passed preservation of unrelated preference keys. Synthetic download fixture.
+
+CRITERION: AC-10 `profile list` shows each profile with its owner, transport kind, times and holder, `profile delete` removes an idle profile completely and refuses one held by a session or used by a running Chromium, and `status` and `access` name a session's profile.
+VERDICT: met
+EVIDENCE: At d92594e, CLI/session/profile race tests passed listing fields, status/access profile fields, locked deletion refusal, complete idle deletion and repeated deletion. TestRealReusableProfileDeleteWhileBrowserRuns passed refusal with Chromium surviving its controllers, preservation of profile files, and complete deletion after cleanup.
+
+CRITERION: AC-11 Credential entry on a reusable profile happens only in human mode. A session with `--profile` starts in human mode unless `--agent-start-approved` is given, the skill gives the agent control only after a confirmed handoff or on the owner's explicit approval in the current task, and the agent opens only a profile the owner named and never reads profile files directly.
+VERDICT: met
+EVIDENCE: At d92594e, config/session race tests passed human defaults, approval requirements, misplaced-option refusals and session-only approval recording. Executed all five native routing profile cases: named, unnamed, unapproved, approved and credential challenge; all passed. Inspected the skill's confirmation and human-only entry rules. Native fixtures use synthetic profiles and a deliberately failing display, not real provider credentials.
+
+CRITERION: AC-12 auth-refresh files stay unread and unchanged by every profile command, and the default profile store lies outside auth-refresh's default directories.
+VERDICT: met
+EVIDENCE: At d92594e, the browser-enabled Bun profile fixture passed create, reuse, concurrent start, list and delete scenarios under a temporary HOME. Both auth-refresh sentinels retained their access times, modification times and hashes, and the default store was outside both trees. No real auth-refresh state was used.
+
+CRITERION: AC-13 The README and skill describe reusable profiles with the glossary terms, the opt-in flag, owner binding, locking, deletion, the at-rest protection, the provider expiry limitation, that only persistent sign-ins survive and the "stay signed in" advice, the recovery for `profile-browser-still-running`, that stop sends no keys and that a sign-in should be left about half a minute before stopping, the rule that agents never read profile files, and auth-refresh as the first route for sign-in.
+VERDICT: met
+EVIDENCE: Inspected both documents at d92594e against every listed requirement; the descriptions agree with the accepted design. The remote-gui package checks passed. The broader vh-adlc checker was not clean: 1423 passed and three failed in installer, cleanup-isolation and triage checks; its read-only isolation rerun also failed. It supplies no clean-suite proof.
+
+CRITERION: AC-14 The module's race tests, vet, pinned lint and tidy checks pass, and service shares, browser phases, owner access and `cleanup` keep their behavior for sessions without a profile.
+VERDICT: met
+EVIDENCE: At d92594e, partitioned race runs covered all ten module packages. Every browser case passed except the initial cookie run's insufficient qualifying-load quota; its focused rerun passed. go vet ./..., golangci-lint v2.15.0 config verify and run, go mod tidy -diff, and formatting checks passed. The browser/viewer-enabled Bun suite passed 22 tests with 29 gated skips, including Chromium and Firefox fixtures. Live tailnet and SSH journeys were not exercised.
+
+CRITERION: AC-15 With an overridden sessions root, `--profile` and the `profile` commands fail with `profile-home-required` unless a profile root override is given, and with one they use that root.
+VERDICT: met
+EVIDENCE: At d92594e, TestOverriddenSessionsRootRequiresProfileHome, TestProfileHomeAndCommands and CLI profile tests passed. They cover --home and REMOTE_GUI_HOME refusals, both profile-root override mechanisms, and actual profile operations using the selected root.
+
+CRITERION: AC-16 A reusable profile session stopped by `stop` or by expiry sends no key to Chromium. When its browser stop starts with at least two seconds of the guard's five-second supervisor deadline left, it ends Chromium with a terminate and, two seconds later, a kill if needed; when less is left, or the browser stop never starts, the guard's session sweep ends Chromium. A persistent cookie set 30 seconds before the stop is present in the next session in every run on a host whose one-minute load average stays below 4, and is best effort under heavier load; the README advises waiting about half a minute after signing in and says a heavily loaded host can lose a later cookie. `stop` reports `stopped` only after the holder is cleared and the lock released, and when clearing the holder fails the session stays `cleanup-pending` with the lock held until a retry clears it, while its record exists and names its guard; a guard whose record is removed or reassigned exits without signalling, and the next start on the profile clears the stale holder; the next session's first launch marks the previous exit `Normal`.
+VERDICT: met
+EVIDENCE: At d92594e, real focused-popup no-input checks and stand-in stop/expiry, interrupted-close, delayed-supervisor and launch-preparation tests passed. Session race tests passed startup/forward-removal delays, holder-clear failure/retry, and removed/reassigned-record recovery. Browser suite boundary loads were 1.19/2.06; session suite loads were 1.74/3.04. The first cookie chain had only five qualifying runs and failed its quota. The quiet-window rerun passed with ten qualifying successful runs, sampled maxima 2.27 to 3.70; three runs reaching 4 were excluded. Inspected both README timing caveats.
+
+CRITERION: AC-17 A reusable profile session keeps the clipboard feature's behavior: a handoff to agent mode clears the remote clipboard, the PRIMARY selection and the cut buffer and refuses the agent launch when the clear cannot be verified, a `stop` or expiry whose supervisor close finishes before the guard's deadline closes the clipboard helper after the browser close, while in an interrupted close the supervisor's death closes the helper's connection before the guard's session sweep ends the remaining members, and the next session on the same profile opens with an empty clipboard panel that sends and reads text; neither the viewer nor the clipboard helper writes clipboard text to the profile store.
+VERDICT: met
+EVIDENCE: At d92594e, TestRealReusableProfileClipboard, the reusable-profile failed-clear test, normal stop/expiry helper-order tests and interrupted-close connection-order test passed. The real profile test verified cleared selections, an empty next-session clipboard, send/read round trips and no sentinel in profile files. Chromium/Firefox viewer fixtures also passed. Shutdown-suite boundary loads were 1.19/2.06; all clipboard text was synthetic.
 
 
 ## Sources
