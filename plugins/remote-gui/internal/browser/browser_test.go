@@ -43,7 +43,9 @@ func setup(t *testing.T) (config.Config, string) {
 						return
 					}
 				}
-				if r.State == "cleanup-pending" {
+				// A passing test expected its cleanup-pending record; keep one
+				// only to debug a failure.
+				if r.State == "cleanup-pending" && t.Failed() {
 					t.Log("retained cleanup-pending record", home)
 					return
 				}

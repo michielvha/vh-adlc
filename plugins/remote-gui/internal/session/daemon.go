@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -251,6 +252,30 @@ func redactedTarget(raw string) string {
 	return raw
 }
 
+// abandoned reports whether the session's record is gone or names another
+// process in role. Either way nothing is left that the caller can prove is its
+// own, so a cleanup-pending controller stops retrying instead of looping
+// forever. A record that exists but cannot be read proves neither, and the
+// controller keeps retrying.
+func abandoned(home, id, role string) bool {
+	if _, err := os.Lstat(filepath.Join(home, id, "state.json")); errors.Is(err, fs.ErrNotExist) {
+		return true
+	}
+	r, err := state.Load(home, id)
+	if err != nil {
+		return false
+	}
+	self, err := state.Inspect(os.Getpid())
+	if err != nil {
+		return false
+	}
+	owned := r.Guard
+	if role == "supervisor" {
+		owned = r.Supervisor
+	}
+	return !state.Equal(owned, self)
+}
+
 func markPending(home, id string, err error) {
 	_ = update(home, id, func(r *state.Record) {
 		r.State = "cleanup-pending"
@@ -349,7 +374,7 @@ func guard(home, id string) int {
 			<-wait
 		}
 	}
-	if err = finish(home, id, true); err == nil {
+	if err = finish(home, id, true); err == nil || abandoned(home, id, "guard") {
 		return 0
 	}
 	markPending(home, id, err)
@@ -389,7 +414,7 @@ func guard(home, id string) int {
 		case <-trigger:
 		case <-ticker.C:
 		}
-		if err = finish(home, id, true); err == nil {
+		if err = finish(home, id, true); err == nil || abandoned(home, id, "guard") {
 			return 0
 		}
 		markPending(home, id, err)
@@ -737,7 +762,7 @@ func pendingController(home, id string) {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
-		if err = finish(home, id, true); err == nil {
+		if err = finish(home, id, true); err == nil || abandoned(home, id, "supervisor") {
 			return
 		}
 		markPending(home, id, err)
