@@ -180,3 +180,21 @@ describe("filename bytes in the push range", () => {
     expect(JSON.parse(run.stdout.toString()).marker).toBe(false);
   });
 });
+
+describe("merge commits in the push range", () => {
+  test("a code path that only merge commits add and remove leaves the skip marker off", () => {
+    const remoteDir = scratch("vh-delivery-remote-"), remote = join(remoteDir, "r.git");
+    git(remoteDir, "init", "-q", "--bare", "-b", "main", remote);
+    const root = repository(base());
+    git(root, "remote", "add", "origin", remote); git(root, "push", "-q", "origin", "main");
+    for (const [side, change] of [["side-a", () => write(root, { "src/added.go": "x\n" })], ["side-b", () => git(root, "rm", "-q", "src/added.go")]] as const) {
+      git(root, "switch", "-q", "-c", side); write(root, { [`docs/specs/${side}.md`]: "# S\n" }); git(root, "add", "-A"); git(root, "commit", "-q", "-m", side);
+      git(root, "switch", "-q", "main"); git(root, "merge", "-q", "--no-ff", "--no-commit", side); change(); git(root, "add", "-A"); git(root, "commit", "-q", "-m", `merge ${side}`);
+    }
+    write(root, { "docs/specs/f.md": "# F4\n" }); git(root, "commit", "-q", "-am", "doc");
+    const cli = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
+    const run = Bun.spawnSync([process.execPath, cli, "skip", "--repo", root, "--base", "origin/main", "--remote-branch", "origin/main", "--feature-root", "docs/specs/", "--docs-revision", "none"],
+      { stdout: "pipe", stderr: "pipe", env: { ...process.env, XDG_CONFIG_HOME: join(remoteDir, "cfg") } });
+    expect(JSON.parse(run.stdout.toString()).marker).toBe(false);
+  });
+});
