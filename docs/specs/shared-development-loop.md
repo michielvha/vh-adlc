@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Re-entered on feat/shared-development-loop after the R-18 acceptance; T25 to T41 remain, with T24 reopened."
+status: draft
+status_description: "Back to draft on feat/shared-development-loop: implementation reviews move to a private clone of the reviewed commit, after concurrent pushes tripped the shared-ref check."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
