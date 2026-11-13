@@ -457,6 +457,7 @@ R-9 F-01 to F-07 are applied. The owner accepts in advance if R-10 has no blocki
 | 2026-11-13 | R-8 | spec | `005f0f5` | claude-opus-5-5 | procedural | Clean: no blocking finding; four should-fix and three nits, listed for the owner and not applied |
 | 2026-11-13 | R-8 | spec | `005f0f5` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-9 | spec | `67a08db` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix and two nits |
+| 2026-11-13 | R-10 | spec | `57d866c` | claude-opus-5-5 | procedural | Clean: no blocking finding; six should-fix and two nits, listed for the owner and not applied |
 
 ### R-1
 
@@ -979,3 +980,61 @@ SEVERITY: nit
 WHERE: Design, Terminology (lines 191-199); Design, Stopping rule (step 7, lines 227-232)
 EVIDENCE: The convention requires that "User-facing terms the feature introduces or changes appear in a glossary row" (conventions/feature-documents.md:156-158). The `drift` and `drift, blocking` Outcome markers and the "drift row" that Terminology, Scope and AC-01 refer to are defined only in step 7. Step 7 also treats every new pass on a `planned` or `in-progress` document with a standing acceptance as a drift pass, even when the owner asks for it without any default-branch change.
 PROPOSAL: Add a Terminology row for a drift pass and its two markers, and say whether an owner-requested re-review of an accepted document with no drift is also recorded as `drift`.
+
+### R-10
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (step 5, lines 232-234; step 6, lines 235-238); Design, Terminology (Clean streak, line 205); Acceptance Criteria AC-01; Test Plan AC-01 row
+EVIDENCE: Step 5 covers picks from the list shown at the ceiling: the author applies them, runs one more pass and, "When that pass is clean, the author asks for acceptance again". Step 6 writes the acceptance row first and lists the pass's findings and the saved nits after it. So with an advance acceptance, the owner sees the list only after accepting. The design does not say what a pick from that list does. Applying a pick changes the baseline of an accepted document, which the convention treats as a revision (conventions/feature-documents.md:70-73). Terminology then sets the previous value to 0 ("an acceptance row follows that row and the document's status is `draft`"), and step 3 forbids asking until three new clean passes have run. Step 5 asks after one. This document is that case: it was accepted at R-8 under an advance acceptance, the owner then picked R-8 F-01 to F-07 (lines 441-442), and R-9 starts a new count. Two careful implementers would build different loops here. Under the Terminology reading, every pick made after an acceptance costs three passes, which is the churn the feature is meant to remove.
+PROPOSAL: Say whether a pick from the list given with an acceptance follows step 5 (one more pass, streak continues, ask again when clean) or a full revision that counts from 0. Raise the choice as an Open Question if it is a trade-off, and add a variant for it.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Owner acceptance, line 209; Decision record, line 208); Design, Stopping rule (step 3, lines 226-228; step 6, lines 235-238); Acceptance Criteria AC-01; Test Plan AC-01 row (Variants D3 and D4)
+EVIDENCE: Line 209 says an advance acceptance "is written into the decision record, holds in any later session, covers only the next spec pass and lapses if that pass has a blocking finding". Step 3 counts "one recorded in the decision record". Nothing requires the record to name the pass the acceptance covers, or to record that it lapsed. Suppose a later session reads "the owner accepts in advance if the next pass has no blocking finding". It cannot tell whether that pass has already run. After a blocking pass and its fixes, a resumed run could therefore apply the lapsed acceptance at the next clean pass. This document's own records happen to name the pass ("accepted in advance if R-5 has no blocking finding", lines 432-433; status_description "if R-10 has no blocking finding"), but the design does not require it. Variant D3 checks a lapse only within one session, and D4 checks only a live acceptance. No variant has a later session meet a recorded acceptance that has lapsed.
+PROPOSAL: Require the decision record to name the pass an advance acceptance covers (R-<n>), and to note the lapse when that pass is blocking. Add a variant where a separate session() call meets a recorded acceptance whose pass was blocking, and check that it writes no acceptance row.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Saved nit, line 206); Design, Stopping rule (steps 4 and 6); Context, Owner summary (lines 72-73); Test Plan AC-01 row (Variants F and I)
+EVIDENCE: Line 206 drops a saved nit when "its `EVIDENCE` quotes text that no longer exists in the document; a nit that quotes nothing is always listed". EVIDENCE often quotes other files. R-9 F-07 quotes the convention ("User-facing terms the feature introduces or changes appear in a glossary row"), text that never existed in the document. Read literally, the rule drops that nit at once although nobody applied it; another reader would keep it. The upgrade case is also undefined. A draft with no acceptance row counts nits "since the first pass", including nits stored before the update, which the old procedure already applied. In this repository, docs/specs/worktree-cleanup.md is a draft with no acceptance row and 39 stored nit records (counted with grep for `^SEVERITY: nit`). Every one of them that quotes nothing would be listed in its acceptance summary. The Owner summary only says that old rows do not count toward the streak. Variant I covers only a quote of document text that a fix removed.
+PROPOSAL: Say that the rule considers only quotes of the reviewed document's own text. Say whether nits in rows stored before the update (the rows without a streak marker) are saved nits. Cover both cases in Variant F or I.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-01 row (Variants B, H2 and J); Design, Stopping rule (paragraph after step 7, line 247)
+EVIDENCE: Line 247 has the author dispatch passes in the same session while no Open Question waits. Variant H2 checks only that "the first clean pass after the revision records `streak 1 of 3`". It gives no canned records for later passes and no point where the run stops. It also does not say whether the blocking drift finding is factual (applied in session) or judgement (an Open Question that stops the run). R-9 F-02 raised this gap for D3 and F, and their fix, a judgement should-fix that stops the run, was not carried over to the new H2. Variant J says only "a later run continues". It does not say whether that run is a separate session() call with no resume, as Variant E now states. Inside one session the conversation still remembers the answer, so a skill whose resumed-pass check ignores the decision record would pass. J also gives no canned records for the pass it dispatches. Variant B does not say whether its blocking pass holds a factual or a judgement blocking finding. A judgement one stops the run for the owner, and the variant has no owner turn for that.
+PROPOSAL: Give H2 a stop, for example a judgement should-fix on the first clean pass after the revision, and state the kind of its blocking finding. Run J's later run as a separate session() call with stated canned records and a stop. Make B's blocking finding factual.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-06 row (line 401, old-pin scenario case); Tasks T9 (line 416); Design, Delivery (lines 335-339)
+EVIDENCE: The old-pin case checks that "findings are applied as today, no streak marker is written, the reviewer still reports a seeded failure-mode gap", on "a fixture spec pinned to the previous revision with a clean pass". Neither the row nor T9 says which reviewer the case uses. Delivery defines the scripted reviewer only for the AC-01 variants. With the scripted reviewer, the failure-mode gap is a canned record, so the check passes whether or not the updated agent's failure-mode check works on an old pin. With the real reviewer, nothing controls whether the pass is clean or which findings there are to apply. Neither reading checks what most clearly marks the current procedure: after a clean pass, the author asks for acceptance and does not dispatch another pass (SKILL.md:73-75).
+PROPOSAL: Name the reviewer for the old-pin case: the real one for the failure-mode check, the scripted one for the procedure check, or two cases. Add a check that after the clean pass the run asks for acceptance and dispatches no second pass.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (lines 41-42, 49-51 and 76-81); Design, Stopping rule (step 7, lines 239-245); Acceptance Criteria AC-01
+EVIDENCE: Lines 50-51 say "A routine re-review of an already accepted document keeps that acceptance and only lists what it finds". Step 7 and AC-01 say a blocking drift pass records `drift, blocking` and goes through a revision that counts from 0, so the acceptance does not survive it. The paragraph on changes since the R-8 acceptance (lines 76-81) leaves out that branch, which R-9 F-03 added along with Variant H2. It also leaves out the new `tests/vh-adlc/fixtures/build.ts` change for the old-pin case. Lines 49-50 say "The author runs the passes itself and never stops to ask before the ceiling". Lines 41-42 say judgement should-fix findings come to the owner as Open Questions answered before the next pass, which stops the run (line 247). The convention asks the summary to explain material changes since the last accepted scope (conventions/feature-documents.md:86-88).
+PROPOSAL: Limit the re-review sentence to a clean re-review, and say that a blocking one reopens the loop through a revision. Say the author never asks for acceptance before the ceiling. Add the blocking drift branch and the fixture change to the changes since R-8.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Delivery (lines 330-332 and 339-341); Test Plan AC-01 row (final sentences)
+EVIDENCE: Delivery says S7.9 keeps passing, and raises `maxTurns` to 250 only for the AC-01 cases and S7.7. In S7.9's second turn the owner accepts in advance: "If it finds nothing blocking and leaves no open questions, I accept the revision" (tests/vh-adlc/scenarios/run.ts:1079). Under step 6 that acceptance lapses at a blocking pass. The author then keeps dispatching real reviewer passes in the same turn toward the ceiling, at `maxTurns: 80` (run.ts:138). A turn cut off there ends with `isError` and the session breaks (run.ts:141). S7.9's draft branch (run.ts:1097-1098) then passes on a half-finished loop. The Test Plan's "Every multi-pass case runs with `maxTurns` 250" does not say whether S7.9 counts as one.
+PROPOSAL: Name S7.9 among the cases that run with `maxTurns` 250 and fail on `isError`, or explain why its single-pass expectation holds.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-05 row; Design, Free-text checks (lines 297-300)
+EVIDENCE: A row "has passed review once a clean pass whose reviewed commit already held the row's current text has no finding whose `WHERE` names that row". The AC-05 trial needs "a stored clean pass, at a commit already holding the row's current text", and a second fixture that "changes the row after the stored clean pass". A reviewer can establish either only from Git history. The row describes the fixtures as files committed under `tests/vh-adlc/evidence/review-convergence/`. It does not say that the trial builds a repository whose history holds the stored pass's commit and, for the second fixture, a later commit that changes the row.
+PROPOSAL: State that each AC-05 fixture is a scratch repository whose history holds the stored pass's commit, plus a later commit that changes the row in the second fixture.
