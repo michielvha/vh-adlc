@@ -481,6 +481,7 @@ R-4 judgement findings (F-02, F-03, F-04) on 2026-11-13; the answers are folded 
 | 2026-11-13 | R-2 | spec | `7af38b0eb50ae12a678dbcebb3b04cd61b32abb0` | gpt-6.1-sol | procedural | One blocking finding: no enrollment rule between native and shared routing; five should-fix. |
 | 2026-11-13 | R-3 | spec | `764df2fe8182152243a40b81e12a9168a88e5fa2` | gpt-6.1-sol | procedural | Two blocking findings: adapter must isolate implement from the live main checkout; domain plans routed to retired agents. Two should-fix. |
 | 2026-11-13 | R-4 | spec | `b777df0b6cc97a2d8b1410f3bedc73631ab504f5` | gpt-6.1-sol | procedural | Two blocking findings: routing criteria contradict for terminal documents; no-publication verdict not tied to the merge commit. Three should-fix. |
+| 2026-11-13 | R-5 | spec | `4f970d4d18078e7c3edbc81db9d941fbfb6116a1` | gpt-6.1-sol | procedural | One blocking finding: the release order needs a post-merge lock commit outside the single-feature lifecycle. Two should-fix. |
 
 ### R-1
 
@@ -643,6 +644,29 @@ SEVERITY: should-fix
 WHERE: Scope / Shared release; Design; AC-12 and its Test Plan row
 EVIDENCE: The pinned conventions/delivery.md requires naming every affected artifact and its build/publication path, with pre-merge checks reproducing those builds. This document names a vh-adlc release and marketplace installation but supplies no artifact/path inventory. .goreleaser.yml builds four platform binaries, archives and signed checksums; .github/workflows/release.yml publishes through a reusable release workflow. Plugin metadata and vh-adlc.lock.json show independently versioned plugin and runtime inputs. AC-12 checks installation and version equality, not the complete affected publication paths.
 PROPOSAL: Name the runtime archives, signatures, plugin payload and docs revision, their actual build/publication paths, and the dependency order for publishing the runtime and updating the plugin lock. Add release-path checks and exact published revision evidence alongside the installed-entry-point checks.
+
+### R-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design / Release path; AC-12
+EVIDENCE: The release sequence requires merging the runtime to main, publishing it, then making a follow-up commit updating the plugin lock and docs pin. The pinned conventions/delivery.md requires code and configuration changes on the feature branch and one PR per feature or child feature. plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md says an authorized merge ends that PR branch's lifetime. The document specifies neither a child delivery nor an exception for the post-release configuration commit, so its required publication sequence cannot finish through the stated single-feature lifecycle. I cannot run Git or vh-adlc; this follows from the written release sequence and lifecycle rules.
+PROPOSAL: Define separately accepted runtime and plugin-finalization child deliveries, or obtain an explicit lifecycle exception for the post-release follow-up. Specify where the remaining document updates land and how their review and completion gates stay valid.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02 and its Test Plan row
+EVIDENCE: The preservation snapshot hashes modified, untracked and “pre-existing ignored” files, while its git status command does not list ignored files. Creating a new ignored file outside review_scratch can therefore escape the specified comparison. The design also excludes review_scratch directories, but AC-02 rejects “any change” to file contents, ignored files included, without that exception. I cannot execute Git mutation fixtures; the written snapshot and criterion define different preservation boundaries.
+PROPOSAL: Compare the ignored-file inventory before and after dispatch so additions outside permitted scratch paths also reject storage. State the scratch exception consistently in AC-02 and test both permitted scratch output and creation of a new ignored file outside it.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan / AC-04
+EVIDENCE: Design says “A failed rung blocks all three” and permits an owner allowance only for a rung that could not run. AC-04 preserves that distinction. Its Test Plan instead says “a failing command and an unavailable procedure must each leave no push, no completion commit and no delivered report, unless the owner allowance is recorded for that rung”, allowing the exception to cover an observed failure too. Stackweaver CLAUDE.md requires verification before pushing, and agents/ship.md prohibits shipping over a known failure.
+PROPOSAL: Split the failure and unavailable-procedure cases. Require an observed failure to block publication and completion even with an allowance, and test the allowance only for the explicitly authorized unavailable rung.
 
 ## Sources
 
