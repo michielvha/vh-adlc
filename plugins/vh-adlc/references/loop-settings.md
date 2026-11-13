@@ -70,6 +70,19 @@ whose output matches `no_publication_pattern` leaves the feature blocked until t
 delivery; any other failure leaves it not delivered. Commands: `cli.ts ci`, `cli.ts skip` and
 `cli.ts delivery`.
 
+## Investigation
+
+| Field | Value |
+| --- | --- |
+| `findings_document` | `on_request` (default) or `always`. With `always`, invoking investigate is the request to write its findings document. |
+| `analysis_dir` | Where findings documents live (default `docs/analysis`). |
+
+Before writing, investigate searches the analysis documents and open issues for the case. A covering
+document is extended, never duplicated. An existing issue never holds the only copy of the findings: they
+go in a document, and an issue update, where investigate has authority to make one, is a summary with a
+link. An investigation ends with one verdict: act now, track (with the conditions that would change
+it), or reject.
+
 `bun scripts/loop/cli.ts context --repo <dir>` prints the reading list (instruction files, then the
 project procedure) and the lenses.
 

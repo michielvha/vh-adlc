@@ -16,7 +16,7 @@ function repo(files: Record<string, string>) {
 }
 const settings = "schema_version: 1\nfindings_document: always\nanalysis_dir: docs/internal/analysis\n";
 const covering = "---\ndescription: Why the launcher heartbeat times out under load.\n---\n\n# Launcher heartbeat timeout\n";
-const issue = { number: 42, title: "Launcher heartbeat times out", body: "The heartbeat stops answering." };
+const issue = { number: 42, title: "Launcher heartbeat timeout", body: "The heartbeat stops answering under load." };
 
 describe("settings", () => {
   test("findings_document and analysis_dir are read; the default writes only on request", () => {
