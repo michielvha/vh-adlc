@@ -1,6 +1,6 @@
 ---
 status: planned
-status_description: "Re-accepted by the owner at R-15 (e2e3de9) after the covers revision; task list next. R-14 and R-15 should-fix items go into the tasks."
+status_description: "Re-accepted by the owner at R-15 (e2e3de9); 34 tasks written, implementation next."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
@@ -569,7 +569,45 @@ published plugin is installed from the marketplace and exercised, and a rollback
 
 ## Tasks
 
-None yet; written once the document is planned.
+Shared vh-adlc work, on the feature branch:
+
+- [ ] T1 `tests/vh-adlc/loop/settings.test.ts` - failing tests for `.vh-adlc/loop.yaml`: a route per role, `command` refused for `author` and `implementer`, resume taking the continued operation's route, the per-user override limited to `argv[0]`, and no file meaning today's behavior; fails because no reader exists (AC-01)
+- [ ] T2 `schema/vh-adlc.schema.json`, `internal/settings/`, `cmd/vh-adlc/`, `docs/reference/cli.md` - a `loop` settings kind for `vh-adlc settings read`, documented; `go test ./...` passes with valid and refused fixtures (AC-01)
+- [ ] T3 `plugins/vh-adlc/scripts/loop/settings.ts`, `plugins/vh-adlc/references/loop-settings.md` - the TypeScript reader and the settings reference, using the Glossary terms; T1 passes (AC-01, AC-19)
+- [ ] T4 `tests/vh-adlc/loop/model-free.test.ts` - a guard that fails on any model name in an agent or skill file; passes on the current tree and fails on a planted name (AC-01)
+- [ ] T5 `tests/vh-adlc/loop/review-route.test.ts` - failing stub-command fixtures: matching reply, wrong model, wrong `TARGET`, no header, exit 1, hang, a touched clean file, a status-preserving rewrite, a moved ref, an overwritten and a new ignored file, an index flag change, an overwritten assume-unchanged file, a `review_scratch` write (stored), a helper left running after success and after timeout, a detached helper, a cleanup failure, a committed symlink escaping the export, and an uncommitted instruction edit (AC-02)
+- [ ] T6 `plugins/vh-adlc/scripts/triage/owned-process.ts` - cleanup tells failed signalling from an absent group, confirms no live member remains, and also stops descendants that detached into their own group or session; the existing triage tests and new cleanup fixtures pass (AC-02)
+- [ ] T7 `plugins/vh-adlc/scripts/loop/review-route.ts` - the command route: `git archive` export with symlink containment, launch from the export with automatic instructions off, the `{model}`, `{prompt}`, `{prompt_file}` and `{export_dir}` placeholders, `MODEL:` and `TARGET:` checks, the before-and-after preservation snapshot and owned-process cleanup; T5 passes (AC-02)
+- [ ] T8 `plugins/vh-adlc/references/review-protocol.md`, `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-review/SKILL.md` - dispatch by role route, the `TARGET:` header and pending rules; `bun test tests/vh-adlc` passes, including direct-operation compatibility (AC-01, AC-02)
+- [ ] T9 `tests/vh-adlc/loop/lenses.test.ts` - failing fixtures: a spec that breaks a declared instruction file, one that breaks a declared lens, and a compliant control (AC-03)
+- [ ] T10 `plugins/vh-adlc/scripts/loop/procedure.ts`, `plugins/vh-adlc/references/loop.md`, the seven SDD `SKILL.md` files - every SDD operation reads the project procedure, instruction files and lenses, and the reviewer receives them as lenses; T9 passes (AC-03)
+- [ ] T11 `tests/vh-adlc/loop/rungs.test.ts` - failing fixtures: path rungs over the whole feature delta (a `backend/` commit followed by a docs-only commit), an always rung, a failed rung blocking push, completion and delivery even with an allowance, an unavailable rung with and without its allowance, an exit-0 run reporting a skipped mandatory subcheck, an earlier pass not counting for a later commit, the merge-commit first-parent check, a refused fast-forward, and an unchanged no-rung lookup (AC-04)
+- [ ] T12 `plugins/vh-adlc/scripts/loop/rungs.ts`, `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` - the rung runner and its gating of push, completion and delivery; T11 passes (AC-04)
+- [ ] T13 `tests/vh-adlc/loop/delivery.test.ts` - failing ship fixtures: `ci_trigger: manual` with no dispatch, a watch that exits 1 then 0, a marked merge with no publication path, an unmarked merge that runs the watch, a watch failing because nothing ran (blocked), a delayed run; skip paths with declared paths only, with code, with an earlier code commit, and under a repository pin without skip-path support (AC-05, AC-15)
+- [ ] T14 vhco-pro/docs `conventions/delivery.md` - a consumer may declare extra skip-eligible paths for feature deliveries; merged in vhco-pro/docs, with its commit recorded here (AC-15)
+- [ ] T15 `plugins/vh-adlc/knowledge.md` - the plugin pin moves to the T14 commit; `vh-adlc knowledge` resolves every loop page at it (AC-12, AC-15)
+- [ ] T16 `plugins/vh-adlc/scripts/loop/delivery.ts`, `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` - CI policy reporting, the merge-commit publication verdict, watch handling and skip paths that respect the resolved pin; T13 passes (AC-05, AC-15)
+- [ ] T17 `internal/doc/doc_test.go`, `internal/fresh/fresh_test.go` - failing cases for `**` at start, middle and end compared with the docs-impact matcher, a committed change under `**` staling the review, and a dirty file under it clearing `feature_tree_clean` without staling (AC-06)
+- [ ] T18 `internal/doc/covers.go`, `internal/doc/lint.go` - `**` support with the docs-impact semantics; T17 and `go test ./...` pass (AC-06)
+- [ ] T19 `tests/vh-adlc/loop/investigate.test.ts` - failing fixtures with and without a covering analysis document and an open issue, including an issue with no covering document (AC-07)
+- [ ] T20 `plugins/vh-adlc/skills/vh-adlc-investigate/SKILL.md` - `findings_document: always`, the duplicate search, extending an existing analysis, issue updates as summary and link only, and the three verdicts; T19 passes (AC-07)
+- [ ] T21 `tests/vh-adlc/loop/claim.test.ts` - failing fixtures: a detached worktree at the tip, the session's own branch at the tip, an unrelated branch at the tip (refused, branch unmoved), a worktree behind an advanced remote, a stray change, a rejected push left pending, and `implement_worktree: isolated` from the primary worktree with and without a host worktree tool (AC-13, AC-18)
+- [ ] T22 `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md`, `plugins/vh-adlc/references/authority.md` - claims from a host worktree with the branch-ownership check, and host-delegated isolation; T21 passes (AC-13, AC-18)
+- [ ] T23 `tests/vh-adlc/loop/glossary.test.ts` - glossary terms and rejected synonyms checked across `references/loop-settings.md`, the loop references and report templates (AC-19)
+- [ ] T24 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - plugin minor version bump; `bun test tests/vh-adlc`, `go test ./...`, `go vet ./...`, `golangci-lint run`, `go mod tidy -diff` and a four-archive `goreleaser release --snapshot --clean` all pass (AC-12)
+
+Stackweaver adoption, on a Stackweaver feature branch against the candidate plugin:
+
+- [ ] T25 Stackweaver `tests/agent-loop/parity.json` - one row per legacy behavior of `agents/spec.md`, `tasks.md`, `implement.md`, `ship.md`, `investigate.md`, `reviewer.md` and the loop rules in `CLAUDE.md` and `AGENTS.md`, with excerpt hashes, home and contract; the schema test fails on an unmapped legacy rule (AC-08, AC-10)
+- [ ] T26 Stackweaver `tests/agent-loop/contract.test.ts`, `tests/agent-loop/retirement.test.ts` - a contract test per parity row, including the acceptance and issue rules, named E2E specs in kind, the live slot pass, the final full kind run and `make verify` skips, plus the retirement check over unenrolled non-terminal specs; they fail before adoption (AC-08, AC-10, AC-16, AC-17)
+- [ ] T27 Stackweaver `.vh-adlc/loop.yaml` - Opus host routes for author and implementer, `gpt-6.1-sol` command routes for both reviewers, rungs, `ci_trigger: manual`, `post_merge_watch`, `skip_ci_paths`, `implement_worktree: isolated`, `review_scratch`, instruction files, lenses and `findings_document: always`; `vh-adlc settings read` accepts it (AC-01, AC-04, AC-05, AC-15, AC-18)
+- [ ] T28 Stackweaver `agents/loop-project.md` - the local rules: slots, the verification ladder, direct-to-main and skip rules for non-feature work, satellites, `lessons.md`, the docs index rebuild, the implement-to-ship grant, acceptance and issue rules, and spec style; every parity row resolves to a home (AC-08, AC-10, AC-16)
+- [ ] T29 Stackweaver `.claude/commands/spec.md`, `tasks.md`, `implement.md`, `ship.md`, `investigate.md`, `AGENTS.md` - enrollment-aware adapters and plain-language routing, `model:` frontmatter checked against `loop.yaml`; T26 passes (AC-08, AC-16, AC-17)
+- [ ] T30 Stackweaver `docs/internal/plans/` draft specs - every draft spec converted to the shared format; `vh-adlc lint` and `gate` pass and a manual-reading table records each gate condition (AC-09)
+- [ ] T31 Stackweaver `CLAUDE.md` - merge commits for feature PRs, the shared spec style, and model routing pointing at `loop.yaml`; `make verify` passes (AC-08, AC-14)
+- [ ] T32 Stackweaver `tests/agent-loop/README.md` - the rollback and reapply procedure, rehearsed on a disposable checkout with matching hashes for the docs index and unrelated workflow files (AC-11)
+- [ ] T33 Stackweaver `tests/agent-loop/evidence/` - a candidate plugin and binary in an isolated Claude Code profile run every adapted command and its plain-language form on enrolled and unenrolled disposable specs, start `/implement` on a clean main checkout, and take one disposable feature from claim to a merge-commit landing (AC-08, AC-12, AC-14, AC-18)
+- [ ] T34 `tests/vh-adlc/evidence/loop-review-route/` - one real Copilot `gpt-6.1-sol` file-only spec review and one shell implementation review that returns `met` on a disposable feature, with transcripts and stored records (AC-02)
 
 ## Open Questions
 
