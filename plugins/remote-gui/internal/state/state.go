@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -278,40 +279,81 @@ func IDs(root string) ([]string, error) {
 }
 
 func Inspect(pid int) (Identity, error) {
+	id, _, err := inspect(pid)
+	return id, err
+}
+
+// inspect also reports the process's current parent.
+func inspect(pid int) (Identity, int, error) {
 	var id Identity
 	if pid <= 0 {
-		return id, errors.New("invalid process identity")
+		return id, 0, errors.New("invalid process identity")
 	}
 	data, err := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/stat")
 	if err != nil {
-		return id, errors.New("process unavailable")
+		return id, 0, errors.New("process unavailable")
 	}
 	end := strings.LastIndexByte(string(data), ')')
 	if end < 0 {
-		return id, errors.New("invalid process identity")
+		return id, 0, errors.New("invalid process identity")
 	}
 	fields := strings.Fields(string(data)[end+1:])
 	if len(fields) < 20 {
-		return id, errors.New("invalid process identity")
+		return id, 0, errors.New("invalid process identity")
 	}
 	boot, err := os.ReadFile("/proc/sys/kernel/random/boot_id")
 	if err != nil {
-		return id, errors.New("boot identity unavailable")
+		return id, 0, errors.New("boot identity unavailable")
 	}
+	parent, e0 := strconv.Atoi(fields[1])
 	group, e1 := strconv.Atoi(fields[2])
 	session, e2 := strconv.Atoi(fields[3])
-	if e1 != nil || e2 != nil || fields[0] == "Z" {
-		return id, errors.New("process unavailable")
+	if e0 != nil || e1 != nil || e2 != nil || fields[0] == "Z" {
+		return id, 0, errors.New("process unavailable")
 	}
 	fi, err := os.Stat("/proc/" + strconv.Itoa(pid))
 	if err != nil {
-		return id, errors.New("process unavailable")
+		return id, 0, errors.New("process unavailable")
 	}
 	stat, ok := fi.Sys().(*syscall.Stat_t)
 	if !ok || stat.Uid != uint32(os.Getuid()) {
-		return id, errors.New("process is not owned by this user")
+		return id, 0, errors.New("process is not owned by this user")
 	}
-	return Identity{PID: pid, Start: fields[19], Boot: strings.TrimSpace(string(boot)), Group: group, Session: session}, nil
+	return Identity{PID: pid, Start: fields[19], Boot: strings.TrimSpace(string(boot)), Group: group, Session: session}, parent, nil
+}
+
+// Descendants returns the live processes this user owns below the given ones,
+// such as the helpers a browser starts. A process is found only while its parent
+// is alive: once the parent exits, the kernel hands it to another reaper.
+func Descendants(roots []Identity) []Identity {
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		return nil
+	}
+	live := map[int]Identity{}
+	children := map[int][]Identity{}
+	for _, e := range entries {
+		pid, err := strconv.Atoi(e.Name())
+		if err != nil {
+			continue
+		}
+		if id, parent, err := inspect(pid); err == nil {
+			live[pid] = id
+			children[parent] = append(children[parent], id)
+		}
+	}
+	var found []Identity
+	queue := slices.Clone(roots)
+	for len(queue) > 0 {
+		p := queue[0]
+		queue = queue[1:]
+		if got, ok := live[p.PID]; !ok || !Equal(got, p) {
+			continue
+		}
+		found = append(found, children[p.PID]...)
+		queue = append(queue, children[p.PID]...)
+	}
+	return found
 }
 
 func Equal(a, b Identity) bool {

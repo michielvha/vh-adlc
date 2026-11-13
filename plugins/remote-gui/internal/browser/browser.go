@@ -251,12 +251,15 @@ func (r *runtime) stop() {
 		if r.clip != nil {
 			_ = r.clip.Close()
 		}
+		helpers := map[int]state.Identity{}
+		r.track(helpers)
 		for i := len(r.children) - 1; i >= 0; i-- {
 			_ = state.Signal(r.children[i].identity, syscall.SIGTERM)
 		}
 		deadline := time.Now().Add(3 * time.Second)
 		for time.Now().Before(deadline) {
-			live := false
+			r.track(helpers)
+			live := anyAlive(helpers)
 			for _, c := range r.children {
 				live = live || state.Alive(c.identity)
 			}
@@ -265,6 +268,12 @@ func (r *runtime) stop() {
 			}
 			time.Sleep(20 * time.Millisecond)
 		}
+		for _, h := range helpers {
+			if state.Alive(h) {
+				_ = state.Signal(h, syscall.SIGKILL)
+			}
+		}
+		settled := time.Now().Add(time.Second)
 		for _, c := range r.children {
 			if state.Alive(c.identity) {
 				_ = state.Signal(c.identity, syscall.SIGKILL)
@@ -274,6 +283,12 @@ func (r *runtime) stop() {
 			case <-time.After(time.Second):
 				r.cleanupErr = errors.New(c.role + "-cleanup-pending")
 			}
+		}
+		for anyAlive(helpers) && time.Now().Before(settled) {
+			time.Sleep(20 * time.Millisecond)
+		}
+		if r.cleanupErr == nil && anyAlive(helpers) {
+			r.cleanupErr = errors.New("browser-helper-cleanup-pending")
 		}
 		if r.cleanupErr == nil {
 			r.cleanupErr = state.ReleaseDisplay(r.display)
@@ -294,6 +309,32 @@ func (r *runtime) stop() {
 			}
 		})
 	})
+}
+
+// track adds the live descendants of the owned processes to helpers. Chromium's
+// zygotes, renderers and network service are not this runtime's children, and
+// the network service still writes the profile after the browser has exited.
+// They are tracked while their parents live, because an orphan is reparented.
+func (r *runtime) track(helpers map[int]state.Identity) {
+	roots := make([]state.Identity, 0, len(r.children)+len(helpers))
+	for _, c := range r.children {
+		roots = append(roots, c.identity)
+	}
+	for _, h := range helpers {
+		roots = append(roots, h)
+	}
+	for _, id := range state.Descendants(roots) {
+		helpers[id.PID] = id
+	}
+}
+
+func anyAlive(ids map[int]state.Identity) bool {
+	for _, id := range ids {
+		if state.Alive(id) {
+			return true
+		}
+	}
+	return false
 }
 
 func Start(ctx context.Context, c config.Config, id string) (session.BrowserHandle, error) {

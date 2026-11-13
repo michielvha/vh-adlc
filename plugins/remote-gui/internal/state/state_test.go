@@ -137,3 +137,28 @@ func TestRejectForeignStateRecord(t *testing.T) {
 		t.Fatal("foreign JSON was accepted as a tool-owned record")
 	}
 }
+
+func TestDescendantsFollowVerifiedParents(t *testing.T) {
+	cmd := exec.Command("/bin/sh", "-c", "/bin/sleep 30 & wait")
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
+	parent, err := Inspect(cmd.Process.Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found []Identity
+	for deadline := time.Now().Add(5 * time.Second); len(found) == 0 && time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		found = Descendants([]Identity{parent})
+	}
+	if len(found) != 1 || !Alive(found[0]) {
+		t.Fatalf("descendants of the owned shell: %v", found)
+	}
+	defer func() { _ = Signal(found[0], syscall.SIGKILL) }()
+	wrong := parent
+	wrong.Start = "not-the-owned-process"
+	if got := Descendants([]Identity{wrong}); len(got) != 0 {
+		t.Fatalf("followed an unverified parent: %v", got)
+	}
+}
