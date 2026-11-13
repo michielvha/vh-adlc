@@ -1,7 +1,7 @@
 ---
-status: draft
-status_description: "R-3 returned no findings; waits for owner acceptance."
-issue: null
+status: planned
+status_description: "Accepted by the owner at R-3; tasks next. Implementation waits until #78 merges."
+issue: https://github.com/michielvha/vh-adlc/issues/83
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
 covers:
   - plugins/vh-adlc/references/issues.md
@@ -367,6 +367,7 @@ None.
 | 2026-11-13 | R-1 | spec | `5381e51` | unknown | procedural | Changes needed: 3 blocking, 5 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-13 | R-2 | spec | `be943c8` | unknown | procedural | Changes needed: 1 blocking, 2 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-13 | R-3 | spec | `cfc2f2d` | unknown | procedural | No findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
+| 2026-11-13 | R-3 | spec | `cfc2f2d` | n/a | n/a | accepted by owner |
 
 ### R-1
 
