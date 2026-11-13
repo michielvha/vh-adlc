@@ -120,7 +120,22 @@ func fakeBrowser(dir string, c config.Config, id string) (BrowserHandle, error) 
 		if err = os.WriteFile(filepath.Join(dir, "browser-"+id), data, 0o600); err != nil {
 			return BrowserHandle{}, err
 		}
-		time.Sleep(100 * time.Millisecond)
+		// The launch returns only once the stand-in ignores SIGTERM, however
+		// long a loaded host takes to start it.
+		for deadline := time.Now().Add(30 * time.Second); ; time.Sleep(5 * time.Millisecond) {
+			if _, err = os.Stat(filepath.Join(dir, "term-"+id+".ready")); err == nil {
+				break
+			}
+			select {
+			case <-done:
+				return BrowserHandle{}, errors.New("stand-in browser exited before it was ready")
+			default:
+			}
+			if time.Now().After(deadline) {
+				_ = cmd.Process.Kill()
+				return BrowserHandle{}, errors.New("stand-in browser not ready")
+			}
+		}
 		closeBrowser = func() {
 			// Record whether the proxy already rejects the test's viewer when the browser stop begins.
 			if data, err := os.ReadFile(filepath.Join(dir, "viewer-"+id)); err == nil {
@@ -129,7 +144,9 @@ func fakeBrowser(dir string, c config.Config, id string) (BrowserHandle, error) 
 					_ = os.WriteFile(filepath.Join(dir, "stop-viewer-"+id), []byte(strconv.Itoa(probe.status())), 0o600)
 				}
 			}
-			stamp(filepath.Join(dir, "stop-begin-"+id))
+			// The send time is written afterwards, so no file write delays the
+			// signal or sits between the two times the test compares.
+			sent := time.Now()
 			_ = cmd.Process.Signal(syscall.SIGTERM)
 			select {
 			case <-done:
@@ -137,6 +154,7 @@ func fakeBrowser(dir string, c config.Config, id string) (BrowserHandle, error) 
 				_ = cmd.Process.Kill()
 				<-done
 			}
+			_ = os.WriteFile(filepath.Join(dir, "term-sent-"+id), []byte(strconv.FormatInt(sent.UnixNano(), 10)), 0o600)
 			stamp(filepath.Join(dir, "stop-end-"+id))
 		}
 	}
@@ -208,10 +226,15 @@ func stamp(file string) {
 func stubbornBrowser(file string) int {
 	terms := make(chan os.Signal, 4)
 	signal.Notify(terms, syscall.SIGTERM)
+	// A SIGTERM before this point would end the stand-in unrecorded.
+	if err := os.WriteFile(file+".ready", nil, 0o600); err != nil {
+		return 1
+	}
 	for range terms {
+		received := time.Now()
 		f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 		if err == nil {
-			_, _ = io.WriteString(f, strconv.FormatInt(time.Now().UnixNano(), 10)+"\n")
+			_, _ = io.WriteString(f, strconv.FormatInt(received.UnixNano(), 10)+"\n")
 			_ = f.Close()
 		}
 	}
@@ -757,6 +780,8 @@ func standInBrowser(t *testing.T, f profileFixture, id string) state.Identity {
 // group stop. The viewer was rejected when the proxy answered 410 Gone, or
 // gave no answer because the supervisor's shutdown, which revokes access
 // before it closes its server, cut the request; an unrevoked proxy answers 200.
+// The kill is timed from when the stand-in close sent SIGTERM: on a loaded host
+// the stand-in can record its SIGTERM well after it was sent.
 func checkStubbornStop(t *testing.T, f profileFixture, id string, browser state.Identity, began time.Time, ending string) {
 	t.Helper()
 	var terms []time.Time
@@ -778,16 +803,9 @@ func checkStubbornStop(t *testing.T, f profileFixture, id string, browser state.
 		}
 	}
 	died := time.Now()
-	if wait := died.Sub(terms[0]); wait < 1900*time.Millisecond || wait > 2700*time.Millisecond {
-		t.Fatalf("the browser died %v after its SIGTERM, want the kill two seconds later", wait)
-	}
-	if got := termTimes(filepath.Join(f.fake, "term-"+id)); len(got) != 1 {
-		t.Fatalf("the browser got %d SIGTERMs: the guard's group stop ended it", len(got))
-	}
-	viewer, _ := os.ReadFile(filepath.Join(f.fake, "stop-viewer-"+id))
-	t.Logf("SIGTERM %v after the %s began, kill %v later, viewer answer %s", terms[0].Sub(began), ending, died.Sub(terms[0]), viewer)
-	// The supervisor records the end of its browser stop just after the browser dies.
-	for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+	// The supervisor records the end of its browser stop just after the browser
+	// dies; the bound only keeps a lost record from stalling the test.
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(10 * time.Millisecond) {
 		if _, err := os.Stat(filepath.Join(f.fake, "stop-end-"+id)); err == nil {
 			break
 		}
@@ -795,6 +813,18 @@ func checkStubbornStop(t *testing.T, f profileFixture, id string, browser state.
 			t.Fatal("the supervisor did not finish its browser stop")
 		}
 	}
+	sent := termTimes(filepath.Join(f.fake, "term-sent-"+id))
+	if len(sent) != 1 {
+		t.Fatal("the stand-in close did not record its SIGTERM")
+	}
+	if wait := died.Sub(sent[0]); wait < 1900*time.Millisecond || wait > 2700*time.Millisecond {
+		t.Fatalf("the browser died %v after its SIGTERM was sent, want the kill two seconds later", wait)
+	}
+	if got := termTimes(filepath.Join(f.fake, "term-"+id)); len(got) != 1 {
+		t.Fatalf("the browser got %d SIGTERMs: the guard's group stop ended it", len(got))
+	}
+	viewer, _ := os.ReadFile(filepath.Join(f.fake, "stop-viewer-"+id))
+	t.Logf("SIGTERM sent %v and received %v after the %s began, kill %v after sending, viewer answer %s", sent[0].Sub(began), terms[0].Sub(began), ending, died.Sub(sent[0]), viewer)
 }
 
 // awaitStopping waits until the supervisor has accepted a stop.
@@ -882,31 +912,66 @@ func TestProfileBrowserStopDoesNotWaitForForwardRemoval(t *testing.T) {
 // reusable profile's browser stop at once: viewer access is rejected first,
 // then the browser gets its SIGTERM and its kill two seconds later, never the
 // guard's group stop.
+//
+// The timing bounds checkStubbornStop asserts are the product's, each measured
+// from the expiry or the stop, and so is the stop command's own wait. Every
+// other wait is setup and may take as long as a loaded host needs: the expiry
+// case holds the startup probe until probeLead before expiry, so expiry falls
+// while the supervisor waits for the lock however long the start took, and a
+// start too slow for its TTL fails as a setup failure, never as a late stop.
 func TestProfileBrowserStopDuringStartup(t *testing.T) {
+	const (
+		setupWait = 30 * time.Second
+		probeLead = 2500 * time.Millisecond
+	)
 	for _, ending := range []string{"expiry", "stop"} {
 		t.Run(ending, func(t *testing.T) {
 			f := newProfileFixture(t)
 			t.Setenv("REMOTE_GUI_TEST_STUBBORN_STOP", "1")
 			t.Setenv("REMOTE_GUI_TEST_HOLD_PROBE", "1")
-			c := f.config(t, "work", "--ttl", map[string]string{"expiry": "2700ms", "stop": "1m"}[ending])
+			c := f.config(t, "work", "--ttl", map[string]string{"expiry": "12s", "stop": "1m"}[ending])
 			started := make(chan struct{})
-			go func() { _, _ = Start(c); close(started) }()
-			var id string
-			for deadline := time.Now().Add(5 * time.Second); id == ""; time.Sleep(5 * time.Millisecond) {
-				if time.Now().After(deadline) {
-					t.Fatal("no session record")
+			var startErr error
+			go func() { _, startErr = Start(c); close(started) }()
+			// await polls ready every 5 ms until it holds, failing with what
+			// once deadline passes or Start returns first.
+			await := func(deadline time.Time, what string, ready func() bool) {
+				t.Helper()
+				for !ready() {
+					select {
+					case <-started:
+						t.Fatalf("%s: start returned first: %v", what, startErr)
+					default:
+					}
+					if time.Now().After(deadline) {
+						t.Fatal(what)
+					}
+					time.Sleep(5 * time.Millisecond)
 				}
+			}
+			var id string
+			var record state.Record
+			await(time.Now().Add(setupWait), "no session record", func() bool {
 				if ids, _ := state.IDs(f.home); len(ids) == 1 {
 					id = ids[0]
 				}
-			}
-			var record state.Record
-			for deadline := time.Now().Add(5 * time.Second); record.Origin == ""; time.Sleep(5 * time.Millisecond) {
-				if time.Now().After(deadline) {
-					t.Fatal("the supervisor did not record its origin")
+				var e error
+				if id != "" {
+					record, e = state.Load(f.home, id)
 				}
-				record, _ = state.Load(f.home, id)
+				return id != "" && e == nil
+			})
+			// In the expiry case every setup step must end before expiry.
+			before := func(lead time.Duration) time.Time {
+				if ending == "expiry" {
+					return record.Expires.Add(-lead)
+				}
+				return time.Now().Add(setupWait)
 			}
+			await(before(probeLead-time.Second), "the supervisor did not record its origin", func() bool {
+				record, _ = state.Load(f.home, id)
+				return record.Origin != ""
+			})
 			// The supervisor is in its startup probe; from here it needs the
 			// lock only to record ready.
 			release, err := state.Lock(context.Background(), f.home)
@@ -919,21 +984,22 @@ func TestProfileBrowserStopDuringStartup(t *testing.T) {
 				unlock()
 				select {
 				case <-started:
-				case <-time.After(30 * time.Second):
+				case <-time.After(setupWait):
 					t.Error("start did not return")
 				}
 			}()
+			if ending == "expiry" {
+				// The supervisor waits for the lock from about here, well
+				// inside its seven-second update timeout when expiry comes.
+				time.Sleep(time.Until(record.Expires.Add(-probeLead)))
+			}
 			if err = os.WriteFile(filepath.Join(f.fake, "probe-open-"+id), nil, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(5 * time.Millisecond) {
-				if _, err = os.Stat(filepath.Join(f.fake, "probed-"+id)); err == nil {
-					break
-				}
-				if time.Now().After(deadline) {
-					t.Fatal("the supervisor's startup probe did not pass")
-				}
-			}
+			await(before(time.Second), "the supervisor's startup probe did not pass", func() bool {
+				_, e := os.Stat(filepath.Join(f.fake, "probed-"+id))
+				return e == nil
+			})
 			time.Sleep(100 * time.Millisecond)
 			browser := standInBrowser(t, f, id)
 			viewer := viewerProbe{URL: record.Origin + "/vnc.html"}
@@ -944,23 +1010,39 @@ func TestProfileBrowserStopDuringStartup(t *testing.T) {
 			if current, e := state.Load(f.home, id); e != nil || current.State != "starting" {
 				t.Fatalf("the session is no longer starting: %+v %v", current.State, e)
 			}
+			if ending == "expiry" && !time.Now().Before(record.Expires) {
+				t.Fatalf("setup ran %v past expiry: the start was too slow for its TTL", time.Since(record.Expires))
+			}
 			began := record.Expires
-			stopped := make(chan View, 1)
+			type stopResult struct {
+				end  View
+				err  error
+				took time.Duration
+			}
+			stopped := make(chan stopResult, 1)
 			if ending == "expiry" {
 				time.Sleep(time.Until(record.Expires))
 			} else {
 				began = time.Now()
-				go func() { end, _ := Stop(f.home, id); stopped <- end }()
+				go func() { end, e := Stop(f.home, id); stopped <- stopResult{end, e, time.Since(began)} }()
 			}
+			// Once the stand-in has its SIGTERM the browser stop has begun with
+			// startup still blocked, so the lock is released: holding it on
+			// would only delay the rest of the stop, which the stop command's
+			// own wait bounds, and the supervisor must still let the browser
+			// close finish before it exits.
+			for deadline := time.Now().Add(8 * time.Second); len(termTimes(filepath.Join(f.fake, "term-"+id))) == 0 && time.Now().Before(deadline); {
+				time.Sleep(5 * time.Millisecond)
+			}
+			unlock()
 			checkStubbornStop(t, f, id, browser, began, ending)
-			// The supervisor is still serving, so the proxy itself refused the viewer.
+			// The supervisor was still starting, so the proxy itself refused the viewer.
 			if data, _ := os.ReadFile(filepath.Join(f.fake, "stop-viewer-"+id)); string(data) != strconv.Itoa(http.StatusGone) {
 				t.Fatalf("the proxy answered the viewer %q when the browser stop began, want %d", data, http.StatusGone)
 			}
-			unlock()
 			if ending == "stop" {
-				if end := <-stopped; end.State != "stopped" {
-					t.Fatalf("stop reported %+v", end)
+				if result := <-stopped; result.end.State != "stopped" {
+					t.Fatalf("stop reported %q %v after %v", result.end.State, result.err, result.took)
 				}
 			} else {
 				waitEnd(t, f.home, id)
