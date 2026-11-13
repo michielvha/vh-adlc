@@ -1,6 +1,6 @@
 {
   "name": "remote-gui",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Share task-local apps over the tailnet, support human-only sign-in and resume agent control after confirmed hand-back.",
   "author": { "name": "Michiel VH" }
 }

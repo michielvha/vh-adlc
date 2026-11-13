@@ -15,9 +15,11 @@ import (
 	"slices"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/profile"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/proxy"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/tailnet"
@@ -183,7 +185,13 @@ func privateCleanup(home, id string) error {
 	return nil
 }
 
-func finish(home, id string, controller bool) error {
+func finish(home, id string, controller bool) error { return finishProfile(home, id, controller, nil) }
+
+// finishProfile ends a session. Once its owned processes are gone, the guard
+// clears the profile holder and releases the lock before it records stopped,
+// so a start issued right after stop returns finds the profile free. A failed
+// holder clear returns before anything is recorded, keeping the lock held.
+func finishProfile(home, id string, controller bool, held *profile.Held) error {
 	r, err := state.Load(home, id)
 	if err != nil {
 		return err
@@ -223,6 +231,9 @@ func finish(home, id string, controller bool) error {
 		return err
 	}
 	if err = privateCleanup(home, id); err != nil {
+		return err
+	}
+	if err = releaseProfile(held); err != nil {
 		return err
 	}
 	return update(home, id, func(r *state.Record) {
@@ -280,7 +291,7 @@ func markPending(home, id string, err error) {
 	_ = update(home, id, func(r *state.Record) {
 		r.State = "cleanup-pending"
 		r.CleanupDiagnostic = err.Error()
-		if r.Diagnostic == "" {
+		if r.Diagnostic == "" && !errors.Is(err, errHolderClear) {
 			r.Diagnostic = err.Error()
 		}
 	})
@@ -292,6 +303,15 @@ func guard(home, id string) int {
 	r, err := awaitRole(ctx, home, id, "guard")
 	if err != nil {
 		return 1
+	}
+	var held *profile.Held
+	if r.Config.Profile != "" {
+		syscall.CloseOnExec(3)
+		if held, err = inheritProfile(r); err != nil {
+			_ = update(home, id, func(r *state.Record) { r.State = "failed"; r.Diagnostic = "profile-lock-unavailable" })
+			return 1
+		}
+		defer held.Release()
 	}
 	if r.Config.Transport == "tailscale" {
 		if err = update(home, id, func(current *state.Record) {
@@ -374,7 +394,7 @@ func guard(home, id string) int {
 			<-wait
 		}
 	}
-	if err = finish(home, id, true); err == nil || abandoned(home, id, "guard") {
+	if err = finishProfile(home, id, true, held); err == nil || abandoned(home, id, "guard") {
 		return 0
 	}
 	markPending(home, id, err)
@@ -414,7 +434,7 @@ func guard(home, id string) int {
 		case <-trigger:
 		case <-ticker.C:
 		}
-		if err = finish(home, id, true); err == nil || abandoned(home, id, "guard") {
+		if err = finishProfile(home, id, true, held); err == nil || abandoned(home, id, "guard") {
 			return 0
 		}
 		markPending(home, id, err)
@@ -459,8 +479,26 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	}
 
 	var bundle BrowserHandle
+	var stopBrowser func()
+	var viewers atomic.Pointer[proxy.Proxy]
 	var browserState *browserControl
 	target := r.Config.Target
+	client := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET"))
+	var ownerLogin string
+	var servePeer state.Peer
+	resolved := false
+	if r.Kind == "browser" && r.Config.Profile != "" {
+		// Chromium never launches on a profile whose owner is not matched here.
+		if r.Config.Transport == "tailscale" {
+			if ownerLogin, servePeer, err = client.ResolveOwner(ctx, r.Config.OwnerLogin); err != nil {
+				return err
+			}
+			resolved = true
+		}
+		if err = checkProfileOwner(r, ownerLogin); err != nil {
+			return err
+		}
+	}
 	if r.Kind == "share" {
 		if !bindingAlive(r) {
 			return errors.New("upstream-ownership-changed")
@@ -474,8 +512,21 @@ func serve(ctx context.Context, r state.Record) (result error) {
 			return err
 		}
 		target = bundle.Target
-		if bundle.Stop != nil {
-			defer bundle.Stop()
+		stopBrowser = bundle.Stop
+		if r.Config.Profile != "" && bundle.Stop != nil {
+			// A reusable profile's browser stop starts the moment ctx is
+			// canceled, rejecting viewer access first, so no startup state
+			// update can hold it past the guard's deadline. It runs once.
+			stopBrowser = sync.OnceFunc(func() {
+				if p := viewers.Load(); p != nil {
+					p.Revoke()
+				}
+				bundle.Stop()
+			})
+			go func() { <-ctx.Done(); stopBrowser() }()
+		}
+		if stopBrowser != nil {
+			defer stopBrowser()
 		}
 		if err = update(home, id, func(r *state.Record) {
 			r.CDPAddress = bundle.CDPAddress
@@ -489,14 +540,12 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		browserState = &browserControl{home: home, id: id, handle: bundle, guard: r.Guard, supervisor: r.Supervisor}
 	}
 	origin := "http://" + r.ProxyAddress
-	client := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET"))
 	var forward *state.Forward
-	var ownerLogin string
-	var servePeer state.Peer
 	if r.Config.Transport == "tailscale" {
-		ownerLogin, servePeer, err = client.ResolveOwner(ctx, r.Config.OwnerLogin)
-		if err != nil {
-			return err
+		if !resolved {
+			if ownerLogin, servePeer, err = client.ResolveOwner(ctx, r.Config.OwnerLogin); err != nil {
+				return err
+			}
 		}
 		if err = update(home, id, func(current *state.Record) { current.OwnerLogin = ownerLogin; current.ServePeer = servePeer }); err != nil {
 			return err
@@ -521,6 +570,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	if err != nil {
 		return err
 	}
+	viewers.Store(p)
 	defer p.Revoke()
 	public := &http.Server{Handler: p, ConnContext: p.ConnContext, ConnState: p.ConnState, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 0, IdleTimeout: 30 * time.Second}
 	publicErrors := make(chan struct{})
@@ -528,6 +578,18 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	// Remove remote exposure while the lifetime guard still reserves this listener.
 	defer func() {
 		p.Revoke()
+		// A reusable profile's browser stop, if ctx has not started it yet,
+		// starts once access is rejected, alongside forward removal, so a slow
+		// removal cannot leave it to the guard's group stop. Without a profile
+		// the existing order stays.
+		var browserStopped chan struct{}
+		if r.Kind == "browser" && r.Config.Profile != "" && bundle.Stop != nil {
+			browserStopped = make(chan struct{})
+			go func() { stopBrowser(); close(browserStopped) }()
+		}
+		if browserStopped != nil {
+			defer func() { <-browserStopped }()
+		}
 		if e := removeForward(home, id); e != nil {
 			markPending(home, id, e)
 			current, loadErr := state.Load(home, id)
@@ -579,7 +641,14 @@ func serve(ctx context.Context, r state.Record) (result error) {
 			w.WriteHeader(405)
 			return
 		}
-		if browserState != nil {
+		// A reusable-profile session still starting has no state to mark, so
+		// a startup state update waiting on the lock cannot delay its stop.
+		starting := false
+		if r.Config.Profile != "" {
+			current, e := state.Load(home, id)
+			starting = e == nil && current.State == "starting"
+		}
+		if browserState != nil && !starting {
 			_ = update(home, id, func(current *state.Record) {
 				if current.State == "ready" || current.State == "handoff" || current.State == "handoff-failed" {
 					current.State = "stopping"

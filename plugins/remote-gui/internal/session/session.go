@@ -17,10 +17,12 @@ import (
 	"time"
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/profile"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
 
 type View struct {
+	Profile           string     `json:"profile,omitempty"`
 	BrowserMode       string     `json:"browser_mode,omitempty"`
 	MarkerURL         string     `json:"marker_url,omitempty"`
 	CleanupDiagnostic string     `json:"cleanup_diagnostic,omitempty"`
@@ -70,6 +72,7 @@ var BrowserLauncher func(context.Context, config.Config, string) (BrowserHandle,
 func view(r state.Record, revealURL bool) View {
 	v := View{SchemaVersion: 1, ID: r.ID, Kind: r.Kind, State: r.State, Result: r.State, LocalTarget: redactedTarget(r.Config.Target), Expires: r.Expires, Diagnostic: r.Diagnostic, CleanupDiagnostic: r.CleanupDiagnostic, CDPAddress: r.CDPAddress, Marker: r.Marker}
 	if r.Kind == "browser" {
+		v.Profile = r.Config.Profile
 		v.BrowserMode, v.MarkerURL = r.Config.Mode(), r.MarkerURL
 		if v.BrowserMode == "human" {
 			v.CDPAddress = ""
@@ -157,14 +160,33 @@ func Start(c config.Config) (View, error) {
 	} else if BrowserLauncher == nil {
 		return View{}, errors.New("browser runtime is not configured")
 	}
+	// A reusable profile is locked, owner-checked and free of a running browser
+	// before any record exists, so a refusal leaves nothing behind.
+	var held *profile.Held
+	var meta profile.Meta
+	var recovery string
+	if c.Kind == "browser" && c.Profile != "" {
+		if held, meta, recovery, err = openProfile(c); err != nil {
+			return View{}, err
+		}
+		defer held.Release()
+	}
 	id, err := state.New(c.Home)
 	if err != nil {
 		return View{}, err
 	}
-	r := state.Record{Version: 1, ID: id, Kind: c.Kind, State: "starting", Config: c, Created: time.Now().UTC(), Expires: time.Now().UTC().Add(c.TTL), Upstream: owner, UpstreamSocket: inode}
+	r := state.Record{Version: 1, ID: id, Kind: c.Kind, State: "starting", Config: c, Created: time.Now().UTC(), Expires: time.Now().UTC().Add(c.TTL), Upstream: owner, UpstreamSocket: inode, ProfileRecovery: recovery}
 	if err = state.Save(c.Home, r); err != nil {
 		_ = os.RemoveAll(filepath.Join(c.Home, id))
 		return View{}, err
+	}
+	if held != nil {
+		meta.HolderID = id
+		if err = held.SaveMeta(meta); err != nil {
+			r.State, r.Diagnostic = "failed", "profile-holder-unrecorded"
+			_ = state.Save(c.Home, r)
+			return View{}, errors.New(r.Diagnostic)
+		}
 	}
 	executable, err := os.Executable()
 	if err != nil {
@@ -174,12 +196,22 @@ func Start(c config.Config) (View, error) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	cmd.Stdout = nil
 	cmd.Stderr = nil
+	if held != nil {
+		// The guard holds this lock for the session's whole life.
+		cmd.ExtraFiles = []*os.File{held.File}
+	}
 	if err = cmd.Start(); err != nil {
 		r.State = "failed"
 		r.Diagnostic = "lifetime-guard-start-failed"
 		_ = state.Save(c.Home, r)
+		if held != nil {
+			meta.HolderID = ""
+			_ = held.SaveMeta(meta)
+		}
 		return View{}, errors.New(r.Diagnostic)
 	}
+	// Unlocking here would also unlock the guard's inherited descriptor.
+	held.Close()
 	r.Guard, err = state.Inspect(cmd.Process.Pid)
 	if err == nil {
 		err = state.Save(c.Home, r)
