@@ -20,7 +20,12 @@ function fixture(scenario: string) {
     .replace("__FIXTURE_ENDPOINT__", JSON.stringify("http://127.0.0.1:1"));
   populateRepository(repo, false, scanner);
   const commands = scenario === "no-commands" ? [] : [["node", "scripts/check.js"]];
-  put(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...settingsFixture(), verification_commands: commands }).toString());
+  const generation = scenario.startsWith("generation-") ? [["node", "scripts/generate.js"]] : [];
+  put(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...settingsFixture(), verification_commands: commands, generation_commands: generation }).toString());
+  if (generation.length) put(repo, "scripts/generate.js", scenario === "generation-failed" ? "process.exit(8);\n"
+    : scenario === "generation-mutates" ? "require('node:fs').appendFileSync('docs/guide.md', 'Uncommitted generated difference\\n');\n"
+    : "if (['GH_TOKEN','GITHUB_TOKEN','GH_ENTERPRISE_TOKEN','ANTHROPIC_API_KEY','SSH_AUTH_SOCK'].some(key => process.env[key])) process.exit(13);\n"
+      + "require('node:fs').writeFileSync('docs/guide.md', '# Current guide\\n'); console.log('regenerated exact committed output');\n");
   const checks = {
     passed: `if (require('node:fs').readFileSync('docs/guide.md', 'utf8') !== '# Current guide\\n') process.exit(12);\n`
       + `if (['GH_TOKEN','GITHUB_TOKEN','GH_ENTERPRISE_TOKEN','ANTHROPIC_API_KEY','SSH_AUTH_SOCK'].some(key => process.env[key])) process.exit(13);\nconsole.log('verified committed guide');\n`,
@@ -184,3 +189,31 @@ test.each(["--verification", "--verification-sha256"])("original verification ch
   expect(outcome.exitCode).toBe(2);
   expect(report.diagnostics.map((item: { message: string }) => item.message).join("\n")).toContain(missing);
 });
+
+
+test.each(["generation-passed", "generation-failed", "generation-mutates"])("declared generation is observed before candidate verification: %s", async scenario => {
+  const { verifyCandidate } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification");
+  const { readCandidateVerificationArtifacts } = await import("../../../plugins/vh-adlc/scripts/docs-drift/verification-evidence");
+  const f = fixture(scenario), before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
+  const options = { repo: f.repo, source: f.source, candidate_repo: f.candidate, candidate: f.head,
+    selection: JSON.parse(f.selection.toString()), artifact_root: f.artifacts, owner: "fixture-owner", run: "fixture-generation", timeout_ms: 15000 };
+  const result = await verifyCandidate(options);
+  const passed = scenario === "generation-passed";
+  expect(result.complete, JSON.stringify(result.diagnostics)).toBe(passed);
+  expect(result.commands[0]?.argv).toEqual(["node", "scripts/generate.js"]);
+  if (passed) {
+    expect(result.commands.map(command => command.argv)).toEqual([["node", "scripts/generate.js"], ["node", "scripts/check.js"]]);
+    expect(readFileSync(join(f.artifacts, result.commands[0].stdout!.path), "utf8")).toContain("regenerated exact committed output");
+    expect(readCandidateVerificationArtifacts({ ...options, reference: result.evidence }).complete).toBe(true);
+    const payload = JSON.parse(readFileSync(result.record_path!, "utf8"));
+    payload.commands = payload.commands.slice(1);
+    const bytes = canonicalJSON(payload); writeFileSync(result.record_path!, bytes);
+    expect(() => readCandidateVerificationArtifacts({ ...options, reference: { ...result.evidence!, sha256: sha256(bytes) } }))
+      .toThrow("complete configured generation and verification required");
+  } else {
+    expect(result.commands).toHaveLength(1);
+    expect(result.diagnostics).toContain(scenario === "generation-failed" ? "Configured candidate generation failed"
+      : "Configured candidate generation changed its source or Git state");
+  }
+  expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
+}, 90000);

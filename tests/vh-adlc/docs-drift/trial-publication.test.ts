@@ -372,7 +372,7 @@ test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed 
 }, 180000);
 
 
-test.each(["published", "published-foreign-lease", "never-dispatched"])("installed trial retained recovery observes missing local proof without replay: %s", async scenario => {
+test.each(["published", "published-foreign-lease", "published-foreign-schema", "never-dispatched"])("installed trial retained recovery observes missing local proof without replay: %s", async scenario => {
   try {
   const { f, context, path } = await publicationRequest(), publication = readTrialPublication(context, path), execute = publication.transport.execute;
   if (scenario === "never-dispatched") publication.transport.execute = async (...args) => {
@@ -390,6 +390,14 @@ test.each(["published", "published-foreign-lease", "never-dispatched"])("install
     const objects = writePlanObject(context.store, foreign);
     git(f.origin, "fetch", "--no-tags", "--no-write-fetch-head", context.store.root, objects.object);
     git(f.origin, "update-ref", context.settings.publication.lease_ref, objects.object);
+  }
+  if (scenario === "published-foreign-schema") {
+    const { writeMetadataObject } = await import("../../../plugins/vh-adlc/scripts/docs-drift/git");
+    const blob = writeMetadataObject(context.store.root, "blob", canonicalJSON({ schema_version: 99, kind: "future-foreign-lease" }));
+    const tree = writeMetadataObject(context.store.root, "tree", Buffer.concat([Buffer.from("100644 plan.json\0"), Buffer.from(blob, "hex")]));
+    const object = writeMetadataObject(context.store.root, "commit", Buffer.from(`tree ${tree}\nauthor Fixture <fixture@example.invalid> 0 +0000\ncommitter Fixture <fixture@example.invalid> 0 +0000\n\nForeign lease\n`));
+    git(f.origin, "fetch", "--no-tags", "--no-write-fetch-head", context.store.root, object);
+    git(f.origin, "update-ref", context.settings.publication.lease_ref, object);
   }
   const operation = original.journal.plan.manifest.operation_id;
   renameSync(original.journal.directory, join(context.artifacts, "unavailable-original-journal"));
@@ -417,11 +425,13 @@ test.each(["published", "published-foreign-lease", "never-dispatched"])("install
   }
   const inspection = await invoke("inspect-retained");
   expect(inspection.data.authority).toBe("none"); expect(inspection.data.operation_id).toBe(operation);
-  expect(inspection.data.observations.find((row: { effect_id: string }) => row.effect_id === "pr").state).toBe(scenario !== "never-dispatched" ? "done" : "absent");
+  expect(inspection.data.inspection_observations.find((row: { effect_id: string }) => row.effect_id === "pr").state).toBe(scenario !== "never-dispatched" ? "done" : "absent");
   expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
   expect(readTrialTracker(context).commit).toBe(tracker);
   const report = await invoke("restore-retained");
   expect(report.data.authority).toBe("none"); expect(report.data.state).toBe(scenario !== "never-dispatched" ? "complete" : "pending");
+  expect(report.data.inspection_observations).toEqual(inspection.data.inspection_observations);
+  expect(report.data).not.toHaveProperty("observations");
   if (scenario === "never-dispatched") expect(report.data.reason).toBe("retained-restore-no-replay");
   const journal = readJournal(report.data.journal_directory, context.source);
   expect(journal.header.recovery_mode).toBe("observation-only");

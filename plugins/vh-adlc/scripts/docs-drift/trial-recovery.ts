@@ -12,12 +12,15 @@ export async function collectTrialRetained(selected: TrialContext, input: { oper
   const transport = createTrialTransport(context), readPlanObject = transport.readPlanObject;
   let originalObject: string | null = null;
   transport.readPlanObject = async id => {
-    const native = await readPlanObject(id), plan = readRetainedPlan(Buffer.from(native.bytes));
+    const native = await readPlanObject(id);
     // The first read is the selected receipt (or lease fallback). Later foreign lease reads
-    // are comparison evidence for the common recovery engine, never authority or replay proof.
-    if ((originalObject === null || id === originalObject) && (plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
-      || plan.manifest.bindings.source_commit !== context.source_commit || plan.manifest.bindings.settings_sha256 !== settingsHash
-      || plan.manifest.operation_id !== input.operation_id)) throw Error("synthetic retained original context changed");
+    // are opaque comparison evidence for the common recovery engine, never authority or replay proof.
+    if (originalObject === null || id === originalObject) {
+      const plan = readRetainedPlan(Buffer.from(native.bytes));
+      if (plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
+        || plan.manifest.bindings.source_commit !== context.source_commit || plan.manifest.bindings.settings_sha256 !== settingsHash
+        || plan.manifest.operation_id !== input.operation_id) throw Error("synthetic retained original context changed");
+    }
     originalObject ??= id;
     return native;
   };
@@ -34,7 +37,7 @@ export async function collectTrialRetained(selected: TrialContext, input: { oper
     settings: context.settings, transport, operation_id: input.operation_id, verify_policy: verifyPolicy });
   const summary = { authority: "none" as const, replay_authority: false as const, operation_id: input.operation_id,
     inspection_directory: inspection.directory, plan_sha256: inspection.objects.plan_sha256, policy_state: inspection.policy_state,
-    observations: inspection.observations.map(({ effect_id, observation }) => ({ effect_id, state: observation.state,
+    inspection_observations: inspection.observations.map(({ effect_id, observation }) => ({ effect_id, state: observation.state,
       ...("reason" in observation ? { reason: observation.reason } : {}) })) };
   if (!input.restore) return { ...summary, complete: inspection.observations.every(row => row.observation.state !== "unknown"),
     state: "inspection", reason: null, journal_directory: null };

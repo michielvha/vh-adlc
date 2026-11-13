@@ -18,7 +18,7 @@ type CandidateVerification = {
   scan_artifacts: { report: Reference; start: Reference; process: Reference; bindings: Reference; record: Reference } | null; checkout_state_sha256: string | null; commands: CommandResult[]; record_path: string | null; evidence: Reference | null;
 };
 
-/** Run the committed scanner and allowed verification vectors in a fresh owned candidate copy. */
+/** Recheck committed generated outputs, scanner results and allowed verification in an owned candidate copy. */
 export async function verifyCandidate(input: Parameters<typeof inspectCandidate>[0] & { timeout_ms?: number }): Promise<CandidateVerification> {
   const options = { ...input, selection: structuredClone(input.selection), resolution_record: structuredClone(input.resolution_record) };
   const result: CandidateVerification = { schema_version: 1, kind: "docs-drift-candidate-verification", authority: "none",
@@ -42,9 +42,13 @@ export async function verifyCandidate(input: Parameters<typeof inspectCandidate>
     const git = Bun.which("git");
     if (!git) throw Error("Candidate verification Git runtime unavailable");
     const timeout = options.timeout_ms ?? snapshot.settings.scanner.timeout_seconds * 1000;
-    for (const [index, argv] of snapshot.settings.verification_commands.entries()) {
+    const configured = [
+      ...snapshot.settings.generation_commands.map(argv => ({ argv, purpose: "generation" })),
+      ...snapshot.settings.verification_commands.map(argv => ({ argv, purpose: "verification" })),
+    ];
+    for (const [index, { argv, purpose }] of configured.entries()) {
       const executable = argv[0].includes("/") ? (isAbsolute(argv[0]) ? argv[0] : join(checkout, argv[0])) : Bun.which(argv[0]);
-      if (!executable) throw Error("Configured candidate verification runtime unavailable");
+      if (!executable) throw Error(`Configured candidate ${purpose} runtime unavailable`);
       const stdout = join(directory, index + "-stdout.log"), stderr = join(directory, index + "-stderr.log"), completion = join(directory, index + "-process.json");
       for (const path of [stdout, stderr]) writeFileSync(path, "", { flag: "wx", mode: 0o600 });
       const command: CommandResult = { start: null, argv: [...argv], process: null, stdout: reference(stdout), stderr: reference(stderr), completion: null };
@@ -56,10 +60,10 @@ export async function verifyCandidate(input: Parameters<typeof inspectCandidate>
       writeFileSync(completion, canonicalJSON(command.process), { flag: "wx", mode: 0o600 });
       command.start = reference(join(directory, index + "-start.json"));
       command.stdout = reference(stdout); command.stderr = reference(stderr); command.completion = reference(completion);
-      if (!matchesRepositoryState(checkout, state)) throw Error("Configured candidate verification changed its source or Git state");
+      if (!matchesRepositoryState(checkout, state)) throw Error(`Configured candidate ${purpose} changed its source or Git state`);
       const process = command.process;
       if (process.exit_code !== 0 || !process.reaped || process.timed_out || process.cancelled || process.output_limit)
-        throw Error("Configured candidate verification failed");
+        throw Error(`Configured candidate ${purpose} failed`);
     }
     result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Candidate verification unavailable"); }

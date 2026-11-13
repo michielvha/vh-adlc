@@ -48,9 +48,10 @@ export function readCandidateVerificationArtifacts(options: Parameters<typeof in
   if (!matchesRepositoryState(scan.checkout, value.checkout_state_sha256)) fail("owned verification source changed or unavailable");
   const snapshot = captureSnapshot(options.candidate_repo, options.candidate);
   readOriginalScan(snapshot, scan, originals, scope.directory, read);
-  if (!Array.isArray(value.commands) || value.commands.length !== snapshot.settings.verification_commands.length) fail("complete configured verification required");
+  const configured = [...snapshot.settings.generation_commands, ...snapshot.settings.verification_commands];
+  if (!Array.isArray(value.commands) || value.commands.length !== configured.length) fail("complete configured generation and verification required");
   for (const [index, command] of value.commands.entries()) {
-    if (!same(command.argv, snapshot.settings.verification_commands[index])) fail("configured verification vector changed");
+    if (!same(command.argv, configured[index])) fail("configured verification vector changed");
     if (!command.start || !command.completion) fail("original verification start and completion required");
     const directory = dirname(command.stdout.path);
     if ([command.stdout.path, command.stderr.path, command.start.path, command.completion.path].some((path, item) =>
