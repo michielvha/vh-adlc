@@ -540,6 +540,7 @@ same, otherwise ask with removal recommended. R-11 F-01 to F-09 are applied.
 | 2026-11-13 | R-10 | spec | `57d866c` | claude-opus-5-5 | procedural | Clean: no blocking finding; six should-fix and two nits, listed for the owner and not applied |
 | 2026-11-13 | R-10 | spec | `57d866c` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-11 | spec | `4c7e151` | claude-opus-5-5 | procedural | Clean: no blocking finding; eight should-fix and one nit |
+| 2026-11-13 | R-12 | spec | `d62c9f0` | claude-opus-5-5 | procedural | One blocking finding (F-01 same-day dates cannot order picks against acceptances), six should-fix and two nits |
 
 ### R-1
 
@@ -1185,3 +1186,68 @@ SEVERITY: nit
 WHERE: Design, Terminology (Saved nit, line 223); Test Plan AC-01 row (Variants D3, E and J)
 EVIDENCE: Saved nits come from "a marked spec review row", but Terminology defines markers only as `streak <n> of 3` and calls `drift` and `drift, blocking` rows drift rows "in place of a streak", so whether a clean drift row's nits are saved nits is open. Variant E has a clean `drift` row after the acceptance and checks that the summary lists "only nits recorded after the acceptance row" without saying whether that row holds a nit. Variant D3 does not state whether its blocking finding is factual or judgement (R-10 F-04 fixed this for B and H2). AC-01's "never raises one again" covers rejected factual findings, but only Variant J (an answered judgement finding) checks it.
 PROPOSAL: Say whether drift rows count as marked for saved nits and give Variant E's drift row a nit with the expected result, make D3's blocking finding factual, and add a rejected factual finding to Variant J or a new variant.
+
+### R-12
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Terminology (Clean streak, line 225; Decision record, line 229); Acceptance Criteria AC-01 ("applies owner picks as a pick revision, continuing the count"); Test Plan AC-01 row (Variants C2, C3 and H2)
+EVIDENCE: Line 225 says that after an acceptance row, with status `draft`, the previous value is the old marker "if the decision record holds a pick revision entry dated after that acceptance row, and 0 otherwise". The Review Log records only a day-granular date (conventions/feature-documents.md:168-171), and the decision record entries are "dated entries" (line 229). The two sections have no other shared ordering. Acceptances and the picks that follow them almost always fall on the same day. In this document R-8's acceptance, the R-8 picks, R-10's acceptance and the R-10 picks are all dated 2026-11-13 (lines 538-542). Variant C2 runs live, so the author writes the acceptance row and the pick revision entry with the same date. Read strictly, "dated after" fails, the previous value becomes 0, and the next pass records `streak 1 of 3` where C2 expects `streak 4 of 3`. Read as "on or after", an earlier pick revision from the same day as a later acceptance counts. Then a blocking drift revision continues from the old marker, which is the R-11 F-04 defect again. H2 passes either way only because its fixture dates the earlier pick "before" the acceptance. No date comparison satisfies both C2 and the case H2 is meant to guard. AC-01, which reads the previous value "as Terminology states", cannot be met for same-day events.
+PROPOSAL: Order the pick against the acceptance by something the document records unambiguously. For example, have the pick revision entry name the acceptance it follows ("pick revision after the acceptance at R-<n>"), or mark the pick in the next spec review row. Give C2 and H2 fixtures where the acceptance row and the pick entries share a date.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (step 3, lines 247-249; step 5, lines 253-258; paragraph after step 7, lines 266-272); Acceptance Criteria AC-01 (final clause, lines 420-421, against lines 413-415); Context, Owner summary (lines 48-49, 52-53); Test Plan AC-01 row (Variants C3 and G)
+EVIDENCE: Step 5 says that after a pick revision, "When the new pass is clean, the author asks for acceptance again ... whatever the streak". After an early acceptance (Variant C3) that pass records `streak 2 of 3`. Step 3 says "When `vh-adlc next` reports `owner acceptance` below the ceiling and no owner acceptance covers the latest pass, the spec and resume operations dispatch another pass instead of asking". The resumed-run check (lines 267-270) applies, as step 3 says, any should-fix finding on the baseline that the decision record does not name. A post-pick pass's findings are not named there. So a run interrupted after that pass and continued, or resumed through the resume skill, applies the pass's findings and dispatches another pass. The live run would list them and ask. AC-01 contains both instructions: "runs one more pass before asking again, whatever the streak" and "when resumed below the ceiling, handles the latest pass's unhandled findings and continues instead of asking for acceptance". No variant interrupts a post-pick pass, so either behavior passes every listed check.
+PROPOSAL: State that a pass following a pick revision is handled by step 5 in a continued or resumed run too, and say how the resumed run recognizes it (for example, a pick revision entry after the latest marked row). Add that exception to step 3, the resumed-run paragraph and AC-01's final clause, and add a variant that resumes after a clean post-pick pass below the ceiling.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (lines 53-55, "a revision you ask for beyond picks starts it again"); Design, Terminology (Clean streak, line 225); Design, Stopping rule (steps 4 and 5); Acceptance Criteria AC-01 (lines 408-409); Test Plan AC-01 row (Variant E)
+EVIDENCE: The summary tells the owner that any revision they ask for beyond picks restarts the count. Terminology resets the previous value only when "an acceptance row follows that row and the document's status is `draft`", and AC-01 limits the reset to "a revision of an accepted document that is not a pick revision". Take an unaccepted draft at `streak 3 of 3` where the owner asks for a scope change instead of picking. No acceptance row exists, so the previous value stays 3, the next clean pass records `streak 4 of 3`, and step 4 lists its findings and asks for acceptance after that single pass. A scope change of any size gets one pass. The same holds mid-loop, where an owner-requested change continues the count. Design does not say how such a revision differs from folded answers, which deliberately do not reset. The Behaviors list (line 218) names only "a revision of an accepted document", and Variant E covers only that case.
+PROPOSAL: Decide whether an owner-requested revision of an unaccepted draft, other than picks and folded answers, restarts the count. If it does, have the author record it in the decision record and read that entry in Terminology, AC-01 and a new variant. If it does not, correct the Owner summary.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (step 3, lines 244-249; step 6, lines 259-261); Design, Applying a pass's findings as one revision (lines 286-288); Design, Terminology (Owner acceptance, line 230); Design, Delivery (S7.7 change, lines 385-387)
+EVIDENCE: The one-revision rule raises a pass's judgement findings as Open Questions "first, without changing the baseline". So at every stop for an Open Question, the normative baseline is unchanged since that clean pass, and an owner acceptance named on it qualifies under Terminology ("after a clean pass while the normative baseline is unchanged since that pass"). Step 6 then says the author "applies nothing to the normative baseline, lists that pass's findings" and writes the acceptance row. It does not say what becomes of the Open Questions already raised from that pass. `gate planned` requires `no_open_questions` (conventions/feature-documents.md:270, :305), and only the owner answers questions (:139). One implementer withdraws the questions into the listed findings and accepts. Another keeps them and asks the owner to answer first, and any answer that changes the baseline then makes the acceptance impossible. S7.7 runs the real reviewer, which "may return judgement findings even on a sound draft" (tests/vh-adlc/scenarios/run.ts:547). Today its check expects no acceptance whenever questions exist (run.ts:549). The new check "expects acceptance when the loop ended at a clean pass" and does not say whether a stop on an Open Question counts as the loop ending.
+PROPOSAL: State what an owner acceptance does to Open Questions raised from the pass it names: withdraw them into the listed findings, or require answers that change nothing on the baseline. Make S7.7's new check say which path it expects when turn 1 stopped on an Open Question.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Pins and older consumers (lines 362-364); Test Plan AC-06 row (procedure case); Context, Owner summary (lines 37-38); Context, Background (lines 116-118)
+EVIDENCE: Pins says that without the new convention "the current procedure runs ...: after a clean pass the author asks for acceptance and dispatches no further pass". The AC-06 procedure case gives the scripted pass "a factual should-fix" and passes when "that finding is applied as today, ... the run asks for acceptance and dispatches no second pass". The Owner summary describes the same procedure differently: it "applies every factual finding and then asks for a new pass", and Background says it "always applies factual findings and asks again". If the canned finding touches Scope, Design, a criterion or the Test Plan, applying it changes the normative baseline (conventions/feature-documents.md:70-73). The review is then stale (:300-301), and `next` names `spec review`. An acceptance row at the reviewed commit fails `accepted` (:309). The case would then demand an acceptance question that cannot lead to a passing gate, and would fail an author that follows the binary and dispatches a second pass. The row does not say where the finding sits.
+PROPOSAL: Put the procedure case's factual should-fix outside the normative baseline (for example in Context), or expect a second pass when it is on the baseline. Make the Pins description of today's procedure agree with the Owner summary and Background.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-06 row ("two scratch clones, each checked out at a commit that holds its `AGENTS.md` pin"); Acceptance Criteria AC-06; Tasks T3
+EVIDENCE: `owner-readable-specifications` covers AGENTS.md, plugins/vh-adlc/knowledge.md, both manifests, the spec skill, the reviewer agent and docs/get-started/first-feature.md. `vh-adlc fresh docs/specs/owner-readable-specifications.md --repo <repo> --plugin-pin d8f07c9...` at d62c9f0 returns one finding per covered path. Implementation review R-4 has `covered-changed` for AGENTS.md, knowledge.md and both manifests, but none for SKILL.md, the reviewer agent or first-feature.md. This feature changes all three (T4, T5, T10). Picture a new-pin clone at the feature's final commit, which is where an implementation reviewer would naturally re-verify AC-06, compared with an old-pin clone at an earlier commit. The new-pin clone gains `covered-changed` findings for those three paths, so `findings` differ for a reason unrelated to the pin, and a correct implementation fails AC-06. The comparison isolates the pin only if the two commits differ in nothing a named spec covers except the pin files, and the row does not require that.
+PROPOSAL: Require the two clones to differ only in the pin. For example, use the T3 commit and its parent with T3 touching only pin files, or the final commit and a scratch commit on it that restores the old pin in AGENTS.md. State that pair in the row and in T3.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks T13, T6
+EVIDENCE: T13 (third in order) has the done condition "the check and the AC-10 side-branch case pass". The two AC-10 scenario cases are written only in T6, which comes later, so T13's done condition cannot be observed when T13 is committed. T6 then claims the AC-10 side-branch case fails "because today's skill ... only fast-forwards a side branch". By then T13 has already changed review mode step 1 to merge, so that case cannot fail first. T13 also puts the failing check and the change in one task, while the convention orders "failing test first" with one commit per task (conventions/feature-documents.md:129-135).
+PROPOSAL: Move the AC-10 scenario cases into a task ordered before T13, with T13's done condition referring to them, or drop the scenario from T13's done condition and the side-branch failure claim from T6. Split T13's failing check into its own preceding task.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 86-89, changes since the acceptance at R-10)
+EVIDENCE: The paragraph lists only the changes R-10 drove. It leaves out the material changes made after R-11 within the same revision since that acceptance: the author now asks for acceptance after picks below the ceiling, judgement findings are answered before the one revision commit, removal is preferred only when both options behave the same (otherwise it is an Open Question), and a document without a `branch` field on a side branch merges the default branch in. Some of these appear elsewhere in the summary, but not as changes since the accepted scope, which the convention asks the summary to explain (conventions/feature-documents.md:86-88).
+PROPOSAL: Add the R-11-driven changes to the changes-since-acceptance paragraph.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Delivery (lines 384-387 and 392-393); Test Plan AC-01 row (final sentence)
+EVIDENCE: `session()` takes a fixed array of prompts and hardcodes `maxTurns: 80` with no option (tests/vh-adlc/scenarios/run.ts:133-141). Delivery says S7.7's "turn-2 prompt names the latest pass", but which pass that is becomes known only after turn 1 ends. It also says the multi-pass cases run with `maxTurns` 250. Both need `session()` to change: computed prompts and a turn limit option. Delivery and T6 do not say so.
+PROPOSAL: Say in Delivery or T6 that `session()` gains a `maxTurns` option and accepts a prompt computed from the document after the previous turn.
