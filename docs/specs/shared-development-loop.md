@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Back to draft on feat/shared-development-loop: implementation reviews move to a private clone of the reviewed commit, after concurrent pushes tripped the shared-ref check."
+status: in-progress
+status_description: "Re-entered after the R-20 acceptance; T48 to T53 and a fresh implementation review remain."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
