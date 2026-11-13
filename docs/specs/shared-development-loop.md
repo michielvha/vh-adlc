@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-12 findings applied at the owner's direction; waiting for review R-13, then owner acceptance."
+status_description: "R-13 has no blocking findings; two should-fix items and owner acceptance are pending."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
@@ -46,72 +46,38 @@ Stackweaver keeps its project rules in settings and one project procedure.
 
 ### Owner summary
 
-Stackweaver still runs its own spec-driven loop: `agents/spec.md`, `tasks.md`, `implement.md`,
-`ship.md`, `investigate.md` and `reviewer.md`. Triage, maintenance, audit, docs impact and SEO already
-run through vh-adlc. This feature moves the rest, roadmap row D-05, without losing anything the native
-loop does today, and fixes the places where vh-adlc cannot yet carry a Stackweaver rule.
+Stackweaver still runs its own spec-driven loop (`agents/spec.md`, `tasks.md`, `implement.md`,
+`ship.md`, `investigate.md`, `reviewer.md`), while triage, maintenance, audit, docs impact and SEO
+already run through vh-adlc. This feature moves the rest, roadmap row D-05, without losing a native
+capability. A comparison of about 120 behaviors found vh-adlc stronger in several places (independent
+implementation review, binary-checked gates, claim commits, handoff, resume) and found 21 conflicts and
+9 missing hooks, which the design resolves.
 
-A comparison of about 120 behaviors found that vh-adlc is already stronger in several places: an
-independent implementation review with one record per criterion, binary-checked gates, a pushed claim
-commit, an explicit handoff between sessions, and a resume operation. It also found 21 conflicts and 9
-missing hooks. The main ones: the SDD skills read no repository settings, so Stackweaver's review lenses
-and conditional verification can only reach them as loose prose. The reviewer cannot run on another
-harness. Lint rejects `**` in `covers`. The claim step would move Stackweaver's live main checkout onto
-a feature branch. Feature PRs may not be squashed or amended. And nothing handles manual-only CI or a
-post-merge satellite watch.
+The shared side gains: per-role model routing in a committed `.vh-adlc/loop.yaml`; a generic external
+command route for the two reviewer roles, so a Claude session gets a `gpt-6.1-sol` review through the
+Copilot CLI that is stored and checked like any other (file-only spec reviews read a read-only export of
+the exact commit; implementation reviews get shell, guarded by a before-and-after check of refs, index
+and files); a project procedure and declared review lenses read by every SDD operation; verification
+rungs by path that must pass before push, completion and delivery; manual-CI reporting, a post-merge
+watch, and consumer skip-CI paths; claims from a host worktree plus an opt-in rule that keeps implement
+out of the primary checkout; `**` in `covers`; and investigation defaults.
 
-The model decision is already made. Stackweaver commit `7861b9dc` moved every command to Opus and sends
-independent reviews to `gpt-6.1-sol` through the Copilot CLI. vh-adlc already keeps models out of agent
-files, but its review protocol only knows an in-host subagent or a manual handoff. This feature adds
-model routing per role, declared in settings, plus an external command route, so a Claude session can
-get a read-only GPT review that is stored and checked like any other.
+Stackweaver adopts it through thin adapters, `loop.yaml` and `agents/loop-project.md`, behind a parity map
+that fails if a legacy rule has no home. Each command routes per document: enrolled specs go to vh-adlc,
+others to the native agents, which retire only once no non-terminal spec is unenrolled. Draft specs move
+now; planned, in-progress and parked specs finish natively unless the owner moves one. Feature PRs land
+by merge commit. `/implement` keeps handing straight to ship under a written grant, and small fixes keep
+shipping through Stackweaver's own `/ship`. The live slot pass, kind runs for named E2E specs and the
+final full kind run stay binding.
 
-The owner settled its open questions on 2026-11-13. Model routes live in a committed
-`.vh-adlc/loop.yaml`, with only the reviewer CLI's binary path overridable per user. A feature is
-claimed from the session's own host worktree when it sits at the tip of the default branch, as
-Stackweaver sessions work today, and vh-adlc gains that as a shared behavior because Claude Code and
-Codex both start work in worktrees they create. Feature PRs land by merge commit with additive
-follow-ups; squash and amend stay for non-feature and bot PRs. The external review route is generic:
-any CLI described by a command template. Stackweaver keeps two standing behaviors: `/implement` hands
-straight to ship under a written grant, and small non-feature fixes keep shipping through Stackweaver's
-own `/ship`. Draft specs move to the shared format now; planned, in-progress and parked specs finish
-under the native loop unless the owner moves one, which then goes back through draft, a fresh review and
-acceptance. Finished specs stay as history.
-Stackweaver adopts vh-adlc's acceptance, completion and issue rules and its document style. A consumer
-may declare extra paths that still skip CI for a feature, which needs a small revision to the central
-delivery convention in vhco-pro/docs.
+Delivery follows an Order list after completion, as `host-cleanup.md` does: release, lock PR, marketplace
+install, then Stackweaver's adoption PR. Rollback is rehearsed on a disposable checkout.
 
-Shared changes ship first in a vh-adlc release. Stackweaver then adopts them through thin command
-adapters, a `.vh-adlc/loop.yaml` settings file and one project procedure, behind a parity map that fails
-if any legacy rule has no new home. Rollback is rehearsed on a disposable checkout. Active Stackweaver
-specs move to the shared format.
-
-Review R-1 on `gpt-6.1-sol` found four blocking problems. The factual ones are fixed and the owner
-answered the judgement ones: implementation reviews get shell access with a worktree-unchanged check,
-active specs finish natively, and the route passes the prompt text explicitly. R-2 found one more
-blocking gap, how each command picks the native or shared loop, now settled per document by enrollment.
-Its other answers: failed checks block completion and delivery, the reviewer worktree check compares file
-contents, and only reviewer roles may use a command route. R-3 led to worktree isolation becoming a
-shared opt-in setting that Stackweaver turns on, refs joining the reviewer worktree check, no push over a
-failing check, and the native agents staying until even the domain plans are enrolled or finished.
-R-4 added the release path inventory and settled that the merge commit decides publication, that checks
-apply over the whole feature delta, and that the reviewer worktree check covers ignored files and index
-flags. R-5 led to an Order list after completion, the way `host-cleanup.md` delivers its release and
-lock PR, and to the reviewer worktree check catching new ignored files. R-6 found nothing blocking; its
-should-fix items tightened the freshness wording, the signed release check, `covers` and flagged tracked
-files. R-7 found nothing blocking either; it settled that a merge with no workflow run counts as having no
-publication path, and that the final check runs on the merge commit. R-8 showed the first of those was
-unsafe, so an unmarked merge now always runs the watch, verification rungs trigger only by path, and
-feature PRs land by merge commit only when rungs or a watch are declared. R-9 found nothing blocking;
-every E2E spec a Test Plan names now runs in kind whatever changed. R-10 found nothing blocking either;
-the live slot pass, the final full kind run and skipped subchecks inside `make verify` are now binding,
-and a Glossary holds the new terms. R-11 found that a file-only review read the live worktree; it now
-reads an export of the exact commit, plain-language requests route like the slash commands, and
-`skip_ci_paths` yields to a consumer's own pin. R-12 moved the file-only reviewer's launch into that
-export with automatic instruction loading off, made investigate extend an existing analysis instead of
-duplicating it, and narrowed what a refused claim may touch. Review R-13 is next, then acceptance. Accepting this
-document authorizes implementation of the accepted scope on a feature branch. Publishing the vh-adlc
-release, merging either repository and retiring the native agents each still need their own approval.
+Validation so far is spec review only, nothing executed: thirteen `gpt-6.1-sol` passes. R-13 has no
+blocking findings; its two should-fix items (findings saved against an existing issue, and reviewer
+helper processes that outlive the review) are open for the owner. Accepting authorizes implementation of
+this scope on a feature branch. Publishing releases, merging either repository and retiring the native
+agents each need separate approval.
 
 ### Background
 
