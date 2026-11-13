@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Normative revision after spec review R-18, describing the merged helper drain, the shared stop deadline and the holder-clear recovery; back to draft with every criterion reset."
+status: planned
+status_description: "Accepted by the owner against R-19 on 2026-11-13; every criterion needs fresh evidence on the feature branch."
 branch: feat/remote-gui-reusable-profiles
 issue: https://github.com/michielvha/vh-adlc/issues/62
 goal: "An owner can opt in to a named browser profile bound to their identity, so provider sessions survive the end of a remote-gui session, while credential entry stays human-only and agent control of a signed-in profile always rests on the owner's confirmation."
@@ -293,6 +293,7 @@ None.
 | 2026-11-13 | R-17 | implementation | `82af2a909fad2af256253ae88dd93e9be4176a5a` | gpt-6.1-sol | procedural | Fourteen criteria met; AC-16 not met because a failed holder clear still reports stopped; AC-02 and AC-14 not verified under host load and without a Firefox build. |
 | 2026-11-13 | R-18 | spec | `bb8a80f9646b81c8e6f84268741dbdb06c15dd19` | gpt-6.1-sol | procedural | No blocking findings; two should-fix findings: Design and the Test Plan did not yet describe the merged helper drain, session sweep and holder-clear recovery. |
 | 2026-11-13 | R-19 | spec | `ea7d8409c61ab422e9a8b60618692c7ecfbe42d1` | gpt-6.1-sol | procedural | No findings on the revision after R-18. |
+| 2026-11-13 | R-19 | spec | `ea7d8409c61ab422e9a8b60618692c7ecfbe42d1` | n/a | n/a | accepted by owner |
 
 ### R-1
 
