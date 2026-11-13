@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -159,13 +160,82 @@ func TestRealHumanBrowserHandoff(t *testing.T) {
 	checkHumanProcess(t, human.Owned)
 }
 
-// A busy host can delay Chromium's handling of the Exit keys. Pausing the
-// browser process while they are typed makes that delay deterministic: the
-// menu opens only after the pause, and its Exit mnemonic must not arrive first.
+// typedMenus marks the quit's second menu query, which it makes only after
+// it wrote Alt+F to the display.
+type typedMenus struct {
+	clipboardHelper
+	calls atomic.Int32
+	typed chan struct{}
+}
+
+func (m *typedMenus) Menus(ctx context.Context) (map[uint32]bool, error) {
+	if m.calls.Add(1) == 2 {
+		close(m.typed)
+	}
+	return m.clipboardHelper.Menus(ctx)
+}
+
+// renderers returns the renderer processes that descend from the browser.
+func renderers(t *testing.T, browser int) []state.Identity {
+	t.Helper()
+	entries, err := os.ReadDir("/proc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parents := map[int]int{}
+	for _, entry := range entries {
+		pid, e := strconv.Atoi(entry.Name())
+		if e != nil {
+			continue
+		}
+		data, e := os.ReadFile("/proc/" + entry.Name() + "/stat")
+		if e != nil {
+			continue
+		}
+		fields := strings.Fields(string(data)[strings.LastIndexByte(string(data), ')')+1:])
+		if len(fields) > 1 {
+			parents[pid], _ = strconv.Atoi(fields[1])
+		}
+	}
+	var found []state.Identity
+	for pid := range parents {
+		ancestor := parents[pid]
+		for ancestor > 1 && ancestor != browser {
+			ancestor = parents[ancestor]
+		}
+		cmdline, e := os.ReadFile("/proc/" + strconv.Itoa(pid) + "/cmdline")
+		if ancestor != browser || e != nil || !strings.Contains(string(cmdline), "--type=renderer") {
+			continue
+		}
+		if id, e := state.Inspect(pid); e == nil {
+			found = append(found, id)
+		}
+	}
+	if len(found) == 0 {
+		t.Fatal("no renderer process found")
+	}
+	return found
+}
+
+// A busy page delays Chromium's app menu: the browser opens it only after the
+// page's renderer declines Alt+F. Pausing the renderers until half a second
+// after Alt+F reached the display makes that delay deterministic, and the
+// Exit mnemonic must not reach the page while the menu is still closed.
 func TestRealHandoffWaitsForStalledBrowserMenu(t *testing.T) {
 	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
 		t.Skip("requires existing GUI dependencies and disposable browser processes")
 	}
+	menus := &typedMenus{typed: make(chan struct{})}
+	original := openClipboard
+	openClipboard = func(ctx context.Context, d xclip.Display) (clipboardHelper, error) {
+		real, err := original(ctx, d)
+		if err != nil {
+			return nil, err
+		}
+		menus.clipboardHelper = real
+		return menus, nil
+	}
+	t.Cleanup(func() { openClipboard = original })
 	c, id := setup(t)
 	c.BrowserMode = "human"
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -178,28 +248,43 @@ func TestRealHandoffWaitsForStalledBrowserMenu(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer h.Stop()
-	var browser state.Identity
+	browser := 0
 	for _, process := range h.Owned {
 		if process.Role == "browser" {
-			browser = process.Identity
+			browser = process.Identity.PID
 		}
 	}
-	if err = state.Signal(browser, syscall.SIGSTOP); err != nil {
-		t.Fatal(err)
+	paused := renderers(t, browser)
+	for _, renderer := range paused {
+		if err = state.Signal(renderer, syscall.SIGSTOP); err != nil {
+			t.Fatal(err)
+		}
 	}
-	resumed := make(chan struct{})
+	resumed, returned := make(chan error, 1), make(chan struct{})
 	go func() {
-		defer close(resumed)
-		time.Sleep(time.Second)
-		_ = state.Signal(browser, syscall.SIGCONT)
+		select {
+		case <-menus.typed:
+			time.Sleep(500 * time.Millisecond)
+		case <-returned:
+		}
+		var failed error
+		for _, renderer := range paused {
+			if e := state.Signal(renderer, syscall.SIGCONT); e != nil {
+				failed = e
+			}
+		}
+		resumed <- failed
 	}()
 	agent, err := h.Handoff(ctx, "agent")
-	<-resumed
+	close(returned)
+	if e := <-resumed; e != nil {
+		t.Fatal(e)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
 	if agent.CDPAddress == "" || agent.MarkerURL != h.MarkerURL {
-		t.Fatal("hand-back after a stalled browser lost control or the marker")
+		t.Fatal("hand-back after a stalled page lost control or the marker")
 	}
 }
 

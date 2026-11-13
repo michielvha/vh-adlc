@@ -20,14 +20,18 @@ type menuDouble struct {
 	opensAt int
 	polls   int
 	open    bool
+	onOpen  func()
 }
 
 func (d *menuDouble) Menus(context.Context) (map[uint32]bool, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.polls++
-	if d.opensAt > 0 && d.polls >= d.opensAt {
+	if d.opensAt > 0 && d.polls >= d.opensAt && !d.open {
 		d.open = true
+		if d.onOpen != nil {
+			d.onOpen()
+		}
 	}
 	if d.open {
 		return map[uint32]bool{7: true}, nil
@@ -143,6 +147,23 @@ func TestQuitTypesNoExitWhenTheMenuStaysClosed(t *testing.T) {
 	for _, event := range <-events {
 		if event.key == 'x' {
 			t.Fatal("Exit mnemonic typed without an open menu")
+		}
+	}
+}
+
+// A cancellation that arrives with a successful menu reply must still stop the quit.
+func TestQuitTypesNoExitAfterCancellation(t *testing.T) {
+	menus := &menuDouble{opensAt: 3}
+	r, events := quitRuntime(t, menus)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	menus.onOpen = cancel
+	if err := r.quitBrowser(ctx); err == nil {
+		t.Fatal("quit reported success after cancellation")
+	}
+	for _, event := range <-events {
+		if event.key == 'x' {
+			t.Fatal("Exit mnemonic typed after cancellation")
 		}
 	}
 }
