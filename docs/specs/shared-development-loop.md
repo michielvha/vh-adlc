@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-13 should-fix items folded in at the owner's direction; the owner accepts once a confirming review has no blocking findings."
+status: planned
+status_description: "Accepted by the owner at R-14 (d367673); ready for /vh-adlc-tasks. R-14's two should-fix items go into the task list."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
