@@ -692,6 +692,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-15 | spec | `e2e3de959b09950f8c9d17dbf1a74413523af7ea` | gpt-6.1-sol | procedural | No blocking findings after the covers revision; two should-fix on symlinks escaping the export and detached reviewer helpers. |
 | 2026-11-13 | R-15 | spec | `e2e3de959b09950f8c9d17dbf1a74413523af7ea` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-16 | spec | `236200bd18f7f23a23172f5a3e7ea107d44ff872` | gpt-6.1-sol | procedural | One blocking finding: the Codex implementation reviewer's writable sandbox conflicts with Stackweaver's read-only review rule. Four should-fix. A Codex attempt before it stayed pending on MODEL: unknown and is not recorded. |
+| 2026-11-13 | R-17 | spec | `0c6a7402a82142997f27e4c535ebd7b71c5f711f` | gpt-6.1-sol | procedural | One blocking finding: review policy is read from the live loop.yaml rather than the dispatched commit. One should-fix on chained symlinks escaping the export. |
 
 ### R-1
 
@@ -1130,6 +1131,22 @@ SEVERITY: should-fix
 WHERE: Context / Owner summary; Tasks / T24
 EVIDENCE: The owner summary says validation is spec review only, with nothing executed. Tasks records extensive executed checks and T24 is checked with a done condition that all listed checks pass, although its evidence reports 1524 passing tests and one failure. These are inconsistent current validation claims, independently of whether the historical executions can be reproduced. File-only access prevents rerunning the checks.
 PROPOSAL: Refresh the owner summary to distinguish recorded implementation checks, their failure and limitations, pending real-route proof, and unverified publication claims. Leave T24 incomplete until its stated passing condition is established, or explicitly revise its remaining work without representing the failed suite as passing.
+
+### R-17
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design / External command route; Project procedure and review lenses; AC-02 Test Plan
+EVIDENCE: Design promises that uncommitted edits cannot shape a spec review and that route arguments come from the committed file. However, plugins/vh-adlc/scripts/settings-file.ts:16-30 reads working-tree settings, and scripts/loop/cli.ts:121-131 constructs the reviewer prompt using loopContext(settings) before exporting the commit. An uncommitted loop.yaml edit can therefore remove instruction files, change a blocking lens or replace its check, influencing a review stored against the unchanged target. The existing instruction-edit fixture tests exported AGENTS.md content, not this dispatch-policy input. I cannot run Git, vh-adlc or Codex; this follows from reading the dispatch and settings readers.
+PROPOSAL: Bind reviewer routes, instruction-file declarations and lenses to the dispatched commit before constructing the prompt, retaining only the documented executable override. Add an end-to-end fixture that changes live loop.yaml after committing and proves that the committed review policy still applies.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance notes; Tasks / T7; Design / External command route
+EVIDENCE: T7 claims export symlink containment is implemented, but plugins/vh-adlc/scripts/loop/review-route.ts:103-107 checks targets with lexical resolve(), without following intermediate symlinks. With committed links d/back -> .. and leak -> d/back/../outside.txt, both lexical targets remain inside the export, while opening leak reaches outside.txt in the export's parent. The direct escaping-symlink fixture does not cover this case, so live content can still enter the supposedly committed-only review. I cannot execute the Git or reviewer fixture; this counterexample follows from the path-resolution code.
+PROPOSAL: Check fully resolved symlink destinations, including intermediate links, and leave the review pending when containment cannot be established. Add the chained-link case before treating T7's containment claim as proved.
 
 ## Sources
 
