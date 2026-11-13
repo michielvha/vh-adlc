@@ -584,51 +584,51 @@ published plugin is installed from the marketplace and exercised, and a rollback
 ## Acceptance Criteria
 
 - [ ] AC-01: A repository's `.vh-adlc/loop.yaml` names a route for each loop role, every SDD operation dispatches according to it, a `command` route is accepted only for the two reviewer roles, no vh-adlc agent or skill file names a model, and a repository without the file behaves as it does at `a7bfca99`.
-      Evidence: R-23 at `0b5b5f23` returned not met.
+      Evidence: R-24 at `8d4bc689` returned met.
 - [ ] AC-02: From a Claude Code session, a read-only spec review that reads only a read-only export of the target commit and writes nothing, and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; the route, instruction files and lenses come from `loop.yaml` at the reviewed commit; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`, where a route with `model_attestation: codex-session` matches on the model Codex's session log records rather than the reviewer's self-report; and a mismatched model or target, a missing header, a non-zero exit, a timeout, a failed process cleanup or any change outside the declared `review_scratch` directories to the private clone's `HEAD`, refs, index entries, status, file contents or ignored-file list, or to the owning worktree's `HEAD`, branch ref, index entries, status, file contents or ignored-file list, leaves the review pending, while another session's push to the shared refs during the review does not with no Review Log row.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-23 at `0b5b5f23` returned not verified.
+      Evidence: R-24 at `8d4bc689` returned not verified.
 - [ ] AC-03: Every SDD operation reads the declared project procedure and instruction files, and a spec review flags a document that contradicts a declared instruction file or lens.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-23 at `0b5b5f23` returned not verified.
+      Evidence: R-24 at `8d4bc689` returned not verified.
 - [ ] AC-04: Implement and ship run each declared verification rung whose path condition holds over the whole feature delta, or that is declared always, and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
-      Evidence: R-23 at `0b5b5f23` returned not met.
+      Evidence: R-24 at `8d4bc689` returned not met.
 - [ ] AC-05: With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, a feature whose actual merge commit carries the skip marker and touches only skip-eligible paths is reported delivered with no publication path and no watch run, every unmarked merge commit runs the watch, and a watch that fails only because no workflow ran leaves the feature reported blocked, not delivered.
-      Evidence: R-23 at `0b5b5f23` returned met.
+      Evidence: R-24 at `8d4bc689` returned not met.
 - [ ] AC-06: Feature-document lint accepts `covers` entries containing `**`, they match the same paths as the docs-impact matcher, and under such an entry a committed change makes the applicable review stale while an uncommitted change makes `feature_tree_clean` false, as for a plain entry.
-      Evidence: R-23 at `0b5b5f23` returned met.
+      Evidence: R-24 at `8d4bc689` returned met.
 - [ ] AC-07: With `findings_document: always`, investigate writes its findings document, or extends the existing analysis document that already covers the case without creating a second one, never leaves an issue holding the only copy of its findings, reports any duplicate analysis document or open issue it found, and ends with one of the three verdicts.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-23 at `0b5b5f23` returned not verified.
+      Evidence: R-24 at `8d4bc689` returned not verified.
 - [ ] AC-08: Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` and the matching plain-language requests through `AGENTS.md` run the installed vh-adlc operations with Stackweaver's settings for every enrolled spec and, until the native agents retire, the native agents for every unenrolled one (after retirement, AC-17's refusal applies to terminal unenrolled documents), new specs are written enrolled, and every row of the committed parity map passes its contract test.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-23 at `0b5b5f23` returned not verified.
+      Evidence: R-24 at `8d4bc689` returned not verified.
 - [ ] AC-09: Every Stackweaver spec in the migration set (the draft specs, plus each planned, in-progress or parked spec the owner moved) passes `vh-adlc lint`, its gate results agree with a manual reading of the document, and each moved spec that was planned or in progress carries a fresh review and an owner acceptance row at its converted baseline.
-      Evidence: R-23 at `0b5b5f23` returned met.
+      Evidence: R-24 at `8d4bc689` returned met.
 - [ ] AC-10: Stackweaver's local behaviors stay available with unchanged invocation: worktree slots, direct-to-main non-feature shipping through its own `/ship`, `[skip ci]` rules, `watch-merge.sh`, the triad and satellite lenses, the browser-pass summary table, and `/implement` handing straight to ship.
-      Evidence: R-23 at `0b5b5f23` returned met.
+      Evidence: R-24 at `8d4bc689` returned met.
 - [ ] AC-11: A disposable Stackweaver checkout rolls back to the native loop and reapplies the adoption, with the docs index and unrelated workflow files byte-identical afterwards.
-      Evidence: R-23 at `0b5b5f23` returned not met.
+      Evidence: R-24 at `8d4bc689` returned met.
 - [ ] AC-12: On the feature branch, a GoReleaser snapshot build produces all four runtime archives, the plugin's `knowledge.md` pin names the merged vhco-pro/docs revision, and a candidate plugin installed from the branch in an isolated profile runs every adapted Stackweaver command through its entry points.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-23 at `0b5b5f23` returned not verified.
+      Evidence: R-24 at `8d4bc689` returned not verified.
 - [ ] AC-13: Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on a branch this session created or was handed over, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops before writing anything, and when the push is rejected it keeps the local claim commit, creates no feature branch and reports the claim pending.
-      Evidence: R-23 at `0b5b5f23` returned met.
+      Evidence: R-24 at `8d4bc689` returned met.
 - [ ] AC-14: A Stackweaver feature taken through the adopted loop passes its completion gate in its owning worktree before merge, and after it lands by merge commit every commit its Review Log names is reachable from `main`.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-23 at `0b5b5f23` returned not verified.
+      Evidence: R-24 at `8d4bc689` returned not verified.
 - [ ] AC-15: With `skip_ci_paths` declared and a resolved delivery convention that supports it, a feature delivery whose commit, push range and PR diff touch only feature documents, Markdown onboarding files or declared paths carries the skip marker, and any other change in the delivery leaves it off; when the resolved convention does not support it, the marker follows the documentation-only rule and the report says the setting was ignored and why.
-      Evidence: R-23 at `0b5b5f23` returned met.
+      Evidence: R-24 at `8d4bc689` returned not met.
 - [ ] AC-16: In Stackweaver, `/spec review` never moves an enrolled spec to `planned` without an owner acceptance row, and `/spec` and `/investigate` create no issue without an explicit request or accepted scope.
-      Evidence: R-23 at `0b5b5f23` returned met.
+      Evidence: R-24 at `8d4bc689` returned met.
 - [ ] AC-17: Stackweaver's native spec, tasks, implement and reviewer agent files stay routable while any non-terminal spec, domain-extension plans included, is unenrolled, are retired only after none is, and after retirement an adapted command given a terminal unenrolled document refuses without running anything.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-23 at `0b5b5f23` returned not verified.
+      Evidence: R-24 at `8d4bc689` returned not verified.
 - [ ] AC-18: With `implement_worktree: isolated`, implement started in the primary worktree continues in a host-created isolated worktree, or stops before writing on a host without a worktree tool, and the primary worktree's branch, `HEAD`, index and files are unchanged afterwards; without the setting, behavior is unchanged.
       Residual: https://github.com/michielvha/vh-adlc/issues/85
-      Evidence: R-23 at `0b5b5f23` returned not verified.
+      Evidence: R-24 at `8d4bc689` returned not verified.
 - [ ] AC-19: The settings reference, the operation reports and Stackweaver's adapters and project procedure use each glossary term with the meaning the Glossary gives it, and introduce no other name for those concepts.
-      Evidence: R-23 at `0b5b5f23` returned met.
+      Evidence: R-24 at `8d4bc689` returned met.
 
 ## Test Plan
 
@@ -782,6 +782,7 @@ Stackweaver adoption, on a Stackweaver feature branch against the candidate plug
       Evidence: The new `rungs.test.ts` case failed first (`cli.ts rungs --merge <failing merge> --run true` exited 0 with advance true after a later repair on main) and now exits 3 with `behavior` blocking. `bun test --timeout 60000 tests/vh-adlc/loop/ tests/vh-adlc/direct-operation-compatibility.test.ts` gives 133 pass, 0 fail. The ship skill says the delivery check runs from a checkout of the merge commit. I replanned this task's wording before starting it: binding the verdict to the merge keeps the checkout's ignored dependencies, which a fresh detached checkout would lack.
 - [x] T60 Stackweaver `tests/agent-loop/rehearse.sh` - the rollback rehearsal reverts the whole current adoption range and reapplies it in a disposable clone, finishing with matching hashes at the current adoption commit (AC-11, R-23 F-03)
       Evidence: Stackweaver `495c8b06` and `83c06b5a`: `rehearse.sh` at `8904c82b` stopped reverting `02844076` (R-23), because its fixed commit list missed `9ba38077`. It now derives the adoption from the commits the branch adds over the main it last merged. At `495c8b06` it reverted all 14 commits, returned the 62 paths they touched to `d86067ea` (hash `90141ec173c2b8f8` at main and after), reapplied to an identical tree `3e4a9f27`, and kept the unrelated files and docs index at `e9349ee04972df8a` throughout. Output is in `tests/agent-loop/evidence/t60-rehearsal.md`. `bun test tests/agent-loop` gives 169 pass, 0 fail.
+- [ ] T61 `plugins/vh-adlc/scripts/loop/git-paths.ts`, `tests/vh-adlc/loop/rungs.test.ts`, `tests/vh-adlc/loop/delivery.test.ts` - committed diffs and outgoing history list both ends of a rename, so a move from code into a skip-eligible path still selects its rung, leaves the skip marker off and runs the post-merge watch (AC-04, AC-05, AC-15, R-24 F-01)
 
 ## Open Questions
 
@@ -822,6 +823,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-22 | spec | `df8ce7cf4aefb6850d7c72142ed7c3590263a180` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on the stale owner summary and T34's file-only wording. |
 | 2026-11-13 | R-22 | spec | `df8ce7cf4aefb6850d7c72142ed7c3590263a180` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-23 | implementation | `0b5b5f234080598f63e28a5c97948719da3f0c47` | gpt-6.1-sol | procedural | Eight criteria met, AC-01, AC-04 and AC-11 not met, eight not verified; three should-fix findings. Ran in a private clone. |
+| 2026-11-13 | R-24 | implementation | `8d4bc689e31939a346ea689023c482991d30595b` | gpt-6.1-sol | procedural | Ten criteria met, AC-04, AC-05 and AC-15 not met, eight not verified (residualised); one blocking finding on rename sources. Ran in a private clone. |
 
 ### R-1
 
@@ -1573,6 +1575,91 @@ SEVERITY: should-fix
 WHERE: Stackweaver tests/agent-loop/rehearse.sh:5
 EVIDENCE: Running the committed rehearsal against 8904c82b stopped while reverting 02844076. Its disposable clone had conflicts in spec.md, tasks.md, implement.md, ship.md and AGENTS.md. The hardcoded adoption list omits later adoption changes, including 9ba38077, which changed those adapters. Neither reapplication nor the final preservation comparisons ran.
 PROPOSAL: Update the rollback procedure to cover the complete current adoption while preserving unrelated changes. Rehearse rollback and reapplication at the current adoption commit and retain the resulting hash comparisons.
+
+### R-24
+
+CRITERION: AC-01 A repository's `.vh-adlc/loop.yaml` names a route for each loop role, every SDD operation dispatches according to it, a `command` route is accepted only for the two reviewer roles, no vh-adlc agent or skill file names a model, and a repository without the file behaves as it does at `a7bfca99`.
+VERDICT: met
+EVIDENCE: At 8d4bc689, settings, model-free, CLI and direct-operation compatibility checks passed, including T58, role mapping, reviewer-only command routes and resume. Inspection against a7bfca99 confirmed the default host review rules remain.
+
+CRITERION: AC-02 From a Claude Code session, a read-only spec review that reads only a read-only export of the target commit and writes nothing, and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; the route, instruction files and lenses come from `loop.yaml` at the reviewed commit; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`, where a route with `model_attestation: codex-session` matches on the model Codex's session log records rather than the reviewer's self-report; and a mismatched model or target, a missing header, a non-zero exit, a timeout, a failed process cleanup or any change outside the declared `review_scratch` directories to the private clone's `HEAD`, refs, index entries, status, file contents or ignored-file list, or to the owning worktree's `HEAD`, branch ref, index entries, status, file contents or ignored-file list, leaves the review pending, while another session's push to the shared refs during the review does not with no Review Log row.
+VERDICT: not verified
+EVIDENCE: At 8d4bc689, route fixtures passed, but five process cleanup checks were skipped. I did not rerun the real Claude Code and Codex route pair or observe its record storage.
+
+CRITERION: AC-03 Every SDD operation reads the declared project procedure and instruction files, and a spec review flags a document that contradicts a declared instruction file or lens.
+VERDICT: not verified
+EVIDENCE: At 8d4bc689, lens and context fixtures passed. I did not execute every SDD operation or the real reviewer contradiction and compliant-control runs.
+
+CRITERION: AC-04 Implement and ship run each declared verification rung whose path condition holds over the whole feature delta, or that is declared always, and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
+VERDICT: not met
+EVIDENCE: At 8d4bc689, the targeted suite and T59 passed, but a disposable committed rename from backend/app.go to docs/internal/app.md made cli.ts rungs --run true report only the destination, applicable [], and advance true despite a declared failing backend/** rung.
+
+CRITERION: AC-05 With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, a feature whose actual merge commit carries the skip marker and touches only skip-eligible paths is reported delivered with no publication path and no watch run, every unmarked merge commit runs the watch, and a watch that fails only because no workflow ran leaves the feature reported blocked, not delivered.
+VERDICT: not met
+EVIDENCE: At 8d4bc689, delivery fixtures passed, but a disposable marked merge renaming backend/app.go to docs/internal/app.md returned delivered true with reason no publication path and never invoked the declared failing watch. The merge removed a non-eligible backend source path.
+
+CRITERION: AC-06 Feature-document lint accepts `covers` entries containing `**`, they match the same paths as the docs-impact matcher, and under such an entry a committed change makes the applicable review stale while an uncommitted change makes `feature_tree_clean` false, as for a plain entry.
+VERDICT: met
+EVIDENCE: At 8d4bc689, go test ./internal/doc/ ./internal/fresh/ and the Bun covers-parity checks passed. They establish double-star lint acceptance, matcher parity, committed review staleness and dirty feature-tree detection.
+
+CRITERION: AC-07 With `findings_document: always`, investigate writes its findings document, or extends the existing analysis document that already covers the case without creating a second one, never leaves an issue holding the only copy of its findings, reports any duplicate analysis document or open issue it found, and ends with one of the three verdicts.
+VERDICT: not verified
+EVIDENCE: At 8d4bc689, findings-plan and verdict fixtures passed. An actual investigation writing or extending its findings document was not observed in this review.
+
+CRITERION: AC-08 Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` and the matching plain-language requests through `AGENTS.md` run the installed vh-adlc operations with Stackweaver's settings for every enrolled spec and, until the native agents retire, the native agents for every unenrolled one (after retirement, AC-17's refusal applies to terminal unenrolled documents), new specs are written enrolled, and every row of the committed parity map passes its contract test.
+VERDICT: not verified
+EVIDENCE: Against 8d4bc689 and Stackweaver 83c06b5a, all 169 adoption checks passed. The full slash-command and plain-language matrix through installed operations and native completion was not executed.
+
+CRITERION: AC-09 Every Stackweaver spec in the migration set (the draft specs, plus each planned, in-progress or parked spec the owner moved) passes `vh-adlc lint`, its gate results agree with a manual reading of the document, and each moved spec that was planned or in progress carries a fresh review and an owner acceptance row at its converted baseline.
+VERDICT: met
+EVIDENCE: Built the runtime from 8d4bc689 into /tmp and ran lint and gate planned on all 14 migrated drafts at Stackweaver 83c06b5a. Every lint passed; each failing gate matched the independently inspected open questions and absence of review and acceptance. No planned or in-progress document is in this migration set.
+
+CRITERION: AC-10 Stackweaver's local behaviors stay available with unchanged invocation: worktree slots, direct-to-main non-feature shipping through its own `/ship`, `[skip ci]` rules, `watch-merge.sh`, the triad and satellite lenses, the browser-pass summary table, and `/implement` handing straight to ship.
+VERDICT: met
+EVIDENCE: At Stackweaver 83c06b5a, all 169 adoption checks passed; slot and worktree entry points returned usage and watch-merge.sh --help exited 0. Their blobs are unchanged from d86067ea. Inspection confirmed native non-feature ship, skip rules, lenses, browser table and the standing implement-to-ship grant remain.
+
+CRITERION: AC-11 A disposable Stackweaver checkout rolls back to the native loop and reapplies the adoption, with the docs index and unrelated workflow files byte-identical afterwards.
+VERDICT: met
+EVIDENCE: Executed tests/agent-loop/rehearse.sh at Stackweaver 83c06b5a. All 15 adoption commits rolled back across 63 paths and reapplied to identical tree ba63d0f2f7827d71183a9542c4eded21fb2a91b9. The docs index and unrelated files retained digest e9349ee04972df8a throughout.
+
+CRITERION: AC-12 On the feature branch, a GoReleaser snapshot build produces all four runtime archives, the plugin's `knowledge.md` pin names the merged vhco-pro/docs revision, and a candidate plugin installed from the branch in an isolated profile runs every adapted Stackweaver command through its entry points.
+VERDICT: not verified
+EVIDENCE: Inspected release configuration, knowledge.md and t51-install.md. Neither the four-archive snapshot nor every adapted command through a branch-installed isolated profile was executed in this review.
+
+CRITERION: AC-13 Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on a branch this session created or was handed over, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops before writing anything, and when the push is rejected it keeps the local claim commit, creates no feature branch and reports the claim pending.
+VERDICT: met
+EVIDENCE: At 8d4bc689, claim.test.ts and the CLI claim fixture passed: detached and owned tip branches claim successfully; unrelated branches, stray tracked changes and stale tips are preserved on refusal; rejected pushes retain the local claim commit without creating a feature branch.
+
+CRITERION: AC-14 A Stackweaver feature taken through the adopted loop passes its completion gate in its owning worktree before merge, and after it lands by merge commit every commit its Review Log names is reachable from `main`.
+VERDICT: not verified
+EVIDENCE: Inspected the retained claim-to-merge evidence at Stackweaver 83c06b5a. I did not execute that adopted feature flow or observe its pre-merge completion gate and post-merge reachability checks.
+
+CRITERION: AC-15 With `skip_ci_paths` declared and a resolved delivery convention that supports it, a feature delivery whose commit, push range and PR diff touch only feature documents, Markdown onboarding files or declared paths carries the skip marker, and any other change in the delivery leaves it off; when the resolved convention does not support it, the marker follows the documentation-only rule and the report says the setting was ignored and why.
+VERDICT: not met
+EVIDENCE: At 8d4bc689, delivery fixtures passed, but cli.ts skip returned marker true for a disposable outgoing rename from backend/app.go to the declared skip-eligible docs/internal/app.md. Both diffPaths and rangePaths omit the non-eligible rename source.
+
+CRITERION: AC-16 In Stackweaver, `/spec review` never moves an enrolled spec to `planned` without an owner acceptance row, and `/spec` and `/investigate` create no issue without an explicit request or accepted scope.
+VERDICT: met
+EVIDENCE: At 8d4bc689, go test ./internal/gate/ passed, including planned-gate refusal when owner acceptance is removed. Stackweaver acceptance and issue contract checks passed at 83c06b5a; inspection confirmed enrolled review requires the gate and issue filing requires explicit request or acceptance.
+
+CRITERION: AC-17 Stackweaver's native spec, tasks, implement and reviewer agent files stay routable while any non-terminal spec, domain-extension plans included, is unenrolled, are retired only after none is, and after retirement an adapted command given a terminal unenrolled document refuses without running anything.
+VERDICT: not verified
+EVIDENCE: At Stackweaver 83c06b5a, retirement checks passed and native agents remain available, including for domain-extension plans. Actual command and plain-language refusal after simulated retirement was not executed.
+
+CRITERION: AC-18 With `implement_worktree: isolated`, implement started in the primary worktree continues in a host-created isolated worktree, or stops before writing on a host without a worktree tool, and the primary worktree's branch, `HEAD`, index and files are unchanged afterwards; without the setting, behavior is unchanged.
+VERDICT: not verified
+EVIDENCE: At 8d4bc689, isolation fixtures passed for enabled, disabled and unavailable-host-tool cases. A real Claude Code handoff from the primary checkout to a host-created worktree was not executed.
+
+CRITERION: AC-19 The settings reference, the operation reports and Stackweaver's adapters and project procedure use each glossary term with the meaning the Glossary gives it, and introduce no other name for those concepts.
+VERDICT: met
+EVIDENCE: At 8d4bc689, glossary checks passed. Inspection of the settings reference, operation outputs, Stackweaver adapters and project procedure at 83c06b5a found consistent meanings for the glossary concepts.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: plugins/vh-adlc/scripts/loop/git-paths.ts:29-35; AC-04, AC-05 and AC-15
+EVIDENCE: At 8d4bc689, Git classified a disposable backend/app.go to docs/internal/app.md move as R100. cli.ts rungs returned applicable [] and advance true despite a failing backend/** rung; cli.ts skip returned marker true. After a marked merge of that rename, cli.ts delivery returned delivered true with reason no publication path without invoking its failing watch. The name-only diff and log helpers return only the rename destination.
+PROPOSAL: Include both rename endpoints in committed diffs and outgoing history, for example by disabling rename detection in both helpers. Add command-level rename fixtures covering rung selection, skip eligibility and post-merge watch execution.
 
 ## Sources
 
