@@ -81,8 +81,10 @@ export function snapshot(root: string, scratch: string[]): Record<string, string
     if (path.endsWith("/")) for (const entry of treeManifest(root, path, scratch)) contents.push(`ignored-tree\t${entry}`);
     else contents.push(`${path}\t${fileDigest(root, path)}`);
   }
+  const symbolic = Bun.spawnSync(["git", "symbolic-ref", "-q", "HEAD"], { cwd: root, stdout: "pipe", stderr: "pipe", env: { ...process.env, ...QUIET_GIT } });
   return {
     head: git(root, ["rev-parse", "HEAD"]).toString().trim(),
+    head_ref: symbolic.exitCode === 0 ? symbolic.stdout.toString().trim() : "detached",
     refs: digest(git(root, ["for-each-ref", "--format=%(refname) %(objectname)"])),
     index: digest(index.join("\n")),
     status: digest(status.join("\n")),
