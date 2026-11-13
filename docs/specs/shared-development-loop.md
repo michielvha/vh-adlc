@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-10 had no blocking findings; its three should-fix items are applied at the owner's direction. Waiting for a final confirming review, then owner acceptance."
+status_description: "R-11 findings applied at the owner's direction; waiting for review R-12, then owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
@@ -105,7 +105,9 @@ unsafe, so an unmarked merge now always runs the watch, verification rungs trigg
 feature PRs land by merge commit only when rungs or a watch are declared. R-9 found nothing blocking;
 every E2E spec a Test Plan names now runs in kind whatever changed. R-10 found nothing blocking either;
 the live slot pass, the final full kind run and skipped subchecks inside `make verify` are now binding,
-and a Glossary holds the new terms. A final confirming review pass is next, then acceptance. Accepting this
+and a Glossary holds the new terms. R-11 found that a file-only review read the live worktree; it now
+reads an export of the exact commit, plain-language requests route like the slash commands, and
+`skip_ci_paths` yields to a consumer's own pin. Review R-12 is next, then acceptance. Accepting this
 document authorizes implementation of the accepted scope on a feature branch. Publishing the vh-adlc
 release, merging either repository and retiring the native agents each still need their own approval.
 
@@ -269,7 +271,11 @@ the path of the same text for a CLI that reads files. The reply opens with `MODE
 reviewer received the dispatch identity, and strips both header lines before storing the records. A
 command that is not given a read-only tool restriction is recorded with `procedural` isolation.
 
-A spec review reads only, so its route may stay file-only. An implementation review must observe the
+A spec review reads only, so its route may stay file-only. It does not read the live worktree: the
+operation exports the target commit with `git archive <commit>` into a fresh read-only directory and
+points the reviewer there, so uncommitted edits, to instruction files or anything else, cannot shape a
+review recorded against that commit. Any other repository the review needs is exported the same way at
+a named commit. An implementation review must observe the
 checks it relies on, because the standard counts only executed evidence the review saw as `met`, so its
 route has shell access. Before dispatch the operation records `HEAD`, the index tree (`git write-tree`),
 every ref (`git for-each-ref`), `git status --porcelain --untracked-files=all`, the list of ignored files (`git ls-files --others --ignored --exclude-standard`), a content
@@ -394,7 +400,11 @@ files or declared paths; any other change still runs normal CI. Stackweaver decl
 (`agents/`, `.claude/`, `.githooks/`, dev-only `scripts/`, `CLAUDE.md`), and never code, `deploy/`,
 workflows, dependency manifests or public `docs/`. The pinned delivery convention forbids this today
 (`conventions/delivery.md:90-94`), so the shared change starts with a revision of that page in
-vhco-pro/docs and a plugin pin bump.
+vhco-pro/docs and a plugin pin bump. A repository's own docs pin takes precedence over the plugin's
+(`pin()` at `internal/knowledge/knowledge.go:159`), so `skip_ci_paths` takes effect only when the resolved
+delivery convention supports it. Otherwise ship applies the convention's documentation-only rule,
+reports that the setting was ignored, and names the pin update that would enable it. Stackweaver has no
+docs pin of its own, so it follows the plugin pin.
 
 ### Investigation defaults
 
@@ -453,7 +463,10 @@ Delivery ends once all four steps have succeeded.
 
 ### Stackweaver adoption
 
-Stackweaver's adapters forward each command to the installed operation with `loop.yaml`, keep the
+Stackweaver's adapters forward each command to the installed operation with `loop.yaml`, and
+Stackweaver's `AGENTS.md`, which today sends plain-language loop requests straight to `agents/spec.md`,
+`tasks.md`, `implement.md` and `ship.md` (`AGENTS.md:29-34`), routes them through the same
+enrollment-aware dispatch as the slash commands. The adapters also keep the
 `model:` frontmatter that settings require, and keep the arguments users type today. A new
 `agents/loop-project.md` holds the local rules: worktree slots, the verification ladder, the
 direct-to-main policy and `[skip ci]` rules for non-feature work, satellite rules, `lessons.md`
@@ -501,20 +514,20 @@ published plugin is installed from the marketplace and exercised, and a rollback
 ## Acceptance Criteria
 
 - [ ] AC-01: A repository's `.vh-adlc/loop.yaml` names a route for each loop role, every SDD operation dispatches according to it, a `command` route is accepted only for the two reviewer roles, no vh-adlc agent or skill file names a model, and a repository without the file behaves as it does at `a7bfca99`.
-- [ ] AC-02: From a Claude Code session, a file-only spec review and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`; and a mismatched model or target, a missing header, a non-zero exit, a timeout or any change outside the declared `review_scratch` directories to the worktree's `HEAD`, index entries, refs, status, file contents or ignored-file list leaves the review pending with no Review Log row.
+- [ ] AC-02: From a Claude Code session, a file-only spec review that reads only a read-only export of the target commit and a shell-enabled implementation review run through declared command routes on `gpt-6.1-sol` against an exact commit; the implementation review can return `met` from checks it ran; a matching reply with the dispatched `TARGET` is stored verbatim and passes `review check`; and a mismatched model or target, a missing header, a non-zero exit, a timeout or any change outside the declared `review_scratch` directories to the worktree's `HEAD`, index entries, refs, status, file contents or ignored-file list leaves the review pending with no Review Log row.
 - [ ] AC-03: Every SDD operation reads the declared project procedure and instruction files, and a spec review flags a document that contradicts a declared instruction file or lens.
 - [ ] AC-04: Implement and ship run each declared verification rung whose path condition holds over the whole feature delta, or that is declared always, and report every rung as passed, failed or not run with a reason; a failed rung, or one that could not run without the owner allowing it for that run, means the feature branch is not pushed and the feature is not complete or delivered; with no rungs declared they keep the current command lookup.
 - [ ] AC-05: With `ci_trigger: manual`, ship reports CI as not triggered by policy and dispatches nothing; with a `post_merge_watch` declared, a feature whose merge can publish is reported delivered only after that command exits 0, a feature whose actual merge commit carries the skip marker and touches only skip-eligible paths is reported delivered with no publication path and no watch run, every unmarked merge commit runs the watch, and a watch that fails only because no workflow ran leaves the feature reported blocked, not delivered.
 - [ ] AC-06: Feature-document lint accepts `covers` entries containing `**`, they match the same paths as the docs-impact matcher, and under such an entry a committed change makes the applicable review stale while an uncommitted change makes `feature_tree_clean` false, as for a plain entry.
 - [ ] AC-07: With `findings_document: always`, investigate writes its findings document, reports any duplicate analysis document or open issue it found, and ends with one of the three verdicts.
-- [ ] AC-08: Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` run the installed vh-adlc operations with Stackweaver's settings for every enrolled spec and, until the native agents retire, the native agents for every unenrolled one (after retirement, AC-17's refusal applies to terminal unenrolled documents), new specs are written enrolled, and every row of the committed parity map passes its contract test.
+- [ ] AC-08: Stackweaver's `/spec`, `/spec review`, `/tasks`, `/implement`, `/ship` for features and `/investigate` and the matching plain-language requests through `AGENTS.md` run the installed vh-adlc operations with Stackweaver's settings for every enrolled spec and, until the native agents retire, the native agents for every unenrolled one (after retirement, AC-17's refusal applies to terminal unenrolled documents), new specs are written enrolled, and every row of the committed parity map passes its contract test.
 - [ ] AC-09: Every Stackweaver spec in the migration set (the draft specs, plus each planned, in-progress or parked spec the owner moved) passes `vh-adlc lint`, its gate results agree with a manual reading of the document, and each moved spec that was planned or in progress carries a fresh review and an owner acceptance row at its converted baseline.
 - [ ] AC-10: Stackweaver's local behaviors stay available with unchanged invocation: worktree slots, direct-to-main non-feature shipping through its own `/ship`, `[skip ci]` rules, `watch-merge.sh`, the triad and satellite lenses, the browser-pass summary table, and `/implement` handing straight to ship.
 - [ ] AC-11: A disposable Stackweaver checkout rolls back to the native loop and reapplies the adoption, with the docs index and unrelated workflow files byte-identical afterwards.
 - [ ] AC-12: On the feature branch, a GoReleaser snapshot build produces all four runtime archives, the plugin's `knowledge.md` pin names the merged vhco-pro/docs revision, and a candidate plugin installed from the branch in an isolated profile runs every adapted Stackweaver command through its entry points.
 - [ ] AC-13: Implement claims a planned feature from a clean worktree whose `HEAD` is the fetched default branch tip, detached or on another branch name, pushes the claim to the default branch and continues in that worktree on the feature branch; with stray changes or a stale tip it stops before writing anything, and when the push is rejected it keeps the local claim commit, creates no feature branch and reports the claim pending.
 - [ ] AC-14: A Stackweaver feature taken through the adopted loop passes its completion gate in its owning worktree before merge, and after it lands by merge commit every commit its Review Log names is reachable from `main`.
-- [ ] AC-15: With `skip_ci_paths` declared, a feature delivery whose commit, push range and PR diff touch only feature documents, Markdown onboarding files or declared paths carries the skip marker, and any other change in the delivery leaves it off.
+- [ ] AC-15: With `skip_ci_paths` declared and a resolved delivery convention that supports it, a feature delivery whose commit, push range and PR diff touch only feature documents, Markdown onboarding files or declared paths carries the skip marker, and any other change in the delivery leaves it off; when the resolved convention does not support it, the marker follows the documentation-only rule and the report says the setting was ignored and why.
 - [ ] AC-16: In Stackweaver, `/spec review` never moves an enrolled spec to `planned` without an owner acceptance row, and `/spec` and `/investigate` create no issue without an explicit request or accepted scope.
 - [ ] AC-17: Stackweaver's native spec, tasks, implement and reviewer agent files stay routable while any non-terminal spec, domain-extension plans included, is unenrolled, are retired only after none is, and after retirement an adapted command given a terminal unenrolled document refuses without running anything.
 - [ ] AC-18: With `implement_worktree: isolated`, implement started in the primary worktree continues in a host-created isolated worktree, or stops before writing on a host without a worktree tool, and the primary worktree's branch, `HEAD`, index and files are unchanged afterwards; without the setting, behavior is unchanged.
@@ -525,22 +538,22 @@ published plugin is installed from the marketplace and exercised, and a rollback
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | `bun test tests/vh-adlc` cases for each supported role and route pair, refusal of a `command` route for `author` and `implementer`, resume taking the continued operation's route, a no-file case compared with `a7bfca99` behavior, and a grep test that fails on a model name in any agent or skill file. |
-| AC-02 | A fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, one that creates or moves a non-current branch or tag, one that overwrites an existing ignored configuration file, one that creates a new ignored file outside `review_scratch`, one that overwrites a tracked file already flagged assume-unchanged without changing the flag, one that writes only inside `review_scratch` (stored), and one that changes an index flag without changing the index tree; then one real Copilot CLI `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
+| AC-02 | A fixture where an uncommitted edit to an instruction file in the worktree contradicts the committed spec, and the file-only review must still see only the committed content (the export, not the worktree); a fixture repository with a stub command that returns a matching reply, a wrong model, a wrong `TARGET`, no header, exit 1, a hang, one that touches a clean file, one that rewrites an already modified or untracked file without changing its status line, one that creates or moves a non-current branch or tag, one that overwrites an existing ignored configuration file, one that creates a new ignored file outside `review_scratch`, one that overwrites a tracked file already flagged assume-unchanged without changing the flag, one that writes only inside `review_scratch` (stored), and one that changes an index flag without changing the index tree; then one real Copilot CLI `gpt-6.1-sol` spec review and one implementation review on a disposable feature where the reviewer runs the tests and returns `met`, with transcripts and the stored records kept as evidence. |
 | AC-03 | Fixture specs that break a declared instruction and a declared lens; the reviewer must return a finding for each and none for a compliant control. |
 | AC-04 | Fixture changes that match some rungs and not others; a feature whose first commit changes `backend/` and whose last changes only documentation must still require the integration rung before push and completion; a pass recorded on an earlier commit must not count for a later one; after a merge, the delivery check over the merge commit against its first parent must still require the `backend/` rung once the default branch contains the feature; with rungs declared, a fast-forward landing of a feature whose earlier commit changed `backend/` must be refused; in Stackweaver, a backend-only feature whose Test Plan names an unchanged E2E spec must not push or complete until that spec has passed in the kind harness, a runtime change must not advance without its live slot pass, targeted kind reruns must not stand in for the final full run, and a `make verify` run that exits 0 with a skipped mandatory subcheck must stop advancement unless the owner allowance names that subcheck; the report must list every rung with the right state; a failing command must leave no push, no completion commit and no delivered report even when an owner allowance is recorded; an unavailable procedure must do the same unless the owner allowance is recorded for that exact rung, and with it must proceed; a no-rung fixture must keep the current lookup. |
 | AC-05 | Ship fixtures with `ci_trigger: manual` (no dispatch call made, state reported), a watch stub that exits 1 then 0 (delivered only after 0), a skip-eligible feature merged with a marked merge commit (delivered with no publication path, watch never invoked), the same feature merged with an unmarked merge commit (watch invoked); a watch stub that fails because no workflow ran (reported blocked, never delivered); and a run that appears only after a delay (watch waits, no early verdict). |
 | AC-06 | Go tests in `internal/doc` for `**` at start, middle and end, compared with the docs-impact matcher on the same inputs; `internal/fresh` tests where a commit under a `**` entry makes the review stale, and separately a dirty file under it makes `feature_tree_clean` false without staling the review; the existing lint suite unchanged. |
 | AC-07 | Investigate fixtures with and without a duplicate analysis document and a duplicate open issue; the run must write the document and name the duplicate and the verdict. |
-| AC-08 | Stackweaver parity contract tests; one real run of each adapted command on a disposable enrolled feature, checking the operation reached and the settings read; and, before retirement, the same commands on a disposable unenrolled spec, which must reach the native agents through a native re-review and completion. Post-retirement refusal is tested under AC-17. |
+| AC-08 | Stackweaver parity contract tests; one real run of each adapted command on a disposable enrolled feature, checking the operation reached and the settings read; and, before retirement, the same commands on a disposable unenrolled spec, which must reach the native agents through a native re-review and completion; each case repeated as a plain-language request routed through `AGENTS.md`. Post-retirement refusal is tested under AC-17. |
 | AC-09 | `vh-adlc lint` and `vh-adlc gate` over the migration set, a manual reading of every migrated spec that records the expected and observed result of each gate condition at its converted baseline, and for each moved planned or in-progress spec an inspection of its Review Log for a post-conversion review and acceptance row. |
 | AC-10 | A scripted check that each listed local behavior's entry point still exists and runs in dry-run or help mode, and a review of `agents/loop-project.md` against the parity map. |
 | AC-11 | The rollback and reapply procedure on a disposable checkout, comparing file hashes before and after. |
 | AC-12 | `goreleaser release --snapshot --clean` at the feature head listing four archives; the `knowledge.md` pin compared with the merged vhco-pro/docs commit; an isolated Claude Code profile with the candidate plugin installed from the branch and the candidate binary, running each adapted command on a disposable Stackweaver checkout. The post-merge Order steps are recorded in `status_description`, not here. |
 | AC-13 | Fixture repositories with a detached worktree at the tip and a worktree on another branch at the tip (both claim); one behind the tip and one with a stray change (both leave the repository byte-identical); and a rejected push (one local claim commit, no feature branch, a pending report). |
 | AC-14 | One disposable Stackweaver feature taken from claim to merge: `vh-adlc gate complete` passes in the owning worktree before the PR merges, then `git merge-base --is-ancestor <commit> origin/main` holds for every Review Log commit after a merge-commit landing. |
-| AC-15 | Ship fixtures whose delivery touches only declared paths, declared paths plus code, and declared paths with an earlier code commit in the push range; only the first carries the marker. |
+| AC-15 | Ship fixtures whose delivery touches only declared paths, declared paths plus code, and declared paths with an earlier code commit in the push range; only the first carries the marker. A fixture whose repository pin names a delivery convention without skip paths: the declared-path delivery gets no marker and the report names the ignored setting and the pin update. |
 | AC-16 | Stackweaver parity contract tests for the acceptance and issue rules, plus a disposable spec review run that ends with the spec still `draft` until an acceptance row exists. |
-| AC-17 | A scripted check over `docs/internal/plans/` that lists every non-terminal unenrolled spec, domain-extension plans included; while the list is non-empty the native command routes must resolve and the retirement commit is refused; after retirement, each adapted command given a terminal unenrolled document must refuse with no write. |
+| AC-17 | A scripted check over `docs/internal/plans/` that lists every non-terminal unenrolled spec, domain-extension plans included; while the list is non-empty the native command routes must resolve and the retirement commit is refused; after retirement, each adapted command and its plain-language form given a terminal unenrolled document must refuse with no write. |
 | AC-18 | Fixtures with the setting on and off; a Claude Code run of the adopted Stackweaver `/implement` started on a clean main checkout, comparing that checkout's branch, `HEAD`, `git write-tree` and file hashes before and after while the feature proceeds in the host worktree; a host without a worktree tool must stop before any write. |
 | AC-19 | A test that greps the plugin's settings reference, report templates and Stackweaver's adapters and project procedure for each glossary term and a list of rejected synonyms, plus a reviewer read of those files against the Glossary. |
 
@@ -553,7 +566,7 @@ None yet; written once the document is planned.
 None. The owner answered Q1 to Q10, the three R-1 judgement findings (F-01, F-03, F-07) and the
 three R-2 judgement findings (F-02, F-03, F-04) the two R-3 judgement findings (F-01, F-04) the three
 R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, F-02) the R-6 judgement finding (F-01), the R-7 findings F-02 and F-03, the R-8 judgement findings
-(F-01, F-03) the R-9 judgement finding (F-01) and the R-10 findings on 2026-11-13; the answers are folded into Owner summary, Scope and Design.
+(F-01, F-03) the R-9 judgement finding (F-01), the R-10 findings and the R-11 findings on 2026-11-13; the answers are folded into Owner summary, Scope and Design.
 
 ## Review Log
 
