@@ -428,6 +428,7 @@ None.
 | 2026-11-12 | R-40 | spec | `d2726cca4b69656f5b3ecc7666d191087a8f54ad` | unknown | procedural | No findings. |
 | 2026-11-12 | R-40 | spec | `d2726cca4b69656f5b3ecc7666d191087a8f54ad` | n/a | n/a | accepted by owner |
 | 2026-11-12 | R-41 | implementation | `4ae46e203d4d05d142ce9fa9bae004bc6bdeb01d` | unknown | procedural | One blocking factual finding (remote snippet calls have no deadline, so a Windows PowerShell bootstrap that never sees end of input hangs the command) and one should-fix factual finding (AC-12 has no residual line); AC-16 not met, AC-12 not verified, the rest met. |
+| 2026-11-13 | R-42 | spec | `09a17a644226f28d9db73d707142b302f9d25cac` | unknown | procedural | Four factual findings (the quit and wait deadline leaves out the force-stop wait, no open tasks, drift from main, warnings arrive as CLIXML) and two judgement findings (deadlines only on desktop app calls, timeout tests during a rollback); none blocking; model identity not attested. |
 
 ### R-1
 
@@ -2001,6 +2002,50 @@ SEVERITY: should-fix
 WHERE: docs/specs/paseo-hosts.md, AC-12 (line 247) and its Evidence/Residual block
 EVIDENCE: `vh-adlc gate complete docs/specs/paseo-hosts.md --repo . --plugin-pin a4e3d59` fails with "AC-12 is not verified without a residual". The document has no `Residual:` line for AC-12, although the Owner summary says it is tracked as issue #77.
 PROPOSAL: Add the AC-12 `Residual:` line naming issue #77, so the gate can accept the not verified criterion.
+
+### R-42
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry, deadline paragraph ("for quit and wait its quit wait of 0 or 20 seconds plus the 120-second installer wait plus 30 seconds"), and AC-18 ("30 seconds after the snippet's own longest wait")
+EVIDENCE: The paragraph says each deadline is 30 seconds longer than the snippet's own longest wait. The quit and wait formula leaves out the snippets' force-stop wait. stop.ps1 lines 49 to 50 wait `Gone 10000` (10 seconds) after Stop-Process. stop.sh lines 35 to 39 run a second `gone` of wait_ms (20 seconds) after pkill. The snippets' longest waits are therefore 20 + 20 + 120 = 160 seconds on macOS with a 20-second quit wait, 10 + 120 = 130 seconds on Windows with no quit wait, and 20 + 10 + 120 = 150 seconds on Windows with a 20-second quit wait. The documented deadlines of 170, 150 and 170 seconds leave margins of about 10, 20 and 20 seconds, not 30. The stop.sh loops also run longer than their nominal time, because each of their wait_ms/100 iterations runs sleep 0.1 plus pgrep, and the installer loop allows about 121 seconds. The margin on macOS is therefore under 10 seconds, and a slow but healthy quit could be killed as a timeout. The formula as written contradicts both the stated rule and AC-18.
+PROPOSAL: Derive the quit and wait deadline from every wait in stop.ps1 and stop.sh, including the force-stop wait: wait + force-stop wait + 120 + 30, where the force-stop wait is 10 seconds on Windows and wait_ms on macOS and Linux. Alternatively, state one fixed deadline per platform that is at least 30 seconds over the measured worst case. Update AC-18 and the Test Plan if the wording changes.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry, deadline paragraph ("Each SSH call that runs a desktop app snippet has a deadline", "the bootstrap above removes the one cause of such hangs seen so far"); AC-18 ("so `link`, `unlink` and `remove` never wait on a hung call past its deadline"); Open Questions
+EVIDENCE: R-41 F-01 saw the hang in the link alias block write: client-ssh.ps1, called from internal/link/link.go line 153, is not a desktop app snippet. R-41 proposed a deadline on every remote snippet call. The revision bounds only desktop app snippet calls. The other client calls still run through remote.run (remote.go lines 85 to 115), which uses exec.CommandContext with no deadline. These are the link probe (link.go lines 198 and 214), the key call (line 136), the alias block write (line 153), the tunnel check in link (line 166), and the unblock and client-pub calls in remove (remove.go lines 264 and 339). A hang in any of them still blocks `link` or `remove` with no end. AC-18's closing clause reads as a promise for the whole command, but it holds only for the desktop app calls. Scoping the deadlines this way, and relying on the bootstrap fix alone for the other calls, is a trade-off the document settles without an Open Question.
+PROPOSAL: Give every SSH call to a client a deadline, and state per call or per class what it fails as. Otherwise, add an Open Question that records the choice to bound only desktop app calls, and reword AC-18's closing clause so it promises only what those calls get.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks (T1 to T44 are all ticked); Owner summary, Acceptance paragraph ("Acceptance authorizes the new tasks"); Test Plan, manual procedure and the implementation reviewer paragraph
+EVIDENCE: The Owner summary says acceptance authorizes new tasks, but the Tasks section has no unchecked task for the bootstrap swap, the per-call deadlines, the stand-in bootstrap change or AC-18. In the previous revision, T39 to T44 were in the document before the spec review that accepted it at d2726cc. Without open tasks, after acceptance the binary's next step goes from implement straight to review, with no failing-test-first task for the new behaviour. The AC-18 Test Plan row has a live check, piping a snippet to `ssh win-main <bootstrap>` 10 seconds after the session starts. That check is not a numbered manual step, and the paragraph that lists which manual steps the implementation reviewer runs does not name it, so the document does not say who runs it.
+PROPOSAL: Add unchecked one-commit tasks with failing-test-first wording. They should cover the remote deadline test and implementation, the clientapp timeout cases (launch timeout as a failed attempt, step 2 stop timeout), the stand-in bootstrap change, the bootstrap constant swap in remote.go and testenv.go, and the live win-main late-input check. Also make the live check a numbered manual step, or name who runs it.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Branch feat/paseo-hosts at 09a17a6 compared with origin/main; covered paths .github/workflows/ci.yml, CONTRIBUTING.md and docs/reference/marketplace.md
+EVIDENCE: `vh-adlc fresh` reports covered-path drift for .github/workflows/ci.yml, CONTRIBUTING.md and docs/reference/marketplace.md. These files changed on origin/main after merge-base 55e7771. `git merge-tree --write-tree 09a17a6 origin/main` reports conflicts in CONTRIBUTING.md and docs/reference/marketplace.md. Any review recorded at 09a17a6 will be stale against main once those changes are counted, and the branch cannot merge cleanly as it is.
+PROPOSAL: Merge origin/main into feat/paseo-hosts and resolve the conflicts. Then run the spec review that acceptance relies on at the merged commit.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Plugin layout, Windows bootstrap description ("writes a caught error as one plain line")
+EVIDENCE: Measured on win-main (Windows PowerShell 5.1) and with pwsh 7.6.9 locally: with the new `-EncodedCommand` bootstrap, a thrown error comes back as one plain stderr line with exit 1, as the paragraph says. `Write-Warning` output, however, now comes back on stderr as a `#< CLIXML` block. With the old bootstrap it came back on stdout as `WARNING: careful`. No plugin snippet calls Write-Warning, but a cmdlet that a snippet calls can write warnings. Those would then reach the CLI's lastLine(stderr) as CLIXML in a failure message. The paragraph says nothing about non-error streams.
+PROPOSAL: Have the script silence or redirect the warning and information streams (for example, set `$WarningPreference` or redirect them to stdout), or state in the Design that warnings arrive as CLIXML on stderr and the CLI ignores them.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan, AC-18 row; Design deadline paragraph ("during a rollback or after a lost window it ends as an unconfirmed rollback does", "the error names the step")
+EVIDENCE: The AC-18 row tests two timeouts: a launch timeout on the first debug launch attempt, and a step 2 stop timeout. It does not test a timeout during a rollback or after a lost window, which the Design says must end as an unconfirmed rollback. It also does not assert that the error names the step. AC-18 and the Design require both.
+PROPOSAL: Add a clientapp case where a call during rollback, or after a lost window, never returns. It should assert the unconfirmed-rollback outcome. Every timeout case should also assert that the message names the step.
 
 ## Sources
 
