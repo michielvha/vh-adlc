@@ -88,7 +88,7 @@ Persistent cookies and site storage carry over. The previous session's tabs and 
 
 ### Stop sends no keys
 
-On stop or expiry remote-gui sends no key to the browser. It sends SIGTERM to Chromium, SIGKILL after two seconds if Chromium is still running, and then stops the display. A cookie written up to about half a minute before the stop may be lost, so wait about half a minute after signing in before you stop the session. The session's downloads, X authority and viewer access are still deleted, and its stopped record remains. A handoff still closes Chromium through its own Exit menu.
+On stop or expiry remote-gui sends no key to the browser. It sends SIGTERM to Chromium, SIGKILL after two seconds if Chromium is still running, and then stops the display. A cookie written up to about half a minute before the stop may be lost, so wait about half a minute after signing in before you stop the session. On a heavily loaded host, with a load average of 4 or more, even a cookie written 30 seconds before the stop can be lost, so persistence there is best effort. The session's downloads, X authority and viewer access are still deleted, and its stopped record remains. A handoff still closes Chromium through its own Exit menu.
 
 ### Lock recovery
 
