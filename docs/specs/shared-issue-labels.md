@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-1 applied and the owner answered Q7 to Q10; waits for a new spec review."
+status_description: "R-2 applied, including the owner's answer on spec mappings; waits for a new spec review."
 issue: null
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
 covers:
@@ -21,6 +21,8 @@ covers:
   - tests/vh-adlc/triage/execution.test.ts
   - tests/vh-adlc/triage/settings.test.ts
   - tests/vh-adlc/settings-file.test.ts
+  - plugins/vh-adlc/plugin.json
+  - plugins/vh-adlc/.claude-plugin/plugin.json
 ---
 
 # Plan: Shared issue labels
@@ -49,7 +51,9 @@ This feature adds a standard label set to the plugin: type labels (`bug`, `enhan
 description. A new helper compares a repository's labels with the set and shows a plan. Once you
 approve its exact digest, it creates the missing labels and corrects colors and descriptions. It
 never deletes or renames a label and never touches labels the standard does not own, such as the
-ones Dependabot and Renovate create. Investigate gives every issue it files one type label and the
+ones Dependabot and Renovate create. The one exception is a label you name as a mapping target in
+`label_map`: mapping a standard label onto it makes it managed, so the plan shows and apply makes the
+standard color and description on it. Investigate gives every issue it files one type label and the
 state label its verdict names. Spec gives the issues it files a type label only, because the feature
 document carries their state. Triage keeps its existing rule: a state label it applies is
 a verdict and needs proof from the confined controller.
@@ -73,8 +77,12 @@ Triage's neutral request issues stay unlabeled. Investigate's act now gives `rea
 `blocked` when a prerequisite is named and `needs-decision` otherwise; a rejected case filed on
 request gets a type label only.
 
-Every check named here is planned; nothing has run yet. A new independent review must clear R-1's
-blocking findings before you can accept. Accepting this document authorizes building it on a feature
+R-2 found one blocking and two should-fix issues. The spec now says plainly that a `label_map` target
+you name becomes managed even if a bot created it, it names the plugin package and a candidate install
+check, and, at your choice, spec also files with mapped names.
+
+Every check named here is planned; nothing has run yet. A new independent review must clear R-2's
+blocking finding before you can accept. Accepting this document authorizes building it on a feature
 branch after #78 merges. Running the helper's apply against any real repository still needs your
 approval of that exact plan.
 
@@ -150,7 +158,8 @@ Out of scope:
 
 - Removing or renaming any existing label, or removing a label from an issue.
 - Labels owned by bots (Dependabot's `dependencies`, `go`, `javascript`, `python:uv`; Renovate's
-  `major-upgrade`). They stay as their tools create them.
+  `major-upgrade`). They stay as their tools create them unless the owner names one as a `label_map`
+  target, which makes it managed (owner, Q8).
 - Priority labels. Priority stays in plan frontmatter and milestones, as the legacy agent decided.
 - Relabeling existing unlabeled issues. That is triage's work and keeps its controller rule.
 - Running the helper on adopters other than vh-adlc and Stackweaver. Each is a separate request.
@@ -231,7 +240,9 @@ A test fails when the reference table and the vocabulary file disagree.
 - The triage settings reader refuses a map in which two standard labels end up with the same
   effective name, compared case-insensitively, counting unmapped standard labels under their own
   names. `ready: blocked` and `bug: Enhancement` both fail with a fixed reason. Any other target is
-  the owner's explicit choice (owner, Q8).
+  the owner's explicit choice (owner, Q8), including a label a bot created: mapping `bug` onto
+  `dependencies` makes `dependencies` the managed `bug` label, and its plan entry shows the color and
+  description change before approval.
 
 `references/authority.md` gains one row: applying a label plan needs the owner's approval of that
 exact plan digest for that repository.
@@ -262,11 +273,23 @@ exact plan digest for that repository.
 `docs/internal/triage`, and bot authors `renovate[bot]` and `dependabot[bot]`. It must pass
 `vh-adlc settings read`.
 
+### Delivery
+
+The affected artifact is the marketplace Git source package under `plugins/vh-adlc/`, selected by
+`.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json` and declared by
+`plugins/vh-adlc/plugin.json` and `plugins/vh-adlc/.claude-plugin/plugin.json`. The new
+`scripts/labels/` helper, its vocabulary file and `references/issues.md` ship inside that package,
+and both manifests take a minor version bump. The binary and its release workflows are unchanged.
+Before merge, a candidate install of the branch's package into an isolated, credential-free profile
+must contain the helper and vocabulary and run the installed `plan` against the fake GitHub fixture.
+After merge, the feature is delivered once the published Git tree matches the reviewed source. That
+publication check, and any tag or release, keeps its own separate authorization.
+
 ### Order against shared-development-loop
 
 This stays a separate feature (owner, Q6). shared-development-loop's `covers` overlaps this one on
 `plugins/vh-adlc/skills/vh-adlc-investigate/`, `plugins/vh-adlc/skills/vh-adlc-spec/`,
-`plugins/vh-adlc/references/authority.md` and `tests/vh-adlc/`. Two features writing those paths at
+`plugins/vh-adlc/references/authority.md`, `tests/vh-adlc/` and both plugin manifests. Two features writing those paths at
 once would make each other's reviews stale. So:
 
 - Until #78 merges, this feature changes only `docs/specs/shared-issue-labels.md`, which #78 does not
@@ -298,8 +321,9 @@ once would make each other's reviews stale. So:
 - [ ] AC-06: Triage's reference names the standard state labels as the labels its verdicts use, a
       state label applied outside the controller is still denied, and a triage `create-request` issue
       is created with no labels.
-- [ ] AC-07: A `label_map` entry makes the plan, triage and investigate treat the mapped repository
-      label as the standard one, and an entry keyed by a non-standard name changes nothing. A map in
+- [ ] AC-07: A `label_map` entry makes the plan, triage, investigate and spec treat the mapped
+      repository label as the standard one, a mapping onto a label outside the standard set appears in
+      the plan as a managed label with its color and description change, and an entry keyed by a non-standard name changes nothing. A map in
       which two standard labels share an effective name, case-insensitively, is refused when read.
       Stackweaver's current settings file still reads, and the triage settings reference describes
       these rules.
@@ -309,6 +333,9 @@ once would make each other's reviews stale. So:
       the standard color and description, and no issue in either lost a label.
 - [ ] AC-10: The workflows user guide describes the standard label set and the helper, and the
       authority reference has the row for applying a label plan.
+- [ ] AC-11: A plugin installed from the branch's marketplace package, in an isolated profile,
+      contains the labels helper and vocabulary file, both manifests carry the bumped version, and the
+      installed `plan` produces the same label plan as the source helper for the same fixture.
 
 ## Test Plan
 
@@ -319,10 +346,11 @@ once would make each other's reviews stale. So:
 | AC-03 | `tests/vh-adlc/labels/apply.test.ts`: approved apply on the fixture yields the standard set and an unchanged unmanaged set with no delete or rename calls. Negative cases each refuse with an empty write log: an edited plan, another digest, another origin repository, another host, another authenticated actor, an edited vocabulary file, an edited `label_map`, and a fake repository label changed between plan and apply. |
 | AC-04, AC-05 | Lifecycle scenario fixtures in `tests/vh-adlc/lifecycle/` grade investigate runs for act now, track with a named prerequisite, track waiting on a decision and a requested reject, plus a spec run, each filing against the fake tracker. Each passes only when the created issue carries exactly the expected labels and the pre-creation summary showed them; a missing-label case passes only with no issue created and the helper's plan named. |
 | AC-06 | Extend `tests/vh-adlc/triage/execution.test.ts`: a `labels` action with a standard state label outside the controller is denied, and an approved `create-request` reaches the fake tracker with an empty labels array; a reference test checks the state label list against the vocabulary file. |
-| AC-07 | `tests/vh-adlc/triage/settings.test.ts` and `tests/vh-adlc/settings-file.test.ts`: a mapped label is used by plan and by the triage and investigate label payloads; a non-standard key changes nothing; `ready: blocked` and `bug: Enhancement` are refused with the fixed reason; a copy of Stackweaver's `.vh-adlc/triage.yaml` reads. |
+| AC-07 | `tests/vh-adlc/triage/settings.test.ts` and `tests/vh-adlc/settings-file.test.ts`: a mapped label is used by plan and by the triage, investigate and spec label payloads, with a spec filing scenario in `tests/vh-adlc/lifecycle/` where only the mapped type label exists checking both the preview and the created issue; a mapping onto a non-standard label shows as a managed metadata change in the plan; a non-standard key changes nothing; `ready: blocked` and `bug: Enhancement` are refused with the fixed reason; a copy of Stackweaver's `.vh-adlc/triage.yaml` reads. |
 | AC-08 | Run `vh-adlc settings read --stdin < .vh-adlc/triage.yaml` and a report-only `vh-adlc-triage sweep` with `--report-output` outside the checkout; record both outputs. |
 | AC-09 | Owner-approved `apply` on each repository, then `gh label list`. Before and after apply, take a complete snapshot of every open and closed issue and pull request with `gh api --paginate "repos/<owner>/<repo>/issues?state=all&per_page=100"`, keeping number and label names. Compare label sets by number: no number may lose a label. Report any page that failed and any issue updated during the window as incomplete instead of passing. Record the receipts and both snapshots. |
 | AC-10 | `tests/vh-adlc/labels/vocabulary.test.ts` checks that the user guide names the helper and that `references/authority.md` has the label-plan row. |
+| AC-11 | Written procedure: install the branch's package through the local marketplace catalog into a fresh, credential-free Claude Code profile, list the installed files, compare both manifest versions, and run the installed `plan` and the source `plan` against the same fake GitHub fixture; pass when the files exist, the versions match the bump and the two plans are byte-identical. Record the commands and output; no published marketplace is claimed. |
 
 ## Tasks
 
