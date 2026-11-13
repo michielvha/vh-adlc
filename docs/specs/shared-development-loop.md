@@ -526,6 +526,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-5 | spec | `4f970d4d18078e7c3edbc81db9d941fbfb6116a1` | gpt-6.1-sol | procedural | One blocking finding: the release order needs a post-merge lock commit outside the single-feature lifecycle. Two should-fix. |
 | 2026-11-13 | R-6 | spec | `db426cbbe13abd8675d4365ad23903e59b94b7c0` | gpt-6.1-sol | procedural | No blocking findings; four should-fix on freshness wording, signed release verification, covers and assume-unchanged files. |
 | 2026-11-13 | R-7 | spec | `1ae2a34e436fb057e4fe2793a04147143c539af1` | gpt-6.1-sol | procedural | No blocking findings; three should-fix on the moved Stackweaver checkout, merges with no publication workflow, and the post-merge verification range. |
+| 2026-11-13 | R-8 | spec | `5a284fc1c6fac8656cf3494f5e79a0f094dcc5dd` | gpt-6.1-sol | procedural | One blocking finding: an empty workflow-run query right after merge does not prove no publication. Two should-fix and a nit. |
 
 ### R-1
 
@@ -764,6 +765,36 @@ SEVERITY: should-fix
 WHERE: Design / Verification rungs; AC-04 and its Test Plan
 EVIDENCE: Rung applicability is calculated from the feature branch against its merge base with the default branch, while applicable rungs must pass again before delivery and earlier-commit results cannot count for a new commit. After the feature lands and the default branch is fetched, the feature tip is its ancestor, so that comparison no longer contains the feature's changed paths. Backend, UX and engine-sensitive rungs can consequently become inapplicable during the delivery check, even though the merge created a new commit. The Test Plan covers earlier feature commits but not this post-merge collapse of the comparison range. I cannot execute the Git scenario.
 PROPOSAL: Preserve an explicit feature-delta identity through delivery and define which commit the final verification establishes, such as the actual merge commit against its first parent. Add a merged-feature scenario proving that mandatory path-conditioned rungs cannot disappear when the default branch advances to contain the feature.
+
+### R-8
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design / Verification rungs, CI policy and post-merge watch; AC-05
+EVIDENCE: The design reports an unmarked, skip-eligible merge delivered when querying GitHub finds no push-triggered workflow runs. Absence at query time does not establish that no workflow will appear. Stackweaver scripts/release/watch-merge.sh:29-30,78-88 explicitly allows delayed appearance and polls before declaring a run missing. An unmarked .claude/settings.json change is skip-eligible under this design but triggers .github/workflows/tag.yml. The proposed check can therefore report delivery before its publication chain starts. I cannot execute Git, GitHub queries or vh-adlc; this finding follows from reading the specified check and workflow.
+PROPOSAL: Establish no publication path from the merge commit's workflow triggers and changed paths, rather than an immediately empty run list. Add delayed-run and API-failure fixtures that must not produce a delivered verdict.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Feature PR history; Verification rungs; AC-04 Test Plan
+EVIDENCE: Feature PR history permits merge commits or fast-forwards, but final verification evaluates the landed commit against its first parent. For a fast-forward containing several feature commits, that range contains only the last commit, potentially just the completion document, rather than the whole feature delta. The Test Plan exercises only a merge-commit landing. This contradicts the whole-feature applicability requirement. I cannot run Git or vh-adlc to execute the scenario.
+PROPOSAL: Define the final comparison base for fast-forward delivery, retaining the pre-integration default-branch tip, or explicitly disallow fast-forward delivery when these hooks apply. Test a fast-forward whose earlier commit changes backend code and whose final commit changes only documentation.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Verification rungs; AC-04
+EVIDENCE: Rungs may depend on “a criterion kind”, and Stackweaver's kind-harness requirement depends on identifying E2E specs, but the design defines neither the kind vocabulary nor how criteria acquire kinds. The pinned feature-document rules define criterion IDs and text without kind metadata; internal/doc/doc.go:64-72 likewise represents no criterion kind. Consequently, the required rung can be silently omitted by inconsistent classification even when the declared-rung tests pass.
+PROPOSAL: Define an explicit, validated classification mechanism, such as committed criterion-ID-to-kind mappings, including how new and unclassified criteria are handled. Add a case proving an E2E criterion cannot bypass its kind-harness rung because classification is missing.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Background; Design / Comparison baseline and Stackweaver adoption
+EVIDENCE: Background reports 55 non-terminal plans, while adoption reports 12 drafts, 43 planned or in-progress specs and 3 parked specs at the same cited revision, totaling 58. Comparison baseline also attributes both comparison passes to 7861b9dc, whereas Stackweaver docs/internal/analysis/shared-development-loop-parity.md identifies both passes as comparing 20e38a94 and explicitly says its model rows predate 7861b9dc. Git execution is unavailable, so I cannot reproduce the historical inventory.
+PROPOSAL: Correct the comparison provenance and reconcile the status counts, naming any different counting populations explicitly. Keep the adoption-head recount requirement.
 
 ## Sources
 
