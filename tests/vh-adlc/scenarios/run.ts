@@ -9,7 +9,7 @@
 
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { accept, addCI, AGENT_NAME, agentHome, build, claim, gh, SHIP_REPO, shipIssue, toGitHub, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, OTHER_FEATURE_BRANCH, OTHER_FEATURE_PATH, plan, prepareOtherFeature, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
 import { CLAUDE_TOKEN, claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
@@ -1106,6 +1106,73 @@ const PHASE5: Scenario[] = [
   },
 ];
 SCENARIOS.push(...PHASE5);
+
+// ---- Review convergence (docs/specs/spec-review-convergence.md) ----
+
+const CONVERGENCE = join(ROOT, "tests", "vh-adlc", "evidence", "review-convergence");
+
+// scriptedPlugin copies plugin A and replaces its reviewer with the scripted stand-in, which returns the
+// canned record for the next pass from evidence/review-convergence/canned/<name>/pass-N.txt.
+function scriptedPlugin(f: Fixtures, name: string): string {
+  const copy = join(f.dir, `plugin-scripted-${name}`);
+  cpSync(f.pluginA, copy, { recursive: true });
+  const template = readFileSync(join(CONVERGENCE, "scripted-reviewer.agent.md"), "utf8");
+  writeFileSync(join(copy, "agents", "vh-adlc-reviewer.agent.md"), template.replaceAll("{{CANNED}}", join(CONVERGENCE, "canned", name)));
+  return copy;
+}
+
+// The session PATH leaves out /usr/local/bin: a system vh-adlc there with the locked version but another
+// digest makes the installer refuse the fixture copy's own lock (see S16.drift's first run).
+const SCENARIO_PATH = [join(homedir(), ".bun", "bin"), "/usr/bin", "/bin"].join(":");
+
+// reviewLogCommits lists the commits of the spec and implementation review rows, without acceptance rows.
+function reviewLogCommits(doc: string): string[] {
+  return doc
+    .split("\n")
+    .filter((l) => /^\| \d{4}-\d{2}-\d{2} \| R-\d+ \|/.test(l) && !l.includes("accepted by owner"))
+    .map((l) => l.split("|")[4]?.trim().replaceAll("`", "").replace(/\+dirty$/, ""))
+    .filter((x): x is string => !!x && /^[0-9a-f]{7,40}$/.test(x));
+}
+
+const CONVERGENCE_SCENARIOS: Scenario[] = [
+  {
+    // AC-10: default-branch drift during a review loop on a feature branch comes in by merge, so every
+    // commit the Review Log names stays reachable. A guard: today's review mode already merges here.
+    id: "S16.drift",
+    title: "Drift during a feature-branch review loop comes in by merge",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      plan(f);
+      const owning = claim(f);
+      pushFromElsewhere(f, "greet.sh", '#!/bin/sh\necho "Hello, world."\n# drift from another session\n', "chore: touch greet.sh from elsewhere");
+      const plugin = scriptedPlugin(f, "drift");
+      const turns = session(f, [plugin], [
+        `/vh-adlc-spec review ${FEATURE_PATH}. ${HANDOFF} The default branch moved under this feature; bring it in as the procedure says and run a fresh spec review.`,
+      ], { cwd: owning, env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
+          const tip = rev(f, FEATURE_BRANCH);
+          const main = rev(f, "origin/main");
+          const reviewed = reviewLogCommits(doc);
+          const freshCalls = c.log().filter((x) => words(x.args)[0] === "fresh");
+          const unreachable = freshCalls.some((x) => JSON.stringify(x.json ?? {}).includes("commit-unreachable"));
+          return [
+            { name: "the feature branch holds the moved default branch", ok: !!tip && !!main && ancestor(f, main, tip) },
+            { name: "no rewrite: the claim commit is still on the feature branch", ok: !!tip && reviewed.length > 0 && ancestor(f, reviewed[0], tip) },
+            { name: "a second spec review row was stored", ok: reviewed.length >= 2, detail: reviewed.join(", ") },
+            { name: "every commit the Review Log names is an ancestor of the branch tip", ok: !!tip && reviewed.length > 0 && reviewed.every((x) => ancestor(f, x, tip)) },
+            { name: "fresh never reported commit-unreachable", ok: freshCalls.length > 0 && !unreachable },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+];
+SCENARIOS.push(...CONVERGENCE_SCENARIOS);
 
 // ---- Phase 6: review ----
 
