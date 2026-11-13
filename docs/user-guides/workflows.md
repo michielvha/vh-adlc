@@ -138,6 +138,67 @@ operations still require their own authority. See the
 [canonical procedure](../../plugins/vh-adlc/references/maintenance.md) and
 [tested compatibility](../reference/compatibility.md#dependency-and-security-maintenance).
 
+## Stale branches
+
+GitHub's automatic deletion of merged PR branches is the only setting that
+guarantees no merged branch stays behind on GitHub. vh-adlc checks it when it
+onboards a repository and in every maintenance sweep, and offers to turn it on.
+Check one repository yourself:
+
+```bash
+bun plugins/vh-adlc/scripts/branches/cli.ts auto-delete --repository OWNER/NAME
+```
+
+It exits 1 while the setting is off; add `--enable` to turn it on. GitHub copies no
+settings from a template repository, so check new repositories too.
+
+A merged PR branch is removed as part of the merge. When you approve a merge, the
+agent runs `after-merge` for that PR. It removes the remote branch, its tracking ref
+and the local branch, as long as their tips are inside the merged PR head. That also
+covers squash merges, which plain `git branch -d` refuses.
+
+Every maintenance sweep also lists stale branches left by earlier merges and shows
+a plan with a digest. Ask `Use vh-adlc-maintenance to sweep and remove stale branches`
+to apply that plan in the same run. Open PR branches, protected branches, unmerged work
+and branches in use by a worktree are kept, each with its reason. Clean worktrees
+are removed only when you ask for worktree cleanup. See the
+[branch hygiene guide](../../plugins/vh-adlc/references/branches.md).
+
+## Repository security settings
+
+GitHub's free security settings, such as Dependabot alerts and secret scanning, are
+off until someone turns them on. vh-adlc checks them in every maintenance sweep and
+when it onboards a repository, and reports each setting's state in the sweep report.
+By default it only checks. To let a full sweep or onboarding turn on the free ones,
+commit this in the `.vh-adlc/maintenance.yaml` that `AGENTS.md` links on the default
+branch:
+
+```yaml
+security_settings: apply
+```
+
+Committing it is your agreement to have them turned on. It never turns a setting
+off. Dependabot security updates stay off beside Renovate, and settings that are not
+free on private repositories are reported as unavailable. List a setting under
+`security_settings_keep_off` to keep it off in one repository.
+
+To check or switch them on yourself, as the onboarding guide in vhco-pro/docs shows:
+
+```bash
+gh api repos/OWNER/NAME --jq .security_and_analysis
+gh api -i repos/OWNER/NAME/vulnerability-alerts
+gh api -X PUT repos/OWNER/NAME/vulnerability-alerts
+gh api -X PATCH repos/OWNER/NAME \
+  -f 'security_and_analysis[secret_scanning][status]=enabled' \
+  -f 'security_and_analysis[secret_scanning_push_protection][status]=enabled'
+gh api -X PUT repos/OWNER/NAME/automated-security-fixes
+```
+
+The second command returns `204` when alerts are on and `404` when they are off.
+Secret scanning and push protection apply to public repositories. Turn on security
+updates only where the repository has a Dependabot config and no Renovate. See the
+[security settings reference](../../plugins/vh-adlc/references/security-settings.md).
+
 ## Host cleanup
 
 Ask `Use vh-adlc-clean to free space`. The operation runs `vh-adlc clean --dry-run`,

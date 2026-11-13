@@ -67,6 +67,21 @@ for the next operation that writes. A review that committed onboarding first wou
 same pages plus `guides/onboard-a-repository.md`, and read it. Their first change then adds the pinned
 `AGENTS.md` and its bridges as that guide describes, merged into any local instructions, in its own
 commit. Local instructions win over the central pages; report every conflict between them.
+Onboarding also checks GitHub's automatic deletion of merged PR branches with `auto-delete` from
+`references/branches.md` and reports the setting. When it is off, ask the owner whether to turn it
+on; enable it only after they say yes. The setting is a repository change, not a commit, so it never
+holds up the onboarding commit.
+Beside that check, onboarding runs the security-settings helper from
+`references/security-settings.md` in the mode `security-settings-mode` prints, and reports its
+output. That is also a repository change that never holds up the onboarding commit. Onboarding has no
+maintenance request, so the committed settings alone decide; it usually runs in `check`, because its
+own commit is what links the settings. A request that is read-only or draft-only, or forbids
+pushing or filesystem writes, selects `check` without calling the command. A nonzero
+`security-settings-mode` exit, whatever its cause, leads to `check` with mode reason
+`committed-settings-unresolved` and the cause, never to `apply`. Under `check`, report the states,
+say how to opt in with `security_settings: apply`, and record the onboarding guide's security
+checklist item as pending the owner's choice. Never run the guide's manual commands or the helper's
+`apply` on an in-session yes.
 
 Every page the loop needs is requested on every call, so a pin older than the plugin's pages stops with
 `missing-page`: always include `conventions/feature-documents.md` and `guides/humanize-prose.md`.
@@ -112,6 +127,11 @@ Code, commands and file contents stay exact, in code spans.
 
 End every operation by reporting what changed, what was verified, every binary result acted on, and what
 is left.
+
+Name every issue, pull request, commit, release or workflow run in a report, question or summary by
+its full URL, such as `https://github.com/OWNER/REPO/pull/8`, never as a bare `#8` or `OWNER/REPO#8`.
+The same holds in documents, commit messages and PR and issue bodies you write. Quoted records stay
+as returned.
 
 When reporting finished spec work to the owner or requesting spec acceptance, including through resume,
 present the owner-facing summary from `skills/vh-adlc-spec/SKILL.md` in the conversation before the

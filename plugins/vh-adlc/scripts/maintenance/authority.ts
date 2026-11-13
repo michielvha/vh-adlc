@@ -2,7 +2,9 @@ import { posix } from "node:path";
 import { git, origin } from "../triage/settings";
 import { canonicalJSON, digest, runID } from "./journal";
 import { commitID, gitBytes } from "./history";
-import type { Settings } from "./types";
+import type { SecurityKeepOff, Settings } from "./types";
+import type { RunScope } from "./journal";
+import { repository as repositoryName, securitySettings, SETTINGS_KEYS } from "./settings";
 import { readYAML } from "../settings-file";
 
 export type Grant = { repository: string; hostname: string; branch: string; publication_route: "default-branch-checkout-ff-only";
@@ -97,7 +99,7 @@ export function resolveStanding(config: Settings, observed: { default_branch: st
   try {
     const raw = source(".vh-adlc/maintenance.yaml"); if (raw === null) return result;
     const settings = object(readYAML(Buffer.from(raw), fail));
-    const known = ["schema_version", "repository", "hostname", "repositories", "discovery_organizations", "excluded_repositories", "bot_authors", "bot_inventory_terms", "dashboards", "generated_mirrors", "source_references", "backlog_references", "report_dir", "history_dir", "project_procedure", "surface_expectations"];
+    const known = ["schema_version", "repository", "hostname", "repositories", "discovery_organizations", "excluded_repositories", "bot_authors", "bot_inventory_terms", "dashboards", "generated_mirrors", "source_references", "backlog_references", "report_dir", "history_dir", "project_procedure", "surface_expectations", "security_settings", "security_settings_keep_off"];
     if (settings.schema_version !== 1 || Object.keys(settings).some(key => !known.includes(key))) fail("invalid committed settings");
     if (settings.repository !== undefined && settings.repository !== config.repository || settings.hostname !== undefined && settings.hostname !== config.hostname) fail("committed settings identity mismatch");
     if (settings.project_procedure === undefined) return result;
@@ -144,4 +146,50 @@ export function reportPermission(config: Settings, standing: Standing, rawReques
     repository: config.repository, hostname: config.hostname, branch: standing.default_branch, default_commit: standing.default_commit, report_path: scope.report_path,
     index_paths: indexes, run_id: scope.run_id, standing, request, later_update: scope.later_update ?? false };
   return { ...data, binding: digest(canonicalJSON(data)) };
+}
+
+export type CommittedSecuritySettings = { linked: boolean; default_commit: string; security_settings: "apply" | "check"; keep_off: SecurityKeepOff[]; repositories: string[] };
+/** Reads the security settings from the committed, linked default-branch settings; throws when the binding or the settings are invalid. */
+export function committedSecuritySettings(config: Settings, observed: { default_branch: string; default_commit: string }): CommittedSecuritySettings {
+  branch(config.root, observed.default_branch);
+  const commit = commitID(config.root, observed.default_commit), identity = origin(config.root);
+  if (identity.repository.toLowerCase() !== config.repository || identity.hostname !== config.hostname) fail("origin identity changed");
+  if (git(config.root, "rev-parse", `refs/remotes/origin/${observed.default_branch}`) !== commit) fail("default commit differs from recorded tracking tip; fetch and reconcile");
+  const unlinked: CommittedSecuritySettings = { linked: false, default_commit: commit, security_settings: "check", keep_off: [], repositories: [config.repository] };
+  const agents = blob(config.root, commit, "AGENTS.md");
+  if (!agents || !links(agents.text).includes(".vh-adlc/maintenance.yaml")) return unlinked;
+  const raw = blob(config.root, commit, ".vh-adlc/maintenance.yaml"); if (!raw) return unlinked;
+  const invalid: (field: string) => never = field => { throw Error(`invalid maintenance settings: committed ${field}`); };
+  let input: Record<string, unknown>;
+  try { input = object(readYAML(Buffer.from(raw.text), invalid)); } catch { invalid("settings are unreadable"); }
+  if (Object.keys(input).some(key => !SETTINGS_KEYS.includes(key))) invalid("settings contain unsupported fields");
+  if (input.schema_version !== 1) invalid("schema_version must be 1");
+  if (input.repository !== undefined && String(input.repository).toLowerCase() !== config.repository || input.hostname !== undefined && String(input.hostname).toLowerCase() !== config.hostname) invalid("settings identity mismatch");
+  if (input.repositories !== undefined && !Array.isArray(input.repositories)) invalid("repositories");
+  const named = ((input.repositories ?? []) as unknown[]).map(row => repositoryName(row && typeof row === "object" ? (row as Record<string, unknown>).repository : undefined, "committed related repository"));
+  const repositories = [...new Set([config.repository, ...named])];
+  let security: ReturnType<typeof securitySettings>;
+  try { security = securitySettings(input, repositories); } catch (error) { invalid(String((error as Error).message).replace(/^invalid maintenance settings: /, "")); }
+  return { linked: true, default_commit: commit, security_settings: security.security_settings ?? "check", keep_off: security.security_settings_keep_off ?? [], repositories };
+}
+
+export type SecurityMode = { repository: string; mode: "apply" | "check"; reason: string; detail?: string };
+const restrictingFlags = ["read_only", "draft_only", "no_push", "no_filesystem"] as const;
+/** The mode the security-settings helper runs in for one repository: the first ordered mode reason that applies, or apply. */
+export function securitySettingsMode(config: Settings, target: string, observed: { default_branch: string; default_commit: string },
+  run?: { request: unknown; scope: RunScope }): SecurityMode & { committed: CommittedSecuritySettings } {
+  const repository = repositoryName(target, "security settings repository"), committed = committedSecuritySettings(config, observed);
+  const result = (mode: "apply" | "check", reason: string, detail?: string) => ({ repository, mode, reason, ...(detail ? { detail } : {}), committed });
+  if (run) {
+    const request = run.request === undefined || run.request === null ? null : parseReportRequest(run.request);
+    const flag = restrictingFlags.find(key => request?.[key] === true);
+    if (flag) return result("check", "request-restricted", flag);
+    if (request?.authorized_sweep !== true) return result("check", "not-authorized-sweep");
+    if (run.scope.pull !== undefined) return result("check", "pull-request-scope");
+    if (!run.scope.repositories.includes(repository)) return result("check", "not-in-run-scope");
+  }
+  if (config.hostname !== "github.com") return result("check", "not-github-com");
+  if (committed.security_settings !== "apply") return result("check", "not-adopted");
+  if (!committed.repositories.includes(repository)) return result("check", "not-in-committed-scope");
+  return result("apply", "adopted");
 }

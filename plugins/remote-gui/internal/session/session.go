@@ -56,6 +56,15 @@ type BrowserHandle struct {
 	Password    string
 	Owned       []state.Process
 	Stop        func()
+	Clipboard   Clipboard
+}
+
+// Clipboard sets, reads and clears a browser session's remote clipboard.
+// Each call also reports the browser mode it ran under.
+type Clipboard interface {
+	Set(ctx context.Context, text, expectedMode string) (string, error)
+	Get(ctx context.Context) (string, string, error)
+	Clear(ctx context.Context) (string, error)
 }
 
 var BrowserLauncher func(context.Context, config.Config, string) (BrowserHandle, error)

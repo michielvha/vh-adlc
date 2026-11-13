@@ -6,9 +6,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"log"
+	"mime"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -18,16 +20,30 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/tailnet"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/xclip"
 )
 
 const (
-	CookiePrefix = "__remote_gui_"
-	loginPath    = "/__remote_gui/login"
+	CookiePrefix  = "__remote_gui_"
+	loginPath     = "/__remote_gui/login"
+	clipboardPath = "/__remote_gui/clipboard"
 )
+
+// MaxClipboardText is the largest clipboard text the viewer routes carry, in bytes of UTF-8.
+const MaxClipboardText = xclip.MaxText
+
+// Clipboard sets, reads and clears a browser session's remote clipboard.
+// Each call also reports the browser mode it ran under.
+type Clipboard interface {
+	Set(ctx context.Context, text, expectedMode string) (string, error)
+	Get(ctx context.Context) (string, string, error)
+	Clear(ctx context.Context) (string, error)
+}
 
 type Options struct {
 	OwnerLogin         string
@@ -41,6 +57,7 @@ type Options struct {
 	UpstreamAlive      func() bool
 	UpstreamConnection func(context.Context, net.Conn) bool
 	OnCompatibility    func(string)
+	Clipboard          Clipboard
 }
 type client struct {
 	probe   bool
@@ -74,6 +91,7 @@ type (
 		upstreamConnection func(context.Context, net.Conn) bool
 		onCompatibility    func(string)
 		problem            string
+		clipboard          Clipboard
 	}
 )
 
@@ -113,6 +131,9 @@ func New(o Options) (*Proxy, error) {
 		}
 	}
 	p := &Proxy{ownerLogin: o.OwnerLogin, servePeer: o.ServePeer, assets: assets, viewerPassword: o.ViewerPassword, landing: landing, id: o.ID, origin: origin, target: target, deadline: o.Deadline, clients: make(map[[32]byte]*client), connections: make(map[net.Conn]bool), upstreamAlive: o.UpstreamAlive, upstreamConnection: o.UpstreamConnection, onCompatibility: o.OnCompatibility}
+	if assets != nil {
+		p.clipboard = o.Clipboard
+	}
 	p.reverse = &httputil.ReverseProxy{Rewrite: p.rewrite, ModifyResponse: p.response, ErrorLog: log.New(io.Discard, "", 0), ErrorHandler: func(w http.ResponseWriter, _ *http.Request, _ error) {
 		p.fail("upstream-or-compatibility-failure")
 		http.Error(w, "application proxy unavailable", http.StatusBadGateway)
@@ -257,7 +278,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.enroll(w, r)
 		return
 	}
-	if strings.HasPrefix(r.URL.Path, "/__remote_gui") && (p.assets == nil || r.URL.Path != "/__remote_gui/viewer-access") {
+	if strings.HasPrefix(r.URL.Path, "/__remote_gui") && (p.assets == nil || r.URL.Path != "/__remote_gui/viewer-access") && (p.clipboard == nil || r.URL.Path != clipboardPath) {
 		http.NotFound(w, r)
 		return
 	}
@@ -285,6 +306,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if p.upstreamAlive != nil && !p.upstreamAlive() {
 		p.Revoke()
 		http.Error(w, "application ownership changed", http.StatusGone)
+		return
+	}
+	if p.clipboard != nil && r.URL.Path == clipboardPath {
+		p.serveClipboard(w, r)
 		return
 	}
 	if p.viewer(w, r) {
@@ -367,4 +392,95 @@ func (p *Proxy) response(r *http.Response) error {
 		}
 	}
 	return nil
+}
+
+// serveClipboard answers the viewer panel. Responses carry only the requested
+// clipboard text, the browser mode and fixed codes, and no CORS headers, so a
+// cross-origin page can neither send the custom header nor read a reply.
+func (p *Proxy) serveClipboard(w http.ResponseWriter, r *http.Request) {
+	sites := r.Header.Values("Sec-Fetch-Site")
+	if r.Header.Get("X-Remote-GUI-Clipboard") != "1" || len(sites) > 1 || (len(sites) == 1 && sites[0] != "same-origin") {
+		clipboardReply(w, http.StatusForbidden, map[string]string{"error": "clipboard-request-refused"})
+		return
+	}
+	if origin := r.Header.Get("Origin"); origin != "" && origin != p.origin.String() {
+		clipboardReply(w, http.StatusForbidden, map[string]string{"error": "clipboard-request-refused"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	switch r.Method {
+	case http.MethodGet:
+		text, mode, err := p.clipboard.Get(ctx)
+		if err != nil {
+			clipboardFailure(w, mode, err)
+			return
+		}
+		clipboardReply(w, http.StatusOK, map[string]string{"text": text, "browser_mode": mode})
+	case http.MethodPost:
+		expected := r.URL.Query().Get("expected_mode")
+		if expected != "human" && expected != "agent" {
+			clipboardReply(w, http.StatusBadRequest, map[string]string{"error": "clipboard-mode-invalid"})
+			return
+		}
+		media, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if err != nil || media != "text/plain" || (params["charset"] != "" && !strings.EqualFold(params["charset"], "utf-8")) {
+			clipboardReply(w, http.StatusUnsupportedMediaType, map[string]string{"error": "clipboard-text-invalid"})
+			return
+		}
+		body, err := io.ReadAll(io.LimitReader(r.Body, MaxClipboardText+1))
+		if err != nil {
+			clipboardReply(w, http.StatusBadRequest, map[string]string{"error": "clipboard-text-invalid"})
+			return
+		}
+		if len(body) > MaxClipboardText {
+			clipboardReply(w, http.StatusRequestEntityTooLarge, map[string]string{"error": "clipboard-too-large"})
+			return
+		}
+		if !utf8.Valid(body) {
+			clipboardReply(w, http.StatusBadRequest, map[string]string{"error": "clipboard-text-invalid"})
+			return
+		}
+		mode, err := p.clipboard.Set(ctx, string(body), expected)
+		if err != nil {
+			clipboardFailure(w, mode, err)
+			return
+		}
+		clipboardReply(w, http.StatusOK, map[string]string{"browser_mode": mode})
+	case http.MethodDelete:
+		mode, err := p.clipboard.Clear(ctx)
+		if err != nil {
+			clipboardFailure(w, mode, err)
+			return
+		}
+		clipboardReply(w, http.StatusOK, map[string]string{"browser_mode": mode})
+	default:
+		clipboardReply(w, http.StatusMethodNotAllowed, map[string]string{"error": "clipboard-method-not-allowed"})
+	}
+}
+
+// clipboardFailure reports only a fixed clipboard code, never the error's other text.
+func clipboardFailure(w http.ResponseWriter, mode string, err error) {
+	code, status := "clipboard-unavailable", http.StatusServiceUnavailable
+	switch err.Error() {
+	case "clipboard-busy":
+		code, status = err.Error(), http.StatusConflict
+	case "clipboard-too-large":
+		code, status = err.Error(), http.StatusRequestEntityTooLarge
+	case "clipboard-text-invalid":
+		code, status = err.Error(), http.StatusBadRequest
+	case "clipboard-timed-out", "clipboard-clear-unverified", "clipboard-ownership-unverified", "clipboard-display-unavailable":
+		code = err.Error()
+	}
+	reply := map[string]string{"error": code}
+	if mode != "" {
+		reply["browser_mode"] = mode
+	}
+	clipboardReply(w, status, reply)
+}
+
+func clipboardReply(w http.ResponseWriter, status int, body map[string]string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(body)
 }
