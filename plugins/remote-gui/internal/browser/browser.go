@@ -283,19 +283,23 @@ func (r *runtime) stop() {
 // group. Members are signalled until an enumeration finds none. A helper that
 // calls setsid itself leaves the session and is not seen. Outside a private
 // session only the direct children can be accounted for.
+// privateMembers enumerates the guard's private session; tests substitute it to
+// model a scan that misses a member.
+var privateMembers = session.PrivateMembers
+
 func (r *runtime) drain() error {
 	for i := len(r.children) - 1; i >= 0; i-- {
 		_ = state.Signal(r.children[i].identity, syscall.SIGTERM)
 	}
 	record, _ := state.Load(r.home, r.id)
-	if _, err := session.PrivateMembers(record); err != nil {
+	if _, err := privateMembers(record); err != nil {
 		return r.drainChildren()
 	}
 	// Both deadlines fit the guard's five seconds for the supervisor.
 	start := time.Now()
 	terminated := map[state.Identity]bool{}
 	for {
-		members, err := session.PrivateMembers(record)
+		members, err := privateMembers(record)
 		if err != nil {
 			return errors.New("browser-helper-cleanup-pending")
 		}

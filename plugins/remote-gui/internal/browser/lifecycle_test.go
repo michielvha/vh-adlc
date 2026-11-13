@@ -98,7 +98,15 @@ func TestStopOutlastsBrowserHelpers(t *testing.T) {
 	t.Run("own-process-group", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, "set -m; ", true) })
 }
 
-func stopOutlastsHelper(t *testing.T, helperScript, prefix string, orphan bool) {
+// helperRun is a stand-in browser whose helper writes into its profile.
+type helperRun struct {
+	r                       *runtime
+	browser                 *child
+	helper                  state.Identity
+	home, id, profile, mark string
+}
+
+func startHelper(t *testing.T, helperScript, prefix string) helperRun {
 	t.Helper()
 	c, id := setup(t)
 	profile := filepath.Join(c.Home, id, "profile")
@@ -124,28 +132,81 @@ func stopOutlastsHelper(t *testing.T, helperScript, prefix string, orphan bool) 
 		}
 	}
 	t.Cleanup(func() { _ = state.Signal(helper, syscall.SIGKILL) })
-	if prefix != "" && helper.Group == browser.identity.Group {
+	return helperRun{r: r, browser: browser, helper: helper, home: c.Home, id: id, profile: profile, mark: marker}
+}
+
+func stopOutlastsHelper(t *testing.T, helperScript, prefix string, orphan bool) {
+	t.Helper()
+	h := startHelper(t, helperScript, prefix)
+	if prefix != "" && h.helper.Group == h.browser.identity.Group {
 		t.Fatal("helper did not lead its own process group")
 	}
 	if orphan {
-		if err = state.Signal(browser.identity, syscall.SIGKILL); err != nil {
+		if err := state.Signal(h.browser.identity, syscall.SIGKILL); err != nil {
 			t.Fatal(err)
 		}
-		<-browser.done
+		<-h.browser.done
 	}
-	r.stop()
-	if r.cleanupErr != nil {
-		t.Fatal(r.cleanupErr)
+	h.stopAndCheck(t)
+}
+
+func (h helperRun) stopAndCheck(t *testing.T) {
+	t.Helper()
+	h.r.stop()
+	if h.r.cleanupErr != nil {
+		t.Fatal(h.r.cleanupErr)
 	}
-	if state.Alive(helper) {
+	if state.Alive(h.helper) {
 		t.Fatal("browser helper survived stop")
 	}
-	if _, err := os.Stat(marker); err != nil {
+	if _, err := os.Stat(h.mark); err != nil {
 		t.Fatal("helper never wrote the profile")
 	}
 	time.Sleep(500 * time.Millisecond)
-	if _, err := os.Stat(profile); !os.IsNotExist(err) {
+	if _, err := os.Stat(h.profile); !os.IsNotExist(err) {
 		t.Fatal("browser helper recreated the profile after stop")
+	}
+}
+
+// A member can fork and exit between reading the /proc listing and inspecting
+// it, so one enumeration omits its live child. The double reports the first
+// enumeration after members were seen as empty, as such a scan would.
+func TestStopConfirmsAnEmptySession(t *testing.T) {
+	if !privateSession(t) {
+		return
+	}
+	h := startHelper(t, stubbornHelper, "")
+	original := privateMembers
+	t.Cleanup(func() { privateMembers = original })
+	seen, missed := false, false
+	privateMembers = func(record state.Record) ([]state.Identity, error) {
+		members, err := original(record)
+		if len(members) > 0 && seen && !missed {
+			missed = true
+			return nil, err
+		}
+		seen = seen || len(members) > 0
+		return members, err
+	}
+	h.stopAndCheck(t)
+}
+
+// A session whose record cannot be read cannot be drained, so stop keeps the
+// profile and reports that a helper may be alive.
+func TestStopFailsClosedWithoutTheSessionRecord(t *testing.T) {
+	if !privateSession(t) {
+		return
+	}
+	h := startHelper(t, stubbornHelper, "")
+	if err := os.Chmod(filepath.Join(h.home, h.id, "state.json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.r.stop()
+	if h.r.cleanupErr == nil || h.r.cleanupErr.Error() != "browser-helper-cleanup-pending" {
+		t.Fatalf("stop without its session record: %v", h.r.cleanupErr)
+	}
+	if _, err := os.Stat(h.profile); err != nil {
+		t.Fatal("profile removed while a helper may be alive")
 	}
 }
 
