@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted by the owner at R-10 under an advance acceptance; R-10's eight findings are listed, not applied. Tasks written; next: implementation on a feature branch."
+status: draft
+status_description: "Revising in one pass: R-10's eight findings plus two process rules the owner wants in vh-adlc itself."
 issue: null
 goal: "A spec review loop that finds blocking defects early and stops asking for passes after three consecutive passes without one."
 covers:
