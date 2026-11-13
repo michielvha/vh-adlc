@@ -162,3 +162,38 @@ func TestDescendantsFollowVerifiedParents(t *testing.T) {
 		t.Fatalf("followed an unverified parent: %v", got)
 	}
 }
+
+// A parent read early in a scan can exit and its PID be reused by a process
+// whose child is read later. That child is not the old parent's.
+func TestDescendantsRejectAParentRecycledDuringTheScan(t *testing.T) {
+	start := func() (*exec.Cmd, Identity) {
+		cmd := exec.Command("/bin/sleep", "30")
+		if err := cmd.Start(); err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+		id, err := Inspect(cmd.Process.Pid)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cmd, id
+	}
+	parentCmd, parent := start()
+	_, foreign := start()
+	original := scanProcesses
+	t.Cleanup(func() { scanProcesses = original })
+	scanProcesses = func() []processRow {
+		rows := []processRow{{id: parent, parent: 1}}
+		// The parent exits after its row is read; the process now holding its
+		// PID owns the foreign child read next.
+		_ = parentCmd.Process.Kill()
+		_ = parentCmd.Wait()
+		return append(rows, processRow{id: foreign, parent: parent.PID})
+	}
+	if got := Descendants([]Identity{parent}); len(got) != 0 {
+		t.Fatalf("classified a recycled parent's child as a descendant: %v", got)
+	}
+	if !Alive(foreign) {
+		t.Fatal("foreign process was disturbed")
+	}
+}

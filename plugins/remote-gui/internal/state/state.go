@@ -322,25 +322,40 @@ func inspect(pid int) (Identity, int, error) {
 	return Identity{PID: pid, Start: fields[19], Boot: strings.TrimSpace(string(boot)), Group: group, Session: session}, parent, nil
 }
 
-// Descendants returns the live processes this user owns below the given ones,
-// such as the helpers a browser starts. A process is found only while its parent
-// is alive: once the parent exits, the kernel hands it to another reaper.
-func Descendants(roots []Identity) []Identity {
+type processRow struct {
+	id     Identity
+	parent int
+}
+
+// scanProcesses lists this user's live processes with their parents. Tests
+// replace it to order a PID reuse against the scan.
+var scanProcesses = func() []processRow {
 	entries, err := os.ReadDir("/proc")
 	if err != nil {
 		return nil
 	}
-	live := map[int]Identity{}
-	children := map[int][]Identity{}
+	var rows []processRow
 	for _, e := range entries {
 		pid, err := strconv.Atoi(e.Name())
 		if err != nil {
 			continue
 		}
 		if id, parent, err := inspect(pid); err == nil {
-			live[pid] = id
-			children[parent] = append(children[parent], id)
+			rows = append(rows, processRow{id: id, parent: parent})
 		}
+	}
+	return rows
+}
+
+// Descendants returns the live processes this user owns below the given ones,
+// such as the helpers a browser starts. A process is found only while its parent
+// is alive: once the parent exits, the kernel hands it to another reaper.
+func Descendants(roots []Identity) []Identity {
+	live := map[int]Identity{}
+	children := map[int][]Identity{}
+	for _, row := range scanProcesses() {
+		live[row.id.PID] = row.id
+		children[row.parent] = append(children[row.parent], row.id)
 	}
 	var found []Identity
 	queue := slices.Clone(roots)
