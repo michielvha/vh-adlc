@@ -63,6 +63,7 @@ remote-gui profile delete work
 | Profile owner | The Tailscale owner login, or the `loopback` transport kind, recorded when the profile was created. |
 | In use | Held by a live session's single-writer lock. |
 | Approved agent start | A session with `--profile` started in agent mode with `--agent-start-approved` on the owner's explicit instruction. |
+| Session sweep | The session guard's stop of every remaining process in its private session, identified by session ID across process groups. |
 
 A profile name has 1 to 40 lowercase letters, digits or hyphens and starts with a letter or digit; any other name fails with `invalid-profile-name`. Without `--profile`, sessions behave exactly as before.
 
