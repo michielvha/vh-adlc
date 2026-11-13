@@ -15,17 +15,28 @@ import { buildCopilotRoleInvocation } from "./role-launch";
 import { captureNativeRoleProcess } from "./role-process";
 import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { OUTPUT_LIMIT } from "./owned-process";
+import type { AuditOutputArtifacts } from "./report-output";
 
 type Options = Parameters<typeof beginAuditReport>[0] & { environment: Record<string, string | undefined>; role_timeout_ms?: number };
 type Capture = Awaited<ReturnType<typeof captureNativeRoleProcess>>;
 type Start = Awaited<ReturnType<typeof beginAuditReport>>;
 type AuditReport = Awaited<ReturnType<typeof completeAuditReport>>;
 type Reference = { path: string; sha256: string };
+type OutputScope = { repo: string; artifact_root: string; source_checkout: string };
+const outputScopes = new WeakMap<object, OutputScope>();
+
+/** The live completed session owns its source scope; a wrapper retaining only its report does not. */
+export function readOriginalAuditSessionOutputScope(session: object): OutputScope {
+  const scope = outputScopes.get(session);
+  if (!scope) throw Error("Original completed audit session required for output scope");
+  return freezeJSON(structuredClone(scope));
+}
 
 /** Retained read-only audit orchestration. Provider execution still needs its caller's actual authorization. */
 export async function runAuditSession(input: Options) {
   const { environment, role_timeout_ms: timeout = 900000, ...options } = structuredClone(input);
   const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  let outputScope: OutputScope | null = null;
   const result: { schema_version: 1; kind: "docs-drift-audit-session"; authority: "none"; source_commit: string;
     complete: boolean; scope_changed: boolean; diagnostics: string[]; start: Start | null;
     requests: { worker: Reference | null; reviewer: Reference | null }; worker: Capture | null; reviewer: Capture | null; report: AuditReport | null } = {
@@ -58,6 +69,7 @@ export async function runAuditSession(input: Options) {
     if (Bun.version !== "1.4.4" || realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/audit-session.ts"))
       throw Error("Audit session must execute through the selected retained component and declared toolchain");
     const cwd = realpathSync(baseline.scan.checkout), canonicalizer = join(runtime.component.directory, "scripts/docs-drift/protocol.ts");
+    outputScope = { repo, artifact_root: scope.directory, source_checkout: cwd };
     const nativePolicy = { repo: facts.store.root, current_default: facts.current_default, identity: facts.identity, runtime };
     const workerPolicy = readAdoptedRolePolicy({ ...nativePolicy, role: "worker" });
     const reviewerPolicy = readAdoptedRolePolicy({ ...nativePolicy, role: "reviewer" });
@@ -135,24 +147,31 @@ export async function runAuditSession(input: Options) {
   }
   if (!matchesRepositoryState(repo, before)) { result.complete = false; result.report = null; result.scope_changed = true; result.diagnostics.push("Caller changed during the audit session"); }
   result.diagnostics = [...new Set(result.diagnostics)];
+  if (result.complete && outputScope) outputScopes.set(result, outputScope);
   return freezeJSON(result);
 }
 
 /** Bound the command projection. Serialized session data creates no original report or permission. */
-export function auditSessionOutput(result: Awaited<ReturnType<typeof runAuditSession>>, limit: number) {
+export function auditSessionOutput(result: Awaited<ReturnType<typeof runAuditSession>>, limit: number, artifacts?: AuditOutputArtifacts) {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > OUTPUT_LIMIT) throw Error("Bounded audit session output required");
   const session = structuredClone(result);
-  const outcome: "incomplete" | "collected" | "attention" = !session.complete ? "incomplete" : session.report?.report?.success ? "collected" : "attention";
+  const outcome: "incomplete" | "collected" | "attention" = !session.complete || artifacts && !artifacts.complete
+    ? "incomplete" : session.report?.report?.success ? "collected" : "attention";
   const output = { schema_version: 1 as const, command: "run-audit", source_commit: session.source_commit,
     outcome,
-    details_omitted: false, audit_session: session,
-    diagnostics: session.diagnostics.map(message => ({ code: "audit-session", message })) };
+    details_omitted: false, audit_session: session, report_artifacts: artifacts ? structuredClone(artifacts) : null,
+    diagnostics: [...session.diagnostics.map(message => ({ code: "audit-session", message })),
+      ...(artifacts?.diagnostics ?? []).map(message => ({ code: "audit-output", message }))] };
   const size = () => Buffer.byteLength(JSON.stringify(output) + "\n");
   if (size() > limit) {
     output.outcome = "incomplete"; output.details_omitted = true; session.complete = false;
     session.start = null; session.worker = null; session.reviewer = null; session.report = null;
     session.diagnostics = ["Audit session details exceed the retained entry bound; inspect the original source and native role records"];
     output.diagnostics = session.diagnostics.map(message => ({ code: "audit-session", message }));
+    if (size() > limit && output.report_artifacts) {
+      output.report_artifacts = null;
+      output.diagnostics.push({ code: "audit-output", message: "Retained artifact details exceed the command output bound; inspect the selected artifact root" });
+    }
     if (size() > limit) throw Error("Configured output bound cannot retain an incomplete audit session summary");
   }
   return freezeJSON(output);

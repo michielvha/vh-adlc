@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 import { auditSessionOutput, runAuditSession } from "./audit-session";
+import { persistAuditOutput, type AuditOutputArtifacts } from "./report-output";
 import { collectAuditProposalInputs, auditProposalInputsOutput } from "./audit-proposal-inputs";
 import { collectNativeReportHistory, historyCollectionOutput } from "./history-collection";
 import { assessmentReviewOutput, collectAssessmentReviewTarget, collectAssessmentReview } from "./assessment-review";
@@ -42,6 +43,7 @@ type Diagnostic = { code: string; message: string };
 export type CLIReport = {
   schema_version: 1; command: string; outcome: "collected" | "attention" | "incomplete"; diagnostics: Diagnostic[];
   audit_session?: Awaited<ReturnType<typeof runAuditSession>>; details_omitted?: boolean;
+  report_artifacts?: AuditOutputArtifacts | null;
   retained_operation?: Awaited<ReturnType<typeof collectNativeRetained>>["retained_operation"];
   recovery_inspection?: Awaited<ReturnType<typeof inspectRecovery>>;
   recovery_effects?: ReturnType<typeof recoveryEffectsOutput>["recovery_effects"];
@@ -633,7 +635,8 @@ export async function main(argv: string[]): Promise<number> {
         const attempt = process.env.GITHUB_RUN_ATTEMPT;
         const session = await runAuditSession({ ...input, environment: process.env,
           hosted_run_attempt: entry === "hosted" && attempt !== undefined && /^[1-9][0-9]*$/u.test(attempt) ? Number(attempt) : undefined });
-        report = auditSessionOutput(session, Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes));
+        const saved = persistAuditOutput({ repo, source: options.source, artifact_root: artifacts.root, session });
+        report = auditSessionOutput(session, Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes), saved);
       } else if (options.command === "collect-audit-proposal-inputs") {
         report = auditProposalInputsOutput(await collectAuditProposalInputs(input));
       } else if (historyCommands.includes(options.command)) {

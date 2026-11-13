@@ -1,6 +1,6 @@
 /** Real retained dispatch with a toy native client and fake read-only GitHub; no model/provider trial. */
 import { afterAll, expect, test } from "bun:test";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { bindingFixture } from "./binding-fixture";
 import { role } from "./manifest-fixture";
@@ -56,7 +56,7 @@ console.log(JSON.stringify({ type: "session.start", data: { sessionId: arg("--se
 console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-opus-5.5", content: "MODEL: claude-opus-5.5\\n" + records } }));
 `; }
 
-test.each(["matching", "proposal", "normal-cli", "unretained", "invalid-worker", "request-change", "review-findings"])("retained normal audit session starts before roles and publishes no effects: %s", async fault => {
+test.each(["matching", "proposal", "normal-cli", "normal-cli-partial-output", "unretained", "invalid-worker", "request-change", "review-findings"])("retained normal audit session starts before roles and publishes no effects: %s", async fault => {
   try {
     await import("../../../plugins/vh-adlc/scripts/docs-drift/audit-session");
     const f = await bindingFixture(roots, false, { fullComponent: true, mutableInventory: fault === "proposal", role: { model: role.requested_model, native_model: role.adopted_model,
@@ -83,18 +83,62 @@ test.each(["matching", "proposal", "normal-cli", "unretained", "invalid-worker",
 const { runAuditSession } = await import(${JSON.stringify(fault === "unretained" ? join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/audit-session.ts") : join(f.retained.directory, "scripts/docs-drift/audit-session.ts"))});
 const result = await runAuditSession(JSON.parse(readFileSync(${JSON.stringify(input)}, "utf8")));
 writeFileSync(${JSON.stringify(output)}, JSON.stringify(result), { mode: 0o600 });
+if (${JSON.stringify(fault)} === "matching") {
+  const { persistAuditOutput } = await import(${JSON.stringify(join(f.retained.directory, "scripts/docs-drift/report-output.ts"))});
+  const wrapped = { ...result, requests: { worker: null, reviewer: null } };
+  const denied = persistAuditOutput({ repo: ${JSON.stringify(f.repo)}, source: ${JSON.stringify(f.source)}, artifact_root: ${JSON.stringify(f.artifacts)}, session: wrapped });
+  writeFileSync(${JSON.stringify(join(f.artifacts, "wrapped-output-scope.json"))}, JSON.stringify(denied), { mode: 0o600 });
+}
 `, { mode: 0o600 });
-    const argv = fault === "normal-cli" ? [globalThis.process.execPath, join(f.retained.directory, "scripts/docs-drift/cli.ts"), "run-audit",
+    const cliArgs = ["run-audit",
       "--repo", f.repo, "--source", f.source, "--artifact-root", f.artifacts, "--cache-root", options.cache_directory,
       "--entry", "copilot", "--launcher", options.launcher_path, "--settings", options.settings_path,
       "--source-verification", options.source_verification.path, "--source-verification-sha256", options.source_verification.sha256,
-      "--decisions", options.decisions.path, "--decisions-sha256", options.decisions.sha256] : [globalThis.process.execPath, bridge];
+      "--decisions", options.decisions.path, "--decisions-sha256", options.decisions.sha256];
+    if (fault === "normal-cli-partial-output") writeFileSync(bridge, `import * as fs from "node:fs";
+import { spyOn } from "bun:test";
+const link = fs.linkSync;
+spyOn(fs, "linkSync").mockImplementation((from, to) => {
+  if (String(to).endsWith("/report.md")) throw Error("Synthetic retained command markdown failure");
+  return link(from, to);
+});
+const { main } = await import(${JSON.stringify(join(f.retained.directory, "scripts/docs-drift/cli.ts"))});
+process.exitCode = await main(${JSON.stringify(cliArgs)});
+`, { mode: 0o600 });
+    const cliCase = ["normal-cli", "normal-cli-partial-output"].includes(fault);
+    const argv = fault === "normal-cli" ? [globalThis.process.execPath, join(f.retained.directory, "scripts/docs-drift/cli.ts"), ...cliArgs]
+      : [globalThis.process.execPath, bridge];
     const before = captureRepositoryState(f.repo), process = Bun.spawnSync(argv, { env: { ...globalThis.process.env, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
       PATH: f.native.environment.PATH, GH_TOKEN: "synthetic-read-token", COPILOT_GITHUB_TOKEN: "synthetic-selected-provider" }, timeout: 210000 });
-    expect(process.exitCode, process.stderr.toString()).toBe(0);
-    const result = fault === "normal-cli" ? JSON.parse(process.stdout.toString()).audit_session : JSON.parse(readFileSync(output, "utf8"));
-    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(["matching", "proposal", "normal-cli"].includes(fault)); expect(result.authority).toBe("none");
+    expect(process.exitCode, process.stderr.toString()).toBe(fault === "normal-cli-partial-output" ? 2 : 0);
+    const cli = cliCase ? JSON.parse(process.stdout.toString()) : null;
+    const result = cli ? cli.audit_session : JSON.parse(readFileSync(output, "utf8"));
+    if (cli) {
+      const partial = fault === "normal-cli-partial-output";
+      expect(cli.report_artifacts?.complete, JSON.stringify(cli)).toBe(!partial);
+      const saved = cli.report_artifacts;
+      expect(saved.content).toBe("report"); expect(saved.history_provenance).toBe("absent"); expect(saved.authority).toBe("none");
+      expect(readdirSync(saved.directory).sort()).toEqual(partial ? ["report.json"] : ["report.json", "report.md"]);
+      expect(lstatSync(saved.directory).mode & 0o777).toBe(0o700);
+      for (const ref of Object.values(saved.files) as Array<{ path: string; sha256: string } | null>) {
+        if (!ref) continue;
+        const path = join(f.artifacts, ref.path), bytes = readFileSync(path);
+        expect(sha256(bytes)).toBe(ref.sha256); expect(lstatSync(path).mode & 0o777).toBe(0o600);
+        expect(bytes.length).toBeLessThanOrEqual(524288);
+      }
+      expect(JSON.parse(readFileSync(join(f.artifacts, saved.files.report_json.path), "utf8"))).toEqual(result.report.report);
+      if (partial) {
+        expect(saved.files.markdown).toBeNull(); expect(cli.outcome).toBe("incomplete");
+        expect(cli.diagnostics).toContainEqual({ code: "audit-output", message: "Synthetic retained command markdown failure" });
+      } else expect(readFileSync(join(f.artifacts, saved.files.markdown.path), "utf8")).toBe(result.report.markdown);
+    }
+    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(["matching", "proposal", "normal-cli", "normal-cli-partial-output"].includes(fault)); expect(result.authority).toBe("none");
     expect(result.start.complete).toBe(true);
+    if (fault === "matching") {
+      const denied = JSON.parse(readFileSync(join(f.artifacts, "wrapped-output-scope.json"), "utf8"));
+      expect(denied.complete).toBe(false); expect(denied.directory).toBeNull();
+      expect(denied.diagnostics).toContain("Original completed audit session required for output scope");
+    }
     if (fault === "unretained") {
       expect(result.worker).toBeNull(); expect(result.reviewer).toBeNull(); expect(result.diagnostics.join("\n")).toContain("selected retained component");
       expect(captureRepositoryState(f.repo)).toEqual(before); return;
@@ -112,7 +156,7 @@ writeFileSync(${JSON.stringify(output)}, JSON.stringify(result), { mode: 0o600 }
       expect(result.scope_changed).toBe(true); expect(result.report).toBeNull(); expect(result.reviewer).toBeNull();
       expect(result.diagnostics.join("\n")).toContain("request artifact changed");
     }
-    if (["matching", "proposal", "normal-cli"].includes(fault)) {
+    if (["matching", "proposal", "normal-cli", "normal-cli-partial-output"].includes(fault)) {
       expect(result.report.complete).toBe(true); expect(result.report.report.collection_complete).toBe(true);
       expect(result.report.report.published).toEqual([]); expect(result.report.report.failures).toEqual([]);
       expect(new Date(result.start.started_at).getTime()).toBeLessThanOrEqual(new Date(result.report.report.completed_at).getTime());
