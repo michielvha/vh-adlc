@@ -272,9 +272,15 @@ test("installed recovery entries refuse outside, nested and linked journals with
       context_sha256: context.context_sha256, journal_directory: journal, acknowledge_effect_ids: ["pr"], retire_effect_ids: [] }), { mode: 0o600 });
     writeFileSync(owner, canonicalJSON({ schema_version: 1, kind: "docs-drift-synthetic-owner-request",
       context_sha256: context.context_sha256, source: "owner-current-request", scope_sha256: "f".repeat(64) }), { mode: 0o600 });
-    for (const command of ["resume-effects", "prepare-acknowledgement", "acknowledge-delivery"] as const) {
+    for (const command of ["resume-effects", "prepare-acknowledgement", "acknowledge-delivery", "prepare-reconciliation", "reconcile-publication"] as const) {
+      const reconciliation = command === "prepare-reconciliation" || command === "reconcile-publication";
+      writeFileSync(selection, canonicalJSON(reconciliation
+        ? { schema_version: 1, kind: "docs-drift-synthetic-reconciliation-selection", context_sha256: context.context_sha256,
+          journal_directory: journal, retire_effect_ids: ["pr"], retirement_lookups: {} }
+        : { schema_version: 1, kind: "docs-drift-synthetic-acknowledgement-selection", context_sha256: context.context_sha256,
+          journal_directory: journal, acknowledge_effect_ids: ["pr"], retire_effect_ids: [] }));
       const args = command === "resume-effects" ? ["--request", path, "--journal", journal]
-        : ["--selection", selection, ...(command === "acknowledge-delivery" ? ["--owner-request", owner] : [])];
+        : ["--selection", selection, ...(["acknowledge-delivery", "reconcile-publication"].includes(command) ? ["--owner-request", owner] : [])];
       const result = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), command,
         "--synthetic-trial", f.root, "--context-commit", f.contextCommit, ...args],
         { stdout: "pipe", stderr: "pipe", timeout: 45000 });
@@ -283,7 +289,7 @@ test("installed recovery entries refuse outside, nested and linked journals with
       expect(report.outcome).toBe("refused");
       // The context rejects every linked fixture input before any entry reads a journal.
       const reason = scenario === "linked" ? "foreign or linked fixture input" : command === "resume-effects"
-        ? "synthetic journal outside owned artifacts" : "synthetic acknowledgement context or journal changed";
+        ? "synthetic journal outside owned artifacts" : reconciliation ? "synthetic reconciliation context or journal changed" : "synthetic acknowledgement context or journal changed";
       expect(report.diagnostics[0].message).toContain(reason);
       expect(readTrialTracker(context).commit).toBe(tracker);
       expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
@@ -293,4 +299,53 @@ test("installed recovery entries refuse outside, nested and linked journals with
     expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
   }
   expect(git(f.source, "status", "--porcelain")).toBe("");
-}, 90000);
+}, 180000);
+
+test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed trial reconciliation uses the common recovery authority and preserves non-success: %s", async approval => {
+  const { f, context, path } = await publicationRequest(), publication = readTrialPublication(context, path), execute = publication.transport.execute;
+  publication.transport.execute = async (...args) => {
+    if (args[1].id === "pr") throw new PublicationExecutionError(false, true);
+    return execute(...args);
+  };
+  const pending = await publish(publication);
+  expect(pending.state).toBe("pending");
+  const selection = join(context.artifacts, "reconciliation-selection.json");
+  writeFileSync(selection, canonicalJSON({ schema_version: 1, kind: "docs-drift-synthetic-reconciliation-selection",
+    context_sha256: context.context_sha256, journal_directory: pending.journal.directory, retire_effect_ids: ["pr"], retirement_lookups: {} }), { mode: 0o600 });
+  const entry = join(f.runtime, "scripts/docs-drift/trial-entry.ts"), args = ["--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--selection", selection];
+  const journalBefore = readJournal(pending.journal.directory, context.source), trackerBefore = readTrialTracker(context).commit;
+  const refsBefore = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)");
+  const inspected = Bun.spawnSync([process.execPath, entry, "prepare-reconciliation", ...args], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+  const report = JSON.parse(inspected.stdout.toString());
+  expect(inspected.exitCode).toBe(2);
+  expect(report.data, JSON.stringify(report)).toBeDefined();
+  expect(report.data.state).toBe("pending"); expect(report.data.reason).toBe("inspection-only");
+  expect(report.data.scopes).toHaveLength(1);
+  expect(report.data.scopes[0].retire_effect_ids).toEqual(["pr"]);
+  expect(readJournal(pending.journal.directory, context.source)).toEqual(journalBefore);
+  expect(readTrialTracker(context).commit).toBe(trackerBefore);
+  expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refsBefore);
+  const originBytes = Buffer.from("Synthetic actual current owner request approves only the presented known-absence retirement and owned lease settlement.\n");
+  writeFileSync(join(context.artifacts, "reconciliation-owner.txt"), originBytes, { mode: 0o600 });
+  const authority = join(context.artifacts, "reconciliation-owner.json");
+  writeFileSync(authority, canonicalJSON({ schema_version: 1, kind: "docs-drift-recovery-authority", purpose: approval === "wrong-purpose" ? "acknowledgement" : "reconciliation",
+    scope_sha256s: report.data.scope_sha256s, origin: { kind: "owner-current-request", artifact: { path: "reconciliation-owner.txt", sha256: sha256(originBytes) } } }), { mode: 0o600 });
+  if (approval === "foreign-lease") git(f.origin, "update-ref", context.settings.publication.lease_ref, f.sourceCommit);
+  const beforeApply = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)");
+  const applied = Bun.spawnSync([process.execPath, entry, "reconcile-publication", ...args,
+    ...(approval === "missing" ? [] : ["--owner-request", authority])], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+  const result = JSON.parse(applied.stdout.toString());
+  expect(applied.exitCode).toBe(2);
+  if (approval === "missing") expect(result.outcome).toBe("refused");
+  else expect(result.data.state, JSON.stringify(result)).toBe(approval === "approved" ? "retired" : "pending");
+  const journal = readJournal(pending.journal.directory, context.source);
+  expect(journal.events.some(event => event.kind === "retired-absence" && event.effect_id === "pr")).toBe(approval === "approved");
+  expect(journal.events.some(event => event.kind === "outcome" && event.effect_id === "pr")).toBe(false);
+  expect(readTrialTracker(context).commit).toBe(trackerBefore);
+  if (approval === "approved") {
+    expect(git(f.origin, "for-each-ref", "--format=%(refname)", context.settings.publication.lease_ref)).toBe("");
+    const repeated = Bun.spawnSync([process.execPath, entry, "reconcile-publication", ...args, "--owner-request", authority], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+    expect(repeated.exitCode).toBe(2); expect(JSON.parse(repeated.stdout.toString()).data.state).toBe("retired");
+  } else expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(beforeApply);
+  expect(git(f.source, "status", "--porcelain")).toBe("");
+}, 180000);

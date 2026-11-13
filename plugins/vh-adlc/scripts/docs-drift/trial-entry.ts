@@ -8,7 +8,7 @@ import { publishArtifact } from "./journal";
 import { canonicalJSON } from "./protocol";
 import { publish } from "./publish";
 import { resumeEffects } from "./recovery";
-import { readTrialPublication, runTrialAcknowledgement } from "./trial-publication";
+import { readTrialPublication, runTrialAcknowledgement, runTrialReconciliation } from "./trial-publication";
 import { collectProposals } from "./proposals";
 import { runScan } from "./scan";
 import { captureSnapshot } from "./snapshot";
@@ -18,13 +18,13 @@ import { readTrialTracker } from "./trial-tracker";
 
 function inputs(argv: string[]) {
   const command = argv[0];
-  if (!["inspect", "scan", "collect-proposals", "publish", "resume-effects", "prepare-acknowledgement", "acknowledge-delivery", "collect-closure", "verify-adoption"].includes(command)) throw Error("unknown synthetic command");
+  if (!["inspect", "scan", "collect-proposals", "publish", "resume-effects", "prepare-acknowledgement", "acknowledge-delivery", "prepare-reconciliation", "reconcile-publication", "collect-closure", "verify-adoption"].includes(command)) throw Error("unknown synthetic command");
   const allowed = ["--synthetic-trial", "--context-commit"];
   if (["publish", "resume-effects"].includes(command)) allowed.push("--request");
   if (command === "resume-effects") allowed.push("--journal");
   if (command === "publish") allowed.push("--interrupt-after");
-  if (["prepare-acknowledgement", "acknowledge-delivery"].includes(command)) allowed.push("--selection");
-  if (command === "acknowledge-delivery") allowed.push("--owner-request");
+  if (["prepare-acknowledgement", "acknowledge-delivery", "prepare-reconciliation", "reconcile-publication"].includes(command)) allowed.push("--selection");
+  if (["acknowledge-delivery", "reconcile-publication"].includes(command)) allowed.push("--owner-request");
   if (command === "collect-closure") allowed.push("--consolidation");
   if (command === "verify-adoption") allowed.push("--adoption-default");
   const values = new Map<string, string>();
@@ -38,8 +38,8 @@ function inputs(argv: string[]) {
   const request = values.get("--request"), journal = values.get("--journal");
   if (["publish", "resume-effects"].includes(command) && !request || command === "resume-effects" && !journal) throw Error("synthetic publication request or journal required");
   const selection = values.get("--selection"), ownerRequest = values.get("--owner-request");
-  if (["prepare-acknowledgement", "acknowledge-delivery"].includes(command) && !selection
-    || command === "acknowledge-delivery" && !ownerRequest) throw Error("synthetic acknowledgement selection or owner request required");
+  if (["prepare-acknowledgement", "acknowledge-delivery", "prepare-reconciliation", "reconcile-publication"].includes(command) && !selection
+    || ["acknowledge-delivery", "reconcile-publication"].includes(command) && !ownerRequest) throw Error("synthetic recovery selection or owner request required");
   const consolidation = values.get("--consolidation");
   if (command === "collect-closure" && (!consolidation || !/^[1-9][0-9]*$/u.test(consolidation) || !Number.isSafeInteger(Number(consolidation)))) throw Error("synthetic consolidation ID required");
   const adoptionDefault = values.get("--adoption-default");
@@ -56,7 +56,14 @@ export async function main(argv: string[]): Promise<number> {
     const entry = context.component.files.find(file => file.path === "scripts/docs-drift/trial-entry.ts");
     if (!entry) throw Error("synthetic entry absent from retained payload");
     let data: unknown, complete = true;
-    if (["prepare-acknowledgement", "acknowledge-delivery"].includes(options.command)) {
+    if (["prepare-reconciliation", "reconcile-publication"].includes(options.command)) {
+      if (!options.selection) throw Error("synthetic reconciliation selection required");
+      const recovered = await runTrialReconciliation(context, options.selection, options.ownerRequest), { result } = recovered;
+      complete = false;
+      data = { state: result.state, reason: result.reason, operation_id: result.journal.plan.manifest.operation_id,
+        journal_directory: result.journal.directory, revision: result.journal.revision,
+        scopes: recovered.scopes, scope_sha256s: recovered.scope_sha256s };
+    } else if (["prepare-acknowledgement", "acknowledge-delivery"].includes(options.command)) {
       if (!options.selection) throw Error("synthetic acknowledgement selection required");
       const acknowledgement = await runTrialAcknowledgement(context, options.selection, options.ownerRequest);
       const { result } = acknowledgement;

@@ -1,3 +1,7 @@
+import { reconcileAbsent, type ReconciliationScope } from "./recovery";
+import { readRecoveryAuthority } from "./recovery-authority";
+import { recoveryEffectsOutput } from "./recovery-output";
+import { OUTPUT_LIMIT } from "./owned-process";
 import { acknowledgeDeliveries, type AcknowledgementScope } from "./delivery-ack";
 import { realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
@@ -122,4 +126,42 @@ export async function runTrialAcknowledgement(selected: TrialContext, selectionP
       return { kind: "owner-delivery-acknowledgement", source: "owner-current-request", scope_sha256: owner.scope_sha256, request_sha256: sha256(bytes) };
     } });
   return { result, scope, scope_sha256: scope === null ? null : sha256(canonicalJSON(scope)) };
+}
+
+/** Synthetic reconciliation uses the ordinary engine and exact current-owner authority reader. */
+export async function runTrialReconciliation(selected: TrialContext, selectionPath: string, ownerRequestPath?: string): Promise<{
+  result: PublishResult; scopes: ReconciliationScope[]; scope_sha256s: string[];
+}> {
+  const context = loadTrialContext({ root: selected.root, context_commit: selected.context_commit, runtime_directory: selected.root + "/runtime" });
+  const selection = exact(json(ownedArtifact(context, selectionPath)), ["schema_version", "kind", "context_sha256", "journal_directory", "retire_effect_ids", "retirement_lookups"]);
+  if (selection.schema_version !== 1 || selection.kind !== "docs-drift-synthetic-reconciliation-selection" || selection.context_sha256 !== context.context_sha256
+    || typeof selection.journal_directory !== "string" || dirname(resolve(selection.journal_directory)) !== context.artifacts
+    || realpathSync(selection.journal_directory) !== resolve(selection.journal_directory)) throw Error("synthetic reconciliation context or journal changed");
+  const ids = selection.retire_effect_ids;
+  if (!Array.isArray(ids) || ids.length > 1000 || ids.some(id => typeof id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/u.test(id))
+    || new Set(ids).size !== ids.length) throw Error("synthetic reconciliation effect IDs");
+  const lookups = selection.retirement_lookups;
+  if (lookups === null || typeof lookups !== "object" || Array.isArray(lookups) || Object.keys(lookups).some(id => !ids.includes(id)))
+    throw Error("synthetic reconciliation selected lookups required");
+  const journal = readJournal(selection.journal_directory, context.source), plan = journal.plan;
+  if (plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
+    || plan.manifest.bindings.source_commit !== context.source_commit
+    || plan.manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256)
+    throw Error("synthetic reconciliation original context changed");
+  const limit = Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes);
+  if (ownerRequestPath) recoveryEffectsOutput({ command: "reconcile-publication", source: context.source_commit, outcome: "incomplete", capacity_check: true,
+    result: { state: "pending", reason: null, journal }, limit });
+  const result = await reconcileAbsent({ source_repo: context.source, journal_directory: journal.directory,
+    object_store: context.store, settings: context.settings, transport: createTrialTransport(context), retire_effect_ids: ids,
+    retirement_lookups: lookups as Parameters<typeof reconcileAbsent>[0]["retirement_lookups"],
+    ...(!ownerRequestPath ? { inspect_only: true as const } : {}),
+    authorize: async scope => {
+      if (!ownerRequestPath) return null;
+      const bytes = ownedArtifact(context, ownerRequestPath);
+      return readRecoveryAuthority({ source_repo: context.source, artifact_root: context.artifacts,
+        reference: { path: relative(context.artifacts, resolve(ownerRequestPath)), sha256: sha256(bytes) }, purpose: "reconciliation", scope });
+    } });
+  const scopes = result.inspection_scopes ?? [], scope_sha256s = scopes.map(scope => sha256(canonicalJSON(scope)));
+  if (Buffer.byteLength(JSON.stringify({ scopes, scope_sha256s })) > limit) throw Error("synthetic reconciliation inspection exceeds the retained entry bound");
+  return { result, scopes, scope_sha256s };
 }
