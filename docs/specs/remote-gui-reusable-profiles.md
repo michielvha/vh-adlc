@@ -268,7 +268,9 @@ Without `--profile`, every command, record and output stays as it is, and existi
 
 ## Open Questions
 
-None.
+- OQ-1 (R-13 F-01): Is cookie persistence a guarantee or best effort? AC-16 promises that a cookie set 30 seconds before the stop survives in every run, but heavy host load (load 5 to 14) lost one in three of four runs, before and after the T22 fix, while low load passed 10 of 10. Either qualify AC-02 and AC-16 as best effort with the README's half-minute advice, or keep the guarantee and design a close that establishes the cookie is on disk without sending page input.
+- OQ-2 (R-13 F-02): Should AC-16 qualify its two-second grace to a browser stop that starts with at least two seconds of the guard's five-second budget left, describing the interrupted close as ending through the guard's group stop, or should the guard preserve the interval? Either way, add proof for an interrupted close and for a supervisor that never begins the browser stop.
+- OQ-3 (R-13 F-03): Should the document state that reusable profiles keep the clipboard feature's clearing and privacy behaviour, and extend the fixtures to prove it for a profile session (human-to-agent clear, refusal on a failed clear, helper shutdown after the browser close, and an empty working clipboard panel in the next session)?
 
 ## Review Log
 
@@ -288,6 +290,7 @@ None.
 | 2026-11-10 | R-10 | spec | `c482919f001d3afbbf765b782bb9232fea203cb1` | n/a | n/a | accepted by owner |
 | 2026-11-10 | R-11 | implementation | `739c0fb85db6e5ccba9b59d81ddb11ef55010bf6` | claude-opus-5-5 | procedural | Fifteen criteria met; AC-16 not met when a late browser stop gets less than two seconds before the guard kills it; one bug in a refused first start. |
 | 2026-11-10 | R-12 | implementation | `e71d1f37b8cee085e6d01300daacc71e6179b85e` | claude-opus-5-5 | procedural | Fifteen criteria met and the R-11 gap fixed; AC-16 still not met when expiry hits a session that is still starting under lock contention. |
+| 2026-11-13 | R-13 | spec | `6ea4aa823e0107ad1e5d7e3e90eefebfb3b6e817` | gpt-6.1-sol | procedural | No blocking findings after the clipboard merge; four should-fix findings on cookie persistence, the two-second grace, clipboard coverage and the owner summary. |
 
 ### R-1
 
@@ -923,6 +926,37 @@ SEVERITY: nit
 WHERE: Tasks (T17); `TestProfileBrowserStopDoesNotWaitForForwardRemoval` in plugins/remote-gui/internal/session/profile_test.go
 EVIDENCE: The test checks that viewer access is rejected only after it has seen the stand-in's first SIGTERM, so it would also pass if `p.Revoke` ran just after the browser stop began. The ordering holds by inspection: in `serve`, `p.Revoke()` runs synchronously before the goroutine that calls `bundle.Stop`. The stand-in close in this test is the session fake, not `closeReusable`; my scratch probe covered the real close.
 PROPOSAL: Have the fake browser's close record whether the proxy already rejects an enrolled viewer when it begins, so the test asserts that access is rejected before the browser stop.
+
+### R-13
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-02, AC-16), Test Plan (AC-02), Design (Lifecycle)
+EVIDENCE: AC-02 promises cookie persistence without a timing condition, and its proof specifies setting a cookie followed by stop without a wait. Lifecycle accepts loss of recently written cookies. AC-16 promises persistence after 30 seconds "in every run", but its latest evidence at docs/specs/remote-gui-reusable-profiles.md:199 explicitly records failures after that wait under heavy host load. The implementation at plugins/remote-gui/internal/browser/browser.go:308-326 terminates Chromium without establishing that cookies have reached disk; the test at browser_test.go:906-932 waits a fixed 30 seconds.
+PROPOSAL: Ask the owner to resolve the persistence guarantee against the recorded failures. If accepting best-effort persistence, qualify both criteria and their proof accordingly; otherwise retain the guarantee and require a design that establishes it without sending page input.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Lifecycle), Acceptance Criteria (AC-16), Test Plan (AC-16)
+EVIDENCE: AC-16 requires a two-second terminate-to-kill interval whenever browser stop starts before the guard deadline. The guard still kills the supervisor after five seconds at plugins/remote-gui/internal/session/daemon.go:322-337, then finishProfile invokes stopMembers, which terminates remaining processes and kills them after about 300 ms at daemon.go:90-119. Starting browser stop less than two seconds before the deadline therefore does not provide the promised interval. The startup watcher at daemon.go:457-469 improves promptness but does not change that deadline. The proof row does not specify this partial-close case or the existing delayed-supervisor fallback test.
+PROPOSAL: Qualify the two-second interval to a close with sufficient remaining budget and describe the interrupted-close fallback, or change the guard to preserve the interval. Add explicit proof for both an interrupted close and a supervisor that never begins browser stop.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Lifecycle and Compatibility), Test Plan (AC-03, AC-11, AC-14, AC-16)
+EVIDENCE: Clipboard handoff clearing now runs before an agent launch at plugins/remote-gui/internal/browser/phase.go:213-220, and reusable stop closes the helper after closing Chromium at browser.go:254-259. The profile tests at browser_test.go:670-795 exercise handoffs without asserting clipboard clearing or panel operation. The clipboard fixture at browser_test.go:985-992 starts only disposable sessions, and the reusable-stop stand-in at lifecycle_test.go:410 has no clipboard helper. No proof row establishes these combined behaviors; AC-14 expressly limits its compatibility promise to sessions without a profile.
+PROPOSAL: State that reusable profiles preserve the clipboard feature's clearing and privacy behavior. Extend existing fixtures to verify a profile session's human-to-agent clear, failed-clear refusal, helper shutdown ordering, and a working empty clipboard panel in the next session.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary)
+EVIDENCE: docs/specs/remote-gui-reusable-profiles.md:30 says validation has not run, describes implementation through T8, and says several criteria still need evidence. The document now records completed tasks through T22 and evidence beneath those criteria. It also records acceptance of R-10 at line 288, while the summary discusses acceptance of R-6. Most importantly, the summary omits the subsequently recorded failures of the 30-second cookie guarantee at line 199.
+PROPOSAL: Refresh the summary to distinguish recorded validation from outstanding proof, identify R-10 as the accepted baseline, and explain the clipboard drift re-review. Include the unresolved cookie-persistence limitation and AC-16's unticked state.
+
 
 ## Sources
 
