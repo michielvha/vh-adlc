@@ -413,7 +413,7 @@ None. The owner answered Q1 to Q10 and the three R-1 judgement findings (F-01, F
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-13 | R-1 | spec | `798132cf54857c07ee04f82f6595ad9b9acd65a8` | gpt-6.1-sol | procedural | Four blocking findings: no review route that can execute checks, post-merge complete gate, active spec migration, skipped delivery versus the merge watch. |
-
+| 2026-11-13 | R-2 | spec | `7af38b0eb50ae12a678dbcebb3b04cd61b32abb0` | gpt-6.1-sol | procedural | One blocking finding: no enrollment rule between native and shared routing; five should-fix. |
 ### R-1
 
 FINDING: F-01
@@ -464,6 +464,50 @@ SEVERITY: should-fix
 WHERE: Design / External command route
 EVIDENCE: The example substitutes "{prompt_file}" directly into Copilot's -p argument, but only defines that placeholder as a file path. Stackweaver CLAUDE.md and agents/spec.md demonstrate -p with reviewer prompt text, not a prompt-file input. The design defines neither reading the file into that argument nor an explicit instruction for the reviewer to open it, so supplying a complete prompt file does not establish that the CLI receives its contents. CLI execution is unavailable in this review.
 PROPOSAL: Specify the command route's prompt transport explicitly, such as supported file input, stdin or a prompt-text placeholder, and use a verified Copilot invocation. Require the real route test to establish that the reviewer received the canonical instructions and every dispatch identity, rather than only that it returned records.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design / Stackweaver adoption; AC-08, AC-16 and AC-17
+EVIDENCE: The adapters must forward every feature command to installed operations, while unmigrated active specs must finish through the native loop. No per-document routing rule distinguishes those paths. Stackweaver agents/spec.md review step 6 moves draft to planned without an acceptance row, contradicting the unconditional AC-16 requirement. Retaining agent files alone does not reconcile these contracts. I cannot run Git or vh-adlc; the contradiction follows from the current specification and native instructions.
+PROPOSAL: Define an explicit enrollment and routing rule for every feature operation, including review and ship, and scope the new lifecycle guarantees consistently. Test unmigrated and migrated specs through the same existing commands, including a native re-review and completion.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Verification rungs, CI policy and post-merge watch; AC-04 and its Test Plan row
+EVIDENCE: AC-04 permits applicable rungs to be reported failed or not run without requiring either result to block completion or delivery. Its proof checks report states but not stopping behavior. Stackweaver CLAUDE.md requires full applicable local verification before pushing, and agents/ship.md prohibits shipping over a known failure. The new conditional verification mechanism has no explicit test establishing that these gates survive.
+PROPOSAL: Require applicable mandatory rungs to pass before completion or delivery, keeping separately authorized progress PRs distinct. Add failing-command and unavailable-procedure cases that establish no completion update or delivery occurs.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02
+EVIDENCE: The preservation check compares only HEAD and porcelain status. Changing the contents of an already modified file, or overwriting an existing untracked file, can leave both snapshots identical. internal/fresh/fresh.go permits unrelated dirty paths when feature_tree_clean holds, while the canonical reviewer requires preserving the working tree and index. The planned fixture only touches a file; it does not cover this unchanged-status case. Git execution is unavailable in this review.
+PROPOSAL: Compare content and index identities for pre-existing dirty state, rather than treating unchanged status as unchanged work. Add a fixture that alters an existing dirty or untracked file without changing its status and require the review to remain pending.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Model routing per role and External command route; AC-01
+EVIDENCE: The design allows either host or command routes for each of the four roles, and AC-01's proof tests each role and route kind. However, the command protocol always supplies canonical reviewer instructions and expects review records. It defines no author or implementer command protocol, and the role table assigns no role to resume despite requiring every SDD operation to dispatch according to settings.
+PROPOSAL: Restrict command routes to reviewer roles and define resume's routing behavior, or specify the supported execution contract for the other role combinations. Make unsupported combinations fail explicitly and align the tests with that capability matrix.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter / covers
+EVIDENCE: Scope requires a plugin docs-pin bump, but covers omits plugins/vh-adlc/knowledge.md, which supplies that pin. It also omits plugins/vh-adlc/vh-adlc.lock.json, which currently selects binary 0.19.0 and determines whether installed operations receive the changed covers matcher. The pinned feature-document standard requires every path whose change can affect the feature to be covered; internal/fresh/fresh.go filters freshness through doc.MatchCovers.
+PROPOSAL: Cover the docs pin, binary lock and directly relevant plugin release metadata. Ensure installed-entry-point proof is bound to those reviewed configuration bytes.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: AC-09 and its Test Plan row
+EVIDENCE: AC-09 requires every migrated spec's gate results to agree with a manual reading. The Test Plan performs that comparison for only five randomly chosen specs, while Design identifies twelve drafts before optional migrations. Passing the prescribed procedure therefore cannot establish the whole criterion.
+PROPOSAL: Compare gate results with a manual reading for every migrated spec, recording the expected and observed conditions at its converted baseline. Alternatively, obtain owner acceptance for an explicitly sampled criterion with its limitations stated.
 
 ## Sources
 
