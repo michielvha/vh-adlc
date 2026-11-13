@@ -60,11 +60,13 @@ type runtime struct {
 	clipMode      string
 }
 
-// clipboardHelper is the session display's clipboard; tests substitute a double.
+// clipboardHelper is the session display's X client: its clipboard, and the
+// open menus the browser quit waits for. Tests substitute a double.
 type clipboardHelper interface {
 	Set(ctx context.Context, text string) error
 	Get(ctx context.Context) (string, error)
 	Clear(ctx context.Context) error
+	Menus(ctx context.Context) (map[uint32]bool, error)
 	Close() error
 }
 
