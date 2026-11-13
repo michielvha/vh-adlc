@@ -127,7 +127,8 @@ func TestLintCodes(t *testing.T) {
 		{"records mixed", withReviews(t, c, specRow, "### R-1\n\nFINDING: F-01\nSEVERITY: nit\n\nNO FINDINGS\n"), report.CodeReviewRecordsMixed},
 		{"duplicate review", withReviews(t, c, specRow+specRow, clean), report.CodeIDDuplicate},
 		{"implementation records malformed", withReviews(t, c, "| 2026-01-02 | R-2 | implementation | `0123abc` | fable | procedural | Review. |\n", "### R-2\n\nCRITERION: AC-01 The first end state, wrapped onto a second line.\nEVIDENCE: no verdict\n"), report.CodeReviewRecordsMalformed},
-		{"covers pattern", edit(t, c, "  - config.yml\n", "  - src/**/x.go\n"), report.CodeCoversPatternUnsupport},
+		// Since docs/specs/shared-development-loop.md (AC-06), ** is supported; only a malformed pattern is flagged.
+		{"covers pattern", edit(t, c, "  - config.yml\n", "  - src/**/[x.go\n"), report.CodeCoversPatternUnsupport},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
