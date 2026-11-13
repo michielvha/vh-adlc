@@ -431,6 +431,7 @@ three R-2 judgement findings (F-02, F-03, F-04) on 2026-11-13; the answers are f
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-13 | R-1 | spec | `798132cf54857c07ee04f82f6595ad9b9acd65a8` | gpt-6.1-sol | procedural | Four blocking findings: no review route that can execute checks, post-merge complete gate, active spec migration, skipped delivery versus the merge watch. |
 | 2026-11-13 | R-2 | spec | `7af38b0eb50ae12a678dbcebb3b04cd61b32abb0` | gpt-6.1-sol | procedural | One blocking finding: no enrollment rule between native and shared routing; five should-fix. |
+| 2026-11-13 | R-3 | spec | `764df2fe8182152243a40b81e12a9168a88e5fa2` | gpt-6.1-sol | procedural | Two blocking findings: adapter must isolate implement from the live main checkout; domain plans routed to retired agents. Two should-fix. |
 
 ### R-1
 
@@ -526,6 +527,36 @@ SEVERITY: should-fix
 WHERE: AC-09 and its Test Plan row
 EVIDENCE: AC-09 requires every migrated spec's gate results to agree with a manual reading. The Test Plan performs that comparison for only five randomly chosen specs, while Design identifies twelve drafts before optional migrations. Passing the prescribed procedure therefore cannot establish the whole criterion.
 PROPOSAL: Compare gate results with a manual reading for every migrated spec, recording the expected and observed conditions at its converted baseline. Alternatively, obtain owner acceptance for an explicitly sampled criterion with its limitations stated.
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design / Claiming from a host worktree; Stackweaver adoption; AC-10 and AC-13
+EVIDENCE: The shared claim procedure accepts a worktree holding the default branch and switches it to the feature branch. Stackweaver adapters only forward commands, with no specified step that creates or requires an isolated host worktree. Stackweaver agents/implement.md:52-56 currently calls EnterWorktree explicitly, and CLAUDE.md:127-137 requires that isolation because the main checkout is live and bind-mounted. .claude/settings.json configures the base of a worktree but does not establish that one exists. Invoking the adopted command from clean main can therefore reproduce the checkout-switching problem. I cannot run Git or vh-adlc; this finding follows from reading the procedures and configuration.
+PROPOSAL: Specify that the Stackweaver adapter obtains an isolated host worktree before invoking shared implement, or refuses invocation from the live main checkout. Add a scenario starting on clean main that proves its branch and files remain unchanged while implementation proceeds in the isolated worktree.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Design / Stackweaver adoption; AC-08 and AC-17
+EVIDENCE: AC-08 requires native agents for every unenrolled spec, while AC-17 requires retiring those agents once no non-terminal spec outside the domain-extension plans remains native. The excluded terraform-provider-stackweaver-plan.md and TFE_COMPATIBILITY_MASTER_PLAN.md are both in-progress, remain unconverted, and therefore remain unenrolled. The routing rule sends /spec review and other generic feature commands for them to agents that the retirement rule removes. Terminal native documents also remain subject to the unqualified routing rule.
+PROPOSAL: Define routing for excluded domain plans and retained historical documents after retirement, without depending on deleted agents. Align AC-08, AC-17 and their tests with that boundary, or retain the native handlers while any supported invocation still needs them.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Verification rungs, CI policy and post-merge watch; AC-04
+EVIDENCE: Design explicitly allows an authorized progress PR to open with failing verification rungs. Stackweaver CLAUDE.md:153 requires full applicable local verification before any push, and agents/ship.md:136-137 says never ship over a known verification failure. Preventing completion and a delivered report does not preserve those pre-push gates. The specified constitution changes address history and document style, but do not address this exception.
+PROPOSAL: Keep Stackweaver's mandatory pre-push checks binding for progress PRs as well as completed delivery. If failed-check publication is intended, raise the constitution change for the owner and test its exact permission boundary.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02 and its Test Plan row
+EVIDENCE: The preservation snapshot records HEAD, the index tree, status and dirty-file contents, but no other refs. plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:22-24 requires commands to leave every ref unchanged. A shell-enabled reviewer can move or create another branch or tag without changing any specified snapshot value, and the review would remain eligible for storage. The proposed mutation fixtures cover files, not refs.
+PROPOSAL: Include the repository's ref identities in the before-and-after preservation check and reject reviews when they differ. Add a fixture that changes a non-current ref while leaving HEAD, index and worktree snapshots unchanged.
 
 ## Sources
 
