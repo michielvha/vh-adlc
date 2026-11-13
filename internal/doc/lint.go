@@ -66,7 +66,9 @@ func Lint(ctx context.Context, g gitcmd.Git, d *Doc, r *rules.Rules) ([]report.F
 
 	for _, c := range d.Covers {
 		if strings.Contains(c, "**") {
-			add(d.finding(1, report.CodeCoversPatternUnsupport, "covers entry %q uses **, which is not supported", c))
+			if _, _, err := compileDoubleStar(c); err != nil {
+				add(d.finding(1, report.CodeCoversPatternUnsupport, "covers entry %q is not a valid coverage pattern", c))
+			}
 		}
 	}
 	if g.Dir != "" && d.Path != "" {

@@ -213,7 +213,8 @@ func TestDaemonReplacementRevokesTheSession(t *testing.T) {
 			t.Fatal(e)
 		}
 		t.Cleanup(func() { _ = state.Signal(identity, syscall.SIGKILL); _ = child.Wait() })
-		deadline := time.Now().Add(3 * time.Second)
+		// Setup only: a re-executed race binary can take seconds to start on a loaded host.
+		deadline := time.Now().Add(20 * time.Second)
 		for time.Now().Before(deadline) {
 			if _, e = os.Stat(filepath.Join(parent, "daemon-ready")); e == nil {
 				return child, identity
@@ -250,12 +251,18 @@ func TestDaemonReplacementRevokesTheSession(t *testing.T) {
 		return (&net.Dialer{}).DialContext(ctx, "unix", record.ProxyAddress)
 	}}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: time.Second}
+	// The guard records cleanup-pending before it serves its denial on the
+	// reserved listener, so the request can wait in the listener's backlog
+	// until the guard is scheduled. The bound only keeps a hang from stalling
+	// the test; what it proves is that no answer grants access.
+	client := &http.Client{Transport: transport, Timeout: 15 * time.Second}
+	asked := time.Now()
 	response, err := client.Get("http://localhost/")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = response.Body.Close()
+	t.Logf("the proxy listener answered %d %v after the request", response.StatusCode, time.Since(asked))
 	if response.StatusCode == 200 {
 		t.Fatal("replaced daemon retained application access")
 	}
@@ -266,7 +273,9 @@ func TestDaemonReplacementRevokesTheSession(t *testing.T) {
 	if _, err = Cleanup(context.Background(), home); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	// Cleanup only wakes the cleanup-pending guard; its retry, which a loaded
+	// host can take seconds to schedule and run, does the reconciling.
+	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		record, err = state.Load(home, v.ID)
 		if err == nil && record.Forward == nil && record.State == "failed" {
@@ -275,7 +284,7 @@ func TestDaemonReplacementRevokesTheSession(t *testing.T) {
 		time.Sleep(25 * time.Millisecond)
 	}
 	if record.Forward != nil || record.Diagnostic != "tailscale-daemon-identity-changed" {
-		t.Fatal("daemon replacement did not reconcile accurately")
+		t.Fatalf("daemon replacement did not reconcile accurately: state %q, diagnostic %q, forward kept %v", record.State, record.Diagnostic, record.Forward != nil)
 	}
 	response, err = app.Client().Get(app.URL)
 	if err != nil {

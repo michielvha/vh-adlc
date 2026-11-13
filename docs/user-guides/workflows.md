@@ -262,6 +262,34 @@ model does not satisfy that request.
 Review isolation is procedural: the reviewer has a shell that can still write.
 See the [compatibility details](../reference/compatibility.md).
 
+A reviewer role can also run through an external command, such as the Codex CLI on
+a model from another vendor. A spec review then reads a read-only export of the
+commit; an implementation review runs in a private clone, where it may run checks.
+The review is stored only when the reply names the requested model and commit and
+the checkout is unchanged afterwards. Otherwise it stays pending.
+
+The command runs in its own PID namespace, created with `unshare --user --pid`, so no
+reviewer process outlives the review. On a host where that fails, command-route reviews
+stay pending. Ubuntu 23.10 and later restrict unprivileged user namespaces through
+AppArmor; allow them, for example with
+`sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`, to use these routes.
+
+## Loop settings
+
+A repository may commit `.vh-adlc/loop.yaml` to tune the feature loop. It can:
+
+- route each role (author, implementer, spec reviewer, implementation reviewer) to the
+  host, optionally with a model, or route a reviewer role to an external command;
+- name a project procedure, instruction files and review lenses every operation reads;
+- declare verification rungs that must pass before push, completion and delivery;
+- set manual CI, a post-merge watch and extra skip-CI paths for delivery;
+- have implement continue in an isolated worktree, and have investigate always write
+  a findings document.
+
+Without the file, the loop runs as described above. A per-user file may replace only
+an external command's executable path. See the
+[loop settings reference](../../plugins/vh-adlc/references/loop-settings.md).
+
 ## Authority and publication
 
 A generic vh-adlc request authorizes the work you requested. Choosing a procedure

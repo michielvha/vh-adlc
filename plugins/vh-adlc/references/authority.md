@@ -77,6 +77,12 @@ already hold someone else's staged work, and a plain `git commit` would take it 
 you commit: `git commit -m <message> -- <path>...`. That commits only those paths and leaves the rest
 staged as it was. A conflicting concurrent edit to the same file stops the run with a question.
 
+A claim may also be made from a host worktree at the default-branch tip that is detached or on a branch
+this session created or was handed, through `scripts/loop/cli.ts claim`; it never advances an unrelated
+branch. With loop setting `implement_worktree: isolated`, implement asks the host's own worktree tool for
+a worktree when it starts in the primary checkout. That worktree is the host's: the plugin itself still
+creates none, and on a host without such a tool the operation stops before writing.
+
 Work on a feature only in its owning worktree, found with `git worktree list --porcelain`; run branch
 checks, `fresh` and `gate` there. Outside the maintenance and audit roles below, never create, remove, prune, reset or force-move a worktree,
 and never repoint an unrelated branch. The one exception is the branch helper in [branches.md](branches.md):

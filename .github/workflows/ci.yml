@@ -36,6 +36,10 @@ jobs:
           sudo apt-get install -y bubblewrap util-linux apparmor
           sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
           bwrap --unshare-all --ro-bind / / -- /usr/bin/true
+          # Command-route reviews run their reviewer in an unprivileged PID namespace through unshare,
+          # which Ubuntu's AppArmor restricts by default.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          unshare --user --map-current-user --pid --fork --kill-child /usr/bin/true
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod

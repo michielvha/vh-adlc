@@ -86,6 +86,11 @@ checklist item as pending the owner's choice. Never run the guide's manual comma
 Every page the loop needs is requested on every call, so a pin older than the plugin's pages stops with
 `missing-page`: always include `conventions/feature-documents.md` and `guides/humanize-prose.md`.
 
+A repository may declare loop settings in `.vh-adlc/loop.yaml` (`references/loop-settings.md`). The
+SDD operations (spec, tasks, implement, review, ship, investigate and resume) then read their loop role's
+route with `bun scripts/loop/cli.ts route`, and before acting read the instruction files and project
+procedure that `bun scripts/loop/cli.ts context` lists.
+
 ## 3. Decide with the binary
 
 The binary decides; the operation only acts on its JSON result and quotes it in the report.

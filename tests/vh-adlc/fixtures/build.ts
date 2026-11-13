@@ -275,8 +275,10 @@ function fixturePlugin(dest: string, revision: string, wrapper: string, home: st
   }
   writeFileSync(join(dest, "vh-adlc.lock.json"), `${JSON.stringify({ version, assets }, null, 2)}\n`);
   // Seed the isolated cache through the unmodified installer.
+  // The fixture binary must be the only vh-adlc the installer can see, so leave out /usr/local/bin, where
+  // a genuine install may live and would not match this fixture lock.
   const r = Bun.spawnSync(["bash", join(dest, "scripts", "ensure-vh-adlc.sh")], {
-    env: { HOME: home, XDG_CACHE_HOME: join(home, ".cache"), PATH: "/usr/local/bin:/usr/bin:/bin", LC_ALL: "C" },
+    env: { HOME: home, XDG_CACHE_HOME: join(home, ".cache"), PATH: "/usr/bin:/bin", LC_ALL: "C" },
     stdout: "pipe",
     stderr: "pipe",
   });
