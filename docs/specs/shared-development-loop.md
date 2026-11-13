@@ -583,6 +583,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-9 | spec | `9378490b8c1681e81508506f61b467ba2456bb30` | gpt-6.1-sol | procedural | No blocking findings; one should-fix on reused E2E proofs and a wording nit. |
 | 2026-11-13 | R-10 | spec | `1d563f0e24e6ad57c1677374dd4f1ac9ac1afd01` | gpt-6.1-sol | procedural | No blocking findings; three should-fix: live slot pass and final full kind run, skipped subchecks inside make verify, glossary. |
 | 2026-11-13 | R-11 | spec | `fcc1245e2deda1fe8ef0d42d43f90954338f8cd3` | gpt-6.1-sol | procedural | One blocking finding: a file-only review reads the live worktree, not the target commit. Two should-fix. |
+| 2026-11-13 | R-12 | spec | `64503e5f5f95d49cc5dfcc717e616c964e68fbd5` | gpt-6.1-sol | procedural | One blocking finding: the reviewer CLI starts in the live checkout and can load its instruction files. Two should-fix. |
 
 ### R-1
 
@@ -913,6 +914,29 @@ SEVERITY: should-fix
 WHERE: Design / Skip-CI paths and Release path; AC-15
 EVIDENCE: The design enables extra skip paths after updating the plugin's knowledge.md pin. However, internal/knowledge/knowledge.go, pin(), gives repository pins precedence over that fallback, and plugins/vh-adlc/references/loop.md requires using the resolved revision and reporting conflicts. A consumer still pinned to d8f07c9 therefore reads conventions/delivery.md's documentation-only restriction while AC-15 unconditionally requires skipping deliveries containing declared tooling paths. I cannot execute knowledge or ship; the precedence is established by reading their source and instructions.
 PROPOSAL: Define how skip_ci_paths behaves when the resolved delivery convention does not support it, including a pin-update handoff or an explicitly authorized, reported exception. Add a repository-pin fixture so updating the plugin fallback cannot silently override the consumer's pinned rule.
+
+### R-12
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design / External command route; AC-02 and its Test Plan row
+EVIDENCE: docs/specs/shared-development-loop.md:264-278 launches the command from the owning worktree while promising that uncommitted instructions cannot shape a spec review. The example argv does not disable automatic custom instructions. Stackweaver .github/copilot-instructions.md:5-10 directs Copilot to repository instructions, and existing isolation prior art in tests/vh-adlc/triage/copilot-trial.ts:8 explicitly uses --no-custom-instructions and launches against exported inputs. Merely pointing the prompt at an archive leaves startup instruction discovery in the live checkout outside the promised boundary. I cannot execute the CLI; this finding follows from the specified launch and existing launch controls.
+PROPOSAL: Launch file-only reviewers from the exported target, with automatic instruction discovery disabled or confined to that export. Extend the real-route test to change live startup instruction files and verify that neither their contents nor their directives enter the review.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Investigation defaults; AC-07 and its Test Plan row
+EVIDENCE: Stackweaver agents/investigate.md:50-51 requires extending an existing issue or document rather than filing a duplicate. The proposed Design only requires searching before writing, and AC-07 requires reporting duplicates found. Its tests require writing a document and naming the duplicate, so creating a second analysis document for the same case can satisfy the stated checks.
+PROPOSAL: Require investigate to reuse or extend the existing document when it covers the case, while preserving issue-creation authority limits. Add a duplicate-document scenario whose pass condition includes no second document being created.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Claiming from a host worktree; AC-13 and its Test Plan row
+EVIDENCE: docs/specs/shared-development-loop.md:298-304 requires comparison with the freshly fetched default-branch tip, then promises a stale-tip refusal before anything is written and with the repository unchanged. The AC-13 proof additionally requires the repository to remain byte-identical. plugins/vh-adlc/references/loop.md requires git fetch before fresh and gate; fetching can update remote-tracking refs and FETCH_HEAD before the stale-tip refusal. I cannot run git or vh-adlc; this is a contradiction between the required procedure and its preservation contract, not an observed test failure.
+PROPOSAL: Explicitly permit the required fetch effects while forbidding changes to the document, local branches, HEAD, index and worktree on pre-claim refusal. Make the stale-tip fixture advance the remote and verify that precise boundary instead of whole-repository byte identity.
 
 ## Sources
 
