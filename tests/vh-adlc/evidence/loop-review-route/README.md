@@ -4,7 +4,7 @@ Recorded on 2026-11-13 from `feat/shared-development-loop`, with the candidate p
 `scripts/loop/cli.ts review` and Codex CLI 0.163.0.
 
 `run.sh` builds a disposable feature repository (`math.ts`, `math.test.ts`, `docs/specs/add.md`) with
-two command routes in its `.vh-adlc/loop.yaml`: a file-only spec reviewer
+two command routes in its `.vh-adlc/loop.yaml`: a read-only spec reviewer
 (`codex exec --json --skip-git-repo-check -s read-only`) and a shell implementation reviewer
 (`codex exec --json -s workspace-write`), both `gpt-6.1-sol` with `model_attestation: codex-session`.
 Both ran inside the route's PID namespace.

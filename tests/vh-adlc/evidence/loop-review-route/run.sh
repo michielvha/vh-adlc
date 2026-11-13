@@ -1,5 +1,5 @@
 #!/bin/bash
-# T34: one real file-only spec review and one shell implementation review through the Codex command
+# T34: one real read-only spec review and one shell implementation review through the Codex command
 # route, on a disposable feature, using the candidate plugin's scripts/loop/cli.ts.
 set -euo pipefail
 export PATH=$HOME/.bun/bin:$PATH

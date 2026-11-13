@@ -90,16 +90,25 @@ and stayed pending, as designed: Codex never tells its model its name, although 
 `gpt-6.1-sol` served the run. The owner chose to let a command route read the served model from the
 CLI's own record (`model_attestation: codex-session`); AC-02 and its proof now cover that.
 
-A fourth revision, during implementation, moves implementation reviews into a private clone of the
+A fourth revision, during implementation, moved implementation reviews into a private clone of the
 reviewed commit: the first Codex implementation review stayed pending because another session pushed to
-the shared refs while it ran.
+the shared refs while it ran. The clone is implemented (T48, T49), and the R-21 implementation review ran
+in it.
 
-Validation so far: nineteen spec reviews on `gpt-6.1-sol`. Every task through T47 is implemented on the two
-feature branches with its checks recorded; the full local suite passed at T24; real Codex reviews
-(T34), routing trials and a claim-to-merge flow (T33) are recorded. The first Codex implementation
-review found five defects, now fixed (T43 to T47), but could not be stored because other sessions pushed
-to the shared refs while it ran, which this revision addresses with a private review clone. Still to do:
-the private clone (T48, T49), the lean evidence runs (T50 to T53), and a fresh implementation review.
+This fifth revision changes one word of the contract. AC-02 and Design called the spec review route
+"file-only", but the Codex route runs in a read-only sandbox where the reviewer may still run read-only
+commands; R-21 saw it run `bun test`. The route is now called read-only: it writes nothing and reads only
+the export of the commit. T57 aligns the code comment, and T34's evidence carries a correction note.
+
+Validation so far: twenty-one spec reviews on `gpt-6.1-sol` and one stored implementation review (R-21 at
+`b44d2f58`: six criteria met, AC-02 not met, twelve not verified, seven should-fix findings). R-21's
+findings are fixed in T54 to T56, apart from this wording change. Every task through T56 is implemented
+with its checks recorded; real Codex reviews (T34), routing trials and a claim-to-merge flow (T33), and
+the lean lens trial and install rehearsal (T50, T51) are recorded. The headless investigation and
+isolation trials (T52, T53) ran but did not succeed; the owner chose residuals on AC-07 and AC-18 instead
+of a retry, recorded as attempts, not as verified outcomes, and they come back after re-acceptance. Still
+to do: T57, a fresh implementation review, and the owner's call on criteria a reviewer cannot verify
+without running full agent operations.
 Accepting authorizes continuing the implementation on its branches. Publishing releases, merging either
 repository and retiring the native agents each need separate approval.
 
@@ -715,6 +724,7 @@ Stackweaver adoption, on a Stackweaver feature branch against the candidate plug
       Evidence: Stackweaver `bedc6b5d`, `tests/agent-loop/evidence/t33-trials.md`: seven capped headless Opus runs with the candidate plugin (`--setting-sources project --plugin-dir`, the only vh-adlc loaded) show `/spec review` and its plain-language form, `/tasks`, `/investigate` and `/implement` reaching the shared operations for enrolled specs, and `/spec review` on an unenrolled spec and `/ship` on a non-feature change reaching the native agents; the clone stayed clean. A disposable enrolled feature went through a Codex spec review (blocking, then `NO FINDINGS`), the owner's in-session acceptance of the fixture, `cli.ts isolation` (primary checkout to host worktree), `cli.ts claim`, a test-first task, rungs (first blocking on a real changelog gap and a skipped frontend check, then `make verify` 47 of 47), a Codex implementation review returning AC-01 met, `vh-adlc gate complete` in the worktree, and a merge-commit landing with every Review Log commit reachable; the primary checkout stayed byte-identical. Limitations: `gh` was disabled, so no PR and only the not-delivered verdict; r1 and r2 stopped at the turn cap after routing; the post-completion ship was a plain push.
 - [x] T34 `tests/vh-adlc/evidence/loop-review-route/` - one real Codex CLI `gpt-6.1-sol` file-only spec review and one shell implementation review that returns `met` on a disposable feature, with transcripts and stored records (AC-02)
       Evidence: `tests/vh-adlc/evidence/loop-review-route/`: on a disposable feature at `196d98c7`, a real Codex CLI 0.163.0 file-only spec review and a shell implementation review, both through the candidate `cli.ts review` inside the route's PID namespace, came back `ready` with `gpt-6.1-sol` attested from Codex's session log. The implementation reviewer ran `bun test` and returned AC-01 `met`; the spec reviewer read the committed export and returned two findings. The repository stayed clean, and both stored record sets pass `vh-adlc review check`. A first real Codex attempt earlier (before attestation existed) stayed pending on `MODEL: unknown`, as designed.
+      Correction: the review ran in Codex's read-only sandbox and the reviewer ran `bun test`, so it was a read-only spec review, not a file-only one, as AC-02 now says (R-22).
 - [x] T46 Stackweaver `agents/loop-project.md`, `.claude/commands/*.md`, `tests/agent-loop/retirement.test.ts` - after the native agents retire, an adapted command or plain-language request given a terminal unenrolled document refuses before invoking any operation; a test simulates retirement in a disposable copy and checks the refusal rule in every adapter and the procedure (AC-17)
       Evidence: Stackweaver `9ba38077`: the four adapted commands, `agents/loop-project.md` and `AGENTS.md` refuse a terminal unenrolled document as closed history once the native agents are gone; `bun test tests/agent-loop` 169 pass, including the new rule check. A simulated-retirement test was drafted and dropped because it could not fail; the refusal is prose an operation follows, checked by the rule test and by implementation review.
 - [x] T47 Stackweaver `tests/agent-loop/parity.json`, `agents/loop-project.md` - the labeling half of `investigate-files-issue` becomes its own row with a local home (an issue filed on request gets one type label and its state label from the existing vocabulary), since Q8 superseded only routine filing; `bun test tests/agent-loop` passes (AC-08, AC-10)
