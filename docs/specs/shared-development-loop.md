@@ -453,6 +453,7 @@ three R-2 judgement findings (F-02, F-03, F-04) and the two R-3 judgement findin
 | 2026-11-13 | R-1 | spec | `798132cf54857c07ee04f82f6595ad9b9acd65a8` | gpt-6.1-sol | procedural | Four blocking findings: no review route that can execute checks, post-merge complete gate, active spec migration, skipped delivery versus the merge watch. |
 | 2026-11-13 | R-2 | spec | `7af38b0eb50ae12a678dbcebb3b04cd61b32abb0` | gpt-6.1-sol | procedural | One blocking finding: no enrollment rule between native and shared routing; five should-fix. |
 | 2026-11-13 | R-3 | spec | `764df2fe8182152243a40b81e12a9168a88e5fa2` | gpt-6.1-sol | procedural | Two blocking findings: adapter must isolate implement from the live main checkout; domain plans routed to retired agents. Two should-fix. |
+| 2026-11-13 | R-4 | spec | `b777df0b6cc97a2d8b1410f3bedc73631ab504f5` | gpt-6.1-sol | procedural | Two blocking findings: routing criteria contradict for terminal documents; no-publication verdict not tied to the merge commit. Three should-fix. |
 
 ### R-1
 
@@ -578,6 +579,43 @@ SEVERITY: should-fix
 WHERE: Design / External command route; AC-02 and its Test Plan row
 EVIDENCE: The preservation snapshot records HEAD, the index tree, status and dirty-file contents, but no other refs. plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:22-24 requires commands to leave every ref unchanged. A shell-enabled reviewer can move or create another branch or tag without changing any specified snapshot value, and the review would remain eligible for storage. The proposed mutation fixtures cover files, not refs.
 PROPOSAL: Include the repository's ref identities in the before-and-after preservation check and reject reviews when they differ. Add a fixture that changes a non-current ref while leaving HEAD, index and worktree snapshots unchanged.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design / Stackweaver adoption; AC-08 and AC-17
+EVIDENCE: AC-08 requires running native agents “for every unenrolled one”, without a status or retirement exception. AC-17 instead requires refusing terminal unenrolled documents after retirement, without running anything. Terminal documents remain unenrolled by design, so the same invocation must both run a native agent and refuse it. Retaining native agents for active domain plans resolves their routing problem but not this remaining criterion contradiction.
+PROPOSAL: Qualify AC-08 with the terminal-document retirement exception specified in Design and AC-17. Test active native routing separately from post-retirement historical-document refusal.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02 and its Test Plan row
+EVIDENCE: AC-02 rejects any change to index or file contents, but the preservation snapshot records only the index tree and hashes modified or untracked files reported by porcelain status. Stackweaver .gitignore:10-25 excludes existing environment files and private-key files, whose contents can change without appearing in that snapshot. Index flags can also change without changing git write-tree output. The canonical reviewer requires preserving the working tree and index. I cannot run Git or vh-adlc to execute mutation fixtures; the specified snapshot leaves these states unobserved.
+PROPOSAL: Include pre-existing ignored files and meaningful index flags in the preservation check, or explicitly define and obtain approval for a narrower boundary with permitted generated outputs. Add fixtures that overwrite an existing ignored configuration file and change an index flag without changing the index tree.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design / Skip-CI paths and post-merge watch; AC-05 and AC-15
+EVIDENCE: The design infers “no publication path” from a skip-marked feature delivery, but does not require checking or setting the authorized merge commit's message. Stackweaver .github/workflows/tag.yml:5-20 triggers on main and does not path-ignore .claude/settings.json or hook scripts. scripts/release/watch-merge.sh:143-150 checks the merge commit's own message for skip directives. Markers on feature-branch commits therefore do not establish that a later merge commit suppresses publication. The prescribed fixtures do not cover an eligible branch merged without a marker. I cannot execute Git or the workflows.
+PROPOSAL: Base the no-publication verdict on the actual merge commit and affected release paths, and require preserving the marker during an authorized skip-eligible merge. Test both marked and unmarked merge commits; an unmarked publishing merge must run the watcher rather than receive a skipped-delivery verdict.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Verification rungs; AC-04 and its Test Plan row
+EVIDENCE: Rung applicability uses a “changed-path glob”, but neither Design nor the proof defines its comparison range. Stackweaver CLAUDE.md requires integration tests before merging any backend/ or core/ change. Evaluating only current dirty paths or the last task's commit can omit that mandatory rung when an earlier feature commit changed backend/ and the final task changed only documentation. The existing fixtures test matching paths but not earlier committed changes followed by a clean or documentation-only final state.
+PROPOSAL: Define applicability against the complete feature delta, including earlier committed changes and owned uncommitted changes, and bind passing evidence to the verified target. Add a backend-change-then-documentation fixture that still requires integration verification before push and completion.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope / Shared release; Design; AC-12 and its Test Plan row
+EVIDENCE: The pinned conventions/delivery.md requires naming every affected artifact and its build/publication path, with pre-merge checks reproducing those builds. This document names a vh-adlc release and marketplace installation but supplies no artifact/path inventory. .goreleaser.yml builds four platform binaries, archives and signed checksums; .github/workflows/release.yml publishes through a reusable release workflow. Plugin metadata and vh-adlc.lock.json show independently versioned plugin and runtime inputs. AC-12 checks installation and version equality, not the complete affected publication paths.
+PROPOSAL: Name the runtime archives, signatures, plugin payload and docs revision, their actual build/publication paths, and the dependency order for publishing the runtime and updating the plugin lock. Add release-path checks and exact published revision evidence alongside the installed-entry-point checks.
 
 ## Sources
 
