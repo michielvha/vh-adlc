@@ -14,9 +14,9 @@ export type LoopRole = typeof LOOP_ROLES[number];
 const REVIEWER_ROLES: readonly LoopRole[] = ["spec_reviewer", "implementation_reviewer"];
 
 export type HostRoute = { route: "host"; model?: string };
-export type CommandRoute = { route: "command"; model: string; argv: string[] };
+export type CommandRoute = { route: "command"; model: string; argv: string[]; model_attestation?: "codex-session" };
 export type Route = HostRoute | CommandRoute;
-export type RoleRoute = { route: "host" | "command"; model?: string; argv?: string[] };
+export type RoleRoute = { route: "host" | "command"; model?: string; argv?: string[]; model_attestation?: "codex-session" };
 
 export type LoopOperation = "spec" | "spec review" | "tasks" | "implement" | "review" | "ship" | "investigate" | "resume";
 const OPERATION_ROLE: Record<Exclude<LoopOperation, "resume">, LoopRole> = {
@@ -152,7 +152,8 @@ function route(role: LoopRole, value: unknown): RoleRoute {
     return { route: "host", ...(item.model === undefined ? {} : { model: text(item.model, `${field}.model`) }) };
   }
   if (!REVIEWER_ROLES.includes(role)) fail(`${field}: a command route is only for reviewer roles`);
-  keys(item, ["route", "model", "argv"], field);
+  keys(item, ["route", "model", "argv", "model_attestation"], field);
+  if (item.model_attestation !== undefined && item.model_attestation !== "codex-session") fail(`${field}.model_attestation must be codex-session`);
   const model = text(item.model, `${field}.model`);
   if (!Array.isArray(item.argv) || item.argv.length === 0) fail(`${field}.argv`);
   const argv = item.argv.map((part, index) => text(part, `${field}.argv[${index}]`));
@@ -160,7 +161,8 @@ function route(role: LoopRole, value: unknown): RoleRoute {
   if (!argv.some(part => part.includes("{prompt}") || part.includes("{prompt_file}"))) fail(`${field}.argv needs {prompt} or {prompt_file}`);
   for (const part of argv) for (const name of part.match(/\{[a-z_]+\}/g) ?? [])
     if (!PLACEHOLDERS.includes(name)) fail(`${field}.argv has an unknown placeholder ${name}`);
-  return { route: "command", model, argv };
+  if (item.model_attestation === "codex-session" && !argv.includes("--json")) fail(`${field}.argv needs --json for codex-session attestation`);
+  return { route: "command", model, argv, ...(item.model_attestation === undefined ? {} : { model_attestation: "codex-session" as const }) };
 }
 
 /** The per-user override file: outside every repository, it may only replace a command route's executable. */

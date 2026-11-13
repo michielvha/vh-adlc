@@ -35,6 +35,7 @@ Resume takes the route of the operation it continues.
 | `roles.<role>.route` | `host` or `command`. A role that is not listed uses `host` with no model. |
 | `roles.<role>.model` | Optional for `host`, passed to the host as a requested model under `review-protocol.md`. Required for `command`. |
 | `roles.<role>.argv` | `command` only: the executable, then its arguments. It must contain `{prompt}` or `{prompt_file}`, and may use `{model}` and `{export_dir}`. No other placeholder is accepted. |
+| `roles.<role>.model_attestation` | Optional, `command` only: `codex-session` reads the served model from Codex's session log for the run's thread id instead of the reviewer's self-report; the `argv` must include `--json`. A missing log, no or several recorded models, or a mismatch leaves the review pending. |
 | `review_scratch` | Optional list of build-output directories inside the checkout that a shell-enabled implementation reviewer may write to; changes there do not leave the review pending. Never `.`. |
 | `project_procedure` | Optional contained file of local rules. Every SDD operation reads it before acting. |
 | `instruction_files` | Optional contained files, such as `AGENTS.md` and `CLAUDE.md`. Every SDD operation reads them, and every spec review checks the document against them. |

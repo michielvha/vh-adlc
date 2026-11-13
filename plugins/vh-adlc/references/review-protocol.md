@@ -12,7 +12,9 @@ Before dispatching, read the reviewer role's route:
   configured CLI with the canonical reviewer instructions and the dispatch identity, as
   `references/loop-settings.md` describes: a spec review reads a read-only export of X and is launched
   from it; an implementation review runs in the owning worktree, which must be unchanged afterwards
-  outside `review_scratch`. Its JSON `status` is `ready` or `pending`. On `ready`, store its `records`
+  outside `review_scratch`. A route with `model_attestation: codex-session` takes the served model from
+  Codex's own session log, so a `MODEL: unknown` self-report is accepted only when that attested model
+  matches the request. Its JSON `status` is `ready` or `pending`. On `ready`, store its `records`
   under `### R-<n>` with a Review Log row naming its `model` and isolation `procedural`, then run
   `review check` against the same text. On `pending`, store nothing and report a line that starts with
   `review pending`, followed by its `reason`, with the raw `reply` in the handoff.

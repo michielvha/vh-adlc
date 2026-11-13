@@ -186,14 +186,15 @@ describe("model attestation through the Codex session log", () => {
   function codex(reply: string, sessionModel: string | null, home: string, writeLog = true) {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-codex-")));
     made.push(dir);
-    const script = join(dir, "codex.sh"), thread = crypto.randomUUID();
+    const script = join(dir, "codex.sh"), thread = crypto.randomUUID(), replyFile = join(dir, "reply.txt");
+    writeFileSync(replyFile, reply);
     const log = join(home, ".codex", "sessions", "2026", "11", "13", `rollout-2026-11-13T00-00-00-${thread}.jsonl`);
     const meta = sessionModel === null ? '{"type":"session_meta","payload":{}}' : `{"type":"turn_context","payload":{"model":"${sessionModel}"}}`;
     writeFileSync(script, `#!/bin/bash
 ${writeLog ? `mkdir -p ${dirname(log)}; printf '%s\\n' '${meta}' > ${log}` : ""}
 printf '%s\\n' '{"type":"thread.started","thread_id":"${thread}"}'
 printf '%s\\n' '{"type":"turn.started"}'
-python3 -c 'import json,sys; print(json.dumps({"type":"item.completed","item":{"id":"i","type":"agent_message","text":sys.argv[1]}}))' ${JSON.stringify(reply)}
+python3 -c 'import json,sys; print(json.dumps({"type":"item.completed","item":{"id":"i","type":"agent_message","text":open(sys.argv[1]).read()}}))' ${replyFile}
 printf '%s\\n' '{"type":"turn.completed"}'
 `);
     chmodSync(script, 0o700);

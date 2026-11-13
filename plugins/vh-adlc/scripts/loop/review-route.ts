@@ -6,7 +6,7 @@
 // is `pending`: nothing is stored.
 import { createHash } from "node:crypto";
 import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { runOwnedClient } from "../triage/owned-process";
 
@@ -18,7 +18,7 @@ export type Cleanup = (result: { survivors: number[]; confirmed: boolean }) => P
 
 export type ReviewRequest = {
   repo: string; commit: string; kind: ReviewKind; document: string;
-  route: { model: string; argv: string[] }; prompt: string;
+  route: { model: string; argv: string[]; model_attestation?: "codex-session" }; prompt: string;
   scratch?: string[]; timeoutMs?: number; env?: Record<string, string>;
   /** Test seam: replaces the confirmation of process cleanup. */
   cleanup?: Cleanup;
@@ -140,6 +140,40 @@ function substitute(argv: string[], values: Record<string, string>): string[] {
   return argv.map(part => part.replace(/\{(model|prompt|prompt_file|export_dir)\}/g, (_, name: string) => values[name] ?? ""));
 }
 
+/**
+ * Codex's `--json` stream names the thread; its session log under `$HOME/.codex/sessions` records the
+ * model that served it. Returns the reply text (the final agent message) and the attested model.
+ */
+export function codexSession(stdout: string, home: string): { reply: string; model?: string; error?: string } {
+  let thread: string | undefined, reply = "";
+  for (const line of stdout.split("\n")) {
+    let event: { type?: string; thread_id?: string; item?: { type?: string; text?: string } };
+    try { event = JSON.parse(line); } catch { continue; }
+    if (event.type === "thread.started" && event.thread_id) thread = event.thread_id;
+    if (event.type === "item.completed" && event.item?.type === "agent_message" && typeof event.item.text === "string") reply = event.item.text;
+  }
+  if (!thread || !/^[0-9a-f-]{16,}$/i.test(thread)) return { reply, error: "the Codex stream named no thread id, so the served model cannot be attested" };
+  const sessions = join(home, ".codex", "sessions");
+  const found: string[] = [];
+  const walk = (dir: string) => {
+    let names: string[];
+    try { names = readdirSync(dir); } catch { return; }
+    for (const name of names) {
+      const path = join(dir, name);
+      if (lstatSync(path).isDirectory()) walk(path);
+      else if (name.startsWith("rollout-") && name.endsWith(`-${thread}.jsonl`)) found.push(path);
+    }
+  };
+  walk(sessions);
+  if (found.length !== 1) return { reply, error: `no single Codex session log for thread ${thread}, so the served model cannot be attested` };
+  const models = new Set<string>();
+  for (const line of readFileSync(found[0]!, "utf8").split("\n")) {
+    for (const match of line.matchAll(/"model":"([^"]+)"/g)) models.add(match[1]!);
+  }
+  if (models.size !== 1) return { reply, error: `the Codex session log records ${models.size === 0 ? "no model" : "several models"}, so the served model cannot be attested` };
+  return { reply, model: [...models][0] };
+}
+
 /** An alias matches any ID of its family; a full ID must match exactly; `unknown` never matches. */
 export function modelMatches(requested: string, reported: string): boolean {
   if (reported === "unknown") return false;
@@ -170,7 +204,9 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
         { timeout_ms: request.timeoutMs ?? 15 * 60_000, grace_ms: 500, reap_ms: 2_000 });
     } catch (error) { return { status: "pending", reason: `the reviewer command could not start: ${(error as Error).message}` }; }
     const cleanup = request.cleanup ? await request.cleanup(result) : result;
-    const reply = readFileSync(stdout, "utf8");
+    const raw = readFileSync(stdout, "utf8");
+    const attestation = request.route.model_attestation === "codex-session" ? codexSession(raw, request.env?.HOME ?? process.env.HOME ?? homedir()) : undefined;
+    const reply = attestation ? attestation.reply : raw;
     if (!cleanup.confirmed) return { status: "pending", reason: `process cleanup could not confirm every reviewer process stopped (${cleanup.survivors.join(", ") || "group"})`, reply };
     const after = snapshot(repo, scratch);
     const changed = Object.keys(before).filter(key => before[key] !== after[key]);
@@ -179,9 +215,15 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     if (result.exit_code !== 0) return { status: "pending", reason: `the reviewer command failed with exit ${result.exit_code}`, reply, exit_code: result.exit_code };
     const parsed = parseReply(reply);
     if ("error" in parsed) return { status: "pending", reason: parsed.error, reply };
-    if (!modelMatches(request.route.model, parsed.model)) return { status: "pending", reason: `the reviewer reported model ${parsed.model}, not the requested ${request.route.model}`, reply };
+    let model = parsed.model;
+    if (attestation) {
+      if (attestation.error || !attestation.model) return { status: "pending", reason: `model attestation failed: ${attestation.error ?? "no model"}`, reply };
+      if (!modelMatches(request.route.model, attestation.model)) return { status: "pending", reason: `model attestation found ${attestation.model}, not the requested ${request.route.model}`, reply };
+      if (parsed.model !== "unknown" && !modelMatches(request.route.model, parsed.model)) return { status: "pending", reason: `the reviewer reported model ${parsed.model}, which differs from the attested ${attestation.model}`, reply };
+      model = attestation.model;
+    } else if (!modelMatches(request.route.model, parsed.model)) return { status: "pending", reason: `the reviewer reported model ${parsed.model}, not the requested ${request.route.model}`, reply };
     if (!commit.startsWith(parsed.target)) return { status: "pending", reason: `the reviewer reported target ${parsed.target}, not ${commit}`, reply };
-    return { status: "ready", model: parsed.model, target: commit, records: parsed.records, isolation: "procedural", reply };
+    return { status: "ready", model, target: commit, records: parsed.records, isolation: "procedural", reply };
   } finally {
     if (exportDir) removeExport(exportDir);
     rmSync(work, { recursive: true, force: true });

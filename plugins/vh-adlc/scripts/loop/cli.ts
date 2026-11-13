@@ -126,7 +126,7 @@ export async function main(argv: string[]): Promise<number> {
     const document = need(options, "document"), commit = need(options, "commit");
     const prompt = reviewPrompt({ repository: kind === "spec" ? "the current directory, a read-only export of the commit" : repo,
       document, commit, kind, docsRevision: need(options, "docs-revision"), binary: need(options, "binary"), pluginPin: need(options, "plugin-pin") }, loopContext(settings));
-    const outcome = await runReviewRoute({ repo, commit, kind, document, route: { model: route.model!, argv: route.argv }, prompt,
+    const outcome = await runReviewRoute({ repo, commit, kind, document, route: { model: route.model!, argv: route.argv, ...(route.model_attestation ? { model_attestation: route.model_attestation } : {}) }, prompt,
       scratch: settings.review_scratch, timeoutMs: options["timeout-ms"] ? Number(options["timeout-ms"]) : undefined });
     console.log(JSON.stringify({ role: route.role, ...outcome }));
     return outcome.status === "ready" ? 0 : 3;
