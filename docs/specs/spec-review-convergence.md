@@ -1,14 +1,13 @@
 ---
 status: planned
-status_description: "Accepted by the owner at R-10 under an advance acceptance; R-10's eight findings are listed, not applied. Tasks written; next: implementation on a feature branch."
+status_description: "Accepted by the owner at R-15; its seven findings are listed and settled during implementation. Tasks written; next: implementation on a feature branch."
 issue: null
-goal: "A spec review loop that finds blocking defects early and stops asking for passes after three consecutive passes without one."
+goal: "Spec review rates findings consistently, finds failure-mode gaps and every restatement in one pass, applies each pass's findings as one revision without applying nits, and never rewrites reviewed commits."
 covers:
   - plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md
   - plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md
-  - plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md
-  - plugins/vh-adlc/references/loop.md
   - plugins/vh-adlc/references/review-protocol.md
+  - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/references/security-settings.md
   - plugins/vh-adlc/knowledge.md
   - plugins/vh-adlc/plugin.json
@@ -24,65 +23,61 @@ covers:
 
 # Plan: Spec review convergence
 
-Give spec review a stopping rule, shared severity definitions, a failure-mode check and a one-pass
-completeness rule, so a spec reaches acceptance in a few passes instead of dozens.
+Give spec review shared severity definitions, a nit rule, a failure-mode check, one-pass completeness, a
+one-revision rule for applying findings and a ban on rewriting reviewed commits, so findings arrive
+complete, get applied once, and stop driving extra passes.
 
 ## Context
 
 ### Owner summary
 
 Four recent specs needed 36 to 47 spec review passes before their first acceptance, although most of
-those passes had no blocking finding. One of them had none at all. The current procedure applies every
-factual finding and then asks for a new pass, and a thorough reviewer finds one or two new items on
-every pass. Several late blocking findings were caused by fixing earlier non-blocking ones.
+those passes had no blocking finding. One of them had none at all. A thorough reviewer finds one or two
+new items on every pass, the procedure applies them and asks again, and several late blocking findings
+were caused by fixing earlier non-blocking ones. This spec's own review repeated that: the blocking findings
+in R-4 to R-7, R-12 and R-13 each traced to the previous pass's fix, and all sat in the stopping rule it
+carried. That rule now lives
+in its own draft, `docs/specs/spec-review-stopping-rule.md`, parked until `shared-development-loop`
+lands.
 
-This feature changes the spec review procedure in four ways. First, the author stops requesting passes
-once three consecutive passes have no blocking finding. Before that point, should-fix findings are
-handled as today: factual ones are applied, and judgement ones come to you as Open Questions answered
-before the next pass. Nits on the normative baseline are saved for the acceptance summary instead of being
-applied; findings outside the baseline may still be applied. After the third clean pass nothing more is
-applied to the normative baseline: its findings and the saved nits are listed, and you pick which to act
-on. The author writes the count into each spec review row, for example `streak 2 of 3`, so it never has to
-be worked out from history. A blocking finding sets it to zero, and a revision starts it again. Three
-is a ceiling, not a floor: an acceptance you give after a clean pass while the baseline is unchanged
-since it is honored at that pass, and an acceptance you give in advance ("accept if nothing blocking")
-covers only the next pass and lapses if that pass is blocking. The author runs the passes itself and
-never stops to ask before the ceiling, including in a resumed session. A routine re-review of an
-already accepted document keeps that acceptance and only lists what it finds.
+This feature changes spec review in seven ways, written into vh-adlc so every adopter gets them:
 
-Second, the shared convention defines blocking, should-fix and nit. Blocking is reserved for defects
-that change what gets built, what a proof checks or how the binary reads the document, or that make a
-criterion impossible to meet. A harmless citation slip is a nit. Because nits no longer trigger passes,
-the definitions directly reduce churn. Third, the reviewer checks designs that change state, run
-concurrently, or cross a process or network boundary for concurrent access, partial failure, retry or
-replay, and upgrade or rollback, and the author covers the same ground while writing. Fourth, the
-reviewer reports every restatement of an inconsistent rule in one finding, and the author fixes all of
-them in one commit. A related rule makes widening a reviewed free-text pattern a nit when it only
-catches more wrong output.
+- The shared convention defines blocking, should-fix and nit. Blocking is reserved for defects that
+  change what gets built, what a proof checks or how the binary reads the document, or that make a
+  criterion impossible to meet. A harmless citation slip is a nit.
+- Nits on the normative baseline never trigger a revision on their own. When a pass's blocking or
+  should-fix finding changes the baseline anyway, the same commit fixes that pass's nits; otherwise the
+  author lists them, from every pass the run handled, in its report and owner-facing summary. Findings
+  outside the baseline, such as in Context, may be applied at any time. The cost: a nit on a pass with
+  nothing else to apply stays in the document unless you pick it.
+- The reviewer and the author check designs that change state, run concurrently, or cross a process or
+  network boundary for concurrent access, partial failure, retry or replay, and upgrade or rollback.
+- The reviewer returns every finding it can establish in one pass and names every restatement of an
+  inconsistent rule; the author fixes all restatements in one commit.
+- The author applies a pass's findings as one revision: it lists every behavior the design touches and
+  every test or scenario its criteria name, walks each finding through all of them, raises judgement
+  findings first, then applies the factual findings and your answers in one commit. It removes a
+  mechanism rather than adding one when both behave the same, asks you when they differ, and revisits a
+  previous change instead of patching on top of it.
+- No operation rebases, amends or otherwise rewrites a commit a Review Log row names, even with
+  approval; default-branch work comes in by merge.
+- Widening a reviewed free-text pattern is a nit when it only catches more wrong output.
 
-The trade-off is that a real gap a reviewer would only notice late can now reach acceptance. In
-`blog-visual-reading` the loop would have stopped at R-4 and missed the R-8 finding. Implementation
-review, which executes every criterion, is the backstop, and a revision reopens the loop.
+The severity definitions, the nit rule and the free-text rule go into `vhco-pro/docs` as a companion
+change with the rules block unchanged, so the binary, gates and existing documents keep working, and a
+consumer on an older pin keeps today's behavior for those parts. The other four rules rely on no
+convention text and apply on any pin. The two user guides that describe spec review are updated. The
+plugin edits overlap with `shared-development-loop`, which is in progress on its own feature branch, so
+whichever lands second merges the first in.
 
-The definitions, the stopping rule and the free-text rule go into `vhco-pro/docs` as a companion change
-with the rules block unchanged, so the binary, gates and existing documents keep working. The failure-mode check and
-one-pass completeness apply on any pin. The severity definitions, saved nits, stopping rule and
-free-text rule follow whatever convention a repository's pin resolves: a consumer on an older pin keeps
-the current procedure for those, and the report says they need a newer pin. The plugin edits overlap with the draft
-`shared-development-loop` feature, so whichever lands second rebases onto the first. Rows stored before
-the update carry no streak marker and do not count, so an in-flight draft needs up to three new passes.
+Since the acceptance at R-10, this revision adds the one-revision and no-rewrite rules, moves the
+stopping rule into its own draft, replaces the saved-nit bookkeeping with the plain nit rule above, and
+drops the side-branch merge proposed at R-11, because the skill already keeps a document without a
+`branch` field on the default branch.
 
-The feature also updates the two user guides that describe spec review
-(`docs/get-started/first-feature.md` and `docs/user-guides/workflows.md`). Since the acceptance at R-8,
-this revision adds a criterion that the convention's Acceptance text and those guides state the new
-rule; has the author name every answered, rejected or picked finding in the decision record so a resumed
-run never raises it again; keeps an advance acceptance recorded in the document valid in a later session
-for the next pass; treats any new pass on an accepted spec, including one you ask for, as a drift pass;
-and tightens the scenario cases (separate sessions, stored passes before owner turns, a 250-turn budget).
-
-Validation is planned, not observed: scenario cases for the stopping rule, reviewer and author trials on
-committed fixtures, a rules block comparison, lint and gate runs on named historical specs under both
-pins, an old-pin run, and the plugin test suite.
+Validation is planned, not observed: reviewer and author trials on committed fixtures, scenario cases
+for the nit rule and the no-rewrite rule, a rules block comparison, lint and gate runs on named
+historical specs under both pins, old-pin cases, and the plugin test suite.
 
 Accepting this authorizes the companion docs change, the plugin edits and their tests on a feature
 branch. Pushing, opening PRs, merging and releasing each still need your separate go.
@@ -136,33 +131,19 @@ R-44 and R-45 each trace to the previous pass's fix (the R-39 wording rule, then
 the AC-07 row; `docs/specs/blog-visual-reading.md:1411`, `:1524`, `:1547`). R-41 returns three findings
 about one rule stated in Terminology, The reading pass, AC-04 and the Owner summary, left out of step by
 the R-40 fix (`:1441`). R-8 is a real, pre-existing gap found late: an AC-07 proof Codex cannot observe
-(`:598`). Under this feature's rule that spec would have stopped at R-4, after clean passes R-2 to R-4.
-
-Existing scenarios. `tests/vh-adlc/scenarios/run.ts` S7.7 (line 526) sends a conditional acceptance as
-a second turn after its first review, S7.7.accept (line 572) stores a `NO FINDINGS` R-1 and then has the
-owner accept the document as reviewed in R-1 with no second review stored, S7.9 (line 1066) pre-accepts
-a revision if its one review finds nothing blocking, and S14.spec (line 626) accepts against R-1. Each
-is an owner acceptance at a clean pass whose normative baseline has not changed since. S7.7's check
-treats any `SEVERITY: blocking` line in the document as meaning the owner was left a decision and
-then expects no acceptance (`run.ts:544-549`). The harness sends
-turns one after another (`run.ts:137-141`). The scenarios dispatch the real reviewer agent; there is no
-scripted reviewer today.
-
-Resume. The resume skill stops and puts the question to the owner whenever `vh-adlc next` says
-`owner acceptance` (`plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md:42`), and `references/loop.md:136-138`
-presents the acceptance question including through resume. Since `next` names owner acceptance after
-any fresh, clean review, a resumed draft would be asked for acceptance at a streak of one.
+(`:598`). Under the stopping rule now drafted in `docs/specs/spec-review-stopping-rule.md`, that spec would have stopped at R-4, after clean passes R-2 to R-4.
 
 Pins. `plugins/vh-adlc/knowledge.md:7-9` says `vh-adlc knowledge` decides whether the repository's pin
 or the plugin's applies, and in this repository the repository pin wins (`lint` reports
 `"source":"repository","pin_files":["AGENTS.md"]`). The docs SHA also appears in
 `plugins/vh-adlc/references/security-settings.md:5`.
 
-Overlapping work. The draft `shared-development-loop` feature on `origin/main` at `b777df0` covers
-`plugins/vh-adlc/skills/vh-adlc-spec/`, `plugins/vh-adlc/skills/vh-adlc-resume/`, the reviewer agent,
-`review-protocol.md`, `references/loop.md`, `knowledge.md` and both manifests
-and `tests/vh-adlc/` (`docs/specs/shared-development-loop.md:7-29` as of `b777df0`), and its scope
-includes a plugin pin bump (`:150-151`).
+Overlapping work. The `shared-development-loop` feature is `in-progress` on
+`feat/shared-development-loop` (`docs/specs/shared-development-loop.md:2-3` on `origin/main` at
+`4bef34e`). It covers `plugins/vh-adlc/skills/vh-adlc-spec/`, `plugins/vh-adlc/skills/vh-adlc-resume/`,
+the reviewer agent, `review-protocol.md`, `references/loop.md`, `references/authority.md`, `knowledge.md`,
+both manifests and `tests/vh-adlc/` (`:7-29` as of `b777df0`), and its scope includes a plugin pin bump
+(`:150-151`).
 
 Model context. This framework names no model. The logs above already show Opus-family and unattested
 reviewers, so the problem is the procedure, and it would persist under any thorough reviewer.
@@ -171,93 +152,88 @@ reviewers, so the problem is the procedure, and it would persist under any thoro
 
 In scope:
 
-- A stopping rule for spec review: the author records the clean streak in each spec review row other than a drift row, stops
-  requesting passes once three consecutive passes have no blocking finding, saves nits for the acceptance
-  summary, and honors an acceptance the owner gives after a clean pass with the baseline unchanged, or
-  in advance for the next pass only.
 - Definitions of blocking, should-fix and nit in the shared convention.
+- The nit rule: nits on the normative baseline are listed, not applied.
 - A failure-mode check in the reviewer's spec section and the author's instructions.
 - One-pass completeness for the reviewer and a same-commit restatement sweep for the author.
+- A one-revision rule for applying a pass's findings, in the spec skill.
+- A rule in `references/authority.md` that no operation rewrites a commit a Review Log row names, even
+  with approval.
 - A free-text check rule in the convention's Test plan section.
-- The resume skill and `references/loop.md`, which apply the stopping rule before acting on
-  `owner acceptance` from `vh-adlc next`.
 - The pin and version moves that adopt the published convention, the two user guides that describe
-  spec review, and scenario coverage for the new branches.
+  spec review, and scenario coverage for the new rules.
 
 Out of scope, by name:
 
+- The stopping rule, the streak count, owner and advance acceptance rules, saved nits collected across
+  passes and the decision record, all now in `docs/specs/spec-review-stopping-rule.md`.
 - Any change to the rules block, the binary, the record formats or gate conditions.
 - Implementation reviews, maintenance reviews and audit reviews, which have their own records and stop
   conditions.
 - Choosing, naming or recommending a reviewer model.
 - A new template section for failure behavior.
 - Rewriting or re-rating stored review records in existing specs.
-- Moving any consumer repository's pin, or carrying the new rules inside the plugin for consumers on
-  older pins.
+- Moving any consumer repository's pin, or carrying the new convention rules inside the plugin for
+  consumers on older pins.
 
 ## Design
+
+### Behaviors these rules touch
+
+Every rule below was checked against each of these: a first draft's review; a blocking pass; a clean
+pass; a pass holding both factual and judgement findings; a revision of an accepted document; a drift
+re-review; an interrupted or resumed run; a document on a feature branch and one on the default branch;
+a repository on an older pin; and the existing scenarios S7.7, S7.7.accept, S7.9
+and S14.spec, whose single-pass acceptance none of these rules changes.
 
 ### Terminology
 
 | Term | Meaning |
 | --- | --- |
-| Clean pass | A spec review pass with no blocking finding, including one that returns `NO FINDINGS` (AC-01). |
-| Clean streak | The count the author writes into the `Outcome` cell of every spec review row it records other than a drift row, as `streak <n> of 3` (AC-01). The previous value is the marker of the latest spec review row, skipping `+dirty` rows and drift rows, or 0 when that row has none. It is also 0 when an acceptance row follows that row and the document's status is `draft`, which marks a revision of an accepted document. A clean pass records the previous value plus one, which can exceed three after an owner pick in step 5; a pass with a blocking finding records `streak 0 of 3`. Applying the findings of clean passes does not change it. |
-| Saved nit | A nit on the normative baseline, recorded in any pass since the latest acceptance row (or since the first pass when there is none) and not named in the decision record. The author lists it in the acceptance summary instead of applying it, unless its `EVIDENCE` quotes text that no longer exists in the document; a nit that quotes nothing is always listed (AC-01). |
-| Drift pass | Any spec review pass on a `planned` or `in-progress` document whose acceptance still holds, whether default-branch drift or the owner asked for it. Its row records `drift` when clean and `drift, blocking` when blocking, in place of a streak; both are drift rows (AC-01). |
-| Decision record | The dated paragraph under Open Questions where the author records the owner's decisions, every finding it has folded, rejected or applied at the owner's pick (by ID, for example `R-4 F-02`), and any advance acceptance (AC-01). |
-| Owner acceptance | An acceptance the owner gives after a clean pass while the normative baseline is unchanged since that pass, as in S7.7, S7.7.accept, S7.9 and S14.spec, or in advance for the next pass, conditioned on that pass being clean. An advance acceptance is written into the decision record, holds in any later session, covers only the next spec pass and lapses if that pass has a blocking finding (AC-01). |
 | Restatement | A second or later place in one document that states the same rule, limit or default (AC-03). |
 
-### Stopping rule (convention and procedure)
+### Nits are listed, not applied (convention and procedure)
 
-In the convention's Acceptance section, step 2 gains the rule, and `SKILL.md` review mode steps 4 and 5
-and the protocol's Records paragraph follow it:
+The convention's Review log section, beside the severity definitions, gains: a nit on the normative
+baseline never causes a revision on its own. When the author applies a pass's blocking or should-fix
+findings to the baseline, the same commit fixes that pass's nits. Every nit it does not apply, from every
+pass the run handled, is listed with its ID and one line in the run's report and the owner-facing
+summary. A finding confined to sections outside the normative baseline
+may be applied at any time, because it does not make the review stale. The spec skill's review mode and
+the protocol's Records paragraph follow it. Today the skill applies every factual finding whatever its
+severity (`plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:71-72`).
 
-1. In every pass, nits on the normative baseline become saved nits. Findings confined to sections
-   outside the normative baseline may be applied at any time, because they do not make the review
-   stale.
-2. After a pass with a blocking finding, the author applies its blocking and should-fix findings as
-   today: factual ones applied, judgement ones put to the owner as Open Questions.
-3. After a clean pass that leaves the clean streak below three, and with no owner acceptance, the
-   author applies its factual should-fix findings and puts its judgement should-fix findings to the
-   owner as Open Questions. The answers are folded in before the next pass is requested, so no question
-   is open when the streak reaches three. The author does not stop to ask whether to accept.
-   When `vh-adlc next` reports `owner acceptance` below the ceiling and no owner acceptance exists,
-   including one recorded in the decision record, the spec and resume operations dispatch another pass
-   instead of asking.
-4. After a clean pass that brings the streak to three or more, the author applies nothing to the normative
-   baseline and raises no Open Questions. It lists each of that pass's findings and every saved nit,
-   with ID and one line, in the owner-facing summary before the acceptance question.
-5. The owner may pick any listed findings. The author applies the picked ones, with judgement ones
-   decided by the owner's pick, names them in the decision record, and requests one more pass. When that pass is clean, the author asks for
-   acceptance again and lists its findings the same way.
-6. With an owner acceptance, the clean pass it names, or for an advance acceptance the next pass when
-   it is clean, ends the loop whatever the streak: the author applies nothing to the normative
-   baseline, lists that pass's findings and the saved nits, and writes the acceptance row at that pass,
-   so the accepted commit keeps the reviewed baseline.
-7. When the document is `planned` or `in-progress` and its acceptance still holds, a new pass is a
-   drift pass, whether default-branch drift or the owner asked for it. The standing acceptance ends the
-   loop at a clean drift pass: the
-   author applies nothing to the normative baseline, lists its findings, and keeps the acceptance. A
-   drift pass records `drift` in place of a streak, so it never changes the count. A blocking drift
-   pass records `drift, blocking` and is handled as today, through a revision, which then counts from
-   0.
+### Applying a pass's findings as one revision (author and reviewer)
 
-In review mode the author dispatches each next pass itself, in the same session, while no Open
-Question is waiting for the owner. Before it dispatches, a continued or resumed run checks the latest
-stored pass: if that pass is clean, below the ceiling and still fresh, and holds should-fix findings on
-the baseline that are neither applied nor answered, the author first applies or raises them as step 3
-says, because an interrupted run can leave them unapplied. Whenever the author folds an owner's answer,
-or decides that a factual finding does not hold, it names the finding (for example `R-4 F-02`) in the
-decision record under Open Questions, and the check skips every finding named there. A run that stops for Open Questions reports the current streak, and
-the next run reads the previous value as Terminology states. The resume skill and `references/loop.md` apply this
-rule before acting on `owner acceptance` from `vh-adlc next`, and continue through the spec skill's
-review mode. Any pass on an accepted `planned` or `in-progress` document follows step 7. The streak marker is the only new
-text. It sits in the existing `Outcome` column, which the binary reads only to match an exact
-`accepted by owner` (`conventions/feature-documents.md:176-178`), so a marker in a spec review row
-changes no result, and the rules block and record formats are unchanged. Acceptance still requires a fresh, clean
-review at the accepted commit, and the pass that ends the loop is that review.
+The spec skill's review mode gains this step before any finding is applied. The author lists the
+behaviors the design touches and every test, scenario and fixture the criteria and Test Plan name. It
+walks each finding of the pass, and every change that finding implies, through all of them, re-reading
+each named test or scenario before changing what it checks. It raises the pass's judgement findings as
+Open Questions first, without changing the baseline, and once the owner has answered it applies every
+factual finding to be applied and every answer as one revision in one commit. Where a finding can be met
+by removing a mechanism or by adding one and both give the same behavior, it removes; where they behave
+differently, the choice is an Open Question with removal as the recommendation. Where a finding traces to
+a change the previous pass's revision made, it revisits that change instead of patching on top of it. The
+run's report lists the behaviors and named checks it walked. The reviewer agent gains the matching
+sentence: when a finding traces to the previous revision's change, say so in its `EVIDENCE`. Today the
+skill applies findings one by one with no such step (`plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:71-72`).
+
+### Commits a Review Log names are never rewritten (authority)
+
+`references/authority.md` Preservation gains: no operation rebases, amends, squashes or otherwise
+rewrites a commit that a Review Log row names, or any commit before it on that branch, even with the
+owner's approval, because the binary then reports every such review `commit-unreachable` and stale.
+The authority table's row for destructive Git operations and history rewrites, which today allows them
+with separate approval (`plugins/vh-adlc/references/authority.md:30`), gains that exception. Default-branch
+work comes in with `git merge`, as review mode already does for drift on a feature branch
+(`plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:57-58`), and as the delivery convention already requires
+of feature PRs, which "never squash, so the commits its Review Log cites stay reachable"
+(`conventions/delivery.md:79`). A document without a `branch` field stays on the default branch, as the
+skill already says (`SKILL.md:36-38`, `:106-109`), so no new merge path is needed. Preservation today
+forbids stash, reset and overwrite of others' changes but says nothing about rewriting reviewed commits
+(`authority.md:72-78`). This document's own review met the gap: it was worked on a side branch against
+the skill's instruction, and a rebase of that branch made every stored review `commit-unreachable` until
+it was undone.
 
 ### Severity definitions (convention)
 
@@ -297,21 +273,20 @@ the same commit.
 The convention's Test plan section gains: a proof that judges free text with a pattern lists its
 must-pass and must-fail examples in the row. A row has passed review once a clean pass whose reviewed
 commit already held the row's current text has no finding whose `WHERE` names that row; a later change
-to the row starts over. After that, a finding that only widens the pattern to catch
-more wrong output is a nit, so under the stopping rule it is saved rather than applied. A finding that
-shows the pattern rejects a correct output stays under the blocking definition, because the proof then
-fails a correct implementation.
+to the row starts over. After that, a finding that only widens the pattern to catch more wrong output is
+a nit, so it is listed rather than applied. A finding that shows the pattern rejects a correct output
+stays under the blocking definition, because the proof then fails a correct implementation.
 
 ### Pins and older consumers
 
-The changes split by source. The failure-mode check and one-pass completeness, in the reviewer agent
-and the spec skill's author mode, apply on any pin, because they rely on no convention text. The
-severity definitions, saved nits, the streak and stopping rule, and the free-text rule need the new
-convention. The skill decides by whether the resolved `conventions/feature-documents.md` contains the
-severity definitions, and the new review-mode and protocol steps are written as conditional on that
-check. Without them, the current procedure runs for those parts, no streak marker is written, and the
-spec report says they need the plugin's own pin from `plugins/vh-adlc/knowledge.md`. The plugin does not
-carry its own copy of the convention rules.
+The changes split by source. The failure-mode check, one-pass completeness, the one-revision rule and
+the no-rewrite rule, in the reviewer agent, the spec skill and `references/authority.md`, apply on any
+pin, because they rely on no convention text. The severity definitions, the nit rule and the free-text
+rule need the new convention. The skill decides by whether the resolved
+`conventions/feature-documents.md` contains the severity definitions, and the nit rule's review-mode and
+protocol text is written as conditional on that check. Without them, nits are handled as today, and the
+spec report says those parts need the plugin's own pin from `plugins/vh-adlc/knowledge.md`. The plugin
+does not carry its own copy of the convention rules.
 
 ### Delivery
 
@@ -321,46 +296,24 @@ because that repository is checked out separately. After it publishes, `AGENTS.m
 `plugins/vh-adlc/knowledge.md` and the convention link in `plugins/vh-adlc/references/security-settings.md:5`
 move to the published commit, both manifests move together from the version current at that time, and
 `docs/get-started/first-feature.md:42-43` and `docs/user-guides/workflows.md:251-263` describe the
-stopping rule, saved nits and owner acceptance.
+severities, the nit rule and the one-revision rule.
 
-`shared-development-loop` edits the same skill steps, protocol, pin and manifests. Whichever feature
-lands second rebases its edits onto the first and moves the pin and version from whatever is current
-then; AC-06 is checked against the docs commit this feature publishes, or a later one that contains it.
+`shared-development-loop`, in progress on its feature branch, edits the same spec skill, protocol,
+`references/authority.md`, pin and manifests. Whichever feature lands second merges the first in, for
+every one of those files, then moves the pin and version from whatever is current; AC-06 is checked
+against the docs commit this feature publishes, or a later one that contains it.
 
-S7.7.accept, S7.9 and S14.spec keep passing: each acceptance names a clean pass whose baseline is
-unchanged, S7.9's status check accepts either a draft still waiting or a re-acceptance, and S14.spec
-runs without the binary. S7.7 changes. Its first turn now continues in-session until the loop ends or a
-question waits, so its check reads only the latest spec review's records instead of any
-`SEVERITY: blocking` line in the document, and expects acceptance when the loop ended at a clean pass;
-its turn-2 prompt names the latest pass. The AC-01 variants are new
-scenario cases in `tests/vh-adlc/scenarios/run.ts` that run against a copy of the plugin whose reviewer
-agent returns canned records keyed by pass number, each starting with `MODEL: scripted-reviewer`. The
-scripted reviewer definition and its canned records live under
-`tests/vh-adlc/evidence/review-convergence/`. A turn that runs several passes needs more room than the
-harness default of 80 turns (`run.ts:138`), so these cases and S7.7 run with `maxTurns` set to 250, and
-their checks fail when any turn ends with `isError` instead of checking a half-finished loop. Their
-transcripts, and the fixture specs and returned records of every reviewer and author trial, are
-committed under `tests/vh-adlc/evidence/review-convergence/`. If the docs change cannot land, adoption
+The AC-10 and AC-11 cases are scenario cases in `tests/vh-adlc/scenarios/run.ts` that run against a
+copy of the plugin whose reviewer agent returns canned records keyed by pass number, each starting with
+`MODEL: scripted-reviewer`. The scripted reviewer definition, its canned records, the transcripts, and the
+fixture specs and returned records of every reviewer and author trial are committed under
+`tests/vh-adlc/evidence/review-convergence/`. Trials that depend on Git history (AC-05, AC-09) build
+scratch repositories whose commits hold the stated history. If the docs change cannot land, adoption
 stays incomplete and the plugin never points at an unpublished commit. The return path is an ordinary
 reviewed revert of the docs and plugin edits and the pin.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: An author following the updated spec procedure writes `streak <n> of 3` into the Outcome of
-      every spec review row it records other than a drift row, reading the previous value as Terminology states, recording
-      `streak 0 of 3` after a blocking finding and counting from 0 after a revision of an accepted
-      document; dispatches each next pass itself while no Open Question waits; saves nits on the
-      normative baseline recorded since the latest acceptance row; ends the loop at a clean drift pass on
-      an accepted document without applying its findings, and handles a blocking drift pass, recorded
-      `drift, blocking`, through a revision that counts from 0; after each clean pass below three without an owner acceptance, applies factual should-fix
-      findings and has judgement should-fix findings answered before the next pass, without asking
-      whether to accept; at three or more, applies nothing to the baseline and lists that pass's findings
-      and the saved nits; applies owner-picked findings and runs one more pass before asking again;
-      honors an owner acceptance by writing the acceptance row at that pass without applying its
-      findings, with an advance acceptance lapsing at a blocking pass; honors an advance acceptance recorded in the decision
-      record in a later session; names every folded, rejected or picked finding in the decision record
-      and never raises one again; and, when resumed below the ceiling, continues the loop instead of
-      asking for acceptance.
 - [ ] AC-02: The published convention defines blocking, should-fix and nit as this document's Design
       states, and a reviewer following the updated agent rates a seeded false claim the design depends
       on blocking, a seeded harmless wrong line number nit, a seeded ambiguity that allows two different
@@ -378,44 +331,61 @@ reviewed revert of the docs and plugin edits and the pin.
 - [ ] AC-06: The rules block is byte-identical to the previous pin, the named historical specs give the
       same lint, `fresh` and gate results under both pins, the repository pin in `AGENTS.md` and every
       docs pin in the plugin point at the published docs commit or a later one containing it, both
-      manifests carry the same version, higher than the version before the change, a
-      repository on the previous pin keeps the current procedure for the convention-dependent parts
-      and its report names the needed pin,
-      and the plugin test suite passes.
+      manifests carry the same version, higher than the version before the change, a repository on the
+      previous pin keeps today's behavior for the convention-dependent parts and its report names the
+      needed pin, and the plugin test suite passes.
 - [ ] AC-07: An author following the updated skill, drafting a feature that crosses a network boundary,
       states the behavior for concurrent requests, partial failure, retry or replay, and upgrade or
       rollback in Design, or raises an Open Question for any it cannot settle.
-- [ ] AC-08: The published convention's Acceptance section states the stopping rule and the
-      `streak <n> of 3` marker, and `docs/get-started/first-feature.md` and
-      `docs/user-guides/workflows.md` describe the stopping rule, saved nits and owner acceptance.
+- [ ] AC-08: The published convention states the nit rule beside the severity definitions, and
+      `docs/get-started/first-feature.md` and `docs/user-guides/workflows.md` describe the severities,
+      the nit rule and applying a pass's findings as one revision.
+- [ ] AC-09: An author following the updated skill raises a pass's judgement findings first and then
+      applies its factual findings and the answers as one revision in one commit that keeps every test
+      or scenario the document names consistent with the change, removes a mechanism rather than adding
+      one when both behave the same, revisits a previous revision's change when a finding traces to it,
+      and lists the behaviors and checks it walked in its report; a reviewer following the updated agent
+      says in `EVIDENCE` when a finding traces to the previous revision's change.
+- [ ] AC-10: `references/authority.md` forbids rewriting a commit a Review Log row names, with no
+      approval exception, in both Preservation and its history-rewrite row; and when the default branch
+      moves during a review loop on a feature branch, the author brings it in by merge and every
+      reviewed commit stays reachable.
+- [ ] AC-11: With the new convention, an author following the updated skill makes no commit that
+      changes the normative baseline only to fix nits; fixes a pass's nits in the same commit that applies
+      its blocking or should-fix findings to the baseline; lists every nit it did not apply, from every
+      pass the run handled, with its ID in the run's report and owner-facing summary; and may apply a
+      finding confined to sections outside the normative baseline.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Scenario cases in `tests/vh-adlc/scenarios/run.ts` with the scripted reviewer, transcripts committed under `tests/vh-adlc/evidence/review-convergence/`. Variant A: a blocking pass holding a factual blocking finding and a nit on Design, then three clean passes: the first two each hold a factual should-fix, a judgement should-fix and a nit on Design, and the third holds a factual should-fix and a nit on Design; pass when the rows record `streak 0 of 3` to `streak 3 of 3`, the factual should-fix findings are applied after clean passes 1 and 2, their judgement findings are asked and folded before the next pass, no acceptance question is asked before streak 3, nothing on the baseline changes after it, and the summary lists pass 3's two finding IDs and the four nits. Variant B: clean, blocking, clean, clean, clean, each holding one nit on Design that later fixes leave in place, and the first two clean passes after the blocking pass each also holding a factual should-fix; pass when the rows record streaks 1, 0, 1, 2 and 3, those two factual should-fix findings are applied, no nit is applied, and the summary lists the last pass's findings and all five nits. Variant C: the owner picks one listed finding; pass when it is applied, one more pass runs and records `streak 4 of 3`, and acceptance is asked again after it. Variant D: the owner gives an advance acceptance and the next pass is clean with a factual should-fix on the baseline; pass when nothing is applied, the acceptance row names that pass and `vh-adlc gate planned` passes. Variant D2: the fixture stores a clean pass holding only nits before the owner's turn, and the owner accepts as reviewed in that pass; pass when the acceptance row names it and no further pass runs. Variant D3: the owner gives an advance acceptance and the next pass is blocking, followed by a clean pass holding a judgement should-fix that stops the run; pass when the blocking fixes are applied, no acceptance row is written, and the clean pass records `streak 1 of 3` and is not accepted. Variant D4: the advance acceptance is recorded in the decision record, the session ends, and a separate `session()` call resumes; the next canned pass is clean; pass when the acceptance row names it. Variant E: a `planned` document whose latest non-drift spec review row records `streak 3 of 3`, followed by an acceptance row and then a clean row marked `drift`, is revised through `vh-adlc gate draft`; the first post-revision pass also holds a judgement should-fix, so the run stops on its Open Question, and the owner's answer starts a separate `session()` call with no `resume`, so only the stored document carries the revision and the drift row. Pass when the next three clean passes, each with a baseline fix applied after the first two, record streaks 1, 2 and 3, and the loop ends at 3, and the summary lists only nits recorded after the acceptance row. Variant F: a `draft` document whose stored log has unmarked clean rows, a clean `+dirty` row and an acceptance row; the next canned pass is clean with a judgement should-fix that stops the run; pass when it records `streak 1 of 3`. Variant G: a draft whose last row records `streak 1 of 3`, with a fresh review whose factual should-fix was never applied, is resumed through the resume skill, and the next canned pass is clean with a judgement should-fix; pass when the stored factual should-fix is applied before any dispatch, a new row records `streak 2 of 3`, the run stops on the Open Question, and no acceptance question is asked. Variant H: a `planned` document whose acceptance holds gets a drift re-review with a factual should-fix; pass when its row records `drift`, nothing is applied, the status stays `planned`, the acceptance is kept and the finding is listed. Variant H2: a blocking drift pass on an accepted `planned` document; pass when its row records `drift, blocking`, the document goes through `vh-adlc gate draft`, and the first clean pass after the revision records `streak 1 of 3`. Variant I: as Variant A, but a fix applied after clean pass 1 removes the line a pass-1 nit quotes; pass when that nit is not listed and the other saved nits are. Variant J: the owner answers a judgement should-fix from a clean pass by keeping the current design, and a later run continues; pass when the finding is named in the decision record and the run dispatches the next pass without asking again. In Variant C, the picked finding is also named there and is not listed at the next acceptance question. Every multi-pass case runs with `maxTurns` 250 and fails if a turn ends with `isError`. S7.7.accept, S7.9 and S14.spec still pass, and S7.7 passes with its updated check. |
 | AC-02 | `tests/vh-adlc/review-convergence.test.ts` checks the published convention page for the three definitions. Independent reviewer trial on a committed fixture spec seeded with a false claim the design depends on, a harmless wrong line number, a criterion that admits two implementations and a wording slip; pass when the returned records rate them blocking, nit, should-fix and nit. Commit the fixture, the returned records and the reported model under `tests/vh-adlc/evidence/review-convergence/`. |
-| AC-03 | Reviewer trial on a fixture spec that states one limit in Scope, Design, a criterion and the Owner summary, with one copy different; pass when one finding names all four locations. Author trial applying a finding that asks for a value none of the four copies hold; pass when one commit leaves all four locations stating that value. Fixtures and records go under `tests/vh-adlc/evidence/review-convergence/`. |
+| AC-03 | Reviewer trial on a fixture spec that states one limit in Scope, Design, a criterion and the Owner summary, with one copy different; pass when one finding names all four locations. Author trial on a stored blocking pass whose factual should-fix finding asks for a value none of the four copies hold; pass when one commit leaves all four locations stating that value. Fixtures and records go under `tests/vh-adlc/evidence/review-convergence/`. |
 | AC-04 | Reviewer trial on five fixture specs: a counter in a shared file updated by parallel runs that defines partial failure, retry and upgrade but not concurrent updates; a remote API call that defines concurrency, partial failure and upgrade but not retry or replay; a design that defines concurrency, partial failure and retry but not upgrade or rollback; a design that defines concurrency, retry and upgrade but not partial failure; and a wording-only guide edit. Pass when each of the first four returns a failure-mode finding on exactly the question it leaves undefined, and the fifth returns no failure-mode finding. Fixtures and records go under `tests/vh-adlc/evidence/review-convergence/`. |
-| AC-05 | `tests/vh-adlc/review-convergence.test.ts` checks the published convention page for the example requirement. Reviewer trial on a fixture spec whose Review Log holds a stored clean pass, at a commit already holding the row's current text, with no finding naming the Test Plan, and whose free-text pattern row lists examples that omit one wrong output stated in Design and reject one correct output stated there. Pass only when the reviewer returns a nit for the missed wrong output and a blocking finding for the rejected correct output; fail if either is missing. A second fixture changes the row after the stored clean pass; pass when the missed wrong output is rated should-fix. Fixtures and records go under `tests/vh-adlc/evidence/review-convergence/`. |
-| AC-06 | Compare the rules block at the old and new pins byte for byte. For `shared-docs-drift`, `seo-assessment` and `owner-readable-specifications`, run `vh-adlc lint`, `fresh` and `gate planned` from two scratch clones, each checked out at a commit that holds its `AGENTS.md` pin (old or new) with a clean tree, assert `knowledge.revision` equals the clone's pin, and compare only `result`, `failing` and `findings`. As a scenario case in `tests/vh-adlc/scenarios/run.ts`, whose fixture docs repository first gains the previous pin's docs commit (`tests/vh-adlc/fixtures/build.ts`), run the updated spec skill's review mode on a fixture spec pinned to the previous revision with a clean pass; pass when findings are applied as today, no streak marker is written, the reviewer still reports a seeded failure-mode gap, and the report names the plugin's pin from `knowledge.md`. Check `AGENTS.md`, `knowledge.md` and `references/security-settings.md` name the published docs commit or a later one containing it, and both manifests match and are higher than the version before the change. Run `bun test tests/vh-adlc` and the docs repository's `npm run check`. |
+| AC-05 | `tests/vh-adlc/review-convergence.test.ts` checks the published convention page for the example requirement. Reviewer trial on a scratch repository whose history holds a stored clean pass at a commit already holding the free-text pattern row's current text, with no finding naming the Test Plan; the row lists examples that omit one wrong output stated in Design and reject one correct output stated there. Pass only when the reviewer returns a nit for the missed wrong output and a blocking finding for the rejected correct output; fail if either is missing. A second scratch repository adds a later commit that changes the row; pass when the missed wrong output is rated should-fix. Fixtures and records go under `tests/vh-adlc/evidence/review-convergence/`. |
+| AC-06 | Compare the rules block at the old and new pins byte for byte. For `shared-docs-drift`, `seo-assessment` and `owner-readable-specifications`, run `vh-adlc lint`, `fresh` and `gate planned` from two scratch clones that differ only in the pin: one at the T3 commit, and one at a scratch commit on top of it that restores the old pin in `AGENTS.md`, each with a clean tree; assert `knowledge.revision` equals the clone's pin, and compare only `result`, `failing` and `findings`. Two scenario cases in `tests/vh-adlc/scenarios/run.ts`, whose fixture docs repository first gains the previous pin's docs commit (`tests/vh-adlc/fixtures/build.ts`), run on a fixture spec pinned to the previous revision. The procedure case uses the scripted reviewer with one clean pass holding only a factual nit on Design, which the new rule would leave unapplied; pass when the nit is applied as today and the report names the plugin's pin from `knowledge.md`. The reviewer case uses the real reviewer on a fixture with a seeded failure-mode gap; pass when the returned records include a failure-mode finding. Check `AGENTS.md`, `knowledge.md` and `references/security-settings.md` name the published docs commit or a later one containing it, and both manifests match and are higher than the version before the change. Run `bun test tests/vh-adlc` and the docs repository's `npm run check`. |
 | AC-07 | Author trial: the updated skill drafts a fixture feature that adds a webhook call to a remote service. Pass when its Design states behavior for all four questions or the document raises an Open Question for each one it leaves open. Commit the transcript and draft under `tests/vh-adlc/evidence/review-convergence/`. |
-| AC-08 | `tests/vh-adlc/review-convergence.test.ts` checks the published `conventions/feature-documents.md` Acceptance section for the stopping rule and the `streak <n> of 3` marker, and checks `docs/get-started/first-feature.md` and `docs/user-guides/workflows.md` for the stopping rule, saved nits and owner acceptance. |
+| AC-08 | `tests/vh-adlc/review-convergence.test.ts` checks the published `conventions/feature-documents.md` for the nit rule beside the severity definitions, and checks `docs/get-started/first-feature.md` and `docs/user-guides/workflows.md` for the severities, the nit rule and the one-revision rule. |
+| AC-09 | Author trial on a scratch repository holding a fixture spec whose Test Plan names a scenario check script, and a stored blocking pass with two factual should-fix findings: applying the first alone, in its narrowest form, would make the named check fail, and the second can be met by removing a mechanism or by adding one with the same behavior. Pass when one commit applies both, the named check script still passes on the result, the mechanism is removed rather than extended, and the report lists the behaviors and checks walked. A second trial adds a judgement should-fix to the stored pass; pass when the author raises it before changing the baseline and, after the owner's scripted answer, applies the factual findings and the answer in one commit. Reviewer trial on a scratch repository whose latest revision commit introduced a contradiction; pass when the returned finding's `EVIDENCE` says it traces to that revision's change. Fixtures, transcripts and records go under `tests/vh-adlc/evidence/review-convergence/`. |
+| AC-10 | `tests/vh-adlc/review-convergence.test.ts` checks that Preservation in `plugins/vh-adlc/references/authority.md` forbids rewriting a commit a Review Log row names and that the history-rewrite row states the same exception. Scenario case in `tests/vh-adlc/scenarios/run.ts` with the scripted reviewer, on a fixture spec with a `branch` field: after a stored `NO FINDINGS` pass, the fixture's default branch gains a commit that changes a path the spec covers, so the review is stale from drift alone, and the owner asks for a fresh review; pass when the feature branch holds a merge of the default branch, every commit the Review Log names is an ancestor of the branch tip, and `vh-adlc fresh` reports no `commit-unreachable`. |
+| AC-11 | Scenario case in `tests/vh-adlc/scenarios/run.ts` with the scripted reviewer and the new convention, which returns two passes: the first holds a factual blocking finding on Design, a nit on Design and a nit on Context; the second is clean with one nit on Scope. Pass when the first pass's blocking finding and both its nits are applied in one commit, the second pass's Scope nit is not applied, and the report and owner-facing summary list that nit with its ID. S7.7, S7.7.accept, S7.9 and S14.spec still pass. |
 
 ## Tasks
 
-- [ ] T1 `tests/vh-adlc/review-convergence.test.ts` - failing checks that the resolved `conventions/feature-documents.md` holds the three severity definitions and the free-text example requirement; they fail at the current pin because the page has neither (AC-02, AC-05)
-- [ ] T12 `tests/vh-adlc/review-convergence.test.ts` - failing checks that the resolved Acceptance section states the stopping rule and the `streak <n> of 3` marker and that the two user guides describe the stopping rule, saved nits and owner acceptance; they fail now because none of that text exists (AC-08)
-- [ ] T2 `docs/specs/spec-review-convergence.md` - the companion `vhco-pro/docs` change to `conventions/feature-documents.md` (severity definitions, the Acceptance stopping rule with the `streak <n> of 3` marker, the free-text rule) passes that repository's `npm run check` and an independent review with the rules block byte-for-byte unchanged; record its PR and published commit here (AC-02, AC-05, AC-06, AC-08)
-- [ ] T3 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/references/security-settings.md` - move every docs pin to the published commit; T1 and the T12 convention checks pass, and the rules block comparison and the three-spec lint, `fresh` and gate comparison from two committed-pin scratch clones show no difference (AC-06, AC-02, AC-05)
-- [ ] T4 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` - rate with the resolved definitions, ask the four failure-mode questions, return every finding in one pass and name every restatement; the AC-02, AC-03 reviewer, AC-04 and AC-05 trials pass with fixtures, returned records and reported model committed under `tests/vh-adlc/evidence/review-convergence/` (AC-02, AC-03, AC-04, AC-05)
-- [ ] T5 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` - author mode states the four failure-mode answers in Design or raises Open Questions, and sweeps every restatement in one commit; the AC-07 and AC-03 author trials pass with transcripts committed under `tests/vh-adlc/evidence/review-convergence/` (AC-03, AC-07)
-- [ ] T6 `tests/vh-adlc/scenarios/run.ts` - the scripted reviewer (a plugin copy whose canned records, keyed by pass number and starting with `MODEL: scripted-reviewer`, live under `tests/vh-adlc/evidence/review-convergence/`) and AC-01 Variants A to J, including D4 and H2 with `maxTurns` 250 and an `isError` failure, plus S7.7's check reading only the latest spec review's records; the variants fail because no streak marker is written yet (AC-01)
-- [ ] T7 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `plugins/vh-adlc/references/review-protocol.md` - review-mode steps 1 to 7, conditional on the resolved page holding the severity definitions: streak marker, saved nits, in-session dispatch, the resumed-pass check, owner and drift acceptance, the decision record; T6 Variants A, B, C, D, D2, D3, F, H, H2, I and J pass, and S7.7, S7.7.accept, S7.9 and S14.spec pass (AC-01)
-- [ ] T8 `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md`, `plugins/vh-adlc/references/loop.md` - apply the stopping rule before acting on `owner acceptance` from `vh-adlc next` and continue through review mode; T6 Variants D4, E and G pass (AC-01)
-- [ ] T9 `tests/vh-adlc/fixtures/build.ts`, `tests/vh-adlc/scenarios/run.ts` - the fixture docs repository also holds the previous pin's commit, and the old-pin case: in a fixture on the previous pin, review mode applies findings as today, writes no streak marker, the reviewer still reports a seeded failure-mode gap, and the report names the plugin's pin from `knowledge.md` (AC-06)
-- [ ] T10 `docs/get-started/first-feature.md`, `docs/user-guides/workflows.md` - describe the stopping rule, saved nits and owner acceptance; the T12 guide checks pass (AC-08)
-- [ ] T11 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - move both manifests together to one version above the version current at the time, rebased onto `shared-development-loop` if it has landed; the version-change check and the full `bun test tests/vh-adlc` pass (AC-06)
+- [ ] T1 `tests/vh-adlc/review-convergence.test.ts` - failing checks that the resolved `conventions/feature-documents.md` holds the three severity definitions, the nit rule and the free-text example requirement; they fail at the current pin because the page has none of them (AC-02, AC-05, AC-08)
+- [ ] T12 `tests/vh-adlc/review-convergence.test.ts` - failing checks that the two user guides describe the severities, the nit rule and the one-revision rule; they fail now because the guides do not (AC-08)
+- [ ] T14 `tests/vh-adlc/review-convergence.test.ts` - the failing check that Preservation and the history-rewrite row in `references/authority.md` forbid rewriting a commit a Review Log row names; it fails because neither says so (AC-10)
+- [ ] T15 `tests/vh-adlc/scenarios/run.ts` - the scripted reviewer (a plugin copy whose canned records, keyed by pass number and starting with `MODEL: scripted-reviewer`, live under `tests/vh-adlc/evidence/review-convergence/`) and the AC-10 drift case, a guard that passes on today's merge path (AC-10)
+- [ ] T13 `plugins/vh-adlc/references/authority.md` - the Preservation rule against rewriting a commit a Review Log row names, even with approval, and the matching exception in the history-rewrite row; the T14 check passes (AC-10)
+- [ ] T2 `docs/specs/spec-review-convergence.md` - the companion `vhco-pro/docs` change to `conventions/feature-documents.md` (severity definitions, the nit rule, the free-text rule) passes that repository's `npm run check` and an independent review with the rules block byte-for-byte unchanged; record its PR and published commit here (AC-02, AC-05, AC-06, AC-08)
+- [ ] T3 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/references/security-settings.md` - move every docs pin to the published commit; the T1 checks pass, and the rules block comparison and the three-spec lint, `fresh` and gate comparison between this commit and a scratch commit restoring the old pin show no difference (AC-06, AC-02, AC-05)
+- [ ] T4 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` - rate with the resolved definitions, ask the four failure-mode questions, return every finding in one pass, name every restatement, and say when a finding traces to the previous revision's change; the AC-02, AC-03 reviewer, AC-04, AC-05 and AC-09 reviewer trials pass with fixtures, returned records and reported model committed under `tests/vh-adlc/evidence/review-convergence/` (AC-02, AC-03, AC-04, AC-05, AC-09)
+- [ ] T6 `tests/vh-adlc/scenarios/run.ts` - the AC-11 scenario case with the new convention; it fails because today's skill applies the clean pass's factual nit on its own (AC-11)
+- [ ] T5 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `plugins/vh-adlc/references/review-protocol.md` - author mode states the four failure-mode answers in Design or raises Open Questions and sweeps every restatement in one commit; review mode applies a pass's findings as one revision after walking the behaviors and named checks, and lists rather than applies nits, conditional on the resolved convention; the AC-07, AC-03 author and AC-09 author trials pass with transcripts under `tests/vh-adlc/evidence/review-convergence/`, the T6 case passes, and S7.7, S7.7.accept, S7.9 and S14.spec pass (AC-03, AC-07, AC-09, AC-11)
+- [ ] T9 `tests/vh-adlc/fixtures/build.ts`, `tests/vh-adlc/scenarios/run.ts` - the fixture docs repository also holds the previous pin's commit, and the two old-pin cases: the procedure case with the scripted reviewer and the reviewer case with the real reviewer, as the AC-06 row states (AC-06)
+- [ ] T10 `docs/get-started/first-feature.md`, `docs/user-guides/workflows.md` - describe the severities, the nit rule and the one-revision rule; the T12 guide checks pass (AC-08)
+- [ ] T11 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - move both manifests together to one version above the version current at the time, after merging `shared-development-loop` in if it has landed; the version-change check and the full `bun test tests/vh-adlc` pass (AC-06)
 
 ## Open Questions
 
@@ -441,7 +411,32 @@ completeness apply on any pin while the convention-dependent parts follow the re
 owner accepted at R-8 under an advance acceptance, then picked all seven R-8 findings to apply
 (R-8 F-01 to F-07), which moved the document back to draft for this revision. After R-9, the owner decided that an advance acceptance
 recorded here holds in a later session, that any pass on an accepted spec is a drift pass, and that
-R-9 F-01 to F-07 are applied. The owner accepts in advance if R-10 has no blocking finding.
+R-9 F-01 to F-07 are applied. The owner accepts in advance if R-10 has no blocking finding. R-10 was clean and the owner accepted
+there. The owner then had all eight R-10 findings applied (R-10 F-01 to F-08) and asked that the process
+lessons this review exposed go into vh-adlc itself: applying a pass's findings as one revision, and
+never rewriting a reviewed commit. R-10 F-01 is settled as the reviewer proposed first: picks after an
+acceptance are a pick revision that continues the count. R-10 F-03 is settled by cutting the
+quote-matching rule for saved nits in favor of a list that marks addressed nits. R-11 was clean.
+After R-11, the owner decided that picks after an early acceptance are followed by one pass and a new
+acceptance question, that a pass's judgement findings are answered before its one revision commit, and
+that a document without a `branch` field on a side branch merges the default branch in. The owner left
+the remove-or-add choice open, so the author applied the recommended rule: remove when both behave the
+same, otherwise ask with removal recommended. R-11 F-01 to F-09 are applied. R-12 had a
+blocking finding: same-day dates cannot order picks against acceptances. After R-12, the owner adopted
+the cut that ends that class of finding: the author writes `, after owner change` into the row of the
+first pass after any change the owner directs, and asks again when that pass is clean, unless the owner
+asks for the full loop. This replaces the pick revision and its dated ordering and changes the earlier
+rule that a revision the owner asks for restarts the count. The owner also decided that an acceptance
+withdraws the open questions of its pass into the listed findings. R-12 F-01 to F-09 are applied. R-13 had a
+blocking finding in the stopping rule again. After R-13, the owner split the feature: the stopping rule,
+the streak count, owner and advance acceptance rules, saved nits collected across passes and the
+decision record moved to `docs/specs/spec-review-stopping-rule.md`, with criterion AC-01 and R-13 F-01
+to F-04, and this document keeps the other parts, with a plain nit rule in place of saved nits. AC-01 is
+retired here and its ID is not reused. R-13 F-06 and F-07 are applied here; F-05 moved with the markers it
+concerns. R-14 had a blocking finding in the side-branch merge added after R-11.
+After R-14, the owner dropped that side-branch merge, made the ban on rewriting reviewed commits absolute
+(no approval exception), and let a pass's nits be fixed in a commit that already changes the baseline for
+that pass's blocking or should-fix findings. R-14 F-01 to F-06 are applied.
 
 ## Review Log
 
@@ -459,6 +454,12 @@ R-9 F-01 to F-07 are applied. The owner accepts in advance if R-10 has no blocki
 | 2026-11-13 | R-9 | spec | `67a08db` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix and two nits |
 | 2026-11-13 | R-10 | spec | `57d866c` | claude-opus-5-5 | procedural | Clean: no blocking finding; six should-fix and two nits, listed for the owner and not applied |
 | 2026-11-13 | R-10 | spec | `57d866c` | n/a | n/a | accepted by owner |
+| 2026-11-13 | R-11 | spec | `4c7e151` | claude-opus-5-5 | procedural | Clean: no blocking finding; eight should-fix and one nit |
+| 2026-11-13 | R-12 | spec | `d62c9f0` | claude-opus-5-5 | procedural | One blocking finding (F-01 same-day dates cannot order picks against acceptances), six should-fix and two nits |
+| 2026-11-13 | R-13 | spec | `a581e9c` | claude-opus-5-5 | procedural | One blocking finding (F-01 a stale after-owner-change row blocks the next owner change), five should-fix and one nit |
+| 2026-11-13 | R-14 | spec | `903314a` | claude-opus-5-5 | procedural | One blocking finding (F-01 the side-branch merge never runs when a fix also changes the baseline), four should-fix and one nit |
+| 2026-11-13 | R-15 | spec | `76f0480` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix and two nits |
+| 2026-11-13 | R-15 | spec | `76f0480` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -1039,3 +1040,279 @@ SEVERITY: nit
 WHERE: Test Plan AC-05 row; Design, Free-text checks (lines 297-300)
 EVIDENCE: A row "has passed review once a clean pass whose reviewed commit already held the row's current text has no finding whose `WHERE` names that row". The AC-05 trial needs "a stored clean pass, at a commit already holding the row's current text", and a second fixture that "changes the row after the stored clean pass". A reviewer can establish either only from Git history. The row describes the fixtures as files committed under `tests/vh-adlc/evidence/review-convergence/`. It does not say that the trial builds a repository whose history holds the stored pass's commit and, for the second fixture, a later commit that changes the row.
 PROPOSAL: State that each AC-05 fixture is a scratch repository whose history holds the stored pass's commit, plus a later commit that changes the row in the second fixture.
+
+### R-11
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (line 81, "whichever lands second rebases onto the first"); Design, Delivery (lines 364-367); Design, Commits a Review Log names are never rewritten (lines 291-297)
+EVIDENCE: The Owner summary says "The plugin edits overlap with the draft `shared-development-loop` feature, so whichever lands second rebases onto the first." Delivery says "Whichever feature lands second merges the first in", and the new Preservation rule says no operation "rebases, amends, squashes or otherwise rewrites a commit that a Review Log row names, or any commit before it on that branch". Both features carry Review Logs on their branches, so the summary tells the owner to do exactly what this revision forbids. This is the restatement drift AC-03 targets, introduced in the same revision as the no-rewrite rule.
+PROPOSAL: Change the summary sentence to say the feature that lands second merges the first in, matching Delivery and the Preservation rule.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (line 80, "the draft `shared-development-loop` feature"); Context, Background, Overlapping work (lines 166-170); Design, Delivery (lines 364-366)
+EVIDENCE: `git show 4bef34e:docs/specs/shared-development-loop.md` (origin/main tip) has `status: in-progress` and `branch: feat/shared-development-loop`; at HEAD 4c7e151 it is `status: planned` with "34 tasks written, implementation next". It is no longer a draft. Background lists its covers "as of `b777df0`" without `plugins/vh-adlc/references/authority.md`, yet `git show b777df0:docs/specs/shared-development-loop.md` has `plugins/vh-adlc/references/authority.md` at frontmatter line 17, and the current version's T22 edits `authority.md` (line 596). Delivery's overlap list ("the same skill steps, protocol, resume skill, `loop.md`, pin and manifests") also omits it. This revision adds an `authority.md` edit (T13), so the omitted file is now a real overlap with an in-progress feature.
+PROPOSAL: Describe `shared-development-loop` as in progress on its feature branch, add `references/authority.md` to the overlap in Background and Delivery, and say which feature merges the other in for that file.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (step 5, lines 248-253; step 3, lines 239-244); Context, Owner summary (lines 47-51); Acceptance Criteria AC-01; Test Plan AC-01 row (Variant C2)
+EVIDENCE: Step 5 lets the owner pick from a list given "at the ceiling or with an acceptance", says "The count continues from the last marker", and "When the new pass is clean, the author asks for acceptance again". An acceptance can come at any clean pass ("You can accept after any clean pass", Owner summary line 53; Terminology, Owner acceptance), including one recording `streak 1 of 3`. Picks from that list continue the count, so the next clean pass records `streak 2 of 3`. Step 3 then says "The author never asks the owner to accept below the ceiling" and the spec and resume operations "dispatch another pass instead of asking", while step 5 says ask. The Owner summary repeats both ("the author never asks you to accept before the ceiling"; "Picks ... after an acceptance, are applied and checked by one more pass"). Variant C2 covers only an acceptance at `streak 3 of 3`, so either reading passes every listed check.
+PROPOSAL: State which rule wins when picks follow an acceptance given below the ceiling (ask after the one pass, or continue to three), use the same wording in step 3, step 5, AC-01 and the Owner summary, and add a variant with an acceptance at `streak 1 of 3` followed by a pick.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Clean streak, line 221; Decision record, line 225); Design, Stopping rule (step 7, lines 257-259); Test Plan AC-01 row (Variants H2 and E)
+EVIDENCE: After an acceptance row with status `draft`, the previous value is the old marker "if the latest decision record entry is a pick revision, and 0 otherwise". The decision record names only findings "folded, rejected or applied at the owner's pick", not factual findings the author applies. Take a log where the owner picks at the ceiling (pick revision entry), the next pass records `streak 4 of 3`, and the owner accepts there. A later blocking drift pass is "handled as today, through a revision that counts from 0", but applying its factual blocking findings writes no decision record entry. The latest entry is still the old pick revision, so Terminology gives a previous value of 4 and the first clean pass records `streak 5 of 3`, while step 7 and Variant H2 expect `streak 1 of 3`. H2's and E's fixtures do not say what the decision record holds, so a skill following Terminology literally passes them.
+PROPOSAL: Tie the pick check to a pick revision recorded after the latest acceptance row, or require every revision to write a decision record entry saying whether it is a pick revision. Give H2 a decision record whose latest entry before the drift pass is an earlier pick revision.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-01 (lines 394-395, "counts from 0 after a revision that is not a pick revision"); Design, Terminology (Clean streak, line 221)
+EVIDENCE: The pinned convention says a change to Scope, Design, Acceptance Criteria, Test Plan or covers "is a revision" (conventions/feature-documents.md:70-71). Applying a clean pass's factual should-fix findings to the baseline is therefore a revision that is not a pick revision, and AC-01 read literally resets the count after it. Terminology says the opposite ("Applying the findings of clean passes does not change it") and limits the reset to the case where an acceptance row precedes and the status is `draft`. Variant A requires `streak 1 of 3` to `streak 3 of 3` across exactly those applied fixes, so the criterion text contradicts its own proof. This is the R-1 F-01 defect returning in the criterion an implementation review compares against.
+PROPOSAL: Reword the AC-01 clause to the event Terminology uses, for example "counts from 0 after a revision of an accepted document that is not a pick revision", so the criterion and Variant A agree.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Applying a pass's findings as one revision (lines 278-287); Design, Stopping rule (step 3, lines 239-242); Acceptance Criteria AC-09; Test Plan AC-09 row
+EVIDENCE: The new step "applies the pass's findings as one revision in one commit", and AC-09 requires "one revision in one commit". Step 3 and step 2 keep today's split: factual findings are applied and judgement findings go to the owner as Open Questions, "folded in before the next pass is dispatched". A pass holding both kinds cannot be applied in one commit unless the author first commits the questions alone and then applies the factual findings together with the answers, and nothing says which. The AC-09 trial's two findings have no stated KIND and the trial has no owner turn, so a correct author that turns one of them into an Open Question fails "one commit applies both".
+PROPOSAL: Say how the one-revision rule treats judgement findings (for example, the one revision holds every factual finding and every folded answer, committed after the owner answers), and state in the AC-09 row that both seeded findings are factual.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Applying a pass's findings as one revision (line 282, "Where a finding can be met by removing a mechanism or by adding one, it removes"); Acceptance Criteria AC-09; Test Plan AC-09 row
+EVIDENCE: The pinned convention says "Every trade-off the document settles is an open question, including one the author would answer the same way the owner would. A section that weighs options and keeps one ... raises that choice here instead of deciding it" (conventions/feature-documents.md:154-157). Choosing between removing a mechanism and adding one to meet a finding is such a trade-off, and the new rule has the author settle it alone. The AC-09 trial then passes only when "the mechanism is removed rather than extended", so an author that follows the convention and raises the choice as an Open Question fails the trial.
+PROPOSAL: Make removal the author's recommendation in an Open Question when the choice changes the design, or limit the rule to cases where both fixes produce the same behavior, and adjust the AC-09 pass condition to match.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-10; Test Plan AC-10 row; Design, Commits a Review Log names are never rewritten (lines 291-297); Tasks T6 and T13
+EVIDENCE: The AC-10 scenario uses "a fixture spec with a `branch` field", and review mode already handles that case with `git merge origin/<default branch>` (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:57-58 at 3963e25), so the scenario passes on today's skill and does not fail first as T6 claims. The case that produced the problem was different: this document has no `branch` field (`git show 4c7e151:docs/specs/spec-review-convergence.md | grep -c '^branch:'` prints 0) yet lives on `docs/review-convergence-spec`, where SKILL.md:58-59 only offers `git merge --ff-only` on the default branch. The reflog shows `rebase (start): checkout origin/main` at 2026-11-13 04:12:05 on that branch, and later `commit (amend)` of the R-8 revision at 04:13:41. With every box ticked, the uncovered no-branch-field side branch still has no instruction and no scenario.
+PROPOSAL: Add a scenario variant for a document on a non-default branch without a `branch` field, and state in Design what review mode does there (merge the default branch in, or stop). Cite the existing delivery rule that feature PRs "never squash, so the commits its Review Log cites stay reachable" (conventions/delivery.md:79) beside the new Preservation text.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Terminology (Saved nit, line 223); Test Plan AC-01 row (Variants D3, E and J)
+EVIDENCE: Saved nits come from "a marked spec review row", but Terminology defines markers only as `streak <n> of 3` and calls `drift` and `drift, blocking` rows drift rows "in place of a streak", so whether a clean drift row's nits are saved nits is open. Variant E has a clean `drift` row after the acceptance and checks that the summary lists "only nits recorded after the acceptance row" without saying whether that row holds a nit. Variant D3 does not state whether its blocking finding is factual or judgement (R-10 F-04 fixed this for B and H2). AC-01's "never raises one again" covers rejected factual findings, but only Variant J (an answered judgement finding) checks it.
+PROPOSAL: Say whether drift rows count as marked for saved nits and give Variant E's drift row a nit with the expected result, make D3's blocking finding factual, and add a rejected factual finding to Variant J or a new variant.
+
+### R-12
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Terminology (Clean streak, line 225; Decision record, line 229); Acceptance Criteria AC-01 ("applies owner picks as a pick revision, continuing the count"); Test Plan AC-01 row (Variants C2, C3 and H2)
+EVIDENCE: Line 225 says that after an acceptance row, with status `draft`, the previous value is the old marker "if the decision record holds a pick revision entry dated after that acceptance row, and 0 otherwise". The Review Log records only a day-granular date (conventions/feature-documents.md:168-171), and the decision record entries are "dated entries" (line 229). The two sections have no other shared ordering. Acceptances and the picks that follow them almost always fall on the same day. In this document R-8's acceptance, the R-8 picks, R-10's acceptance and the R-10 picks are all dated 2026-11-13 (lines 538-542). Variant C2 runs live, so the author writes the acceptance row and the pick revision entry with the same date. Read strictly, "dated after" fails, the previous value becomes 0, and the next pass records `streak 1 of 3` where C2 expects `streak 4 of 3`. Read as "on or after", an earlier pick revision from the same day as a later acceptance counts. Then a blocking drift revision continues from the old marker, which is the R-11 F-04 defect again. H2 passes either way only because its fixture dates the earlier pick "before" the acceptance. No date comparison satisfies both C2 and the case H2 is meant to guard. AC-01, which reads the previous value "as Terminology states", cannot be met for same-day events.
+PROPOSAL: Order the pick against the acceptance by something the document records unambiguously. For example, have the pick revision entry name the acceptance it follows ("pick revision after the acceptance at R-<n>"), or mark the pick in the next spec review row. Give C2 and H2 fixtures where the acceptance row and the pick entries share a date.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (step 3, lines 247-249; step 5, lines 253-258; paragraph after step 7, lines 266-272); Acceptance Criteria AC-01 (final clause, lines 420-421, against lines 413-415); Context, Owner summary (lines 48-49, 52-53); Test Plan AC-01 row (Variants C3 and G)
+EVIDENCE: Step 5 says that after a pick revision, "When the new pass is clean, the author asks for acceptance again ... whatever the streak". After an early acceptance (Variant C3) that pass records `streak 2 of 3`. Step 3 says "When `vh-adlc next` reports `owner acceptance` below the ceiling and no owner acceptance covers the latest pass, the spec and resume operations dispatch another pass instead of asking". The resumed-run check (lines 267-270) applies, as step 3 says, any should-fix finding on the baseline that the decision record does not name. A post-pick pass's findings are not named there. So a run interrupted after that pass and continued, or resumed through the resume skill, applies the pass's findings and dispatches another pass. The live run would list them and ask. AC-01 contains both instructions: "runs one more pass before asking again, whatever the streak" and "when resumed below the ceiling, handles the latest pass's unhandled findings and continues instead of asking for acceptance". No variant interrupts a post-pick pass, so either behavior passes every listed check.
+PROPOSAL: State that a pass following a pick revision is handled by step 5 in a continued or resumed run too, and say how the resumed run recognizes it (for example, a pick revision entry after the latest marked row). Add that exception to step 3, the resumed-run paragraph and AC-01's final clause, and add a variant that resumes after a clean post-pick pass below the ceiling.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (lines 53-55, "a revision you ask for beyond picks starts it again"); Design, Terminology (Clean streak, line 225); Design, Stopping rule (steps 4 and 5); Acceptance Criteria AC-01 (lines 408-409); Test Plan AC-01 row (Variant E)
+EVIDENCE: The summary tells the owner that any revision they ask for beyond picks restarts the count. Terminology resets the previous value only when "an acceptance row follows that row and the document's status is `draft`", and AC-01 limits the reset to "a revision of an accepted document that is not a pick revision". Take an unaccepted draft at `streak 3 of 3` where the owner asks for a scope change instead of picking. No acceptance row exists, so the previous value stays 3, the next clean pass records `streak 4 of 3`, and step 4 lists its findings and asks for acceptance after that single pass. A scope change of any size gets one pass. The same holds mid-loop, where an owner-requested change continues the count. Design does not say how such a revision differs from folded answers, which deliberately do not reset. The Behaviors list (line 218) names only "a revision of an accepted document", and Variant E covers only that case.
+PROPOSAL: Decide whether an owner-requested revision of an unaccepted draft, other than picks and folded answers, restarts the count. If it does, have the author record it in the decision record and read that entry in Terminology, AC-01 and a new variant. If it does not, correct the Owner summary.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (step 3, lines 244-249; step 6, lines 259-261); Design, Applying a pass's findings as one revision (lines 286-288); Design, Terminology (Owner acceptance, line 230); Design, Delivery (S7.7 change, lines 385-387)
+EVIDENCE: The one-revision rule raises a pass's judgement findings as Open Questions "first, without changing the baseline". So at every stop for an Open Question, the normative baseline is unchanged since that clean pass, and an owner acceptance named on it qualifies under Terminology ("after a clean pass while the normative baseline is unchanged since that pass"). Step 6 then says the author "applies nothing to the normative baseline, lists that pass's findings" and writes the acceptance row. It does not say what becomes of the Open Questions already raised from that pass. `gate planned` requires `no_open_questions` (conventions/feature-documents.md:270, :305), and only the owner answers questions (:139). One implementer withdraws the questions into the listed findings and accepts. Another keeps them and asks the owner to answer first, and any answer that changes the baseline then makes the acceptance impossible. S7.7 runs the real reviewer, which "may return judgement findings even on a sound draft" (tests/vh-adlc/scenarios/run.ts:547). Today its check expects no acceptance whenever questions exist (run.ts:549). The new check "expects acceptance when the loop ended at a clean pass" and does not say whether a stop on an Open Question counts as the loop ending.
+PROPOSAL: State what an owner acceptance does to Open Questions raised from the pass it names: withdraw them into the listed findings, or require answers that change nothing on the baseline. Make S7.7's new check say which path it expects when turn 1 stopped on an Open Question.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Pins and older consumers (lines 362-364); Test Plan AC-06 row (procedure case); Context, Owner summary (lines 37-38); Context, Background (lines 116-118)
+EVIDENCE: Pins says that without the new convention "the current procedure runs ...: after a clean pass the author asks for acceptance and dispatches no further pass". The AC-06 procedure case gives the scripted pass "a factual should-fix" and passes when "that finding is applied as today, ... the run asks for acceptance and dispatches no second pass". The Owner summary describes the same procedure differently: it "applies every factual finding and then asks for a new pass", and Background says it "always applies factual findings and asks again". If the canned finding touches Scope, Design, a criterion or the Test Plan, applying it changes the normative baseline (conventions/feature-documents.md:70-73). The review is then stale (:300-301), and `next` names `spec review`. An acceptance row at the reviewed commit fails `accepted` (:309). The case would then demand an acceptance question that cannot lead to a passing gate, and would fail an author that follows the binary and dispatches a second pass. The row does not say where the finding sits.
+PROPOSAL: Put the procedure case's factual should-fix outside the normative baseline (for example in Context), or expect a second pass when it is on the baseline. Make the Pins description of today's procedure agree with the Owner summary and Background.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-06 row ("two scratch clones, each checked out at a commit that holds its `AGENTS.md` pin"); Acceptance Criteria AC-06; Tasks T3
+EVIDENCE: `owner-readable-specifications` covers AGENTS.md, plugins/vh-adlc/knowledge.md, both manifests, the spec skill, the reviewer agent and docs/get-started/first-feature.md. `vh-adlc fresh docs/specs/owner-readable-specifications.md --repo <repo> --plugin-pin d8f07c9...` at d62c9f0 returns one finding per covered path. Implementation review R-4 has `covered-changed` for AGENTS.md, knowledge.md and both manifests, but none for SKILL.md, the reviewer agent or first-feature.md. This feature changes all three (T4, T5, T10). Picture a new-pin clone at the feature's final commit, which is where an implementation reviewer would naturally re-verify AC-06, compared with an old-pin clone at an earlier commit. The new-pin clone gains `covered-changed` findings for those three paths, so `findings` differ for a reason unrelated to the pin, and a correct implementation fails AC-06. The comparison isolates the pin only if the two commits differ in nothing a named spec covers except the pin files, and the row does not require that.
+PROPOSAL: Require the two clones to differ only in the pin. For example, use the T3 commit and its parent with T3 touching only pin files, or the final commit and a scratch commit on it that restores the old pin in AGENTS.md. State that pair in the row and in T3.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks T13, T6
+EVIDENCE: T13 (third in order) has the done condition "the check and the AC-10 side-branch case pass". The two AC-10 scenario cases are written only in T6, which comes later, so T13's done condition cannot be observed when T13 is committed. T6 then claims the AC-10 side-branch case fails "because today's skill ... only fast-forwards a side branch". By then T13 has already changed review mode step 1 to merge, so that case cannot fail first. T13 also puts the failing check and the change in one task, while the convention orders "failing test first" with one commit per task (conventions/feature-documents.md:129-135).
+PROPOSAL: Move the AC-10 scenario cases into a task ordered before T13, with T13's done condition referring to them, or drop the scenario from T13's done condition and the side-branch failure claim from T6. Split T13's failing check into its own preceding task.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 86-89, changes since the acceptance at R-10)
+EVIDENCE: The paragraph lists only the changes R-10 drove. It leaves out the material changes made after R-11 within the same revision since that acceptance: the author now asks for acceptance after picks below the ceiling, judgement findings are answered before the one revision commit, removal is preferred only when both options behave the same (otherwise it is an Open Question), and a document without a `branch` field on a side branch merges the default branch in. Some of these appear elsewhere in the summary, but not as changes since the accepted scope, which the convention asks the summary to explain (conventions/feature-documents.md:86-88).
+PROPOSAL: Add the R-11-driven changes to the changes-since-acceptance paragraph.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Delivery (lines 384-387 and 392-393); Test Plan AC-01 row (final sentence)
+EVIDENCE: `session()` takes a fixed array of prompts and hardcodes `maxTurns: 80` with no option (tests/vh-adlc/scenarios/run.ts:133-141). Delivery says S7.7's "turn-2 prompt names the latest pass", but which pass that is becomes known only after turn 1 ends. It also says the multi-pass cases run with `maxTurns` 250. Both need `session()` to change: computed prompts and a turn limit option. Delivery and T6 do not say so.
+PROPOSAL: Say in Delivery or T6 that `session()` gains a `maxTurns` option and accepts a prompt computed from the document after the previous turn.
+
+### R-13
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Stopping rule (step 5, lines 259-266; paragraph after step 7, lines 275-280); Acceptance Criteria AC-01 (lines 430-431, 437-438); Context, Owner summary (lines 51-56)
+EVIDENCE: Step 5 says that after an owner change the author "makes the change ... and dispatches one pass", and that "a continued or resumed run that finds such a row as the latest one does the same" (asks). The paragraph after step 7 says "Before it dispatches, a continued or resumed run checks the latest stored pass: if its row carries `, after owner change`, the author asks as step 5 says". Only the other branch of that check requires the pass to be "still fresh". The suffix branch has no freshness or recency condition. Consider R-5 clean with `streak 4 of 3, after owner change`. The author asks. In the next turn, which is a continued run, the owner picks a finding or asks for another revision. The author applies it, and the review becomes stale (`baseline-changed`; `vh-adlc next` names `spec review`, as observed on this document at a581e9c). Before dispatching, the check finds R-5, still the latest stored pass, carrying the suffix, so the author asks for acceptance again and never dispatches the pass step 5 promises. A run interrupted after applying the change and then resumed does the same, because step 5 tells it to ask. The same thing happens when the owner accepts at a suffix row and later asks for a revision. An acceptance row is not a pass, so the suffix row stays the latest stored pass. Either way an acceptance at R-5 then fails `accepted` (conventions/feature-documents.md:309), because the baseline changed after it. So for any second owner change, AC-01's "after an owner change, runs one pass" and the suffix rule it also requires cannot both hold. Variants C, C2, C3 and C5 each have only one owner change, so a literal implementation passes all of them.
+PROPOSAL: Make the suffix branch apply only while that pass is still fresh, both in the paragraph after step 7 and in step 5's continued-or-resumed sentence. A stale suffix row then falls through to dispatching one pass. Add a variant with two owner changes in a row, and one that resumes after a second owner change was applied but before its pass was dispatched.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Owner change, line 232); Design, Stopping rule (steps 2, 3 and 5, lines 247-266); Context, Owner summary (lines 51-55); Test Plan AC-01 row (Variants A, E and J)
+EVIDENCE: Owner change is defined as "picks from a list the author gave, or any other revision the owner asks for", and the first clean pass after one records the suffix and asks for acceptance "whatever the count". An owner's answer to an Open Question is a change to the document that the owner directs. When the answer picks an option other than the current design, it is arguably a revision the owner asks for. The Test Plan treats folded answers as not an owner change. Variant A requires "no acceptance question comes before streak 3" although judgement findings are "asked and folded" after clean passes 1 and 2. Variant E requires post-revision clean passes "1, 2 and 3 without the suffix" after the owner answers a judgement should-fix. Neither Terminology nor the steps say that folded answers, or answers to a blocking pass's judgement findings, are excluded. R-12 F-03 asked how such a revision differs from folded answers, and the revision does not say. An implementer reading Terminology literally adds the suffix after every answered question and fails Variants A and E. Another reads it the way the Test Plan does.
+PROPOSAL: State in Terminology that folding the owner's answers to Open Questions raised from a pass is not an owner change, and say whether an answer that also asks for a further change is one. Use the same wording in step 5, AC-01 and the Owner summary.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Owner change, line 232; Clean streak, line 231); Design, Stopping rule (step 5, line 266); Context, Owner summary (lines 54-55); Test Plan AC-01 row (Variant C4)
+EVIDENCE: "When the owner asks for the full loop, the author leaves the suffix off." Without the suffix the count continues from the previous value, and only a blocking pass or an acceptance resets it (Terminology, line 231; Owner summary "A blocking finding sets the count to zero, and so does an acceptance"). In an unaccepted draft at `streak 3 of 3`, as in Variant C, an owner who asks for a scope change and the full loop gets a next clean pass at `streak 4 of 3`. Step 4 then lists its findings and asks after that single pass, which is what happens without the request. At `streak 2 of 3` the request gives one more pass, not three. Variant C4 covers the request only after an acceptance, where the count was already reset to 0. The owner is told "ask for the full loop instead", which reads as three clean passes, but outside the post-acceptance case the request changes nothing except the suffix. Under conventions/feature-documents.md:154-157 this is a trade-off the document settles without raising it.
+PROPOSAL: Decide whether a full-loop request resets the count to 0. If it does, record the request in the decision record so a resumed run can read it, and update Terminology. If it does not, say in the Owner summary that it only matters after an acceptance. Add a C4-style variant on an unaccepted draft at the ceiling.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (steps 5 and 6, lines 259-270); Design, Terminology (Owner acceptance, line 236); Design, Delivery (S7.9, lines 401-402); Test Plan AC-01 row (Variants C to D6)
+EVIDENCE: Step 5 says the clean first pass after an owner change records the suffix and the author "asks the owner again, whatever the count". Step 6 says that with an owner acceptance "the clean pass it names ends the loop whatever the streak". The design does not say which wins when the owner directs a change and accepts in advance for the pass that follows. S7.9 is that case: turn 1 asks for a revision, and turn 2 says "If it finds nothing blocking and leaves no open questions, I accept the revision" (tests/vh-adlc/scenarios/run.ts:1079 at 3963e25). That acceptance also names no `R-<n>`, although Terminology recognizes an advance acceptance only "for a named pass `R-<n>`". Delivery keeps S7.9's check accepting "either a draft still waiting or a re-acceptance" (run.ts:1097-1098). So an author that asks again and one that writes the acceptance row both pass, and no D variant combines an advance acceptance with an owner change.
+PROPOSAL: State that an advance acceptance covering the first pass after an owner change takes precedence over step 5's question, and say how the author records an unnamed conditional acceptance like S7.9's (as an advance acceptance for the next pass `R-<n>`, or not at all). Make S7.9's check expect the chosen path, or add a D variant for it.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-08 (lines 462-464); Test Plan AC-08 row; Tasks T2 (line 498), T12 (line 494); Design, Stopping rule (lines 241-242, 285)
+EVIDENCE: Design says "In the convention's Acceptance section, step 2 gains the rule". That rule is steps 1 to 7, which define the `, after owner change` suffix (step 5) and the `drift` and `drift, blocking` markers (step 7), and line 285 calls the count, the suffix and the drift markers "the only new text". Pins says "The plugin does not carry its own copy of the convention rules" (line 376). AC-08, its Test Plan row, T12's failing check and T2's change list name only "the stopping rule and the `streak <n> of 3` marker". A published convention that omits the suffix and the drift markers passes AC-08 and T12, while the plugin writes markers the shared convention never defines.
+PROPOSAL: Add the `, after owner change` suffix and the `drift` and `drift, blocking` markers to AC-08, the AC-08 Test Plan row, T12's check and T2's change list, or state in Design that they live only in the plugin and why.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-03 row (author trial); Test Plan AC-09 row (author trial); Tasks T5
+EVIDENCE: The AC-03 author trial applies "a finding that asks for a value none of the four copies hold", and the AC-09 author trial uses "a stored pass with two factual findings". Neither row states the findings' severity or the stored pass's state in the loop. Under the new stopping rule, a nit on the normative baseline is saved rather than applied (step 1), and a clean pass at or above the ceiling has nothing applied to the baseline (step 4). If either fixture's finding is a nit, or its stored pass records `streak 3 of 3`, a correct author applies nothing, and the trial fails it on "one commit leaves all four locations stating that value" or "one commit applies both". The design rates such a proof blocking ("a proof fails a correct implementation").
+PROPOSAL: State in both rows that the seeded findings are should-fix (or blocking) and that the stored pass is blocking or below the ceiling with no owner acceptance. Under the old pin, say the fixture is pinned to the new revision.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T6 (line 502), T7 (line 503), T15 (line 496), T3 (line 499); Test Plan AC-01 row (Variant C2)
+EVIDENCE: T6 and T7 still end "(AC-01, AC-10)", although the AC-10 scenario cases now sit in T15 and the rule change sits in T13, and neither T6's nor T7's done condition names an AC-10 case. T15 says the side-branch case fails "because today's review mode only fast-forwards a side branch". SKILL.md:58 at 3963e25 runs `git merge --ff-only origin/<default branch>` on the default branch and gives no instruction for a side branch. T3's done condition compares "the final commit" with a scratch commit, but no final commit exists when T3 is committed. Variant C2's "same day" and "all on one date" are left over from the date-ordering rule this revision removed.
+PROPOSAL: Drop AC-10 from T6 and T7, say in T15 that today's step 1 has no side-branch case, have T3 compare its own commit with a scratch commit restoring the old pin, and remove the date wording from C2.
+
+### R-14
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Acceptance Criteria AC-10 (lines 340-342); Test Plan AC-10 row (line 359); Design, Commits a Review Log names are never rewritten (lines 214-227); Tasks T13, T15
+EVIDENCE: The Design adds the side-branch merge to review mode step 1 ("Review mode step 1 gains the case ...", lines 222-224). Step 1 merges only "When `vh-adlc fresh` shows the spec review stale from drift alone (covered changes on the default branch, an unchanged baseline)" (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:55-57 at 903314a). The AC-10 row starts each case "after a stored blocking pass", then moves the default branch "so the review is stale from drift, and the run continues to a second pass". Before that second pass the author applies the blocking finding as one revision (lines 199-212). That changes the normative baseline whenever the finding sits in Scope, Design, a criterion or the Test Plan (conventions/feature-documents.md:70-71), so `fresh` reports `baseline-changed` as well as drift, and step 1's "drift alone" condition is false. An author that follows the Design as written commits the revision and dispatches the second pass without merging, and both cases then fail "the working branch holds a merge of the default branch". AC-10 itself asks for more than the Design gives: the author brings default-branch work in by merge whenever the default branch moves "during a review loop". The row does not say where the fixture's blocking finding sits, which is the only thing that would keep drift alone.
+PROPOSAL: Say in Design when default-branch work comes in during a loop: either on any covered drift, including when the baseline also changed, with step 1's condition widened to match, or only on drift alone, with AC-10 narrowed to that. Make the AC-10 fixture agree, for example by placing the stored blocking finding outside the normative baseline if the narrow rule is kept.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Commits a Review Log names are never rewritten (lines 222-224); Acceptance Criteria AC-10; Test Plan AC-10 row (side-branch case); Tasks T13
+EVIDENCE: The design gives review mode a merge for "a document without a `branch` field that sits on a branch other than the default one". The same skill tells the author to avoid that state. Start step 3 says that without a `branch` field the author works "on the default branch in a worktree that holds it" (SKILL.md:36-38), and Committing and pushing says that while the document has no `branch` field it is committed "on the default branch" and pushed there (SKILL.md:106-109). T13 changes only Preservation and step 1, so the updated skill would both tell the author to move to the default branch and tell it how to merge on a side branch. In the side-branch scenario, an author that follows Start step 3 may switch to the default branch, where the fixture document does not exist, and never reach the merge the case checks.
+PROPOSAL: State whether a document without a `branch` field may be worked on a side branch. If it may, amend Start step 3 and Committing and pushing in T13 to allow it and name the branch to commit on. If it may not, replace the side-branch merge with what the author does when it finds such a document.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Commits a Review Log names are never rewritten (lines 216-226); Context, Owner summary (lines 59-60); Test Plan AC-10 row (authority.md check); Tasks T13, T14
+EVIDENCE: The Design says Preservation "says nothing about rewriting reviewed commits" (authority.md:72-78). The same file's authority table already covers the action: "Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action" (plugins/vh-adlc/references/authority.md:30). The design does not mention that row. The new rule says "no operation rebases, amends, squashes or otherwise rewrites" a reviewed commit, which leaves it open whether the owner's separate approval under line 30 still allows such a rewrite. One implementer adds an absolute ban that contradicts line 30. Another keeps line 30 and has the ban yield to approval, and the T14 check that authority.md "forbids rewriting a commit a Review Log row names" passes on either. The rebase this document cites as the trigger would already have needed that approval.
+PROPOSAL: Cite authority.md:30 in Design and decide whether the owner's separate approval can authorize rewriting a reviewed commit, for example by allowing it only with a warning that every review it names becomes stale. Make the Preservation text, line 30 and the T14 check say the same thing.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Nits are listed, not applied (lines 192-197); Acceptance Criteria AC-11 (lines 343-345); Test Plan AC-11 row (line 360); Context, Owner summary (lines 47-49)
+EVIDENCE: The rule lists "every nit of the latest pass" in the report and the owner-facing summary. The AC-11 case stores a blocking pass that holds a Design nit. After the blocking finding is applied the review is stale, and the design expects a run to continue to a second pass (the AC-10 row: "the run continues to a second pass"). Once that pass runs, the blocking pass is no longer the latest, so an author following the rule may leave out its Design nit, while the case requires that nit "with its ID in the report and the owner-facing summary". The row does not say whether the scripted reviewer returns a second pass or what it holds. More generally, a nit from any pass except the last one in a run is never reported, so the owner never sees it.
+PROPOSAL: Say whether the report lists the nits of every pass the run handled or only the last one, and use the same wording in Design, AC-11 and the Owner summary. In the AC-11 row, state how many canned passes the scripted reviewer returns and which nits the report must list.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Nits are listed, not applied (lines 192-197); Context, Owner summary (lines 47-49); Open Questions
+EVIDENCE: Under the rule, a nit on the normative baseline is never applied by any path. That holds even when the same pass's blocking or should-fix finding already changes the baseline in that commit, so a new pass happens anyway and holding back the nit saves no pass. A harmless wrong `file:line` in Design, which AC-02 requires to be rated nit, therefore stays in the document for good, although the convention asks Design to cite its claims (conventions/feature-documents.md:75). Now that the saved-nit list has moved to spec-review-stopping-rule.md, this document keeps no record of such nits beyond one run's report. The Owner summary gives the benefit ("they never trigger another pass") but not this cost, and the convention asks the summary to cover trade-offs (:80-83) and asks every trade-off the document settles to go to Open Questions (:154-157). The decision record says only that a "plain nit rule" replaced saved nits, not whether applying nits alongside a revision that is already happening was considered.
+PROPOSAL: Raise as an Open Question whether nits on the baseline may be applied in a commit that already revises the baseline for a blocking or should-fix finding. State the chosen behavior and its cost in the Owner summary.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 37-39)
+EVIDENCE: "R-4 to R-13 were each caused by the previous pass's narrow fix, all in the stopping rule it carried." The Review Log shows that R-8, R-9, R-10 and R-11 had no blocking finding (lines 437-442), and several findings in that range are outside the stopping rule: R-12 F-05 and F-06 concern Pins and the AC-06 row, and R-12 F-07 concerns Tasks T13 and T6 for AC-10 (lines 1121-1140). The claim holds for the blocking findings in R-4 to R-7, R-12 and R-13, not for every pass in the range.
+PROPOSAL: Say that the blocking findings in R-4 to R-7, R-12 and R-13 each traced to the previous pass's fix and all sat in the stopping rule.
+
+### R-15
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Nits are listed, not applied (lines 197-204); Design, Applying a pass's findings as one revision (lines 208-213); Acceptance Criteria AC-11 (lines 353-357); Test Plan AC-11 row (line 372); Tasks T6 (line 384)
+EVIDENCE: The nit rule says "a nit on the normative baseline never causes a revision on its own", and AC-11 says the author "makes no commit that changes the normative baseline only to fix nits". The one-revision rule says the author "raises the pass's judgement findings as Open Questions first" and then applies "every answer" in one commit, and today's skill turns every judgement finding into an Open Question whatever its severity (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:71-72). Nothing says what happens to a nit whose KIND is judgement. If a clean pass holds only a judgement nit on Design, one implementer raises it as an Open Question and folds the owner's answer, which is a baseline commit made only for a nit and fails AC-11. Another lists it and raises nothing. The AC-11 row does not give the KIND of any of its three nits, so the second pass's Scope nit can be either. T6's failure reason, "today's skill applies the clean pass's factual nit on its own", only holds if that nit is factual, while the AC-06 row does say "factual nit".
+PROPOSAL: State whether a judgement nit on the baseline is raised as an Open Question or only listed, and use the same wording in the one-revision paragraph and AC-11. In the AC-11 row, give each nit's KIND so it matches T6.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (lines 48-52); Design, Nits are listed, not applied (lines 197-204); Acceptance Criteria AC-11 (lines 353-357)
+EVIDENCE: The Owner summary says "The cost: a nit on a pass with nothing else to apply stays in the document unless you pick it." The Design gives no owner-pick path for nits. AC-11 says the author "makes no commit that changes the normative baseline only to fix nits", with no exception for an owner's pick. An author that applies a nit the owner picked, as the summary promises, fails AC-11 as written. An author that refuses the pick meets AC-11 but contradicts the summary. Picking a listed finding was the R-10 and R-12 mechanism that moved to spec-review-stopping-rule.md, so this document no longer defines it.
+PROPOSAL: Either add to Design and AC-11 that a nit the owner picks is applied as an owner-directed revision, or drop "unless you pick it" from the Owner summary and say the nit stays until a later revision touches it.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-11 row (line 372); Acceptance Criteria AC-11 (lines 356-357); Design, Nits are listed, not applied (lines 197-203)
+EVIDENCE: The row passes only "when the first pass's blocking finding and both its nits are applied in one commit", and one of those nits is on Context. AC-11 says the author "may apply a finding confined to sections outside the normative baseline", and Design says such a finding "may be applied at any time". The Design sentence "the same commit fixes that pass's nits" sits inside the rule about baseline nits, so it can be read as covering only baseline nits. Under that reading, an author that leaves the Context nit unapplied follows AC-11 and still fails the proof. Under the other reading, fixing the Context nit is required, and AC-11's "may" is wrong. By this document's own severity definitions, a proof that fails a correct implementation is a defect.
+PROPOSAL: Decide whether a pass's non-baseline nits must go in the same commit as its baseline fixes. Then either make the row accept the Context nit as applied or unapplied, or change AC-11 and Design to require it.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Free-text checks (lines 273-278); Design, Nits are listed, not applied (lines 197-200); Acceptance Criteria AC-05 and AC-11; Test Plan AC-05 row
+EVIDENCE: This traces to the previous revision's change, the R-14 F-05 answer that a pass's nits are fixed in the same commit that applies its blocking or should-fix findings to the baseline. Under the free-text rule, a widening finding on a row that has passed review is a nit "so it is listed rather than applied", and "a later change to the row starts over". Under the new nit rule, whenever the same pass also has a blocking or should-fix finding on the baseline, the widening nit must be fixed in that commit. That changes the row, the row loses its passed state, and the next pass may rate a further widening should-fix again. This is the regex-tuning loop of blog-visual-reading R-40, R-44 and R-45 that Background cites (docs/specs/blog-visual-reading.md:1411, :1524, :1547 at 3963e25). The two rules now contradict each other ("listed rather than applied" against "the same commit fixes that pass's nits"), and the AC-05 trial does not cover a pass with both kinds of finding.
+PROPOSAL: State which rule wins for a free-text widening nit on a pass that also changes the baseline: either it is always listed and never applied, or applying it alongside does not restart the row. Add that case to the AC-05 trial.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-10 (lines 349-352); Test Plan AC-10 row (line 371); Design, Commits a Review Log names are never rewritten (lines 228-232); Context, Owner summary (lines 62-63)
+EVIDENCE: This traces to the previous revision's change for R-14 F-01, which narrowed the Test Plan row to "stale from drift alone" but left AC-10 broad. AC-10 still says "when the default branch moves during a review loop on a feature branch, the author brings it in by merge". The only merge instruction is review mode step 1, which runs only "When `vh-adlc fresh` shows the spec review stale from drift alone (covered changes on the default branch, an unchanged baseline)" (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:55-57 at 76f0480). T13 no longer changes the skill. When the default branch moves after a pass whose fixes also change the baseline, `fresh` reports `baseline-changed` as well as drift, step 1 does not run, and nothing brings the default branch in. The AC-10 scenario only tests drift alone, so it passes while AC-10's broader end state is not delivered. The Owner summary's unconditional "default-branch work comes in by merge" repeats the broad form.
+PROPOSAL: Narrow AC-10 and the Owner summary to "when the author brings default-branch work in, it uses a merge", or to the drift-alone case step 1 covers. Alternatively, widen step 1 in T13 and add a mixed-staleness case to the row.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Delivery (lines 293-299); Tasks T10; Acceptance Criteria AC-08
+EVIDENCE: docs/user-guides/workflows.md:279 says "Merging, tagging, releasing, deploying, and destructive operations need separate approval" and points to authority.md for the full contracts. After T13, a history rewrite of a commit a Review Log row names cannot be approved at all. T10 and AC-08 update the guides only for the severities, the nit rule and the one-revision rule, so the user guide would not mention the one destructive Git operation that approval cannot unlock.
+PROPOSAL: Add a sentence to T10 and the AC-08 guide check saying that no approval allows rewriting a commit a Review Log row names.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Delivery (lines 301-304); Context, Background, Overlapping work (lines 141-146)
+EVIDENCE: Delivery says shared-development-loop "edits the same spec skill, protocol, `references/authority.md`, pin and manifests", and the second feature to land merges the first in "for every one of those files". Background, and that feature's covers (docs/specs/shared-development-loop.md:7-29 at b777df0 and 4bef34e), show it also covers the reviewer agent and `knowledge.md`, and covers `tests/vh-adlc/` at b777df0. This feature changes all three (T4, T3, T6, T9, T15). A git merge brings in the whole branch, so the list changes nothing in practice. It just disagrees with Background.
+PROPOSAL: Add the reviewer agent, `knowledge.md` and `tests/vh-adlc/scenarios/run.ts` to the Delivery list, or say "every file both features change".

@@ -3,6 +3,9 @@ package browser
 import (
 	"bufio"
 	"context"
+	"crypto/sha1"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -10,7 +13,9 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +24,7 @@ import (
 	"time"
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/profile"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/session"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
@@ -53,6 +59,231 @@ func TestFailedHandoffRetainsRecoveryAfterOwnerClosesBrowser(t *testing.T) {
 	<-done
 	if !r.healthy() {
 		t.Fatal("owner completing a failed close would trigger premature profile cleanup")
+	}
+}
+
+// privateSession reruns the calling test as a session leader, the way the guard
+// runs the supervisor that owns a browser, and reports whether the caller is
+// already that rerun and should continue.
+func privateSession(t *testing.T) bool {
+	t.Helper()
+	if self, err := state.Inspect(os.Getpid()); err == nil && self.Session == self.PID {
+		return true
+	}
+	cmd := exec.Command(os.Args[0], "-test.run=^"+t.Name()+"$", "-test.count=1", "-test.v")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	out, err := cmd.CombinedOutput()
+	if err != nil || !strings.Contains(string(out), "--- PASS: "+t.Name()) {
+		t.Fatalf("private-session run failed: %v\n%s", err, out)
+	}
+	return false
+}
+
+// Chromium's network service flushes its disk cache into the profile after the
+// browser process has exited. These scripts stand in for such helpers.
+const (
+	// Writes once the browser is gone, then exits on its own. It ignores
+	// SIGTERM, as a helper that shuts down on its own schedule would.
+	flushingHelper = `trap '' TERM; while kill -0 "$parent" 2>/dev/null; do sleep 0.02; done; sleep 0.3; mkdir -p "$profile/Default/Cache"; : >"$profile/Default/Cache/index"; : >"$marker"`
+	// Ignores the browser's exit until it is killed.
+	stubbornHelper = `trap '' TERM; mkdir -p "$profile/Default/Cache"; : >"$marker"; while :; do mkdir -p "$profile/Default/Cache"; sleep 0.02; done`
+	// Keeps forking writers until it is killed.
+	forkingHelper = `trap '' TERM; while :; do (sleep 0.2; mkdir -p "$profile/Default/Cache"; : >"$marker") & sleep 0.01; done`
+)
+
+func TestStopOutlastsBrowserHelpers(t *testing.T) {
+	if !privateSession(t) {
+		return
+	}
+	t.Run("flushing", func(t *testing.T) { stopOutlastsHelper(t, flushingHelper, "", false) })
+	t.Run("stubborn", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, "", false) })
+	t.Run("late-fork", func(t *testing.T) { stopOutlastsHelper(t, forkingHelper, "", false) })
+	// A browser that crashed or was closed by its owner leaves helpers that are
+	// no longer its descendants, and a helper may lead its own process group.
+	t.Run("orphaned", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, "", true) })
+	t.Run("own-process-group", func(t *testing.T) { stopOutlastsHelper(t, stubbornHelper, "set -m; ", true) })
+}
+
+// helperRun is a stand-in browser whose helper writes into its profile.
+type helperRun struct {
+	r                       *runtime
+	browser                 *child
+	helper                  state.Identity
+	home, id, profile, mark string
+}
+
+func startHelper(t *testing.T, helperScript, prefix string) helperRun {
+	t.Helper()
+	c, id := setup(t)
+	profile := filepath.Join(c.Home, id, "profile")
+	if err := os.Mkdir(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	marker, pidFile := filepath.Join(dir, "helper-wrote"), filepath.Join(dir, "helper-pid")
+	script := `profile=$1 marker=$2; parent=$$; ` + prefix + `(sh -c 'echo $PPID' >"$3"; ` + helperScript + `) & exec sleep 30`
+	r := &runtime{home: c.Home, id: id, profile: profile}
+	browser, err := r.spawn("browser", "/bin/bash", []string{"-c", script, "bash", profile, marker, pidFile}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var helper state.Identity
+	for deadline := time.Now().Add(5 * time.Second); helper.PID == 0; time.Sleep(10 * time.Millisecond) {
+		if time.Now().After(deadline) {
+			t.Fatal("helper did not start")
+		}
+		data, _ := os.ReadFile(pidFile)
+		if pid, e := strconv.Atoi(strings.TrimSpace(string(data))); e == nil {
+			helper, _ = state.Inspect(pid)
+		}
+	}
+	t.Cleanup(func() { _ = state.Signal(helper, syscall.SIGKILL) })
+	return helperRun{r: r, browser: browser, helper: helper, home: c.Home, id: id, profile: profile, mark: marker}
+}
+
+func stopOutlastsHelper(t *testing.T, helperScript, prefix string, orphan bool) {
+	t.Helper()
+	h := startHelper(t, helperScript, prefix)
+	if prefix != "" && h.helper.Group == h.browser.identity.Group {
+		t.Fatal("helper did not lead its own process group")
+	}
+	if orphan {
+		if err := state.Signal(h.browser.identity, syscall.SIGKILL); err != nil {
+			t.Fatal(err)
+		}
+		<-h.browser.done
+	}
+	h.stopAndCheck(t)
+}
+
+func (h helperRun) stopAndCheck(t *testing.T) {
+	t.Helper()
+	h.r.stop()
+	if h.r.cleanupErr != nil {
+		t.Fatal(h.r.cleanupErr)
+	}
+	if state.Alive(h.helper) {
+		t.Fatal("browser helper survived stop")
+	}
+	if _, err := os.Stat(h.mark); err != nil {
+		t.Fatal("helper never wrote the profile")
+	}
+	time.Sleep(500 * time.Millisecond)
+	if _, err := os.Stat(h.profile); !os.IsNotExist(err) {
+		t.Fatal("browser helper recreated the profile after stop")
+	}
+}
+
+// A member can fork and exit between reading the /proc listing and inspecting
+// it, so one enumeration omits its live child. The scripted enumerations see a
+// member, omit it once, find it again on the confirming scan, then lose it for
+// good; drain must finish only after that. The fixture member's birth time is
+// not the test process's, so the pidfd signal refuses it.
+func TestStopConfirmsAnEmptySession(t *testing.T) {
+	c, id := setup(t)
+	self, err := state.Inspect(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
+	}
+	guard := state.Identity{PID: self.PID, Start: "fixture-guard", Boot: self.Boot, Group: self.PID, Session: self.PID}
+	if err = state.Update(context.Background(), c.Home, id, func(record *state.Record) { record.Guard = guard }); err != nil {
+		t.Fatal(err)
+	}
+	profile := filepath.Join(c.Home, id, "profile")
+	if err = os.Mkdir(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	member := self
+	member.Start = "fixture-member"
+	script := [][]state.Identity{{member}, nil, {member}, nil, nil}
+	var calls int
+	original := privateMembers
+	t.Cleanup(func() { privateMembers = original })
+	privateMembers = func(record state.Record) ([]state.Identity, error) {
+		if !state.Equal(record.Guard, guard) {
+			t.Error("drain enumerated another session")
+		}
+		calls++
+		if calls > len(script) {
+			return nil, nil
+		}
+		return script[calls-1], nil
+	}
+	r := &runtime{home: c.Home, id: id, profile: profile}
+	r.stop()
+	if r.cleanupErr != nil {
+		t.Fatal(r.cleanupErr)
+	}
+	if calls < 3 {
+		t.Fatalf("drain finished after %d enumerations, before the confirming scan found the omitted member", calls)
+	}
+	if calls != len(script) {
+		t.Fatalf("drain finished after %d enumerations, want %d", calls, len(script))
+	}
+	if _, err = os.Stat(profile); !os.IsNotExist(err) {
+		t.Fatal("profile survived a confirmed empty session")
+	}
+}
+
+// A session whose record cannot be read cannot be drained, so stop keeps the
+// profile and reports that a helper may be alive.
+func TestStopFailsClosedWithoutTheSessionRecord(t *testing.T) {
+	if !privateSession(t) {
+		return
+	}
+	h := startHelper(t, stubbornHelper, "")
+	if err := os.Chmod(filepath.Join(h.home, h.id, "state.json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.r.stop()
+	if h.r.cleanupErr == nil || h.r.cleanupErr.Error() != "browser-helper-cleanup-pending" {
+		t.Fatalf("stop without its session record: %v", h.r.cleanupErr)
+	}
+	if _, err := os.Stat(h.profile); err != nil {
+		t.Fatal("profile removed while a helper may be alive")
+	}
+}
+
+// A recorded guard whose PID now belongs to a foreign session leader must not
+// make that session's processes look like ours.
+func TestStopLeavesForeignSessionsAlone(t *testing.T) {
+	if !privateSession(t) {
+		return
+	}
+	foreign := exec.Command("/bin/sh", "-c", "/bin/sleep 30 & wait")
+	foreign.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if err := foreign.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = foreign.Process.Kill(); _ = foreign.Wait() })
+	leader, err := state.Inspect(foreign.Process.Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, id := setup(t)
+	stale := leader
+	stale.Start = "recycled"
+	if err = state.Update(context.Background(), c.Home, id, func(record *state.Record) { record.Guard = stale }); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	var members []state.Identity
+	entries, _ := os.ReadDir("/proc")
+	for _, e := range entries {
+		if pid, e := strconv.Atoi(e.Name()); e == nil {
+			if member, e := state.Inspect(pid); e == nil && member.Session == leader.PID {
+				members = append(members, member)
+			}
+		}
+	}
+	if len(members) < 2 {
+		t.Fatal("foreign session did not start")
+	}
+	(&runtime{home: c.Home, id: id}).stop()
+	for _, member := range members {
+		if !state.Alive(member) {
+			t.Fatal("stop signalled a process outside its session")
+		}
 	}
 }
 
@@ -123,7 +354,17 @@ func TestHandoffRejectsForeignBrowserIdentity(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
+	// Helper roles re-execute this test binary in place of x11vnc and Chromium.
+	if file := os.Getenv("REMOTE_GUI_TEST_FAKE_VNC"); file != "" {
+		os.Exit(fakeVNCProcess(file))
+	}
+	if file := os.Getenv("REMOTE_GUI_TEST_STUBBORN"); file != "" {
+		os.Exit(stubbornBrowser(file))
+	}
 	session.BrowserLauncher = Start
+	if os.Getenv("REMOTE_GUI_TEST_STANDIN") != "" {
+		session.BrowserLauncher = standInLauncher
+	}
 	if handled, code := session.Internal(os.Args[1:]); handled {
 		os.Exit(code)
 	}
@@ -269,6 +510,663 @@ func TestBrowserComponentsCrashAndExpire(t *testing.T) {
 	}
 }
 
+// fakeVNCProcess accepts x11vnc's password handshake, ignores every key and logs
+// each key event to <file>.keys, so a test can prove that no key was sent.
+func fakeVNCProcess(file string) int {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 1
+	}
+	if err = os.WriteFile(file+".tmp", []byte(listener.Addr().String()), 0o600); err != nil || os.Rename(file+".tmp", file) != nil {
+		return 1
+	}
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			return 1
+		}
+		go func() {
+			defer func() { _ = conn.Close() }()
+			var buffer [24]byte
+			_, _ = io.WriteString(conn, "RFB 003.008\n")
+			if _, err := io.ReadFull(conn, buffer[:12]); err != nil {
+				return
+			}
+			_, _ = conn.Write([]byte{1, 2})
+			if _, err := io.ReadFull(conn, buffer[:1]); err != nil {
+				return
+			}
+			_, _ = conn.Write(make([]byte, 16))
+			if _, err := io.ReadFull(conn, buffer[:16]); err != nil {
+				return
+			}
+			_, _ = conn.Write([]byte{0, 0, 0, 0})
+			if _, err := io.ReadFull(conn, buffer[:1]); err != nil {
+				return
+			}
+			_, _ = conn.Write(make([]byte, 24))
+			for {
+				if _, err := io.ReadFull(conn, buffer[:8]); err != nil {
+					return
+				}
+				if buffer[0] == 4 {
+					f, e := os.OpenFile(file+".keys", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+					if e == nil {
+						_, _ = io.WriteString(f, strconv.Itoa(int(buffer[7]))+"\n")
+						_ = f.Close()
+					}
+				}
+			}
+		}()
+	}
+}
+
+// stubbornBrowser stands in for a Chromium that ignores both Exit and SIGTERM,
+// recording when each SIGTERM arrives.
+func stubbornBrowser(file string) int {
+	terms := make(chan os.Signal, 4)
+	signal.Notify(terms, syscall.SIGTERM)
+	for range terms {
+		f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if err == nil {
+			_, _ = io.WriteString(f, strconv.FormatInt(time.Now().UnixNano(), 10)+"\n")
+			_ = f.Close()
+		}
+	}
+	return 0
+}
+
+func waitFile(path string, limit time.Duration) (string, error) {
+	deadline := time.Now().Add(limit)
+	for time.Now().Before(deadline) {
+		if data, err := os.ReadFile(path); err == nil {
+			return string(data), nil
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return "", errors.New("helper did not report " + filepath.Base(path))
+}
+
+func helper(t *testing.T, role, variable, file string) *child {
+	t.Helper()
+	cmd := exec.Command(os.Args[0], "-test.run=^$")
+	cmd.Env = append(os.Environ(), variable+"="+file)
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { _ = cmd.Wait(); close(done) }()
+	t.Cleanup(func() { _ = cmd.Process.Kill(); <-done })
+	identity, err := state.Inspect(cmd.Process.Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &child{role: role, identity: identity, done: done}
+}
+
+func termTimes(file string) []time.Time {
+	data, _ := os.ReadFile(file)
+	var times []time.Time
+	for _, line := range strings.Fields(string(data)) {
+		if n, err := strconv.ParseInt(line, 10, 64); err == nil {
+			times = append(times, time.Unix(0, n))
+		}
+	}
+	return times
+}
+
+func TestReusableStopSendsNoKeyAndTerminatesThenKills(t *testing.T) {
+	c, id := setup(t)
+	dir := t.TempDir()
+	vnc := helper(t, "vnc", "REMOTE_GUI_TEST_FAKE_VNC", filepath.Join(dir, "vnc"))
+	address, err := waitFile(filepath.Join(dir, "vnc"), 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chrome := helper(t, "browser", "REMOTE_GUI_TEST_STUBBORN", filepath.Join(dir, "term"))
+	time.Sleep(200 * time.Millisecond)
+	kept := filepath.Join(dir, "chromium")
+	if err = os.Mkdir(kept, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(kept, "Cookies"), []byte("kept"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := &runtime{home: c.Home, id: id, reusable: true, profile: kept, chrome: chrome, children: []*child{vnc, chrome}, vncAddress: address}
+	r.current.Password = "fixture"
+	died := make(chan time.Time, 1)
+	go func() { <-chrome.done; died <- time.Now() }()
+	begin := time.Now()
+	r.stop()
+	elapsed := time.Since(begin)
+	if keys, e := os.ReadFile(filepath.Join(dir, "vnc.keys")); e == nil {
+		t.Fatalf("stop sent keys to the display: %q", keys)
+	}
+	terms := termTimes(filepath.Join(dir, "term"))
+	if len(terms) == 0 {
+		t.Fatal("stubborn browser received no SIGTERM")
+	}
+	var death time.Time
+	select {
+	case death = <-died:
+	default:
+		t.Fatal("stubborn browser survived stop")
+	}
+	if wait := terms[0].Sub(begin); wait > 300*time.Millisecond {
+		t.Fatalf("SIGTERM after %v, want it first", wait)
+	}
+	if wait := death.Sub(terms[0]); wait < 1900*time.Millisecond || wait > 2600*time.Millisecond {
+		t.Fatalf("SIGKILL %v after SIGTERM, want about two seconds", wait)
+	}
+	if elapsed > 4500*time.Millisecond {
+		t.Fatalf("stop took %v, past the guard's five-second supervisor deadline", elapsed)
+	}
+	if data, err := os.ReadFile(filepath.Join(kept, "Cookies")); err != nil || string(data) != "kept" {
+		t.Fatal("stop deleted the reusable profile")
+	}
+}
+
+func TestReusableProfileLaunchPreparation(t *testing.T) {
+	c, id := setup(t)
+	profiles := filepath.Join(t.TempDir(), "profiles")
+	held, err := profile.Acquire(profiles, "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	held.Release()
+	c.Profile, c.ProfileHome = "work", profiles
+	r := &runtime{home: c.Home, id: id}
+	if err = r.prepare(c); err != nil {
+		t.Fatal(err)
+	}
+	chromium := filepath.Join(profiles, "work", "chromium")
+	downloads := filepath.Join(c.Home, id, "downloads")
+	if r.profile != chromium || r.downloads != downloads || !r.reusable {
+		t.Fatalf("profile paths: %q %q %v", r.profile, r.downloads, r.reusable)
+	}
+	if info, e := os.Lstat(downloads); e != nil || info.Mode() != os.ModeDir|0o700 {
+		t.Fatal("session downloads directory missing")
+	}
+	if _, e := os.Lstat(filepath.Join(c.Home, id, "profile")); !os.IsNotExist(e) {
+		t.Fatal("a reusable-profile session created a disposable profile")
+	}
+	prefs := func() map[string]any {
+		data, e := os.ReadFile(filepath.Join(chromium, "Default", "Preferences"))
+		if e != nil {
+			t.Fatal(e)
+		}
+		var out map[string]any
+		if e = json.Unmarshal(data, &out); e != nil {
+			t.Fatal(e)
+		}
+		return out
+	}
+	args, err := r.prepareLaunch("human", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if slices.Contains(args, "--restore-last-session") || !slices.Contains(args, "--user-data-dir="+chromium) {
+		t.Fatalf("first launch arguments: %v", args)
+	}
+	first := prefs()
+	if first["profile"].(map[string]any)["exit_type"] != "Normal" || first["session"].(map[string]any)["restore_on_startup"] != float64(5) || first["download"].(map[string]any)["default_directory"] != downloads {
+		t.Fatalf("first launch preferences: %v", first)
+	}
+	args, err = r.prepareLaunch("agent", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(args, "--restore-last-session") || prefs()["session"].(map[string]any)["restore_on_startup"] != float64(1) {
+		t.Fatalf("handoff launch does not restore the last session: %v", args)
+	}
+	d, did := setup(t)
+	disposable := &runtime{home: d.Home, id: did}
+	if err = disposable.prepare(d); err != nil {
+		t.Fatal(err)
+	}
+	if disposable.reusable || disposable.profile != filepath.Join(d.Home, did, "profile") {
+		t.Fatal("a session without a profile lost its fresh disposable profile")
+	}
+	if args, err = disposable.prepareLaunch("human", 1); err != nil || !slices.Contains(args, "--restore-last-session") {
+		t.Fatalf("disposable first launch changed: %v %v", args, err)
+	}
+}
+
+// standInClipboard is the stand-in launcher's clipboard helper. Close records
+// whether the browser was still alive, then closes the helper's connection.
+type standInClipboard struct {
+	record string
+	chrome *child
+	conn   net.Conn
+}
+
+func (*standInClipboard) Set(context.Context, string) error              { return nil }
+func (*standInClipboard) Get(context.Context) (string, error)            { return "", nil }
+func (*standInClipboard) Clear(context.Context) error                    { return nil }
+func (*standInClipboard) Menus(context.Context) (map[uint32]bool, error) { return nil, nil }
+func (h *standInClipboard) Close() error {
+	alive := state.Alive(h.chrome.identity)
+	_ = os.WriteFile(h.record, []byte(strconv.FormatBool(alive)+" "+strconv.FormatInt(time.Now().UnixNano(), 10)), 0o600)
+	if h.conn != nil {
+		return h.conn.Close()
+	}
+	return nil
+}
+
+// clipConnections accepts the stand-in helpers' connections on dir/clip.sock and
+// reports when each one closes.
+func clipConnections(t *testing.T, dir string) <-chan time.Time {
+	t.Helper()
+	listener, err := net.Listen("unix", filepath.Join(dir, "clip.sock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	closed := make(chan time.Time, 4)
+	go func() {
+		for {
+			conn, e := listener.Accept()
+			if e != nil {
+				return
+			}
+			go func() {
+				_, _ = io.Copy(io.Discard, conn)
+				closed <- time.Now()
+				_ = conn.Close()
+			}()
+		}
+	}()
+	return closed
+}
+
+// standInLauncher runs in the re-executed supervisor. It prepares the reusable
+// profile like a real launch, then runs the fake VNC and the stubborn browser
+// in place of x11vnc and Chromium.
+func standInLauncher(_ context.Context, c config.Config, id string) (session.BrowserHandle, error) {
+	var empty session.BrowserHandle
+	dir := os.Getenv("REMOTE_GUI_TEST_STANDIN")
+	r := &runtime{home: c.Home, id: id}
+	if err := r.prepare(c); err != nil {
+		return empty, err
+	}
+	if _, err := r.prepareLaunch(c.Mode(), r.generation.Add(1)); err != nil {
+		return empty, err
+	}
+	vncFile := filepath.Join(dir, "vnc-"+id)
+	if _, err := r.spawn("vnc", os.Args[0], []string{"-test.run=^$"}, append(os.Environ(), "REMOTE_GUI_TEST_FAKE_VNC="+vncFile)); err != nil {
+		return empty, err
+	}
+	address, err := waitFile(vncFile, 5*time.Second)
+	if err != nil {
+		return empty, err
+	}
+	chrome, err := r.spawn("browser", os.Args[0], []string{"-test.run=^$"}, append(os.Environ(), "REMOTE_GUI_TEST_STUBBORN="+filepath.Join(dir, "term-"+id)))
+	if err != nil {
+		return empty, err
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return empty, err
+	}
+	viewer := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conn, buffered, e := http.NewResponseController(w).Hijack()
+		if e != nil {
+			return
+		}
+		sum := sha1.Sum([]byte(req.Header.Get("Sec-WebSocket-Key") + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
+		_, _ = buffered.WriteString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + base64.StdEncoding.EncodeToString(sum[:]) + "\r\n\r\n")
+		_ = buffered.Flush()
+		_, _ = io.Copy(io.Discard, conn)
+		_ = conn.Close()
+	})}
+	go func() { _ = viewer.Serve(listener) }()
+	r.chrome, r.vncAddress, r.modeReady = chrome, address, true
+	clip := &standInClipboard{record: filepath.Join(dir, "clip-closed-"+id), chrome: chrome}
+	// Like the real helper, the stand-in holds a connection from inside the
+	// supervisor; the test observes when it closes.
+	if conn, e := net.Dial("unix", filepath.Join(dir, "clip.sock")); e == nil {
+		clip.conn = conn
+	}
+	r.clip = clip
+	r.current = session.BrowserHandle{BrowserMode: c.Mode(), Target: "http://" + listener.Addr().String() + "/vnc.html", Assets: dir, Password: "fixture"}
+	handle := r.snapshot()
+	handle.Stop = func() {
+		if delay, e := time.ParseDuration(os.Getenv("REMOTE_GUI_TEST_STOP_DELAY")); e == nil {
+			time.Sleep(delay)
+		}
+		r.stop()
+		_ = viewer.Close()
+		_ = os.WriteFile(filepath.Join(dir, "stopped-"+id), nil, 0o600)
+	}
+	return handle, nil
+}
+
+func TestReusableProfileStopAndExpiryWithStubbornBrowser(t *testing.T) {
+	for _, ending := range []string{"stop", "expiry"} {
+		t.Run(ending, func(t *testing.T) {
+			base, err := os.MkdirTemp("/tmp", "rg-standin-")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = os.RemoveAll(base) })
+			home, profiles, dir := filepath.Join(base, "s"), filepath.Join(base, "p"), filepath.Join(base, "d")
+			if err = os.Mkdir(dir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			version := filepath.Join(dir, "chromium")
+			if err = os.WriteFile(version, []byte("#!/bin/sh\necho 'Chromium 151.0.7922.137'\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("REMOTE_GUI_TEST_STANDIN", dir)
+			t.Setenv("REMOTE_GUI_CHROMIUM", version)
+			clipClosed := clipConnections(t, dir)
+			ttl := "1m"
+			if ending == "expiry" {
+				ttl = "4s"
+			}
+			c, err := config.Parse([]string{"start", "--home", home, "--profile-home", profiles, "--profile", "work", "--transport", "loopback", "--ttl", ttl})
+			if err != nil {
+				t.Fatal(err)
+			}
+			v, err := session.Start(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _, _ = session.Stop(home, v.ID) })
+			record, err := state.Load(home, v.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var chrome state.Identity
+			for _, p := range record.Owned {
+				if p.Role == "browser" {
+					chrome = p.Identity
+				}
+			}
+			began := record.Expires
+			if ending == "stop" {
+				began = time.Now()
+				end, err := session.Stop(home, v.ID)
+				if err != nil || end.State != "stopped" || time.Since(began) > 10*time.Second {
+					t.Fatalf("stop: %+v %v after %v", end, err, time.Since(began))
+				}
+			} else {
+				deadline := time.Now().Add(15 * time.Second)
+				for {
+					end, e := session.Read(home, v.ID)
+					if e == nil && end.State == "stopped" {
+						break
+					}
+					if time.Now().After(deadline) {
+						t.Fatalf("expiry did not stop the session: %+v %v", end, e)
+					}
+					time.Sleep(50 * time.Millisecond)
+				}
+			}
+			if _, err = os.Stat(filepath.Join(dir, "stopped-"+v.ID)); err != nil {
+				t.Fatal("the supervisor did not finish its browser stop before the guard's deadline")
+			}
+			terms := termTimes(filepath.Join(dir, "term-"+v.ID))
+			if len(terms) == 0 || state.Alive(chrome) {
+				t.Fatal("the stubborn browser was not terminated and killed")
+			}
+			if wait := terms[0].Sub(began); wait > time.Second {
+				t.Fatalf("SIGTERM reached the browser %v after the %s began, want it first", wait, ending)
+			}
+			if keys, e := os.ReadFile(filepath.Join(dir, "vnc-"+v.ID+".keys")); e == nil {
+				t.Fatalf("%s sent keys to the display: %q", ending, keys)
+			}
+			closing, err := os.ReadFile(filepath.Join(dir, "clip-closed-"+v.ID))
+			if err != nil {
+				t.Fatalf("the clipboard helper was not closed on %s", ending)
+			}
+			alive, at, _ := strings.Cut(string(closing), " ")
+			if alive != "false" {
+				t.Fatalf("the clipboard helper closed while the browser was still running on %s", ending)
+			}
+			select {
+			case gone := <-clipClosed:
+				closedAt, _ := strconv.ParseInt(at, 10, 64)
+				if gone.Before(time.Unix(0, closedAt)) {
+					t.Fatalf("the helper's connection closed before its Close on %s", ending)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatalf("the clipboard helper's connection stayed open after %s", ending)
+			}
+			held, err := profile.Acquire(profiles, "work")
+			if err != nil {
+				t.Fatalf("profile still held after %s: %v", ending, err)
+			}
+			m, _, err := held.Meta()
+			if err != nil || m.HolderID != "" {
+				held.Release()
+				t.Fatalf("holder not cleared after %s: %+v %v", ending, m, err)
+			}
+			preferences := filepath.Join(held.Chromium(), "Default", "Preferences")
+			data, err := os.ReadFile(preferences)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var prefs map[string]any
+			if err = json.Unmarshal(data, &prefs); err != nil {
+				t.Fatal(err)
+			}
+			prefs["profile"].(map[string]any)["exit_type"] = "Crashed"
+			data, _ = json.Marshal(prefs)
+			if err = os.WriteFile(preferences, data, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			held.Release()
+			next, err := session.Start(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _, _ = session.Stop(home, next.ID) })
+			if data, err = os.ReadFile(preferences); err != nil || json.Unmarshal(data, &prefs) != nil || prefs["profile"].(map[string]any)["exit_type"] != "Normal" {
+				t.Fatalf("next first launch did not mark a clean exit: %s", data)
+			}
+		})
+	}
+}
+
+// When forward removal or anything else delays the supervisor past the guard's
+// deadline, its browser stop never starts: no key is sent and the guard's
+// group stop ends Chromium.
+func TestDelayedSupervisorLeavesChromiumToTheGuard(t *testing.T) {
+	base, err := os.MkdirTemp("/tmp", "rg-standin-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(base) })
+	home, profiles, dir := filepath.Join(base, "s"), filepath.Join(base, "p"), filepath.Join(base, "d")
+	if err = os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	version := filepath.Join(dir, "chromium")
+	if err = os.WriteFile(version, []byte("#!/bin/sh\necho 'Chromium 151.0.7922.137'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("REMOTE_GUI_TEST_STANDIN", dir)
+	t.Setenv("REMOTE_GUI_TEST_STOP_DELAY", "8s")
+	t.Setenv("REMOTE_GUI_CHROMIUM", version)
+	c, err := config.Parse([]string{"start", "--home", home, "--profile-home", profiles, "--profile", "work", "--transport", "loopback", "--ttl", "4s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := session.Start(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = session.Stop(home, v.ID) })
+	record, err := state.Load(home, v.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var chrome state.Identity
+	for _, p := range record.Owned {
+		if p.Role == "browser" {
+			chrome = p.Identity
+		}
+	}
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		end, e := session.Read(home, v.ID)
+		if e == nil && (end.State == "stopped" || end.State == "failed") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expiry past the supervisor deadline did not end the session: %+v %v", end, e)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if _, err = os.Stat(filepath.Join(dir, "stopped-"+v.ID)); err == nil {
+		t.Fatal("the delayed supervisor finished its browser stop")
+	}
+	if keys, e := os.ReadFile(filepath.Join(dir, "vnc-"+v.ID+".keys")); e == nil {
+		t.Fatalf("keys were sent to the display: %q", keys)
+	}
+	terms := termTimes(filepath.Join(dir, "term-"+v.ID))
+	if len(terms) == 0 || state.Alive(chrome) {
+		t.Fatal("the guard's group stop did not end the browser")
+	}
+	if wait := terms[0].Sub(record.Expires); wait < 4500*time.Millisecond || wait > 7*time.Second {
+		t.Fatalf("SIGTERM %v after expiry, want the guard's group stop after its five-second deadline", wait)
+	}
+	held, err := profile.Acquire(profiles, "work")
+	if err != nil {
+		t.Fatalf("profile still held: %v", err)
+	}
+	m, _, err := held.Meta()
+	held.Release()
+	if err != nil || m.HolderID != "" {
+		t.Fatalf("holder not cleared: %+v %v", m, err)
+	}
+}
+
+// An expiry whose browser stop starts with less than two seconds of the guard's
+// five-second supervisor deadline left: the browser stop's SIGTERM comes first,
+// no key is sent, the guard kills the supervisor, which closes the clipboard
+// helper's connection, and its group stop then ends the browser before the
+// browser stop's own kill.
+func TestInterruptedReusableCloseEndsThroughTheGuard(t *testing.T) {
+	base, err := os.MkdirTemp("/tmp", "rg-standin-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(base) })
+	home, profiles, dir := filepath.Join(base, "s"), filepath.Join(base, "p"), filepath.Join(base, "d")
+	if err = os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	version := filepath.Join(dir, "chromium")
+	if err = os.WriteFile(version, []byte("#!/bin/sh\necho 'Chromium 151.0.7922.137'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	clipClosed := clipConnections(t, dir)
+	t.Setenv("REMOTE_GUI_TEST_STANDIN", dir)
+	t.Setenv("REMOTE_GUI_TEST_STOP_DELAY", "3600ms")
+	t.Setenv("REMOTE_GUI_CHROMIUM", version)
+	c, err := config.Parse([]string{"start", "--home", home, "--profile-home", profiles, "--profile", "work", "--transport", "loopback", "--ttl", "4s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := session.Start(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = session.Stop(home, v.ID) })
+	record, err := state.Load(home, v.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var chrome state.Identity
+	for _, p := range record.Owned {
+		if p.Role == "browser" {
+			chrome = p.Identity
+		}
+	}
+	watch := func(identity state.Identity) <-chan time.Time {
+		gone := make(chan time.Time, 1)
+		go func() {
+			for state.Alive(identity) {
+				time.Sleep(5 * time.Millisecond)
+			}
+			gone <- time.Now()
+		}()
+		return gone
+	}
+	died, supervisorDied := watch(chrome), watch(record.Supervisor)
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		end, e := session.Read(home, v.ID)
+		if e == nil && (end.State == "stopped" || end.State == "failed") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("the interrupted close did not end the session: %+v %v", end, e)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if _, err = os.Stat(filepath.Join(dir, "stopped-"+v.ID)); err == nil {
+		t.Fatal("the browser stop finished although the guard's deadline cut it short")
+	}
+	if keys, e := os.ReadFile(filepath.Join(dir, "vnc-"+v.ID+".keys")); e == nil {
+		t.Fatalf("keys were sent to the display: %q", keys)
+	}
+	var death, supervisorDeath time.Time
+	select {
+	case death = <-died:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the browser survived the guard's group stop")
+	}
+	select {
+	case supervisorDeath = <-supervisorDied:
+	case <-time.After(2 * time.Second):
+		t.Fatal("the supervisor survived the guard's deadline")
+	}
+	terms := termTimes(filepath.Join(dir, "term-"+v.ID))
+	if len(terms) < 2 {
+		t.Fatalf("want the browser stop's SIGTERM and then the group stop's, got %d", len(terms))
+	}
+	first, group := terms[0].Sub(record.Expires), terms[1].Sub(record.Expires)
+	t.Logf("browser stop SIGTERM %v, supervisor killed %v, group SIGTERM %v, browser death %v after expiry", first, supervisorDeath.Sub(record.Expires), group, death.Sub(record.Expires))
+	if first < 3*time.Second || first > 4800*time.Millisecond {
+		t.Fatalf("browser stop SIGTERM %v after expiry, want it with less than two seconds of the deadline left", first)
+	}
+	if group < 4900*time.Millisecond {
+		t.Fatalf("group SIGTERM %v after expiry, want it after the guard's five-second deadline", group)
+	}
+	// The browser stop's own kill was due two seconds after its SIGTERM, past
+	// the deadline; the supervisor that would send it was gone before the group
+	// stop began, so the group stop ended the browser.
+	if !supervisorDeath.Before(terms[1]) || !supervisorDeath.Before(terms[0].Add(2*time.Second)) {
+		t.Fatal("the supervisor outlived the point where its browser stop could kill the browser")
+	}
+	if death.Before(terms[1]) {
+		t.Fatal("the browser died before the group stop")
+	}
+	if _, e := os.Stat(filepath.Join(dir, "clip-closed-"+v.ID)); e == nil {
+		t.Fatal("the clipboard helper's Close ran although the supervisor was killed first")
+	}
+	select {
+	case gone := <-clipClosed:
+		if !gone.After(terms[0]) || !gone.Before(terms[1]) {
+			t.Fatalf("helper connection closed %v after expiry, want it between the browser stop and the group stop", gone.Sub(record.Expires))
+		}
+	default:
+		t.Fatal("the clipboard helper's connection stayed open after the supervisor was killed")
+	}
+	held, err := profile.Acquire(profiles, "work")
+	if err != nil {
+		t.Fatalf("profile still held: %v", err)
+	}
+	m, _, err := held.Meta()
+	held.Release()
+	if err != nil || m.HolderID != "" {
+		t.Fatalf("holder not cleared: %+v %v", m, err)
+	}
+}
+
 type clipboardDouble struct {
 	mu        sync.Mutex
 	failClear int
@@ -359,6 +1257,51 @@ func TestFailedClipboardClearBlocksAgentLaunch(t *testing.T) {
 	r.clipMu.Unlock()
 	if switching {
 		t.Fatal("failed launch left the switch marked")
+	}
+}
+
+func TestFailedClipboardClearBlocksAgentLaunchOnReusableProfile(t *testing.T) {
+	c, id := setup(t)
+	t.Setenv("REMOTE_GUI_CHROMIUM", filepath.Join(t.TempDir(), "absent-chromium"))
+	profiles := filepath.Join(t.TempDir(), "profiles")
+	held, err := profile.Acquire(profiles, "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	held.Release()
+	c.Profile, c.ProfileHome = "work", profiles
+	double := &clipboardDouble{failClear: 1}
+	r := &runtime{home: c.Home, id: id, clip: double, clipMode: "human"}
+	if err = r.prepare(c); err != nil {
+		t.Fatal(err)
+	}
+	// The session's first launch has already happened; the handoff relaunches.
+	r.generation.Store(1)
+	r.current.BrowserMode = "human"
+	ctx := context.Background()
+	if _, err = r.handoff(ctx, "agent"); err == nil || !strings.HasPrefix(err.Error(), "clipboard-") {
+		t.Fatalf("failed clear on a reusable profile: %v", err)
+	}
+	preferences := filepath.Join(r.profile, "Default", "Preferences")
+	if clears, _ := double.counts(); clears != 1 || len(r.children) != 0 {
+		t.Fatalf("failed clear reached launch: clears=%d children=%d", clears, len(r.children))
+	}
+	if _, e := os.Stat(preferences); e == nil {
+		t.Fatal("a refused agent launch prepared the reusable profile")
+	}
+	if _, err = r.handoff(ctx, "agent"); err == nil || err.Error() != "browser-start-failed" {
+		t.Fatalf("retry did not reach the launch: %v", err)
+	}
+	if clears, _ := double.counts(); clears != 2 {
+		t.Fatalf("retry did not clear again before launch: clears=%d", clears)
+	}
+	data, err := os.ReadFile(preferences)
+	if err != nil {
+		t.Fatal("the retried launch did not prepare the reusable profile")
+	}
+	var prefs map[string]any
+	if err = json.Unmarshal(data, &prefs); err != nil || prefs["session"].(map[string]any)["restore_on_startup"] != float64(1) {
+		t.Fatalf("the retried handoff did not use the reusable profile's handoff launch: %s", data)
 	}
 }
 
