@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Normative revision after spec reviews R-13 and R-14: back to draft with every criterion reset; awaiting a spec review and the owner's acceptance."
+status: planned
+status_description: "Accepted by the owner against R-16 on 2026-11-13; T23 to T25 and fresh evidence for every criterion come next on the feature branch."
 branch: feat/remote-gui-reusable-profiles
 issue: https://github.com/michielvha/vh-adlc/issues/62
 goal: "An owner can opt in to a named browser profile bound to their identity, so provider sessions survive the end of a remote-gui session, while credential entry stays human-only and agent control of a signed-in profile always rests on the owner's confirmation."
@@ -280,6 +280,7 @@ None.
 | 2026-11-13 | R-14 | spec | `a5165431340556b1c090516955d8cfa082c14679` | gpt-6.1-sol | procedural | Blocking: the normative revision must return to draft with every criterion reset; three should-fix findings on pasted text in site storage, helper shutdown in an interrupted close and load sampling. |
 | 2026-11-13 | R-15 | spec | `2ff1a62336717a4a6d43d75dc857749c6b06042e` | gpt-6.1-sol | procedural | No blocking findings; one should-fix finding on how an interrupted close ends the clipboard helper. |
 | 2026-11-13 | R-16 | spec | `69ba525642d043cc7576bf5d43ec7ba5ff69e9fd` | gpt-6.1-sol | procedural | No findings on the revision after R-13 to R-15. |
+| 2026-11-13 | R-16 | spec | `69ba525642d043cc7576bf5d43ec7ba5ff69e9fd` | n/a | n/a | accepted by owner |
 
 ### R-1
 
