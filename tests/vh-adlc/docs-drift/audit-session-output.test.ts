@@ -41,5 +41,15 @@ test("retained references participate in the command output bound", () => {
   const result = auditSessionOutput(failed(), 2048, retained);
   expect(Buffer.byteLength(JSON.stringify(result) + "\n")).toBeLessThanOrEqual(2048);
   expect(result.outcome).toBe("incomplete"); expect(result.details_omitted).toBe(true);
-  expect(result.report_artifacts).toBeNull(); expect(retained.diagnostics[0].length).toBe(600000);
+  expect(result.report_artifacts?.files.report_json).toEqual(retained.files.report_json);
+  expect(result.report_artifacts?.directory).toBe(retained.directory);
+  expect(result.report_artifacts?.diagnostics).toEqual(["Retained output diagnostics exceed the command bound; inspect the saved files and original records"]);
+  expect(result.audit_session).toEqual(failed()); expect(retained.diagnostics[0].length).toBe(600000);
+});
+test("artifact paths too large for a failure summary can be omitted only with an incomplete result", () => {
+  const retained = artifacts(false); retained.files.report_json!.path = "x".repeat(6000);
+  const result = auditSessionOutput(failed(), 2048, retained);
+  expect(result.outcome).toBe("incomplete"); expect(result.details_omitted).toBe(true); expect(result.report_artifacts).toBeNull();
+  expect(Buffer.byteLength(JSON.stringify(result) + "\n")).toBeLessThanOrEqual(2048);
+  expect(retained.files.report_json!.path.length).toBe(6000);
 });

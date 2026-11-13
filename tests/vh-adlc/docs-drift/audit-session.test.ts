@@ -79,15 +79,22 @@ test.each(["matching", "proposal", "normal-cli", "normal-cli-partial-output", "u
     const input = join(f.artifacts, "audit-session-input.json"), output = join(f.artifacts, "audit-session-output.json");
     writeFileSync(input, JSON.stringify(options), { mode: 0o600 });
     const bridge = join(f.artifacts, "audit-session-bridge.ts");
-    writeFileSync(bridge, `import { readFileSync, writeFileSync } from "node:fs";
-const { runAuditSession } = await import(${JSON.stringify(fault === "unretained" ? join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/audit-session.ts") : join(f.retained.directory, "scripts/docs-drift/audit-session.ts"))});
+    writeFileSync(bridge, `import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+const { runAuditSession, readOriginalAuditSessionOutputScope } = await import(${JSON.stringify(fault === "unretained" ? join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/audit-session.ts") : join(f.retained.directory, "scripts/docs-drift/audit-session.ts"))});
 const result = await runAuditSession(JSON.parse(readFileSync(${JSON.stringify(input)}, "utf8")));
 writeFileSync(${JSON.stringify(output)}, JSON.stringify(result), { mode: 0o600 });
 if (${JSON.stringify(fault)} === "matching") {
   const { persistAuditOutput } = await import(${JSON.stringify(join(f.retained.directory, "scripts/docs-drift/report-output.ts"))});
   const wrapped = { ...result, requests: { worker: null, reviewer: null } };
   const denied = persistAuditOutput({ repo: ${JSON.stringify(f.repo)}, source: ${JSON.stringify(f.source)}, artifact_root: ${JSON.stringify(f.artifacts)}, session: wrapped });
-  writeFileSync(${JSON.stringify(join(f.artifacts, "wrapped-output-scope.json"))}, JSON.stringify(denied), { mode: 0o600 });
+  const other = ${JSON.stringify(join(f.artifacts, "different-output-root"))}; mkdirSync(other, { mode: 0o700 });
+  const changed = persistAuditOutput({ repo: ${JSON.stringify(f.repo)}, source: ${JSON.stringify(f.source)}, artifact_root: other, session: result });
+  const checkout = readOriginalAuditSessionOutputScope(result).source_checkout;
+  const { captureRepositoryState } = await import(${JSON.stringify(join(f.retained.directory, "scripts/docs-drift/snapshot.ts"))});
+  const before = JSON.stringify(captureRepositoryState(checkout));
+  const inside = persistAuditOutput({ repo: ${JSON.stringify(f.repo)}, source: ${JSON.stringify(f.source)}, artifact_root: checkout, session: result });
+  writeFileSync(${JSON.stringify(join(f.artifacts, "wrapped-output-scope.json"))}, JSON.stringify({ denied, changed, inside,
+    different_root_files: readdirSync(other), source_unchanged: JSON.stringify(captureRepositoryState(checkout)) === before }), { mode: 0o600 });
 }
 `, { mode: 0o600 });
     const cliArgs = ["run-audit",
@@ -135,9 +142,14 @@ process.exitCode = await main(${JSON.stringify(cliArgs)});
     expect(result.complete, JSON.stringify(result.diagnostics)).toBe(["matching", "proposal", "normal-cli", "normal-cli-partial-output"].includes(fault)); expect(result.authority).toBe("none");
     expect(result.start.complete).toBe(true);
     if (fault === "matching") {
-      const denied = JSON.parse(readFileSync(join(f.artifacts, "wrapped-output-scope.json"), "utf8"));
+      const probes = JSON.parse(readFileSync(join(f.artifacts, "wrapped-output-scope.json"), "utf8")), { denied } = probes;
       expect(denied.complete).toBe(false); expect(denied.directory).toBeNull();
       expect(denied.diagnostics).toContain("Original completed audit session required for output scope");
+      for (const rejected of [probes.changed, probes.inside]) {
+        expect(rejected.complete).toBe(false); expect(rejected.scope_changed).toBe(true); expect(rejected.directory).toBeNull();
+        expect(rejected.diagnostics).toContain("Original audit output scope changed");
+      }
+      expect(probes.different_root_files).toEqual([]); expect(probes.source_unchanged).toBe(true);
     }
     if (fault === "unretained") {
       expect(result.worker).toBeNull(); expect(result.reviewer).toBeNull(); expect(result.diagnostics.join("\n")).toContain("selected retained component");

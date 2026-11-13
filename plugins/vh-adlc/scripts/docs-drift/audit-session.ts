@@ -163,11 +163,20 @@ export function auditSessionOutput(result: Awaited<ReturnType<typeof runAuditSes
     diagnostics: [...session.diagnostics.map(message => ({ code: "audit-session", message })),
       ...(artifacts?.diagnostics ?? []).map(message => ({ code: "audit-output", message }))] };
   const size = () => Buffer.byteLength(JSON.stringify(output) + "\n");
+  const diagnosticSummary = "Retained output diagnostics exceed the command bound; inspect the saved files and original records";
+  if (size() > limit && output.report_artifacts
+    && JSON.stringify(output.report_artifacts.diagnostics).length > JSON.stringify([diagnosticSummary]).length) {
+    output.outcome = "incomplete"; output.details_omitted = true;
+    output.report_artifacts.diagnostics = [diagnosticSummary];
+    output.diagnostics = [...session.diagnostics.map(message => ({ code: "audit-session", message })),
+      { code: "audit-output", message: diagnosticSummary }];
+  }
   if (size() > limit) {
     output.outcome = "incomplete"; output.details_omitted = true; session.complete = false;
     session.start = null; session.worker = null; session.reviewer = null; session.report = null;
     session.diagnostics = ["Audit session details exceed the retained entry bound; inspect the original source and native role records"];
-    output.diagnostics = session.diagnostics.map(message => ({ code: "audit-session", message }));
+    output.diagnostics = [...session.diagnostics.map(message => ({ code: "audit-session", message })),
+      ...(output.report_artifacts?.diagnostics ?? []).map(message => ({ code: "audit-output", message }))];
     if (size() > limit && output.report_artifacts) {
       output.report_artifacts = null;
       output.diagnostics.push({ code: "audit-output", message: "Retained artifact details exceed the command output bound; inspect the selected artifact root" });
