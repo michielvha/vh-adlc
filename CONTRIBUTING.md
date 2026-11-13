@@ -67,8 +67,9 @@ release process in [publishing releases](docs/internal/releasing.md).
 
 For remote-gui, run the Go checks above from `plugins/remote-gui/`, including
 `go test -race ./...`, then run `bun test tests/remote-gui` from the repository root.
-Its optional headed-browser test uses only existing host dependencies and fresh
-profiles with `REMOTE_GUI_BROWSER_E2E=1`. See the [plugin setup](plugins/remote-gui/README.md).
+Its optional headed-browser and clipboard-helper tests use only existing host
+dependencies and fresh profiles with `REMOTE_GUI_BROWSER_E2E=1`, and the viewer
+tests run with `REMOTE_GUI_VIEWER_E2E=1`, as described in `tests/remote-gui/README.md`. See the [plugin setup](plugins/remote-gui/README.md).
 
 For paseo-hosts, run the same Go checks from `plugins/paseo-hosts/`, including
 `go test -race ./...`, then run `bun test tests/paseo-hosts` from the repository root.
