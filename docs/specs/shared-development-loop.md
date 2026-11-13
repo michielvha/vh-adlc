@@ -598,6 +598,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-14 | spec | `d367673759c90a3b0b5da6a6e8b6884d99d18c6a` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on claiming from an unrelated branch and verifying process group cleanup. |
 | 2026-11-13 | R-14 | spec | `d367673759c90a3b0b5da6a6e8b6884d99d18c6a` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-15 | spec | `e2e3de959b09950f8c9d17dbf1a74413523af7ea` | gpt-6.1-sol | procedural | No blocking findings after the covers revision; two should-fix on symlinks escaping the export and detached reviewer helpers. |
+| 2026-11-13 | R-15 | spec | `e2e3de959b09950f8c9d17dbf1a74413523af7ea` | n/a | n/a | accepted by owner |
 
 ### R-1
 
