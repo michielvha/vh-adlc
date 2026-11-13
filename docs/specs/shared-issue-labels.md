@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner answered all six questions; waits for the first independent spec review."
+status_description: "R-1 factual findings applied; four judgement questions (Q7-Q10) wait for the owner, then a new spec review."
 issue: null
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
 covers:
@@ -17,6 +17,10 @@ covers:
   - docs/user-guides/workflows.md
   - .vh-adlc/triage.yaml
   - tests/vh-adlc/labels/
+  - tests/vh-adlc/lifecycle/
+  - tests/vh-adlc/triage/execution.test.ts
+  - tests/vh-adlc/triage/settings.test.ts
+  - tests/vh-adlc/settings-file.test.ts
 ---
 
 # Plan: Shared issue labels
@@ -45,8 +49,9 @@ This feature adds a standard label set to the plugin: type labels (`bug`, `enhan
 description. A new helper compares a repository's labels with the set and shows a plan. Once you
 approve its exact digest, it creates the missing labels and corrects colors and descriptions. It
 never deletes or renames a label and never touches labels the standard does not own, such as the
-ones Dependabot and Renovate create. Investigate and spec give every issue they file one type label
-and the state label their verdict names. Triage keeps its existing rule: a state label it applies is
+ones Dependabot and Renovate create. Investigate gives every issue it files one type label and the
+state label its verdict names. Spec gives the issues it files a type label only, because the feature
+document carries their state. Triage keeps its existing rule: a state label it applies is
 a verdict and needs proof from the confined controller.
 
 vh-adlc gets its own `.vh-adlc/triage.yaml`, and the helper is run on vh-adlc and Stackweaver as the
@@ -60,7 +65,11 @@ the authority reference and every vh-adlc test, this feature changes nothing but
 until #78 merges; implementation starts after that. A handoff asks the #78 session to record
 Stackweaver's investigate labeling as moving here instead of superseded.
 
-Every check named here is planned; nothing has run yet. No spec review has happened. Accepting this
+Every check named here is planned; nothing has run yet. The first independent review (R-1) found
+three blocking and five should-fix issues. The four factual ones are fixed. The other four are open
+questions for you: how tightly apply binds its approval, how `label_map` avoids unsafe mappings,
+whether triage-created issues get labels, and which state label each investigate verdict gives.
+Accepting this
 document authorizes building it on a feature branch. Running the
 helper's apply against any real repository still needs your approval of that exact plan.
 
@@ -169,9 +178,12 @@ the helper and the operations read the same versioned data (owner, Q1). It holds
 | `needs-decision` | state | `5319e7` | Needs a product or architecture call before work starts |
 
 GitHub's other defaults (`duplicate`, `good first issue`, `help wanted`, `invalid`, `question`,
-`wontfix`) stay as GitHub creates them; the set does not own them. Colors and the first four
-descriptions match the current labels in both repositories. The state descriptions drop "triage
-comment" because investigate also applies them.
+`wontfix`) stay as GitHub creates them; the set does not own them. `bug`, `enhancement` and
+`documentation` match GitHub's defaults, which both repositories carry today. The four state colors
+match Stackweaver's labels. `refactor` keeps Stackweaver's color and gains a description, where
+Stackweaver's is empty. `security` gains a color and a description, where Stackweaver has `ededed`
+and none. vh-adlc has neither label yet. The state descriptions drop "triage comment" because
+investigate also applies them.
 
 `references/issues.md` renders the same table and adds who applies each kind:
 
@@ -273,7 +285,7 @@ once would make each other's reviews stale. So:
 | AC-06 | Extend `tests/vh-adlc/triage/execution.test.ts`: a `labels` action with a standard state label outside the controller is denied; a reference test checks the state label list against the vocabulary file. |
 | AC-07 | `tests/vh-adlc/triage/settings.test.ts` and `tests/vh-adlc/settings-file.test.ts` cover the decided `label_map` behavior and keep today's accepted files passing. |
 | AC-08 | Run `vh-adlc settings read --stdin < .vh-adlc/triage.yaml` and a report-only `vh-adlc-triage sweep` with `--report-output` outside the checkout; record both outputs. |
-| AC-09 | Owner-approved `apply` on each repository, then `gh label list` and a before/after `gh issue list --json number,labels` snapshot showing no label lost; record the receipts. |
+| AC-09 | Owner-approved `apply` on each repository, then `gh label list`. Before and after apply, take a complete snapshot of every open and closed issue and pull request with `gh api --paginate "repos/<owner>/<repo>/issues?state=all&per_page=100"`, keeping number and label names. Compare label sets by number: no number may lose a label. Report any page that failed and any issue updated during the window as incomplete instead of passing. Record the receipts and both snapshots. |
 | AC-10 | `tests/vh-adlc/labels/vocabulary.test.ts` checks that the user guide names the helper and that `references/authority.md` has the label-plan row. |
 
 ## Tasks
@@ -282,7 +294,69 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None.
+### Q7: What exactly must a label plan approval bind before apply writes anything?
+
+From R-1 F-01: as drafted, apply rechecks only the plan digest and the repository's labels, so a
+changed vocabulary or `label_map` could change the writes behind an unchanged plan.
+
+**Recommendation:** A. Bind everything that decides the writes, as the projects helper does for its
+scope.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Bind host, repository, actor, effective names and exact payloads** | Apply refuses another target, another account, or any change in vocabulary or mapping since approval | A few more fields in the plan and refusal tests |
+| **B. Digest and label recheck only** | The simpler draft design | A plugin update or settings edit between plan and apply can change what is written |
+
+**Why this is yours:** it sets how strict the approval boundary for a GitHub write is.
+
+### Q8: How should `label_map` handle unsafe mappings?
+
+From R-1 F-02: the reader accepts any map today, so `ready: blocked` would make two standard labels
+share one GitHub label with conflicting colors, and `bug: dependencies` would recolor a
+Dependabot label.
+
+**Recommendation:** A. Refuse colliding mappings in the settings reader, and treat any mapping target
+as the owner's explicit choice.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Reader refuses collisions** | One check in `settings.ts`: no two standard names may map to the same label, and no mapping may target another standard name, both compared case-insensitively. Stackweaver's identity map still passes | A map that already collides would stop triage from reading it; none is known |
+| **B. Reader unchanged, helper refuses** | Every settings file read today keeps passing | The check lives in the helper and every operation that applies labels, so it can drift |
+| **C. A protected-label list as well** | Mappings onto bot labels are refused too | One more setting to keep current with each bot's labels |
+
+**Why this is yours:** it trades strict safety against compatibility for settings that collide.
+
+### Q9: Should issues that triage creates get labels?
+
+From R-1 F-05: the draft says every issue a vh-adlc operation files gets a type label, but triage's
+`create-request` sends no labels (`plugins/vh-adlc/scripts/triage/github.ts:140-141`) and its schema
+has no label field (`scripts/triage/execute.ts:15`).
+
+**Recommendation:** A. Limit the rule to investigate and spec, and leave triage's neutral requests
+unlabeled.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Investigate and spec only** | Triage's request boundary stays unchanged; a later triage pass can label those issues under its controller rule | Owner requests filed by triage start unlabeled |
+| **B. Triage requests carry one owner-chosen type label** | Every vh-adlc issue starts with a type label | Changes a heavily guarded triage boundary and its tests |
+
+**Why this is yours:** it trades uniformity against touching the triage write boundary.
+
+### Q10: Which state label does each investigate verdict give?
+
+From R-1 F-06: investigate's verdicts are act now, track and reject (Stackweaver
+`agents/investigate.md:35-40`), and a rejected case may still be filed on request (`:71-73`). The
+draft maps only track, and to three labels without a rule.
+
+**Recommendation:** A. Act now gives `ready`. Track gives `blocked` when the document names a missing
+prerequisite, otherwise `needs-decision`. Reject filed on request gets a type label and no state.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Reject gets no state label** | Uses only the standard set; the document explains the rejection | A rejected issue looks like an untriaged one until it is closed |
+| **B. Reject gets `wontfix`** | Rejected work is visibly marked | Pulls a GitHub default the set does not own into the rule |
+
+**Why this is yours:** it defines what each label means when investigate applies it.
 
 ## Review Log
 
