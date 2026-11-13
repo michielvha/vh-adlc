@@ -9,6 +9,7 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/app"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/browser"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/profile"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/session"
 )
 
@@ -45,6 +46,19 @@ func execute(c config.Config) (any, error) {
 		return session.Handoff(c.Home, c.ID, c.Mode())
 	case "stop":
 		return session.Stop(c.Home, c.ID)
+	case "profile":
+		if c.ProfileAction == "delete" {
+			return session.ProfileDelete(c.Home, c.ProfileHome, c.Profile)
+		}
+		profiles, err := session.ProfileList(c.ProfileHome)
+		if err != nil {
+			return nil, err
+		}
+		return struct {
+			SchemaVersion int             `json:"schema_version"`
+			Result        string          `json:"result"`
+			Profiles      []profile.Entry `json:"profiles"`
+		}{1, "observed", profiles}, nil
 	case "cleanup":
 		return struct {
 			SchemaVersion int            `json:"schema_version"`

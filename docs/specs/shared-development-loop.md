@@ -1,7 +1,8 @@
 ---
-status: draft
-status_description: "R-13 should-fix items folded in at the owner's direction; the owner accepts once a confirming review has no blocking findings."
+status: in-progress
+status_description: "Claimed on feat/shared-development-loop; implementing T1 onward in the vh-adlc-shared-development-loop worktree."
 issue: https://github.com/michielvha/vh-adlc/issues/78
+branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-spec/
@@ -17,6 +18,11 @@ covers:
   - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/scripts/settings-file.ts
+  - plugins/vh-adlc/scripts/loop/
+  - plugins/vh-adlc/scripts/triage/owned-process.ts
+  - plugins/vh-adlc/references/loop-settings.md
+  - cmd/vh-adlc/
+  - docs/reference/cli.md
   - plugins/vh-adlc/knowledge.md
   - plugins/vh-adlc/vh-adlc.lock.json
   - plugins/vh-adlc/plugin.json
@@ -73,13 +79,31 @@ final full kind run stay binding.
 Delivery follows an Order list after completion, as `host-cleanup.md` does: release, lock PR, marketplace
 install, then Stackweaver's adoption PR. Rollback is rehearsed on a disposable checkout.
 
+A revision after the first acceptance only adds the code paths the design needs to `covers`
+(`plugins/vh-adlc/scripts/loop/`, `scripts/triage/owned-process.ts`, `references/loop-settings.md`,
+`cmd/vh-adlc/`, `docs/reference/cli.md`) and names them in Design; scope and criteria are unchanged.
+
 Validation so far is spec review only, nothing executed: thirteen `gpt-6.1-sol` passes. R-13 has no
 blocking findings; its two should-fix items (findings saved against an existing issue, and reviewer
-helper processes that outlive the review) are folded in, and a confirming pass precedes acceptance. The
-owner accepts on the condition that the move loses nothing useful from the native loop, which the
-parity map (AC-08) and the retained local rules (AC-10) enforce. Accepting authorizes implementation of
+helper processes that outlive the review) are folded in, and R-14 has no blocking findings either. Accepting authorizes implementation of
 this scope on a feature branch. Publishing releases, merging either repository and retiring the native
 agents each need separate approval.
+
+### Acceptance notes
+
+The owner accepted this document on 2026-11-13 at R-14 (`d367673`), on the condition that the move to
+vh-adlc loses nothing useful from the native loop. The parity map (AC-08) and the retained local rules
+(AC-10) are how implementation proves that condition; a legacy behavior with no home fails AC-08.
+
+R-14's two should-fix items stay within the accepted design and go into the task list: a claim made in
+a worktree on another branch name requires that branch to be the session's own or handed over, never an
+unrelated branch (`references/authority.md:80-86` already forbids repointing one); and the reviewer
+process wrapper confirms that no member of the process group is still alive before the final check,
+because `owned-process.ts` reports `reaped` from the parent alone. Both get fixtures under AC-02 and
+AC-13. R-15, after the covers revision, adds two more of the same kind: the export check refuses to
+read through a committed symlink that escapes the export, and process cleanup also stops helpers that
+detached into their own process group or session, so none can write after the final check. Both get
+AC-02 fixtures.
 
 ### Background
 
@@ -196,7 +220,10 @@ map at the then-current heads, so the counts below are a starting point, not the
 ### Model routing per role
 
 A new settings file, `.vh-adlc/loop.yaml`, read through the existing settings reader, declares a route
-for each role:
+for each role. Following the layout the other operations use, its reference is
+`plugins/vh-adlc/references/loop-settings.md`, the shared code that reads it and runs routes, rungs and
+delivery checks lives in `plugins/vh-adlc/scripts/loop/`, and any binary support for the new settings
+kind goes through `cmd/vh-adlc/` and is documented in `docs/reference/cli.md`:
 
 | Role | Used by |
 | --- | --- |
@@ -543,7 +570,45 @@ published plugin is installed from the marketplace and exercised, and a rollback
 
 ## Tasks
 
-None yet; written once the document is planned.
+Shared vh-adlc work, on the feature branch:
+
+- [ ] T1 `tests/vh-adlc/loop/settings.test.ts` - failing tests for `.vh-adlc/loop.yaml`: a route per role, `command` refused for `author` and `implementer`, resume taking the continued operation's route, the per-user override limited to `argv[0]`, and no file meaning today's behavior; fails because no reader exists (AC-01)
+- [ ] T2 `schema/vh-adlc.schema.json`, `internal/settings/`, `cmd/vh-adlc/`, `docs/reference/cli.md` - a `loop` settings kind for `vh-adlc settings read`, documented; `go test ./...` passes with valid and refused fixtures (AC-01)
+- [ ] T3 `plugins/vh-adlc/scripts/loop/settings.ts`, `plugins/vh-adlc/references/loop-settings.md` - the TypeScript reader and the settings reference, using the Glossary terms; T1 passes (AC-01, AC-19)
+- [ ] T4 `tests/vh-adlc/loop/model-free.test.ts` - a guard that fails on any model name in an agent or skill file; passes on the current tree and fails on a planted name (AC-01)
+- [ ] T5 `tests/vh-adlc/loop/review-route.test.ts` - failing stub-command fixtures: matching reply, wrong model, wrong `TARGET`, no header, exit 1, hang, a touched clean file, a status-preserving rewrite, a moved ref, an overwritten and a new ignored file, an index flag change, an overwritten assume-unchanged file, a `review_scratch` write (stored), a helper left running after success and after timeout, a detached helper, a cleanup failure, a committed symlink escaping the export, and an uncommitted instruction edit (AC-02)
+- [ ] T6 `plugins/vh-adlc/scripts/triage/owned-process.ts` - cleanup tells failed signalling from an absent group, confirms no live member remains, and also stops descendants that detached into their own group or session; the existing triage tests and new cleanup fixtures pass (AC-02)
+- [ ] T7 `plugins/vh-adlc/scripts/loop/review-route.ts` - the command route: `git archive` export with symlink containment, launch from the export with automatic instructions off, the `{model}`, `{prompt}`, `{prompt_file}` and `{export_dir}` placeholders, `MODEL:` and `TARGET:` checks, the before-and-after preservation snapshot and owned-process cleanup; T5 passes (AC-02)
+- [ ] T8 `plugins/vh-adlc/references/review-protocol.md`, `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-review/SKILL.md` - dispatch by role route, the `TARGET:` header and pending rules; `bun test tests/vh-adlc` passes, including direct-operation compatibility (AC-01, AC-02)
+- [ ] T9 `tests/vh-adlc/loop/lenses.test.ts` - failing fixtures: a spec that breaks a declared instruction file, one that breaks a declared lens, and a compliant control (AC-03)
+- [ ] T10 `plugins/vh-adlc/scripts/loop/procedure.ts`, `plugins/vh-adlc/references/loop.md`, the seven SDD `SKILL.md` files - every SDD operation reads the project procedure, instruction files and lenses, and the reviewer receives them as lenses; T9 passes (AC-03)
+- [ ] T11 `tests/vh-adlc/loop/rungs.test.ts` - failing fixtures: path rungs over the whole feature delta (a `backend/` commit followed by a docs-only commit), an always rung, a failed rung blocking push, completion and delivery even with an allowance, an unavailable rung with and without its allowance, an exit-0 run reporting a skipped mandatory subcheck, an earlier pass not counting for a later commit, the merge-commit first-parent check, a refused fast-forward, and an unchanged no-rung lookup (AC-04)
+- [ ] T12 `plugins/vh-adlc/scripts/loop/rungs.ts`, `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` - the rung runner and its gating of push, completion and delivery; T11 passes (AC-04)
+- [ ] T13 `tests/vh-adlc/loop/delivery.test.ts` - failing ship fixtures: `ci_trigger: manual` with no dispatch, a watch that exits 1 then 0, a marked merge with no publication path, an unmarked merge that runs the watch, a watch failing because nothing ran (blocked), a delayed run; skip paths with declared paths only, with code, with an earlier code commit, and under a repository pin without skip-path support (AC-05, AC-15)
+- [ ] T14 vhco-pro/docs `conventions/delivery.md` - a consumer may declare extra skip-eligible paths for feature deliveries; merged in vhco-pro/docs, with its commit recorded here (AC-15)
+- [ ] T15 `plugins/vh-adlc/knowledge.md` - the plugin pin moves to the T14 commit; `vh-adlc knowledge` resolves every loop page at it (AC-12, AC-15)
+- [ ] T16 `plugins/vh-adlc/scripts/loop/delivery.ts`, `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` - CI policy reporting, the merge-commit publication verdict, watch handling and skip paths that respect the resolved pin; T13 passes (AC-05, AC-15)
+- [ ] T17 `internal/doc/doc_test.go`, `internal/fresh/fresh_test.go` - failing cases for `**` at start, middle and end compared with the docs-impact matcher, a committed change under `**` staling the review, and a dirty file under it clearing `feature_tree_clean` without staling (AC-06)
+- [ ] T18 `internal/doc/covers.go`, `internal/doc/lint.go` - `**` support with the docs-impact semantics; T17 and `go test ./...` pass (AC-06)
+- [ ] T19 `tests/vh-adlc/loop/investigate.test.ts` - failing fixtures with and without a covering analysis document and an open issue, including an issue with no covering document (AC-07)
+- [ ] T20 `plugins/vh-adlc/skills/vh-adlc-investigate/SKILL.md` - `findings_document: always`, the duplicate search, extending an existing analysis, issue updates as summary and link only, and the three verdicts; T19 passes (AC-07)
+- [ ] T21 `tests/vh-adlc/loop/claim.test.ts` - failing fixtures: a detached worktree at the tip, the session's own branch at the tip, an unrelated branch at the tip (refused, branch unmoved), a worktree behind an advanced remote, a stray change, a rejected push left pending, and `implement_worktree: isolated` from the primary worktree with and without a host worktree tool (AC-13, AC-18)
+- [ ] T22 `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md`, `plugins/vh-adlc/references/authority.md` - claims from a host worktree with the branch-ownership check, and host-delegated isolation; T21 passes (AC-13, AC-18)
+- [ ] T23 `tests/vh-adlc/loop/glossary.test.ts` - glossary terms and rejected synonyms checked across `references/loop-settings.md`, the loop references and report templates (AC-19)
+- [ ] T24 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - plugin minor version bump; `bun test tests/vh-adlc`, `go test ./...`, `go vet ./...`, `golangci-lint run`, `go mod tidy -diff` and a four-archive `goreleaser release --snapshot --clean` all pass (AC-12)
+
+Stackweaver adoption, on a Stackweaver feature branch against the candidate plugin:
+
+- [ ] T25 Stackweaver `tests/agent-loop/parity.json` - one row per legacy behavior of `agents/spec.md`, `tasks.md`, `implement.md`, `ship.md`, `investigate.md`, `reviewer.md` and the loop rules in `CLAUDE.md` and `AGENTS.md`, with excerpt hashes, home and contract; the schema test fails on an unmapped legacy rule (AC-08, AC-10)
+- [ ] T26 Stackweaver `tests/agent-loop/contract.test.ts`, `tests/agent-loop/retirement.test.ts` - a contract test per parity row, including the acceptance and issue rules, named E2E specs in kind, the live slot pass, the final full kind run and `make verify` skips, plus the retirement check over unenrolled non-terminal specs; they fail before adoption (AC-08, AC-10, AC-16, AC-17)
+- [ ] T27 Stackweaver `.vh-adlc/loop.yaml` - Opus host routes for author and implementer, `gpt-6.1-sol` command routes for both reviewers, rungs, `ci_trigger: manual`, `post_merge_watch`, `skip_ci_paths`, `implement_worktree: isolated`, `review_scratch`, instruction files, lenses and `findings_document: always`; `vh-adlc settings read` accepts it (AC-01, AC-04, AC-05, AC-15, AC-18)
+- [ ] T28 Stackweaver `agents/loop-project.md` - the local rules: slots, the verification ladder, direct-to-main and skip rules for non-feature work, satellites, `lessons.md`, the docs index rebuild, the implement-to-ship grant, acceptance and issue rules, and spec style; every parity row resolves to a home (AC-08, AC-10, AC-16)
+- [ ] T29 Stackweaver `.claude/commands/spec.md`, `tasks.md`, `implement.md`, `ship.md`, `investigate.md`, `AGENTS.md` - enrollment-aware adapters and plain-language routing, `model:` frontmatter checked against `loop.yaml`; T26 passes (AC-08, AC-16, AC-17)
+- [ ] T30 Stackweaver `docs/internal/plans/` draft specs - every draft spec converted to the shared format; `vh-adlc lint` and `gate` pass and a manual-reading table records each gate condition (AC-09)
+- [ ] T31 Stackweaver `CLAUDE.md` - merge commits for feature PRs, the shared spec style, and model routing pointing at `loop.yaml`; `make verify` passes (AC-08, AC-14)
+- [ ] T32 Stackweaver `tests/agent-loop/README.md` - the rollback and reapply procedure, rehearsed on a disposable checkout with matching hashes for the docs index and unrelated workflow files (AC-11)
+- [ ] T33 Stackweaver `tests/agent-loop/evidence/` - a candidate plugin and binary in an isolated Claude Code profile run every adapted command and its plain-language form on enrolled and unenrolled disposable specs, start `/implement` on a clean main checkout, and take one disposable feature from claim to a merge-commit landing (AC-08, AC-12, AC-14, AC-18)
+- [ ] T34 `tests/vh-adlc/evidence/loop-review-route/` - one real Copilot `gpt-6.1-sol` file-only spec review and one shell implementation review that returns `met` on a disposable feature, with transcripts and stored records (AC-02)
 
 ## Open Questions
 
@@ -569,6 +634,10 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-11 | spec | `fcc1245e2deda1fe8ef0d42d43f90954338f8cd3` | gpt-6.1-sol | procedural | One blocking finding: a file-only review reads the live worktree, not the target commit. Two should-fix. |
 | 2026-11-13 | R-12 | spec | `64503e5f5f95d49cc5dfcc717e616c964e68fbd5` | gpt-6.1-sol | procedural | One blocking finding: the reviewer CLI starts in the live checkout and can load its instruction files. Two should-fix. |
 | 2026-11-13 | R-13 | spec | `478dcab03f798ade50341adbd27273660fd0cb43` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on findings saved against an existing issue and reviewer helper processes outliving the review. |
+| 2026-11-13 | R-14 | spec | `d367673759c90a3b0b5da6a6e8b6884d99d18c6a` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on claiming from an unrelated branch and verifying process group cleanup. |
+| 2026-11-13 | R-14 | spec | `d367673759c90a3b0b5da6a6e8b6884d99d18c6a` | n/a | n/a | accepted by owner |
+| 2026-11-13 | R-15 | spec | `e2e3de959b09950f8c9d17dbf1a74413523af7ea` | gpt-6.1-sol | procedural | No blocking findings after the covers revision; two should-fix on symlinks escaping the export and detached reviewer helpers. |
+| 2026-11-13 | R-15 | spec | `e2e3de959b09950f8c9d17dbf1a74413523af7ea` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -938,6 +1007,38 @@ SEVERITY: should-fix
 WHERE: Design / External command route; AC-02 and its Test Plan row
 EVIDENCE: The route specifies timeout handling and a preservation snapshot after the reply, but no requirement to terminate and reap the command's remaining processes before taking that snapshot. A successful reviewer process can leave a helper running that changes files after the review is stored. Existing plugins/vh-adlc/scripts/triage/owned-process.ts:1-16 explicitly owns a process group and terminates remaining helpers even after successful parent exit. AC-02's fixtures cover a hang, but not surviving descendants. Git, vh-adlc and CLI execution are unavailable, so these scenarios were not executed.
 PROPOSAL: Reuse the owned-process runner and require process cleanup before the final preservation check or record storage, reporting cleanup failures as review pending. Add successful-exit and timeout fixtures with a surviving helper and verify that it cannot modify the checkout afterward.
+
+### R-14
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Claiming from a host worktree; AC-13 and its Test Plan row
+EVIDENCE: Design permits claiming in "any worktree" at the fetched default-branch tip, including one on another branch name. Committing there advances that existing branch before git switch -c creates the feature branch. Neither AC-13 nor its fixtures distinguish a session-owned host branch from an unrelated branch. plugins/vh-adlc/references/authority.md:80-86 forbids repointing unrelated branches, and Stackweaver CLAUDE.md:127-137 treats worktrees as concurrent session resources. I cannot execute git or vh-adlc; this finding follows from the written procedure and preservation rules.
+PROPOSAL: Require a non-default branch and its worktree to belong to the current session or have an explicit owner handoff before claiming. Add a clean, tip-aligned unrelated-branch fixture that refuses without advancing that branch or changing its checkout.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / External command route; covers; AC-02 and its Test Plan row
+EVIDENCE: Design requires the reused owned-process runner to terminate and reap the entire reviewer group before preservation checks, leaving cleanup failures pending. plugins/vh-adlc/scripts/triage/owned-process.ts:5-12 swallows signal errors and defines reaped solely from child.exited, which observes the parent rather than surviving helpers. A successful parent can therefore produce exit_code: 0 and reaped: true despite failed group termination. The runner is absent from covers, and AC-02's proof has no cleanup-failure fixture. Process fixtures, git and vh-adlc could not be executed in this review.
+PROPOSAL: Require the runner or its review wrapper to distinguish an absent group from failed signalling and confirm that no live group members remain before storage. Cover the runner and add a cleanup-failure fixture that leaves the review pending even when the parent exits successfully.
+
+### R-15
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02 and its Test Plan row
+EVIDENCE: The design relies on a read-only git archive export to ensure that live, uncommitted content cannot shape a spec review, but specifies no containment check for exported symlinks. A tracked symlink can resolve outside that export into the live checkout, so viewing an apparently exported instruction or source file can read uncommitted bytes. Existing plugins/vh-adlc/scripts/triage/controller.ts checks realpath containment, and tests/vh-adlc/triage/copilot-trial.ts explicitly probes reads through an escaping symlink. I cannot execute git, vh-adlc or CLI probes; this gap follows from the written export procedure and those existing containment checks.
+PROPOSAL: Validate exported symlinks and prevent reads through links that escape the declared committed exports and pinned inputs, leaving the review pending when required content cannot be inspected safely. Add a fixture whose committed symlink points to a modified live instruction file and prove that its uncommitted content cannot reach the reviewer.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02 and its Test Plan row
+EVIDENCE: Design promises that “no helper outlives the review” through termination of the reviewer's process group. The acceptance notes additionally require confirming that this group has no live members. Neither condition covers descendants that create a separate process group or session, which shell-enabled checks can spawn. plugins/vh-adlc/scripts/triage/owned-process.ts signals only -child.pid, and its existing descendant fixture never detaches the helper. An escaped helper can therefore write after the final preservation check even when the original group is empty. Process execution, git and vh-adlc are unavailable in this review.
+PROPOSAL: Require cleanup to account for detached descendants too, or enforce an execution boundary that prevents descendants from escaping the owned process scope. Add successful-exit and timeout fixtures with a detached helper scheduled to write after the reply; store no review until that helper is confirmed stopped.
 
 ## Sources
 

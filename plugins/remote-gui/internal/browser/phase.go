@@ -17,10 +17,10 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
 
-func browserArgs(profile, marker, mode string) []string {
+func browserArgs(profile, marker, mode string, restore bool) []string {
 	args := []string{
 		"--user-data-dir=" + profile,
-		"--no-first-run", "--no-default-browser-check", "--restore-last-session",
+		"--no-first-run", "--no-default-browser-check",
 		"--disable-search-engine-choice-screen", "--disable-default-apps",
 		"--disable-background-networking", "--disable-component-update",
 		"--disable-extensions", "--disable-sync",
@@ -29,6 +29,9 @@ func browserArgs(profile, marker, mode string) []string {
 		"--disable-breakpad", "--disable-crash-reporter", "--disable-dev-shm-usage",
 		"--disable-gpu", "--disable-renderer-backgrounding", "--disable-background-timer-throttling",
 		"--ozone-platform=x11", "--window-position=0,0", "--window-size=1440,900",
+	}
+	if restore {
+		args = append(args, "--restore-last-session")
 	}
 	if mode == "agent" {
 		args = append(args, "--enable-automation", "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=0")

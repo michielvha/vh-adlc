@@ -39,6 +39,7 @@ type Forward struct {
 	Web       json.RawMessage `json:"web"`
 }
 type Record struct {
+	ProfileRecovery   string        `json:"profile_recovery,omitempty"`
 	CleanupDiagnostic string        `json:"cleanup_diagnostic,omitempty"`
 	OwnerLogin        string        `json:"owner_login,omitempty"`
 	ServePeer         Peer          `json:"serve_peer,omitempty"`
@@ -85,6 +86,10 @@ func private(path string, mode os.FileMode) error {
 	return nil
 }
 
+// Private checks that path is this user's own directory (0700) or regular file
+// (0600), reached without following a symlink.
+func Private(path string, mode os.FileMode) error { return private(path, mode) }
+
 func EnsureRoot(root string) error {
 	if !filepath.IsAbs(root) {
 		return errors.New("private state root must be absolute")
@@ -102,8 +107,13 @@ func EnsureRoot(root string) error {
 	return nil
 }
 
+// Lock takes the state lock of an existing root. Only New creates the root, so
+// a controller that outlives a removed root cannot recreate it.
 func Lock(ctx context.Context, root string) (func(), error) {
-	if err := EnsureRoot(root); err != nil {
+	if !filepath.IsAbs(root) {
+		return nil, errors.New("private state root must be absolute")
+	}
+	if err := private(root, 0o700); err != nil {
 		return nil, err
 	}
 	f, err := os.OpenFile(filepath.Join(root, ".lock"), os.O_CREATE|os.O_RDWR|syscall.O_NOFOLLOW, 0o600)
@@ -133,6 +143,9 @@ func Lock(ctx context.Context, root string) (func(), error) {
 }
 
 func New(root string) (string, error) {
+	if err := EnsureRoot(root); err != nil {
+		return "", err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	release, err := Lock(ctx, root)

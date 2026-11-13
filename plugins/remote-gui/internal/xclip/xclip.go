@@ -442,6 +442,15 @@ func (h *Helper) CutBufferExists(ctx context.Context) (bool, error) {
 	return h.cutBuffer(ctx, c)
 }
 
+// SetPrimary is a test probe that makes text the PRIMARY selection, held by
+// this connection.
+func (h *Helper) SetPrimary(ctx context.Context, text string) error {
+	if len(text) > MaxText {
+		return ErrTooLarge
+	}
+	return h.own(ctx, "PRIMARY", text)
+}
+
 // SetCutBuffer is a test probe that writes CUT_BUFFER0 on the root window.
 func (h *Helper) SetCutBuffer(ctx context.Context, text string) error {
 	if len(text) > MaxText {
