@@ -459,6 +459,7 @@ that pass's blocking or should-fix findings. R-14 F-01 to F-06 are applied.
 | 2026-11-13 | R-13 | spec | `a581e9c` | claude-opus-5-5 | procedural | One blocking finding (F-01 a stale after-owner-change row blocks the next owner change), five should-fix and one nit |
 | 2026-11-13 | R-14 | spec | `903314a` | claude-opus-5-5 | procedural | One blocking finding (F-01 the side-branch merge never runs when a fix also changes the baseline), four should-fix and one nit |
 | 2026-11-13 | R-15 | spec | `76f0480` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix and two nits |
+| 2026-11-13 | R-15 | spec | `76f0480` | n/a | n/a | accepted by owner |
 
 ### R-1
 
