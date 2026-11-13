@@ -1,8 +1,8 @@
 ---
 status: draft
-status_description: "Written with the owner's four decisions folded in; waiting for its first independent spec review."
+status_description: "R-1 findings applied and the owner's four answers folded in; waiting for spec review R-2."
 issue: null
-goal: "A spec review loop that finds blocking defects early and stops after three consecutive passes without one."
+goal: "A spec review loop that finds blocking defects early and stops asking for passes after three consecutive passes without one."
 covers:
   - plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md
   - plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md
@@ -13,6 +13,7 @@ covers:
   - docs/get-started/first-feature.md
   - docs/user-guides/workflows.md
   - tests/vh-adlc/review-convergence.test.ts
+  - tests/vh-adlc/scenarios/run.ts
   - AGENTS.md
 ---
 
@@ -25,32 +26,39 @@ completeness rule, so a spec reaches acceptance in a few passes instead of dozen
 
 ### Owner summary
 
-Recent specs needed 34 to 47 independent review passes before acceptance, although most of those passes
-returned no blocking finding. The current procedure applies every finding and then asks for a new pass,
-and a thorough reviewer finds one or two new should-fix items on every pass. Many of the later blocking
-findings were caused by fixing earlier non-blocking ones. Most real blocking findings appeared in the
-first five passes.
+Four recent specs needed 36 to 47 spec review passes before their first acceptance, although most of
+those passes had no blocking finding. One of them had none at all. The current procedure applies every
+factual finding and then asks for a new pass, and a thorough reviewer finds one or two new should-fix
+items on every pass. Several late blocking findings were caused by fixing earlier non-blocking ones.
 
-This feature changes the spec review procedure in four ways. First, the loop stops after three
-consecutive passes without a blocking finding. The author applies the findings of the first two of
-those passes. The third pass's findings are listed for you at acceptance instead of being applied, and
-you choose which ones to act on. A blocking finding at any point resets the count. Second, the shared
-feature-document convention defines blocking, should-fix and nit, so reviewers rate the same defect the
-same way. Third, the reviewer checks designs that change state, run concurrently or cross a process
-boundary for concurrent access, partial failure, retry or replay, and upgrade or rollback. The author
-covers the same ground while writing. Fourth, the reviewer reports every place a document restates an
-inconsistent rule in one finding, and the author fixes all of them in the same commit. A small related
-rule fixes the examples of a free-text pattern check once, so later tuning of that pattern is a nit.
+This feature changes the spec review procedure in four ways. First, the author stops requesting passes
+once three consecutive passes have no blocking finding. In the first two of those passes, factual
+findings are applied and judgement findings become Open Questions that you answer before the next pass.
+The third pass's findings are listed for you at acceptance instead of being applied, and you choose
+which to act on. A blocking finding resets the count. Three is a ceiling, not a floor: you can still
+accept after any clean pass, as today. Second, the shared convention defines blocking, should-fix and
+nit. Blocking is reserved for defects that change what gets built, what a proof checks or how the
+binary reads the document, so a harmless citation slip is a nit. Third, the reviewer checks designs that
+change state, run concurrently, or cross a process or network boundary for concurrent access, partial
+failure, retry or replay, and upgrade or rollback, and the author covers the same ground while writing.
+Fourth, the reviewer reports every restatement of an inconsistent rule in one finding, and the author
+fixes all of them in one commit. A related rule makes widening a reviewed free-text pattern a nit when
+it only catches more wrong output.
 
-The severity definitions, the stopping rule and the free-text rule go into `vhco-pro/docs`
-(`conventions/feature-documents.md`), delivered as a companion change. The machine-readable rules block
-stays unchanged, so the binary, gates and existing documents keep working. The plugin's reviewer, spec
-skill, review protocol and two user guides then follow the published convention, the pin moves to its
-commit, and both plugin manifests get a version bump.
+The trade-off is that a real gap a reviewer would only notice late can now reach acceptance. In
+`blog-visual-reading` the loop would have stopped at R-4 and missed the R-8 finding. Implementation
+review, which executes every criterion, is what catches such a gap afterwards, and a revision reopens
+the loop.
 
-Validation is planned, not observed: reviewer trials on seeded fixture specs, a disposable author trial
-of the stopping rule, a byte comparison of the rules block, lint and gate runs on historical specs, and
-the plugin's test suite. Model identity in trials is recorded as the reviewer reports it.
+The severity definitions, the stopping rule and the free-text rule go into `vhco-pro/docs` as a
+companion change with the rules block unchanged, so the binary, gates and existing documents keep
+working. The plugin's reviewer, spec skill, review protocol and two user guides then follow it, the pin
+moves to the published commit, and both manifests get a version bump. Passes already stored in a draft
+count toward its streak after the update.
+
+Validation is planned, not observed: reviewer trials on seeded fixture specs, author trials of the
+stopping rule including early acceptance and owner picks, a rules block comparison, lint and gate runs
+on named historical specs under both pins, and the plugin test suite.
 
 Accepting this authorizes the companion docs change, the plugin edits and their tests on a feature
 branch. Pushing, opening PRs, merging and releasing each still need your separate go.
@@ -69,39 +77,46 @@ the current commit exists (`SKILL.md:73-75`). The review protocol repeats the ap
 
 The convention at the pinned docs revision `d8f07c9dd69038375a535af8ad586086688f85ab` lists the
 severities `blocking | should-fix | nit` without defining them (`conventions/feature-documents.md:185`).
-Its Acceptance steps say blocking findings are fixed and reviewed again (`:214-215`). A review is clean
-when it has no blocking finding (`:308`), and the binary's `next` rules already name owner acceptance as
-the next step once a fresh, clean review exists (`:279`). Applying any finding changes the normative
-baseline, which makes the review stale (`:277`, `:300-301`), so the next step reverts to spec review.
-The binary therefore already supports stopping; the churn comes from the procedure, which always
-applies.
+Scope, Design, Acceptance Criteria, Test Plan and `covers` form the normative baseline (`:70-71`). Its
+Acceptance steps say blocking findings are fixed and reviewed again (`:214-215`). A review is clean when
+it has no blocking finding (`:308`), and the binary's `next` rules already name owner acceptance as the
+next step once a fresh, clean review exists (`:279`). Applying a finding to the normative baseline makes
+the review stale (`:277`, `:300-301`), so the next step reverts to spec review. The binary therefore
+already supports stopping; the churn comes from the procedure, which always applies factual findings
+and asks again.
 
-Measured churn. Counting review subsections and severities in five recent specs:
+Measured churn. Counting spec review rows before the first acceptance row, and the blocking findings in
+those passes, from each Review Log and its `### R-<n>` records:
 
 ```sh
-for f in shared-docs-drift blog-visual-reading seo-assessment shared-triage repository-security-settings; do
-  echo "$f rounds=$(grep -cE '^### R-[0-9]+' docs/specs/$f.md) blocking=$(grep -c '^SEVERITY: blocking' docs/specs/$f.md) \
-should=$(grep -c '^SEVERITY: should-fix' docs/specs/$f.md) nit=$(grep -c '^SEVERITY: nit' docs/specs/$f.md)"
-done
+awk '/^\| [0-9-]+ \| R-[0-9]+ \| spec \|/ { if ($0 ~ /accepted by owner/) acc=1; else if (!acc) { spec[$4]=1; n++ } }
+     /^### R-[0-9]+$/ { cur=$2 }
+     /^SEVERITY: blocking/ { if (cur in spec) b++ }
+     END { print n, b }' docs/specs/<slug>.md
 ```
 
-| Spec | Passes | Blocking | Should-fix | Nit |
-| --- | --- | --- | --- | --- |
-| shared-docs-drift | 46 | 2 | 97 | 32 |
-| blog-visual-reading | 47 | 5 | 57 | 107 |
-| seo-assessment | 37 | 5 | 75 | 91 |
-| shared-triage | 34 | 20 | 74 | 71 |
-| repository-security-settings | 37 | 0 | 67 | 58 |
+| Spec | Spec passes before first acceptance | Blocking findings in them | Passes with a blocking finding |
+| --- | --- | --- | --- |
+| shared-docs-drift | 46 | 2 | R-1 |
+| blog-visual-reading | 47 | 5 | R-1, R-8, R-40, R-44, R-45 |
+| seo-assessment | 37 | 5 | R-1 to R-5 |
+| repository-security-settings | 36 | 0 | none |
+| shared-triage | 2 | 1 | R-1 |
 
-In `shared-docs-drift`, both blocking findings are in R-1 (`docs/specs/shared-docs-drift.md:505`); R-2
-through R-46 have none, yet the loop ran 45 more passes. In `seo-assessment`, all five blocking findings
-are in R-1 to R-5, and R-4 is a concurrency gap: two helper runs read the same unit ledger without a
-lock and together spend twice the limit (`docs/specs/seo-assessment.md:565-571`). In
-`blog-visual-reading`, the blocking findings in R-40, R-44 and R-45 each trace to the previous pass's fix
-(the R-39 wording rule, then repeated regex tuning in the AC-07 row; `docs/specs/blog-visual-reading.md:1411`,
-`:1524`, `:1547`). R-41 returns three findings about one rule stated in Terminology, The reading pass,
-AC-04 and the Owner summary, left out of step by the R-40 fix (`:1441`). R-8 is the one late blocking
-finding that was a real, pre-existing gap: an AC-07 proof Codex cannot observe (`:598`).
+`shared-triage` shows the fast path the current rule allows: it was accepted at R-2 after a
+`NO FINDINGS` pass. In `shared-docs-drift`, both blocking findings are in R-1
+(`docs/specs/shared-docs-drift.md:505`), and 45 more passes followed. In `seo-assessment`, R-4 is a
+concurrency gap: two helper runs read the same unit ledger without a lock and together spend twice the
+limit (`docs/specs/seo-assessment.md:565-571`). In `blog-visual-reading`, the blocking findings in R-40,
+R-44 and R-45 each trace to the previous pass's fix (the R-39 wording rule, then repeated regex tuning in
+the AC-07 row; `docs/specs/blog-visual-reading.md:1411`, `:1524`, `:1547`). R-41 returns three findings
+about one rule stated in Terminology, The reading pass, AC-04 and the Owner summary, left out of step by
+the R-40 fix (`:1441`). R-8 is a real, pre-existing gap found late: an AC-07 proof Codex cannot observe
+(`:598`). Under this feature's rule that spec would have stopped at R-4, after clean passes R-2 to R-4.
+
+Existing scenarios. `tests/vh-adlc/scenarios/run.ts` S7.7 (line 526) has the owner accept after one
+review that found nothing blocking, and S7.7.accept (line 572) accepts the document as reviewed in R-1
+with no second review stored. Both rely on acceptance after a single clean pass.
 
 Model context. The owner is moving routine spec and review work off the most expensive model tier.
 Those moves are project configuration; this framework names no model. The logs above already show
@@ -112,13 +127,14 @@ thorough reviewer.
 
 In scope:
 
-- A stopping rule for spec review: three consecutive passes without a blocking finding end the loop.
+- A stopping rule for spec review: the author stops requesting passes once three consecutive passes have
+  no blocking finding, and the owner may accept after any clean pass.
 - Definitions of blocking, should-fix and nit in the shared convention.
 - A failure-mode check in the reviewer's spec section and the author's instructions.
 - One-pass completeness for the reviewer and a same-commit restatement sweep for the author.
 - A free-text check rule in the convention's Test plan section.
-- The pin and version moves that adopt the published convention, and the two user guides that describe
-  spec review.
+- The pin and version moves that adopt the published convention, the two user guides that describe
+  spec review, and scenario coverage for the new branches.
 
 Out of scope, by name:
 
@@ -137,49 +153,57 @@ Out of scope, by name:
 | Term | Meaning |
 | --- | --- |
 | Clean pass | A spec review pass with no blocking finding, including one that returns `NO FINDINGS` (AC-01). |
-| Clean streak | The number of consecutive clean passes since the last pass with a blocking finding, or since the document's last normative revision began (AC-01). |
+| Clean streak | The number of consecutive clean passes at the end of the Review Log, counting only `spec` rows that are not acceptance rows and whose commit has no `+dirty` suffix. A pass with a blocking finding resets it to zero, and so does moving a `planned` or `in-progress` document to `draft` for a revision. Applying the findings of clean passes does not reset it (AC-01). |
 | Restatement | A second or later place in one document that states the same rule, limit or default (AC-03). |
 
 ### Stopping rule (convention and procedure)
 
-In the convention's Acceptance section, step 2 gains the rule: after a clean pass, the author applies
-its findings and requests another pass until the clean streak reaches three. The third clean pass's
-findings are not applied. The author lists each of them, with its ID and one line, in the owner-facing
-summary before the acceptance question, and the owner picks any to apply. If the owner picks some, the
-author applies them and requests one more pass. When that pass is clean, the author asks for acceptance
-again and lists its findings the same way. Judgement findings in the third clean pass are
-listed the same way instead of becoming Open Questions, so they do not block acceptance unless the owner
-raises one. A blocking finding resets the streak to zero. A normative revision of an accepted document
-starts a new streak.
+In the convention's Acceptance section, step 2 gains the rule, and `SKILL.md` review mode steps 4 and 5
+and the protocol's Records paragraph follow it:
 
-In the plugin, `SKILL.md` review mode steps 4 and 5 and the protocol's Records paragraph refer to that
-rule and say which findings are applied and which are listed. The skill computes the streak from the
-Review Log and the stored records it already keeps; nothing new is stored. Acceptance still requires a
-fresh, clean review at the accepted commit, which the third clean pass is, because nothing was applied
-after it.
+1. After a clean pass that leaves the clean streak below three, the author applies its factual findings,
+   turns its judgement findings into Open Questions, and puts them to the owner. The answers are folded
+   in before the next pass is requested, so no question is open when the streak reaches three.
+2. After the clean pass that brings the streak to three, the author applies nothing and raises no
+   Open Questions. It lists each of that pass's findings, factual and judgement alike, with its ID and
+   one line, in the owner-facing summary before the acceptance question.
+3. The owner may pick any listed findings. The author applies the picked ones, with judgement ones
+   decided by the owner's pick, and requests one more pass. When that pass is clean, the author asks for
+   acceptance again and lists its findings the same way.
+4. The owner may accept after any clean pass, whatever the streak. The streak caps how many passes the
+   author requests; it never blocks an acceptance the owner gives.
+5. A pass with a blocking finding resets the streak to zero, and the loop continues as today.
+
+A re-review caused only by default-branch drift counts as a pass like any other. Passes stored before
+the plugin adopts this rule count toward a document's streak, so a long-running draft can stop at once.
+Nothing new is stored: the skill reads the streak from the Review Log rows and their `### R-<n>`
+records. Acceptance still requires a fresh, clean review at the accepted commit, and the pass that
+brings the streak to three is that review, because nothing changes after it.
 
 ### Severity definitions (convention)
 
 Beside the spec review record format, the convention defines:
 
-- blocking: a stated fact is false, the binary would read the document differently from its author, or
-  an implementer following the document would build something that does not solve the stated problem.
-- should-fix: two careful implementers would build different things, or a Test Plan proof could pass on
-  a wrong implementation.
-- nit: wording, style or redundancy that changes nothing an implementer builds or a proof checks.
+- blocking: a stated fact is false and that changes what is built, what a proof checks or how the
+  binary reads the document; an implementer following the document would build something that does not
+  solve the stated problem; a criterion cannot be met; or a proof fails a correct implementation or
+  cannot be executed.
+- should-fix: two careful implementers would build different things, or a proof could pass on a wrong
+  implementation.
+- nit: wording, style, redundancy, or a citation slip that changes nothing an implementer builds or a
+  proof checks.
 
-The reviewer agent tells the reviewer to rate with these definitions. The definitions add no record
-field.
+The reviewer agent tells the reviewer to rate with these definitions. They add no record field.
 
 ### Failure-mode check (reviewer and author)
 
 The reviewer's spec section gains: where the design changes state, runs concurrently, or crosses a
 process or network boundary, ask what happens under concurrent requests, partial failure, retry or
 replay, and upgrade or rollback from the previous version. A path the document leaves undefined is a
-finding. A design that changes no state gets no such finding.
+finding. A design that changes no state and crosses no boundary gets no such finding.
 
 The spec skill's author mode gains the matching step: where those conditions apply, state the behavior
-in Design, and put any choice that cannot be settled into Open Questions.
+for each of the four questions in Design, and put any choice that cannot be settled into Open Questions.
 
 ### One-pass completeness and restatements (reviewer and author)
 
@@ -191,8 +215,10 @@ the same commit.
 ### Free-text checks (convention)
 
 The convention's Test plan section gains: a proof that judges free text with a pattern lists its
-must-pass and must-fail examples in the row. Once a review has passed the row, a finding that only asks
-to widen the pattern to more wordings is a nit.
+must-pass and must-fail examples in the row. A row has passed review once a clean pass's records hold
+no finding whose `WHERE` names that row. After that, a finding that only widens the pattern to catch
+more wrong output is a nit. A finding that shows the pattern rejects a correct output stays under the
+blocking definition, because the proof then fails a correct implementation.
 
 ### Delivery
 
@@ -201,40 +227,47 @@ independent review, with the rules block byte-for-byte unchanged. Docs paths are
 because that repository is checked out separately. After it publishes, `AGENTS.md` and
 `plugins/vh-adlc/knowledge.md` move to the published commit, both manifests move from 0.16.1 together,
 and `docs/get-started/first-feature.md:42-43` and `docs/user-guides/workflows.md:251-263` describe the
-stopping rule. If the docs change cannot land, adoption stays incomplete and the plugin never points at
-an unpublished commit. The return path is an ordinary reviewed revert of the docs and plugin edits and
-the pin.
+stopping rule and early acceptance. S7.7 and S7.7.accept keep their single-pass acceptance unchanged,
+and new scenario cases cover the streak. If the docs change cannot land, adoption stays incomplete and
+the plugin never points at an unpublished commit. The return path is an ordinary reviewed revert of the
+docs and plugin edits and the pin.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: An author following the updated spec procedure applies the findings of the first and second
-      consecutive clean passes, stops after the third, lists that pass's findings with IDs in the
-      owner-facing summary instead of applying them, and restarts the streak after any blocking finding.
-- [ ] AC-02: The published convention defines blocking, should-fix and nit, and a reviewer following the
-      updated agent rates a seeded false claim blocking, a seeded ambiguity that allows two different
+- [ ] AC-01: An author following the updated spec procedure, after each of the first two consecutive
+      clean passes, applies the factual findings and has the judgement findings answered as Open
+      Questions before the next pass; after the third, applies nothing, raises no questions and lists
+      every finding with its ID in the owner-facing summary; applies owner-picked findings and requests
+      one more pass before asking again; restarts the streak after a blocking finding; and honors an
+      owner acceptance given after any clean pass.
+- [ ] AC-02: The published convention defines blocking, should-fix and nit as this document's Design
+      states, and a reviewer following the updated agent rates a seeded false claim the design depends
+      on blocking, a seeded harmless wrong line number nit, a seeded ambiguity that allows two different
       implementations should-fix, and a seeded wording issue nit.
 - [ ] AC-03: A reviewer following the updated agent reports, in one finding, every location of a rule a
       document states inconsistently, and an author following the updated skill changes every
       restatement in one commit.
-- [ ] AC-04: A reviewer following the updated agent returns a finding for a design that changes shared
-      state without defining concurrent access, partial failure, retry or rollback, and returns none of
-      those findings for a design that changes no state.
+- [ ] AC-04: A reviewer following the updated agent returns a finding when a design that changes shared
+      state, or one that crosses a network boundary, leaves concurrent requests, partial failure, retry
+      or replay, or upgrade and rollback undefined, and returns none of those findings for a design that
+      changes no state and crosses no boundary.
 - [ ] AC-05: The published convention requires must-pass and must-fail examples in a free-text pattern
-      proof, and a reviewer rates a request to widen an already reviewed pattern as a nit.
-- [ ] AC-06: The rules block is byte-identical to the previous pin, historical specs give the same lint,
-      `fresh` and gate results under the new pin, the plugin points at the published docs commit, both
-      manifests carry the same new version, and the plugin test suite passes.
+      proof; a reviewer rates a request that only widens an already reviewed pattern to catch more wrong
+      output as a nit, and rates a demonstrated rejection of a correct output as blocking.
+- [ ] AC-06: The rules block is byte-identical to the previous pin, the named historical specs give the
+      same lint, `fresh` and gate results under both pins, the plugin points at the published docs
+      commit, both manifests carry the same new version, and the plugin test suite passes.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Disposable author trial in a temporary repository with a fixture spec and a scripted reviewer that returns, in order, one blocking pass and then three passes with only should-fix and nit findings. Pass: the author applies findings after the first and second clean passes, makes no normative change after the third, the owner-facing summary lists the third pass's finding IDs, and a variant with a blocking finding in the second clean position restarts the count. Preserve the transcript. |
-| AC-02 | `tests/vh-adlc/review-convergence.test.ts` checks the published convention page for the three definitions. Independent reviewer trial on a committed fixture spec seeded with one false `file:line` claim, one criterion that admits two implementations and one wording slip; pass when the returned records rate them blocking, should-fix and nit. Store the returned records and the reported model. |
+| AC-01 | Disposable author trials in temporary repositories with a fixture spec and a scripted reviewer, transcripts preserved. Variant A: one blocking pass, then three clean passes whose first two each hold a factual and a judgement finding; pass when factual findings are applied after clean passes 1 and 2, their judgement findings are asked and folded before the next pass, nothing changes after pass 3, and the summary lists pass 3's IDs including a judgement finding that did not become a question. Variant B: blocking finding in the second clean position; pass when the count restarts. Variant C: the owner picks one listed finding; pass when it is applied and one more pass is requested before acceptance is asked again. Variant D: the owner accepts after the first clean pass; pass when the acceptance row is written without further passes. S7.7 and S7.7.accept in `tests/vh-adlc/scenarios/run.ts` still pass. |
+| AC-02 | `tests/vh-adlc/review-convergence.test.ts` checks the published convention page for the three definitions. Independent reviewer trial on a committed fixture spec seeded with a false claim the design depends on, a harmless wrong line number, a criterion that admits two implementations and a wording slip; pass when the returned records rate them blocking, nit, should-fix and nit. Store the returned records and the reported model. |
 | AC-03 | Reviewer trial on a fixture spec that states one limit in Scope, Design, a criterion and the Owner summary, with one copy different; pass when one finding names all four locations. Author trial applying that finding; pass when the resulting commit changes all four. |
-| AC-04 | Reviewer trial on two fixture specs: one adds a counter in a shared file updated by parallel runs with no lock or retry behavior stated, one only edits a guide's wording; pass when the first returns a failure-mode finding and the second returns none. |
-| AC-05 | `tests/vh-adlc/review-convergence.test.ts` checks the published convention page for the example requirement. Reviewer trial on a fixture spec whose reviewed pattern row lists examples and passes them; pass when a seeded request to widen it is rated nit. |
-| AC-06 | Compare the rules block at the old and new pins byte for byte. Run `vh-adlc lint`, `fresh` and `gate planned` on three historical specs under both pins and compare the JSON results. Check `AGENTS.md` and `knowledge.md` name the published docs commit and both manifests match. Run `bun test tests/vh-adlc` and the docs repository's `npm run check`. |
+| AC-04 | Reviewer trial on three fixture specs: one adds a counter in a shared file updated by parallel runs, one adds a call to a remote API with no retry or replay behavior stated, and one only edits a guide's wording; pass when the first two each return a failure-mode finding and the third returns none. |
+| AC-05 | `tests/vh-adlc/review-convergence.test.ts` checks the published convention page for the example requirement. Reviewer trial on a fixture spec whose reviewed pattern row lists examples; pass when a seeded request to widen it for more wrong outputs is rated nit and a seeded correct output the pattern rejects is rated blocking. |
+| AC-06 | Compare the rules block at the old and new pins byte for byte. For `shared-docs-drift`, `seo-assessment` and `owner-readable-specifications`, run `vh-adlc lint`, `fresh` and `gate planned` from two scratch clones whose `AGENTS.md` names the old and the new pin, assert `knowledge.revision` equals the clone's pin, and compare only `result`, `failing` and `findings`. Check `AGENTS.md` and `knowledge.md` name the published docs commit and both manifests match. Run `bun test tests/vh-adlc` and the docs repository's `npm run check`. |
 
 ## Tasks
 
@@ -244,7 +277,10 @@ None yet; written once the document is planned.
 
 None. The owner decided on 2026-11-13: severity definitions go in the shared convention; the
 failure-mode check goes in the reviewer and author steps without a template section; the free-text
-check rule is included; and the loop stops after three consecutive clean passes.
+check rule is included; the author stops requesting passes after three consecutive clean passes. After
+R-1, the owner decided that three is a ceiling and acceptance after any clean pass is honored, that the
+tighter severity definitions apply, that only non-acceptance, non-dirty spec rows count and stored passes
+count after the update, and that the ceiling stays at three.
 
 ## Review Log
 
