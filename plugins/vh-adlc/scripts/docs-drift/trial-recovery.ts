@@ -10,11 +10,15 @@ export async function collectTrialRetained(selected: TrialContext, input: { oper
   if (input.entry !== "copilot" && input.entry !== "claude") throw Error("synthetic retained entry required");
   const settingsHash = loadCommittedSettings(context.source, context.source_commit).settings_sha256;
   const transport = createTrialTransport(context), readPlanObject = transport.readPlanObject;
+  let originalObject: string | null = null;
   transport.readPlanObject = async id => {
     const native = await readPlanObject(id), plan = readRetainedPlan(Buffer.from(native.bytes));
-    if (plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
+    // The first read is the selected receipt (or lease fallback). Later foreign lease reads
+    // are comparison evidence for the common recovery engine, never authority or replay proof.
+    if ((originalObject === null || id === originalObject) && (plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
       || plan.manifest.bindings.source_commit !== context.source_commit || plan.manifest.bindings.settings_sha256 !== settingsHash
-      || plan.manifest.operation_id !== input.operation_id) throw Error("synthetic retained original context changed");
+      || plan.manifest.operation_id !== input.operation_id)) throw Error("synthetic retained original context changed");
+    originalObject ??= id;
     return native;
   };
   transport.execute = async () => { throw Error("Retained synthetic inspection grants no effects"); };

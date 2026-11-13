@@ -93,6 +93,9 @@ export async function main(argv: string[]): Promise<number> {
       if (!options.request) throw Error("synthetic publication request required");
       const publication = readTrialPublication(context, options.request, preflight);
       const requestHash = publication.request_sha256;
+      if (options.command === "publish") assertTrialEffectCapacity({ command: options.command,
+        operation_id: publication.plan.manifest.operation_id,
+        journal_directory: join(context.artifacts, "docs-drift-" + publication.plan.manifest.operation_id), limit: outputLimit });
       if (options.interrupt) {
         if (!publication.plan.manifest.effects.some(effect => effect.id === options.interrupt)) throw Error("synthetic interruption effect unavailable");
         const execute = publication.transport.execute;

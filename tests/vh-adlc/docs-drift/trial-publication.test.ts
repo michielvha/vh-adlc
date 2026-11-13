@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { readJournal, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
@@ -14,6 +14,7 @@ import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { persistentTrialPublication, syntheticTrialFixture } from "./trial-fixture";
 import { git } from "./repository-fixture";
+import { fixture as manifestFixture } from "./manifest-fixture";
 
 const roots: string[] = [];
 let preserveFailedTrialRoots = false;
@@ -371,7 +372,7 @@ test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed 
 }, 180000);
 
 
-test.each(["published", "never-dispatched"])("installed trial retained recovery observes missing local proof without replay: %s", async scenario => {
+test.each(["published", "published-foreign-lease", "never-dispatched"])("installed trial retained recovery observes missing local proof without replay: %s", async scenario => {
   try {
   const { f, context, path } = await publicationRequest(), publication = readTrialPublication(context, path), execute = publication.transport.execute;
   if (scenario === "never-dispatched") publication.transport.execute = async (...args) => {
@@ -379,7 +380,17 @@ test.each(["published", "never-dispatched"])("installed trial retained recovery 
     return execute(...args);
   };
   const original = await publish(publication);
-  expect(original.state).toBe(scenario === "published" ? "complete" : "pending");
+  expect(original.state).toBe(scenario !== "never-dispatched" ? "complete" : "pending");
+  if (scenario === "published-foreign-lease") {
+    const { writePlanObject } = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+    const { review, policy } = await publication.gate(null);
+    const foreignReview = manifestFixture(publication.plan.manifest.bindings, publication.plan.manifest.effects, "other-operation");
+    foreignReview.policy = review.policy;
+    const foreign = sealPlan({ reviewed: validateReviewedManifest(foreignReview), grants: foreignReview.grants, ...policy, corrections: [], attention: [] });
+    const objects = writePlanObject(context.store, foreign);
+    git(f.origin, "fetch", "--no-tags", "--no-write-fetch-head", context.store.root, objects.object);
+    git(f.origin, "update-ref", context.settings.publication.lease_ref, objects.object);
+  }
   const operation = original.journal.plan.manifest.operation_id;
   renameSync(original.journal.directory, join(context.artifacts, "unavailable-original-journal"));
   renameSync(join(context.artifacts, operation + ".journal-owner.json"), join(context.artifacts, "unavailable-original-journal-owner.json"));
@@ -401,16 +412,16 @@ test.each(["published", "never-dispatched"])("installed trial retained recovery 
     writeFileSync(prefix + "-process.json", canonicalJSON(metadata), { flag: "wx", mode: 0o600 });
     const diagnostic = JSON.stringify({ command, ...metadata, stderr: Buffer.from(captured?.stderr ?? []).toString().slice(0, 512) });
     expect(completed.reaped, diagnostic).toBe(true); expect(completed.timed_out, diagnostic).toBe(false);
-    expect(completed.exit_code, diagnostic).toBe(command === "inspect-retained" || scenario === "published" ? 0 : 2);
+    expect(completed.exit_code, diagnostic).toBe(command === "inspect-retained" || scenario !== "never-dispatched" ? 0 : 2);
     return JSON.parse(Buffer.from(captured?.stdout ?? []).toString());
   }
   const inspection = await invoke("inspect-retained");
   expect(inspection.data.authority).toBe("none"); expect(inspection.data.operation_id).toBe(operation);
-  expect(inspection.data.observations.find((row: { effect_id: string }) => row.effect_id === "pr").state).toBe(scenario === "published" ? "done" : "absent");
+  expect(inspection.data.observations.find((row: { effect_id: string }) => row.effect_id === "pr").state).toBe(scenario !== "never-dispatched" ? "done" : "absent");
   expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
   expect(readTrialTracker(context).commit).toBe(tracker);
   const report = await invoke("restore-retained");
-  expect(report.data.authority).toBe("none"); expect(report.data.state).toBe(scenario === "published" ? "complete" : "pending");
+  expect(report.data.authority).toBe("none"); expect(report.data.state).toBe(scenario !== "never-dispatched" ? "complete" : "pending");
   if (scenario === "never-dispatched") expect(report.data.reason).toBe("retained-restore-no-replay");
   const journal = readJournal(report.data.journal_directory, context.source);
   expect(journal.header.recovery_mode).toBe("observation-only");
@@ -423,6 +434,7 @@ test.each(["published", "never-dispatched"])("installed trial retained recovery 
 
 
 test("an installed post-effect framing handoff retains the retired journal and observed lease result", async () => {
+  try {
   const { reconcileAbsent } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
   const { recoveryEffectsOutput } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-output");
   const { OUTPUT_LIMIT } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
@@ -458,18 +470,31 @@ test("an installed post-effect framing handoff retains the retired journal and o
   writeFileSync(authority, canonicalJSON({ schema_version: 1, kind: "docs-drift-recovery-authority", purpose: "reconciliation",
     scope_sha256s: scopes.map(scope => sha256(canonicalJSON(scope))),
     origin: { kind: "owner-current-request", artifact: { path: "small-owner.txt", sha256: sha256(origin) } } }), { mode: 0o600 });
-  const applied = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), "reconcile-publication",
-    "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--selection", selection, "--owner-request", authority],
-    { stdout: "pipe", stderr: "pipe", timeout: 90000 });
-  const report = JSON.parse(applied.stdout.toString()), journal = readJournal(pending.journal.directory, context.source);
+  const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
+  const { verifiedHelperEnvironment } = await import("../../../plugins/vh-adlc/scripts/docs-drift/git");
+  const argv = [process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), "reconcile-publication",
+    "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--selection", selection, "--owner-request", authority];
+  const prefix = join(context.artifacts, "post-effect-command"), applied = await executeOwnedProcess({ argv, cwd: context.source,
+    env: Object.fromEntries(Object.entries(verifiedHelperEnvironment()).filter((pair): pair is [string, string] => typeof pair[1] === "string")),
+    capture: "memory", watched_outputs: [], timeout_ms: 90000, stdout: prefix + ".stdout", stderr: prefix + ".stderr",
+    started: pid => writeFileSync(prefix + "-started.json", canonicalJSON({ pid, argv, cwd: context.source }), { flag: "wx", mode: 0o600 }) });
+  const { captured, ...metadata } = applied;
+  writeFileSync(prefix + ".stdout", captured?.stdout ?? new Uint8Array(), { flag: "wx", mode: 0o600 });
+  writeFileSync(prefix + ".stderr", captured?.stderr ?? new Uint8Array(), { flag: "wx", mode: 0o600 });
+  writeFileSync(prefix + "-process.json", canonicalJSON(metadata), { flag: "wx", mode: 0o600 });
+  const diagnostic = JSON.stringify({ ...metadata, stderr: Buffer.from(captured?.stderr ?? []).toString().slice(0, 512) });
+  expect(applied.reaped, diagnostic).toBe(true); expect(applied.timed_out, diagnostic).toBe(false); expect(applied.exit_code, diagnostic).toBe(2);
+  const stdout = Buffer.from(captured?.stdout ?? []);
+  const report = JSON.parse(stdout.toString()), journal = readJournal(pending.journal.directory, context.source);
   expect(journal.events.some(event => event.kind === "retired-absence" && event.effect_id === "pr")).toBe(true);
   expect(journal.events.some(event => event.kind === "outcome" && event.effect_id === "pr")).toBe(false);
   expect(git(f.origin, "for-each-ref", "--format=%(refname)", context.settings.publication.lease_ref)).toBe("");
-  expect(applied.exitCode).toBe(2); expect(report.outcome, JSON.stringify(report)).toBe("incomplete");
+  expect(report.outcome, JSON.stringify(report)).toBe("incomplete");
   expect(report.diagnostics[0].code).toBe("synthetic-output-bound-after-effects");
   expect(report.data.state).toBe("retired"); expect(report.data.operation_id).toBe(journal.plan.manifest.operation_id);
   expect(report.data.journal_directory).toBe(journal.directory); expect(report.data.revision).toBe(journal.revision);
-  expect(applied.stdout.length).toBeLessThanOrEqual(limit);
+  expect(stdout.length).toBeLessThanOrEqual(limit);
+  } catch (error) { preserveFailedTrialRoots = true; throw error; }
 }, 365000);
 
 test("installed retained inspection and restoration refuse a structurally valid plan from another trial context", async () => {
@@ -493,3 +518,29 @@ test("installed retained inspection and restoration refuse a structurally valid 
     }
   } catch (error) { preserveFailedTrialRoots = true; throw error; }
 }, 180000);
+
+
+test("installed publish capacity refusal preserves the cause and creates no journal or refs", async () => {
+  try {
+    const probe = persistentTrialPublication(roots, { bound_roles: true }), limit = canonicalJSON(probe.options.plan).length + 128;
+    const parent = realpathSync(mkdtempSync(join(tmpdir(), "vh-capacity-parent-"))); roots.push(parent);
+    let temporaryParent = parent;
+    while (temporaryParent.length < limit - 500) { temporaryParent = join(temporaryParent, "p".repeat(120)); mkdirSync(temporaryParent, { mode: 0o700 }); }
+    const { f, context, path } = await publicationRequest("advisory", limit, temporaryParent);
+    expect(canonicalJSON(readTrialPublication(context, path).plan).length).toBeLessThan(limit);
+    const { assertTrialEffectCapacity } = await import("../../../plugins/vh-adlc/scripts/docs-drift/trial-output");
+    expect(() => assertTrialEffectCapacity({ command: "publish", operation_id: "persistent-one", journal_directory: join(context.artifacts, "docs-drift-persistent-one"), limit }))
+      .toThrow("Configured output bound cannot retain trial recovery metadata");
+    const before = readdirSync(context.artifacts), refs = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)");
+    const tracker = readTrialTracker(context).commit;
+    const result = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), "publish",
+      "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--request", path], { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+    expect(result.exitCode, JSON.stringify({ signal: result.signalCode, stderr: result.stderr.toString() })).toBe(2);
+    const report = JSON.parse(result.stdout.toString());
+    expect(report.outcome).toBe("refused");
+    expect(report.diagnostics[0].message).toBe("Configured output bound cannot retain trial recovery metadata");
+    expect(readdirSync(context.artifacts)).toEqual(before);
+    expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
+    expect(readTrialTracker(context).commit).toBe(tracker);
+  } catch (error) { preserveFailedTrialRoots = true; throw error; }
+}, 120000);
