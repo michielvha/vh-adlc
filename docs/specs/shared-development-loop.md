@@ -536,6 +536,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-6 | spec | `db426cbbe13abd8675d4365ad23903e59b94b7c0` | gpt-6.1-sol | procedural | No blocking findings; four should-fix on freshness wording, signed release verification, covers and assume-unchanged files. |
 | 2026-11-13 | R-7 | spec | `1ae2a34e436fb057e4fe2793a04147143c539af1` | gpt-6.1-sol | procedural | No blocking findings; three should-fix on the moved Stackweaver checkout, merges with no publication workflow, and the post-merge verification range. |
 | 2026-11-13 | R-8 | spec | `5a284fc1c6fac8656cf3494f5e79a0f094dcc5dd` | gpt-6.1-sol | procedural | One blocking finding: an empty workflow-run query right after merge does not prove no publication. Two should-fix and a nit. |
+| 2026-11-13 | R-9 | spec | `9378490b8c1681e81508506f61b467ba2456bb30` | gpt-6.1-sol | procedural | No blocking findings; one should-fix on reused E2E proofs and a wording nit. |
 
 ### R-1
 
@@ -804,6 +805,22 @@ SEVERITY: nit
 WHERE: Context / Background; Design / Comparison baseline and Stackweaver adoption
 EVIDENCE: Background reports 55 non-terminal plans, while adoption reports 12 drafts, 43 planned or in-progress specs and 3 parked specs at the same cited revision, totaling 58. Comparison baseline also attributes both comparison passes to 7861b9dc, whereas Stackweaver docs/internal/analysis/shared-development-loop-parity.md identifies both passes as comparing 20e38a94 and explicitly says its model rows predate 7861b9dc. Git execution is unavailable, so I cannot reproduce the historical inventory.
 PROPOSAL: Correct the comparison provenance and reconcile the status counts, naming any different counting populations explicitly. Keep the adoption-head recount requirement.
+
+### R-9
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Verification rungs, CI policy and post-merge watch; AC-04 and its Test Plan
+EVIDENCE: Stackweaver's kind rung applies only to changes under e2e/, deploy/ or frontend/nginx.conf. A backend-only runtime change whose Test Plan reuses an unchanged E2E spec therefore triggers make verify and integration tests, but not kind. Stackweaver agents/implement.md:61-66 requires the Test Plan's E2E checks and a live runtime pass; CLAUDE.md:184 requires kind execution for E2E proof. The specification does not explicitly preserve these requirements independently of the narrower rung conditions, and AC-04's fixtures do not cover reused E2E specs. Git and vh-adlc execution are unavailable; this follows from reading the configured conditions and native instructions.
+PROPOSAL: Explicitly retain Test Plan E2E execution in kind and runtime verification even when their test files are unchanged. Add a backend-only fixture that reuses an existing E2E spec and cannot advance without that proof.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design / Verification rungs, CI policy and post-merge watch
+EVIDENCE: The statement that Stackweaver's tag workflow “runs on every push to main” contradicts .github/workflows/tag.yml:9-18, which declares paths-ignore. The same design section later acknowledges those exclusions.
+PROPOSAL: Qualify the statement to describe unmarked pushes that pass the workflow's path filters. Keep the subsequent blocked-delivery handling for unmarked merges that trigger no publication.
 
 ## Sources
 
