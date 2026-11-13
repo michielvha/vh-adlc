@@ -99,7 +99,10 @@ a worktree on another branch name requires that branch to be the session's own o
 unrelated branch (`references/authority.md:80-86` already forbids repointing one); and the reviewer
 process wrapper confirms that no member of the process group is still alive before the final check,
 because `owned-process.ts` reports `reaped` from the parent alone. Both get fixtures under AC-02 and
-AC-13.
+AC-13. R-15, after the covers revision, adds two more of the same kind: the export check refuses to
+read through a committed symlink that escapes the export, and process cleanup also stops helpers that
+detached into their own process group or session, so none can write after the final check. Both get
+AC-02 fixtures.
 
 ### Background
 
@@ -594,6 +597,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-13 | spec | `478dcab03f798ade50341adbd27273660fd0cb43` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on findings saved against an existing issue and reviewer helper processes outliving the review. |
 | 2026-11-13 | R-14 | spec | `d367673759c90a3b0b5da6a6e8b6884d99d18c6a` | gpt-6.1-sol | procedural | No blocking findings; two should-fix on claiming from an unrelated branch and verifying process group cleanup. |
 | 2026-11-13 | R-14 | spec | `d367673759c90a3b0b5da6a6e8b6884d99d18c6a` | n/a | n/a | accepted by owner |
+| 2026-11-13 | R-15 | spec | `e2e3de959b09950f8c9d17dbf1a74413523af7ea` | gpt-6.1-sol | procedural | No blocking findings after the covers revision; two should-fix on symlinks escaping the export and detached reviewer helpers. |
 
 ### R-1
 
@@ -979,6 +983,22 @@ SEVERITY: should-fix
 WHERE: Design / External command route; covers; AC-02 and its Test Plan row
 EVIDENCE: Design requires the reused owned-process runner to terminate and reap the entire reviewer group before preservation checks, leaving cleanup failures pending. plugins/vh-adlc/scripts/triage/owned-process.ts:5-12 swallows signal errors and defines reaped solely from child.exited, which observes the parent rather than surviving helpers. A successful parent can therefore produce exit_code: 0 and reaped: true despite failed group termination. The runner is absent from covers, and AC-02's proof has no cleanup-failure fixture. Process fixtures, git and vh-adlc could not be executed in this review.
 PROPOSAL: Require the runner or its review wrapper to distinguish an absent group from failed signalling and confirm that no live group members remain before storage. Cover the runner and add a cleanup-failure fixture that leaves the review pending even when the parent exits successfully.
+
+### R-15
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02 and its Test Plan row
+EVIDENCE: The design relies on a read-only git archive export to ensure that live, uncommitted content cannot shape a spec review, but specifies no containment check for exported symlinks. A tracked symlink can resolve outside that export into the live checkout, so viewing an apparently exported instruction or source file can read uncommitted bytes. Existing plugins/vh-adlc/scripts/triage/controller.ts checks realpath containment, and tests/vh-adlc/triage/copilot-trial.ts explicitly probes reads through an escaping symlink. I cannot execute git, vh-adlc or CLI probes; this gap follows from the written export procedure and those existing containment checks.
+PROPOSAL: Validate exported symlinks and prevent reads through links that escape the declared committed exports and pinned inputs, leaving the review pending when required content cannot be inspected safely. Add a fixture whose committed symlink points to a modified live instruction file and prove that its uncommitted content cannot reach the reviewer.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02 and its Test Plan row
+EVIDENCE: Design promises that “no helper outlives the review” through termination of the reviewer's process group. The acceptance notes additionally require confirming that this group has no live members. Neither condition covers descendants that create a separate process group or session, which shell-enabled checks can spawn. plugins/vh-adlc/scripts/triage/owned-process.ts signals only -child.pid, and its existing descendant fixture never detaches the helper. An escaped helper can therefore write after the final preservation check even when the original group is empty. Process execution, git and vh-adlc are unavailable in this review.
+PROPOSAL: Require cleanup to account for detached descendants too, or enforce an execution boundary that prevents descendants from escaping the owned process scope. Add successful-exit and timeout fixtures with a detached helper scheduled to write after the reply; store no review until that helper is confirmed stopped.
 
 ## Sources
 
