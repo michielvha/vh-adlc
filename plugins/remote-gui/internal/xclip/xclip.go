@@ -1,5 +1,6 @@
 // Package xclip is a minimal X11 client, written with the standard library only,
-// that sets, reads and clears the CLIPBOARD selection of one display.
+// that sets, reads and clears the CLIPBOARD selection of one display, and lists
+// the display's open menus.
 //
 // It never logs clipboard text, and its errors carry fixed diagnostic codes only.
 package xclip
