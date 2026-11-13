@@ -287,6 +287,7 @@ count after the update, and that the ceiling stays at three.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-13 | R-1 | spec | `83ae24c` | claude-opus-5-5 | procedural | Two blocking findings (F-01 streak reset, F-02 blocking definition) and ten others |
+| 2026-11-13 | R-2 | spec | `c643cc0` | claude-opus-5-5 | procedural | Clean: no blocking finding; three should-fix and three nits |
 
 ### R-1
 
@@ -373,3 +374,47 @@ SEVERITY: nit
 WHERE: Context, Background (lines 74-75)
 EVIDENCE: "Applying any finding changes the normative baseline, which makes the review stale" is too broad. Only Scope, Design, Acceptance Criteria, Test Plan and covers form the baseline (conventions/feature-documents.md:70-71, rules block normative_sections and normative_frontmatter), so a finding applied to Context, the Owner summary or Sources leaves the review fresh.
 PROPOSAL: Say "Applying a finding to the normative baseline makes the review stale".
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (steps 1 and 4, lines 164-166 and 173-174, and lines 180-181); Acceptance Criteria AC-01 (lines 237-242); Test Plan AC-01 row (Variant D); Context, Owner summary (line 38-39, "you can still accept after any clean pass, as today"); Context, Background, Existing scenarios
+EVIDENCE: Step 1 has the author apply a clean pass's factual findings and put its judgement findings to the owner as soon as the pass returns, whenever the streak is below three. Step 4 says "The owner may accept after any clean pass". Lines 180-181 say "Acceptance still requires a fresh, clean review at the accepted commit". If clean pass 1 holds a factual finding that edits Scope, Design, a criterion or the Test Plan, step 1 has already changed the normative baseline by the time the owner accepts. An acceptance row naming that pass then fails `accepted`, which needs "a clean spec review whose commit has the current normative baseline" (conventions/feature-documents.md:309). The design does not say whether an owner acceptance after a pass that holds findings skips step 1 (apply nothing and list the findings, as at pass 3), or applies them and requests another pass. Variant D says "pass when the acceptance row is written without further passes" but does not say whether its first clean pass holds findings, so a skill that applies a baseline finding and writes a stale acceptance row, or one that drops step 1, passes when the fixture pass is NO FINDINGS. Two careful implementers would build different skills here. Background names only S7.7 and S7.7.accept as single-pass acceptances, but tests/vh-adlc/scenarios/run.ts S7.9 (around line 1072) also has the owner pre-accept a revision "If it finds nothing blocking and leaves no open questions", after one review.
+PROPOSAL: State what happens when the owner accepts after a clean pass below three that holds findings (for example: apply nothing, list its findings as in step 2, and write the acceptance row at that pass), and use the same wording in AC-01 and the Owner summary. Make Variant D's first clean pass hold a factual finding on the normative baseline and require that `gate planned` passes, and list S7.9 with the scenarios that must keep passing.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Terminology (Clean streak, line 156); Design, Stopping rule (lines 179-180, "Nothing new is stored: the skill reads the streak from the Review Log rows and their ### R-<n> records"); Acceptance Criteria AC-01; Test Plan AC-01 row
+EVIDENCE: Line 156 says moving a planned or in-progress document to draft for a revision resets the streak. The Review Log never records that move. SKILL.md:98-99 commits it on its own as a `vh-adlc gate draft` commit, so it shows only in Git history. An acceptance row followed by later spec rows does not show it either, because a re-review caused only by default-branch drift also follows an acceptance and keeps it (conventions/feature-documents.md:220-222; Design line 177 counts such a re-review as a pass). The streak as defined therefore cannot be read from the Review Log rows and records alone. AC-01 does not mention the revision reset, and Variants A to D contain no revision. A skill that carries a pre-acceptance streak of three or more through a revision would apply nothing after the first post-revision pass and still pass every listed check.
+PROPOSAL: Name the source the skill uses to find the reset, for example the latest `gate draft` commit on the document in Git history, or rows after the latest acceptance row when the document's status history shows a revision, and correct line 179-180 to match. Add the revision reset to AC-01 and a Test Plan variant where a planned document with a stored streak of three is revised and the next clean pass is treated as streak one.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-03 (lines 247-249); Test Plan AC-03 row (line 267); Design, One-pass completeness and restatements (lines 212-213)
+EVIDENCE: The AC-03 fixture "states one limit in Scope, Design, a criterion and the Owner summary, with one copy different", and the author trial passes "when the resulting commit changes all four". If the finding proposes the value the other three copies already hold, a correct author edits only the one different copy and leaves the document consistent, and the proof fails that author. If the trial instead accepts one edited copy, it cannot tell a skill that sweeps restatements from one that only edits the location the finding names first. The row does not say which value the finding asks for.
+PROPOSAL: Specify that the fixture finding asks for a value none of the four copies hold, so every copy must change, or pass the author trial when all four locations state the finding's value after one commit and the commit touches every copy that differed.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-01, AC-02, AC-03, AC-04 and AC-05 rows; Design, Delivery (lines 230-231)
+EVIDENCE: Delivery says "new scenario cases cover the streak", and covers lists tests/vh-adlc/scenarios/run.ts. The AC-01 row instead uses "Disposable author trials in temporary repositories with a fixture spec and a scripted reviewer, transcripts preserved". The AC-02 row says "Store the returned records and the reported model". Neither says where the transcripts, fixtures or records are kept, although the repository already keeps such evidence under tests/vh-adlc/evidence/. An implementation reviewer has to inspect or rerun these trials, and the document does not say whether they are committed scenario cases or scratch runs.
+PROPOSAL: Say whether the AC-01 variants are scenario cases in run.ts or scratch trials, and name the committed path for the fixture specs, transcripts and returned reviewer records, for example tests/vh-adlc/evidence/review-convergence/.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-04 (lines 252-253); Test Plan AC-04 row (line 268)
+EVIDENCE: AC-04 requires that the wording-only design gets "none of those findings", meaning no failure-mode finding. The Test Plan row passes only "when the first two each return a failure-mode finding and the third returns none". Read literally, a reviewer that returns an unrelated wording nit on the third fixture fails the trial, although it meets AC-04.
+PROPOSAL: Change the row to "and the third returns no failure-mode finding".
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Delivery (lines 227-228); Acceptance Criteria AC-06 ("the plugin points at the published docs commit")
+EVIDENCE: The docs SHA appears in three places, not two: AGENTS.md:4, plugins/vh-adlc/knowledge.md:5 and :7, and plugins/vh-adlc/references/security-settings.md:5, which links conventions/repository-security.md at d8f07c9dd69038375a535af8ad586086688f85ab (`git grep -n d8f07c9 c643cc0`). The last pin move (ff8d7fe, "Both docs pins move to d8f07c9") left security-settings.md alone. Delivery names only AGENTS.md and knowledge.md, so after this feature security-settings.md would still point at the old revision, and it is unclear whether that meets "the plugin points at the published docs commit".
+PROPOSAL: Say whether references/security-settings.md moves with the pin. If it stays, narrow AC-06 to the knowledge.md and AGENTS.md pins.
