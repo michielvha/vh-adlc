@@ -458,6 +458,7 @@ R-9 F-01 to F-07 are applied. The owner accepts in advance if R-10 has no blocki
 | 2026-11-13 | R-8 | spec | `005f0f5` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-9 | spec | `67a08db` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix and two nits |
 | 2026-11-13 | R-10 | spec | `57d866c` | claude-opus-5-5 | procedural | Clean: no blocking finding; six should-fix and two nits, listed for the owner and not applied |
+| 2026-11-13 | R-10 | spec | `57d866c` | n/a | n/a | accepted by owner |
 
 ### R-1
 
