@@ -2,8 +2,8 @@
 // `.vh-adlc/loop.yaml` through the verified strict reader. A repository without
 // the file keeps the host default for every role. The reference is
 // references/loop-settings.md.
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { readYAML, settingsFile } from "../settings-file";
 import { resolveInside } from "../triage/settings";
@@ -219,6 +219,25 @@ export function loadLoopSettings(root: string, options: { settingsPath?: string;
     findings_document: input.findings_document === undefined ? "on_request" : input.findings_document === "always" || input.findings_document === "on_request" ? input.findings_document : fail("findings_document must be on_request or always"),
     analysis_dir: input.analysis_dir === undefined ? "docs/analysis" : (() => { const dir = text(input.analysis_dir, "analysis_dir").replace(/\/+$/, ""); try { resolveInside(root, dir); } catch { fail("analysis_dir"); } return dir; })(),
     skip_ci_paths: input.skip_ci_paths === undefined ? [] : (Array.isArray(input.skip_ci_paths) ? input.skip_ci_paths.map((p, i) => text(p, `skip_ci_paths[${i}]`)) : fail("skip_ci_paths")) };
+}
+
+/**
+ * Loop settings as committed at `commit`: the review policy a review recorded against that commit
+ * applies, whatever the working tree holds. Only the per-user executable override stays local.
+ */
+export function loadLoopSettingsAt(repo: string, commit: string, options: { overridePath?: string | null } = {}): LoopSettings {
+  repo = realpathSync(repo);
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "vh-adlc-loop-policy-")));
+  try {
+    const archive = Bun.spawnSync(["git", "archive", "--format=tar", commit], { cwd: repo, stdout: "pipe", stderr: "pipe" });
+    if (archive.exitCode !== 0) fail(`commit ${commit} cannot be read`);
+    const tar = Bun.spawnSync(["tar", "-x", "-C", dir], { stdin: archive.stdout, stdout: "ignore", stderr: "pipe" });
+    if (tar.exitCode !== 0) fail(`commit ${commit} cannot be exported`);
+    const settings = loadLoopSettings(dir, options);
+    return { ...settings, root: repo };
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /** The role and route an operation runs on. Resume follows the operation it continues. */

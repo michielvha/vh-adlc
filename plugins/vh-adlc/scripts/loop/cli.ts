@@ -17,7 +17,7 @@
 // host dispatches its own reviewer. Output is one JSON object on stdout.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadLoopSettings, routeFor, type LoopOperation } from "./settings";
+import { loadLoopSettings, loadLoopSettingsAt, routeFor, type LoopOperation } from "./settings";
 import { runReviewRoute } from "./review-route";
 import { loopContext, type LoopContext } from "./procedure";
 import { applicableRungs, featureDelta, mayAdvance, runRungs } from "./rungs";
@@ -71,7 +71,8 @@ export async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   const options = args(rest);
   const repo = need(options, "repo");
-  const settings = loadLoopSettings(repo);
+  // A review reads its policy from the reviewed commit; only the other commands read the working tree.
+  const settings = command === "review" ? (undefined as unknown as ReturnType<typeof loadLoopSettings>) : loadLoopSettings(repo);
   if (command === "route") {
     const operation = need(options, "operation") as LoopOperation;
     console.log(JSON.stringify(routeFor(settings, operation, options.continues ? { continues: options.continues as Exclude<LoopOperation, "resume"> } : {})));
@@ -121,13 +122,15 @@ export async function main(argv: string[]): Promise<number> {
   if (command === "review") {
     const kind = need(options, "kind");
     if (kind !== "spec" && kind !== "implementation") throw Error("--kind must be spec or implementation");
-    const route = routeFor(settings, kind === "spec" ? "spec review" : "review");
+    // The review policy is the one committed at the reviewed commit, never the working tree's.
+    const policy = loadLoopSettingsAt(repo, need(options, "commit"));
+    const route = routeFor(policy, kind === "spec" ? "spec review" : "review");
     if (route.route !== "command" || !route.argv) { console.log(JSON.stringify({ status: "host", ...route })); return 0; }
     const document = need(options, "document"), commit = need(options, "commit");
     const prompt = reviewPrompt({ repository: kind === "spec" ? "the current directory, a read-only export of the commit" : repo,
-      document, commit, kind, docsRevision: need(options, "docs-revision"), binary: need(options, "binary"), pluginPin: need(options, "plugin-pin") }, loopContext(settings));
+      document, commit, kind, docsRevision: need(options, "docs-revision"), binary: need(options, "binary"), pluginPin: need(options, "plugin-pin") }, loopContext(policy));
     const outcome = await runReviewRoute({ repo, commit, kind, document, route: { model: route.model!, argv: route.argv, ...(route.model_attestation ? { model_attestation: route.model_attestation } : {}) }, prompt,
-      scratch: settings.review_scratch, timeoutMs: options["timeout-ms"] ? Number(options["timeout-ms"]) : undefined });
+      scratch: policy.review_scratch, timeoutMs: options["timeout-ms"] ? Number(options["timeout-ms"]) : undefined });
     console.log(JSON.stringify({ role: route.role, ...outcome }));
     return outcome.status === "ready" ? 0 : 3;
   }

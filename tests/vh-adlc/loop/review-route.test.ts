@@ -3,7 +3,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { runReviewRoute, type ReviewOutcome } from "../../../plugins/vh-adlc/scripts/loop/review-route";
 
 const made: string[] = [];
@@ -252,5 +252,25 @@ describe("preservation hardening", () => {
       symlinkSync("d/back/../outside.txt", join(dir, "leak"));
     });
     pending(await review(root, commit, stub("", ok(commit)), { kind: "spec" }), "symlink");
+  });
+});
+
+describe("review policy comes from the reviewed commit", () => {
+  test("an uncommitted loop.yaml edit that drops a lens and an instruction file does not change the review", () => {
+    const stubDir = realpathSync(mkdtempSync(join(tmpdir(), "vh-review-policy-")));
+    made.push(stubDir);
+    const stubScript = join(stubDir, "reviewer.sh");
+    // Echoes, as its records, whether the committed lens and instruction file reached the prompt.
+    writeFileSync(stubScript, `#!/bin/bash\nprompt="$2"; commit=$(grep -o 'Commit: [0-9a-f]*' <<<"$prompt" | cut -d' ' -f2)\nprintf 'MODEL: %s\\nTARGET: %s\\n\\n' "$1" "$commit"\nif grep -q 'satellite (blocking)' <<<"$prompt" && grep -q 'AGENTS.md' <<<"$prompt"; then echo 'NO FINDINGS'; else echo 'POLICY CHANGED'; fi\n`);
+    chmodSync(stubScript, 0o700);
+    const committed = `schema_version: 1\ninstruction_files: [AGENTS.md]\nlenses:\n  - name: satellite\n    check: A new component names its satellite.\n    severity: blocking\nroles:\n  spec_reviewer:\n    route: command\n    model: gpt-6.1-sol\n    argv: [${stubScript}, "{model}", "{prompt}"]\n`;
+    const { root, commit } = repository(dir => { mkdirSync(join(dir, ".vh-adlc")); writeFileSync(join(dir, ".vh-adlc/loop.yaml"), committed); });
+    writeFileSync(join(root, ".vh-adlc/loop.yaml"), `schema_version: 1\nroles:\n  spec_reviewer:\n    route: command\n    model: gpt-6.1-sol\n    argv: [${stubScript}, "{model}", "{prompt}"]\n`);
+    const cli = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
+    const run = Bun.spawnSync([process.execPath, cli, "review", "--repo", root, "--document", "docs/specs/feature.md", "--commit", commit, "--kind", "spec",
+      "--docs-revision", "abc", "--binary", "/bin/false", "--plugin-pin", "def"], { stdout: "pipe", stderr: "pipe", timeout: 60_000,
+      env: { ...process.env, XDG_CONFIG_HOME: join(stubDir, "no-override") } });
+    const outcome = JSON.parse(run.stdout.toString() || "{}");
+    expect(outcome).toMatchObject({ status: "ready", records: "NO FINDINGS\n" });
   });
 });
