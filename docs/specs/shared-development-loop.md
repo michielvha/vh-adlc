@@ -681,6 +681,7 @@ R-4 judgement findings (F-02, F-03, F-04) the two R-5 judgement findings (F-01, 
 | 2026-11-13 | R-14 | spec | `d367673759c90a3b0b5da6a6e8b6884d99d18c6a` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-15 | spec | `e2e3de959b09950f8c9d17dbf1a74413523af7ea` | gpt-6.1-sol | procedural | No blocking findings after the covers revision; two should-fix on symlinks escaping the export and detached reviewer helpers. |
 | 2026-11-13 | R-15 | spec | `e2e3de959b09950f8c9d17dbf1a74413523af7ea` | n/a | n/a | accepted by owner |
+| 2026-11-13 | R-16 | spec | `236200bd18f7f23a23172f5a3e7ea107d44ff872` | gpt-6.1-sol | procedural | One blocking finding: the Codex implementation reviewer's writable sandbox conflicts with Stackweaver's read-only review rule. Four should-fix. A Codex attempt before it stayed pending on MODEL: unknown and is not recorded. |
 
 ### R-1
 
@@ -1082,6 +1083,43 @@ SEVERITY: should-fix
 WHERE: Design / External command route; AC-02 and its Test Plan row
 EVIDENCE: Design promises that “no helper outlives the review” through termination of the reviewer's process group. The acceptance notes additionally require confirming that this group has no live members. Neither condition covers descendants that create a separate process group or session, which shell-enabled checks can spawn. plugins/vh-adlc/scripts/triage/owned-process.ts signals only -child.pid, and its existing descendant fixture never detaches the helper. An escaped helper can therefore write after the final preservation check even when the original group is empty. Process execution, git and vh-adlc are unavailable in this review.
 PROPOSAL: Require cleanup to account for detached descendants too, or enforce an execution boundary that prevents descendants from escaping the owned process scope. Add successful-exit and timeout fixtures with a detached helper scheduled to write after the reply; store no review until that helper is confirmed stopped.
+
+### R-16
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design / External command route; Stackweaver adoption; Open Questions
+EVIDENCE: The implementation-review example selects Codex's workspace-write sandbox. Stackweaver CLAUDE.md:202 explicitly requires independent reviews, including vh-adlc implementation reviews, through codex exec -s read-only. Its constitution rule requires exceptions to become owner Open Questions. The proposed constitution changes do not explicitly identify this sandbox-permission change, and Open Questions says None.
+PROPOSAL: Raise the implementation review's sandbox permissions for an owner decision. Either retain read-only execution or explicitly authorize and document the narrower writable exception, including its scratch-output limits, in Stackweaver's constitution.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / External command route; Tasks / T7; AC-02 Test Plan
+EVIDENCE: Design requires content hashes of every ignored file outside review_scratch, and AC-02 rejects any file-content change there. T7 instead reports comparing ignored directories by path, size and modification time. plugins/vh-adlc/scripts/loop/review-route.ts, treeManifest and snapshot, confirm that substitution. A same-size replacement preserving modification time is invisible to that comparison. I cannot execute Git or vh-adlc; this counterexample follows from reading the snapshot implementation.
+PROPOSAL: Retain content hashing for ignored directory contents outside review_scratch and add a same-size, preserved-mtime mutation fixture. Do not treat metadata comparison as establishing AC-02's content-preservation requirement.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / External command route; AC-02
+EVIDENCE: The codex-session paragraph permits a matching session-log model to replace MODEL: unknown, and AC-02's Test Plan explicitly requires storing that response. The same Design section subsequently says that an unknown model leaves the review pending without qualifying that rule for successful CLI attestation. These instructions prescribe different outcomes for the newly supported case.
+PROPOSAL: State explicitly that unknown self-reporting is acceptable only after successful configured CLI attestation, while a missing header or conflicting named self-report still blocks storage. Keep the unattested requested-model rule separate.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Claiming from a host worktree; AC-13 and its Test Plan
+EVIDENCE: Design permits claiming in any clean, tip-aligned worktree on another branch name, and AC-13's proof requires that other-branch fixture to claim without an ownership qualification. plugins/vh-adlc/references/authority.md:80-88 instead permits only a session-created or handed-over non-default branch and forbids advancing an unrelated branch. T21 and T22 also describe refusing the unrelated-branch case. The normative claim contract remains broader than the implemented preservation rule.
+PROPOSAL: Fold the ownership requirement into Design, AC-13 and its Test Plan. Distinguish a session-owned branch that succeeds from an unrelated tip-aligned branch that remains unchanged.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary; Tasks / T24
+EVIDENCE: The owner summary says validation is spec review only, with nothing executed. Tasks records extensive executed checks and T24 is checked with a done condition that all listed checks pass, although its evidence reports 1524 passing tests and one failure. These are inconsistent current validation claims, independently of whether the historical executions can be reproduced. File-only access prevents rerunning the checks.
+PROPOSAL: Refresh the owner summary to distinguish recorded implementation checks, their failure and limitations, pending real-route proof, and unverified publication claims. Leave T24 incomplete until its stated passing condition is established, or explicitly revise its remaining work without representing the failed suite as passing.
 
 ## Sources
 
