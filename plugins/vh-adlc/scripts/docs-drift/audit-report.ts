@@ -1,5 +1,6 @@
 import { realpathSync } from "node:fs";
 import { collectAuditProposalInputs, readCollectedAuditProposals } from "./audit-proposal-inputs";
+import { collectAuditPublicationReceipts, readCollectedAuditPublicationReceipts } from "./audit-publication-receipts";
 import { collectAssessmentReview } from "./assessment-review";
 import { collectNativeReportHistory, readCollectedReportHistory } from "./history-collection";
 import { workerInputsDigest } from "./manifests";
@@ -23,12 +24,13 @@ type Start = {
 };
 type Counts = {
   proposed_edits: number | null; required_proposals: number | null; collected_proposals: number | null;
-  assessed_proposals: number | null; unassessed_proposals: number | null; unverified_proposals: number | null; findings: AssessmentReport["counts"] | null; review_nits: number | null;
+  assessed_proposals: number | null; unassessed_proposals: number | null; unverified_proposals: number | null;
+  eligible_publications: number | null; findings: AssessmentReport["counts"] | null; review_nits: number | null;
 };
 type Result = {
   schema_version: 1; kind: "docs-drift-audit-report"; authority: "none"; source_commit: string;
   complete: boolean; scope_changed: boolean; details_omitted: boolean; diagnostics: string[];
-  counts: Counts; report: Report | null; markdown: string | null;
+  counts: Counts; publication_receipts: Awaited<ReturnType<typeof collectAuditPublicationReceipts>> | null; report: Report | null; markdown: string | null;
 };
 type Context = {
   options: Options; before: string; limit: number;
@@ -92,9 +94,10 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
   const options = original.options, repo = realpathSync(options.repo), snapshot = captureSnapshot(repo, options.source), historyContext = original.history.context;
   if (!historyContext) throw Error("Original complete audit report run required");
   const result: Result = { schema_version: 1, kind: "docs-drift-audit-report", authority: "none", source_commit: options.source,
-    complete: false, scope_changed: false, details_omitted: false, diagnostics: [], report: null, markdown: null,
+    complete: false, scope_changed: false, details_omitted: false, diagnostics: [], publication_receipts: null, report: null, markdown: null,
     counts: { proposed_edits: null, required_proposals: original.proposals.required_proposals, collected_proposals: original.proposals.collected_proposals,
-      assessed_proposals: null, unassessed_proposals: original.proposals.required_proposals, unverified_proposals: null, findings: null, review_nits: null } };
+      assessed_proposals: null, unassessed_proposals: original.proposals.required_proposals, unverified_proposals: null,
+      eligible_publications: null, findings: null, review_nits: null } };
   const attention: AttentionInput[] = [], failures: Report["failures"] = [], history = readCollectedReportHistory(original.history);
   const addFailure = (code: string, message: string) => {
     result.diagnostics.push(message);
@@ -112,6 +115,16 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
       throw new AuditReportFailure("audit-collection-incomplete", "Original audit report proposal inputs changed or became unavailable");
     }
     collectionComplete = current.complete && original.history.complete;
+    result.publication_receipts = await collectAuditPublicationReceipts({ repo, source: options.source, artifact_root: options.artifact_root,
+      credential: options.credential, path: options.path, proposals: current });
+    result.scope_changed ||= result.publication_receipts.scope_changed;
+    if (!result.publication_receipts.complete) {
+      collectionComplete = false;
+      for (const message of result.publication_receipts.diagnostics) addFailure("audit-publication-inputs-diagnostic", message);
+      throw new AuditReportFailure("audit-publication-inputs-incomplete", "Complete current native publication receipt collection required");
+    }
+    const receiptRows = readCollectedAuditPublicationReceipts(result.publication_receipts);
+    result.counts.eligible_publications = result.publication_receipts.reviewed_proposals;
     result.counts.required_proposals = current.required_proposals; result.counts.collected_proposals = current.collected_proposals;
     result.counts.assessed_proposals = 0; result.counts.unassessed_proposals = current.required_proposals; result.counts.unverified_proposals = current.required_proposals;
     const review = await collectAssessmentReview({ ...options, ...structuredClone(roles) });
@@ -151,13 +164,17 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
     result.counts.unverified_proposals = current.required_proposals;
     for (const proposal of readCollectedAuditProposals(current)) {
       const judgment = proposalAssessment?.proposals.find(row => row.number === proposal.number && row.binding_sha256 === proposal.binding_sha256);
+      const publication = receiptRows.find(row => row.number === proposal.number && row.binding_sha256 === proposal.binding_sha256);
+      if (!publication) throw new AuditReportFailure("audit-publication-inputs-incomplete", "Original current proposal receipt binding required");
       attention.push(item({ identity: "proposal:" + proposal.number, disposition: judgment ? proposalAttentionDisposition(judgment.assessment) : "unknown",
-        reason: judgment ? "Current source assessment: " + judgment.assessment + "; full proposal verification and reviewed delivery are not established"
+        reason: judgment ? "Current source assessment: " + judgment.assessment + "; historical shared receipt "
+          + (publication.eligibility === "reviewed" ? "is eligible" : "is not eligible") + "; current result verification and carried delivery are not established"
           : "Full native proposal inputs are collected; current semantic support has not been assessed for this report",
         owner_action: judgment ? "Review every hunk recommendation under Existing proposal assessments before selecting verification, delivery or resolution"
           : "Complete the current support assessment before carrying or resolving this proposal",
         rule: { number: proposal.number, head_sha: proposal.head_sha, base_sha: proposal.base_sha, binding_sha256: proposal.binding_sha256,
-          assessment_sha256: judgment ? canonicalDigest(judgment) : null, verification: "unverified", delivery: "unverified" },
+          assessment_sha256: judgment ? canonicalDigest(judgment) : null, verification: "unverified", delivery: "unverified",
+          publication: { eligibility: publication.eligibility, receipt_sha256: publication.receipt ? canonicalDigest(publication.receipt) : null } },
         title: "Existing audit proposal " + proposal.number + (judgment ? " awaits verification and delivery review" : " remains unassessed"),
         links: ["https://" + snapshot.settings.hostname + "/" + snapshot.settings.repository + "/pull/" + proposal.number] }));
     }
@@ -194,7 +211,7 @@ export function boundAuditReport(input: Result, limit: number): Result {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > OUTPUT_LIMIT) throw Error("Final report output bound required");
   const result = structuredClone(input);
   if (Buffer.byteLength(JSON.stringify(result) + "\n") > limit) {
-    result.complete = false; result.details_omitted = true; result.report = null; result.markdown = null;
+    result.complete = false; result.details_omitted = true; result.publication_receipts = null; result.report = null; result.markdown = null;
     result.diagnostics = ["Final report exceeds the retained entry bound; inspect the original source and role records"];
     if (Buffer.byteLength(JSON.stringify(result) + "\n") > limit) throw Error("Configured output bound cannot hold the incomplete final report");
   }

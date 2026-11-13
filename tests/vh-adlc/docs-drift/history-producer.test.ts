@@ -1,12 +1,16 @@
 import { afterAll, expect, test } from "bun:test";
-import { rmSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { source, write, commit, portableRecord, deliverRecord, runtimeIdentity } from "./adoption-fixture";
 import { compatibleTrialUpgrade, trialAdoptionDelivery } from "./adoption-trial-fixture";
 import { canonicalDigest, canonicalJSON, compareUTF8, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
-import { readAdoptionInput, readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
+import { readAdoptionInput, readGit, writeMetadataObject } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { captureRepositoryState, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import type { WorkflowRunInput } from "../../../plugins/vh-adlc/scripts/github-read";
 import type { ProducerSource } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
+import { collectActionsHistory } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
+import { createGitHubReader, createRepositoryReader } from "../../../plugins/vh-adlc/scripts/github-read";
+import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 
 const roots: string[] = [];
 let preserveRoots = false;
@@ -62,6 +66,47 @@ test.each(["matching", "changed-native-blob", "foreign-repository", "unadopted-s
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveRoots = true; throw error; }
 });
+
+test.each(["shallow-history", "ancestry-command-failure"])("history collection is incomplete rather than skipping unavailable producer ancestry: %s", async fault => {
+  try {
+    const { createAdoptedProducerVerifier } = await import("../../../plugins/vh-adlc/scripts/docs-drift/history-producer");
+    const f = fixture(), tree = readGit(f.store.root, "rev-parse", f.current + "^{tree}").toString().trim();
+    const current = writeMetadataObject(f.store.root, "commit", Buffer.from(`tree ${tree}\nparent ${f.current}\nauthor Fixture <fixture@example.invalid> 1 +0000\ncommitter Fixture <fixture@example.invalid> 1 +0000\n\nOwned later default\n`));
+    const verify = createAdoptedProducerVerifier({ store: f.store, current_default: current, identity: runtimeIdentity }), native = run(f.current);
+    expect(verify(producerSource(f.repo, f.current), native)?.source_commit).toBe(f.current);
+    const before = captureRepositoryState(f.repo), empty = join(f.artifacts, "unused-api-bin"); mkdirSync(empty, { mode: 0o700 });
+    let artifactReads = 0, callbackError: unknown;
+    const reader = { ...createRepositoryReader(createGitHubReader("github.com", { inherit_env: false, env: { PATH: empty } }), "fixture/docs"),
+      repository: () => ({ id: 10, full_name: "fixture/docs", default_branch: "main" }),
+      workflow: () => ({ id: 19, path: f.configured.reports.workflow_path, state: "active" }),
+      recentRuns: () => ({ items: [native], pages: 1, complete: true, diagnostics: [] }), run: () => native,
+      commit: (sha: string) => ({ sha, tree_sha: readGit(f.store.root, "rev-parse", sha + "^{tree}").toString().trim(), parents: [], message: "Owned synthetic source" }),
+      artifacts: () => { artifactReads++; throw Error("Artifact reads must not replace unavailable ancestry proof"); } };
+    const oldPath = process.env.PATH;
+    try {
+      if (fault === "shallow-history") writeFileSync(join(f.store.root, "shallow"), current + "\n", { mode: 0o600 });
+      else {
+        const git = Bun.which("git"), bin = join(f.artifacts, "producer-git-fault"); if (!git) throw Error("Fixture Git unavailable");
+        mkdirSync(bin, { mode: 0o700 }); writeFileSync(join(bin, "git"), `#!${process.execPath}
+const args = process.argv.slice(2);
+if (args.includes("merge-base") && args.includes("--is-ancestor")) process.exit(2);
+const result = Bun.spawnSync([${JSON.stringify(git)}, ...args], { env: process.env, stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+process.exit(result.exitCode);
+`, { mode: 0o700 }); process.env.PATH = bin + ":" + oldPath;
+      }
+      const result = await collectActionsHistory({ repo: f.repo, artifact_root: f.artifacts, settings: parseSettings(f.configured), reader,
+        context: { repository: "fixture/docs", scope_sha256: sha256(Buffer.from("synthetic history scope")), run_id: "102", started_at: "2000-01-02T00:00:00Z" },
+        environment: { PATH: empty }, verifyProducer: (source, run) => {
+          try { return verify(source, run); } catch (error) { callbackError = error; throw error; }
+        } });
+      expect(result.complete).toBe(false); expect(result.records).toEqual([]);
+      expect(result.diagnostics).toContain("Earlier run 101 required native history inputs could not be verified");
+      expect(callbackError).toBeInstanceOf(Error); expect((callbackError as Error).message).toContain("incomplete docs-drift history producer");
+      expect(artifactReads).toBe(0);
+    } finally { if (oldPath === undefined) delete process.env.PATH; else process.env.PATH = oldPath; }
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { preserveRoots = true; throw error; }
+}, 90000);
 
 // Observed-shaped owner-attestation parser fixtures only; these do not establish actual native adoption.
 test("a verified compatible predecessor remains eligible while test-only successor evidence refuses", async () => {

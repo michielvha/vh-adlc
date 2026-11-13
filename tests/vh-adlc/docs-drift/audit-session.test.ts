@@ -170,6 +170,9 @@ process.exitCode = await main(${JSON.stringify(cliArgs)});
     }
     if (["matching", "proposal", "normal-cli", "normal-cli-partial-output"].includes(fault)) {
       expect(result.report.complete).toBe(true); expect(result.report.report.collection_complete).toBe(true);
+      expect(result.report.publication_receipts?.complete, JSON.stringify(result.report.diagnostics)).toBe(true);
+      expect(result.report.publication_receipts.required_proposals).toBe(fault === "proposal" ? 1 : 0);
+      expect(result.report.counts.eligible_publications).toBe(0);
       expect(result.report.report.published).toEqual([]); expect(result.report.report.failures).toEqual([]);
       expect(new Date(result.start.started_at).getTime()).toBeLessThanOrEqual(new Date(result.report.report.completed_at).getTime());
       expect(order[0].context).not.toBe(order[1].context);

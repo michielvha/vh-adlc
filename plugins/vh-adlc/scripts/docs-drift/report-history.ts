@@ -28,6 +28,7 @@ export type OwnedInvocation = {
 export class HistoryEligibilityError extends Error {
   constructor(reason: string) { super(`ineligible docs-drift history ${reason}`); }
 }
+export class PublicationEvidenceChanged extends HistoryEligibilityError {}
 function invalid(reason: string): never { throw new HistoryEligibilityError(reason); }
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) invalid("object");
@@ -400,7 +401,8 @@ export async function readReviewedProposal(options: {
 }) {
   const { reader, settings, proposal } = options;
   const current = reader.pull(proposal.number);
-  if (canonicalDigest(current) !== canonicalDigest(proposal) || current.state !== "open" || current.merged_at !== null
+  if (canonicalDigest(current) !== canonicalDigest(proposal)) throw new PublicationEvidenceChanged("current owned PR changed during read");
+  if (current.state !== "open" || current.merged_at !== null
     || current.base_repository.full_name.toLowerCase() !== settings.repository.toLowerCase()
     || current.base_ref !== settings.default_branch || current.head_repository?.id !== current.base_repository.id
     || current.actor !== settings.publication.actor) invalid("current owned PR changed or unavailable");
@@ -428,7 +430,8 @@ export async function readReviewedProposal(options: {
   for (const item of reviewed.attention) {
     if (item.version !== 1 || hash(item.sha256) !== canonicalDigest(item.binding)) invalid("reviewed attention projection");
   }
-  if (reader.ref(ref).sha !== nativeRef.sha || canonicalDigest(reader.pull(current.number)) !== canonicalDigest(current)) invalid("native publication changed during read");
+  if (reader.ref(ref).sha !== nativeRef.sha || canonicalDigest(reader.pull(current.number)) !== canonicalDigest(current))
+    throw new PublicationEvidenceChanged("native publication changed during read");
   return { reviewed: { actor: reviewed.actor, head: reviewed.head, body_sha256: reviewed.body_sha256,
     corrections: reviewed.corrections, attention: reviewed.attention },
     receipt: { repository: settings.repository, repository_id: current.base_repository.id, operation_id: operation[1], ref, object: nativeRef.sha,

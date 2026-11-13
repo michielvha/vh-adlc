@@ -6,7 +6,12 @@ import { loadCommittedSettings } from "../../../plugins/vh-adlc/scripts/docs-dri
 import { put } from "./repository-fixture";
 import { assessmentReviewFixture } from "./assessment-review-fixture";
 import { evidence } from "./manifest-fixture";
-import { captureSyntheticRole } from "./original-publication-fixture";
+import { captureSyntheticRole, retainSyntheticArtifact } from "./original-publication-fixture";
+import { auditReceiptFixture } from "./audit-publication-receipts-fixture";
+import { collectWorkerInputs } from "../../../plugins/vh-adlc/scripts/docs-drift/publication-worker";
+import { readCollectedAuditProposals } from "../../../plugins/vh-adlc/scripts/docs-drift/audit-proposal-inputs";
+import { roleRuntimeDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
+import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { collectAssessmentReviewTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/assessment-review";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 
@@ -139,8 +144,43 @@ test("independent full proposal assessment removes the unassessed gap while leav
     expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
     expect(result.report).toMatchObject({ collection_complete: true, outcome: "new-attention", published: [], carried_delivery: [] });
     expect(result.counts).toMatchObject({ required_proposals: 1, collected_proposals: 1, assessed_proposals: 1, unassessed_proposals: 0, unverified_proposals: 1 });
-    expect(result.report?.attention.find(item => item.item.identity === "proposal:11")?.item.reason).toContain("verification and reviewed delivery are not established");
+    expect(result.report?.attention.find(item => item.item.identity === "proposal:11")?.item.reason).toContain("current result verification and carried delivery are not established");
     expect(result.markdown).toContain("Proposal assessments independently reviewed");
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { preserveRoots = true; throw error; }
+}, 245000);
+
+test("final report distinguishes eligible historical receipts from unverified current results", async () => {
+  try {
+    const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/audit-report"), f = await auditReceiptFixture(roots);
+    const current = await collectWorkerInputs(f.options), inputs = await collectAuditProposalInputs(f.options);
+    if (!current.complete || !current.worker_input_sha256 || !current.facts?.runtime || !current.source_verification?.evidence || !inputs.complete)
+      throw Error("Complete original source and receipt fixture required");
+    const assessment = retainSyntheticArtifact(f.artifacts, "receipt-report-finding-assessment.json", canonicalJSON({ schema_version: 1,
+      kind: "docs-drift-assessment", source_commit: f.source, source_verification_sha256: current.source_verification.evidence.sha256,
+      findings: (current.source_verification.scan?.findings ?? []).map(finding => ({ id: finding.id, verdict: "unknown",
+        reason: "Synthetic current-source uncertainty", recommendation: "Inspect this source", evidence: [] })) }));
+    const proposalAssessment = retainSyntheticArtifact(f.artifacts, "receipt-report-proposal-assessment.json", canonicalJSON({ schema_version: 1,
+      kind: "docs-drift-proposal-assessment", source_commit: f.source, inputs_sha256: inputs.inputs_sha256,
+      proposals: readCollectedAuditProposals(inputs).map(proposal => ({ number: proposal.number, binding_sha256: proposal.binding_sha256,
+        hunks: proposal.hunks.map(hunk => ({ id: hunk.id, verdict: "unknown", reason: "Current result still needs verification",
+          recommendation: "Verify this full proposal before carrying delivery", evidence: [] })) })) }));
+    const worker = captureSyntheticRole(f.artifacts, f.source, "worker", roleRuntimeDigest(current.facts.runtime, "worker"),
+      evidence("receipt-report-worker", current.worker_input_sha256, canonicalJSON({ input_sha256: current.worker_input_sha256,
+        edits: structuredClone(f.selection.edits), publication: null, assessment, proposal_assessment: proposalAssessment }).toString()));
+    const begun = await api.beginAuditReport(f.options); expect(begun.complete, JSON.stringify(begun.diagnostics)).toBe(true);
+    const target = await collectAssessmentReviewTarget({ ...f.options, worker_capture: worker });
+    if (!target.complete || !target.reviewer_runtime_sha256 || !target.target_sha256) throw Error("Complete original receipt-report target required");
+    const reviewer = captureSyntheticRole(f.artifacts, f.source, "reviewer", target.reviewer_runtime_sha256,
+      evidence("receipt-report-reviewer", target.target_sha256, "NO FINDINGS\n"));
+    const before = captureRepositoryState(f.repo), result = await api.completeAuditReport(begun, { worker_capture: worker, reviewer_capture: reviewer });
+    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+    expect(result.counts).toMatchObject({ required_proposals: 2, assessed_proposals: 2, unassessed_proposals: 0, unverified_proposals: 2, eligible_publications: 1 });
+    expect(result.publication_receipts?.reviewed_proposals).toBe(1);
+    expect(result.report).toMatchObject({ collection_complete: true, success: false, published: [], carried_delivery: [] });
+    expect(result.report?.attention.find(row => row.item.identity === "proposal:11")?.item.rule).toMatchObject({ verification: "unverified",
+      delivery: "unverified", publication: { eligibility: "reviewed" } });
+    expect(result.report?.attention.find(row => row.item.identity === "proposal:11")?.item.reason).toContain("historical shared receipt is eligible");
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveRoots = true; throw error; }
 }, 245000);

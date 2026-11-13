@@ -58,6 +58,9 @@ function completeHistory(repo: string, commit: string): void {
   if (missing.includes(63)) incomplete("missing history objects");
 }
 
+/** History consumers need the same graph validation without requiring ordinary documentation inputs. */
+export { completeHistory as requireCompleteHistory };
+
 /** Read raw tree identities and bytes without checkout filters or automatic object fetching. */
 export function readCommittedTree(repo: string, sourceCommit: string): TreeBlob[] {
   commitID(sourceCommit);

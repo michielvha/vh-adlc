@@ -1,13 +1,14 @@
 import type { WorkflowRunInput } from "../github-read";
 import { collectAdoptionBindings, verifyRuntimeAdoption } from "./adoption";
 import { readCompatibleAdoptionLineage } from "./adoption-lineage";
-import { readAdoptionInput, readGit } from "./git";
+import { isGitAncestor, readAdoptionInput, readGit } from "./git";
 import { readHistoryWorkflowContract } from "./history-workflow";
 import { requireOwnedStore } from "./proposals";
 import { canonicalDigest, freezeJSON, sha256 } from "./protocol";
 import type { ProducerSource, VerifiedProducer } from "./report-history";
 import { loadCommittedSettings } from "./settings";
 import type { OwnedObjectStore } from "./snapshot";
+import { requireCompleteHistory } from "./snapshot";
 import type { PublicationIdentity } from "./transport";
 
 function fail(reason: string): never { throw Error("incomplete docs-drift history producer " + reason); }
@@ -26,7 +27,8 @@ export function createAdoptedProducerVerifier(input: { store: OwnedObjectStore; 
         || run.event !== "schedule" || run.head_branch !== identity.default_branch) fail("native source or repository changed");
       if (readGit(repo, "rev-parse", "--verify", "--end-of-options", run.head_sha + "^{commit}").toString().trim() !== run.head_sha)
         fail("complete producer objects required");
-      try { readGit(repo, "merge-base", "--is-ancestor", run.head_sha, current); } catch { return null; }
+      requireCompleteHistory(repo, run.head_sha); requireCompleteHistory(repo, current);
+      if (!isGitAncestor(repo, run.head_sha, current)) return null;
       // A pre-adoption run is ineligible, not a fabricated approved producer.
       if (readAdoptionInput(repo, run.head_sha, ".vh-adlc/docs-drift.yaml") === null) return null;
       const { settings } = loadCommittedSettings(repo, run.head_sha);
