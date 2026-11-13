@@ -1,5 +1,5 @@
 ---
-status: draft
+status: parked
 status_description: "Split out of spec-review-convergence at its R-13; parked until shared-development-loop lands, then reviewed against its review flow."
 issue: null
 goal: "Spec review stops requesting passes after three consecutive passes without a blocking finding, and every owner acceptance, pick and resume lands on the right pass."
