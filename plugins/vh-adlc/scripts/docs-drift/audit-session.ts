@@ -163,9 +163,15 @@ export function auditSessionOutput(result: Awaited<ReturnType<typeof runAuditSes
     diagnostics: [...session.diagnostics.map(message => ({ code: "audit-session", message })),
       ...(artifacts?.diagnostics ?? []).map(message => ({ code: "audit-output", message }))] };
   const size = () => Buffer.byteLength(JSON.stringify(output) + "\n");
-  const diagnosticSummary = "Retained output diagnostics exceed the command bound; inspect the saved files and original records";
+  let firstReason = "", encodedBytes = 0;
+  for (const character of output.report_artifacts?.diagnostics[0] ?? "") {
+    const bytes = Buffer.byteLength(JSON.stringify(character)) - 2;
+    if (encodedBytes + bytes > 128) break;
+    firstReason += character; encodedBytes += bytes;
+  }
+  const diagnosticSummary = "Output diagnostics truncated. First error: " + firstReason + "; inspect the selected artifact root and original records";
   if (size() > limit && output.report_artifacts
-    && JSON.stringify(output.report_artifacts.diagnostics).length > JSON.stringify([diagnosticSummary]).length) {
+    && Buffer.byteLength(JSON.stringify(output.report_artifacts.diagnostics)) > Buffer.byteLength(JSON.stringify([diagnosticSummary]))) {
     output.outcome = "incomplete"; output.details_omitted = true;
     output.report_artifacts.diagnostics = [diagnosticSummary];
     output.diagnostics = [...session.diagnostics.map(message => ({ code: "audit-session", message })),

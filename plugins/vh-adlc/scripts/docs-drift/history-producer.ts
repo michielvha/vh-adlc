@@ -1,6 +1,7 @@
 import type { WorkflowRunInput } from "../github-read";
 import { collectAdoptionBindings, verifyRuntimeAdoption } from "./adoption";
-import { collectionReaders, readAdoptionInput, readGit } from "./git";
+import { readCompatibleAdoptionLineage } from "./adoption-lineage";
+import { readAdoptionInput, readGit } from "./git";
 import { readHistoryWorkflowContract } from "./history-workflow";
 import { requireOwnedStore } from "./proposals";
 import { canonicalDigest, freezeJSON, sha256 } from "./protocol";
@@ -10,33 +11,12 @@ import type { OwnedObjectStore } from "./snapshot";
 import type { PublicationIdentity } from "./transport";
 
 function fail(reason: string): never { throw Error("incomplete docs-drift history producer " + reason); }
-function record(value: unknown): Record<string, unknown> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) fail("adoption record unavailable");
-  return value as Record<string, unknown>;
-}
 
 /** Native history supplies this callback. It accepts no report-provided approval or producer identity. */
 export function createAdoptedProducerVerifier(input: { store: OwnedObjectStore; current_default: string; identity: PublicationIdentity }) {
   const store = { ...input.store }, current = input.current_default, identity = { ...input.identity }, repo = store.root;
   requireOwnedStore(store, identity.repository);
-  const allowed = new Set<string>(), seen = new Set<string>();
-  let next = current;
-  while (true) {
-    if (seen.has(next) || seen.size >= 64) fail("bounded adoption lineage required");
-    seen.add(next);
-    // This verifies the complete original C/D and successor chain, retaining its owner-attestation limitation.
-    const adopted = verifyRuntimeAdoption({ repo, current_default: next, identity });
-    allowed.add(adopted.adoption_sha256);
-    const original = readAdoptionInput(repo, next, adopted.record_path);
-    if (!original || original.sha256 !== adopted.adoption_sha256) fail("approved adoption record changed");
-    const predecessor = record(collectionReaders().yaml(original.bytes)).predecessor;
-    if (predecessor === null) break;
-    const link = record(predecessor);
-    // A different trial contract is not an implicitly compatible history producer.
-    if (link.route !== "compatible") break;
-    if (typeof link.default_commit !== "string") fail("approved predecessor source required");
-    next = link.default_commit;
-  }
+  const allowed = new Set(readCompatibleAdoptionLineage({ store, current_default: current, identity }));
   return (source: ProducerSource, run: WorkflowRunInput): VerifiedProducer | null => {
     try {
       requireOwnedStore(store, identity.repository);

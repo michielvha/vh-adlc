@@ -43,8 +43,30 @@ test("retained references participate in the command output bound", () => {
   expect(result.outcome).toBe("incomplete"); expect(result.details_omitted).toBe(true);
   expect(result.report_artifacts?.files.report_json).toEqual(retained.files.report_json);
   expect(result.report_artifacts?.directory).toBe(retained.directory);
-  expect(result.report_artifacts?.diagnostics).toEqual(["Retained output diagnostics exceed the command bound; inspect the saved files and original records"]);
+  expect(result.report_artifacts?.diagnostics[0]).toContain("First error: " + "x".repeat(128));
+  expect(result.report_artifacts?.diagnostics[0]).toContain("selected artifact root and original records");
   expect(result.audit_session).toEqual(failed()); expect(retained.diagnostics[0].length).toBe(600000);
+});
+test("oversized session details preserve ordinary partial-output references and diagnostics", () => {
+  const session = failed(); session.diagnostics = ["x".repeat(16000)]; const retained = artifacts(false);
+  const result = auditSessionOutput(session, 2048, retained);
+  expect(result.outcome).toBe("incomplete"); expect(result.details_omitted).toBe(true);
+  expect(Buffer.byteLength(JSON.stringify(result) + "\n")).toBeLessThanOrEqual(2048);
+  expect(result.audit_session.diagnostics).toEqual(["Audit session details exceed the retained entry bound; inspect the original source and native role records"]);
+  expect(result.report_artifacts?.files.report_json).toEqual(retained.files.report_json);
+  expect(result.report_artifacts?.directory).toBe(retained.directory);
+  expect(result.diagnostics).toContainEqual({ code: "audit-output", message: "Markdown publication failed" });
+});
+test("truncated output failures retain a byte bounded first reason without claiming files exist", () => {
+  const session = failed(); session.diagnostics = ["x".repeat(16000)]; const retained = artifacts(false);
+  retained.directory = null; retained.files.report_json = null;
+  retained.diagnostics = ["Cannot create selected root: " + "界".repeat(300)];
+  const result = auditSessionOutput(session, 2048, retained), message = result.report_artifacts?.diagnostics[0];
+  expect(result.outcome).toBe("incomplete"); expect(result.details_omitted).toBe(true);
+  expect(Buffer.byteLength(JSON.stringify(result) + "\n")).toBeLessThanOrEqual(2048);
+  expect(message).toContain("Cannot create selected root: 界"); expect(message).toContain("selected artifact root and original records");
+  expect(message).not.toContain("saved files"); expect(message).not.toContain("\ufffd");
+  expect(Buffer.byteLength(message!)).toBeLessThanOrEqual(260);
 });
 test("artifact paths too large for a failure summary can be omitted only with an incomplete result", () => {
   const retained = artifacts(false); retained.files.report_json!.path = "x".repeat(6000);

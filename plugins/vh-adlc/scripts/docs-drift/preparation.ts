@@ -235,6 +235,13 @@ export function readCandidatePatch(store: OwnedObjectStore, repository: string, 
   requireOwnedStore(store, repository);
   if (store.source_commit !== candidate || ![source, candidate].every(value => /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(value)))
     throw Error("Candidate patch requires exact retained commits");
+  return readOwnedPatch(store, repository, source, candidate, paths);
+}
+
+/** Raw collection from an owned object pool. This does not establish candidate or review eligibility. */
+export function readOwnedPatch(store: OwnedObjectStore, repository: string, source: string, candidate: string, paths: string[] = []): Buffer {
+  requireOwnedStore(store, repository);
+  if (![source, candidate].every(value => /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(value))) throw Error("Exact owned patch commits required");
   const emptyTree = writeMetadataObject(store.root, "tree", Buffer.alloc(0));
   return readGit(store.root, "--attr-source=" + emptyTree, "-c", "core.attributesFile=/dev/null", "-c", "core.quotePath=true",
     "-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false", "-c", "diff.indentHeuristic=true", "-c", "diff.suppressBlankEmpty=false",
