@@ -42,6 +42,9 @@ func (r *runtime) quitBrowser(ctx context.Context) error {
 		return errors.New("browser-quit-display-unavailable")
 	}
 	defer func() { _ = conn.Close() }()
+	// Closing is final, so no later deadline can let a key out after cancellation.
+	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stop()
 	if err = setVNCDeadline(ctx, conn); err != nil {
 		return err
 	}
@@ -58,6 +61,9 @@ func (r *runtime) quitBrowser(ctx context.Context) error {
 	}
 	if err = setVNCDeadline(ctx, conn); err != nil {
 		return err
+	}
+	if ctx.Err() != nil {
+		return errors.New("browser-quit-canceled")
 	}
 	return sendKeys(conn, 'x')
 }
@@ -106,7 +112,11 @@ func (r *runtime) awaitMenu(ctx context.Context, before map[uint32]bool) error {
 	defer cancel()
 	for {
 		menus, err := r.clip.Menus(ctx)
-		if err != nil && ctx.Err() == nil {
+		// A reply can arrive with the cancellation or the timeout; neither may type X.
+		if ctx.Err() != nil {
+			return errors.New("browser-quit-menu-not-open")
+		}
+		if err != nil {
 			return errors.New("browser-quit-menu-unverified")
 		}
 		for window := range menus {
