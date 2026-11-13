@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-1 factual findings applied; four judgement questions (Q7-Q10) wait for the owner, then a new spec review."
+status_description: "R-1 applied and the owner answered Q7 to Q10; waits for a new spec review."
 issue: null
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
 covers:
@@ -65,13 +65,18 @@ the authority reference and every vh-adlc test, this feature changes nothing but
 until #78 merges; implementation starts after that. A handoff asks the #78 session to record
 Stackweaver's investigate labeling as moving here instead of superseded.
 
-Every check named here is planned; nothing has run yet. The first independent review (R-1) found
-three blocking and five should-fix issues. The four factual ones are fixed. The other four are open
-questions for you: how tightly apply binds its approval, how `label_map` avoids unsafe mappings,
-whether triage-created issues get labels, and which state label each investigate verdict gives.
-Accepting this
-document authorizes building it on a feature branch. Running the
-helper's apply against any real repository still needs your approval of that exact plan.
+The first independent review (R-1) found three blocking and five should-fix issues. The four factual
+ones are fixed. You settled the other four at their recommendations. Apply refuses unless the host,
+repository, account, effective label names and exact payloads all still match what you approved. The
+settings reader refuses a `label_map` in which two standard labels would share one GitHub label.
+Triage's neutral request issues stay unlabeled. Investigate's act now gives `ready`; track gives
+`blocked` when a prerequisite is named and `needs-decision` otherwise; a rejected case filed on
+request gets a type label only.
+
+Every check named here is planned; nothing has run yet. A new independent review must clear R-1's
+blocking findings before you can accept. Accepting this document authorizes building it on a feature
+branch after #78 merges. Running the helper's apply against any real repository still needs your
+approval of that exact plan.
 
 ### Background
 
@@ -113,7 +118,10 @@ helper's apply against any real repository still needs your approval of that exa
 - That parity map, on Stackweaver's `feat/vh-adlc-development-loop` at `bedc6b5d`, puts the labeling
   rule in row `investigate-files-issue` together with routine issue filing, and marks the whole row
   superseded by the rule that investigate files an issue only on request
-  (`tests/agent-loop/parity.json`, `agents/loop-project.md:61`). The labeling half has no home.
+  (`tests/agent-loop/parity.json`, `agents/loop-project.md:61`). The labeling half has no home there.
+  In a message on 2026-11-13, the #78 session agreed to split the row after its current review and
+  give the labeling half a local Stackweaver home until this feature takes it over; that change is not
+  yet in the tree.
 - The projects helper already follows an inventory, digest and approved-apply pattern
   (`plugins/vh-adlc/references/projects.md:105-111`, `plugins/vh-adlc/scripts/projects/apply.ts`).
 - Seventeen distinct repositories under the `michielvha`, `vhco-pro` and `LowGok` owners have a local
@@ -129,9 +137,11 @@ In scope:
 - A packaged labels helper with `plan` and `apply`: plan compares a repository with the set, apply
   makes only the approved changes.
 - Labeling rules in investigate and spec for the issues they already have authority to file.
+  Triage's neutral `create-request` issues stay unlabeled (owner, Q9).
 - Triage's reference naming the standard state labels as the ones its verdicts use, with the
   controller rule unchanged.
-- A defined meaning for the unused `label_map` setting: a standard label mapped to a repository's own name.
+- A defined meaning for the unused `label_map` setting: a standard label mapped to a repository's own
+  name, with colliding maps refused by the settings reader.
 - vh-adlc's own `.vh-adlc/triage.yaml`.
 - Applying the set to `michielvha/vh-adlc` and `michielvha/stackweaver`.
 - The workflows user guide and an authority row for the helper.
@@ -187,7 +197,9 @@ investigate also applies them.
 
 `references/issues.md` renders the same table and adds who applies each kind:
 
-- One type label on every issue a vh-adlc operation files.
+- One type label on every issue investigate or spec files. Triage's neutral `create-request` issues
+  stay unlabeled, so its request boundary is unchanged; a later triage pass can label them under its
+  controller rule (owner, Q9).
 - At filing, investigate applies the state label its own verdict names (owner, Q4). Spec applies
   none; the feature document carries the state.
 - After filing, a state change is a triage verdict and follows `references/triage.md`.
@@ -200,15 +212,26 @@ A test fails when the reference table and the vocabulary file disagree.
 
 - `plan --repo <checkout>` reads the origin's labels through the GitHub CLI and writes a label plan
   that lists each standard label as `present`, `missing` or `different` (with the differing fields),
-  plus every non-standard label as `unmanaged`. The plan names the repository, the actor and a
-  SHA-256 digest of its exact bytes.
-- `apply --repo <checkout> --plan <file> --approved-digest <sha>` recomputes the digest, rereads the
-  repository's labels, and refuses if either changed. It then creates each missing label and edits
-  each different one to the standard color and description, and writes a receipt. It never deletes
-  or renames, and it never touches an `unmanaged` label.
+  plus every non-standard label as `unmanaged`. The plan records the host, the repository, the
+  authenticated actor, a hash of the vocabulary file, the effective label names after `label_map`,
+  the repository labels it read, and each write as an exact before and after payload. A SHA-256
+  digest covers its exact bytes.
+- `apply --repo <checkout> --plan <file> --approved-digest <sha>` recomputes the digest. It then
+  derives the host and repository from the checkout's origin, reads the authenticated actor, rehashes
+  the vocabulary, recomputes the effective names from the current settings and rereads the
+  repository's labels. Any difference from the plan refuses before a write (owner, Q7). Otherwise it
+  makes exactly the planned writes: it creates each missing label and edits each different one to the
+  standard color and description, and writes a receipt. It never deletes or renames, and it never
+  touches an `unmanaged` label.
 - A `label_map` entry maps a standard name to the repository's own label (owner, Q5). The plan
   checks the mapped label against the standard color and description and counts it as present;
-  operations apply the mapped name. A repository without the key uses the standard names.
+  operations apply the mapped name. A repository without the key uses the standard names. An entry
+  whose key is not a standard name has no effect, so Stackweaver's `major-upgrade: major-upgrade`
+  stays valid.
+- The triage settings reader refuses a map in which two standard labels end up with the same
+  effective name, compared case-insensitively, counting unmapped standard labels under their own
+  names. `ready: blocked` and `bug: Enhancement` both fail with a fixed reason. Any other target is
+  the owner's explicit choice (owner, Q8).
 
 `references/authority.md` gains one row: applying a label plan needs the owner's approval of that
 exact plan digest for that repository.
@@ -216,9 +239,17 @@ exact plan digest for that repository.
 ### Operations
 
 - Investigate: when the owner asks for an issue, file it with one type label and the state label its
-  verdict names (`track` to `ready`, `blocked` or `needs-decision`). Show the labels with the title
-  and body before creating it. If a needed label is missing, file nothing and name `labels plan` as
-  the fix.
+  verdict names (owner, Q10):
+
+  | Verdict | State label |
+  | --- | --- |
+  | act now | `ready` |
+  | track, with a missing prerequisite named in the findings document | `blocked` |
+  | track, waiting on an owner, product or architecture call | `needs-decision` |
+  | reject, filed only because the owner asked | none |
+
+  Show the labels with the title and body before creating it. If a needed label is missing, file
+  nothing and name `labels plan` as the fix.
 - Spec: an issue created under acceptance or request gets the type label and no state label; the
   feature document is its state.
 - Triage: the reference names the standard state labels and, through `label_map`, their repository
@@ -255,18 +286,23 @@ once would make each other's reviews stale. So:
       present, missing or different, lists the others as unmanaged, and changes nothing on GitHub.
 - [ ] AC-03: After approval of its exact digest, apply leaves the repository holding every standard
       label with the standard color and description, every other label unchanged, and no label
-      deleted or renamed; with a changed plan file, a different digest or a repository that changed
-      after planning, apply refuses before any write.
-- [ ] AC-04: An issue investigate files carries one type label and the state label its verdict names,
+      deleted or renamed. Apply refuses before any write when the plan file changed, the digest
+      differs, or the host, repository, authenticated actor, vocabulary, effective label names or
+      repository labels differ from the plan.
+- [ ] AC-04: An issue investigate files carries one type label and the state label the verdict table
+      gives (`ready` for act now, `blocked` or `needs-decision` for track, none for a requested reject),
       and the owner saw those labels before creation; when a needed label is missing, no issue exists
       and the result names the helper's plan.
 - [ ] AC-05: An issue spec files under acceptance or request carries one type label and no state
       label.
-- [ ] AC-06: Triage's reference names the standard state labels as the labels its verdicts use, and a
-      state label applied outside the controller is still denied.
+- [ ] AC-06: Triage's reference names the standard state labels as the labels its verdicts use, a
+      state label applied outside the controller is still denied, and a triage `create-request` issue
+      is created with no labels.
 - [ ] AC-07: A `label_map` entry makes the plan, triage and investigate treat the mapped repository
-      label as the standard one, the triage settings reference describes that behavior, and settings
-      files the reader accepts today still pass.
+      label as the standard one, and an entry keyed by a non-standard name changes nothing. A map in
+      which two standard labels share an effective name, case-insensitively, is refused when read.
+      Stackweaver's current settings file still reads, and the triage settings reference describes
+      these rules.
 - [ ] AC-08: This repository has a `.vh-adlc/triage.yaml` that `vh-adlc settings read` accepts and a
       triage run in report-only mode reads.
 - [ ] AC-09: `michielvha/vh-adlc` and `michielvha/stackweaver` each hold every standard label with
@@ -280,10 +316,10 @@ once would make each other's reviews stale. So:
 | --- | --- |
 | AC-01 | `tests/vh-adlc/labels/vocabulary.test.ts` parses the vocabulary file and the table in `references/issues.md` and fails on any difference or missing glossary term. |
 | AC-02 | `tests/vh-adlc/labels/plan.test.ts` runs `plan` against a fake GitHub CLI fixture (pattern of `tests/vh-adlc/projects/fake-gh.ts`) and asserts the classification and an empty write log. |
-| AC-03 | `tests/vh-adlc/labels/apply.test.ts`: approved apply on the fixture yields the standard set and an unchanged unmanaged set with no delete or rename calls; negative cases edit the plan, pass another digest and mutate the fake repository between plan and apply, each refusing with no write. |
-| AC-04, AC-05 | Lifecycle scenario fixtures in `tests/vh-adlc/lifecycle/` grade an investigate run and a spec run that file issues against the fake tracker: labels on the created issue, labels in the pre-creation summary, and the missing-label case with no issue created. |
-| AC-06 | Extend `tests/vh-adlc/triage/execution.test.ts`: a `labels` action with a standard state label outside the controller is denied; a reference test checks the state label list against the vocabulary file. |
-| AC-07 | `tests/vh-adlc/triage/settings.test.ts` and `tests/vh-adlc/settings-file.test.ts` cover the decided `label_map` behavior and keep today's accepted files passing. |
+| AC-03 | `tests/vh-adlc/labels/apply.test.ts`: approved apply on the fixture yields the standard set and an unchanged unmanaged set with no delete or rename calls. Negative cases each refuse with an empty write log: an edited plan, another digest, another origin repository, another host, another authenticated actor, an edited vocabulary file, an edited `label_map`, and a fake repository label changed between plan and apply. |
+| AC-04, AC-05 | Lifecycle scenario fixtures in `tests/vh-adlc/lifecycle/` grade investigate runs for act now, track with a named prerequisite, track waiting on a decision and a requested reject, plus a spec run, each filing against the fake tracker. Each passes only when the created issue carries exactly the expected labels and the pre-creation summary showed them; a missing-label case passes only with no issue created and the helper's plan named. |
+| AC-06 | Extend `tests/vh-adlc/triage/execution.test.ts`: a `labels` action with a standard state label outside the controller is denied, and an approved `create-request` reaches the fake tracker with an empty labels array; a reference test checks the state label list against the vocabulary file. |
+| AC-07 | `tests/vh-adlc/triage/settings.test.ts` and `tests/vh-adlc/settings-file.test.ts`: a mapped label is used by plan and by the triage and investigate label payloads; a non-standard key changes nothing; `ready: blocked` and `bug: Enhancement` are refused with the fixed reason; a copy of Stackweaver's `.vh-adlc/triage.yaml` reads. |
 | AC-08 | Run `vh-adlc settings read --stdin < .vh-adlc/triage.yaml` and a report-only `vh-adlc-triage sweep` with `--report-output` outside the checkout; record both outputs. |
 | AC-09 | Owner-approved `apply` on each repository, then `gh label list`. Before and after apply, take a complete snapshot of every open and closed issue and pull request with `gh api --paginate "repos/<owner>/<repo>/issues?state=all&per_page=100"`, keeping number and label names. Compare label sets by number: no number may lose a label. Report any page that failed and any issue updated during the window as incomplete instead of passing. Record the receipts and both snapshots. |
 | AC-10 | `tests/vh-adlc/labels/vocabulary.test.ts` checks that the user guide names the helper and that `references/authority.md` has the label-plan row. |
@@ -294,69 +330,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q7: What exactly must a label plan approval bind before apply writes anything?
-
-From R-1 F-01: as drafted, apply rechecks only the plan digest and the repository's labels, so a
-changed vocabulary or `label_map` could change the writes behind an unchanged plan.
-
-**Recommendation:** A. Bind everything that decides the writes, as the projects helper does for its
-scope.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Bind host, repository, actor, effective names and exact payloads** | Apply refuses another target, another account, or any change in vocabulary or mapping since approval | A few more fields in the plan and refusal tests |
-| **B. Digest and label recheck only** | The simpler draft design | A plugin update or settings edit between plan and apply can change what is written |
-
-**Why this is yours:** it sets how strict the approval boundary for a GitHub write is.
-
-### Q8: How should `label_map` handle unsafe mappings?
-
-From R-1 F-02: the reader accepts any map today, so `ready: blocked` would make two standard labels
-share one GitHub label with conflicting colors, and `bug: dependencies` would recolor a
-Dependabot label.
-
-**Recommendation:** A. Refuse colliding mappings in the settings reader, and treat any mapping target
-as the owner's explicit choice.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Reader refuses collisions** | One check in `settings.ts`: no two standard names may map to the same label, and no mapping may target another standard name, both compared case-insensitively. Stackweaver's identity map still passes | A map that already collides would stop triage from reading it; none is known |
-| **B. Reader unchanged, helper refuses** | Every settings file read today keeps passing | The check lives in the helper and every operation that applies labels, so it can drift |
-| **C. A protected-label list as well** | Mappings onto bot labels are refused too | One more setting to keep current with each bot's labels |
-
-**Why this is yours:** it trades strict safety against compatibility for settings that collide.
-
-### Q9: Should issues that triage creates get labels?
-
-From R-1 F-05: the draft says every issue a vh-adlc operation files gets a type label, but triage's
-`create-request` sends no labels (`plugins/vh-adlc/scripts/triage/github.ts:140-141`) and its schema
-has no label field (`scripts/triage/execute.ts:15`).
-
-**Recommendation:** A. Limit the rule to investigate and spec, and leave triage's neutral requests
-unlabeled.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Investigate and spec only** | Triage's request boundary stays unchanged; a later triage pass can label those issues under its controller rule | Owner requests filed by triage start unlabeled |
-| **B. Triage requests carry one owner-chosen type label** | Every vh-adlc issue starts with a type label | Changes a heavily guarded triage boundary and its tests |
-
-**Why this is yours:** it trades uniformity against touching the triage write boundary.
-
-### Q10: Which state label does each investigate verdict give?
-
-From R-1 F-06: investigate's verdicts are act now, track and reject (Stackweaver
-`agents/investigate.md:35-40`), and a rejected case may still be filed on request (`:71-73`). The
-draft maps only track, and to three labels without a rule.
-
-**Recommendation:** A. Act now gives `ready`. Track gives `blocked` when the document names a missing
-prerequisite, otherwise `needs-decision`. Reject filed on request gets a type label and no state.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Reject gets no state label** | Uses only the standard set; the document explains the rejection | A rejected issue looks like an untriaged one until it is closed |
-| **B. Reject gets `wontfix`** | Rejected work is visibly marked | Pulls a GitHub default the set does not own into the rule |
-
-**Why this is yours:** it defines what each label means when investigate applies it.
+None.
 
 ## Review Log
 
