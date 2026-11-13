@@ -14,6 +14,10 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
 
+// Chromium opens its app menu late on a busy host, so the quit waits this long
+// for the menu before it gives up without typing the Exit mnemonic.
+const menuWait = 5 * time.Second
+
 // Quit through the owned display so Chrome can flush its native session state.
 // An outstanding browser confirmation is left to the owner instead of killing it.
 func (r *runtime) quitBrowser(ctx context.Context) error {
@@ -26,42 +30,96 @@ func (r *runtime) quitBrowser(ctx context.Context) error {
 	if !owned {
 		return errors.New("browser-quit-display-ownership-changed")
 	}
+	if r.clip == nil {
+		return errors.New("browser-quit-menu-unverified")
+	}
+	before, err := r.clip.Menus(ctx)
+	if err != nil {
+		return errors.New("browser-quit-menu-unverified")
+	}
 	conn, err := (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "tcp", r.vncAddress)
 	if err != nil {
 		return errors.New("browser-quit-display-unavailable")
 	}
 	defer func() { _ = conn.Close() }()
-	deadline := time.Now().Add(3 * time.Second)
-	if limit, ok := ctx.Deadline(); ok && limit.Before(deadline) {
-		deadline = limit
-	}
-	if err = conn.SetDeadline(deadline); err != nil {
-		return errors.New("browser-quit-display-unavailable")
+	if err = setVNCDeadline(ctx, conn); err != nil {
+		return err
 	}
 	if err = authenticateVNC(conn, r.current.Password); err != nil {
 		return err
 	}
 	// Chrome documents Alt+F followed by X as its Windows/Linux Exit shortcut.
-	keys := []struct {
-		down bool
-		key  uint32
-	}{{true, 0xffe9}, {true, 'f'}, {false, 'f'}, {false, 0xffe9}, {true, 'x'}, {false, 'x'}}
-	for index, key := range keys {
-		if index == 4 {
-			// Let the native menu open before sending its Exit mnemonic.
-			time.Sleep(150 * time.Millisecond)
+	if err = sendKeys(conn, keyAlt, 'f'); err != nil {
+		return err
+	}
+	// An X typed before the menu opens reaches the focused page instead.
+	if err = r.awaitMenu(ctx, before); err != nil {
+		return err
+	}
+	if err = setVNCDeadline(ctx, conn); err != nil {
+		return err
+	}
+	return sendKeys(conn, 'x')
+}
+
+const keyAlt = 0xffe9
+
+// sendKeys presses the keys in order and releases them in reverse, as a chord.
+func sendKeys(conn net.Conn, keys ...uint32) error {
+	events := make([]byte, 0, 16*len(keys))
+	event := func(down bool, key uint32) {
+		var e [8]byte
+		e[0] = 4
+		if down {
+			e[1] = 1
 		}
-		var event [8]byte
-		event[0] = 4
-		if key.down {
-			event[1] = 1
-		}
-		binary.BigEndian.PutUint32(event[4:], key.key)
-		if _, err = conn.Write(event[:]); err != nil {
-			return errors.New("browser-quit-input-unavailable")
-		}
+		binary.BigEndian.PutUint32(e[4:], key)
+		events = append(events, e[:]...)
+	}
+	for _, key := range keys {
+		event(true, key)
+	}
+	for i := len(keys) - 1; i >= 0; i-- {
+		event(false, keys[i])
+	}
+	if _, err := conn.Write(events); err != nil {
+		return errors.New("browser-quit-input-unavailable")
 	}
 	return nil
+}
+
+func setVNCDeadline(ctx context.Context, conn net.Conn) error {
+	deadline := time.Now().Add(3 * time.Second)
+	if limit, ok := ctx.Deadline(); ok && limit.Before(deadline) {
+		deadline = limit
+	}
+	if err := conn.SetDeadline(deadline); err != nil {
+		return errors.New("browser-quit-display-unavailable")
+	}
+	return nil
+}
+
+// awaitMenu waits for a menu window that was not open before Alt+F. The
+// display is private to this session, so a new menu is Chromium's app menu.
+func (r *runtime) awaitMenu(ctx context.Context, before map[uint32]bool) error {
+	ctx, cancel := context.WithTimeout(ctx, menuWait)
+	defer cancel()
+	for {
+		menus, err := r.clip.Menus(ctx)
+		if err != nil && ctx.Err() == nil {
+			return errors.New("browser-quit-menu-unverified")
+		}
+		for window := range menus {
+			if !before[window] {
+				return nil
+			}
+		}
+		select {
+		case <-ctx.Done():
+			return errors.New("browser-quit-menu-not-open")
+		case <-time.After(25 * time.Millisecond):
+		}
+	}
 }
 
 // x11vnc uses the existing RFB password challenge on its private loopback listener.
