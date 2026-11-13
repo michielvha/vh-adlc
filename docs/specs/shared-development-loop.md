@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Re-entered after the R-22 acceptance; T57 and a fresh implementation review remain."
+status: complete
+status_description: "Complete at R-27: eleven criteria met; AC-02, AC-03, AC-07, AC-08, AC-12, AC-14, AC-17 and AC-18 carry owner residuals tracked in issue 85. The release and Stackweaver adoption Order steps follow."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
