@@ -458,6 +458,7 @@ that pass's blocking or should-fix findings. R-14 F-01 to F-06 are applied.
 | 2026-11-13 | R-12 | spec | `d62c9f0` | claude-opus-5-5 | procedural | One blocking finding (F-01 same-day dates cannot order picks against acceptances), six should-fix and two nits |
 | 2026-11-13 | R-13 | spec | `a581e9c` | claude-opus-5-5 | procedural | One blocking finding (F-01 a stale after-owner-change row blocks the next owner change), five should-fix and one nit |
 | 2026-11-13 | R-14 | spec | `903314a` | claude-opus-5-5 | procedural | One blocking finding (F-01 the side-branch merge never runs when a fix also changes the baseline), four should-fix and one nit |
+| 2026-11-13 | R-15 | spec | `76f0480` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix and two nits |
 
 ### R-1
 
@@ -1263,3 +1264,54 @@ SEVERITY: nit
 WHERE: Context, Owner summary (lines 37-39)
 EVIDENCE: "R-4 to R-13 were each caused by the previous pass's narrow fix, all in the stopping rule it carried." The Review Log shows that R-8, R-9, R-10 and R-11 had no blocking finding (lines 437-442), and several findings in that range are outside the stopping rule: R-12 F-05 and F-06 concern Pins and the AC-06 row, and R-12 F-07 concerns Tasks T13 and T6 for AC-10 (lines 1121-1140). The claim holds for the blocking findings in R-4 to R-7, R-12 and R-13, not for every pass in the range.
 PROPOSAL: Say that the blocking findings in R-4 to R-7, R-12 and R-13 each traced to the previous pass's fix and all sat in the stopping rule.
+
+### R-15
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Nits are listed, not applied (lines 197-204); Design, Applying a pass's findings as one revision (lines 208-213); Acceptance Criteria AC-11 (lines 353-357); Test Plan AC-11 row (line 372); Tasks T6 (line 384)
+EVIDENCE: The nit rule says "a nit on the normative baseline never causes a revision on its own", and AC-11 says the author "makes no commit that changes the normative baseline only to fix nits". The one-revision rule says the author "raises the pass's judgement findings as Open Questions first" and then applies "every answer" in one commit, and today's skill turns every judgement finding into an Open Question whatever its severity (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:71-72). Nothing says what happens to a nit whose KIND is judgement. If a clean pass holds only a judgement nit on Design, one implementer raises it as an Open Question and folds the owner's answer, which is a baseline commit made only for a nit and fails AC-11. Another lists it and raises nothing. The AC-11 row does not give the KIND of any of its three nits, so the second pass's Scope nit can be either. T6's failure reason, "today's skill applies the clean pass's factual nit on its own", only holds if that nit is factual, while the AC-06 row does say "factual nit".
+PROPOSAL: State whether a judgement nit on the baseline is raised as an Open Question or only listed, and use the same wording in the one-revision paragraph and AC-11. In the AC-11 row, give each nit's KIND so it matches T6.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (lines 48-52); Design, Nits are listed, not applied (lines 197-204); Acceptance Criteria AC-11 (lines 353-357)
+EVIDENCE: The Owner summary says "The cost: a nit on a pass with nothing else to apply stays in the document unless you pick it." The Design gives no owner-pick path for nits. AC-11 says the author "makes no commit that changes the normative baseline only to fix nits", with no exception for an owner's pick. An author that applies a nit the owner picked, as the summary promises, fails AC-11 as written. An author that refuses the pick meets AC-11 but contradicts the summary. Picking a listed finding was the R-10 and R-12 mechanism that moved to spec-review-stopping-rule.md, so this document no longer defines it.
+PROPOSAL: Either add to Design and AC-11 that a nit the owner picks is applied as an owner-directed revision, or drop "unless you pick it" from the Owner summary and say the nit stays until a later revision touches it.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-11 row (line 372); Acceptance Criteria AC-11 (lines 356-357); Design, Nits are listed, not applied (lines 197-203)
+EVIDENCE: The row passes only "when the first pass's blocking finding and both its nits are applied in one commit", and one of those nits is on Context. AC-11 says the author "may apply a finding confined to sections outside the normative baseline", and Design says such a finding "may be applied at any time". The Design sentence "the same commit fixes that pass's nits" sits inside the rule about baseline nits, so it can be read as covering only baseline nits. Under that reading, an author that leaves the Context nit unapplied follows AC-11 and still fails the proof. Under the other reading, fixing the Context nit is required, and AC-11's "may" is wrong. By this document's own severity definitions, a proof that fails a correct implementation is a defect.
+PROPOSAL: Decide whether a pass's non-baseline nits must go in the same commit as its baseline fixes. Then either make the row accept the Context nit as applied or unapplied, or change AC-11 and Design to require it.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Free-text checks (lines 273-278); Design, Nits are listed, not applied (lines 197-200); Acceptance Criteria AC-05 and AC-11; Test Plan AC-05 row
+EVIDENCE: This traces to the previous revision's change, the R-14 F-05 answer that a pass's nits are fixed in the same commit that applies its blocking or should-fix findings to the baseline. Under the free-text rule, a widening finding on a row that has passed review is a nit "so it is listed rather than applied", and "a later change to the row starts over". Under the new nit rule, whenever the same pass also has a blocking or should-fix finding on the baseline, the widening nit must be fixed in that commit. That changes the row, the row loses its passed state, and the next pass may rate a further widening should-fix again. This is the regex-tuning loop of blog-visual-reading R-40, R-44 and R-45 that Background cites (docs/specs/blog-visual-reading.md:1411, :1524, :1547 at 3963e25). The two rules now contradict each other ("listed rather than applied" against "the same commit fixes that pass's nits"), and the AC-05 trial does not cover a pass with both kinds of finding.
+PROPOSAL: State which rule wins for a free-text widening nit on a pass that also changes the baseline: either it is always listed and never applied, or applying it alongside does not restart the row. Add that case to the AC-05 trial.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-10 (lines 349-352); Test Plan AC-10 row (line 371); Design, Commits a Review Log names are never rewritten (lines 228-232); Context, Owner summary (lines 62-63)
+EVIDENCE: This traces to the previous revision's change for R-14 F-01, which narrowed the Test Plan row to "stale from drift alone" but left AC-10 broad. AC-10 still says "when the default branch moves during a review loop on a feature branch, the author brings it in by merge". The only merge instruction is review mode step 1, which runs only "When `vh-adlc fresh` shows the spec review stale from drift alone (covered changes on the default branch, an unchanged baseline)" (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:55-57 at 76f0480). T13 no longer changes the skill. When the default branch moves after a pass whose fixes also change the baseline, `fresh` reports `baseline-changed` as well as drift, step 1 does not run, and nothing brings the default branch in. The AC-10 scenario only tests drift alone, so it passes while AC-10's broader end state is not delivered. The Owner summary's unconditional "default-branch work comes in by merge" repeats the broad form.
+PROPOSAL: Narrow AC-10 and the Owner summary to "when the author brings default-branch work in, it uses a merge", or to the drift-alone case step 1 covers. Alternatively, widen step 1 in T13 and add a mixed-staleness case to the row.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Delivery (lines 293-299); Tasks T10; Acceptance Criteria AC-08
+EVIDENCE: docs/user-guides/workflows.md:279 says "Merging, tagging, releasing, deploying, and destructive operations need separate approval" and points to authority.md for the full contracts. After T13, a history rewrite of a commit a Review Log row names cannot be approved at all. T10 and AC-08 update the guides only for the severities, the nit rule and the one-revision rule, so the user guide would not mention the one destructive Git operation that approval cannot unlock.
+PROPOSAL: Add a sentence to T10 and the AC-08 guide check saying that no approval allows rewriting a commit a Review Log row names.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Delivery (lines 301-304); Context, Background, Overlapping work (lines 141-146)
+EVIDENCE: Delivery says shared-development-loop "edits the same spec skill, protocol, `references/authority.md`, pin and manifests", and the second feature to land merges the first in "for every one of those files". Background, and that feature's covers (docs/specs/shared-development-loop.md:7-29 at b777df0 and 4bef34e), show it also covers the reviewer agent and `knowledge.md`, and covers `tests/vh-adlc/` at b777df0. This feature changes all three (T4, T3, T6, T9, T15). A git merge brings in the whole branch, so the list changes nothing in practice. It just disagrees with Background.
+PROPOSAL: Add the reviewer agent, `knowledge.md` and `tests/vh-adlc/scenarios/run.ts` to the Delivery list, or say "every file both features change".
