@@ -229,3 +229,28 @@ printf '%s\\n' '{"type":"turn.completed"}'
     pending(await attested(root, commit, codex(`MODEL: claude-opus-5-5\nTARGET: ${commit}\n\nNO FINDINGS`, "gpt-6.1-sol", home), home), "model");
   });
 });
+
+describe("preservation hardening", () => {
+  test("a same-size replacement inside an ignored directory that keeps its modification time leaves the review pending", async () => {
+    const { root, commit } = repository();
+    writeFileSync(join(root, ".git/info/exclude"), "cache/\n");
+    mkdirSync(join(root, "cache"));
+    writeFileSync(join(root, "cache/data.bin"), "AAAA\n");
+    const body = "cp -p cache/data.bin /tmp/vh-mtime-ref-$$; printf 'BBBB\\n' > cache/data.bin; touch -r /tmp/vh-mtime-ref-$$ cache/data.bin; rm -f /tmp/vh-mtime-ref-$$";
+    pending(await review(root, commit, stub(body, ok(commit))), "changed");
+  });
+
+  test("a reviewer that detaches HEAD at the same commit leaves the review pending", async () => {
+    const { root, commit } = repository();
+    pending(await review(root, commit, stub("git switch -q --detach HEAD", ok(commit))), "changed");
+  });
+
+  test("a chained committed symlink that escapes the export leaves the review pending", async () => {
+    const { root, commit } = repository(dir => {
+      mkdirSync(join(dir, "d"));
+      symlinkSync("..", join(dir, "d", "back"));
+      symlinkSync("d/back/../outside.txt", join(dir, "leak"));
+    });
+    pending(await review(root, commit, stub("", ok(commit)), { kind: "spec" }), "symlink");
+  });
+});

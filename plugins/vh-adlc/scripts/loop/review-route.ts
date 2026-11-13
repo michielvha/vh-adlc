@@ -37,7 +37,7 @@ function underScratch(path: string, scratch: string[]) {
   return scratch.some(dir => path === dir || path.startsWith(`${dir.replace(/\/+$/, "")}/`));
 }
 
-/** A manifest of a directory tree by path, size and modification time, for ignored directories. */
+/** A manifest of an ignored directory tree: each file's path and content hash. */
 function treeManifest(root: string, dir: string, scratch: string[]): string[] {
   const out: string[] = [];
   const walk = (path: string) => {
@@ -46,7 +46,7 @@ function treeManifest(root: string, dir: string, scratch: string[]): string[] {
       if (underScratch(child, scratch)) continue;
       const info = lstatSync(join(root, child));
       if (info.isDirectory()) walk(child);
-      else out.push(`${child}\t${info.size}\t${info.mtimeNs ?? info.mtimeMs}`);
+      else out.push(`${child}\t${fileDigest(root, child)}`);
     }
   };
   walk(dir.replace(/\/+$/, ""));
