@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Being written; open questions wait for the owner before the first spec review."
+status_description: "Owner answered all six questions; waits for the first independent spec review."
 issue: null
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
 covers:
@@ -52,9 +52,13 @@ a verdict and needs proof from the confined controller.
 vh-adlc gets its own `.vh-adlc/triage.yaml`, and the helper is run on vh-adlc and Stackweaver as the
 first two repositories. Other adopters follow later, on your request per repository.
 
-Every check named here is planned; nothing has run yet. No spec review has happened. Six open
-questions need your answers first, including where the set lives, how it reaches repositories and how
-this fits around #78. Accepting this document authorizes building it on a feature branch. Running the
+You settled six questions on 2026-11-13, each at its recommendation. The set lives in the plugin.
+Repositories get it through the helper. It holds the nine labels above. Investigate may set a state
+label at filing. `label_map` maps a standard name to a repository's own name, so existing settings
+keep working. The feature stays separate from #78, and its investigate change lands after #78 merges.
+
+Every check named here is planned; nothing has run yet. No spec review has happened. Accepting this
+document authorizes building it on a feature branch. Running the
 helper's apply against any real repository still needs your approval of that exact plan.
 
 ### Background
@@ -93,9 +97,9 @@ helper's apply against any real repository still needs your approval of that exa
   document does not mention issue labels (`grep -n -i label` finds no issue-label rule).
 - The projects helper already follows an inventory, digest and approved-apply pattern
   (`plugins/vh-adlc/references/projects.md:105-111`, `plugins/vh-adlc/scripts/projects/apply.ts`).
-- Seventeen distinct repositories have a local checkout that pins the vhco-pro/docs conventions or carries `.vh-adlc/` settings, across
-  `michielvha`, `vhco-pro` and `LowGok` repositories (a scan of `/home/m/code/*/AGENTS.md` and
-  `.vh-adlc/`, 2026-11-13).
+- Seventeen distinct repositories under the `michielvha`, `vhco-pro` and `LowGok` owners have a local
+  checkout that pins the vhco-pro/docs conventions or carries `.vh-adlc/` settings (a scan of
+  `/home/m/code/*/AGENTS.md` and `.vh-adlc/`, 2026-11-13).
 
 ## Scope
 
@@ -108,7 +112,7 @@ In scope:
 - Labeling rules in investigate and spec for the issues they already have authority to file.
 - Triage's reference naming the standard state labels as the ones its verdicts use, with the
   controller rule unchanged.
-- A defined meaning for `label_map`, or its removal, per Q5.
+- A defined meaning for the unused `label_map` setting: a standard label mapped to a repository's own name.
 - vh-adlc's own `.vh-adlc/triage.yaml`.
 - Applying the set to `michielvha/vh-adlc` and `michielvha/stackweaver`.
 - The workflows user guide and an authority row for the helper.
@@ -138,8 +142,9 @@ Out of scope:
 
 ### The standard label set
 
-One file, `plugins/vh-adlc/scripts/labels/vocabulary.json`, holds the set. Proposed contents,
-pending Q3:
+One file, `plugins/vh-adlc/scripts/labels/vocabulary.json`, holds the set. It lives in the plugin so
+the helper and the operations read the same versioned data (owner, Q1). It holds these nine labels
+(owner, Q3); `accessibility` and `release:preview` stay repository-local:
 
 | Name | Kind | Color | Description |
 | --- | --- | --- | --- |
@@ -161,14 +166,15 @@ comment" because investigate also applies them.
 `references/issues.md` renders the same table and adds who applies each kind:
 
 - One type label on every issue a vh-adlc operation files.
-- At filing, investigate and spec apply the state label their own verdict names, per Q4.
+- At filing, investigate applies the state label its own verdict names (owner, Q4). Spec applies
+  none; the feature document carries the state.
 - After filing, a state change is a triage verdict and follows `references/triage.md`.
 
 A test fails when the reference table and the vocabulary file disagree.
 
 ### The labels helper
 
-`plugins/vh-adlc/scripts/labels/cli.ts` mirrors the projects helper:
+`plugins/vh-adlc/scripts/labels/cli.ts` mirrors the projects helper (owner, Q2):
 
 - `plan --repo <checkout>` reads the origin's labels through the GitHub CLI and writes a label plan
   that lists each standard label as `present`, `missing` or `different` (with the differing fields),
@@ -178,7 +184,9 @@ A test fails when the reference table and the vocabulary file disagree.
   repository's labels, and refuses if either changed. It then creates each missing label and edits
   each different one to the standard color and description, and writes a receipt. It never deletes
   or renames, and it never touches an `unmanaged` label.
-- A `label_map` entry, if Q5 keeps it, makes the mapped repository label count as the standard one.
+- A `label_map` entry maps a standard name to the repository's own label (owner, Q5). The plan
+  checks the mapped label against the standard color and description and counts it as present;
+  operations apply the mapped name. A repository without the key uses the standard names.
 
 `references/authority.md` gains one row: applying a label plan needs the owner's approval of that
 exact plan digest for that repository.
@@ -203,7 +211,8 @@ exact plan digest for that repository.
 
 ### Order against shared-development-loop
 
-Per Q6, tasks that edit `skills/vh-adlc-investigate/` wait until #78 merges, and this document reports
+This stays a separate feature (owner, Q6). Tasks that edit `skills/vh-adlc-investigate/` wait until
+#78 merges, and this document reports
 the label rule to that feature's owner as the home for its parity row. Everything else can land
 first.
 
@@ -226,8 +235,9 @@ first.
       label.
 - [ ] AC-06: Triage's reference names the standard state labels as the labels its verdicts use, and a
       state label applied outside the controller is still denied.
-- [ ] AC-07: `label_map` behaves as Q5 decides and the triage settings reference describes that
-      behavior; existing settings files that pass the reader today still pass.
+- [ ] AC-07: A `label_map` entry makes the plan, triage and investigate treat the mapped repository
+      label as the standard one, the triage settings reference describes that behavior, and settings
+      files the reader accepts today still pass.
 - [ ] AC-08: This repository has a `.vh-adlc/triage.yaml` that `vh-adlc settings read` accepts and a
       triage run in report-only mode reads.
 - [ ] AC-09: `michielvha/vh-adlc` and `michielvha/stackweaver` each hold every standard label with
@@ -255,79 +265,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q1: Where should the standard label set live?
-
-**Recommendation:** A. In the vh-adlc plugin, because the helper and the operations read it and it
-ships with the plugin version.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. vh-adlc plugin** | One versioned file the helper and operations read; adopters get it with the plugin | The vhco-pro/docs onboarding guide only links to it |
-| **B. vhco-pro/docs convention** | The rule sits beside "Findings and issues" for every repository, plugin or not | The helper must fetch a pinned page to read machine data, and two repositories change together |
-
-**Why this is yours:** it decides whether issue labels are a plugin behavior or a personal convention.
-
-### Q2: How should repositories get the labels?
-
-**Recommendation:** A. A packaged helper with plan and digest-approved apply, the same shape as the
-projects helper.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Labels helper** | One command per repository, a reviewable plan, no deletes, repeatable drift checks | A new script and tests to maintain |
-| **B. Triage `create-label` batches** | No new helper | Descriptions get the "unverified definition" prefix, and it needs a triage run per repository |
-| **C. Documented `gh label create` commands** | Nothing to build | Drift returns silently; nothing checks it |
-
-**Why this is yours:** it trades build effort against how well the set stays consistent.
-
-### Q3: Which labels belong in the standard set?
-
-**Recommendation:** A. The five type and four state labels in the Design table, leaving
-`accessibility` and `release:preview` repository-local.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Nine labels** | The set Stackweaver already uses, with descriptions for `refactor` and `security` | `accessibility` stays only in vh-adlc, where no issue uses it |
-| **B. Nine plus `accessibility`** | Accessibility barriers flagged the same way everywhere | A label most repositories will rarely use |
-| **C. Nine plus `release:preview`** | The delivery convention's preview label everywhere | It only means something in repositories that use tag-driven preview releases |
-
-**Why this is yours:** it sets the vocabulary every repository will carry.
-
-### Q4: May investigate apply a state label when it files an issue?
-
-**Recommendation:** A. Yes, from its own verdict, shown to you before creation, as Stackweaver does
-today.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Type and state at filing** | New issues arrive already marked `ready`, `blocked` or `needs-decision`, keeping Stackweaver's habit | The state rests on investigate's document, not triage's controller proof |
-| **B. Type label only** | Every state label passes through triage's controller | New issues stay without state until a triage run |
-
-**Why this is yours:** it decides how much proof a state label needs when the issue is new.
-
-### Q5: What should happen to the unused `label_map` setting?
-
-**Recommendation:** A. Give it a meaning: it maps a standard label to a repository's own name for it.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Map standard names to local ones** | Existing files keep passing; a repository can keep a legacy name on purpose | A way to differ from "the same labels everywhere" |
-| **B. Remove it** | One less setting; every repository uses the standard names | Stackweaver's settings file and two tests fail until the key is deleted |
-| **C. Leave it unused** | No change | A documented setting that does nothing |
-
-**Why this is yours:** it trades compatibility against strict uniformity.
-
-### Q6: How should this feature fit around shared-development-loop (#78)?
-
-**Recommendation:** A. A separate feature; its investigate tasks land after #78 merges, and #78's owner
-points its parity row here.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Separate, sequenced** | #78 keeps its accepted scope; the helper and triage parts land first | Investigate labeling waits for #78 |
-| **B. Fold into #78** | One change ports investigate with labels included | #78 goes back to draft and needs a new review and acceptance |
-
-**Why this is yours:** it affects another in-progress feature's scope and schedule.
+None.
 
 ## Review Log
 
