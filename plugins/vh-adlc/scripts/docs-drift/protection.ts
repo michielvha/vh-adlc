@@ -1,3 +1,4 @@
+import { sourceProtection } from "./protection-source";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readDocumentMetadata, resolveRoots } from "../docs-impact/collection";
@@ -131,6 +132,16 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
   if (roots.head !== snapshot.source_commit || !["declared", "absent"].includes(roots.outcome) || roots.diagnostics.length > 0) {
     for (const diagnostic of roots.diagnostics) gap(diagnostic.code, diagnostic.path, diagnostic.message);
     if (result.diagnostics.length === 0) gap("assessment-source", undefined, "Protection requires the exact committed assessment and complete root classification.");
+    return result;
+  }
+  try {
+    const committed = sourceProtection(snapshot, readers.yaml);
+    context = { ...context,
+      local_ranges: [...(committed.local_ranges ?? []), ...(context.local_ranges ?? [])],
+      other_writers: [...(committed.other_writers ?? []), ...(context.other_writers ?? [])],
+      document_kinds: [...(committed.document_kinds ?? []), ...(context.document_kinds ?? [])] };
+  } catch (error) {
+    gap("project-protection", snapshot.settings.project_procedure, error instanceof Error ? error.message : "Project protection unavailable");
     return result;
   }
   if (roots.policy.local_format && context.local_coverage === undefined) {
