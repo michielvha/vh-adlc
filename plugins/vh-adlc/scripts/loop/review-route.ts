@@ -70,7 +70,7 @@ function fileDigest(root: string, path: string): string {
  * flags, status, the ignored-file list and the contents of modified, untracked, ignored and
  * flag-hidden tracked files. Scratch directories are left out.
  */
-export function snapshot(root: string, scratch: string[]): Record<string, string> {
+export function snapshot(root: string, scratch: string[], scope: "full" | "owning" = "full"): Record<string, string> {
   const keep = (path: string) => !underScratch(path, scratch);
   const entries = statusEntries(root, ["--untracked-files=all", "--ignored=no"]).filter(entry => keep(entry.path));
   const status = entries.map(entry => `${entry.xy}\0${entry.path}\0${entry.from ?? ""}`);
@@ -88,7 +88,9 @@ export function snapshot(root: string, scratch: string[]): Record<string, string
   return {
     head: git(root, ["rev-parse", "HEAD"]).toString().trim(),
     head_ref: symbolic.exitCode === 0 ? symbolic.stdout.toString().trim() : "detached",
-    refs: digest(git(root, ["for-each-ref", "--format=%(refname) %(objectname)"])),
+    // In the owning worktree only HEAD and its own branch count: other sessions move the shared refs.
+    refs: scope === "full" ? digest(git(root, ["for-each-ref", "--format=%(refname) %(objectname)"]))
+      : digest(symbolic.exitCode === 0 ? `${symbolic.stdout.toString().trim()} ${git(root, ["rev-parse", symbolic.stdout.toString().trim()]).toString().trim()}` : "detached"),
     index: digest(index.join("\n")),
     status: digest(status.join("\n")),
     ignored: digest(ignored.join("\n")),
@@ -194,22 +196,28 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
   const repo = realpathSync(request.repo), scratch = (request.scratch ?? []).map(dir => dir.replace(/\/+$/, ""));
   const commit = git(repo, ["rev-parse", "--verify", `${request.commit}^{commit}`]).toString().trim();
   const work = realpathSync(mkdtempSync(join(tmpdir(), "vh-adlc-review-run-")));
-  let exportDir: string | undefined;
+  let exportDir: string | undefined, cloneDir: string | undefined;
   try {
     if (request.kind === "spec") {
       try { exportDir = exportCommit(repo, commit); } catch (error) { return { status: "pending", reason: (error as Error).message }; }
+    } else {
+      // An implementation review runs in a private clone of the reviewed commit, with refs of its own.
+      cloneDir = join(work, "clone");
+      const clone = Bun.spawnSync(["git", "clone", "-q", "--no-hardlinks", repo, cloneDir], { stdout: "pipe", stderr: "pipe" });
+      const checkout = clone.exitCode === 0 ? Bun.spawnSync(["git", "-C", cloneDir, "checkout", "-q", "--detach", commit], { stdout: "pipe", stderr: "pipe" }) : clone;
+      if (checkout.exitCode !== 0) return { status: "pending", reason: "the private review clone could not be prepared" };
     }
     const promptFile = join(work, "prompt.md");
     writeFileSync(promptFile, request.prompt);
     chmodSync(promptFile, 0o400);
     const argv = substitute(request.route.argv, { model: request.route.model, prompt: request.prompt, prompt_file: promptFile, export_dir: exportDir ?? "" });
-    const before = snapshot(repo, scratch);
+    const before = snapshot(repo, scratch, "owning"), cloneBefore = cloneDir ? snapshot(cloneDir, scratch, "full") : undefined;
     const stdout = join(work, "stdout"), stderr = join(work, "stderr");
     mkdirSync(dirname(stdout), { recursive: true });
     const env = Object.fromEntries(Object.entries({ ...process.env, ...request.env }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
     let result;
     try {
-      result = await runOwnedClient(argv, { cwd: exportDir ?? repo, env, stdout, stderr, pidNamespace: request.boundary !== "unavailable" },
+      result = await runOwnedClient(argv, { cwd: exportDir ?? cloneDir ?? repo, env, stdout, stderr, pidNamespace: request.boundary !== "unavailable" },
         { timeout_ms: request.timeoutMs ?? 15 * 60_000, grace_ms: 500, reap_ms: 2_000 });
     } catch (error) { return { status: "pending", reason: `the reviewer command could not start: ${(error as Error).message}` }; }
     const cleanup = request.cleanup ? await request.cleanup(result) : result;
@@ -218,8 +226,9 @@ export async function runReviewRoute(request: ReviewRequest): Promise<ReviewOutc
     const reply = attestation ? attestation.reply : raw;
     if (result.boundary !== "pid-namespace") return { status: "pending", reason: "no process boundary on this host could confirm that every reviewer process stopped (a PID namespace through unshare is required)", reply: readFileSync(stdout, "utf8") };
     if (!cleanup.confirmed) return { status: "pending", reason: `process cleanup could not confirm every reviewer process stopped (${cleanup.survivors.join(", ") || "group"})`, reply };
-    const after = snapshot(repo, scratch);
-    const changed = Object.keys(before).filter(key => before[key] !== after[key]);
+    const after = snapshot(repo, scratch, "owning"), cloneAfter = cloneDir ? snapshot(cloneDir, scratch, "full") : undefined;
+    const changed = [...Object.keys(before).filter(key => before[key] !== after[key]),
+      ...(cloneBefore && cloneAfter ? Object.keys(cloneBefore).filter(key => cloneBefore[key] !== cloneAfter[key]).map(key => `private clone ${key}`) : [])];
     if (changed.length) return { status: "pending", reason: `the reviewer changed the owning worktree: ${changed.join(", ")}`, reply };
     if (result.timed_out) return { status: "pending", reason: "the reviewer command timed out", reply };
     if (result.exit_code !== 0) return { status: "pending", reason: `the reviewer command failed with exit ${result.exit_code}`, reply, exit_code: result.exit_code };

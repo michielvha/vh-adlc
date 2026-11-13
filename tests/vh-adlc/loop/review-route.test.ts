@@ -236,13 +236,14 @@ describe("preservation hardening", () => {
     writeFileSync(join(root, ".git/info/exclude"), "cache/\n");
     mkdirSync(join(root, "cache"));
     writeFileSync(join(root, "cache/data.bin"), "AAAA\n");
-    const body = "cp -p cache/data.bin /tmp/vh-mtime-ref-$$; printf 'BBBB\\n' > cache/data.bin; touch -r /tmp/vh-mtime-ref-$$ cache/data.bin; rm -f /tmp/vh-mtime-ref-$$";
+    // Since the private review clone (T49) the reviewer works in a fresh clone, so it reaches the owning worktree by path.
+    const body = `cd "${root}" && cp -p cache/data.bin /tmp/vh-mtime-ref-$$ && printf 'BBBB\\n' > cache/data.bin && touch -r /tmp/vh-mtime-ref-$$ cache/data.bin; rm -f /tmp/vh-mtime-ref-$$`;
     pending(await review(root, commit, stub(body, ok(commit))), "changed");
   });
 
   test("a reviewer that detaches HEAD at the same commit leaves the review pending", async () => {
     const { root, commit } = repository();
-    pending(await review(root, commit, stub("git switch -q --detach HEAD", ok(commit))), "changed");
+    pending(await review(root, commit, stub(`git -C "${root}" switch -q --detach HEAD`, ok(commit))), "changed");
   });
 
   test("a chained committed symlink that escapes the export leaves the review pending", async () => {
