@@ -1,17 +1,18 @@
 import { realpathSync } from "node:fs";
+import { join } from "node:path";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { readBoundArtifact } from "./evidence-input";
 import { exactRecord } from "./publication-decisions";
 import { evaluateProtection, type ProtectionContext } from "./protection";
-import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON } from "./protocol";
+import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
 import { escapeReportText } from "./report";
 import { matchesSourceQuote, parseSourceQuote } from "./resolve";
 import type { Finding, ScanRun } from "./scan";
-import { captureBareSnapshot, captureRepositoryState, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureBareSnapshot, captureRepositoryState, matchesRepositoryState } from "./snapshot";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
 
 type Options = Omit<Parameters<typeof readSourceAssessmentArtifacts>[0], "reference" | "candidate_repo"> & {
-  source_verification: unknown; assessment: unknown; protection_context?: ProtectionContext;
+  source_verification: unknown; assessment: unknown; candidate_repo?: string; protection_context?: ProtectionContext;
 };
 type Verdict = "confirmed-drift" | "still-accurate" | "unknown";
 type Reference = { path: string; sha256: string };
@@ -39,6 +40,8 @@ export function readAssessmentReport(input: Options): AssessmentReport {
   const options = { ...input, source_verification: structuredClone(input.source_verification), assessment: structuredClone(input.assessment),
     protection_context: structuredClone(input.protection_context) };
   const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const candidateRepo = options.candidate_repo ? realpathSync(options.candidate_repo) : repo;
+  const candidateBefore = candidateRepo === repo ? before : canonicalDigest(captureRepositoryState(candidateRepo));
   const result: AssessmentReport = { schema_version: 1, kind: "docs-drift-assessment-report", authority: "none", origin: "caller-assessment",
     complete: false, collection_complete: false, source_commit: options.source, diagnostics: [], source_verification: null,
     assessment_reference: null, details_omitted: false, diagnostics_omitted: 0, findings: [], suppressed_findings: [], stale_suppressions: [],
@@ -47,7 +50,8 @@ export function readAssessmentReport(input: Options): AssessmentReport {
   let scan: ScanRun | null = null;
   let entryLimit = OUTPUT_LIMIT;
   try {
-    const source = readSourceAssessmentArtifacts({ ...options, candidate_repo: repo, reference: options.source_verification });
+    const secondary = artifactDirectoryScope(options.artifact_root, candidateRepo);
+    const source = readSourceAssessmentArtifacts({ ...options, candidate_repo: candidateRepo, reference: options.source_verification });
     if (!source.complete || !source.scan?.complete || !source.evidence || !source.object_store) throw Error("Complete original source assessment required");
     scan = source.scan;
     result.source_verification = source.evidence;
@@ -64,7 +68,9 @@ export function readAssessmentReport(input: Options): AssessmentReport {
       result.diagnostics.push(...protection.diagnostics.map(diagnostic => diagnostic.message));
       throw Error("Finding report requires complete root and feature classification");
     }
-    const bytes = readBoundArtifact({ source_repo: repo, artifact_root: options.artifact_root, reference: options.assessment });
+    const reference = options.assessment as { path?: unknown } | null;
+    secondary.assertExternal(join(secondary.directory, protocolPath(reference?.path)));
+    const bytes = readBoundArtifact({ source_repo: repo, artifact_root: secondary.directory, reference: options.assessment });
     // The shared artifact reader has validated this exact reference and its bytes.
     result.assessment_reference = options.assessment as Reference;
     if (bytes.length > snapshot.settings.reports.max_entry_bytes) throw Error("Finding assessment exceeds the retained entry bound");
@@ -91,6 +97,9 @@ export function readAssessmentReport(input: Options): AssessmentReport {
     result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Finding assessment unavailable"); }
   if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during report collection"); }
+  if (candidateRepo !== repo && !matchesRepositoryState(candidateRepo, candidateBefore)) {
+    result.complete = false; result.diagnostics.push("Candidate changed or became unavailable during report collection");
+  }
   result.counts = {
     documents: scan?.documents.length ?? null, detectors: scan?.detectors.length ?? null, candidates: scan?.findings.length ?? null,
     suppressed: scan?.suppressed_findings.length ?? null, stale_suppressions: scan?.stale_suppressions.length ?? null,
@@ -140,13 +149,15 @@ function sentence(value: string): string {
   return /[.!?…]$/u.test(value.trim()) ? escaped : escaped + ".";
 }
 
-export function renderAssessmentReport(report: AssessmentReport): string {
+/** Render recorded data; a presentation introduction never supplies verification or effect authority. */
+export function renderAssessmentReport(report: AssessmentReport,
+  introduction: readonly string[] = ["Caller-recorded verdicts and recommendations remain provisional pending independent review"]): string {
   const verdictNames = { "confirmed-drift": "Confirmed drift", "still-accurate": "Still accurate", unknown: "Unknown" };
   const summary = report.counts.candidates === null ? "Candidate counts unavailable."
     : `${report.counts.candidates} candidate(s). ${report.counts.confirmed_drift} confirmed drift, ${report.counts.still_accurate} still accurate, ${report.counts.unknown} unknown, ${report.counts.unassessed} unassessed.`;
   const sourceLabel = report.source_verification === null ? "Selected source" : "Assessed source";
   const lines = ["# Documentation drift report", "", summary,
-    "", "Caller-recorded verdicts and recommendations remain provisional pending independent review.",
+    "", ...introduction.map(sentence),
     `Recorded assessments ${report.counts.assessed ?? "unavailable"}. Unassessed candidates ${report.counts.unassessed ?? "unavailable"}.`,
     `Suppressed candidates ${report.counts.suppressed ?? "unavailable"}. Stale suppressions ${report.counts.stale_suppressions ?? "unavailable"}.`,
     `${sourceLabel} ${escapeReportText(report.source_commit)}.`, "", "## Proposed fixes and decisions", ""];

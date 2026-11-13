@@ -443,6 +443,7 @@ test.each(["legacy", "scan-only"])("worker input rechecks reuse their original a
 }), 60000);
 
 async function originalCandidateCase(scenario: string) {
+  const startedAt = performance.now();
   const { collectReviewTarget } = await import("../../../plugins/vh-adlc/scripts/docs-drift/review-target");
   const { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
   const { roleRuntimeDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-capture");
@@ -467,6 +468,9 @@ async function originalCandidateCase(scenario: string) {
   } });
   const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
   const invokeReview = async (command: string, extra: string[] = []) => {
+    const preparationBudget = scenario === "cli" ? 60000 : 120000;
+    // Refuse before launch if setup consumed the child's separately reserved budget.
+    expect(performance.now() - startedAt, "Fixture and in-process target exceeded their preparation budget").toBeLessThan(preparationBudget);
     if (!captured) throw Error("missing review-target author fixture");
     const reference = captured as { path: string; sha256: string }, selection = canonicalJSON(f.selection), options = f.options;
     writeFileSync(join(f.artifacts, "review-selection.json"), selection, { mode: 0o600 });
@@ -566,8 +570,9 @@ async function originalCandidateCase(scenario: string) {
 }
 
 test.each(["matching", "changed-selection", "missing-proposal", "foreign-branch", "reviewer", "coordinated-reviewer", "stale-reviewer", "same-reviewer-context", "findings-reviewer", "publication-check", "missing-publication-authority", "retained-execution"])("candidate review target retains the original author %s", preserveFailure(originalCandidateCase), 125000);
-// Allow sixty seconds for fixture setup, 120 for the compound review CLI and five for cleanup.
-test.each(["cli", "reviewer-cli", "publication-check-cli"])("candidate review target retains the original author %s", preserveFailure(originalCandidateCase), 185000);
+// Reserve fixture60 + child120 + cleanup5; the other entries also need an in-process target60.
+test("candidate review target retains the original author cli", preserveFailure(() => originalCandidateCase("cli")), 185000);
+test.each(["reviewer-cli", "publication-check-cli"])("candidate review target retains the original author %s", preserveFailure(originalCandidateCase), 245000);
 
 test("normal binding rechecks preserve the reviewed input after its exact own PR creation", preserveFailure(async () => {
   const f = await fixture(false, { mutableInventory: true });

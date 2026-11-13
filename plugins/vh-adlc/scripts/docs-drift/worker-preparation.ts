@@ -1,15 +1,17 @@
 import { readCoordinatedSelection } from "./coordination";
 import { PublicationScopeChanged } from "./publish";
-import { parseWorkerPublication } from "./publication-proposal";
+import { parseWorkerHandoff } from "./worker-handoff";
+import { readAssessmentReport } from "./assessment-report";
+import { join } from "node:path";
 import { realpathSync } from "node:fs";
 import { collectWorkerInputs, type WorkerCollectionOptions } from "./publication-worker";
 import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
-import { exactRecord, parseDecisionPacket, validateAdvisorySelection } from "./publication-decisions";
+import { parseDecisionPacket, validateAdvisorySelection } from "./publication-decisions";
 import { inspectPreparation } from "./preparation";
-import { canonicalDigest, canonicalJSON, freezeJSON } from "./protocol";
-import { parseEdit, type Edit } from "./resolve";
+import { canonicalDigest, freezeJSON, protocolPath } from "./protocol";
+import type { Edit } from "./resolve";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
-import { captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { verifyRoleIdentity } from "./manifests";
 
 type Preparation = {
@@ -17,15 +19,16 @@ type Preparation = {
   worker_inputs: Awaited<ReturnType<typeof collectWorkerInputs>> | null;
   worker: Omit<ReturnType<typeof readNativeRoleCapture>, "evidence"> | null;
   selection: { schema_version: 1; source_commit: string; edits: Edit[] } | null;
-  publication: ReturnType<typeof parseWorkerPublication>; inspection: ReturnType<typeof inspectPreparation> | null;
+  assessment: ReturnType<typeof readAssessmentReport> | null;
+  publication: ReturnType<typeof parseWorkerHandoff>["publication"]; inspection: ReturnType<typeof inspectPreparation> | null;
 };
 
 /** Preserve the original worker's bounded output as preparation data under current source/runtime checks. */
-export async function collectWorkerPreparation(input: WorkerCollectionOptions & { worker_capture: unknown }): Promise<Preparation> {
+export async function collectWorkerPreparation(input: WorkerCollectionOptions & { worker_capture: unknown; candidate_repo?: string }): Promise<Preparation> {
   const options = { ...input, source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), worker_capture: structuredClone(input.worker_capture) };
   const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
   const result: Preparation = { schema_version: 1, kind: "docs-drift-worker-preparation", authority: "none", complete: false, scope_changed: false, diagnostics: [],
-    worker_inputs: null, worker: null, selection: null, publication: null, inspection: null };
+    worker_inputs: null, worker: null, selection: null, assessment: null, publication: null, inspection: null };
   try {
     result.worker_inputs = await collectWorkerInputs(options);
     if (!result.worker_inputs.complete) { result.diagnostics.push(...result.worker_inputs.diagnostics); throw Error("Current worker inputs incomplete"); }
@@ -33,25 +36,29 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
     if (!current.worker_input_sha256 || !facts?.runtime || !facts.store || !facts.current_default || !facts.identity) throw Error("Current native worker runtime required");
     const runtime = facts.runtime;
     const policy = readAdoptedRolePolicy({ repo: facts.store.root, current_default: facts.current_default, identity: facts.identity, runtime, role: "worker" });
-    const captured = readNativeRoleCapture({ source_repo: repo, artifact_root: options.artifact_root, reference: options.worker_capture, policy,
+    const captured = readNativeRoleCapture({ source_repo: repo, candidate_repo: options.candidate_repo, artifact_root: options.artifact_root, reference: options.worker_capture, policy,
       expected: { role: "worker", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: current.worker_input_sha256 } });
     result.worker = { binding: captured.binding, launch: captured.launch };
     const verified = verifyRoleIdentity(captured.evidence, policy), snapshot = captureSnapshot(repo, options.source);
-    if (Buffer.byteLength(verified.records, "utf8") > snapshot.settings.reports.max_entry_bytes) throw Error("Bounded original worker handoff required");
-    const packet = exactRecord(JSON.parse(verified.records), ["input_sha256", "edits", "publication"], "Original worker handoff fields changed");
-    if (packet.input_sha256 !== current.worker_input_sha256 || !Array.isArray(packet.edits)) throw Error("Original worker input target changed");
-    const publication = parseWorkerPublication(packet.publication);
-    const edits = packet.edits.map(parseEdit);
-    result.selection = { schema_version: 1, source_commit: options.source, edits };
+    const handoff = parseWorkerHandoff({ records: verified.records, source: options.source, input_sha256: current.worker_input_sha256,
+      max_entry_bytes: snapshot.settings.reports.max_entry_bytes });
+    result.selection = handoff.selection;
     const decisions = parseDecisionPacket(readBoundArtifact({ source_repo: repo, artifact_root: options.artifact_root, reference: options.decisions }), snapshot);
     if (decisions.mode === "advisory") validateAdvisorySelection(decisions, result.selection);
-    result.publication = publication;
+    result.publication = handoff.publication;
     const coordinated = readCoordinatedSelection({ repo, source: options.source, artifact_root: options.artifact_root,
       selection: result.selection, reference: decisions.coordination });
     result.inspection = inspectPreparation({ repo, source: options.source, selection: result.selection, protection_context: { coordinated } });
     if (!result.inspection.complete) { result.diagnostics.push(...result.inspection.diagnostics); throw Error("Original worker preparation incomplete"); }
-    // Keep the exact parsed worker postimages; preparation and publication have separate grants.
-    if (!canonicalJSON(packet.edits).equals(canonicalJSON(edits))) throw Error("Original worker edit representation changed");
+    if (handoff.assessment_reference) {
+      const secondary = artifactDirectoryScope(options.artifact_root, options.candidate_repo ?? repo), reference = handoff.assessment_reference;
+      secondary.assertExternal(join(secondary.directory, protocolPath(reference.path)));
+      const recheck = () => readBoundArtifact({ source_repo: repo, artifact_root: secondary.directory, reference });
+      recheck();
+      result.assessment = readAssessmentReport({ ...options, repo, assessment: reference, protection_context: { coordinated } });
+      recheck();
+      if (!result.assessment.complete) { result.diagnostics.push(...result.assessment.diagnostics); throw Error("Original worker assessment incomplete"); }
+    }
     result.complete = true;
   } catch (error) {
     result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.worker_inputs?.scope_changed);

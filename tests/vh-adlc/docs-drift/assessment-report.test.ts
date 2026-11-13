@@ -23,7 +23,7 @@ async function fixture(verdict = "confirmed-drift", options: { badRoots?: boolea
     scanner = scanner.replace("suppressed_findings: [], stale_suppressions: []", `suppressed_findings: ${JSON.stringify(suppressed)}, stale_suppressions: ${JSON.stringify(stale)}`);
   }
   let source = populateRepository(repo, false, scanner).commit;
-  if (options.badRoots) { put(repo, "AGENTS.md", "Feature documents: ../escape/\n"); source = commitAll(repo); }
+  if (options.badRoots) { put(repo, "AGENTS.md", "Feature documents: plans/\nDocumentation impact roots: [missing-docs-root]\n"); source = commitAll(repo); }
   if (options.localCoverage) {
     put(repo, "AGENTS.md", "Feature documents: plans/\nFeature document format: local\n");
     put(repo, "plans/prior.md", "---\nstatus: shipped\nbranch: feat/prior\ncovers: [docs/**]\n---\n# Prior local plan\n");
@@ -139,6 +139,22 @@ test("a complete scan with incomplete roots remains an incomplete finding report
   expect(f.original.complete).toBe(true);
   expect(report.complete).toBe(false); expect(report.collection_complete).toBe(false);
   expect(report.counts.candidates).toBe(1); expect(report.diagnostics.join("\n")).toContain("root");
+});
+
+test("malformed committed feature classification refuses source collection without claiming an empty report", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-assessment-invalid-feature-"))); roots.push(root);
+  const repo = join(root, "source"), artifacts = join(root, "artifacts"); mkdirSync(repo, { mode: 0o700 }); mkdirSync(artifacts, { mode: 0o700 });
+  populateRepository(repo);
+  put(repo, "AGENTS.md", "Feature documents: ../outside/\n");
+  const source = commitAll(repo), before = captureRepositoryState(repo);
+  const options = { repo, source, artifact_root: artifacts, owner: "fixture-owner", run: "invalid-feature-report" };
+  const original = await assessSource(options);
+  expect(original.complete).toBe(false); expect(original.scan).toBe(null);
+  expect(original.diagnostics.join("\n")).toContain("repository-relative path");
+  const { readAssessmentReport } = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
+  const report = readAssessmentReport({ ...options, source_verification: original.evidence, assessment: { path: "absent-assessment.json", sha256: "a".repeat(64) } });
+  expect(report.complete).toBe(false); expect(report.collection_complete).toBe(false); expect(report.counts.candidates).toBe(null);
+  expect(captureRepositoryState(repo)).toEqual(before);
 });
 
 test("unavailable original source retains unknown counts and incomplete status", async () => {

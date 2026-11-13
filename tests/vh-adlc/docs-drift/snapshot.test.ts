@@ -89,16 +89,27 @@ test.each(["plans/new.md", "plans/nested/new.md"])("bounded freshness binds futu
 test("bounded feature-root reads use original committed policy in source and bare stores", () => {
   const { repo, commit } = fixture(true), storeRoot = temporary();
   git(storeRoot, "clone", "--bare", "--no-local", repo, "objects.git");
-  const bare = join(storeRoot, "objects.git"), original = captureSnapshot(repo, commit), originalBare = captureBareSnapshot(bare, commit);
-  expect(originalBare.read_set).toEqual(original.read_set);
+  const bare = join(storeRoot, "objects.git"), original = captureSnapshot(repo, commit);
+  put(repo, "plans/new.md", "---\nstatus: in-progress\nbranch: feat/another-writer\ncovers: [docs/guide.md]\n---\n# Active claim\n");
+  const newClaim = commitAll(repo);
   put(repo, "AGENTS.md", "Feature documents: newly-selected/\n");
   const changedPolicy = commitAll(repo);
+  git(bare, "fetch", "--no-write-fetch-head", repo, changedPolicy);
+  git(bare, "update-ref", "refs/heads/main", changedPolicy);
   put(repo, "AGENTS.md", "Feature documents: dirty-overlay/\n");
   const before = captureRepositoryState(repo), old = captureSnapshot(repo, commit), current = captureSnapshot(repo, changedPolicy);
+  const originalBare = captureBareSnapshot(bare, commit);
+  expect(originalBare.read_set).toEqual(original.read_set);
+  expect(originalBare.read_set.prefixes).toContain("plans");
+  expect(originalBare.read_set.prefixes).not.toContain("newly-selected");
   expect(old.read_set.prefixes).toContain("plans");
   expect(current.read_set.prefixes).toContain("newly-selected");
   expect(current.read_set.prefixes).not.toContain("dirty-overlay");
-  expect(checkFreshness(old, changedPolicy).fresh).toBe(false);
+  for (const assessed of [old, originalBare]) {
+    const freshness = checkFreshness(assessed, newClaim);
+    expect(freshness.fresh).toBe(false);
+    expect(freshness.material_paths).toEqual(["plans/new.md"]);
+  }
   expect(captureRepositoryState(repo)).toEqual(before);
 });
 

@@ -301,6 +301,18 @@ function cleanReview(records: string): void {
   complete();
 }
 
+/** Verify a read-only semantic review. Only validateReviewedManifest can authorize an effect plan. */
+export function verifyIndependentRoleReview(input: {
+  worker: NativeRoleEvidence; reviewer: NativeRoleEvidence;
+  worker_target_sha256: string; reviewer_target_sha256: string; policy: { worker: RolePolicy; reviewer: RolePolicy };
+}) {
+  const worker = verifyRoleIdentity(input.worker, input.policy.worker), reviewer = verifyRoleIdentity(input.reviewer, input.policy.reviewer);
+  if (worker.invocation_id === reviewer.invocation_id || worker.context_id === reviewer.context_id) invalid("independent review context");
+  if (worker.target_sha256 !== input.worker_target_sha256 || reviewer.target_sha256 !== input.reviewer_target_sha256) invalid("review target");
+  cleanReview(reviewer.records);
+  return freezeJSON({ worker, reviewer });
+}
+
 const reviewedInstances = new WeakSet<object>();
 export type ReviewedManifest = ReturnType<typeof validateReviewedManifest>;
 export function requireReviewedManifest(value: ReviewedManifest): void {
@@ -314,10 +326,8 @@ export function verifyReviewEvidence(input: {
   const manifest = parseActionManifest(input.manifest);
   const hash = manifestDigest(manifest);
   if (hash !== manifestDigest(input.current)) invalid("changed current bindings or payload");
-  const worker = verifyRoleIdentity(input.worker, input.policy.worker);
-  const reviewer = verifyRoleIdentity(input.reviewer, input.policy.reviewer);
-  if (worker.invocation_id === reviewer.invocation_id || worker.context_id === reviewer.context_id) invalid("independent review context");
-  if (worker.target_sha256 !== workerInputDigest(manifest.bindings) || reviewer.target_sha256 !== hash) invalid("review target");
+  const { worker, reviewer } = verifyIndependentRoleReview({ worker: input.worker, reviewer: input.reviewer, policy: input.policy,
+    worker_target_sha256: workerInputDigest(manifest.bindings), reviewer_target_sha256: hash });
   const receipt = { invocation_id: worker.invocation_id, context_id: worker.context_id, native_sha256: worker.native_sha256, returned_sha256: worker.returned_sha256 };
   if (!canonicalJSON(manifest.worker).equals(canonicalJSON(receipt))) invalid("worker receipt binding");
   let preparation: unknown;
@@ -325,7 +335,6 @@ export function verifyReviewEvidence(input: {
   if (field(preparation, ["input_sha256"]) !== workerInputDigest(manifest.bindings)) invalid("worker input binding");
   // The wrapper validates/stages the bounded edit manifest. Its unchanged original bytes are bound
   // above and reviewed together with the resulting checkpoint and complete publication payload.
-  cleanReview(reviewer.records);
   return freezeJSON({ manifest, manifest_sha256: hash, worker, reviewer });
 }
 
