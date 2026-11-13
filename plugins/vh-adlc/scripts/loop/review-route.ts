@@ -102,8 +102,12 @@ export function exportCommit(repo: string, commit: string): string {
     for (const name of readdirSync(join(dir, path))) {
       const child = path ? `${path}/${name}` : name, full = join(dir, child), info = lstatSync(full);
       if (info.isSymbolicLink()) {
-        const target = readlinkSync(full), resolved = isAbsolute(target) ? target : resolve(dirname(full), target);
-        const rel = relative(dir, resolved);
+        // Follow every intermediate link: a lexical check misses chains such as d/back -> .. with
+        // leak -> d/back/../outside.txt. A link whose destination cannot be resolved cannot be shown
+        // to stay inside, so it counts as escaping too.
+        let real: string | undefined;
+        try { real = realpathSync(full); } catch { real = undefined; }
+        const rel = real === undefined ? ".." : relative(dir, real);
         if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) escaping.push(child);
       } else if (info.isDirectory()) walk(child);
     }
