@@ -33,6 +33,16 @@ describe("route", () => {
     const { root } = repo({});
     expect(cli("route", "--repo", root, "--operation", "implement").json).toEqual({ role: "implementer", route: "host" });
   });
+  test("a per-user override written for another repository's command route leaves an unconfigured repository on the host default", () => {
+    const { root } = repo({});
+    const config = mkdtempSync(join(tmpdir(), "vh-loop-cli-override-"));
+    mkdirSync(join(config, "vh-adlc"), { recursive: true });
+    writeFileSync(join(config, "vh-adlc", "loop.local.yaml"), "schema_version: 1\nroles:\n  spec_reviewer:\n    executable: /opt/codex/bin/codex\n");
+    const run = Bun.spawnSync([process.execPath, CLI, "route", "--repo", root, "--operation", "spec review"], { stdout: "pipe", stderr: "pipe", env: { ...process.env, XDG_CONFIG_HOME: config }, timeout: 60_000 });
+    rmSync(config, { recursive: true, force: true });
+    expect([run.exitCode, run.stderr.toString()]).toEqual([0, ""]);
+    expect(JSON.parse(run.stdout.toString())).toEqual({ role: "spec_reviewer", route: "host" });
+  });
 });
 
 describe("review", () => {

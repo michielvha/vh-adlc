@@ -181,10 +181,12 @@ function applyOverride(roles: Record<LoopRole, RoleRoute>, path: string) {
   for (const [role, value] of Object.entries(entries) as [LoopRole, unknown][]) {
     const field = `override roles.${role}`, item = object(value, field);
     keys(item, ["executable"], field);
-    const current = roles[role];
-    if (current.route !== "command" || !current.argv) fail(`${field}: only a command route has an executable`);
     const executable = text(item.executable, `${field}.executable`);
     if (PLACEHOLDERS.some(name => executable.includes(name))) fail(`${field}.executable`);
+    // The override file serves every repository on the machine; an entry for a role this repository
+    // routes to the host belongs to another repository and changes nothing here.
+    const current = roles[role];
+    if (current.route !== "command" || !current.argv) continue;
     roles[role] = { ...current, argv: [executable, ...current.argv.slice(1)] };
   }
 }

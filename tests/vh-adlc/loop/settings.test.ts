@@ -109,10 +109,13 @@ describe("the per-user override", () => {
       expect(refusal(() => loadLoopSettings(checkout({ ".vh-adlc/loop.yaml": full }), { overridePath: override }))).toContain(reason);
     });
 
-  test("refuses an executable for a host route", () => {
+  // Changed after R-23 F-01: the override file is per user and shared by every repository, so an entry
+  // for a role this repository routes to the host is ignored rather than refused.
+  test("ignores an executable for a host route, which belongs to another repository", () => {
     const override = join(checkout(), "loop.local.yaml");
     writeFileSync(override, "schema_version: 1\nroles:\n  author:\n    executable: /bin/true\n");
-    expect(refusal(() => loadLoopSettings(checkout({ ".vh-adlc/loop.yaml": full }), { overridePath: override }))).toContain("override roles.author: only a command route has an executable");
+    const root = checkout({ ".vh-adlc/loop.yaml": full });
+    expect(loadLoopSettings(root, { overridePath: override }).roles).toEqual(loadLoopSettings(root, { overridePath: null }).roles);
   });
 
   test("a missing override file changes nothing", () => {

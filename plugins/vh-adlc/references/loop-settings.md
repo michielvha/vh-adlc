@@ -130,5 +130,6 @@ roles:
     executable: /home/me/bin/copilot
 ```
 
-An override for a role whose route is not `command`, or one naming a model or arguments, is refused.
+The file serves every repository on the machine, so an entry for a role that this repository routes
+to the host is ignored. One naming a model or arguments is refused.
 The model, the arguments and the role mapping always come from the committed file.
