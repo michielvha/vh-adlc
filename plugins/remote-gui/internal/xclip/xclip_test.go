@@ -258,3 +258,43 @@ func TestWrongCookieRefused(t *testing.T) {
 		t.Fatalf("wrong cookie: %v", err)
 	}
 }
+
+func TestMenusListsOnlyViewableMenus(t *testing.T) {
+	d := scratchDisplay(t)
+	h := open(t, d)
+	ctx := bounded(t)
+	c, err := dial(ctx, d, func(*conn, packet) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(c.close)
+	atom := func(name string) uint32 {
+		reply, e := c.call(ctx, internAtom(name))
+		if e != nil {
+			t.Fatal(e)
+		}
+		return le.Uint32(reply[8:])
+	}
+	kind := atom("_NET_WM_WINDOW_TYPE")
+	window := func(typeName string, mapped bool) uint32 {
+		id := c.id()
+		reqs := [][]byte{createWindow(id, c.root, 0), changeProperty(id, kind, atomAtom, 32, atoms32(atom(typeName)), false)}
+		if mapped {
+			reqs = append(reqs, windowRequest(8, id)) // MapWindow
+		}
+		if e := c.check(ctx, reqs...); e != nil {
+			t.Fatal(e)
+		}
+		return id
+	}
+	menu := window("_NET_WM_WINDOW_TYPE_MENU", true)
+	window("_NET_WM_WINDOW_TYPE_MENU", false)
+	window("_NET_WM_WINDOW_TYPE_NORMAL", true)
+	menus, err := h.Menus(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(menus) != 1 || !menus[menu] {
+		t.Fatalf("menus: %v, want only %d", menus, menu)
+	}
+}

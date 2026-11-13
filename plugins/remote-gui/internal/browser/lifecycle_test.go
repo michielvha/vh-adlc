@@ -284,8 +284,9 @@ func (d *clipboardDouble) Set(_ context.Context, text string) error {
 	return nil
 }
 
-func (d *clipboardDouble) Get(context.Context) (string, error) { return "", nil }
-func (d *clipboardDouble) Close() error                        { return nil }
+func (d *clipboardDouble) Get(context.Context) (string, error)            { return "", nil }
+func (d *clipboardDouble) Close() error                                   { return nil }
+func (d *clipboardDouble) Menus(context.Context) (map[uint32]bool, error) { return nil, nil }
 
 func (d *clipboardDouble) Clear(context.Context) error {
 	d.mu.Lock()
