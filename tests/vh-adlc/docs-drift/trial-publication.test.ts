@@ -1,6 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
-import { cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { readJournal, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { readAppliedDelivery } from "../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
@@ -15,7 +16,11 @@ import { persistentTrialPublication, syntheticTrialFixture } from "./trial-fixtu
 import { git } from "./repository-fixture";
 
 const roots: string[] = [];
-afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+let preserveFailedTrialRoots = false;
+afterAll(() => {
+  if (preserveFailedTrialRoots) console.error("Preserved failed owned trial roots", JSON.stringify(roots));
+  else for (const root of roots) rmSync(root, { recursive: true, force: true });
+});
 
 test("a report flag cannot authorize synthetic publication", () => {
   const f = syntheticTrialFixture(roots);
@@ -26,8 +31,8 @@ test("a report flag cannot authorize synthetic publication", () => {
   expect(git(f.origin, "for-each-ref", "--format=%(refname)")).toBe("refs/heads/main");
 });
 
-async function publicationRequest(kind: "advisory" | "resolve" = "advisory") {
-  const fixture = persistentTrialPublication(roots, { bound_roles: true }), { context } = fixture;
+async function publicationRequest(kind: "advisory" | "resolve" = "advisory", max_entry_bytes?: number, temporary_parent?: string) {
+  const fixture = persistentTrialPublication(roots, { bound_roles: true, max_entry_bytes, temporary_parent }), { context } = fixture;
   const { review, policy: originalPolicy } = await fixture.options.gate();
   const policy = { ...originalPolicy, publication_kind: kind };
   const options = { ...fixture.options,
@@ -363,4 +368,128 @@ test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed 
     expect(readTrialTracker(context).commit).toBe(trackerBefore);
   }
   expect(git(f.source, "status", "--porcelain")).toBe("");
+}, 180000);
+
+
+test.each(["published", "never-dispatched"])("installed trial retained recovery observes missing local proof without replay: %s", async scenario => {
+  try {
+  const { f, context, path } = await publicationRequest(), publication = readTrialPublication(context, path), execute = publication.transport.execute;
+  if (scenario === "never-dispatched") publication.transport.execute = async (...args) => {
+    if (args[1].id === "pr") throw new PublicationExecutionError(false, true);
+    return execute(...args);
+  };
+  const original = await publish(publication);
+  expect(original.state).toBe(scenario === "published" ? "complete" : "pending");
+  const operation = original.journal.plan.manifest.operation_id;
+  renameSync(original.journal.directory, join(context.artifacts, "unavailable-original-journal"));
+  renameSync(join(context.artifacts, operation + ".journal-owner.json"), join(context.artifacts, "unavailable-original-journal-owner.json"));
+  for (const name of ["request.json", "worker.jsonl", "reviewer.jsonl"]) renameSync(join(context.artifacts, name), join(context.artifacts, "unavailable-" + name));
+  const refs = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)"), tracker = readTrialTracker(context).commit;
+  const entry = join(f.runtime, "scripts/docs-drift/trial-entry.ts"), args = ["--synthetic-trial", f.root, "--context-commit", f.contextCommit,
+    "--operation-id", operation, "--entry", "copilot"];
+  const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
+  const { verifiedHelperEnvironment } = await import("../../../plugins/vh-adlc/scripts/docs-drift/git");
+  async function invoke(command: "inspect-retained" | "restore-retained") {
+    const prefix = join(context.artifacts, command);
+    const completed = await executeOwnedProcess({ argv: [process.execPath, entry, command, ...args], cwd: context.source,
+      env: Object.fromEntries(Object.entries(verifiedHelperEnvironment()).filter((pair): pair is [string, string] => typeof pair[1] === "string")), capture: "memory", watched_outputs: [], timeout_ms: 45000,
+      stdout: prefix + ".stdout", stderr: prefix + ".stderr",
+      started: pid => writeFileSync(prefix + "-started.json", canonicalJSON({ pid, command, argv: [process.execPath, entry, command, ...args], cwd: context.source }), { flag: "wx", mode: 0o600 }) });
+    const { captured, ...metadata } = completed;
+    writeFileSync(prefix + ".stdout", captured?.stdout ?? new Uint8Array(), { flag: "wx", mode: 0o600 });
+    writeFileSync(prefix + ".stderr", captured?.stderr ?? new Uint8Array(), { flag: "wx", mode: 0o600 });
+    writeFileSync(prefix + "-process.json", canonicalJSON(metadata), { flag: "wx", mode: 0o600 });
+    const diagnostic = JSON.stringify({ command, ...metadata, stderr: Buffer.from(captured?.stderr ?? []).toString().slice(0, 512) });
+    expect(completed.reaped, diagnostic).toBe(true); expect(completed.timed_out, diagnostic).toBe(false);
+    expect(completed.exit_code, diagnostic).toBe(command === "inspect-retained" || scenario === "published" ? 0 : 2);
+    return JSON.parse(Buffer.from(captured?.stdout ?? []).toString());
+  }
+  const inspection = await invoke("inspect-retained");
+  expect(inspection.data.authority).toBe("none"); expect(inspection.data.operation_id).toBe(operation);
+  expect(inspection.data.observations.find((row: { effect_id: string }) => row.effect_id === "pr").state).toBe(scenario === "published" ? "done" : "absent");
+  expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
+  expect(readTrialTracker(context).commit).toBe(tracker);
+  const report = await invoke("restore-retained");
+  expect(report.data.authority).toBe("none"); expect(report.data.state).toBe(scenario === "published" ? "complete" : "pending");
+  if (scenario === "never-dispatched") expect(report.data.reason).toBe("retained-restore-no-replay");
+  const journal = readJournal(report.data.journal_directory, context.source);
+  expect(journal.header.recovery_mode).toBe("observation-only");
+  expect(journal.events.some(event => event.kind === "attempt")).toBe(false);
+  expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
+  expect(readTrialTracker(context).commit).toBe(tracker);
+  expect(git(f.source, "status", "--porcelain")).toBe("");
+  } catch (error) { preserveFailedTrialRoots = true; throw error; }
+}, 240000);
+
+
+test("an installed post-effect framing handoff retains the retired journal and observed lease result", async () => {
+  const { reconcileAbsent } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { recoveryEffectsOutput } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-output");
+  const { OUTPUT_LIMIT } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
+  const probe = persistentTrialPublication(roots, { bound_roles: true });
+  const limit = canonicalJSON(probe.options.plan).length + 128;
+  // Keep the valid retained plan within the configured bound while the full report repeats a long owned path.
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "vh-trial-deep-parent-"))); roots.push(parent);
+  let temporaryParent = parent;
+  while (temporaryParent.length < Math.ceil(limit / 2) + 256) {
+    temporaryParent = join(temporaryParent, "p".repeat(160)); mkdirSync(temporaryParent, { mode: 0o700 });
+  }
+  const { f, context, path } = await publicationRequest("advisory", limit, temporaryParent), publication = readTrialPublication(context, path), execute = publication.transport.execute;
+  expect(canonicalJSON(publication.plan).length).toBeLessThan(limit);
+  publication.transport.execute = async (...args) => {
+    if (args[1].id === "pr") throw new PublicationExecutionError(false, true);
+    return execute(...args);
+  };
+  const pending = await publish(publication);
+  expect(pending.state).toBe("pending");
+  const preflight = recoveryEffectsOutput({ command: "reconcile-publication", source: context.source_commit, outcome: "incomplete", capacity_check: true,
+    result: { state: "pending", reason: null, journal: pending.journal }, limit: OUTPUT_LIMIT });
+  expect(Buffer.byteLength(JSON.stringify(preflight) + "\n")).toBeLessThan(limit);
+  const inspected = await reconcileAbsent({ source_repo: context.source, journal_directory: pending.journal.directory,
+    object_store: context.store, settings: context.settings, transport: createTrialTransport(context), retire_effect_ids: ["pr"], inspect_only: true,
+    authorize: async () => null });
+  expect(inspected.reason).toBe("inspection-only");
+  const scopes = inspected.inspection_scopes!;
+  const selection = join(context.artifacts, "small-reconciliation-selection.json"), authority = join(context.artifacts, "small-reconciliation-authority.json");
+  writeFileSync(selection, canonicalJSON({ schema_version: 1, kind: "docs-drift-synthetic-reconciliation-selection",
+    context_sha256: context.context_sha256, journal_directory: pending.journal.directory, retire_effect_ids: ["pr"], retirement_lookups: {} }), { mode: 0o600 });
+  const origin = Buffer.from("Synthetic current owner request approves exactly this retirement scope and owned lease settlement.\n");
+  writeFileSync(join(context.artifacts, "small-owner.txt"), origin, { mode: 0o600 });
+  writeFileSync(authority, canonicalJSON({ schema_version: 1, kind: "docs-drift-recovery-authority", purpose: "reconciliation",
+    scope_sha256s: scopes.map(scope => sha256(canonicalJSON(scope))),
+    origin: { kind: "owner-current-request", artifact: { path: "small-owner.txt", sha256: sha256(origin) } } }), { mode: 0o600 });
+  const applied = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), "reconcile-publication",
+    "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--selection", selection, "--owner-request", authority],
+    { stdout: "pipe", stderr: "pipe", timeout: 90000 });
+  const report = JSON.parse(applied.stdout.toString()), journal = readJournal(pending.journal.directory, context.source);
+  expect(journal.events.some(event => event.kind === "retired-absence" && event.effect_id === "pr")).toBe(true);
+  expect(journal.events.some(event => event.kind === "outcome" && event.effect_id === "pr")).toBe(false);
+  expect(git(f.origin, "for-each-ref", "--format=%(refname)", context.settings.publication.lease_ref)).toBe("");
+  expect(applied.exitCode).toBe(2); expect(report.outcome, JSON.stringify(report)).toBe("incomplete");
+  expect(report.diagnostics[0].code).toBe("synthetic-output-bound-after-effects");
+  expect(report.data.state).toBe("retired"); expect(report.data.operation_id).toBe(journal.plan.manifest.operation_id);
+  expect(report.data.journal_directory).toBe(journal.directory); expect(report.data.revision).toBe(journal.revision);
+  expect(applied.stdout.length).toBeLessThanOrEqual(limit);
+}, 365000);
+
+test("installed retained inspection and restoration refuse a structurally valid plan from another trial context", async () => {
+  try {
+    const { writePlanObject } = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+    const { f, context, options } = persistentTrialPublication(roots, { bound_roles: true });
+    const changed = { ...options.plan, adoption_sha256: "f".repeat(64) }, object = writePlanObject(context.store, changed);
+    git(f.origin, "fetch", "--no-tags", "--no-write-fetch-head", context.store.root, object.object);
+    git(f.origin, "update-ref", context.settings.publication.receipt_ref_prefix + changed.manifest.operation_id, object.object);
+    const refs = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)"), tracker = readTrialTracker(context).commit;
+    for (const command of ["inspect-retained", "restore-retained"]) {
+      const result = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), command,
+        "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--operation-id", changed.manifest.operation_id, "--entry", "copilot"],
+        { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+      expect(result.exitCode, JSON.stringify({ signal: result.signalCode, stderr: result.stderr.toString().slice(0, 512) })).toBe(2);
+      const report = JSON.parse(result.stdout.toString());
+      expect(report.outcome).toBe("refused");
+      expect(report.diagnostics[0].message).toBe("synthetic retained original context changed");
+      expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
+      expect(readTrialTracker(context).commit).toBe(tracker);
+    }
+  } catch (error) { preserveFailedTrialRoots = true; throw error; }
 }, 180000);

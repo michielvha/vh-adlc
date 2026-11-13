@@ -15,8 +15,8 @@ import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/r
 import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
 
 /** This creates no native-provider or historical observed-execution evidence. */
-export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean; bound_roles?: boolean; max_entry_bytes?: number; seed?: { repo: string; commit: string; objects: string[]; resources: [string, Record<string, unknown>][]; settings: ReturnType<typeof settingsFixture> } } = {}) {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-docs-trial-"))); roots.push(root);
+export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean; bound_roles?: boolean; max_entry_bytes?: number; temporary_parent?: string; seed?: { repo: string; commit: string; objects: string[]; resources: [string, Record<string, unknown>][]; settings: ReturnType<typeof settingsFixture> } } = {}) {
+  const root = realpathSync(mkdtempSync(join(options.temporary_parent ?? tmpdir(), "vh-docs-trial-"))); roots.push(root);
   const names = ["source", "origin.git", "tracker.git", "artifacts", "objects", "evidence", "component-source", "runtime"];
   for (const name of names) mkdirSync(join(root, name), { mode: 0o700 });
   const source = join(root, "source"), origin = join(root, "origin.git"), tracker = join(root, "tracker.git");
@@ -85,7 +85,7 @@ export function reviseTrialManifest(f: ReturnType<typeof syntheticTrialFixture>,
   return git(f.source, "rev-parse", "HEAD");
 }
 
-export function persistentTrialPublication(roots: string[], fixtureOptions: { legacy?: boolean; bound_roles?: boolean } = {}) {
+export function persistentTrialPublication(roots: string[], fixtureOptions: { legacy?: boolean; bound_roles?: boolean; max_entry_bytes?: number; temporary_parent?: string } = {}) {
   const f = syntheticTrialFixture(roots, fixtureOptions);
   const context = loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime });
   const settings = context.settings, operation = "persistent-one";

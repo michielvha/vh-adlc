@@ -6,7 +6,7 @@ import { acknowledgeDeliveries, type AcknowledgementScope } from "./delivery-ack
 import { realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { readGit } from "./git";
-import { readArtifact, readJournal, readVerifiedPlan, sealPlan, type PlanPolicy, type SealedPlan } from "./journal";
+import { readArtifact, readJournal, readVerifiedPlan, sealPlan, type PlanPolicy, type SealedPlan, type Journal } from "./journal";
 import { effectDigest, manifestDigest, validateReviewedManifest, type NativeRoleEvidence, type RolePolicy } from "./manifests";
 import { readNativeRoleArtifacts } from "./evidence-input";
 import { canonicalJSON, decodeUTF8, protocolPath, sha256 } from "./protocol";
@@ -55,7 +55,7 @@ function nativeRole(context: TrialContext, value: unknown, binding: SealedPlan["
 }
 
 /** Only the immutable setup test grant supplies collector authority. Request/report flags supply none. */
-export function readTrialPublication(selected: TrialContext, requestPath: string): PublishOptions & { request_sha256: string } {
+export function readTrialPublication(selected: TrialContext, requestPath: string, preflight?: (journal: Journal) => void): PublishOptions & { request_sha256: string } {
   const context = loadTrialContext({ root: selected.root, context_commit: selected.context_commit, runtime_directory: selected.root + "/runtime" });
   const requestBytes = ownedArtifact(context, requestPath), requestHash = sha256(requestBytes);
   const request = exact(json(requestBytes), ["schema_version", "kind", "context_sha256", "entry", "publication_kind", "plan", "worker", "reviewer"]);
@@ -87,7 +87,8 @@ export function readTrialPublication(selected: TrialContext, requestPath: string
     corrections: plan.corrections, attention: plan.attention, candidate_verification_sha256: plan.candidate_verification_sha256 });
   if (!canonicalJSON(checked).equals(canonicalJSON(plan))) throw Error("synthetic publication original review changed");
   return { source_repo: context.source, artifact_root: context.artifacts, object_store: context.store, settings: context.settings,
-    plan, request_sha256: requestHash, transport: createTrialTransport(context), gate: async () => {
+    plan, request_sha256: requestHash, transport: createTrialTransport(context), gate: async (journal: Journal | null) => {
+      if (journal) preflight?.(journal);
       const current = readTrialPublication(context, requestPath);
       if (current.request_sha256 !== requestHash || !canonicalJSON(current.plan).equals(canonicalJSON(plan))) throw new PublicationScopeChanged("synthetic publication request changed");
       return { review, policy };
@@ -95,7 +96,7 @@ export function readTrialPublication(selected: TrialContext, requestPath: string
 }
 
 /** The optional owner request is distinct from the setup's standing synthetic publication grant. */
-export async function runTrialAcknowledgement(selected: TrialContext, selectionPath: string, ownerRequestPath?: string): Promise<{
+export async function runTrialAcknowledgement(selected: TrialContext, selectionPath: string, ownerRequestPath?: string, preflight?: (journal: Journal) => void): Promise<{
   result: PublishResult; scope: AcknowledgementScope | null; scope_sha256: string | null;
 }> {
   const context = loadTrialContext({ root: selected.root, context_commit: selected.context_commit, runtime_directory: selected.root + "/runtime" });
@@ -112,6 +113,7 @@ export async function runTrialAcknowledgement(selected: TrialContext, selectionP
   if (plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
     || plan.manifest.bindings.source_commit !== context.source_commit
     || plan.manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256) throw Error("synthetic acknowledgement original context changed");
+  if (ownerRequestPath) preflight?.(journal);
   let scope: AcknowledgementScope | null = null;
   const result = await acknowledgeDeliveries({ source_repo: context.source, journal_directory: journal.directory,
     object_store: context.store, settings: context.settings, transport: createTrialTransport(context),
@@ -129,7 +131,7 @@ export async function runTrialAcknowledgement(selected: TrialContext, selectionP
 }
 
 /** Synthetic reconciliation uses the ordinary engine and exact current-owner authority reader. */
-export async function runTrialReconciliation(selected: TrialContext, selectionPath: string, ownerRequestPath?: string): Promise<{
+export async function runTrialReconciliation(selected: TrialContext, selectionPath: string, ownerRequestPath?: string, preflight?: (journal: Journal) => void): Promise<{
   result: PublishResult; scopes: ReconciliationScope[]; scope_sha256s: string[];
 }> {
   const context = loadTrialContext({ root: selected.root, context_commit: selected.context_commit, runtime_directory: selected.root + "/runtime" });
@@ -148,6 +150,7 @@ export async function runTrialReconciliation(selected: TrialContext, selectionPa
     || plan.manifest.bindings.source_commit !== context.source_commit
     || plan.manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256)
     throw Error("synthetic reconciliation original context changed");
+  if (ownerRequestPath) preflight?.(journal);
   const limit = Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes);
   if (ownerRequestPath) recoveryEffectsOutput({ command: "reconcile-publication", source: context.source_commit, outcome: "incomplete", capacity_check: true,
     result: { state: "pending", reason: null, journal }, limit });
