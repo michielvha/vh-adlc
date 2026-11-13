@@ -1,5 +1,22 @@
 # Review protocol
 
+## Routes
+
+Before dispatching, read the reviewer role's route:
+`bun scripts/loop/cli.ts route --repo <dir> --operation "spec review"` for a spec review, or
+`--operation review` for an implementation review. Its JSON names the role, the route and any model.
+
+- A `host` route uses the procedure below. A model the route names counts as a requested model.
+- A `command` route runs `bun scripts/loop/cli.ts review --repo <dir> --document <doc> --commit <X>
+  --kind <spec|implementation> --docs-revision <sha> --binary <path> --plugin-pin <pin>`. It runs the
+  configured CLI with the canonical reviewer instructions and the dispatch identity, as
+  `references/loop-settings.md` describes: a spec review reads a read-only export of X and is launched
+  from it; an implementation review runs in the owning worktree, which must be unchanged afterwards
+  outside `review_scratch`. Its JSON `status` is `ready` or `pending`. On `ready`, store its `records`
+  under `### R-<n>` with a Review Log row naming its `model` and isolation `procedural`, then run
+  `review check` against the same text. On `pending`, store nothing and report a line that starts with
+  `review pending`, followed by its `reason`, with the raw `reply` in the handoff.
+
 ## Independence
 
 A review runs in a separate context. Prefer the registered `vh-adlc-reviewer` agent. If the host does not

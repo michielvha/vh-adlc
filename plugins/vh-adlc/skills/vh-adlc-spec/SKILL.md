@@ -26,6 +26,15 @@ Two modes: author (`/vh-adlc-spec <issue, goal or document>`) and review (`/vh-a
 Follow `references/loop.md` for every step it describes, `references/authority.md` for what you may do
 without asking, and `references/review-protocol.md` for the review mode.
 
+## Loop routes
+
+This operation's loop role and route come from `.vh-adlc/loop.yaml` through
+`bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
+host default. A reviewer role's `command` route runs through `bun scripts/loop/cli.ts review` in place
+of the host dispatch described below, as `references/review-protocol.md` (Routes) describes: a `ready`
+outcome is stored like a host reviewer's records, and a `pending` outcome leaves the review pending. A
+`host` route that names a model dispatches with it as a requested model.
+
 ## Start
 
 1. Get the binary and run `vh-adlc knowledge` with `conventions/feature-documents.md`,

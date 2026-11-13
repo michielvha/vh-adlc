@@ -29,9 +29,11 @@ export type LoopSettings = {
   configured: boolean;
   settings_path: string;
   roles: Record<LoopRole, RoleRoute>;
+  /** Directories a shell-enabled reviewer may write to without leaving the review pending. */
+  review_scratch: string[];
 };
 
-export const LOOP_SETTINGS_KEYS = ["schema_version", "roles"];
+export const LOOP_SETTINGS_KEYS = ["schema_version", "roles", "review_scratch"];
 const PLACEHOLDERS = ["{model}", "{prompt}", "{prompt_file}", "{export_dir}"];
 
 function fail(field: string): never { throw Error(`invalid loop settings: ${field}`); }
@@ -45,6 +47,18 @@ function keys(value: Record<string, unknown>, allowed: readonly string[], field:
 function text(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim() || /[\x00-\x1f\x7f]/.test(value)) fail(field);
   return value;
+}
+
+function directories(root: string, value: unknown, field: string): string[] {
+  if (!Array.isArray(value)) fail(field);
+  const out = value.map((item, index) => {
+    const path = text(item, `${field}[${index}]`).replace(/\/+$/, "");
+    try { resolveInside(root, path); } catch { fail(`${field}[${index}]`); }
+    if (path === "." || path === "") fail(`${field}[${index}] may not be the whole checkout`);
+    return path;
+  });
+  if (new Set(out).size !== out.length) fail(`${field} duplicates`);
+  return out;
 }
 
 function route(role: LoopRole, value: unknown): RoleRoute {
@@ -104,7 +118,8 @@ export function loadLoopSettings(root: string, options: { settingsPath?: string;
     [role, declared[role] === undefined ? { route: "host" } : route(role, declared[role])])) as Record<LoopRole, RoleRoute>;
   const overridePath = options.overridePath === undefined ? defaultOverridePath() : options.overridePath;
   if (overridePath !== null) applyOverride(roles, overridePath);
-  return { schema_version: 1, root, configured: file.configured, settings_path: file.path, roles };
+  const review_scratch = input.review_scratch === undefined ? [] : directories(root, input.review_scratch, "review_scratch");
+  return { schema_version: 1, root, configured: file.configured, settings_path: file.path, roles, review_scratch };
 }
 
 /** The role and route an operation runs on. Resume follows the operation it continues. */

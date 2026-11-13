@@ -29,6 +29,7 @@ Resume takes the route of the operation it continues.
 | `roles.<role>.route` | `host` or `command`. A role that is not listed uses `host` with no model. |
 | `roles.<role>.model` | Optional for `host`, passed to the host as a requested model under `review-protocol.md`. Required for `command`. |
 | `roles.<role>.argv` | `command` only: the executable, then its arguments. It must contain `{prompt}` or `{prompt_file}`, and may use `{model}` and `{export_dir}`. No other placeholder is accepted. |
+| `review_scratch` | Optional list of build-output directories inside the checkout that a shell-enabled implementation reviewer may write to; changes there do not leave the review pending. Never `.`. |
 
 Only `spec_reviewer` and `implementation_reviewer` accept a `command` route; settings that give one to
 `author` or `implementer` are refused, naming the role. Agent and skill files never name a model.

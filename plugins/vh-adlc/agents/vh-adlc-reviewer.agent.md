@@ -54,6 +54,7 @@ Then add finding records for any defect you found.
 
 Start with one line, `MODEL: <id>`, giving the exact model ID your system prompt says you run on, or
 `MODEL: unknown` if it names none. The dispatching session cannot see which model ran, so it records this
-line. After it, return only records, in the standard's formats and nothing else. Write their text plainly,
+line. When the dispatch asks for a TARGET line, give `TARGET: <commit>` on the next line, with the exact
+commit you reviewed. After that, return only records, in the standard's formats and nothing else. Write their text plainly,
 as `guides/humanize-prose.md` at the revision asks, with no em dashes or en dashes; your records are
 stored exactly as you return them.
