@@ -2,6 +2,9 @@ package doc
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -281,5 +284,32 @@ func TestLintGitFailure(t *testing.T) {
 	d := Parse("docs/f.md", []byte(conforming()), r)
 	if _, err := Lint(t.Context(), gitcmd.Git{Dir: t.TempDir() + "/absent"}, d, r); err == nil {
 		t.Fatal("a failing git history read passed lint")
+	}
+}
+
+// TestMatchCoversDoubleStar holds covers entries with ** to the docs-impact matcher's meaning, using the
+// case table tests/vh-adlc/loop/covers-cases.json shares with that matcher's parity test.
+func TestMatchCoversDoubleStar(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "tests", "vh-adlc", "loop", "covers-cases.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var table struct {
+		Cases []struct {
+			Pattern string `json:"pattern"`
+			Path    string `json:"path"`
+			Match   bool   `json:"match"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(raw, &table); err != nil {
+		t.Fatal(err)
+	}
+	if len(table.Cases) == 0 {
+		t.Fatal("no cases")
+	}
+	for _, c := range table.Cases {
+		if got := MatchCovers([]string{c.Pattern}, c.Path); got != c.Match {
+			t.Errorf("MatchCovers(%q, %q) = %v, want %v", c.Pattern, c.Path, got, c.Match)
+		}
 	}
 }
