@@ -44,7 +44,10 @@ This section grants no publication authority.
 This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
 host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
-files and its project procedure, whose local rules apply alongside this procedure. A `host` route that names a model runs with it as a requested model.
+files and its project procedure, whose local rules apply alongside this procedure. With declared verification rungs, ship runs
+`bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` before pushing and never
+pushes or reports the feature complete unless it may advance at HEAD; after the merge, the delivery check
+runs the same command with `--merge <merge commit>`. The feature lands by merge commit only. A `host` route that names a model runs with it as a requested model.
 
 ## Start
 

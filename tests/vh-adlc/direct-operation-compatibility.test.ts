@@ -24,6 +24,8 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     for (const phrase of [".vh-adlc/loop.yaml", "scripts/loop/cli.ts route", "references/loop-settings.md", "host default", "scripts/loop/cli.ts context", "project procedure"]) expect(loop).toContain(phrase);
     if (name === "resume") expect(loop).toContain("--continues");
     if (name === "spec") expect(loop).toContain("lenses");
+    if (name === "implement" || name === "ship") for (const phrase of ["verification rungs", "scripts/loop/cli.ts rungs"]) expect(loop).toContain(phrase);
+    if (name === "ship") expect(loop).toContain("--merge");
     if (name === "spec" || name === "review") for (const phrase of ["scripts/loop/cli.ts review", "references/review-protocol.md", "pending", "requested model"]) expect(loop).toContain(phrase);
     current = (current.slice(0, loopStart) + current.slice(loopEnd)).replace(/\n+$/, "\n");
   }

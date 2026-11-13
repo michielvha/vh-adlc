@@ -7,6 +7,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { readYAML, settingsFile } from "../settings-file";
 import { resolveInside } from "../triage/settings";
+import type { Rung } from "./rungs";
 
 export const LOOP_ROLES = ["author", "implementer", "spec_reviewer", "implementation_reviewer"] as const;
 export type LoopRole = typeof LOOP_ROLES[number];
@@ -36,10 +37,13 @@ export type LoopSettings = {
   /** Repository instruction files: read by every operation and checked by every spec review. */
   instruction_files: string[];
   lenses: Lens[];
+  verification_rungs: Rung[];
+  /** The command run after a merge before a publishing feature is reported delivered (T16). */
+  post_merge_watch?: string[];
 };
 export type Lens = { name: string; check: string; severity: "blocking" | "should-fix" | "nit" };
 
-export const LOOP_SETTINGS_KEYS = ["schema_version", "roles", "review_scratch", "project_procedure", "instruction_files", "lenses"];
+export const LOOP_SETTINGS_KEYS = ["schema_version", "roles", "review_scratch", "project_procedure", "instruction_files", "lenses", "verification_rungs"];
 const PLACEHOLDERS = ["{model}", "{prompt}", "{prompt_file}", "{export_dir}"];
 
 function fail(field: string): never { throw Error(`invalid loop settings: ${field}`); }
@@ -87,6 +91,35 @@ function lenses(value: unknown): Lens[] {
     return { name, check: text(lens.check, `${field}.check`), severity: lens.severity };
   });
   if (new Set(out.map(lens => lens.name)).size !== out.length) fail("lenses duplicates");
+  return out;
+}
+
+function rungs(value: unknown): Rung[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) fail("verification_rungs");
+  const out = value.map((item, index): Rung => {
+    const field = `verification_rungs[${index}]`, rung = object(item, field);
+    keys(rung, ["name", "when", "command", "procedure", "skipped_pattern"], field);
+    const name = text(rung.name, `${field}.name`);
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) fail(`${field}.name`);
+    let when: Rung["when"];
+    if (rung.when === "always") when = "always";
+    else {
+      const condition = object(rung.when, `${field}.when must be always or {paths}`);
+      keys(condition, ["paths"], `${field}.when`);
+      if (!Array.isArray(condition.paths) || !condition.paths.length) fail(`${field}.when.paths`);
+      when = { paths: condition.paths.map((path, i) => text(path, `${field}.when.paths[${i}]`)) };
+    }
+    if ((rung.command === undefined) === (rung.procedure === undefined)) fail(`${field} needs exactly one of command or procedure`);
+    if (rung.skipped_pattern !== undefined) {
+      if (rung.command === undefined) fail(`${field}.skipped_pattern needs a command`);
+      try { new RegExp(text(rung.skipped_pattern, `${field}.skipped_pattern`)); } catch { fail(`${field}.skipped_pattern`); }
+    }
+    return { name, when,
+      ...(rung.command === undefined ? { procedure: text(rung.procedure, `${field}.procedure`) } : { command: text(rung.command, `${field}.command`) }),
+      ...(rung.skipped_pattern === undefined ? {} : { skipped_pattern: rung.skipped_pattern as string }) };
+  });
+  if (new Set(out.map(rung => rung.name)).size !== out.length) fail("verification_rungs duplicates");
   return out;
 }
 
@@ -156,7 +189,7 @@ export function loadLoopSettings(root: string, options: { settingsPath?: string;
   })();
   return { schema_version: 1, root, configured: settingsRead.configured, settings_path: settingsRead.path, roles, review_scratch,
     ...(input.project_procedure === undefined ? {} : { project_procedure: file(root, input.project_procedure, "project_procedure") }),
-    instruction_files, lenses: lenses(input.lenses) };
+    instruction_files, lenses: lenses(input.lenses), verification_rungs: rungs(input.verification_rungs) };
 }
 
 /** The role and route an operation runs on. Resume follows the operation it continues. */

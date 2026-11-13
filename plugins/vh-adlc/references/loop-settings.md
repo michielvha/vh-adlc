@@ -34,6 +34,26 @@ Resume takes the route of the operation it continues.
 | `instruction_files` | Optional contained files, such as `AGENTS.md` and `CLAUDE.md`. Every SDD operation reads them, and every spec review checks the document against them. |
 | `lenses` | Optional list of `{name, check, severity}`: a named check every spec review applies, with severity `blocking`, `should-fix` or `nit`. |
 
+## Verification rungs
+
+| Field | Value |
+| --- | --- |
+| `verification_rungs[].name` | Lowercase name, unique. |
+| `verification_rungs[].when` | `always`, or `{paths: [glob, ...]}` matched against the whole feature delta. |
+| `verification_rungs[].command` | A shell command run from the worktree. Exit 0 passes; exit 126 or 127 means it could not run; any other exit fails. |
+| `verification_rungs[].procedure` | Instead of a command: a written procedure the operation performs and records. |
+| `verification_rungs[].skipped_pattern` | Optional regular expression for an output line that reports a skipped mandatory subcheck; its first group names the subcheck. |
+
+Before merge the feature delta is the branch against its merge base with the default branch, plus every
+uncommitted change; after merge it is the merge commit against its first parent. Every applicable rung
+must pass at the commit being pushed, completed or delivered; a result recorded at another commit does
+not count. A failed rung always blocks. A rung that could not run, or that reported a skipped mandatory
+subcheck, blocks unless the owner allows that exact rung (`<rung>`) or subcheck (`<rung>/<subcheck>`) for
+that run, and the report records the allowance. With rungs or a post-merge watch declared, a feature
+lands by merge commit only. Without rungs, operations keep reading verification commands from
+`AGENTS.md`. `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` reports the
+delta, the applicable rungs, each result and whether the feature may advance.
+
 `bun scripts/loop/cli.ts context --repo <dir>` prints the reading list (instruction files, then the
 project procedure) and the lenses.
 
