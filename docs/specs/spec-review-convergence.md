@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "After R-5 the owner cut the derived streak to a recorded one; R-5's other findings are applied. Waiting for spec review R-6."
+status_description: "R-6 had a blocking finding in the stopping-rule mechanics, so the advance acceptance did not apply. Waiting for the owner to decide how to continue."
 issue: null
 goal: "A spec review loop that finds blocking defects early and stops asking for passes after three consecutive passes without one."
 covers:
@@ -387,6 +387,7 @@ owner had R-5's other findings applied.
 | 2026-11-13 | R-3 | spec | `cd193f3` | claude-opus-5-5 | procedural | Clean: no blocking finding; seven should-fix and three nits |
 | 2026-11-13 | R-4 | spec | `89afa41` | claude-opus-5-5 | procedural | One blocking finding (F-01 advance acceptance contradicts S7.7.accept), three should-fix and two nits |
 | 2026-11-13 | R-5 | spec | `f263bbd` | claude-opus-5-5 | procedural | One blocking finding (F-01 revision event resets on every applied fix), five should-fix and three nits; advance acceptance not met |
+| 2026-11-13 | R-6 | spec | `96fc16f` | claude-opus-5-5 | procedural | One blocking finding (F-01 in-session passes break the S7.7 check), three should-fix and three nits; advance acceptance not met |
 
 ### R-1
 
@@ -698,3 +699,54 @@ SEVERITY: nit
 WHERE: Context, Background, Overlapping work (lines 146-149)
 EVIDENCE: The plugin pin bump in shared-development-loop's Scope is at lines 150-151 at b777df0, not `:154` (`git show b777df0:docs/specs/shared-development-loop.md | grep -n "pin bump"` gives 151). That feature's covers also list `plugins/vh-adlc/skills/vh-adlc-resume/` and `plugins/vh-adlc/references/loop.md` (lines 13 and 16 at b777df0), which this feature now edits too, but Background does not name them in the overlap.
 PROPOSAL: Cite `:150-151` and add the resume skill and loop.md to the overlap list.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Delivery (lines 300-302, "S7.7, S7.7.accept, S7.9 and S14.spec keep passing"); Test Plan AC-01 row (last sentence); Context, Background, Existing scenarios (lines 130-136)
+EVIDENCE: S7.7's check sets `const blocking = /SEVERITY: blocking/.test(doc);` over the whole document (tests/vh-adlc/scenarios/run.ts:544). Then `const path = blocking || questions ? "the owner was left a decision" : "accepted"` (run.ts:549), and on that path it requires no acceptance row, status draft and no passing planned gate (run.ts:559). Under the current procedure a blocking R-1 ended turn 1, so the turn-2 conditional acceptance (run.ts:534) correctly did nothing. Under this Design, turn 1 (`/vh-adlc-spec review`, with no acceptance yet) keeps dispatching passes in-session until the streak reaches three or a question waits (lines 224-226). If R-1 has a factual blocking finding, the author fixes it and goes on to three clean passes. Turn 2 then accepts at the latest clean pass and the document reaches planned, which is correct under steps 4 and 6. But the stored R-1 record still matches `SEVERITY: blocking`, so the check expects no acceptance and the scenario fails. Turn 2's wording "if the review found nothing blocking" also stops naming a single review once turn 1 stores several. The AC-01 row requires S7.7 to keep passing, so the proof fails a correct implementation whenever any pass in turn 1 is blocking. This document's own blocking definition covers that case ("a proof fails a correct implementation").
+PROPOSAL: Say in Delivery how S7.7 changes: its check should read only the latest spec review's records and expect acceptance when the loop ended at a clean pass, and its turn-2 prompt should name the latest pass. Drop the claim that it keeps passing unchanged.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Clean streak, line 192); Design, Stopping rule (steps 4 and 5, lines 213-218, and line 226, "the next run continues from the last marked row"); Context, Owner summary (lines 44-46, "so it never has to be worked out from history. A blocking finding sets it to zero, and a revision starts it again"); Acceptance Criteria AC-01 ("reading the previous value from the latest marked spec row ... counting from 0 after a revision"); Test Plan AC-01 row (Variants C and E)
+EVIDENCE: Terminology reads the previous value from "the latest spec review row, skipping acceptance rows and `+dirty` rows; a row without a marker reads as 0". AC-01 and line 226 read it from the latest marked row instead. The two disagree when an unmarked spec row follows a marked one, for example a pass recorded under an older pin, which the Pins section says writes no marker. The stored rows also carry no record of a revision. SKILL.md:96-99 commits the move to draft on its own, and after it the latest marked spec row of a re-accepted document still says `streak 3 of 3`, followed only by an acceptance row that the count skips. A later session (resume, or a run that stopped for Open Questions during the revision) that follows the row rule records the first clean pass after the revision as 4, or ends the loop there. That contradicts "a revision starts it again". Values past three are also undefined. Step 5's extra pass after the owner picks findings follows a `streak 3 of 3` row, so the row rule gives 4. Steps 3 and 4 cover only "below three" and "the clean pass that brings the streak to three". Variant C does not state the expected marker. Variant E does not say whether the post-revision passes run in a new session, so a skill that keeps the revision only in session memory passes it.
+PROPOSAL: Make the stored rows carry every input. For example, count from 0 when an acceptance row follows the latest marked spec row, use one rule for unmarked rows in Terminology, AC-01 and line 226, and state the marker and the step that applies at or above three. Have Variant E run its post-revision passes in a fresh session, and state Variant C's expected markers.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stopping rule (steps 3 and 6, lines 207-212 and 219-222, and line 228, "A re-review caused only by default-branch drift counts as a pass like any other"); Design, Terminology (Owner acceptance, line 194); Test Plan AC-01 row
+EVIDENCE: A re-review caused only by default-branch drift keeps the acceptance when the baseline is unchanged (conventions/feature-documents.md:220-222). `accepted` still holds (:309), and for a planned document `next` moves on to tasks or implement (:281-282). The Design counts such a pass "like any other" but does not say whether the standing acceptance row is an "owner acceptance" for steps 3 and 6. If it is, step 6 ends the loop at "the clean pass it names", which is the old pass, not the drift pass. If it is not, step 3 applies the drift pass's factual should-fix findings to the baseline of a planned document, which first needs `vh-adlc gate draft` and a revision (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:96-99), and then dispatches more passes. Two careful implementers build different loops, and the second turns a routine drift re-review into a revision. No variant covers a drift re-review of an accepted document.
+PROPOSAL: State what the loop does after a drift-only re-review of a document whose acceptance still holds. For example, the standing acceptance ends the loop at the drift pass and its findings are listed rather than applied. Add a variant for it.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Terminology (Saved nit, line 193); Design, Stopping rule (steps 1 and 4, lines 202-204 and 213-215); Acceptance Criteria AC-01 ("saves nits on the normative baseline from the current streak"); Test Plan AC-01 row (Variants B and E)
+EVIDENCE: Terminology defines a saved nit as one "from a pass recorded since the latest `streak 0` row, inclusive". AC-01 says "from the current streak". The two differ in three cases. First, a document with no `streak 0` row (every marked pass clean, or a pre-update draft whose unmarked rows only read as 0) has no defined window under Terminology. Second, after a revision the latest `streak 0` row predates the revision and the earlier acceptance, so Terminology's window takes in nits that were already listed at that acceptance, while AC-01's current streak starts at the revision. Third, nits from clean passes before a blocking pass fall outside both windows: in Variant B, the first clean pass's nits are neither applied nor listed. That trade-off is settled without an Open Question. Variant E gives no expected nit list.
+PROPOSAL: Define the window once, for example as the passes since the start of the current streak, and say whether nits dropped by a reset are lost or carried. Add expected nit lists to Variants B and E.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Terminology (Clean streak and Saved nit, lines 192-193); Acceptance Criteria AC-01; Test Plan AC-01 row (Variant A); Context, Owner summary (line 44)
+EVIDENCE: AC-01 says the author writes `streak <n> of 3` into every spec row and records 0 after a blocking finding, which gives `streak 0 of 3`. Terminology says a blocking pass "records `streak 0`", the saved-nit window starts at "the latest `streak 0` row", and Variant A expects rows from "`streak 0` to `streak 3 of 3`". Later runs read the value back from this text, so the exact form matters to whatever matches it.
+PROPOSAL: Pick one form for zero, for example `streak 0 of 3`, and use it in Terminology, AC-01 and Variant A.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Stopping rule (lines 228-230, "the existing `Outcome` column, which the binary does not parse")
+EVIDENCE: The binary reads the Outcome cell to recognize acceptance rows: "A row with `Outcome` exactly `accepted by owner` is an acceptance" (conventions/feature-documents.md:176-178; rules block `acceptance_row: { ..., outcome: accepted by owner, ... }`). The marker is harmless. In a scratch clone at 96fc16f, appending `; streak 0` to the R-5 Outcome left `vh-adlc lint` at `"result":"pass"`.
+PROPOSAL: Say that the binary reads Outcome only to match an exact `accepted by owner`, so a streak marker in a spec review row does not change any result.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 66-68, "a consumer on an older pin keeps the current procedure"); Design, Pins and older consumers (lines 278-284)
+EVIDENCE: Only the stopping rule is made conditional on the resolved page having the severity definitions. Line 282 says "the new `SKILL.md` and protocol steps are written as conditional on that check". The failure-mode check and one-pass completeness go into the reviewer agent unconditionally ("The reviewer's spec section gains", line 251; line 261). The Design does not say whether the author-side failure-mode step and restatement sweep in SKILL.md fall under the conditional. On an older pin, the reviewer therefore changes behavior while the summary says the current procedure is kept. AC-06's old-pin check looks only for the streak marker.
+PROPOSAL: Say which changes apply on any pin and which only with the new convention, and make the Owner summary match.
