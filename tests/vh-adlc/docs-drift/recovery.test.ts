@@ -1018,3 +1018,26 @@ test("reconciliation inspection refuses cleanup while its original owned lease i
   expect(inspected.state).toBe("pending"); expect(inspected.reason).toBe("owned-cleanup-lease-unavailable");
   expect(inspected.inspection_scopes).toBeUndefined();
 });
+
+
+test("observation-only restoration preserves an unavailable foreign lease as pending", async () => {
+  const f = setup(), original = await publish(options(f)), foreign = "f".repeat(40);
+  expect(original.state).toBe("complete");
+  f.refs.set(f.settings.publication.lease_ref, foreign);
+  const read = f.transport.readPlanObject; let unavailableReads = 0;
+  f.transport.readPlanObject = async object => {
+    if (object === foreign) { unavailableReads++; throw Error("Synthetic foreign metadata transport unavailable"); }
+    return read(object);
+  };
+  const executed = [...f.executed];
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: f.artifacts, settings: f.settings, transport: f.transport,
+    operation_id: f.plan.manifest.operation_id, verify_policy: () => f.policy });
+  // The original local mirror is deliberately unavailable; remove only its owned fixture names.
+  const { renameSync } = await import("node:fs");
+  renameSync(original.journal.directory, original.journal.directory + "-unavailable");
+  renameSync(join(f.artifacts, f.plan.manifest.operation_id + ".journal-owner.json"), join(f.artifacts, "unavailable-journal-owner.json"));
+  const result = await restoreRetainedOperation({ inspection, publication: options(f) });
+  expect(result.state).toBe("pending"); expect(result.reason).toBe("current-proof-or-recovery-effect-unavailable");
+  expect(unavailableReads).toBe(2); expect(f.refs.get(f.settings.publication.lease_ref)).toBe(foreign);
+  expect(f.executed).toEqual(executed); expect(result.journal.events.some(event => event.kind === "attempt")).toBe(false);
+});

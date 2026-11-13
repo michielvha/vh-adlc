@@ -8,7 +8,7 @@ import { canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { publicationMarker } from "./report-history";
 import { externalArtifactDirectory } from "./snapshot";
 import type { Settings } from "./settings";
-import type { PublicationTransport, PlanObjects, EffectObservation } from "./transport";
+import { UnrecognizedRetainedMetadata, type PublicationTransport, type PlanObjects, type EffectObservation } from "./transport";
 import { PublicationScopeChanged, verifyPublicationGate, type PublishOptions, type PublishResult } from "./publish";
 
 function terminal(journal: Journal, effectId: string): boolean {
@@ -160,10 +160,16 @@ async function restoredAcquisition(options: PublishOptions, journal: Journal, ob
   if (receipt?.kind !== "receipt-retain" || receipt.payload.ref !== options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id) return null;
   const lease = await options.transport.ref(options.settings.publication.lease_ref);
   if (lease.state === "present" && lease.object !== journal.header.observed_lease_object) {
-    const current = await options.transport.readPlanObject(lease.object);
-    const bytes = Buffer.from(current.bytes);
-    if (current.objects.object !== lease.object || current.objects.plan_sha256 !== sha256(bytes)
-      || bytes.equals(canonicalJSON(journal.plan))) return null;
+    try {
+      const current = await options.transport.readPlanObject(lease.object);
+      const bytes = Buffer.from(current.bytes);
+      if (current.objects.object !== lease.object || current.objects.plan_sha256 !== sha256(bytes)
+        || bytes.equals(canonicalJSON(journal.plan))) return null;
+    } catch (error) {
+      // A positively observed different native layout proves a foreign object, never ownership.
+      // Missing, oversized or unavailable metadata remains unknown and cannot take this path.
+      if (!(error instanceof UnrecognizedRetainedMetadata)) throw error;
+    }
   }
   const retained = await options.transport.observe(journal.plan, receipt, objects);
   if (retained.state !== "done") return null;

@@ -206,6 +206,11 @@ test.each(["generation-passed", "generation-failed", "generation-mutates"])("dec
     expect(readFileSync(join(f.artifacts, result.commands[0].stdout!.path), "utf8")).toContain("regenerated exact committed output");
     expect(readCandidateVerificationArtifacts({ ...options, reference: result.evidence }).complete).toBe(true);
     const payload = JSON.parse(readFileSync(result.record_path!, "utf8"));
+    payload.commands[0].argv = ["node", "scripts/unapproved-generator.js"];
+    const changedVector = canonicalJSON(payload); writeFileSync(result.record_path!, changedVector);
+    expect(() => readCandidateVerificationArtifacts({ ...options, reference: { ...result.evidence!, sha256: sha256(changedVector) } }))
+      .toThrow("configured generation vector changed");
+    payload.commands[0].argv = ["node", "scripts/generate.js"];
     payload.commands = payload.commands.slice(1);
     const bytes = canonicalJSON(payload); writeFileSync(result.record_path!, bytes);
     expect(() => readCandidateVerificationArtifacts({ ...options, reference: { ...result.evidence!, sha256: sha256(bytes) } }))

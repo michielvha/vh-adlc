@@ -51,18 +51,19 @@ export function readCandidateVerificationArtifacts(options: Parameters<typeof in
   const configured = [...snapshot.settings.generation_commands, ...snapshot.settings.verification_commands];
   if (!Array.isArray(value.commands) || value.commands.length !== configured.length) fail("complete configured generation and verification required");
   for (const [index, command] of value.commands.entries()) {
-    if (!same(command.argv, configured[index])) fail("configured verification vector changed");
-    if (!command.start || !command.completion) fail("original verification start and completion required");
+    const purpose = index < snapshot.settings.generation_commands.length ? "generation" : "verification";
+    if (!same(command.argv, configured[index])) fail(`configured ${purpose} vector changed`);
+    if (!command.start || !command.completion) fail(`original ${purpose} start and completion required`);
     const directory = dirname(command.stdout.path);
     if ([command.stdout.path, command.stderr.path, command.start.path, command.completion.path].some((path, item) =>
-      path !== join(directory, index + ["-stdout.log", "-stderr.log", "-start.json", "-process.json"][item]))) fail("original verification artifact location changed");
+      path !== join(directory, index + ["-stdout.log", "-stderr.log", "-start.json", "-process.json"][item]))) fail(`original ${purpose} artifact location changed`);
     const completion = json(read(command.completion)); requireSuccessfulProcess(completion);
-    if (!same(completion, command.process)) fail("original verification completion changed");
+    if (!same(completion, command.process)) fail(`original ${purpose} completion changed`);
     const start = json(read(command.start));
     if (start === null || typeof start !== "object" || Array.isArray(start)
       || (start as Record<string, unknown>).pid !== completion.pid
       || (start as Record<string, unknown>).source_commit !== options.candidate
-      || !same((start as Record<string, unknown>).argv, command.argv)) fail("original verification start changed");
+      || !same((start as Record<string, unknown>).argv, command.argv)) fail(`original ${purpose} start changed`);
     read(command.stdout); read(command.stderr);
   }
   return { ...value, evidence: options.reference as Verification["evidence"] };

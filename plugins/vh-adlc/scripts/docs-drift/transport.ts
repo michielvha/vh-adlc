@@ -26,6 +26,9 @@ export type EffectObservation = { state: "done"; outcome: Outcome; payload_sha25
 type NativeDelivery = { objects: PlanObjects; sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null; effect: Effect; completed_commands: number; commands: number; before?: ExecutionResult["before"]; successes: ExecutionResult["successes"]; capture_unverified: boolean; identity?: PublicationIdentity; rejection?: RejectionEvidence };
 export type PublicationIdentity = { repository: string; repository_id: number; default_branch: string; actor: string; actor_id: number };
 
+/** A native Git object was read successfully but has a different metadata layout. */
+export class UnrecognizedRetainedMetadata extends Error {}
+
 /** The production entry constructs its native transport. Only the separate trial entry injects a collector. */
 export interface PublicationTransport {
   kind: "native" | "collector";
@@ -580,9 +583,11 @@ export function createNativeTransport(options: {
     identity: nativeIdentity,
     async ref(ref) { return getRef(ref); },
     async readPlanObject(object) {
-      const commit = repository.commit(object), tree = repository.tree(commit.tree_sha, 2);
-      if (commit.parents.length !== 0 || tree.entries.length !== 1 || tree.entries[0].path !== "plan.json"
-        || tree.entries[0].mode !== "100644" || tree.entries[0].type !== "blob") throw Error("invalid retained operation metadata object");
+      const commit = repository.commit(object);
+      if (commit.parents.length !== 0) throw new UnrecognizedRetainedMetadata("invalid retained operation metadata object");
+      const tree = repository.tree(commit.tree_sha, 2);
+      if (tree.entries.length !== 1 || tree.entries[0].path !== "plan.json"
+        || tree.entries[0].mode !== "100644" || tree.entries[0].type !== "blob") throw new UnrecognizedRetainedMetadata("invalid retained operation metadata object");
       const blob = tree.entries[0].sha, bytes = repository.blob(blob, settings.reports.max_entry_bytes);
       return { bytes, objects: { object, tree: commit.tree_sha, blob, plan_sha256: sha256(bytes) } };
     },

@@ -20,7 +20,7 @@ afterAll(() => {
   if (preserveFailure) console.error("Preserved seeded native observation fixtures", JSON.stringify(roots));
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
-function seeded(limit = 524288, deep = false, foreign = false) {
+function seeded(limit = 524288, deep = false, foreign: false | "schema" | "layout" = false) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-native-observations-"))); roots.push(root);
   let base = root;
   if (deep) while (base.length < 1700) { base = join(base, "p".repeat(100)); mkdirSync(base, { mode: 0o700 }); }
@@ -50,7 +50,9 @@ function seeded(limit = 524288, deep = false, foreign = false) {
   git(origin, "update-ref", "refs/heads/docs-drift/seeded", source);
   if (foreign) {
     const blob = writeMetadataObject(store.root, "blob", canonicalJSON({ schema_version: 99, kind: "future-foreign-lease" }));
-    const tree = writeMetadataObject(store.root, "tree", Buffer.concat([Buffer.from("100644 plan.json\0"), Buffer.from(blob, "hex")]));
+    const entries = foreign === "layout" ? [Buffer.from("100644 note.txt\0"), Buffer.from(blob, "hex"), Buffer.from("100644 plan.json\0"), Buffer.from(blob, "hex")]
+      : [Buffer.from("100644 plan.json\0"), Buffer.from(blob, "hex")];
+    const tree = writeMetadataObject(store.root, "tree", Buffer.concat(entries));
     const object = writeMetadataObject(store.root, "commit", Buffer.from(`tree ${tree}\nauthor Fixture <fixture@example.invalid> 0 +0000\ncommitter Fixture <fixture@example.invalid> 0 +0000\n\nForeign lease\n`));
     git(origin, "fetch", "--no-tags", "--no-write-fetch-head", store.root, object);
     git(origin, "update-ref", settings.publication.lease_ref, object);
@@ -60,9 +62,9 @@ function seeded(limit = 524288, deep = false, foreign = false) {
     owner: "fixture-owner", run: "observe", credential: "synthetic-read-token", path: join(root, "native-bin") + ":" + process.env.PATH, restore: true as const } };
 }
 
-test("native retained recovery compares a foreign future-schema lease without parsing or cleaning it", async () => {
+test.each(["schema", "layout"] as const)("native retained recovery compares foreign metadata without parsing or cleaning it: %s", async mode => {
   try {
-    const f = seeded(undefined, false, true), refs = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)");
+    const f = seeded(undefined, false, mode), refs = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)");
     const report = await collectNativeRetained(f.options);
     expect(report.retained_operation.state, JSON.stringify(report.diagnostics)).toBe("complete");
     expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
