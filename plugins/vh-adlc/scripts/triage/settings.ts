@@ -1,6 +1,6 @@
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
-import type { Settings } from "./types";
+import type { EffectiveLabel, Settings, StandardLabel } from "./types";
 import { settingsFile } from "../settings-file";
 import {createHash} from "node:crypto";
 
@@ -72,6 +72,18 @@ export function origin(root: string): { repository: string; hostname: string } {
   return { repository, hostname: url.hostname.toLowerCase() };
 }
 
+/** The standard label set from the plugin's vocabulary file. */
+export function standardLabels(): StandardLabel[] {
+  const input = JSON.parse(readFileSync(resolve(import.meta.dir, "../labels/vocabulary.json"), "utf8")) as { schema_version: number; labels: StandardLabel[] };
+  if (input.schema_version !== 1 || !Array.isArray(input.labels)) throw new Error("invalid label vocabulary");
+  return input.labels;
+}
+
+/** Each standard label under the name this repository uses; entries keyed by other names have no effect. */
+export function effectiveLabels(config: Pick<Settings, "label_map">): EffectiveLabel[] {
+  return standardLabels().map((label) => ({ ...label, standard: label.name, name: config.label_map[label.name] ?? label.name }));
+}
+
 export function loadSettings(root: string, options: { settingsPath?: string } = {}): Settings {
   root = realpathSync(root);
   const identity = origin(root), file = settingsFile({ root, name: "triage", settingsPath: options.settingsPath, inside: path => resolveInside(root, path), fail });
@@ -92,6 +104,8 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
   const labels = input.label_map === undefined ? {} : object(input.label_map, "label_map");
   const label_map: Record<string, string> = {};
   for (const [name, value] of Object.entries(labels)) label_map[name] = string(value, "label_map");
+  const effective = standardLabels().map((label) => (label_map[label.name] ?? label.name).toLowerCase());
+  if (new Set(effective).size !== effective.length) fail("label_map maps two standard labels to one repository label");
   if(input.workstreams!==undefined&&!Array.isArray(input.workstreams))fail("workstreams");
   const workstreams=(input.workstreams as unknown[]??[]).map(value=>{
     const rule=object(value,"workstreams");keys(rule,["owner","plan_roots","reference_files"],"workstreams");
