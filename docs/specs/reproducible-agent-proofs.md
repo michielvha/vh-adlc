@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Drafted with the owner's answers to Q1 to Q3 folded in; waiting for the first spec review."
+status_description: "R-1 was blocking; its judgement findings are Open Questions Q4 to Q11 for the owner before the revision."
 issue: null
 goal: "A criterion whose proof depends on what an agent session does can be met in an independent implementation review, because the reviewer can repeat the proof itself."
 covers:
@@ -238,9 +238,110 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None. The owner answered Q1 to Q3 on 2026-11-14: hash-matched transcripts can stand in for a proof that
-needs a person, transcripts are committed as redacted copies with raw and redacted hashes, and the Test
-Plan rule goes into the shared convention as well as the plugin.
+The owner answered the first three questions on 2026-11-14: hash-matched transcripts can stand in for a
+proof that needs a person, transcripts are committed as redacted copies with raw and redacted hashes, and
+the Test Plan rule goes into the shared convention as well as the plugin. The questions below come from
+spec review R-1.
+
+### Q4: What does a command-route review do with an agent-session proof? (R-1 F-01)
+
+**Recommendation:** A. The command route's prompt carries the runner commands, implementation reviews get a
+timeout that fits a rerun, and when the route's sandbox cannot start a runner the reviewer returns
+`not verified` for that criterion, naming the reason.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Pass the commands, longer timeout, `not verified` when it cannot start** | Every route gets the same dispatch; a sandboxed route gives an honest verdict instead of timing out | A sandboxed route such as Codex `workspace-write` cannot meet those criteria; they need a host-route review |
+| **B. Review agent-session criteria on the host route** | Those criteria can always be met | Overrides the route the repository chose for implementation reviews |
+
+**Why this is yours:** It decides whether the repository's chosen review route or the proof's needs win.
+
+### Q5: Where do the harness commands in a dispatch come from? (R-1 F-02)
+
+**Recommendation:** A. The runner commands named in the current Test Plan rows, plus the verification
+commands in the repository's `AGENTS.md`.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Test Plan runner commands plus `AGENTS.md` commands** | The commands the criteria actually rely on, from the document under review | The dispatcher reads both sources |
+| **B. The loop settings' `verification_rungs`** | One machine-read source | Rungs list delivery checks, not per-criterion runners, and many repositories have no loop settings |
+
+**Why this is yours:** It fixes what every dispatch must carry.
+
+### Q6: How strict are the S17 reviewer scenarios? (R-1 F-04)
+
+**Recommendation:** A. S17.stale-summary passes only on `not met` with `EVIDENCE` that reports the runner's
+failure, and both cases check that the reviewer session ran the runner command at the target commit.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Require `not met` and an observed run** | The proof fails a reviewer that trusts the summary or skips the run | Depends on the session's tool log |
+| **B. Keep "not `met`"** | A simpler check | Passes a reviewer that returns `not verified` without running anything, which is what R-20 did |
+
+**Why this is yours:** It sets how hard the proof is.
+
+### Q7: What severity does a missing runner get? (R-1 F-06)
+
+**Recommendation:** A. Blocking, as the convention's existing definition of a proof that cannot be executed
+already says, stated in the new Test plan text, so no special severity is needed. On a pin without the new
+text the reviewer raises nothing new.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Blocking, from the existing definition** | One rule, no exception to the severity definitions | A missing runner stops acceptance until it is named |
+| **B. Should-fix, stated as an exception** | Drafts with a missing runner can still be accepted | An exception to the shared definitions the reviewer must carry |
+
+**Why this is yours:** It decides whether a missing runner blocks acceptance.
+
+### Q8: Can the author defer the runner to a task? (R-1 F-07)
+
+**Recommendation:** A. No. The Test Plan row always names the runner's path and command, even before the
+runner exists, the same way a row names a test that implementation will write.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Always name the path and command** | One row form that review can check | The author picks the runner's path while drafting |
+| **B. Allow a row that points at a future task** | Less to decide while drafting | Tasks exist only once a document is planned, so the row names nothing a review can check |
+
+**Why this is yours:** It decides how much the draft must fix up front.
+
+### Q9: How many runs count, and which verdict follows each outcome? (R-1 F-08)
+
+**Recommendation:** A. The reviewer runs each agent-session proof once. A failed pass condition gives
+`not met`. A run that cannot start or finish gives `not verified` with the reason. The reviewer may retry
+once only when the run did not start.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. One run, defined verdicts, one retry if it did not start** | Predictable verdicts and bounded cost | A model that passes most of the time can still fail one review |
+| **B. Best of three runs** | Tolerates an occasional model miss | Three times the cost, and a flaky proof can pass |
+
+**Why this is yours:** It trades review cost against tolerance for model variance.
+
+### Q10: What happens when the raw transcripts of a proof that needs a person cannot be read? (R-1 F-09)
+
+**Recommendation:** A. The committed redacted copy counts when its sha256 matches the recorded redacted
+hash. Redaction changes only account details, and the raw files stay for audit.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. A hash-matched redacted copy counts** | Any reviewer on any machine can meet the criterion | Relies on the redaction changing nothing that matters |
+| **B. Only raw transcripts count; otherwise `not verified`** | The strictest reading of your earlier answer | Only a reviewer on the machine that ran them, before cleanup, can meet such a criterion |
+
+**Why this is yours:** It refines your earlier answer on transcripts.
+
+### Q11: Which files decide whether a run still counts? (R-1 F-10)
+
+**Recommendation:** A. Each runner declares its inputs, such as the plugin directory and its fixture paths.
+The manifest records their tree or blob ids and whether any had uncommitted changes, and a change to any
+of them needs a new run.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Inputs the runner declares** | A precise, checkable rule per runner | Each runner lists its inputs |
+| **B. The whole repository tree** | Nothing to declare | Any unrelated commit forces a rerun of every paid session |
+
+**Why this is yours:** It trades rerun cost against precision.
 
 ## Review Log
 
