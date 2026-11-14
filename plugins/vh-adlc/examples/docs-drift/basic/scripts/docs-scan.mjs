@@ -27,20 +27,27 @@ const documents = [], findings = [], failures = [];
 for (const file of files) {
   try {
     const bytes = blob(file), text = bytes.toString("utf8");
-    documents.push({ path: file, sha256: hash(bytes), status: "complete" });
     for (const match of text.matchAll(/\[[^\]]*\]\(([^\s)]+)\)/gu)) {
       const target = match[1].split(/[?#]/u)[0];
       if (!target || /^[A-Za-z][A-Za-z0-9+.-]*:/u.test(target) || target.startsWith("/")) continue;
-      const relative = posix.normalize(posix.join(posix.dirname(file), decodeURIComponent(target)));
-      if (tracked.has(relative) || paths.some(path => path.startsWith(relative + "/"))) continue;
+      let explanation;
+      try {
+        const relative = posix.normalize(posix.join(posix.dirname(file), decodeURIComponent(target)));
+        if (tracked.has(relative) || paths.some(path => path.startsWith(relative + "/"))) continue;
+        explanation = "Relative link target is absent from the selected Git tree: " + relative;
+      } catch (error) {
+        if (!(error instanceof URIError)) throw error;
+        explanation = "Relative link target has invalid percent encoding: " + target;
+      }
       findings.push({ id: hash(Buffer.from(file + "\0" + match.index + "\0" + target)), detector: "local-links",
         severity: "warning", document: file, location: { line: text.slice(0, match.index).split("\n").length },
-        explanation: "Relative link target is absent from the selected Git tree: " + relative });
+        explanation });
     }
+    documents.push({ path: file, sha256: hash(bytes), status: "complete" });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Document collection failed";
     // Preserve a read failure even when other documents were collected successfully.
-    if (!documents.some(row => row.path === file)) documents.push({ path: file, sha256: null, status: "failed", error: message });
+    documents.push({ path: file, sha256: null, status: "failed", error: message });
     failures.push({ path: file, message });
   }
 }

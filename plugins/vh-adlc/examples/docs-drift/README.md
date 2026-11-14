@@ -39,7 +39,20 @@ release and put that exact source commit in the caller. Record source release,
 plugin version and the complete component digest separately. The worker compares
 the selected payload with that committed pin and saves only its bounded scan
 envelope. Its placeholder pin deliberately fails setup until configured.
-It has read-only contents permission, no provider secrets and no cron trigger.
+It has read-only contents and actions permissions, no provider secrets and no
+cron trigger. The settings reader requires `actions: read`.
+
+The pin step checks consistency of an operator-verified immutable release.
+It executes that selected component's installer and imports its modules to
+compute the compared identity. An operator establishes trust in the release
+before this example runs. A credentialed worker adaptation verifies identity
+with already trusted tooling before executing the selected component.
+
+For native role setup, replace each role's `identity_source: null` with the
+selected client's observed native identity event and field path. The separate
+Claude client is also a placeholder requiring its actual distribution/digest,
+version, model and arguments. All six native role identities need configuration
+and verification before independent review can finish.
 
 The diagnostic artifact uses its own name and cannot supply eligible completed
 audit history or hosted advisory-trial evidence. A real adoption adds the

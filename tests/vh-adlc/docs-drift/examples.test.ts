@@ -27,17 +27,27 @@ test("the complete example settings pass the production strict reader and stay s
   expect(settings.runtime_loader.automatic_updates).toBe(false);
   expect(settings.runtime_loader.ambient_discovery).toBe(false);
   expect(settings.execution.secret_mappings).toEqual({});
+  for (const entry of Object.values(settings.execution.entries)) {
+    expect(entry.worker.identity_source).toBeNull();
+    expect(entry.reviewer.identity_source).toBeNull();
+  }
+  expect(settings.clients[settings.execution.entries.claude.worker.client].provider).toBe("claude");
   for (const path of [settings.project_procedure, settings.scanner.script, settings.runtime_loader.launcher,
     settings.execution.worker_workflow, settings.execution.scheduled_workflow, settings.execution.claude_command])
     expect(readFileSync(join(example, path)).length).toBeGreaterThan(0);
 });
 
-test.each([false, true])("the packaged example collects actual Git inputs and local-link findings, missing target %s", missing => {
+test.each([
+  { name: "present target", missing: false, malformed: false, findings: 0 },
+  { name: "missing target", missing: true, malformed: false, findings: 1 },
+  { name: "malformed target", missing: false, malformed: true, findings: 1 },
+])("the packaged example collects actual Git inputs with a $name", scenario => {
   try {
     const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-drift-example-"))); roots.push(root);
     const repo = join(root, "example with spaces"), artifacts = join(root, "artifacts");
     cpSync(example, repo, { recursive: true }); mkdirSync(artifacts, { mode: 0o700 });
-    if (missing) unlinkSync(join(repo, "src/server.ts"));
+    if (scenario.missing) unlinkSync(join(repo, "src/server.ts"));
+    if (scenario.malformed) writeFileSync(join(repo, "docs/guide.md"), readFileSync(join(repo, "docs/guide.md"), "utf8") + "\n[Invalid link](a%zz.md)\n");
     readGit(repo, "init", "--template=", "-b", "main");
     readGit(repo, "add", "--all");
     readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "Owned packaged example");
@@ -50,8 +60,12 @@ test.each([false, true])("the packaged example collects actual Git inputs and lo
     const report = JSON.parse(completion.stdout.toString());
     expect(report).toMatchObject({ command: "scan", outcome: "collected", assessment: { complete: true } });
     expect(report.assessment.documents.map((row: { path: string }) => row.path)).toEqual(["docs/guide.md"]);
-    expect(report.assessment.findings).toHaveLength(missing ? 1 : 0);
-    if (missing) expect(report.assessment.findings[0]).toMatchObject({ detector: "local-links", document: "docs/guide.md" });
+    expect(report.assessment.findings).toHaveLength(scenario.findings);
+    if (scenario.findings) expect(report.assessment.findings[0]).toMatchObject({ detector: "local-links", document: "docs/guide.md" });
+    if (scenario.malformed) {
+      expect(report.assessment.documents[0].status).toBe("complete");
+      expect(report.assessment.detectors[0].outcome).toBe("complete");
+    }
     expect(captureRepositoryState(repo)).toEqual(before);
   } catch (error) { failed = true; throw error; }
 }, 45000);

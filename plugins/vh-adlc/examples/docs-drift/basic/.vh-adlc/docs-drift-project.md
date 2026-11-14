@@ -8,6 +8,9 @@ The example starts staged and has no standing publication effects. Its client
 distribution and model fields are placeholders. Local collection requires no
 provider credentials. Configure and verify the consumer's actual client,
 launcher, role identity, worker and adoption evidence before provider execution.
+Replace every role's null native identity source and the separate Claude client
+placeholder with the selected client's actual verified bindings. Each entry
+retains its own worker/reviewer identity and full model.
 
 No generated files or feedback stores are configured here. Add actual project
 checks and separate suppression/correction-history procedures during authorized

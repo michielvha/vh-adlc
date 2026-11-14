@@ -826,3 +826,39 @@ WHERE: plugins/vh-adlc/references/docs-drift-review.md, Interrupted delivery (`i
 EVIDENCE: The production CLI usage in cli.ts gives the recovery invocation as "bun <original-retained-plugin>/scripts/docs-drift/cli.ts <inspect-recovery|acknowledge-delivery|reconcile-publication>". It explains: "Recovery uses original retained code, policy and journal evidence while preserving current worktree policy and launchers". It also says "Publishing and resuming execute only from the exact approved retained controller." The reference template instead uses `bun <plugin>/scripts/docs-drift/cli.ts inspect-recovery ...`. A grep of the docs-drift references and SKILL.md finds no wording about invoking the original retained plugin or the approved retained controller for recovery, acknowledgement, reconciliation, publish or resume. After a plugin upgrade, an agent that copies the template runs the current installed helper against the original journal. Another agent that follows the CLI usage runs the retained one, so the two diverge on the recovery and publication path. The grammar test cannot catch this. templates() keeps only blocks where `words[1] === "<plugin>/scripts/docs-drift/cli.ts"` and checks only the argv after the script path. A template that correctly used `<original-retained-plugin>` would be silently dropped from coverage.
 PROPOSAL: Change the `inspect-recovery` template to `<original-retained-plugin>`. State in docs-drift-review.md that `inspect-recovery`, `acknowledge-delivery` and `reconcile-publication` run from the original retained plugin, and that `publish`, `resume` and `resume-closure` run from the exact approved retained controller rather than the current checkout. Extend the procedure.test.ts filter to accept the `<original-retained-plugin>` script path as well. Then the recovery template is still parsed by `argumentsForCommand`, and a recovery template that uses `<plugin>` fails.
 ```
+
+## Component diagnostic 128
+
+Exact committed target `8a82080130f7e61fcd83f43ca1fb20c276241230`. Actual Copilot Opus 5.5 qualifies all 140 required reads with unchanged packet hashes, procedural isolation, no outside reads and no private files sent. One should-fix concerns malformed link accounting in the new example scanner. Three nits concern read-only permissions, operator-trusted pin-check ordering and placeholder native role bindings. Original return follows before correction.
+
+```text
+MODEL: claude-opus-5.5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/examples/docs-drift/basic/scripts/docs-scan.mjs, per-document loop (`decodeURIComponent(target)` inside the try block, and the catch that runs `if (!documents.some(row => row.path === file))`)
+EVIDENCE: The document row is pushed with `status: "complete"` before the links are parsed. A relative link with a malformed percent escape, such as `[x](a%zz.md)`, makes `decodeURIComponent` throw a URIError after that push. The catch sees that the row already exists, so it does not mark it failed, but it still adds the file to `collection_failures`. The protocol output then lists the document as complete in both `documents` and `execution.documents`, lists it again as a collection failure, keeps any findings from earlier links in that document, and sets the detector outcome to failed. One malformed link in document content therefore makes the whole collection incomplete and produces contradictory accounting. The accepted contract keeps read and parse failures separate from detector findings, and the README says the unchanged example produces complete collection. No example test covers this path.
+PROPOSAL: Report a link target that cannot be decoded as a local-links finding instead of throwing, or decode inside a narrow try that records a finding. If a failure after the read is kept, rewrite that document's row as failed and remove it from `execution.documents` so the accounting is consistent.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: plugins/vh-adlc/examples/docs-drift/README.md, staged workflow paragraph ("It has read-only contents permission, no provider secrets and no cron trigger.")
+EVIDENCE: Both `basic/.github/workflows/docs-drift.yml` and `docs-drift-worker.yml` grant `contents: read` and `actions: read`. settings.ts rejects any `execution.permissions` without `actions: read`, and examples.test.ts asserts that pair. The README describes only the contents permission.
+PROPOSAL: Say that the workflows have read-only contents and actions permissions, and note that the settings reader requires `actions: read`.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: plugins/vh-adlc/examples/docs-drift/basic/.github/workflows/docs-drift-worker.yml, steps "Prepare the locked reader" and "Match the committed collection pin"; basic/scripts/check-component.ts; README.md ("The worker compares the selected payload with that committed pin")
+EVIDENCE: The worker runs `component/plugins/vh-adlc/scripts/ensure-vh-adlc.sh` from the selected checkout before the pin step. check-component.ts then imports `git.ts`, `settings-file.ts`, `adoption.ts` and `bootstrap.ts` from that same selected directory, through `DOCS_DRIFT_PLUGIN_DIR`, to compute the identity it compares. The selected component's own code has already run before any mismatch is detected, and the digest is computed by the code being checked. So the step checks that the operator-attested immutable SHA is consistent with the committed pin. It does not independently verify integrity before loading. The README does not state this limit, and a consumer adapting the example to a worker that holds credentials could carry the ordering forward.
+PROPOSAL: State in the README and in a workflow comment that the pin step checks consistency of an operator-verified immutable release and runs that component's installer and modules. Add that a credentialed adaptation should compute or verify the identity with already trusted tooling before executing the selected component.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: plugins/vh-adlc/examples/docs-drift/basic/.vh-adlc/docs-drift.yaml, `execution.entries.claude` and every worker/reviewer role; docs-drift-settings.md, Runtime and hosted entry
+EVIDENCE: The guide says worker and reviewer roles bind a client, a full model and a native identity-source event/field. None of the six example roles declares `identity_source`, which settings.ts accepts as null. The `claude` entry's worker and reviewer are bound to `client: copilot-linux`, the only client defined. The README and project procedure name only the client distribution and model values as placeholders. A consumer who replaces just those labelled values keeps a Claude entry that launches a Copilot client and roles without native identity, so review stays pending.
+PROPOSAL: Add a commented placeholder `identity_source` to each role and a separate placeholder Claude client for the `claude` entry. Alternatively, list both as required replacements in the README and the project procedure.
+```
