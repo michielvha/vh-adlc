@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Awaiting decisions on the first provider fixtures and the brief approval step after the first independent spec review."
+status_description: "Awaiting owner choices on provider coverage, brief approval and local draw.io setup after review R-1."
 issue: null
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
 covers:
@@ -112,6 +112,17 @@ None yet; written once the document is planned.
 | **B. Wait for brief approval** | The owner can correct the view before the agent lays it out. | Every new diagram requires a second interaction, even when the sources are clear. |
 
 **Why this is yours:** This sets how much control the owner has before an on-demand render.
+
+### Q3: Who should supply draw.io Desktop and the provider assets?
+
+**Recommendation:** A. Use a configured local installation and pinned provider assets. The two design samples exported with the local renderer while networking was disabled.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Use a configured local installation** | The plugin uses an existing Desktop exporter and provider assets that the project or host has supplied. | The owner supplies those prerequisites before requesting an export. |
+| **B. Provision the renderer and assets with the plugin** | The shared setup acquires the exporter and provider assets for adopters. | The plugin owns platform support, distribution permissions, verification and updates for those artifacts. |
+
+**Why this is yours:** This decides who maintains the rendering tools and provider assets.
 
 ## Review Log
 
