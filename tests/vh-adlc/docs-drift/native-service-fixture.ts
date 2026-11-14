@@ -16,6 +16,14 @@ if (state.git_source) {
     for (const pr of state.prs) if (state.refs['refs/heads/' + pr.head.ref]) pr.head.sha = state.refs['refs/heads/' + pr.head.ref];
 }
 const save = () => writeFileSync(statePath, JSON.stringify(state));
+if (process.argv[1].endsWith('/gh') && args[0] === 'api' && !args.includes('graphql') && Number.isSafeInteger(state.rest_request_limit)) {
+    state.rest_requests = (state.rest_requests ?? 0) + 1;
+    save();
+    if (state.rest_requests > state.rest_request_limit) {
+        process.stdout.write('HTTP/2.0 403 Forbidden\\r\\nx-ratelimit-limit: 1000\\r\\nx-ratelimit-remaining: 0\\r\\nx-ratelimit-reset: ' + Math.ceil(Date.now() / 1000 + 3600) + '\\r\\n\\r\\n' + JSON.stringify({ message: 'Synthetic API rate limit exceeded' }));
+        process.exit(1);
+    }
+}
 const option = name => args[args.indexOf(name) + 1];
 const applyLabels = names => {
     if (state.drop_labels) return [];

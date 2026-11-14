@@ -18,9 +18,9 @@ import { resumeEffects } from "./recovery";
 import { publicationEffectsOutput } from "./recovery-output";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { loadCommittedSettings } from "./settings";
-import { createNativeTransport, readNativeContext } from "./transport";
+import { createNativeTransport, readNativeContext, withNativeObservation, NativeObservationChanged } from "./transport";
 
-type Options = Omit<Parameters<typeof collectClosureReview>[0], "closure_inventory"> & { authority: unknown };
+type Options = Omit<Parameters<typeof collectClosureReview>[0], "closure_inventory" | "observation"> & { authority: unknown };
 function requireExecutingRuntime(runtime: { component: { directory: string } }): void {
   if (Bun.version !== "1.4.4" || realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/closure-controller.ts"))
     throw Error("Retained executing closure controller required");
@@ -29,17 +29,28 @@ function requireExecutingRuntime(runtime: { component: { directory: string } }):
 async function currentState(options: Options, inventory?: ClosureInventory, expected?: SealedPlan) {
   if (readGit(options.repo, "rev-parse", "HEAD").toString().trim() !== options.source) throw new PublicationScopeChanged("Closure assessment HEAD changed");
   const { settings } = loadCommittedSettings(options.repo, options.source);
-  const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
-  if (native.default_commit !== options.source || expected && (native.identity.repository_id !== expected.manifest.repository_id
-    || native.identity.actor_id !== expected.manifest.actor_id || native.identity.actor !== expected.manifest.actor))
-    throw new PublicationScopeChanged("Original closure source or actor changed");
-  const checked = await collectClosureReview({ ...options, closure_inventory: inventory }), target = checked.target;
-  const current = target?.worker_inputs, facts = current?.target;
-  if (!checked.complete) {
-    if (checked.scope_changed || expected && current?.complete && current.worker_input_sha256 !== workerInputDigest(expected.manifest.bindings))
-      throw new PublicationScopeChanged("Original closure worker or native inputs changed");
-    throw Error(checked.diagnostics.join("\n") || "Current closure review unavailable");
+  const scope = { hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path };
+  let checked: Awaited<ReturnType<typeof collectClosureReview>>;
+  try {
+    checked = await withNativeObservation(scope, async observation => {
+      const native = readNativeContext({ ...scope, observation });
+      if (native.default_commit !== options.source || expected && (native.identity.repository_id !== expected.manifest.repository_id
+        || native.identity.actor_id !== expected.manifest.actor_id || native.identity.actor !== expected.manifest.actor))
+        throw new PublicationScopeChanged("Original closure source or actor changed");
+      const result = await collectClosureReview({ ...options, closure_inventory: inventory, observation });
+      const current = result.target?.worker_inputs;
+      if (!result.complete) {
+        if (result.scope_changed || expected && current?.complete && current.worker_input_sha256 !== workerInputDigest(expected.manifest.bindings))
+          throw new PublicationScopeChanged("Original closure worker or native inputs changed");
+        throw Error(result.diagnostics.join("\n") || "Current closure review unavailable");
+      }
+      return result;
+    });
+  } catch (error) {
+    if (error instanceof NativeObservationChanged) throw new PublicationScopeChanged(error.message);
+    throw error;
   }
+  const target = checked.target, current = target?.worker_inputs, facts = current?.target;
   if (!target?.manifest || !current?.runtime || !facts?.store || !facts.identity) throw Error("Complete original closure runtime and manifest required");
   const runtime = current.runtime, manifest = target.manifest;
   const policyOptions = { repo: facts.store.root, current_default: options.source, identity: facts.identity, runtime };

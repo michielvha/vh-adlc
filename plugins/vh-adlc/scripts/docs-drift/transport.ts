@@ -4,6 +4,7 @@ import { nativeMutationArguments, projectSuccess, retainSuccess, type ExecutionR
 import { projectBeforeSource, retainBefore, type BeforeData } from "./delivery-proof";
 import { projectRejection, retainRejection, type RejectionEvidence } from "./rejections";
 import { PublicationExecutionError } from "./attempts";
+import { ArtifactChanged } from "./evidence-input";
 import type { Effect } from "./manifests";
 import { publishArtifact, syncDirectory, type Outcome, type SealedPlan, type writePlanObject } from "./journal";
 import { randomUUID } from "node:crypto";
@@ -11,11 +12,11 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { createGitHubReader, createRepositoryReader, GitHubReadError } from "../github-read";
 import { gitEnvironment } from "../git-read";
-import { canonicalJSON, protocolPath, sha256 } from "./protocol";
+import { canonicalJSON, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { effectMarker } from "./manifests";
 import { publicationMarker } from "./report-history";
 import { retainAbsence, retainLookup, type AbsenceEvidence } from "./observations";
-import { executeOwnedProcess } from "./owned-process";
+import { executeOwnedProcess, OUTPUT_LIMIT } from "./owned-process";
 import { externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
 import { isRefreshTarget, requireOwnedStore } from "./proposals";
 import { readGit } from "./git";
@@ -133,14 +134,99 @@ function authenticatedIdentity(repo: ReturnType<typeof contentsAccess>, hostname
     actor: text(viewer.login), actor_id: positive(viewer.databaseId) };
 }
 
-/** Observe contents access and the authenticated account without constructing an effect transport. */
-export function readNativeContext(options: {
+type NativeContextOptions = {
   hostname: string; repository: string; credential: string; path?: string; timeout_ms?: number;
-}): { identity: PublicationIdentity; default_commit: string; repository: ReturnType<typeof createRepositoryReader> } {
+};
+type NativeContext = { identity: PublicationIdentity; default_commit: string; repository: ReturnType<typeof createRepositoryReader> };
+const observationBrand = Symbol("native-observation");
+export type NativeObservation = Readonly<{ [observationBrand]: true }>;
+export class NativeObservationChanged extends ArtifactChanged {}
+type Observation = {
+  scope: Required<NativeContextOptions>; context: NativeContext; invalidate(reason: string): never;
+};
+const nativeObservations = new WeakMap<NativeObservation, Observation>();
+
+function nativeContext(options: NativeContextOptions): NativeContext {
   const environment = nativeEnvironment(options), timeout = options.timeout_ms ?? 30000;
   const reader = createGitHubReader(options.hostname, { inherit_env: false, env: environment, timeout_ms: timeout });
   const repository = createRepositoryReader(reader, options.repository), current = contentsAccess(repository);
   return { identity: authenticatedIdentity(current, options.hostname, environment, timeout), default_commit: current.head_sha, repository };
+}
+
+/** Observe contents access and the authenticated account without constructing an effect transport. */
+export function readNativeContext(options: NativeContextOptions & { observation?: NativeObservation }): NativeContext {
+  if (options.observation === undefined) return nativeContext(options);
+  const observed = nativeObservations.get(options.observation);
+  if (!observed) throw new NativeObservationChanged("Original active native observation required");
+  const scope = observed.scope;
+  if (options.hostname !== scope.hostname || options.repository !== scope.repository || options.credential !== scope.credential
+    || (options.path ?? process.env.PATH ?? "/usr/bin:/bin") !== scope.path || (options.timeout_ms ?? 30000) !== scope.timeout_ms)
+    observed.invalidate("Native observation scope changed");
+  return { ...observed.context, identity: { ...observed.context.identity } };
+}
+
+/** One read-only validation phase shares observations and replays its complete read set before returning. */
+export async function withNativeObservation<T>(options: NativeContextOptions, run: (observation: NativeObservation) => Promise<T>): Promise<T> {
+  const scope = { hostname: options.hostname, repository: options.repository, credential: options.credential,
+    path: options.path ?? process.env.PATH ?? "/usr/bin:/bin", timeout_ms: options.timeout_ms ?? 30000 };
+  const initial = nativeContext(scope), observation = Object.freeze({ [observationBrand]: true as const });
+  type Reader = NativeContext["repository"];
+  const checks: Array<{ digest: string; read(reader: Reader): unknown }> = [];
+  let active = true, retained = 0, changed: string | null = null;
+  function invalidate(reason: string): never { changed = reason; throw new NativeObservationChanged(reason); }
+  function cached<Args extends (number | string)[], Value>(read: (reader: Reader, ...args: Args) => Value) {
+    const values = new Map<string, { digest: string; retained?: { value: Value } }>();
+    return (...args: Args): Value => {
+      if (!active) throw new NativeObservationChanged("Native observation has finished");
+      const key = canonicalJSON(args).toString(), prior = values.get(key);
+      if (prior?.retained) return structuredClone(prior.retained.value);
+      const value = read(initial.repository, ...args), bytes = canonicalJSON(value), digest = sha256(bytes);
+      if (prior) {
+        if (prior.digest !== digest) invalidate("Native repository inputs changed during validation");
+      } else {
+        const saved = retained + bytes.length <= OUTPUT_LIMIT ? { value: freezeJSON(structuredClone(value)) } : undefined;
+        if (saved) retained += bytes.length;
+        values.set(key, { digest, ...(saved ? { retained: saved } : {}) });
+        checks.push({ digest, read: reader => read(reader, ...args) });
+      }
+      return value;
+    };
+  }
+  const repository = Object.freeze({ ...initial.repository,
+    repository: cached(reader => reader.repository()),
+    ref: cached((reader, ref: string) => reader.ref(ref)),
+    pull: cached((reader, number: number) => reader.pull(number)),
+    mergedPull: cached((reader, number: number) => reader.mergedPull(number)),
+    comments: cached((reader, number: number) => {
+      const page = reader.comments(number);
+      if (!page.complete) throw Error("Incomplete native comments collection");
+      return page;
+    }),
+  });
+  function recheck() {
+    if (changed !== null) throw new NativeObservationChanged(changed);
+    const fresh = nativeContext(scope);
+    if (!same(fresh.identity, initial.identity) || fresh.default_commit !== initial.default_commit)
+      invalidate("Native source or actor changed during validation");
+    for (const check of checks) {
+      if (sha256(canonicalJSON(check.read(fresh.repository))) !== check.digest)
+        invalidate("Native repository inputs changed during validation");
+    }
+    const final = nativeContext(scope);
+    if (!same(final.identity, initial.identity) || final.default_commit !== initial.default_commit)
+      invalidate("Native source or actor changed during final validation");
+  }
+  nativeObservations.set(observation, { scope, context: { ...initial, repository }, invalidate });
+  try {
+    let result: T;
+    try { result = await run(observation); }
+    catch (error) {
+      try { recheck(); } catch (fresh) { if (fresh instanceof NativeObservationChanged) throw fresh; }
+      throw error;
+    }
+    recheck();
+    return result;
+  } finally { active = false; nativeObservations.delete(observation); }
 }
 
 /** Shared observation rules operate on the entry's explicitly selected read adapter. */

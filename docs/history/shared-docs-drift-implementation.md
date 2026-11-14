@@ -708,3 +708,17 @@ WHERE: tests/vh-adlc/docs-drift/local-history.test.ts, case "legacy invocation r
 EVIDENCE: The case checks only a limit one byte under the record size. No case accepts a legacy record whose size equals the limit. If `>` changed to `>=`, the matrix would still pass, so the boundary of the retained-byte guard is not pinned.
 PROPOSAL: Add an at-limit control: set `max_entry_bytes = bytes.length` and expect the legacy record to be returned with no diagnostics, next to the existing one-byte-under refusal.
 ```
+
+## Component diagnostic 123
+
+Exact local target `c6f1f7330b45db36784cdaab7ba1bc69ca43f893`. Actual Copilot Opus 5.5 with procedural isolation. All 63 required chunks were read with unchanged packet hashes, no outside paths and no private files sent. The deterministic legacy follow-up returns no blocking or should-fix findings and one prose nit. Original records follow before the Context-only correction. Full feature acceptance remains open.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: shared/docs/specs/shared-docs-drift.md, Context, "Current implementation checkpoint" (current-status.md chunk 00001 line 15)
+EVIDENCE: The sentence "T92 [U+2013] T95 retain current-result verification and exact carried-delivery evidence." contains an en dash (U+2013) between the task IDs. A native grep for U+2013/U+2014 across all supplied chunks finds only this line. guides/humanize-prose.md section 8 says the documentation convention in these repositories forbids em and en dashes in prose a reader sees. The Owner summary area of this spec is part of the spec/history documentation that this patch is allowed to change. The test-only correction itself is sound. Bun's spy on the fs namespace intercepts the named `opendirSync` import in local-history.ts, as the passing `opened > 0` assertion in each legacy call shows. In the legacy variant, every original, unsaved and z-newer record is renamed to the timestamp/digest layout. With descending order, five newer unsaved files and `by-invocation` come before the saved record's prefix, so adding a max_runs entry counter would make the case fail. The wrongFirst order forces the same-stamp refusal and the continued traversal. The bound case refuses at bytes.length - 1 and accepts the same file at bytes.length with no diagnostics. The checkpoint log shows 33 passing cases and 154 assertions.
+PROPOSAL: Replace the en dash with plain wording, for example "T92 to T95 retain current-result verification and exact carried-delivery evidence."
+```

@@ -10,7 +10,7 @@ import { captureRepositoryState, captureSnapshot, createOwnedObjectStore, extern
 import { collectClosureInputs, recheckClosureInputs, type ClosureInputs } from "./closure-inputs";
 import { collectResolutionInputs, readResolutionProposal, recheckResolutionInputs, type ResolutionInputs, type ResolutionProposal } from "./resolve-inputs";
 import { fetchProposalObjects } from "./proposals";
-import { readNativeContext } from "./transport";
+import { readNativeContext, type NativeObservation } from "./transport";
 import { canonicalDigest, canonicalJSON, freezeJSON } from "./protocol";
 
 function selectedProposals(value: unknown, source: string): number[] {
@@ -30,7 +30,7 @@ type ResolutionCollectionResult = {
 
 type NativeCollectionOptions = {
   repo: string; source: string; artifact_root: string; selection: unknown; owner: string; run: string;
-  credential: string; path?: string; closure_inventory?: ClosureInventory; closure_operation?: string;
+  credential: string; path?: string; closure_inventory?: ClosureInventory; closure_operation?: string; observation?: NativeObservation;
 };
 
 /** The production collector selects the native reader and fixed authenticated fetch itself. */
@@ -43,7 +43,7 @@ export async function collectNativeResolution(input: NativeCollectionOptions): P
     ...(settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com")
       ? { GH_TOKEN: options.credential } : { GH_ENTERPRISE_TOKEN: options.credential }) };
   const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository,
-    credential: options.credential, path: options.path });
+    credential: options.credential, path: options.path, observation: options.observation });
   try {
     const root = externalArtifactDirectory(options.artifact_root, snapshot.repo), context = native();
     if (context.default_commit !== snapshot.source_commit || context.identity.default_branch !== settings.default_branch)
@@ -97,7 +97,7 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
   const consolidation = selection.consolidation;
   if (options.closure_inventory) {
     const { settings } = loadCommittedSettings(options.repo, options.source);
-    const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, observation: options.observation });
     requireClosureInventoryScope(options.closure_inventory, { source_commit: options.source, operation_id: options.closure_operation,
       consolidation, repository: settings.repository, repository_id: native.identity.repository_id });
   }
@@ -111,7 +111,7 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
     }
     const snapshot = captureSnapshot(options.repo, options.source), settings = snapshot.settings;
     const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository,
-      credential: options.credential, path: options.path });
+      credential: options.credential, path: options.path, observation: options.observation });
     const context = native();
     if (context.default_commit !== options.source || context.identity.repository_id !== initial.inputs.repository_id)
       throw Error("Closure source or repository changed");
@@ -176,7 +176,7 @@ export async function collectNativeClosureTarget(input: NativeCollectionOptions)
   const result: ClosureTargetCollection = { authority: "none", scope_changed: false, complete: false, diagnostics: [], store: null, identity: null, target: null, target_sha256: null };
   const before = canonicalDigest(captureRepositoryState(options.repo)), limit = Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes);
   try {
-    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, observation: options.observation });
     const context = native(); result.identity = context.identity;
     if (options.closure_inventory) requireClosureInventoryScope(options.closure_inventory, { source_commit: options.source,
       operation_id: selected.operation_id, consolidation: selected.consolidation, repository: settings.repository, repository_id: context.identity.repository_id });

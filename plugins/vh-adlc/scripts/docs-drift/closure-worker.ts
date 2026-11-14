@@ -76,7 +76,7 @@ function recheckRoleTarget(options: Options, current: Inputs): void {
   const observed = current.target;
   if (!observed?.target || !observed.store || !observed.identity) throw Error("Original closure target unavailable");
   const snapshot = captureSnapshot(options.repo, options.source), settings = snapshot.settings;
-  const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+  const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, observation: options.observation });
   const context = native();
   if (context.default_commit !== options.source || canonicalDigest(context.identity) !== canonicalDigest(observed.identity))
     throw new PublicationScopeChanged("Closure source or actor changed after original role collection");
@@ -154,7 +154,7 @@ export async function collectClosureReviewTarget(input: Options & { worker_captu
     result.worker = { binding: worker.binding, launch: worker.launch };
     const original = verifyRoleIdentity(worker.evidence, policy);
     const verified = readVerifications(options, snapshot, target.target, original.records, current.worker_input_sha256, original.returned_sha256);
-    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, observation: options.observation });
     const context = native();
     if (context.default_commit !== options.source || canonicalDigest(context.identity) !== canonicalDigest(target.identity))
       throw new PublicationScopeChanged("Closure source or actor changed before semantic verification");
