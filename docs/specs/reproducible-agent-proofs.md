@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Restored what the cut dropped, after clean spec review R-5; waiting for spec review R-6."
+status: planned
+status_description: "Accepted by the owner at R-6; R-6's three should-fix gaps are listed for implementation. Next: tasks, then the companion vhco-pro/docs change."
 issue: null
 goal: "A criterion whose proof depends on what an agent session does can be met in an independent implementation review, because the reviewer can repeat the proof itself."
 covers:
@@ -321,6 +321,7 @@ Design and the AC-01 and AC-09 tests made exact.
 | 2026-11-14 | R-4 | spec | `0661a35` | claude-opus-5-5 | procedural | Blocking: two static-check rows reject the criteria's own hyphenated wording; five should-fix findings and two nits |
 | 2026-11-14 | R-5 | spec | `c378677` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix findings and two nits, all from text the cut dropped |
 | 2026-11-14 | R-6 | spec | `e2785fe` | claude-opus-5-5 | procedural | Clean: no blocking finding; three should-fix findings and one nit, listed for implementation |
+| 2026-11-14 | R-6 | spec | `e2785fe` | n/a | n/a | accepted by owner |
 
 ### R-1
 
