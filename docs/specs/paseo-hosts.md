@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revising the Windows bootstrap and adding deadlines to every desktop client call after review R-41 found a hung SSH call (F-01)."
+status: planned
+status_description: "Revision accepted at R-44; T45 to T49 add the Windows bootstrap fix and client call deadlines."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 branch: feat/paseo-hosts
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
@@ -436,6 +436,7 @@ None.
 | 2026-11-13 | R-42 | spec | `09a17a644226f28d9db73d707142b302f9d25cac` | unknown | procedural | Four factual findings (the quit and wait deadline leaves out the force-stop wait, no open tasks, drift from main, warnings arrive as CLIXML) and two judgement findings (deadlines only on desktop app calls, timeout tests during a rollback); none blocking; model identity not attested. |
 | 2026-11-13 | R-43 | spec | `6a077d29dabfc1a7857dbeeaa1d25500043f315e` | unknown | procedural | Three factual findings (a probe that times out falls through to exit 4, T49 names a release build for the rollbacks, the macOS quit deadline leaves out the AppleScript reply wait) and one judgement finding (the debugging-port forward reads as a call with a 30-second deadline); none blocking; model identity not attested. |
 | 2026-11-14 | R-44 | spec | `b0916807a30ca6884847d9b7f682f13fd8203a76` | unknown | procedural | No blocking finding: one should-fix factual finding (AC-18 does not repeat the Design's exception for the debugging-port forward) and four factual nits (a `uname -s` timeout case, the macOS worst-case sum, the owner summary, a CI line citation); model identity not attested. |
+| 2026-11-14 | R-44 | spec | `b0916807a30ca6884847d9b7f682f13fd8203a76` | n/a | n/a | accepted by owner |
 
 ### R-1
 
