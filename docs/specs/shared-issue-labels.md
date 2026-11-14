@@ -357,8 +357,9 @@ once would make each other's reviews stale. So:
       which two standard labels share an effective name, case-insensitively, is refused when read.
       Stackweaver's current settings file still reads, and the triage settings reference describes
       these rules.
-- [ ] AC-08: This repository has a `.vh-adlc/triage.yaml` that `vh-adlc settings read` accepts and a
+- [x] AC-08: This repository has a `.vh-adlc/triage.yaml` that `vh-adlc settings read` accepts and a
       triage run in report-only mode reads.
+      Evidence: on feat/shared-issue-labels at T15, `vh-adlc settings read --stdin` answered for `.vh-adlc/triage.yaml`; the triage CLI loaded it as configured settings, collected michielvha/vh-adlc read-only (10 issues, all collections complete) and saved a report to `/tmp/sil-t15/report.md` outside the checkout. This was the collect and report steps run directly, not an agent-driven sweep.
 - [ ] AC-09: `michielvha/vh-adlc` and `michielvha/stackweaver` each hold every standard label with
       the standard color and description, and no issue in either lost a label.
 - [ ] AC-10: The workflows user guide describes the standard label set and the helper, and the
@@ -421,7 +422,8 @@ shared-development-loop).
       Evidence: `bun test tests/vh-adlc/labels/vocabulary.test.ts`: 5 pass, 2 fail; the guide lacks the label set and helper and the authority reference has no label-plan row.
 - [x] T14 `docs/user-guides/workflows.md`, `plugins/vh-adlc/references/authority.md` - the guide section and the authority row; T13 passes (AC-10)
       Evidence: `bun test tests/vh-adlc/labels/vocabulary.test.ts`: 7 pass. Suites that read `authority.md` or the guide (audit discovery, intake and setup-docs, maintenance and triage discovery, triage migration, loop): all pass.
-- [ ] T15 `.vh-adlc/triage.yaml` - vh-adlc's own triage settings; `vh-adlc settings read --stdin` accepts it and a report-only triage sweep with `--report-output` outside the checkout reads it, both outputs recorded (AC-08)
+- [x] T15 `.vh-adlc/triage.yaml` - vh-adlc's own triage settings; `vh-adlc settings read --stdin` accepts it and a report-only triage sweep with `--report-output` outside the checkout reads it, both outputs recorded (AC-08)
+      Evidence: `vh-adlc settings read --stdin < .vh-adlc/triage.yaml`: answered with the declared values. `bun plugins/vh-adlc/scripts/triage/cli.ts settings --repo .`: configured true from `.vh-adlc/triage.yaml`. A read-only `collect --mode sweep` against michielvha/vh-adlc collected 10 issues and 11 labels with every collection complete, and `report --report-output /tmp/sil-t15/report.md` saved outside the checkout; `git status` showed only the new settings file.
 - [ ] T16 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - minor version bump from the current merged version (0.18.0 at `da736bc`, so 0.19.0 unless main moves again); `bun test tests/vh-adlc --timeout 60000`, `go test ./...`, `go vet ./...`, `golangci-lint run` and `go mod tidy -diff` pass (AC-11)
 - [ ] T17 `tests/vh-adlc/labels/evidence/candidate-install.md` - the AC-11 procedure run on the branch head: installed files listed, both manifest versions compared, installed and source `plan` outputs byte-identical (AC-11)
 - [ ] T18 `tests/vh-adlc/labels/evidence/rollout-vh-adlc.md` - owner-approved `plan` and `apply` on `michielvha/vh-adlc` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
