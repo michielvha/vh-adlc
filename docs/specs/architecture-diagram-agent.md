@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted at spec review R-3 and ready for task planning."
+status: in-progress
+status_description: "Implementing the shared diagram skill and native-host fixtures."
 issue: null
+branch: feat/architecture-diagram-agent
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
 covers:
   - .agents/plugins/marketplace.json
