@@ -367,3 +367,9 @@ from source paths. Ordinary mapping upkeep stays here; standard feature-spec
 coverage revisions go through the spec operation. Project generators and visual
 checks remain local. See the [procedure](../../plugins/vh-adlc/references/docs-impact.md)
 and [complete runnable example](../../plugins/vh-adlc/examples/docs-impact/README.md).
+
+## Architecture diagrams
+
+Ask for `vh-adlc-diagram` with a diagram question, the repository files or design brief to use, and a new output directory. The skill writes a source brief, an editable draw.io file and an SVG. It renders in the same request when the sources support a useful view. Proposed connections are marked, and unresolved connections stay in the brief.
+
+Configure a local draw.io Desktop executable and graphical environment, Bun, `xmllint` and GNU `mv` with no-replace support. Provide the local XML schema and provider shape assets with their expected SHA-256 digests. The [diagram procedure](../../plugins/vh-adlc/references/diagram.md) details the inputs and export command.

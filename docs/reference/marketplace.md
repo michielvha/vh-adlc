@@ -110,3 +110,7 @@ A consumer compatibility wrapper can use `VH_ADLC_PLUGIN_ROOT` exported before
 sessions start. Point it to the actual installed plugin directory and refresh it
 when the installer changes the location. A local source copy is not marketplace
 installation evidence.
+
+## Architecture diagram skill
+
+The shared `vh-adlc` package includes `vh-adlc-diagram` from plugin version 0.21.0. The [workflow](../user-guides/workflows.md#architecture-diagrams) lists the local renderer and asset prerequisites.
