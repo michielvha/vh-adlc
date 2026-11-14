@@ -81,6 +81,7 @@ The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`.
 - [ ] AC-02: The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
 - [ ] AC-03: A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
 - [ ] AC-04: An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+      Evidence: Review R-8 found AC-04 not met because the Codex retry published a partial directory after an export timeout.
 - [ ] AC-05: A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
 
 ## Test Plan
@@ -122,6 +123,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | 2026-11-14 | R-6 | spec | `48db37936eab67d416ccdbf53172b0d02a2765f7` | unknown | procedural | Three should-fix findings and one nit |
 | 2026-11-14 | R-7 | spec | `5d3af84c9f93809faf5ad3668477fab1e7bfd1d1` | unknown | procedural | No findings |
 | 2026-11-14 | R-7 | spec | `5d3af84c9f93809faf5ad3668477fab1e7bfd1d1` | n/a | n/a | accepted by owner |
+| 2026-11-14 | R-8 | implementation | `7cd15314eb48ac223a6126006fd55ad049d0dc3c` | unknown | procedural | Four criteria met, one unmet and three findings |
 
 ### R-1
 
@@ -272,6 +274,49 @@ PROPOSAL: Refresh the summary to record the completed checks at their tested rev
 ### R-7
 
 NO FINDINGS
+
+### R-8
+
+CRITERION: AC-01 An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
+VERDICT: met
+EVIDENCE: At `7cd15314eb48ac223a6126006fd55ad049d0dc3c`, both isolated native profiles installed the candidate from their respective catalogs. I matched all 154 installed files on each host to the candidate and verified completed reads of the installed skill in both AWS transcripts. The package checker and maintenance and triage discovery tests passed.
+
+CRITERION: AC-02 The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
+VERDICT: met
+EVIDENCE: I compared the four delivered briefs, drawings and SVGs to the fixture sources. The AWS routes show 443, 8080 and 5432 in order and omit the dependency-only Log Bucket. Both OCI views show the three proposed backup hops, label the unset handoff protocol, place the bucket outside the VCN and record the unresolved restore without drawing it. I checked the mapping in both directions and classified the remaining cells as headings, labels, icon parts or legend samples. The isolated Claude OCI result has two legend arrows that the automated grader misclassified as traffic.
+
+CRITERION: AC-03 A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
+VERDICT: met
+EVIDENCE: All four delivered drawings passed the pinned XSD and reference checks. I dragged the Public Tier on each AWS drawing and the Proxmox Host on each OCI drawing. The named child moved with its parent each time. Offline Desktop 32.6.10 re-exports matched the delivered SVGs byte for byte or after normalizing only the generated SVG ID and its references. I inspected the four SVGs at 900 px and 390 px. The final Claude OCI result came from an isolated run of the same candidate.
+
+CRITERION: AC-04 An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+VERDICT: not met
+EVIDENCE: The helper tests passed. My synchronized race with distinct staged artifacts produced one complete winner, one collision and a successful retry to another path. In the exact Codex intake retry, the exporter reported two timeouts. The native agent then created the requested final directory and copied in the draw.io file and brief without an SVG. The runner recorded `Incomplete diagram directory`. The accepted proof requires failed requests to expose no partial final directory.
+
+CRITERION: AC-05 A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+VERDICT: met
+EVIDENCE: Each host rendered AWS and the useful OCI backup view in its original request in a completed native case. Both OCI briefs record the missing restore link. I read both clarification responses and checked that neither created a final directory. Both asked what carries the restore, which component initiates it and which way data travels. The Claude OCI and clarification evidence came from isolated runs of the same candidate after the shared renderer broker was interrupted.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan AC-02, `tests/vh-adlc/diagram/grade.ts:75`
+EVIDENCE: The isolated Claude OCI output contains three source-backed traffic edges and two legend samples between decorative endpoints. The committed grader reports `Unmapped connector in the drawing` because it counts all five edges. The accepted proof explicitly allows unmapped legend samples.
+PROPOSAL: Confirm unmatched edges through the manual reverse-mapping check or distinguish legend samples without waiving any edge connected to a semantic node. Exercise a valid legend and an unsupported traffic edge.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-04, `plugins/vh-adlc/skills/vh-adlc-diagram/SKILL.md:10`, `plugins/vh-adlc/references/diagram.md:35`
+EVIDENCE: In `codex-retry/oci-local/transcript.jsonl`, both helper attempts returned an export timeout. Codex then created `diagram/` directly and copied `architecture.drawio` and `brief.md`. The exact-target manifest confirms those two files and the missing SVG.
+PROPOSAL: Require final publication through the helper and explicitly keep working files outside the requested destination on failure. Verify this through a native case with a renderer that returns an error.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-05, `tests/vh-adlc/diagram/grade.ts:5`
+EVIDENCE: The free-text heuristic gave a clean grade to a response that said the restore facts were unknown and `No clarification is needed`. The manual transcript check required by the accepted proof showed that both observed hosts did ask for the missing facts.
+PROPOSAL: Keep manual verification of an actual request for information in the review evidence. Consider a disclosure-only negative control if the grader becomes the sole check.
 
 ## Sources
 
