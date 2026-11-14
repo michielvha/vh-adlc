@@ -157,7 +157,9 @@ const earlyChange = spyOn(reports, "createOriginalAuditReportEnvelope").mockImpl
 let earlyRefusal; try { earlyRefusal = save(); } finally { earlyChange.mockRestore(); writeFileSync(guide, originalGuide); }
 const ineligible = spyOn(reports, "createOriginalAuditReportEnvelope").mockImplementation(() => { throw new HistoryEligibilityError("technical report state"); });
 let refused; try { refused = save(); } finally { ineligible.mockRestore(); }
-const result = { late, identity, changedEnvelope, bound, earlyRefusal, refused };
+const earlyDirectories = { bound: fs.readdirSync(bound.directory).sort(),
+  earlyRefusal: fs.readdirSync(earlyRefusal.directory).sort(), refused: fs.readdirSync(refused.directory).sort() };
+const result = { late, identity, changedEnvelope, bound, earlyRefusal, refused, earlyDirectories };
 `);
     type LateOutput = AuditOutputArtifacts & { upload_file_exists: boolean; provisional_file_exists: boolean };
     const diagnostics: Record<string, string> = { run: "Current native scheduled run changed before output",
@@ -169,6 +171,9 @@ const result = { late, identity, changedEnvelope, bound, earlyRefusal, refused }
       expect(saved.provisional_file_exists, fault).toBe(true);
       expect(saved.diagnostics, fault).toContain(diagnostics[fault]);
     }
+    expect(result.late.caller.diagnostics.filter((message: string) => message === diagnostics.caller)).toHaveLength(1);
+    for (const name of ["bound", "earlyRefusal", "refused"])
+      expect(result.earlyDirectories[name], name).toEqual(["report.json", "report.md"]);
     expect(result.identity.complete).toBe(false); expect(result.identity.scope_changed).toBe(true);
     expect(result.identity.diagnostics).toContain("Original hosted report bytes changed");
     expect(result.changedEnvelope.complete).toBe(false); expect(result.changedEnvelope.scope_changed).toBe(true);
