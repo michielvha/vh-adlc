@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, renameSync } from "node:fs";
+import { existsSync, mkdirSync, opendirSync, renameSync } from "node:fs";
 import { join, relative } from "node:path";
 import { verifyRuntimeAdoption } from "./adoption";
 import { readCompatibleAdoptionLineage } from "./adoption-lineage";
@@ -7,7 +7,7 @@ import { readBoundArtifact } from "./evidence-input";
 import { isGitAncestor } from "./git";
 import { publishArtifact } from "./journal";
 import { OUTPUT_LIMIT } from "./owned-process";
-import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, sha256 } from "./protocol";
+import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "./protocol";
 import { parseOwnedInvocation, type OwnedInvocation } from "./report-history";
 import { reportTime } from "./report";
 import { loadCommittedSettings, type Settings } from "./settings";
@@ -19,11 +19,11 @@ export type LocalHistoryContext = {
   current_default: string; source: string; component_sha256: string; run_id: string; scope_sha256: string; started_at: string;
   recheck(): void;
 };
-function registry(context: LocalHistoryContext, create: boolean): string | null {
+function registry(context: LocalHistoryContext, create: boolean, indexed = false): string | null {
   const cache = artifactDirectoryScope(context.cache_directory, context.repo).directory;
   const identity = canonicalDigest({ hostname: context.settings.hostname, repository_id: context.identity.repository_id, actor_id: context.identity.actor_id });
   let current = cache;
-  for (const name of ["local-report-history", identity]) {
+  for (const name of ["local-report-history", identity, ...(indexed ? ["by-invocation"] : [])]) {
     current = join(current, name);
     if (!existsSync(current)) {
       if (!create) return null;
@@ -43,19 +43,25 @@ function normalizedIdentity(input: unknown) {
 function identity(context: LocalHistoryContext) { return normalizedIdentity({ hostname: context.settings.hostname, ...context.identity }); }
 function stamp(value: string) { return new Date(reportTime(value)).toISOString().replaceAll(/[-:.]/gu, ""); }
 
-/** Read only cache-owned attestations. Adoption and the eventual report pair remain independent requirements. */
-export function readLocalInvocationRegistry(context: LocalHistoryContext): { invocations: OwnedInvocation[]; diagnostics: string[] } {
-  const invocations: OwnedInvocation[] = [], diagnostics: string[] = [];
-  try {
-    const root = registry(context, false);
-    if (root === null) return { invocations, diagnostics };
-    const allowed = new Set(readCompatibleAdoptionLineage({ store: context.store, current_default: context.current_default, identity: context.identity }));
-    const names = readdirSync(root).filter(name => /^\d{8}T\d{9}Z-[a-f0-9]{64}\.json$/u.test(name))
-      .sort(compareUTF8).reverse().slice(0, context.settings.reports.max_runs);
-    for (const name of names) {
-      try {
-        const digest = name.slice(-69, -5), bytes = readBoundArtifact({ source_repo: context.repo, artifact_root: root,
-          reference: { path: name, sha256: digest } });
+/** Resolve only the invocations named by the bounded saved-pair collection. */
+export function createLocalInvocationReader(inputContext: LocalHistoryContext) {
+  const context = { ...inputContext }, diagnostics: string[] = [];
+  return { diagnostics, read(input: OwnedInvocation): OwnedInvocation | null {
+    try {
+      const wanted = parseOwnedInvocation(input), completed = reportTime(wanted.completed_at), start = reportTime(context.started_at);
+      if (wanted.repository !== context.settings.repository || wanted.scope_sha256 !== context.scope_sha256
+        || completed >= start || start - completed > context.settings.reports.max_age_seconds * 1000
+        || !isGitAncestor(context.store.root, wanted.source_commit, context.current_default)) throw Error("Local invocation scope or age changed");
+      const root = registry(context, false);
+      if (root === null) throw Error("Local invocation registry unavailable");
+      const allowed = new Set(readCompatibleAdoptionLineage({ store: context.store, current_default: context.current_default, identity: context.identity }));
+      const adopted = verifyRuntimeAdoption({ repo: context.store.root, current_default: wanted.source_commit, identity: context.identity });
+      if (!allowed.has(adopted.adoption_sha256) || adopted.component_pin.component_sha256 !== wanted.component_sha256
+        || loadCommittedSettings(context.store.root, wanted.source_commit).settings.reports.interactive !== "local-attestation")
+        throw Error("Local invocation producer is outside approved history");
+      const expected = canonicalJSON({ schema_version: 1, kind: "docs-drift-local-invocation", identity: identity(context), invocation: wanted });
+      const read = (directory: string, name: string, digest: string) => {
+        const bytes = readBoundArtifact({ source_repo: context.repo, artifact_root: directory, reference: { path: name, sha256: digest } });
         if (bytes.length > Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes)) throw Error("Local invocation exceeds the retained bound");
         const parsed: unknown = JSON.parse(decodeUTF8(bytes));
         if (!canonicalJSON(parsed).equals(bytes) || !parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw Error("Original local invocation record required");
@@ -63,19 +69,25 @@ export function readLocalInvocationRegistry(context: LocalHistoryContext): { inv
         if (Object.keys(record).sort().join(",") !== "identity,invocation,kind,schema_version" || record.schema_version !== 1
           || record.kind !== "docs-drift-local-invocation" || canonicalDigest(normalizedIdentity(record.identity)) !== canonicalDigest(identity(context)))
           throw Error("Local invocation identity changed");
-        const invocation = parseOwnedInvocation(record.invocation), completed = reportTime(invocation.completed_at), start = reportTime(context.started_at);
-        if (name !== stamp(invocation.completed_at) + "-" + sha256(bytes) + ".json" || invocation.repository !== context.settings.repository
-          || invocation.scope_sha256 !== context.scope_sha256 || completed >= start || start - completed > context.settings.reports.max_age_seconds * 1000
-          || !isGitAncestor(context.store.root, invocation.source_commit, context.current_default)) throw Error("Local invocation scope or age changed");
-        const adopted = verifyRuntimeAdoption({ repo: context.store.root, current_default: invocation.source_commit, identity: context.identity });
-        if (!allowed.has(adopted.adoption_sha256) || adopted.component_pin.component_sha256 !== invocation.component_sha256
-          || loadCommittedSettings(context.store.root, invocation.source_commit).settings.reports.interactive !== "local-attestation")
-          throw Error("Local invocation producer is outside approved history");
-        invocations.push(invocation);
-      } catch { diagnostics.push("Local invocation record " + name + " is missing, changed or ineligible"); }
-    }
-  } catch { diagnostics.push("Local invocation registry is unavailable; earlier local attention cannot be carried"); }
-  return freezeJSON({ invocations, diagnostics });
+        const invocation = parseOwnedInvocation(record.invocation);
+        if (!canonicalJSON(invocation).equals(canonicalJSON(wanted))) throw Error("Original local invocation changed");
+        return invocation;
+      };
+      const indexed = registry(context, false, true), name = wanted.invocation_sha256 + ".json";
+      if (indexed !== null && existsSync(join(indexed, name))) return read(indexed, name, sha256(expected));
+      // Original timestamp-addressed records remain readable without a second max_runs window.
+      const prefix = stamp(wanted.completed_at) + "-", directory = opendirSync(root);
+      try {
+        let entry;
+        while ((entry = directory.readSync()) !== null) {
+          if (!entry.name.startsWith(prefix) || !/^\d{8}T\d{9}Z-[a-f0-9]{64}\.json$/u.test(entry.name)) continue;
+          try { return read(root, entry.name, entry.name.slice(-69, -5)); }
+          catch { /* A different invocation can share the same millisecond. */ }
+        }
+      } finally { directory.closeSync(); }
+      throw Error("Original local invocation missing");
+    } catch { diagnostics.push("Local invocation record " + input.id + " is missing, changed or ineligible"); return null; }
+  } };
 }
 
 /** Stage immutable owner-attestation metadata. Activation follows the controller's final original-input checks. */
@@ -87,9 +99,9 @@ export function stageLocalInvocation(inputContext: LocalHistoryContext, input: O
     || invocation.scope_sha256 !== context.scope_sha256 || invocation.id !== context.run_id) throw Error("Original local invocation scope required");
   const bytes = canonicalJSON({ schema_version: 1, kind: "docs-drift-local-invocation", identity: identity(context), invocation });
   if (bytes.length > Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes)) throw Error("Local invocation exceeds the retained bound");
-  const root = registry(context, true);
+  const root = registry(context, true, true);
   if (root === null) throw Error("Private local invocation registry required");
-  const digest = sha256(bytes), path = join(root, stamp(invocation.completed_at) + "-" + digest + ".json");
+  const digest = sha256(bytes), path = join(root, invocation.invocation_sha256 + ".json");
   const reference = { path: relative(context.cache_directory, path), sha256: digest };
   const read = () => readBoundArtifact({ source_repo: context.repo, artifact_root: context.cache_directory, reference });
   const existing = existsSync(path), pending = join(root, ".pending-" + randomUUID());

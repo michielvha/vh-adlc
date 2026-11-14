@@ -628,3 +628,28 @@ WHERE: plugins/vh-adlc/scripts/docs-drift/history-output.ts catch block, result.
 EVIDENCE: context.md says the catch path "deduplicates failure diagnostics". The late "caller" fault is the case that needs it. The in-try check throws PublicationScopeChanged("Caller changed during hosted report retention"). The catch pushes that message, and the new block pushes the same text again because matchesRepositoryState(repo, before) is still false. The test only asserts expect(saved.diagnostics, fault).toContain(diagnostics[fault]), and earlyRefusal also uses toContain. If the Set line were removed, the duplicate would come back and every assertion would still pass.
 PROPOSAL: In the late "caller" case, assert that the diagnostic appears exactly once, for example saved.diagnostics.filter(message => message === diagnostics.caller).length === 1. The deduplication would then have a regression test.
 ```
+
+## Component diagnostic 120
+
+Exact local target `6d46e7ca934f7898a0a92731663995716bc3913b`. Actual Copilot Opus 5.5 with procedural isolation. All 112 required chunks were read with unchanged packet hashes, no outside paths and no private files sent. The scoped local-history review returns one should-fix item and one test-coverage nit. Its original records follow before correction. Full feature acceptance remains open.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/docs-drift/local-history.ts, readLocalInvocationRegistry: the line `.sort(compareUTF8).reverse().slice(0, context.settings.reports.max_runs)` and the eligibility loop that follows it. Also report-history.ts collectLocalHistory, `if (inspected++ >= settings.reports.max_runs) break;`
+EVIDENCE: The registry keeps only the newest max_runs record names. It does this before any identity, scope, age, ancestry or adoption check. collectLocalHistory then makes a second, separate newest max_runs cut, this time over the saved report directories under local_history_roots. The two windows count different things. persistLocalAuditOutput stages and activates an invocation for every completed local report. Saving the pair into a history root is a separate step that needs report-write authority, which is how the success trial runs it ("explicitly authorized synthetic report-save copy between two ordinary CLI runs"). Take an owner who saves a first-red report and then runs max_runs more audits without saving them. Those unsaved records fill the registry window. The saved pair's invocation is never read, so owned_local_invocations has no match and the earlier attention comes back as new. The window also counts records from an older scope_sha256 after a settings change, and records stamped after the current started_at by a concurrent run. The reader refuses all of these anyway. This fails safe, but it quietly limits carrying for normal interactive use. Nothing documents or tests the limit. Nothing removes expired records or .pending-UUID files left by failed activations either, so the private registry grows without bound. Stored retention is not bounded even though the read window is.
+PROPOSAL: Apply max_runs to the records that pass the identity, scope and age checks, or have the registry read the invocations named by the saved pairs that collectLocalHistory inspects. That way one window governs both sides. Skip records whose stamp is at or after started_at or whose age exceeds max_age_seconds before counting them, and say in the design text how long registry records and pending files are kept. Add a regression in which more than max_runs newer unsaved or ineligible records sit beside one eligible saved record, and assert that the saved record still carries.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/docs-drift/local-history.test.ts, the test.each fault list ("matching" through "mutated-guard"). Code under test: local-history.ts readLocalInvocationRegistry, checks `completed >= start`, `!isGitAncestor(context.store.root, invocation.source_commit, context.current_default)` and `loadCommittedSettings(...).settings.reports.interactive !== "local-attestation"`
+EVIDENCE: context.md asks for coverage of source ancestry and compatible lineage. The "unadopted" case changes invocation.source_commit to f.candidate. That commit is an ancestor of current_default, so the case fails in verifyRuntimeAdoption ("circular source candidate record"), not in the ancestry check. "expired" covers only the max_age_seconds side. No case uses a source commit that cannot be reached from current_default, such as a side branch carrying the same adoption record and component pin. No case uses a record stamped at or after context.started_at. No case uses an adopted source whose committed reports.interactive is not local-attestation. If any of those three conditions were deleted, all 17 metadata cases would still pass.
+PROPOSAL: Add three fault cases in the same test.each:
+1. A source_commit on a side branch that is not reachable from current_default.
+2. completed_at set at or after started_at, with the stamp renamed to match.
+3. A source commit whose committed settings select another interactive mode.
+Each case expects invocations [] and the record diagnostic.
+```

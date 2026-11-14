@@ -4,8 +4,11 @@ import { chmodSync, linkSync, mkdirSync, readFileSync, readdirSync, renameSync, 
 import { dirname, join } from "node:path";
 import { source, portableRecord, deliverRecord, runtimeIdentity, pin, write, commit } from "./adoption-fixture";
 import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { buildReport } from "../../../plugins/vh-adlc/scripts/docs-drift/report";
+import { collectLocalHistory, createLocalEnvelope } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { loadCommittedSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { captureRepositoryState, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { readGit, writeMetadataObject } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import type { OwnedInvocation } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 
 const roots: string[] = []; let failed = false;
@@ -13,10 +16,12 @@ afterAll(() => {
   if (failed) console.error("Preserved failed owned local-history metadata roots", JSON.stringify(roots));
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
-function fixture(expired = false) {
+function fixture(expired = false, nonLocal = false) {
   const f = source(roots);
   f.configured.reports.interactive = "local-attestation"; f.configured.reports.local_history_roots = ["history"];
-  write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(f.configured)); f.candidate = commit(f.repo, "synthetic local history policy");
+  if (nonLocal) { f.configured.reports.interactive = "none"; f.configured.reports.local_history_roots = []; }
+  write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(f.configured));
+  if (!nonLocal) f.candidate = commit(f.repo, "synthetic local history policy");
   const current = deliverRecord(f, portableRecord(f)), cache = join(f.artifacts, "local-cache");
   mkdirSync(cache, { mode: 0o700 });
   const store = createOwnedObjectStore({ parent: f.artifacts, evidence_directory: f.artifacts, source_repo: f.repo,
@@ -30,17 +35,19 @@ function fixture(expired = false) {
   const context = { repo: f.repo, cache_directory: cache, settings: loadCommittedSettings(f.repo, current).settings,
     identity: runtimeIdentity, store, current_default: current, source: current, component_sha256: bare.component_sha256,
     run_id: bare.id, scope_sha256: bare.scope_sha256, started_at: new Date().toISOString(), recheck: () => {} };
+  // Defensive reader fixture: the source must independently adopt local history even if the caller context selects it.
+  if (nonLocal) { context.settings.reports.interactive = "local-attestation"; context.settings.reports.local_history_roots = ["history"]; }
   return { ...f, cache, invocation, context };
 }
 
-test.each(["matching", "current-casing", "legacy-casing", "interleaved", "changed", "foreign", "component", "scope", "unadopted", "fields", "symlink", "hardlink", "directory", "expired", "guard", "mutated-guard"])("local invocation records are private, source-bound and activated last: %s", async fault => {
+test.each(["matching", "current-casing", "legacy-casing", "interleaved", "changed", "foreign", "component", "scope", "unadopted", "fields", "symlink", "hardlink", "directory", "expired", "non-ancestor", "at-start", "after-start", "non-local", "guard", "mutated-guard"])("local invocation records are private, source-bound and activated last: %s", async fault => {
   try {
-    const { readLocalInvocationRegistry, stageLocalInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/local-history");
-    const f = fixture(fault === "expired"), before = captureRepositoryState(f.repo);
-    expect(readLocalInvocationRegistry(f.context).invocations).toEqual([]);
+    const { createLocalInvocationReader, stageLocalInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/local-history");
+    const f = fixture(fault === "expired", fault === "non-local"), before = captureRepositoryState(f.repo);
+    expect(createLocalInvocationReader(f.context).read(f.invocation)).toBeNull();
     if (fault === "mutated-guard") f.context.recheck = () => { throw Error("Synthetic changed source"); };
     const staged = stageLocalInvocation(f.context, f.invocation);
-    expect(readLocalInvocationRegistry(f.context).invocations).toEqual([]);
+    expect(createLocalInvocationReader(f.context).read(f.invocation)).toBeNull();
     if (fault === "mutated-guard") f.context.recheck = () => {};
     if (fault === "guard" || fault === "mutated-guard") {
       const validate = fault === "guard" ? () => { throw Error("Synthetic changed source"); } : () => {};
@@ -53,7 +60,7 @@ test.each(["matching", "current-casing", "legacy-casing", "interleaved", "change
         repository: f.context.identity.repository.toUpperCase(), actor: f.context.identity.actor.toUpperCase() };
       const path = join(f.cache, staged.reference.path);
       if (fault === "changed") writeFileSync(path, "Changed original invocation record\n");
-      if (["foreign", "component", "scope", "unadopted", "fields", "legacy-casing"].includes(fault)) {
+      if (["foreign", "component", "scope", "unadopted", "fields", "legacy-casing", "non-ancestor", "at-start", "after-start"].includes(fault)) {
         const record = JSON.parse(readFileSync(path, "utf8"));
         if (fault === "legacy-casing") { record.identity.repository = record.identity.repository.toUpperCase(); record.identity.actor = record.identity.actor.toUpperCase(); }
         if (fault === "foreign") record.identity.actor_id++;
@@ -61,17 +68,30 @@ test.each(["matching", "current-casing", "legacy-casing", "interleaved", "change
         if (fault === "scope") record.invocation.scope_sha256 = "f".repeat(64);
         if (fault === "unadopted") record.invocation.source_commit = f.candidate;
         if (fault === "fields") record.extra = true;
+        if (fault === "non-ancestor") {
+          const tree = readGit(f.context.store.root, "rev-parse", f.context.current_default + "^{tree}").toString().trim();
+          record.invocation.source_commit = writeMetadataObject(f.context.store.root, "commit", Buffer.from(
+            "tree " + tree + "\nparent " + f.context.current_default
+            + "\nauthor Fixture <fixture@example.invalid> 1 +0000\ncommitter Fixture <fixture@example.invalid> 1 +0000\n\nUnreachable sibling source\n"));
+        }
+        if (fault === "at-start" || fault === "after-start") record.invocation.completed_at =
+          new Date(Date.parse(f.context.started_at) + (fault === "after-start" ? 1 : 0)).toISOString();
         const { invocation_sha256: _digest, ...original } = record.invocation;
         record.invocation.invocation_sha256 = canonicalDigest(original);
-        const bytes = canonicalJSON(record), name = path.replace(/[a-f0-9]{64}(?=\.json$)/u, sha256(bytes));
+        f.invocation = record.invocation;
+        const bytes = canonicalJSON(record), name = fault === "legacy-casing"
+          ? join(dirname(dirname(path)), new Date(f.invocation.completed_at).toISOString().replaceAll(/[-:.]/gu, "") + "-" + sha256(bytes) + ".json")
+          : join(dirname(path), f.invocation.invocation_sha256 + ".json");
         renameSync(path, path + ".original"); writeFileSync(name, bytes, { mode: 0o600 });
       }
       if (fault === "symlink") { renameSync(path, path + ".target"); symlinkSync(path + ".target", path); }
       if (fault === "hardlink") linkSync(path, path + ".linked");
       if (fault === "directory") chmodSync(dirname(path), 0o755);
     }
-    const result = readLocalInvocationRegistry(f.context);
-    expect(result.invocations, JSON.stringify(result.diagnostics)).toEqual(["matching", "interleaved", "current-casing", "legacy-casing"].includes(fault) ? [f.invocation] : []);
+    const result = createLocalInvocationReader(f.context);
+    const eligible = ["matching", "interleaved", "current-casing", "legacy-casing"].includes(fault);
+    expect(result.read(f.invocation), JSON.stringify(result.diagnostics)).toEqual(eligible ? f.invocation : null);
+    if (!eligible) expect(result.diagnostics).toHaveLength(1);
     if (fault === "matching") {
       const again = stageLocalInvocation(f.context, f.invocation);
       expect(again.activate(() => {})).toEqual(staged.reference);
@@ -89,5 +109,56 @@ test("oversized invocation metadata is refused before cache records are created"
     expect(() => stageLocalInvocation({ ...f.context, run_id: id }, { ...changed, invocation_sha256: canonicalDigest(changed) }))
       .toThrow("Local invocation exceeds the retained bound");
     expect(readdirSync(f.cache)).toEqual([]);
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+test.each(["current", "legacy"])("saved reports survive newer unsaved and ineligible invocation records: %s", async layout => {
+  try {
+    const { createLocalInvocationReader, stageLocalInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/local-history");
+    const f = fixture(), settings = f.context.settings;
+    f.context.started_at = new Date(Date.now() + 1000).toISOString();
+    settings.reports.max_runs = 2;
+    const attention = [{ repository: settings.repository, scope_sha256: f.context.scope_sha256, identity: "claims:guide",
+      disposition: "unknown" as const, reason: "Source verification pending", owner_action: "Choose the behavior",
+      rule: { detector: "claims" }, inputs: { guide: sha256(Buffer.from("guide")) }, required_inputs: ["guide"],
+      title: "Behavior decision", links: [] }];
+    const bytes = canonicalJSON(buildReport({ repository: settings.repository, scope_sha256: f.context.scope_sha256,
+      run_id: f.invocation.id, source_commit: f.invocation.source_commit,
+      started_at: new Date(Date.parse(f.invocation.completed_at) - 1000).toISOString(), completed_at: f.invocation.completed_at,
+      collection_complete: true, failures: [], attention, corrections: [], proposals: [], published: [],
+      history: { captured_at: new Date(Date.parse(f.invocation.completed_at) - 2000).toISOString(), records: [], diagnostics: [] } }));
+    const { invocation_sha256: _digest, ...original } = f.invocation;
+    const saved = { ...original, report_sha256: sha256(bytes) }, invocation = { ...saved, invocation_sha256: canonicalDigest(saved) };
+    const staged = stageLocalInvocation(f.context, invocation); staged.activate(() => {});
+    if (layout === "legacy") {
+      const path = join(f.cache, staged.reference.path), root = dirname(path);
+      const name = new Date(invocation.completed_at).toISOString().replaceAll(/[-:.]/gu, "") + "-" + staged.reference.sha256 + ".json";
+      if (!path.endsWith(name)) renameSync(path, join(dirname(root), name));
+    }
+    const pair = join(f.repo, "history", "saved"); mkdirSync(pair, { recursive: true, mode: 0o700 });
+    writeFileSync(join(pair, "report.json"), bytes, { mode: 0o600 });
+    writeFileSync(join(pair, "provenance.json"), createLocalEnvelope(bytes, invocation), { mode: 0o600 });
+    for (let i = 0; i < settings.reports.max_runs + 3; i++) {
+      const entry = { ...saved, id: "unsaved-" + i,
+        completed_at: new Date(Date.parse(invocation.completed_at) + 1000 + i).toISOString() };
+      stageLocalInvocation({ ...f.context, run_id: entry.id }, { ...entry, invocation_sha256: canonicalDigest(entry) }).activate(() => {});
+    }
+    const future = { ...saved, id: "future", completed_at: f.context.started_at };
+    stageLocalInvocation({ ...f.context, run_id: future.id }, { ...future, invocation_sha256: canonicalDigest(future) }).activate(() => {});
+    const otherScope = { ...saved, id: "old-scope", scope_sha256: sha256(Buffer.from("old scope")) };
+    stageLocalInvocation({ ...f.context, run_id: otherScope.id, scope_sha256: otherScope.scope_sha256 },
+      { ...otherScope, invocation_sha256: canonicalDigest(otherScope) }).activate(() => {});
+    const recorded = createLocalInvocationReader(f.context);
+    const history = collectLocalHistory({ repo: f.repo, settings,
+      context: { repository: settings.repository, scope_sha256: f.context.scope_sha256, run_id: "current", started_at: f.context.started_at },
+      readInvocation: recorded.read });
+    expect(history.records, JSON.stringify({ collection: history.diagnostics, registry: recorded.diagnostics })).toHaveLength(1);
+    expect(history.records[0]?.sha256).toBe(sha256(bytes));
+    const current = buildReport({ repository: settings.repository, scope_sha256: f.context.scope_sha256,
+      run_id: "current", source_commit: f.invocation.source_commit, started_at: f.context.started_at,
+      completed_at: new Date(Date.parse(f.context.started_at) + 1000).toISOString(), collection_complete: true,
+      failures: [], attention, corrections: [], proposals: [], published: [], history });
+    expect(current.outcome).toBe("carried-attention");
+    expect(current.success).toBe(true);
   } catch (error) { failed = true; throw error; }
 }, 90000);

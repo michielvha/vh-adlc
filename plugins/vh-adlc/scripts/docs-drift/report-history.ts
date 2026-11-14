@@ -222,7 +222,8 @@ function privateFile(path: string, maxBytes: number, before: number): Buffer {
   } finally { closeSync(fd); }
 }
 
-export function collectLocalHistory(options: { repo: string; settings: Settings; context: HistoryContext; invocations: OwnedInvocation[] }): HistorySnapshot {
+export function collectLocalHistory(options: { repo: string; settings: Settings; context: HistoryContext; invocations?: OwnedInvocation[];
+  readInvocation?: (wanted: OwnedInvocation) => OwnedInvocation | null }): HistorySnapshot {
   const { settings, context } = options;
   const snapshot: HistorySnapshot = { captured_at: context.started_at, records: [], diagnostics: [] };
   if (settings.reports.interactive !== "local-attestation") return snapshot;
@@ -252,7 +253,9 @@ export function collectLocalHistory(options: { repo: string; settings: Settings;
           const rawEnvelope = privateFile(join(directory, "provenance.json"), settings.reports.max_entry_bytes, started);
           const report = reportRecord(bytes), envelope = parseCanonical(rawEnvelope), invocation = object(envelope.invocation);
           const digest = canonicalDigest(invocation);
-          const owned = options.invocations.find(candidate => candidate.invocation_sha256 === digest);
+          const wanted = parseOwnedInvocation({ ...invocation, invocation_sha256: digest });
+          const owned = options.readInvocation ? options.readInvocation(wanted)
+            : options.invocations?.find(candidate => candidate.invocation_sha256 === digest);
           if (!owned || owned.origin !== "local-attestation" || owned.context !== "production" || owned.repository !== context.repository) invalid("unknown invocation attestation");
           const { invocation_sha256: ownedDigest, ...original } = owned;
           if (ownedDigest !== canonicalDigest(original) || !canonicalJSON(original).equals(canonicalJSON(invocation))) invalid("changed invocation attestation");

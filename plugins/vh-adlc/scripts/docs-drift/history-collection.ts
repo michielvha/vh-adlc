@@ -2,7 +2,7 @@ import { realpathSync } from "node:fs";
 import type { WorkflowRunInput } from "../github-read";
 import { ArtifactChanged } from "./evidence-input";
 import { createAdoptedProducerVerifier } from "./history-producer";
-import { readLocalInvocationRegistry, type LocalHistoryContext } from "./local-history";
+import { createLocalInvocationReader, type LocalHistoryContext } from "./local-history";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { canonicalDigest, freezeJSON } from "./protocol";
 import { PublicationScopeChanged } from "./publish";
@@ -104,9 +104,9 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
           if (observed.default_commit !== currentDefault || canonicalDigest(observed.identity) !== canonicalDigest(identity))
             throw new PublicationScopeChanged("Native local history source or actor changed");
         } };
-      const recorded = options.owned_local_invocations ? { invocations: options.owned_local_invocations, diagnostics: [] }
-        : readLocalInvocationRegistry(localContext);
-      snapshot = collectLocalHistory({ repo, settings, context, invocations: recorded.invocations });
+      const recorded = createLocalInvocationReader(localContext);
+      snapshot = collectLocalHistory({ repo, settings, context, ...(options.owned_local_invocations
+        ? { invocations: options.owned_local_invocations } : { readInvocation: recorded.read }) });
       snapshot.diagnostics.unshift(...recorded.diagnostics);
     } else snapshot = { captured_at, records: [], diagnostics: ["Report history is disabled by the adopted interactive policy; no earlier attention can be carried"] };
     const final = native();

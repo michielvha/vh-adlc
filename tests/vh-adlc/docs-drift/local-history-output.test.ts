@@ -69,7 +69,7 @@ const observe = saved => ({ ...saved, upload_file_exists: saved.directory && fs.
 function records() {
   const root = join(options.cache_directory, "local-report-history");
   if (!fs.existsSync(root)) return [];
-  return fs.readdirSync(root).flatMap(name => fs.readdirSync(join(root, name)).filter(file => file.endsWith(".json")));
+  return fs.readdirSync(root, { recursive: true }).filter(file => String(file).endsWith(".json"));
 }
 const copied = observe(save(JSON.parse(JSON.stringify(session)))), wrapped = observe(save({ ...session }));
 let hostedError = null;
