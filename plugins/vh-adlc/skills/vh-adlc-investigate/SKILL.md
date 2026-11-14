@@ -48,3 +48,15 @@ update, where you have authority to make one, is a summary with a link to the do
 conclusions come from primary sources read in this run. End with one verdict: act now, track (naming
 the conditions that would change it) or reject. Issue creation keeps the authority rule in
 `references/authority.md`.
+
+## Issue labels
+
+When the owner asks for a new issue, file it through the labels helper so it carries the labels
+`references/issues.md` gives for your verdict. Run `bun scripts/labels/cli.ts file --repo <checkout>
+--operation investigate --type <type label>` with `--title`, `--body-file` and a new `--output` file,
+and the verdict: `--verdict "act now"`, `--verdict track` with `--waiting-on prerequisite` when the
+findings document names a missing prerequisite or `--waiting-on decision` when the work waits on an
+owner, product or architecture call, or `--verdict reject` for a rejected case the owner still wants
+filed. Show the owner the title, body and labels it prints. Once they approve, create the issue with
+`--preview <that file> --approved-digest <digest>`. When it reports missing labels, file nothing and
+give its next step.

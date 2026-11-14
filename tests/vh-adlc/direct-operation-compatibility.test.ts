@@ -35,6 +35,17 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     if (name === "spec" || name === "review") for (const phrase of ["scripts/loop/cli.ts review", "references/review-protocol.md", "pending", "requested model"]) expect(loop).toContain(phrase);
     current = (current.slice(0, loopStart) + current.slice(loopEnd)).replace(/\n+$/, "\n");
   }
+  // Shared issue labels (docs/specs/shared-issue-labels.md) add one section to the operations that file issues.
+  if (name === "investigate" || name === "spec") {
+    const start = current.indexOf("## Issue labels\n");
+    expect(start).toBeGreaterThan(0);
+    const next = current.indexOf("\n## ", start + 1), end = next < 0 ? current.length : next + 1;
+    const section = current.slice(start, end);
+    for (const phrase of ["scripts/labels/cli.ts file", "references/issues.md", "--preview", "--approved-digest", "missing labels", `--operation ${name}`]) expect(section).toContain(phrase);
+    if (name === "investigate") for (const phrase of ["act now", "--waiting-on prerequisite", "--waiting-on decision", "reject"]) expect(section).toContain(phrase);
+    if (name === "spec") expect(section).toContain("no state label");
+    current = (current.slice(0, start) + current.slice(end)).replace(/\n+$/, "\n");
+  } else expect(current).not.toContain("## Issue labels\n");
   if (name === "implement" || name === "ship") {
     const start = current.indexOf("## Documentation impact\n"), end = current.indexOf("## Start\n", start);
     expect(start).toBeGreaterThan(0); expect(end).toBeGreaterThan(start);

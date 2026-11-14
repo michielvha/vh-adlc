@@ -23,6 +23,7 @@ additional execution or publication permission.
 | Apply/commit reverify/full ledger updates | Current explicit ledger-update/ledger-commit request or freshly adopted audit-mode effects; use the owned audit-ledger role at the exact clean assessed default base, never a shared or unrelated checkout |
 | Repair selected audit findings and deliver a selected batch | Eligible selected local repair follows `audit.md` and `audit-record.md`; live/remote effects additionally need exact current permission or adopted `Standing audit workflow authorization`, current selection/restrictions and all retained gates |
 | Create a tracking issue | Included in acceptance, or requested; a triage-created issue must be in its exact approved batch |
+| Apply a label plan with the labels helper | The owner's approval of that exact plan digest for that repository (`references/issues.md`) |
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
 | Merge | Separate approval for that exact action, or the explicitly selected audit batch's current/adopted `conditional-merge` permission and all retained gates in [audit.md](audit.md). Either one also covers that PR's `after-merge` branch cleanup in [branches.md](branches.md) |
 | Rebuild/restart an owned audit verification runtime | Current explicit permission or adopted `live-verify` naming that exact owned development target and method, with all local ownership/restriction gates |

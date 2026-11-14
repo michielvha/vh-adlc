@@ -164,6 +164,29 @@ and branches in use by a worktree are kept, each with its reason. Clean worktree
 are removed only when you ask for worktree cleanup. See the
 [branch hygiene guide](../../plugins/vh-adlc/references/branches.md).
 
+## Issue labels
+
+Every repository that uses vh-adlc carries the same standard label set: the type labels `bug`,
+`enhancement`, `documentation`, `refactor` and `security`, and the state labels `ready`, `blocked`,
+`partial` and `needs-decision`. Investigate gives an issue it files on request one type label and the
+state its verdict names. Spec gives the issues it files a type label only. After filing, a state
+change is a triage verdict. The
+[issue labels reference](../../plugins/vh-adlc/references/issues.md) (`references/issues.md`) lists
+each label's color and description.
+
+Bring a repository to the set with the labels helper:
+
+```bash
+bun plugins/vh-adlc/scripts/labels/cli.ts plan --repo . --output labels-plan.json
+```
+
+The label plan shows each standard label as present, missing or different, every write with its
+before and after values, and a digest. Nothing changes until you approve that exact digest and the
+agent runs `apply` with it. Apply refuses if the account, repository, label set, mapping or labels
+changed since the plan. It never deletes or renames a label, and labels outside the set stay as they
+are. A repository that keeps its own name for a standard label maps it with `label_map` in
+`.vh-adlc/triage.yaml`.
+
 ## Repository security settings
 
 GitHub's free security settings, such as Dependabot alerts and secret scanning, are

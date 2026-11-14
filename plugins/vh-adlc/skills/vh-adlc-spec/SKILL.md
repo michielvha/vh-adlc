@@ -36,6 +36,15 @@ of the host dispatch described below, as `references/review-protocol.md` (Routes
 outcome is stored like a host reviewer's records, and a `pending` outcome leaves the review pending. A
 `host` route that names a model dispatches with it as a requested model.
 
+## Issue labels
+
+An issue this operation creates under acceptance or request gets one type label and no state label;
+the feature document carries its state (`references/issues.md`). Run `bun scripts/labels/cli.ts file
+--repo <checkout> --operation spec --type <type label>` with `--title`, `--body-file` and a new
+`--output` file. It uses the repository's mapped label names. Show the owner the labels with the
+title and body, then create the issue with `--preview <that file> --approved-digest <digest>`. When it
+reports missing labels, create nothing and give its next step.
+
 ## Start
 
 1. Get the binary and run `vh-adlc knowledge` with `conventions/feature-documents.md`,
