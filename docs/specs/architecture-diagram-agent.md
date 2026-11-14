@@ -97,7 +97,8 @@ The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`.
       Evidence: bun test tests/vh-adlc/diagram/output.test.ts returned four expected failures before the export helper existed.
 - [x] T5 `tests/vh-adlc/diagram/` - fixture runner and committed scenarios reject the package when the skill is absent (AC-01, AC-02, AC-03, AC-05)
       Evidence: bun test tests/vh-adlc/diagram/discovery.test.ts rejected the candidate because the declared skill had no SKILL.md.
-- [ ] T6 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `tests/vh-adlc/check.test.ts`, `docs/reference/marketplace.md`, `docs/user-guides/workflows.md` - the package checker and export tests pass, followed by native fixture and intake runs on both hosts and rendered inspection (AC-01, AC-02, AC-03, AC-04, AC-05)
+- [x] T6 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `tests/vh-adlc/check.test.ts`, `docs/reference/marketplace.md`, `docs/user-guides/workflows.md` - the package checker and export tests pass, followed by native fixture and intake runs on both hosts and rendered inspection (AC-01, AC-02, AC-03, AC-04, AC-05)
+      Evidence: bun test tests/vh-adlc --timeout 20000 passed 1634 tests. Both native hosts produced the AWS and OCI outputs and requested clarification for the missing restore link. All four delivered SVGs matched offline re-exports, and all four editor boundary drags moved the child. Review R-5 recorded two follow-ups.
 
 ## Open Questions
 
