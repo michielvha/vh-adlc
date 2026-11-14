@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { historyOutputFixture, runHistoryOutput } from "./history-output-fixture";
 import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import type { AuditOutputArtifacts } from "../../../plugins/vh-adlc/scripts/docs-drift/report-output";
 
 const roots: string[] = []; let failed = false;
 afterAll(() => {
@@ -77,7 +78,7 @@ const changedActor = save(session);
 writeFileSync(executable, nativeBytes);
 const fs = await import("node:fs"), { spyOn } = await import("bun:test"), link = fs.linkSync;
 const fault = spyOn(fs, "linkSync").mockImplementation((from, to) => {
-  if (String(to).endsWith("/provenance.json")) throw Error("Synthetic provenance delivery failure");
+  if (String(to).endsWith("/provenance.json") || String(to).endsWith("/provenance.pending.json")) throw Error("Synthetic provenance delivery failure");
   return link(from, to);
 });
 let partial; try { partial = save(session); } finally { fault.mockRestore(); }
@@ -94,6 +95,75 @@ const result = { copied, wrapped, changed, changedActor, interactiveError, copie
     expect(result.partial.files.report_json).not.toBeNull(); expect(result.partial.files.markdown).not.toBeNull();
     expect(result.partial.files.provenance_json).toBeNull();
     expect(result.partial.diagnostics.join("\n")).toContain("Synthetic provenance delivery failure");
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { failed = true; throw error; }
+}, 600000);
+
+test("late hosted refusals keep provisional evidence outside the upload pair", async () => {
+  try {
+    const f = await historyOutputFixture(roots), before = captureRepositoryState(f.repo);
+    const result = runHistoryOutput(f, `
+const fs = await import("node:fs"), { spyOn } = await import("bun:test");
+const output = await import(plugin + "/scripts/docs-drift/report-output.ts");
+const reports = await import(plugin + "/scripts/docs-drift/audit-report.ts");
+const { persistHostedAuditOutput } = await import(plugin + "/scripts/docs-drift/history-output.ts");
+const { HistoryEligibilityError } = await import(plugin + "/scripts/docs-drift/report-history.ts");
+const { sha256 } = await import(plugin + "/scripts/docs-drift/protocol.ts");
+const save = () => persistHostedAuditOutput({ repo: options.repo, source: options.source, artifact_root: options.artifact_root, session });
+const nativePath = ${JSON.stringify(f.runPath)}, native = readFileSync(nativePath), guide = options.repo + "/docs/guide.md", originalGuide = readFileSync(guide);
+const link = fs.linkSync, late = {};
+for (const fault of ["run", "reopen", "caller"]) {
+  const hook = spyOn(fs, "linkSync").mockImplementation((from, to) => {
+    const value = link(from, to);
+    if (String(to).endsWith("/provenance.json") || String(to).endsWith("/provenance.pending.json")) {
+      if (fault === "run") writeFileSync(nativePath, JSON.stringify({ ...JSON.parse(native), status: "completed", conclusion: "cancelled" }));
+      if (fault === "reopen") writeFileSync(to, "Changed provisional envelope\\n", { mode: 0o600 });
+      if (fault === "caller") writeFileSync(guide, Buffer.concat([originalGuide, Buffer.from("Synthetic later caller change\\n")]));
+    }
+    return value;
+  });
+  try { late[fault] = structuredClone(save()); } finally { hook.mockRestore(); writeFileSync(nativePath, native); writeFileSync(guide, originalGuide); }
+  late[fault].upload_file_exists = fs.existsSync(late[fault].directory + "/provenance.json");
+  late[fault].provisional_file_exists = fs.existsSync(late[fault].directory + "/provenance.pending.json");
+}
+const persist = output.persistAuditOutput;
+const identityFault = spyOn(output, "persistAuditOutput").mockImplementation(options => {
+  const saved = structuredClone(persist(options)), path = options.artifact_root + "/" + saved.files.report_json.path;
+  const bytes = Buffer.concat([readFileSync(path), Buffer.from("\\n")]); writeFileSync(path, bytes);
+  saved.files.report_json.sha256 = sha256(bytes); return saved;
+});
+let identity; try { identity = save(); } finally { identityFault.mockRestore(); }
+const originalEnvelope = reports.createOriginalAuditReportEnvelope;
+let envelopeCalls = 0;
+const differentEnvelope = spyOn(reports, "createOriginalAuditReportEnvelope").mockImplementation(report => {
+  const bytes = originalEnvelope(report); return ++envelopeCalls === 1 ? bytes : Buffer.concat([bytes, Buffer.from("\\n")]);
+});
+let changedEnvelope; try { changedEnvelope = save(); } finally { differentEnvelope.mockRestore(); }
+const oversized = spyOn(reports, "createOriginalAuditReportEnvelope").mockImplementation(report => {
+  const bytes = originalEnvelope(report); return Buffer.concat([bytes, Buffer.alloc(524288)]);
+});
+let bound; try { bound = save(); } finally { oversized.mockRestore(); }
+const ineligible = spyOn(reports, "createOriginalAuditReportEnvelope").mockImplementation(() => { throw new HistoryEligibilityError("technical report state"); });
+let refused; try { refused = save(); } finally { ineligible.mockRestore(); }
+const result = { late, identity, changedEnvelope, bound, refused };
+`);
+    type LateOutput = AuditOutputArtifacts & { upload_file_exists: boolean; provisional_file_exists: boolean };
+    for (const [fault, saved] of Object.entries(result.late as Record<string, LateOutput>)) {
+      expect(saved.complete, fault + JSON.stringify(saved)).toBe(false);
+      expect(saved.scope_changed, fault).toBe(true); expect(saved.history_provenance).toBe("absent");
+      expect(saved.files.provenance_json, fault).toBeNull(); expect(saved.upload_file_exists, fault).toBe(false);
+      expect(saved.provisional_file_exists, fault).toBe(true);
+    }
+    expect(result.identity.complete).toBe(false); expect(result.identity.scope_changed).toBe(true);
+    expect(result.identity.diagnostics).toContain("Original hosted report bytes changed");
+    expect(result.changedEnvelope.complete).toBe(false); expect(result.changedEnvelope.scope_changed).toBe(true);
+    expect(result.changedEnvelope.files.provenance_json).toBeNull();
+    expect(result.changedEnvelope.diagnostics).toContain("Original hosted provenance changed during retention");
+    expect(result.bound.complete).toBe(false); expect(result.bound.scope_changed).toBe(false);
+    expect(result.bound.diagnostics).toContain("Hosted provenance exceeds the configured retained entry bound");
+    expect(result.refused.complete).toBe(false); expect(result.refused.history_provenance).toBe("absent");
+    expect(result.refused.files.report_json).not.toBeNull(); expect(result.refused.files.markdown).not.toBeNull();
+    expect(result.refused.diagnostics).toContain("ineligible docs-drift history technical report state");
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { failed = true; throw error; }
 }, 600000);
