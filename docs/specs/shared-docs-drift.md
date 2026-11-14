@@ -1368,6 +1368,7 @@ None. The owner selected preservation of both existing publisher identities on 2
 | 2026-11-14 | R-65 | spec | `11d8fe626236c941daa5418bbe39d5529f3b10b0` | claude-opus-5.5 | procedural | No blocking or should-fix findings. One status-description nit. All 136 required chunks read. Unchanged accepted normative baseline. |
 | 2026-11-14 | R-66 | spec | `f7c49559348b156b844ba391c825865dc19c6685` | claude-opus-5.5 | procedural | 1 should-fix on task-state prose and 2 nits, corrected outside the normative baseline. All 190 required chunks read. |
 | 2026-11-14 | R-67 | spec | `943a1170e8e3f561443f9fb356e5121a502b265f` | claude-opus-5.5 | procedural | 1 should-fix on cross-entry post-merge closure and 2 nits. All 163 required chunks read. |
+| 2026-11-14 | R-68 | spec | `2284b7f1f8c8a78ec791adf68f71ba684b05e112` | claude-opus-5.5 | procedural | 2 should-fix findings on criterion proof mapping and discovery coverage. All 162 required chunks read. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -1533,6 +1534,22 @@ SEVERITY: nit
 WHERE: Tasks T111, T112 and T113 (spec chunk 01065 lines 13 to 15; publisher-revision.patch 00081).
 EVIDENCE: The pinned convention says each task names its files, a done condition and the "criteria it advances" (feature-documents.md 00071 to 00141). The template example ends with "(AC-01)". Every other task line in this document ends with its AC tags, for example T29 "(AC-01, AC-06)" and T37 "(AC-06, AC-07)". The three tasks this revision adds have no criteria tag. The revision itself ties this work to the new identity text in AC-05 and AC-06.
 PROPOSAL: End T111 and T112 with "(AC-05, AC-06)". End T113 with "(AC-01, AC-06)", adding AC-07 if its migration checks are meant to count toward that criterion.
+
+### R-68
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: docs/specs/shared-docs-drift.md, Acceptance Criteria AC-05 (chunk 00518 line 1); Test Plan AC-05 row (chunk 00530 line 1); Test Plan AC-06 row (chunk 00531 line 1); Tasks T111 and T112 (chunk 01065).
+EVIDENCE: The criterion text for AC-05 was revised in the earlier identity revision, so this finding traces to that revision. It now requires that "Hosted and interactive entries preserve their configured publisher identities with exact per-entry native account bindings, original-account recovery and verified cross-entry history". The AC-05 Test Plan row was not changed in either the identity revision or this one, and patch chunk 00017 shows it only as a context line. That row still proves a single adopted identity and the race between scheduled and local publishers for the shared lease. Every per-entry proof is in the row labelled AC-06 alone. That includes the per-entry account binding, refusal of an altered original account ID, unavailable original attribution, bot assessment of an owner consolidation and closure across entries. T111 and T112 cite (AC-05, AC-06), but the Test Plan never ties their cases to AC-05. The feature-documents convention allows one row to list several criterion IDs. Without that label, a per-criterion review of AC-05 could record it as met on a single-identity implementation, so the proof could pass on a wrong implementation.
+PROPOSAL: Label the per-entry identity proofs "AC-05, AC-06" by moving them into their own row or relabelling the current row. The other option is to extend the AC-05 row so it names those cases: per-entry native account binding, original-account recovery with its refusals, cross-entry history in both directions, and the shared-lease race between the two configured publishers.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: docs/specs/shared-docs-drift.md, Publisher identity by entry section (chunk 00265 lines 5 and 13); settings and discovery inputs (chunk 00195 line 1); Test Plan AC-06 row (chunk 00531); Task T111 (chunk 01065). Source context: plugins/vh-adlc/scripts/docs-drift/settings.ts, pr_discovery parsing (chunks 00281 lines 29 and 30, 00351 lines 1 to 4); audit-publication-receipts.ts excerpt lines 61 to 63.
+EVIDENCE: The revised section requires verified cross-entry history, for example "a reviewed owner consolidation can be assessed by the bot". Discovery of existing shared proposals still comes from the separate protected `pr_discovery.authors` list. The spec says only that "PR discovery and publication destinations are explicit consumer inputs" and never relates the new per-entry `publication.entry_actors` map to `pr_discovery.authors`. Suppose a configuration maps the interactive entry to the owner but leaves the owner out of the discovery authors. The hosted run then never inventories the owner's proposals, and carried delivery, stale-proposal checks and receipt history miss them without any error. The receipt audit already treats `proposal.actor !== settings.publication.actor` as legacy. One implementer could reject such a configuration while another leaves it unchecked, so the two would build different things.
+PROPOSAL: In the Publisher identity by entry section, state that when the per-entry map is present, every mapped login must appear in `pr_discovery.authors`, and that settings validation rejects the configuration otherwise. If a different relation is intended, state that relation. Add the refusal case of a mapped actor missing from the discovery authors to the AC-06 Test Plan row and to T111.
 
 ## Sources
 
