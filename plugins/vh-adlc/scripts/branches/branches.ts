@@ -194,7 +194,18 @@ function inspect(checkout: Checkout, tree: Worktree, trees: Worktree[]): { reaso
     if (refs.code !== 0 || refs.timedOut) reasons.push("per-worktree ref check failed");
     else if (refs.stdout.trim()) reasons.push("has per-worktree refs under refs/worktree/");
   }
-  if (tree.prunable) return { reasons, ignored };
+  if (tree.prunable) {
+    // Design item 4: removing the entry deletes its admin directory, with any submodule commits and staged blobs it holds.
+    if (present(tree.path)) reasons.push(present(join(tree.path, ".git")) ? "its directory exists though Git reports it missing" : "its directory exists without a .git file");
+    if (tree.admin) {
+      if (existsSync(join(tree.admin, "modules"))) reasons.push("submodule state: modules/ in its admin directory");
+      const index = checkout.call([`--git-dir=${tree.admin}`, "diff-index", "--cached", "--quiet", "HEAD"]);
+      if (index.timedOut) reasons.push("index check timed out");
+      else if (index.code === 1) reasons.push("staged changes in its index");
+      else if (index.code !== 0) reasons.push(`index check failed (exit ${index.code})`);
+    }
+    return { reasons, ignored };
+  }
   for (const other of trees) if (other !== tree && other.path.startsWith(tree.path + sep)) reasons.push(`another worktree inside it: ${other.path}`);
   const git = (...args: string[]) => checkout.call(["-C", tree.path, ...args]);
   const failed = (r: Result, what: string) => r.timedOut ? `${what} timed out` : r.code !== 0 ? `${what} failed (exit ${r.code})` : r.stderr.trim() ? `${what} wrote to stderr: ${redact(r.stderr)}` : "";
@@ -250,7 +261,6 @@ function assess(c: Context, tree: Worktree, trees: Worktree[], extra: string[] =
   if (tree.path === c.main) reasons.push("the main worktree");
   if (real(tree.path) === c.invoking) reasons.push("the invoking worktree");
   if (tree.locked) reasons.push("locked");
-  if (tree.prunable) reasons.push("directory is missing");
   if (!c.worktrees) return { reasons: [...reasons, "worktree removal is off (--worktrees false)"], ignored: [] };
   if (tree.path === c.main) return { reasons, ignored: [] };
   const found = inspect(c.checkout, tree, trees);
@@ -404,7 +414,7 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
     if (!tree.branch) {
       const { reasons, ignored } = assess(context, tree, trees, loose(tree));
       if (reasons.length) keepTree(tree, reasons);
-      else plan.operations.push({ kind: "remove-worktree", path: tree.path, oid: tree.head!, proof: `HEAD reachable from ${defaultBranch}, at least 7 days old, and no other commit only its HEAD reflog names`, ignored });
+      else plan.operations.push({ kind: "remove-worktree", path: tree.path, oid: tree.head!, proof: `HEAD reachable from ${defaultBranch}, ${tree.prunable ? "directory gone" : "at least 7 days old"}, and no other commit only its HEAD reflog names`, ignored });
       continue;
     }
     const rule = tree.branch === defaultBranch ? `the default branch ${defaultBranch} is checked out` : local.has(tree.branch) ? "its branch is out of scope" : "unborn branch";

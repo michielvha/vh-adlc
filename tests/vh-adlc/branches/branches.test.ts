@@ -751,7 +751,7 @@ test("a worktree entry whose directory is gone is kept while its admin directory
   const sub = f.merged("sub", { setup: path => { git(path, "-c", "protocol.file.allow=always", "submodule", "add", "-q", lib, "lib"); } });
   const own = commit(join(sub, "lib"), "submodule work");
   const staged = f.merged("staged"), stagedDetached = detach(f, "staged-detached", 0);
-  for (const path of [staged, stagedDetached]) { put(path, { "staged.txt": "staged\n" }); git(path, "add", "staged.txt"); }
+  for (const path of [staged, stagedDetached]) { put(path, { "added.txt": "staged\n" }); git(path, "add", "added.txt"); }
   for (const path of [sub, staged, stagedDetached]) rmSync(path, { recursive: true, force: true });
   const plan = f.plan();
   expect(removals(plan)).toEqual([]);
@@ -759,7 +759,7 @@ test("a worktree entry whose directory is gone is kept while its admin directory
   for (const path of [staged, stagedDetached]) expect(onlyKept(plan, path)).toContain("staged changes");
   for (const name of ["feat/sub", "feat/staged"]) expect(summary(plan.operations)).not.toContain(`delete-local:${name}`);
   approve(f.options, plan);
-  git(f.work, `--git-dir=${join(admin, "sub", "modules", "lib")}`, "cat-file", "-e", `${own}^{commit}`);
+  git(f.work, `--git-dir=${join(admin, "sub", "modules", "lib")}`, `--work-tree=${f.dir}`, "cat-file", "-e", `${own}^{commit}`);
   for (const name of ["staged", "staged-detached"]) expect(existsSync(join(admin, name, "index"))).toBe(true);
   for (const path of [sub, staged, stagedDetached]) expect(listed(f)).toContain(`worktree ${path}\n`);
   expect(locals(f.work)).toEqual(["feat/staged", "feat/sub", "main"]);
