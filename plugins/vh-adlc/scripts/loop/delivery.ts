@@ -19,9 +19,23 @@ function git(repo: string, args: string[]): string {
   return run.stdout.toString();
 }
 
-export function ciReport(settings: LoopSettings): { state: "not triggered" | "follow runs"; reason: string; dispatch: false } {
-  return settings.ci_trigger === "manual"
-    ? { state: "not triggered", reason: "manual CI policy", dispatch: false }
+export type Visibility = "public" | "private" | "internal" | "unknown";
+
+/** The repository's GitHub visibility, or unknown when gh cannot tell. */
+export function repositoryVisibility(repo: string): Visibility {
+  const run = Bun.spawnSync(["gh", "repo", "view", "--json", "visibility", "-q", ".visibility"], { cwd: repo, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+  const value = run.exitCode === 0 ? run.stdout.toString().trim().toLowerCase() : "";
+  return value === "public" || value === "private" || value === "internal" ? value : "unknown";
+}
+
+// The delivery convention runs a private repository's CI locally; the owner may keep hosted checks,
+// so this only warns and never changes the report's state.
+const PRIVATE_AUTOMATIC = "this repository is not public but its loop settings use automatic CI; the delivery convention runs private repository CI locally with ci_trigger: manual unless the owner chose hosted checks for it";
+
+export function ciReport(settings: LoopSettings, visibility: Visibility = "unknown"): { state: "not triggered" | "follow runs"; reason: string; dispatch: false; warning?: string } {
+  if (settings.ci_trigger === "manual") return { state: "not triggered", reason: "manual CI policy", dispatch: false };
+  return visibility === "private" || visibility === "internal"
+    ? { state: "follow runs", reason: "automatic CI", dispatch: false, warning: PRIVATE_AUTOMATIC }
     : { state: "follow runs", reason: "automatic CI", dispatch: false };
 }
 

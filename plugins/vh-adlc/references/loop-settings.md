@@ -68,7 +68,7 @@ performed it, at the current head.
 
 | Field | Value |
 | --- | --- |
-| `ci_trigger` | `automatic` (default) or `manual`. With `manual`, ship reports CI as not triggered by policy and never dispatches a run. |
+| `ci_trigger` | `automatic` (default) or `manual`. With `manual`, ship reports CI as not triggered by policy and never dispatches a run. With `automatic` in a private or internal GitHub repository, `cli.ts ci` adds a `warning`, because the delivery convention runs private repository CI locally; the owner may keep hosted checks, so it never blocks. |
 | `skip_ci_paths` | Optional globs of extra skip-eligible paths for feature deliveries, honoured only when the resolved delivery convention allows them; otherwise ship reports them ignored and names the pin update. |
 | `post_merge_watch.argv` | A command run after a merge; it must contain `{merge_sha}`. Exit 0 means every release path published. |
 | `post_merge_watch.no_publication_pattern` | Optional regular expression for watch output that means no workflow ran at all. |
