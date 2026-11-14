@@ -77,13 +77,13 @@ const keptTrees = (plan: Plan, path: string) => plan.kept.filter(k => k.scope ==
 const why = (plan: Plan, path: string) => keptTrees(plan, path).join(" | ");
 const localWhy = (plan: Plan, branch: string) => plan.kept.find(k => k.scope === "local" && k.branch === branch)?.reason ?? "";
 const listed = (f: { work: string }) => git(f.work, "worktree", "list", "--porcelain");
-/** Runs cli.ts with the fake gh first on PATH. */
-function cliFor(f: { dir: string; state: string }) {
+/** Runs cli.ts with the fake gh first on PATH, from `cwd` when given. */
+function cliFor(f: { dir: string; state: string }, cwd?: string) {
   const shim = join(f.dir, "bin");
   if (!existsSync(shim)) { mkdirSync(shim); writeFileSync(join(shim, "gh"), `#!/bin/sh\nexec bun ${JSON.stringify(fakeGh)} "$@"\n`, { mode: 0o755 }); }
   const env = { ...process.env, PATH: shim + delimiter + process.env.PATH, BRANCHES_FIXTURE: f.state };
   return (...args: string[]) => {
-    const r = Bun.spawnSync(["bun", cli, ...args], { stdout: "pipe", stderr: "pipe", env });
+    const r = Bun.spawnSync(["bun", cli, ...args], { stdout: "pipe", stderr: "pipe", env, ...(cwd ? { cwd } : {}) });
     return { code: r.exitCode, out: r.stdout.toString(), err: r.stderr.toString() };
   };
 }
@@ -778,4 +778,94 @@ test("a week-old branch with no commits of its own, paused in a rebase in a work
   approve(f.options, plan);
   expect(locals(f.work)).toContain("feat/paused");
   expect(listed(f)).toContain(`worktree ${path}\n`);
+}, 120000);
+
+type Merged = { complete: boolean; outcomes: { operation: Operation; status: string }[]; kept: Plan["kept"] };
+
+test("after-merge removes the merged PR's clean worktree and branch and leaves an old detached worktree alone", () => {
+  const f = repo(), tree = f.merged("done"), old = detach(f, "old", 8);
+  expect(removals(f.plan())).toContain(old);
+  const result: Merged = afterMerge(f.options, 1);
+  expect(result.complete, JSON.stringify(result.outcomes)).toBe(true);
+  expect(summary(result.outcomes.map(o => o.operation))).toEqual(["delete-remote:feat/done", "remove-worktree:feat/done", "delete-local:feat/done"]);
+  expect(existsSync(tree)).toBe(false);
+  expect(listed(f)).not.toContain(`worktree ${tree}\n`);
+  expect(listed(f)).toContain(`worktree ${old}\n`);
+  expect(result.kept.filter(k => k.scope === "worktree")).toEqual([]);
+  expect(locals(f.work)).toEqual(["main"]);
+}, 120000);
+
+/** Each case sets up one fixture whose PR #1 branch is checked out in a single worktree, then runs after-merge. */
+const afterMergeKeeps: [string, () => { f: ReturnType<typeof repo>; tree: string; branch: string; reason: string; result: Merged }][] = [
+  ["holds an ignored node_modules/", () => {
+    const f = repo(), tree = f.merged("deps");
+    put(tree, { "node_modules/a/index.js": "x\n" });
+    return { f, tree, branch: "feat/deps", reason: "holds ignored files; remove it through an approved plan", result: afterMerge(f.options, 1) };
+  }],
+  ["holds an ignored .env under status.showUntrackedFiles=no", () => {
+    const f = repo(true), tree = f.merged("env");
+    put(tree, { ".env": "TOKEN=x\n" });
+    return { f, tree, branch: "feat/env", reason: "holds ignored files; remove it through an approved plan", result: afterMerge(f.options, 1) };
+  }],
+  ["has a modified tracked file", () => {
+    const f = repo(), tree = f.merged("edited");
+    put(tree, { "edited.txt": "changed\n" });
+    return { f, tree, branch: "feat/edited", reason: "changed or untracked files", result: afterMerge(f.options, 1) };
+  }],
+  ["has an untracked file", () => {
+    const f = repo(), tree = f.merged("draft");
+    put(tree, { "notes.md": "draft\n" });
+    return { f, tree, branch: "feat/draft", reason: "changed or untracked files", result: afterMerge(f.options, 1) };
+  }],
+  ["is locked", () => {
+    const f = repo(), tree = f.merged("held");
+    git(f.work, "worktree", "lock", "--reason", "vh-adlc test-run", tree);
+    return { f, tree, branch: "feat/held", reason: "vh-adlc test-run", result: afterMerge(f.options, 1) };
+  }],
+  ["is the main worktree", () => {
+    const f = repo(), aux = detach(f, "aux", 0);
+    git(f.work, "switch", "-q", "-c", "feat/home");
+    const tip = commit(f.work, "home"); git(f.work, "push", "-q", "-u", "origin", "feat/home");
+    f.write({ pulls: [pr(1, "feat/home", tip)] });
+    return { f, tree: f.work, branch: "feat/home", reason: "the main worktree", result: afterMerge({ ...f.options, repo: aux }, 1) };
+  }],
+  ["is the --repo worktree", () => {
+    const f = repo(), tree = f.merged("repo");
+    return { f, tree, branch: "feat/repo", reason: "the --repo worktree", result: afterMerge({ ...f.options, repo: tree }, 1) };
+  }],
+  ["holds the process's working directory while --repo names the main checkout", () => {
+    const f = repo(), tree = f.merged("cwd", { setup: path => put(path, { "src/a.txt": "a\n" }) });
+    const run = cliFor(f, join(tree, "src"))("after-merge", "--repo", f.work, "--repository", "acme/demo", "--pull", "1");
+    expect(run.code, run.out + run.err).toBe(0);
+    return { f, tree, branch: "feat/cwd", reason: "holds the process's working directory", result: JSON.parse(run.out) as Merged };
+  }],
+];
+for (const [name, setup] of afterMergeKeeps) test(`after-merge keeps the merged PR's worktree and branch, with a reason, when it ${name}`, () => {
+  const { f, tree, branch, reason, result } = setup();
+  const ops = summary(result.outcomes.map(o => o.operation));
+  expect(ops).not.toContain(`remove-worktree:${branch}`);
+  expect(ops).not.toContain(`delete-local:${branch}`);
+  const kept = result.kept.filter(k => k.scope === "worktree" && k.path === tree);
+  expect(kept).toHaveLength(1);
+  expect(kept[0]).toMatchObject({ branch });
+  expect(kept[0]!.reason).toContain(reason);
+  expect(result.kept.find(k => k.scope === "local" && k.branch === branch)?.reason ?? "").toContain(tree);
+  expect(listed(f)).toContain(`worktree ${tree}\n`);
+  expect(existsSync(join(tree, ".git"))).toBe(true);
+  expect(locals(f.work)).toContain(branch);
+}, 120000);
+
+test("a locked worktree is kept with its lock reason, and once unlocked the next plan proposes it", () => {
+  const f = repo(), old = detach(f, "old", 8), held = join(f.dir, "held");
+  aged(8, f.work, "worktree", "add", "-q", "-b", "feat/held", held, "main");
+  git(f.work, "worktree", "lock", "--reason", "vh-adlc test-run", old);
+  git(f.work, "worktree", "lock", "--reason", "vh-adlc audit-42", held);
+  const plan = f.plan();
+  expect(removals(plan)).toEqual([]);
+  expect(onlyKept(plan, old)).toContain("vh-adlc test-run");
+  expect(onlyKept(plan, held)).toContain("vh-adlc audit-42");
+  expect(summary(plan.operations)).not.toContain("delete-local:feat/held");
+  expect(localWhy(plan, "feat/held")).toContain(held);
+  git(f.work, "worktree", "unlock", old);
+  expect(removals(f.plan())).toEqual([old]);
 }, 120000);
