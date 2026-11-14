@@ -46,7 +46,18 @@ describe("resolved feature-document convention", () => {
   });
 
   test("states the nit rule beside the severity definitions (AC-08)", () => {
-    expect(reviewLog).toContain("a nit on the normative baseline never causes a revision on its own");
+    expect(reviewLog).toContain("A nit on the normative baseline never causes a revision on its own.");
+    expect(reviewLog).toContain("the same commit fixes every nit of that pass, in any");
+    expect(reviewLog).toContain("free-text widening nit, which stays listed even when the baseline changes for other findings");
+    expect(reviewLog).toContain("in its report and the owner-facing conversation summary, not in the document");
+  });
+
+  test("lets a declared review lens keep its own severity (AC-02)", () => {
+    expect(reviewLog).toContain("A\nfinding a declared lens raises takes that lens's severity");
+  });
+
+  test("exempts nits from open questions (AC-11)", () => {
+    expect(section(convention, "Open questions")).toContain("A review finding rated nit is the exception");
   });
 
   test("requires must-pass and must-fail examples in a free-text pattern proof (AC-05)", () => {
@@ -68,7 +79,7 @@ describe("user guides", () => {
     });
   }
 
-  test("docs/user-guides/workflows.md says no approval allows rewriting a reviewed commit (AC-10, R-15 F-06)", () => {
+  test("docs/user-guides/workflows.md says no approval allows rewriting a reviewed commit (AC-08)", () => {
     expect(guides[1].text).toContain("No approval allows rewriting a commit that a Review Log row names");
   });
 });
