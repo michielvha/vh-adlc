@@ -76,6 +76,16 @@ if (fault === "mixed-findings") report.findings.push(
   { detector: 42, severity: "note", document: "docs/guide.md", explanation: "Malformed candidate." },
   { detector: "valid-after", severity: "note", document: "docs/guide.md", explanation: "Last valid candidate." },
 );
+if (["corpus-finding", "corpus-feedback", "corpus-missing-unit", "foreign-finding"].includes(fault)) {
+  const candidate = { id: "synthetic-corpus-candidate", detector: "fixture-corpus", severity: "note",
+    document: fault === "foreign-finding" ? "docs/outside.md" : null,
+    location: { scope: "corpus" }, explanation: "Synthetic corpus-wide documentation inventory candidate." };
+  if (fault === "corpus-feedback") {
+    report.suppressed_findings.push({ finding: candidate, reason: "Synthetic corpus exception" });
+    report.stale_suppressions.push({ id: "synthetic-corpus-stale", reason: "Synthetic stale corpus exception", document: null });
+  } else report.findings.push(candidate);
+  if (fault === "corpus-missing-unit") report.detectors = units.slice(1);
+}
 if (fault === "delayed") {
   fs.writeFileSync(outputPath + ".started", "started");
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 350);

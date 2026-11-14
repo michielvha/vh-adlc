@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureRepositoryState, captureSnapshot } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -7,8 +7,10 @@ import { runScan } from "../../../plugins/vh-adlc/scripts/docs-drift/scan";
 import { commitAll, populateRepository, put } from "./repository-fixture";
 
 const roots: string[] = [];
+const preservedRoots = new Set<string>();
 afterAll(() => {
-  for (const root of roots) rmSync(root, { recursive: true, force: true });
+  for (const root of roots) if (!preservedRoots.has(root)) rmSync(root, { recursive: true, force: true });
+  if (preservedRoots.size) console.error("Preserved failed corpus scanner fixtures", JSON.stringify([...preservedRoots]));
 });
 
 function fixture(fault = "none", endpoint = "http://127.0.0.1:1") {
@@ -72,6 +74,42 @@ test("unknown local findings and embedded instructions remain visible data", asy
     expect(result.findings[0].detector).toBe("unknown-local-label");
     expect(result.process?.exit_code).toBe(0);
   }
+});
+
+test.each([false, true])("corpus-wide findings retain their scope with an empty document inventory %s", async empty => {
+  const f = fixture("corpus-finding");
+  try {
+    if (empty) {
+      const settings = JSON.parse(readFileSync(join(f.repo, ".vh-adlc/docs-drift.yaml"), "utf8"));
+      put(f.repo, "consumer-procedure.md", readFileSync(join(f.repo, "docs/docs-procedure.md"), "utf8"));
+      settings.project_procedure = "consumer-procedure.md";
+      put(f.repo, ".vh-adlc/docs-drift.yaml", JSON.stringify(settings));
+      unlinkSync(join(f.repo, "docs/guide.md")); unlinkSync(join(f.repo, "docs/docs-procedure.md"));
+      f.commit = commitAll(f.repo);
+    }
+    const before = captureRepositoryState(f.repo), result = await scan(f);
+    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+    expect(result.findings).toHaveLength(1);
+    expect(result.findings[0]).toMatchObject({ document: null, location: { scope: "corpus" } });
+    expect(result.documents).toHaveLength(empty ? 0 : 2);
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { preservedRoots.add(f.root); throw error; }
+});
+
+test.each(["corpus-feedback", "corpus-missing-unit", "foreign-finding"])("corpus collection preserves feedback and required boundaries %s", async fault => {
+  const f = fixture(fault);
+  try {
+    const result = await scan(f);
+    if (fault === "corpus-feedback") {
+      expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+      expect(result.suppressed_findings[0].finding.document).toBeNull();
+      expect(result.stale_suppressions[0].document).toBeNull();
+    } else {
+      expect(result.complete).toBe(false);
+      expect(result.findings).toHaveLength(1);
+      expect(result.diagnostics.some(row => row.code === (fault === "corpus-missing-unit" ? "incomplete-detectors" : "foreign-finding"))).toBe(true);
+    }
+  } catch (error) { preservedRoots.add(f.root); throw error; }
 });
 
 test("malformed entries retain valid candidates on both sides of the gap", async () => {

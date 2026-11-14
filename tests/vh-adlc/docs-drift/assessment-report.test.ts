@@ -1,21 +1,28 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { populateRepository, commitAll, git, put } from "./repository-fixture";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { assessSource } from "../../../plugins/vh-adlc/scripts/docs-drift/source-assessment";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 
 const roots: string[] = [];
-afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+const preservedRoots = new Set<string>();
+afterAll(() => {
+  for (const root of roots) if (!preservedRoots.has(root)) rmSync(root, { recursive: true, force: true });
+  if (preservedRoots.size) console.error("Preserved failed corpus report fixtures", JSON.stringify([...preservedRoots]));
+});
 
-async function fixture(verdict = "confirmed-drift", options: { badRoots?: boolean; feedback?: boolean; localCoverage?: "declared" | "omitted" | "malformed" } = {}) {
+async function fixture(verdict = "confirmed-drift", options: {
+  badRoots?: boolean; feedback?: boolean; corpus?: boolean; emptyCorpus?: boolean;
+  localCoverage?: "declared" | "omitted" | "malformed";
+} = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-drift-assessment-report-"))); roots.push(root);
   const repo = join(root, "source"), artifacts = join(root, "artifacts");
   mkdirSync(repo, { mode: 0o700 }); mkdirSync(artifacts, { mode: 0o700 });
   let scanner = readFileSync(join(import.meta.dir, "fixtures/scanner.js"), "utf8")
-    .replace("__FIXTURE_CASE__", JSON.stringify("finding")).replace("__FIXTURE_ENDPOINT__", JSON.stringify("http://127.0.0.1:1"));
+    .replace("__FIXTURE_CASE__", JSON.stringify(options.corpus ? "corpus-finding" : "finding")).replace("__FIXTURE_ENDPOINT__", JSON.stringify("http://127.0.0.1:1"));
   if (options.feedback) {
     const suppressed = [{ finding: { id: "suppressed-1", detector: "fixture-feedback", severity: "note", document: "docs/guide.md", location: null,
       explanation: "Synthetic suppressed candidate" }, reason: "Retained historical exception" }];
@@ -23,6 +30,14 @@ async function fixture(verdict = "confirmed-drift", options: { badRoots?: boolea
     scanner = scanner.replace("suppressed_findings: [], stale_suppressions: []", `suppressed_findings: ${JSON.stringify(suppressed)}, stale_suppressions: ${JSON.stringify(stale)}`);
   }
   let source = populateRepository(repo, false, scanner).commit;
+  if (options.emptyCorpus) {
+    const settings = JSON.parse(readFileSync(join(repo, ".vh-adlc/docs-drift.yaml"), "utf8"));
+    put(repo, "consumer-procedure.md", readFileSync(join(repo, settings.project_procedure), "utf8"));
+    settings.project_procedure = "consumer-procedure.md";
+    put(repo, ".vh-adlc/docs-drift.yaml", JSON.stringify(settings));
+    unlinkSync(join(repo, "docs/guide.md")); unlinkSync(join(repo, "docs/docs-procedure.md"));
+    source = commitAll(repo);
+  }
   if (options.badRoots) { put(repo, "AGENTS.md", "Feature documents: plans/\nDocumentation impact roots: [missing-docs-root]\n"); source = commitAll(repo); }
   if (options.localCoverage) {
     put(repo, "AGENTS.md", "Feature documents: plans/\nFeature document format: local\n");
@@ -33,9 +48,14 @@ async function fixture(verdict = "confirmed-drift", options: { badRoots?: boolea
   }
   const common = { repo, source, artifact_root: artifacts, owner: "fixture-owner", run: "fixture-report" };
   const original = await assessSource(common);
-  if (!original.complete || !original.evidence || !original.scan || original.scan.findings.length !== 1) throw Error("Missing complete original scanner fixture");
-  const finding = original.scan.findings[0], document = readFileSync(join(repo, finding.document));
-  const quote = { path: finding.document, sha256: sha256(document), start: 0, end: document.length, quote_sha256: sha256(document) };
+  if (!original.complete || !original.evidence || !original.scan || original.scan.findings.length !== 1) {
+    preservedRoots.add(root);
+    throw Error("Missing complete original scanner fixture");
+  }
+  const finding = original.scan.findings[0], evidencePath = options.corpus ? "src/app.ts" : finding.document;
+  if (typeof evidencePath !== "string") throw Error("The fixture requires its declared source evidence path");
+  const document = readFileSync(join(repo, evidencePath));
+  const quote = { path: evidencePath, sha256: sha256(document), start: 0, end: document.length, quote_sha256: sha256(document) };
   const packet = { schema_version: 1, kind: "docs-drift-assessment", source_commit: source, source_verification_sha256: original.evidence.sha256,
     findings: [{ id: finding.id, verdict, reason: "Synthetic source-grounded finding decision", recommendation: "Review the bounded documentation correction", evidence: verdict === "unknown" ? [] : [quote] }] };
   return { ...common, root, artifacts, original, finding, packet };
@@ -61,7 +81,50 @@ test.each(["confirmed-drift", "still-accurate", "unknown"])("original-source rep
   expect(captureRepositoryState(f.repo)).toEqual(before); expect(git(f.repo, "rev-parse", "HEAD")).toBe(head);
 });
 
-test.each(["missing-row", "unknown-id", "duplicate", "changed-source", "changed-proof", "bad-quote", "missing-evidence", "extra-authority"])("original-source report refuses incomplete or unbound assessment %s", async fault => {
+test.each(["confirmed-drift", "still-accurate", "unknown"])("corpus assessment keeps its source evidence and explicit scope %s", async verdict => {
+  const { readAssessmentReport, renderAssessmentReport } = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
+  const f = await fixture(verdict, { corpus: true });
+  try {
+    const report = readAssessmentReport({ ...f, source_verification: f.original.evidence, assessment: retain(f, f.packet) });
+    expect(report.complete, report.diagnostics.join("\n")).toBe(true);
+    expect(report.authority).toBe("none");
+    expect(report.findings[0]).toMatchObject({ finding: { document: null }, verdict });
+    expect(renderAssessmentReport(report)).toContain("Corpus");
+  } catch (error) { preservedRoots.add(f.root); throw error; }
+});
+
+test.each(["missing", "changed"])("affirmative corpus assessments require bound current source evidence %s", async fault => {
+  const { readAssessmentReport } = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
+  const f = await fixture("confirmed-drift", { corpus: true });
+  if (fault === "missing") f.packet.findings[0].evidence = [];
+  else f.packet.findings[0].evidence[0].quote_sha256 = "0".repeat(64);
+  const report = readAssessmentReport({ ...f, source_verification: f.original.evidence, assessment: retain(f, f.packet) });
+  expect(report.complete).toBe(false); expect(report.authority).toBe("none");
+});
+
+test("the normal report CLI preserves a corpus finding and its caller-assessment boundary", async () => {
+  const f = await fixture("confirmed-drift", { corpus: true, emptyCorpus: true }), assessment = retain(f, f.packet);
+  const before = captureRepositoryState(f.repo);
+  try {
+    const result = Bun.spawnSync([process.execPath, resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"),
+      "report-findings", "--repo", f.repo, "--source", f.source, "--artifact-root", f.artifacts,
+      "--source-verification", f.original.evidence!.path, "--source-verification-sha256", f.original.evidence!.sha256,
+      "--assessment", assessment.path, "--assessment-sha256", assessment.sha256], {
+      env: { PATH: process.env.PATH, HOME: process.env.HOME, LANG: "C", LC_ALL: "C", BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
+      stdout: "pipe", stderr: "pipe", timeout: 30000,
+    });
+    expect(result.exitCode).toBe(0);
+    const report = JSON.parse(result.stdout.toString());
+    expect(report).toMatchObject({ command: "report-findings", outcome: "collected",
+      assessment_report: { complete: true, authority: "none", origin: "caller-assessment" } });
+    expect(report.assessment_report.findings[0].finding.document).toBeNull();
+    expect(report.assessment_report.counts.documents).toBe(0);
+    expect(report.markdown).toContain("Corpus-wide finding");
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { preservedRoots.add(f.root); throw error; }
+}, 45000);
+
+test.each(["missing-row", "unknown-id", "duplicate", "changed-source", "changed-proof", "bad-quote", "wrong-document", "missing-evidence", "extra-authority"])("original-source report refuses incomplete or unbound assessment %s", async fault => {
   const { readAssessmentReport } = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
   const f = await fixture(), packet = structuredClone(f.packet);
   if (fault === "missing-row") packet.findings = [];
@@ -70,6 +133,10 @@ test.each(["missing-row", "unknown-id", "duplicate", "changed-source", "changed-
   if (fault === "changed-source") packet.source_commit = "0".repeat(40);
   if (fault === "changed-proof") packet.source_verification_sha256 = "0".repeat(64);
   if (fault === "bad-quote") packet.findings[0].evidence[0].quote_sha256 = "0".repeat(64);
+  if (fault === "wrong-document") {
+    const bytes = readFileSync(join(f.repo, "src/app.ts"));
+    packet.findings[0].evidence = [{ path: "src/app.ts", sha256: sha256(bytes), start: 0, end: bytes.length, quote_sha256: sha256(bytes) }];
+  }
   if (fault === "missing-evidence") packet.findings[0].evidence = [];
   const selected: unknown = fault === "extra-authority" ? { ...packet, approved: true } : packet;
   const report = readAssessmentReport({ ...f, source_verification: f.original.evidence, assessment: retain(f, selected) });

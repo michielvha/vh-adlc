@@ -89,7 +89,10 @@ export function readAssessmentReport(input: Options): AssessmentReport {
       if (!Array.isArray(row.evidence)) throw Error("Finding source evidence required");
       const evidence = row.evidence.map(parseSourceQuote);
       if (evidence.some(quote => !matchesSourceQuote(quote, { snapshot }))) throw Error("Finding evidence differs from its original source");
-      if (row.verdict !== "unknown" && !evidence.some(quote => quote.path === finding.document)) throw Error("An affirmative finding decision requires document evidence");
+      if (row.verdict !== "unknown" && finding.document === null && evidence.length === 0)
+        throw Error("An affirmative corpus finding decision requires current source evidence");
+      if (row.verdict !== "unknown" && finding.document !== null && !evidence.some(quote => quote.path === finding.document))
+        throw Error("An affirmative finding decision requires document evidence");
       decisions.set(finding.id, { assessed: true, verdict: row.verdict, reason: text(row.reason), recommendation: text(row.recommendation), evidence });
     }
     result.findings = result.findings.map(row => ({ ...row, ...decisions.get(row.finding.id) }));
@@ -164,7 +167,7 @@ export function renderAssessmentReport(report: AssessmentReport,
   const proposed = report.findings.filter(row => row.verdict !== "still-accurate")
     .sort((left, right) => Number(right.verdict === "confirmed-drift") - Number(left.verdict === "confirmed-drift"));
   for (const row of proposed.slice(0, 5))
-    lines.push(`- ${row.assessed ? verdictNames[row.verdict] : "Unassessed"}. ${escapeReportText(row.finding.document)}. ${sentence(row.recommendation)}`);
+    lines.push(`- ${row.assessed ? verdictNames[row.verdict] : "Unassessed"}. ${escapeReportText(row.finding.document ?? "Corpus")}. ${sentence(row.recommendation)}`);
   if (proposed.length > 5) lines.push(`${proposed.length - 5} additional items appear in Finding details.`);
   if (!proposed.length) {
     if (report.details_omitted) lines.push("Proposed corrections are retained with the original assessment.");
@@ -174,7 +177,8 @@ export function renderAssessmentReport(report: AssessmentReport,
   lines.push("", "## Finding details", "");
   if (report.details_omitted) lines.push("Full finding details are retained in the original source and assessment records.", "");
   for (const row of report.findings) {
-    lines.push(`### ${escapeReportText(row.finding.id)}`, "", `Document ${escapeReportText(row.finding.document)}. Detector ${escapeReportText(row.finding.detector)}.`,
+    const scope = row.finding.document === null ? "Corpus-wide finding" : `Document ${escapeReportText(row.finding.document)}`;
+    lines.push(`### ${escapeReportText(row.finding.id)}`, "", `${scope}. Detector ${escapeReportText(row.finding.detector)}.`,
       `Severity ${escapeReportText(row.finding.severity)}.${row.finding.location === null ? "" : " Location " + escapeReportText(JSON.stringify(row.finding.location)) + "."}`,
       `Candidate ${sentence(row.finding.explanation)}`, `Verdict ${row.assessed ? verdictNames[row.verdict] : "Unassessed"}. ${sentence(row.reason)}`,
       `Recommendation ${sentence(row.recommendation)}`, "");
@@ -185,7 +189,7 @@ export function renderAssessmentReport(report: AssessmentReport,
   if (report.suppressed_findings.length) {
     lines.push("## Suppressed candidates", "");
     for (const row of report.suppressed_findings)
-      lines.push(`- ${escapeReportText(row.finding.id)}. ${escapeReportText(row.finding.document)}. Detector ${escapeReportText(row.finding.detector)}. Severity ${escapeReportText(row.finding.severity)}. ${sentence(row.finding.explanation)} ${sentence(row.reason)}`);
+      lines.push(`- ${escapeReportText(row.finding.id)}. ${escapeReportText(row.finding.document ?? "Corpus")}. Detector ${escapeReportText(row.finding.detector)}. Severity ${escapeReportText(row.finding.severity)}. ${sentence(row.finding.explanation)} ${sentence(row.reason)}`);
     lines.push("");
   }
   if (report.stale_suppressions.length) {

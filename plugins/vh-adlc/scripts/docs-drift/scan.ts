@@ -11,7 +11,7 @@ import { captureRepositoryState, externalArtifactDirectory, readCommittedTree } 
 import type { Snapshot } from "./snapshot";
 
 type Diagnostic = { code: string; message: string };
-export type Finding = { id: string; detector: string; severity: string; document: string; location: unknown; explanation: string };
+export type Finding = { id: string; detector: string; severity: string; document: string | null; location: unknown; explanation: string };
 type DocumentRead = { path: string; sha256: string | null; status: "complete" | "failed"; error: string | null };
 type DetectorExecution = { id: string; options: unknown; documents: PathDigest[]; input_count: number; input_sha256: string; outcome: "complete" | "failed"; error: string | null };
 export type ScanAssessment = {
@@ -59,7 +59,7 @@ function finding(value: unknown): Finding {
   const input = object(value, ["id", "detector", "severity", "document", "location", "explanation"], "finding");
   const body = {
     detector: text(input.detector, "finding detector"), severity: text(input.severity, "finding severity"),
-    document: protocolPath(input.document), location: input.location ?? null, explanation: text(input.explanation, "finding explanation"),
+    document: input.document === null ? null : protocolPath(input.document), location: input.location ?? null, explanation: text(input.explanation, "finding explanation"),
   };
   canonicalJSON(body.location);
   return { id: input.id === undefined ? canonicalDigest(body) : text(input.id, "finding id"), ...body };
@@ -95,7 +95,7 @@ export function assessScan(value: unknown, snapshot: Snapshot): ScanAssessment {
   });
   result.stale_suppressions = collect(input.stale_suppressions, "stale_suppressions", value => {
     const item = object(value, ["id", "reason", "document"], "stale suppression");
-    return { id: text(item.id, "suppression id"), reason: text(item.reason, "suppression reason"), document: item.document === undefined ? null : protocolPath(item.document) };
+    return { id: text(item.id, "suppression id"), reason: text(item.reason, "suppression reason"), document: item.document === undefined || item.document === null ? null : protocolPath(item.document) };
   });
   try {
     const expected = snapshot.protocol.bindings;
@@ -158,7 +158,7 @@ export function assessScan(value: unknown, snapshot: Snapshot): ScanAssessment {
   } catch { gap("invalid-failures", "Collection failure accounting is malformed."); }
   const documentPaths = new Set(snapshot.protocol.bindings.documents.map(row => row[0]));
   const activeFindings = [...result.findings, ...result.suppressed_findings.map(item => item.finding)];
-  if (activeFindings.some(item => !documentPaths.has(item.document))) gap("foreign-finding", "A finding names a document outside the bound inventory.");
+  if (activeFindings.some(item => item.document !== null && !documentPaths.has(item.document))) gap("foreign-finding", "A finding names a document outside the bound inventory.");
   result.complete = result.diagnostics.length === 0;
   return result;
 }
