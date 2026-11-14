@@ -538,3 +538,12 @@ WHERE: shared/plugins/vh-adlc/scripts/docs-drift/report.ts: proposalDecision and
 EVIDENCE: joinReportSentences appends "." to every segment that lacks terminal punctuation (`/[.!?]$/u.test(value) ? value : value + "."`). proposalDecision now builds both reasons with it. The default branch uses `reason: explanation` and the controller branch uses `reason: joinReportSentences([proposal.resolution_attention.reason, explanation])`. So every proposal decision reason now ends with a period. renderReport still renders `- ${prose(entry.item.title)}. ${prose(entry.item.reason)}. ${prose(entry.item.owner_action)}.`, and prose does not touch periods. The Markdown Decisions line for every existing proposal therefore reads "...needs current verification.. Select a separate resolve assessment...". The retained first red log shows that before T94 the reason was "Current support needs source review.. Proposal support is unverifiable. Its reviewed payload needs current verification", with the doubled period inside and none at the end, so it rendered with one trailing period. T94 fixes the item.reason field but moves a doubled period into the rendered owner report on every proposal decision, including the default branch, which had none before. That is the defect class F03 targets. The new test checks only `buildReport(current).attention[0].item.reason` against `/\.\s*\./u`. No pure test, and none of the focused checkpoint stages (pure-reports, normal-report, retained-cli), asserts on renderReport output for a proposal decision, so the regression passes every supplied log.
 PROPOSAL: Render the decision line through the shared helper, for example `"- " + joinReportSentences([prose(entry.item.title), prose(entry.item.reason), prose(entry.item.owner_action)])`, and treat match_reason, failure.message and history diagnostics the same way. Alternatively, keep attention reasons unterminated, but that is more fragile. Extend the controller reason test, or add a sibling, so it renders the report with renderReport and asserts the Decisions output has no `/\.\s*\./u` for both the controller branch and the default overlapping proposal.
 ```
+
+## Component diagnostic 116
+
+Exact local target `2c953c3a0f9afc437bc662f05444d74476577652`. Actual Copilot Opus 5.5 with procedural isolation. All 81 required chunks were read with no outside paths or private files sent. The scoped outer-renderer review returns no findings. Broader feature criteria remain open.
+
+```text
+MODEL: claude-opus-5.5
+NO FINDINGS
+```
