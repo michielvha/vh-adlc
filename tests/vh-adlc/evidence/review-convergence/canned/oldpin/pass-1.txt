@@ -1,0 +1,7 @@
+MODEL: scripted-reviewer
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design
+EVIDENCE: Design writes `greet.sh <name>` while every criterion writes `./greet.sh`.
+PROPOSAL: Write `./greet.sh <name>` in Design.

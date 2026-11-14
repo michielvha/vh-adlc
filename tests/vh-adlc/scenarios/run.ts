@@ -1210,6 +1210,60 @@ const CONVERGENCE_SCENARIOS: Scenario[] = [
       };
     },
   },
+  {
+    // AC-06 procedure case: on a repository pinned to the docs revision before the severity definitions,
+    // a clean pass's lone factual nit is still applied as today, and the report names the needed pin.
+    id: "S16.oldpin",
+    title: "An older docs pin keeps today's nit handling and names the needed pin",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      writePin(f, f.revisionPrevious);
+      const plugin = scriptedPlugin(f, "oldpin");
+      const turns = session(f, [plugin], [`/vh-adlc-spec review ${FEATURE_PATH}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const body = doc.split(/^## Review Log$/m)[0];
+          const reports = turns.map((t) => t.result).join("\n");
+          const resolved = c.log().filter((x) => words(x.args)[0] === "knowledge").map((x) => x.json?.knowledge?.revision);
+          return [
+            { name: "knowledge resolved the previous pin", ok: resolved.length > 0 && resolved.every((r) => r === f.revisionPrevious) },
+            { name: "a review pass was stored", ok: /### R-1\b/.test(doc) },
+            { name: "the lone factual nit was applied as today", ok: body.includes("./greet.sh <name>") },
+            { name: "the report names the plugin's own pin", ok: reports.includes(f.revisionA.slice(0, 7)) },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    // AC-06 reviewer case: the failure-mode check relies on no convention text, so the real reviewer still
+    // asks it on a repository pinned to the previous docs revision.
+    id: "S16.oldpin-reviewer",
+    title: "On an older docs pin the reviewer still raises a failure-mode gap",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      editFeature(f, "keeps printing \`Hello, world.\`", "keeps printing \`Hello, world.\` Every run also appends the name to the shared file names.log, which parallel CI runs on one host write at the same time.", "fixture: seed a failure-mode gap");
+      writePin(f, f.revisionPrevious);
+      const turns = session(f, [f.pluginA], [`/vh-adlc-spec review ${FEATURE_PATH}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const records = doc.split(/^### R-1$/m)[1] ?? "";
+          return [
+            { name: "a review pass was stored", ok: records.trim() !== "" },
+            { name: "the records raise the concurrency gap on names.log", ok: /names\.log/.test(records) && /(concurren|parallel|lock|interleav|simultaneous)/i.test(records) },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
 ];
 SCENARIOS.push(...CONVERGENCE_SCENARIOS);
 
