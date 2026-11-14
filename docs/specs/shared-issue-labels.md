@@ -363,7 +363,8 @@ once would make each other's reviews stale. So:
 Implementation starts only after #78 has merged to the default branch (Design, Order against
 shared-development-loop).
 
-- [ ] T1 `tests/vh-adlc/labels/vocabulary.test.ts` - failing test that parses `scripts/labels/vocabulary.json` and the table in `references/issues.md`, requires the same nine names, colors and descriptions, every glossary term and the rule for who applies each kind; fails because neither file exists (AC-01)
+- [x] T1 `tests/vh-adlc/labels/vocabulary.test.ts` - failing test that parses `scripts/labels/vocabulary.json` and the table in `references/issues.md`, requires the same nine names, colors and descriptions, every glossary term and the rule for who applies each kind; fails because neither file exists (AC-01)
+      Evidence: `bun test tests/vh-adlc/labels/vocabulary.test.ts` at this commit: 0 pass, 4 fail, each with ENOENT for `scripts/labels/vocabulary.json` or `references/issues.md`, the stated reason.
 - [ ] T2 `plugins/vh-adlc/scripts/labels/vocabulary.json`, `plugins/vh-adlc/references/issues.md` - the standard label set and its reference page, with the glossary, the investigate verdict table and the triage boundary; T1 passes (AC-01)
 - [ ] T3 `tests/vh-adlc/triage/settings.test.ts`, `tests/vh-adlc/settings-file.test.ts` - failing cases: `ready: blocked` and `bug: Enhancement` refused with a fixed reason, a non-standard key ignored, effective names resolved through `label_map`, and a copy of Stackweaver's `.vh-adlc/triage.yaml` still reading (AC-07)
 - [ ] T4 `plugins/vh-adlc/scripts/triage/settings.ts`, `plugins/vh-adlc/scripts/triage/types.ts`, `plugins/vh-adlc/references/triage-settings.md` - collision refusal and one shared effective-name resolver, documented; T3 passes (AC-07)
