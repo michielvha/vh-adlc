@@ -76,7 +76,7 @@ test("unknown local findings and embedded instructions remain visible data", asy
   }
 });
 
-test.each([false, true])("corpus-wide findings retain their scope with an empty document inventory %s", async empty => {
+test.each([{ inventory: "populated", empty: false }, { inventory: "empty", empty: true }])("corpus-wide findings retain their scope with a $inventory document inventory", async ({ empty }) => {
   const f = fixture("corpus-finding");
   try {
     if (empty) {

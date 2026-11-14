@@ -274,3 +274,26 @@ test("suppression retirement needs the complete corresponding detector and docum
   expect((await buildResolution({ ...options, scan: { ...scan, detectors: [] } })).complete).toBe(false);
   expect((await buildResolution({ ...options, scan: { ...scan, detectors: [{ ...scan.detectors[0], documents: [] }] } })).complete).toBe(false);
 });
+
+test("corpus suppression retirement requires the complete corresponding whole inventory", async () => {
+  const f = setup(), path = "docs/suppressions.yaml", source = f.snapshot.blobs.find(blob => blob.path === path);
+  if (!source) throw Error("missing feedback fixture");
+  const edit = { ...f.edit, id: "feedback", path, start: 0, end: source.bytes.length, before_sha256: sha256(source.bytes),
+    replacement_base64: Buffer.from("suppressions: []\n# retired corpus stale-1 after complete collection\n").toString("base64") };
+  const feedback = { cause: "detector", channel: "suppression", action: "retire", path, edit_id: edit.id,
+    finding_id: "stale-1", detector_id: "links", document: null, policy_quote: f.quote("docs/docs-procedure.md"), delivery_quote: null };
+  const decision = { ...f.decision, disposition: "already-fixed", edit_ids: [], feedback };
+  const bound = f.snapshot.protocol.bindings.detectors.find(unit => unit.id === "links");
+  if (!bound) throw Error("missing bound detector fixture");
+  const unit = { id: bound.id, options: bound.options, documents: [...bound.documents], input_count: bound.documents.length,
+    input_sha256: bound.input_sha256, outcome: "complete" as const, error: null };
+  const scan: ScanAssessment = { ...f.options.scan, stale_suppressions: [{ id: "stale-1", reason: "Corpus rule no longer applies", document: null }], detectors: [unit] };
+  const options = { ...f.options, scan, decisions: [decision], edits: [edit] };
+  expect((await buildResolution(options)).complete).toBe(true);
+  expect((await buildResolution({ ...options, scan: { ...scan, complete: false } })).complete).toBe(false);
+  expect((await buildResolution({ ...options, scan: { ...scan, detectors: [] } })).complete).toBe(false);
+  expect((await buildResolution({ ...options, scan: { ...scan, detectors: [{ ...unit, documents: unit.documents.slice(1) }] } })).complete).toBe(false);
+  expect((await buildResolution({ ...options, decisions: [{ ...decision, feedback: { ...feedback, detector_id: "claims" } }],
+    scan: { ...scan, detectors: [{ ...unit, id: "claims" }] } })).complete).toBe(false);
+  expect((await buildResolution({ ...options, decisions: [{ ...decision, feedback: { ...feedback, finding_id: "uncollected" } }] })).complete).toBe(false);
+});

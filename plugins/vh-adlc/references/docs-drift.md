@@ -75,6 +75,9 @@ and supporting source and record confirmed drift, still accurate or unknown,
 with evidence, reason and recommendation. Preserve unknown and unassessed items.
 Corpus-wide candidates retain `document: null` and their location context.
 Affirmative corpus assessments require a current bound source quote.
+Retiring a corpus-scoped suppression requires a complete scan and the corresponding
+detector's complete whole-inventory execution. Document-scoped retirement retains
+its corresponding document requirement.
 Document-bound assessments require evidence from that document.
 Keep intended contracts, dated history and deliberately incomplete matrices.
 Record product defects separately and propose their own repair or issue.

@@ -93,11 +93,17 @@ test.each(["confirmed-drift", "still-accurate", "unknown"])("corpus assessment k
   } catch (error) { preservedRoots.add(f.root); throw error; }
 });
 
-test.each(["missing", "changed"])("affirmative corpus assessments require bound current source evidence %s", async fault => {
+test.each(["missing", "changed", "untracked", "dirty-bytes"])("affirmative corpus assessments require bound current source evidence %s", async fault => {
   const { readAssessmentReport } = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
   const f = await fixture("confirmed-drift", { corpus: true });
   if (fault === "missing") f.packet.findings[0].evidence = [];
-  else f.packet.findings[0].evidence[0].quote_sha256 = "0".repeat(64);
+  else if (fault === "changed") f.packet.findings[0].evidence[0].quote_sha256 = "0".repeat(64);
+  else {
+    const path = fault === "untracked" ? "untracked-source.ts" : "src/app.ts";
+    const bytes = Buffer.from("export const source = 'uncommitted';\n");
+    put(f.repo, path, bytes.toString());
+    f.packet.findings[0].evidence = [{ path, sha256: sha256(bytes), start: 0, end: bytes.length, quote_sha256: sha256(bytes) }];
+  }
   const report = readAssessmentReport({ ...f, source_verification: f.original.evidence, assessment: retain(f, f.packet) });
   expect(report.complete).toBe(false); expect(report.authority).toBe("none");
 });

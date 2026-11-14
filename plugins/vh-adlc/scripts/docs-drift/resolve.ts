@@ -185,8 +185,12 @@ function feedbackValid(item: Decision, edits: Map<string, Edit>, options: Resolu
   if (change.action === "retire") {
     const stale = options.scan.stale_suppressions.find(stale => stale.id === change.finding_id && stale.document === change.document);
     const detector = options.scan.detectors.find(detector => detector.id === change.detector_id && detector.outcome === "complete");
-    return change.channel === "suppression" && options.scan.complete && stale !== undefined && detector !== undefined
-      && change.document !== null && detector.documents.some(document => document[0] === change.document);
+    if (change.channel !== "suppression" || !options.scan.complete || stale === undefined || detector === undefined) return false;
+    if (change.document !== null) return detector.documents.some(document => document[0] === change.document);
+    const bound = options.collection.snapshot.protocol.bindings;
+    const expected = bound.detectors.find(unit => unit.id === change.detector_id);
+    return expected !== undefined && "all_inventory" in expected.selector
+      && canonicalDigest(detector.documents) === canonicalDigest(bound.documents);
   }
   return change.finding_id === null || options.scan.findings.some(finding => finding.id === change.finding_id
     && (change.detector_id === null || finding.detector === change.detector_id) && (change.document === null || finding.document === change.document));

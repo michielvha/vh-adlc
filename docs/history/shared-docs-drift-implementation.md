@@ -871,3 +871,43 @@ Exact committed target `e565d42961162718cafc34134e9684225b0a3fd7`. Actual Copilo
 MODEL: claude-opus-5.5
 NO FINDINGS
 ```
+
+## Component diagnostic 130
+
+Exact committed target `18127bcea6a50c3472eaa21523a0b75c0b244f52`. Actual Copilot Opus 5.5 returned NO FINDINGS, but native read validation qualified only 61 of 63 required chunks. Two contract chunks were truncated. This attempt does not qualify as a clean review. The unchanged packet was split into smaller chunks for diagnostic 131. Original return follows.
+
+```text
+MODEL: claude-opus-5.5
+NO FINDINGS
+```
+
+## Component diagnostic 131
+
+Exact committed target `18127bcea6a50c3472eaa21523a0b75c0b244f52`. Actual Copilot Opus 5.5 qualifies all 109 required reads with unchanged packet hashes, procedural isolation and no outside or private reads. Two should-fix findings and one nit remain open at this checkpoint. Original return follows.
+
+```text
+MODEL: claude-opus-5.5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: shared/plugins/vh-adlc/scripts/docs-drift/resolve.ts, feedbackValid retire branch (chunk 00181, lines 6 to 9)
+EVIDENCE: The retire branch needs a stale entry whose document equals change.document. It also needs `change.document !== null` and a detector document that equals change.document. After this change, scan.ts accepts and emits `document: null` stale suppressions for corpus feedback. The corpus-feedback scan test asserts `result.stale_suppressions[0].document` is null. A stale suppression for a corpus-wide or repository-wide finding therefore matches by id and null document, then always fails the `change.document !== null` guard. Even with a complete scan and a complete detector, that stale entry can never be retired through feedback. This fails closed, so it is not unsafe. The result is that the corpus stale suppressions this change now exposes can be reported but never resolved.
+PROPOSAL: Choose one of two fixes. First option: allow retirement when `change.document === null` and the detector is complete for the corpus scope, for example when the detector covers a corpus unit or a complete document set. Add a resolve test that retires a null-document stale suppression. Second option: if this is intentionally deferred to the remaining runtime integration, record that null-document stale suppressions cannot be retired yet in docs-drift.md and in context.md's remaining work.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: shared/tests/vh-adlc/docs-drift/assessment-report.test.ts, "affirmative corpus assessments require bound current source evidence %s" (chunk 00061, lines 30 to 37)
+EVIDENCE: For corpus findings, the only negative evidence cases are "missing", which empties the evidence array, and "changed", which sets quote_sha256 to zeros. No case covers a quote whose path is outside snapshot.entries or not tracked at the source commit. No case covers a quote whose blob sha256 is stale while its quote_sha256 matches the current bytes. For a corpus finding, the path is the only thing tying the evidence to the bound source, because there is no document-equality check. A wrong implementation would still pass these tests. For example, one that hashes working-tree bytes for any readable path, or one that skips the snapshot membership check. The document-scoped "bad-quote" case has the same gap, but there "wrong-document" still pins the path.
+PROPOSAL: Add two corpus fault rows. The first uses a path that is absent from the bound read set or untracked at the source commit, with self-consistent hashes. The second uses a path whose committed bytes differ from a dirty working copy, with hashes computed from the dirty bytes. Each should assert `report.complete` is false and `authority` is "none".
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: shared/tests/vh-adlc/docs-drift/scan.test.ts, `test.each([false, true])("corpus-wide findings retain their scope with an empty document inventory %s", ...)` (chunk 00061, line 19)
+EVIDENCE: Both rows run under the same literal name. evidence/t107-corpus-first-red.log and evidence/t107-corpus-report-first-red.log each show "corpus-wide findings retain their scope with an empty document inventory %s" twice. Neither the name nor the log shows which row was the empty-inventory case. In the first-red log, the two rows failed for different reasons: invalid-findings, and a missing procedure input in snapshotAt. Only line order tells them apart.
+PROPOSAL: Use string rows such as ["populated", "empty"], or use object rows with a $-named field. That gives each row a distinct name, so the retained red and green logs show which inventory case failed.
+```
+
+Diagnostic 131 correction checkpoint. Corpus retirement first fails at the existing document-only guard. It now requires complete corresponding all-inventory execution, preserving document-bound retirement and refusing missing/partial/mismatched collection. Self-consistent untracked and dirty-byte quote regressions refuse corpus assessment. Populated/empty inventory rows now have distinct names. The frozen checkpoint passes 99 cases/443 assertions and all declared repository gates, preserving source/index/HEAD/status. These source corrections await committed scoped re-review.
