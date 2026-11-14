@@ -811,3 +811,18 @@ WHERE: plugins/vh-adlc/references/docs-drift.md, Setup and ownership ("plus appl
 EVIDENCE: settings.ts merges the five pinned DOCS_DRIFT_KNOWLEDGE_PAGES with the committed `knowledge_pages` field, and docs-drift-settings.md describes `knowledge_pages` as the additional pinned pages. The setup step tells the agent to pick "applicable" pages without referring to the committed field. Two agents could therefore load different knowledge sets.
 PROPOSAL: Say to request the five shared pages plus the committed `knowledge_pages` entries from `.vh-adlc/docs-drift.yaml`, and report any missing page at the existing handoff.
 ```
+
+## Component diagnostic 127
+
+Exact committed target `937ea3b2dd2fcefb195588698e04a6d2e873fbcc`. Actual Copilot Opus 5.5 qualifies all 114 required reads with unchanged packet hashes, procedural isolation, no outside reads and no private files sent. One should-fix identifies missing retained-controller invocation guidance and a template-coverage gap. The original return follows before corrections.
+
+```text
+MODEL: claude-opus-5.5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/references/docs-drift-review.md, Interrupted delivery (`inspect-recovery` text template, "`acknowledge-delivery` uses the inspected recovery argument set", "Use `resume` with the original publication arguments", "use `publish` through the same production CLI/native transport"); tests/vh-adlc/docs-drift/procedure.test.ts templates() filter
+EVIDENCE: The production CLI usage in cli.ts gives the recovery invocation as "bun <original-retained-plugin>/scripts/docs-drift/cli.ts <inspect-recovery|acknowledge-delivery|reconcile-publication>". It explains: "Recovery uses original retained code, policy and journal evidence while preserving current worktree policy and launchers". It also says "Publishing and resuming execute only from the exact approved retained controller." The reference template instead uses `bun <plugin>/scripts/docs-drift/cli.ts inspect-recovery ...`. A grep of the docs-drift references and SKILL.md finds no wording about invoking the original retained plugin or the approved retained controller for recovery, acknowledgement, reconciliation, publish or resume. After a plugin upgrade, an agent that copies the template runs the current installed helper against the original journal. Another agent that follows the CLI usage runs the retained one, so the two diverge on the recovery and publication path. The grammar test cannot catch this. templates() keeps only blocks where `words[1] === "<plugin>/scripts/docs-drift/cli.ts"` and checks only the argv after the script path. A template that correctly used `<original-retained-plugin>` would be silently dropped from coverage.
+PROPOSAL: Change the `inspect-recovery` template to `<original-retained-plugin>`. State in docs-drift-review.md that `inspect-recovery`, `acknowledge-delivery` and `reconcile-publication` run from the original retained plugin, and that `publish`, `resume` and `resume-closure` run from the exact approved retained controller rather than the current checkout. Extend the procedure.test.ts filter to accept the `<original-retained-plugin>` script path as well. Then the recovery template is still parsed by `argumentsForCommand`, and a recovery template that uses `<plugin>` fails.
+```

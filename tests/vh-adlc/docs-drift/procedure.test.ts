@@ -22,8 +22,8 @@ function templates() {
     const text = readFileSync(join(plugin, reference), "utf8");
     return [...text.matchAll(/```text\n([\s\S]*?)\n```/gu)]
       .map(match => match[1].replaceAll(/\\\n\s*/gu, " ").trim().split(/\s+/u))
-      .filter(words => words[0] === "bun" && words[1] === "<plugin>/scripts/docs-drift/cli.ts")
-      .map(words => ({ reference, argv: words.slice(2) }));
+      .filter(words => words[0] === "bun" && words[1]?.endsWith("/scripts/docs-drift/cli.ts"))
+      .map(words => ({ reference, script: words[1], argv: words.slice(2) }));
   });
 }
 
@@ -62,6 +62,10 @@ test("documented command templates use the production CLI grammar", () => {
   for (const required of ["scan", "collect-resolution", "collect-closure", "collect-closure-target"])
     expect(commands.map(template => template.argv[0])).toContain(required);
   for (const template of commands) {
+    expect(["<plugin>/scripts/docs-drift/cli.ts", "<original-retained-plugin>/scripts/docs-drift/cli.ts",
+      "<approved-retained-plugin>/scripts/docs-drift/cli.ts"]).toContain(template.script);
+    if (["inspect-recovery", "acknowledge-delivery", "reconcile-publication"].includes(template.argv[0]))
+      expect(template.script).toBe("<original-retained-plugin>/scripts/docs-drift/cli.ts");
     const parsed = argumentsForCommand(fill(template.argv));
     expect(parsed.command).toBe(template.argv[0]);
     expect(parsed.repo).toBe("/fixture/repository");

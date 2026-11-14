@@ -63,7 +63,12 @@ It does not interpret prose permissions. An unchanged nonempty procedure alone
 cannot supply that semantic authority. Leave missing or ambiguous authority
 pending for the owner.
 After its checks and actual publication authority, use `publish` through the
-same production CLI/native transport. Preserve its returned journal location.
+same production CLI/native transport. Invoke its `cli.ts` from the exact
+approved retained component directory returned by runtime selection. Preserve
+that directory identity and its returned journal location. `publish`,
+`publish-closure`, `resume` and `resume-closure` execute from that exact approved
+retained controller. The original operation retains its controller identity
+across later plugin upgrades.
 All hosted and interactive delivery uses this common publisher. An approved
 refresh uses its exact-owned branch-history checks. Follow every effect's
 separate scope from `references/authority.md`, including lease and receipt refs.
@@ -89,6 +94,7 @@ Unchanged resume preserves completed comments and effect IDs.
 
 Use `resume` with the original publication arguments and journal directory,
 or `resume-closure` with the original closure arguments and journal. Both
+run through the original operation's exact approved retained controller and
 revalidate actual current authority, scope and source. Replay requires complete
 known absence plus unchanged original proof, payload and authorization.
 Source/actor/payload changes require a new reviewed/authorized operation and
@@ -108,10 +114,15 @@ does not recreate original approval. Original ownership remains necessary for
 mutating reconciliation or releasing a live lease.
 
 Use `inspect-recovery` to collect a fresh bounded native lookup against the
-original selected journal and scope.
+original selected journal and scope. Invoke `inspect-recovery`,
+`acknowledge-delivery` and `reconcile-publication` from the original retained
+plugin's `scripts/docs-drift/cli.ts`, using the original retained cache, policy
+and journal evidence. Preserve current worktree policy and launchers during
+that recovery. Report missing retained code/runtime evidence in the pending
+handoff. `<original-retained-plugin>` below is that verified original directory.
 
 ```text
-bun <plugin>/scripts/docs-drift/cli.ts inspect-recovery --repo <repo> --source <source> \
+bun <original-retained-plugin>/scripts/docs-drift/cli.ts inspect-recovery --repo <repo> --source <source> \
   --artifact-root <artifacts> --cache-root <cache> --entry <entry> \
   --journal-directory <journal> --selection <selection> --selection-sha256 <sha256>
 ```
