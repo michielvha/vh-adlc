@@ -1,12 +1,15 @@
 ---
 status: draft
-status_description: "R-1 was blocking; its judgement findings are Open Questions Q4 to Q11 for the owner before the revision."
+status_description: "Revised after spec review R-1 with the owner's answers to Q4 to Q11; waiting for spec review R-2."
 issue: null
 goal: "A criterion whose proof depends on what an agent session does can be met in an independent implementation review, because the reviewer can repeat the proof itself."
 covers:
   - plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md
   - plugins/vh-adlc/references/review-protocol.md
+  - plugins/vh-adlc/references/loop-settings.md
+  - plugins/vh-adlc/scripts/loop/
   - plugins/vh-adlc/skills/vh-adlc-implement/
+  - plugins/vh-adlc/skills/vh-adlc-review/
   - plugins/vh-adlc/skills/vh-adlc-spec/
   - plugins/vh-adlc/knowledge.md
   - plugins/vh-adlc/references/security-settings.md
@@ -16,7 +19,7 @@ covers:
   - docs/user-guides/workflows.md
   - docs/reference/compatibility.md
   - tests/vh-adlc/agent-proofs.test.ts
-  - tests/vh-adlc/scenarios/run.ts
+  - tests/vh-adlc/loop/review-agent-proofs.test.ts
   - tests/vh-adlc/evidence/agent-proofs/
   - tests/vh-adlc/direct-operation-compatibility.test.ts
 ---
@@ -24,8 +27,8 @@ covers:
 # Plan: Reproducible agent proofs
 
 Proofs that depend on what an agent session does become runs a reviewer can repeat: a committed runner,
-kept transcripts and a recorded commit. The implement and review operations use them, so such criteria can
-reach `met` in an independent review.
+kept transcripts and recorded inputs. Every review route carries what the reviewer needs to repeat them,
+so such criteria can reach `met` in an independent review.
 
 ## Context
 
@@ -40,28 +43,29 @@ session and keeps its transcript. With it, R-22 to R-24 reran every trial themse
 
 This feature makes that the rule for every adopter:
 
-- The Test Plan names a committed runner for every proof that runs an agent session, with its fixtures and
-  pass condition.
-- The implement operation proves such criteria only through that runner. It runs it at a commit with no
-  uncommitted change to the text the session reads, and keeps the transcripts. A run counts only for the
-  text it ran on.
-- A review dispatch never tells the reviewer to skip a check. It says how to run the harnesses and where
-  kept transcripts are.
-- The reviewer repeats agent-session proofs with the runner rather than trusting a stored summary.
-- A proof that needs a person, such as a GUI pass, can be met from its raw transcripts when their sha256
-  values match the recorded ones.
-- Transcripts are committed as redacted copies, with raw and redacted sha256 values in a manifest; the raw
-  files stay on the machine that ran them.
+- The Test Plan row of an agent-session proof names the runner's path and command, its fixtures and its
+  pass condition, even before the runner exists. A row without a runner is blocking, because the proof
+  cannot be executed.
+- The implement operation proves such criteria only through the runner. A run counts only for the inputs
+  the runner declares, at the ids its manifest records.
+- Every review dispatch, host or command route, carries the runner commands from the Test Plan and the
+  verification commands from `AGENTS.md`, and never limits which checks the reviewer runs.
+- The reviewer runs each agent-session proof once. A failed pass condition is `not met`. A run that cannot
+  start or finish is `not verified` with the reason, which is what a sandboxed command route returns.
+- A proof that needs a person, such as a GUI pass, can be met from its kept transcripts when their sha256
+  matches the recorded value. The committed redacted copy counts; the raw files stay for audit.
 
-The Test Plan rule and the transcript sentence for `met` go into the shared feature-document convention
-in `vhco-pro/docs`, with the rules block unchanged. The plugin text, the workflows guide and the
-compatibility page follow. You chose all three of these on 2026-11-14.
+The Test Plan rule and the transcript case of `met` go into the shared feature-document convention in
+`vhco-pro/docs`, with the rules block unchanged. You chose every recommendation in Q1 to Q11 on
+2026-11-14.
 
 The cost: implementation reviews take longer and spend more model usage, because the reviewer reruns paid
-sessions. R-22 took about 30 minutes.
+sessions. R-22 took about 30 minutes, so the command route's implementation-review timeout grows from 15
+minutes to two hours.
 
-Validation is planned, not observed: static checks on the convention and plugin text, reviewer scenarios
-with a runner whose stored summary disagrees with its result, an author trial, and the plugin suite.
+Validation is planned, not observed: static checks with listed must-pass and must-fail examples, a unit
+test of the command-route prompt and timeout, reviewer and author trials run by a committed runner, and
+the plugin suite.
 
 Acceptance authorizes the companion docs change and the plugin edits on a feature branch. Pushing, PRs,
 merging and release each need your go.
@@ -72,28 +76,39 @@ Evidence rules. The convention defines `met` as "executed evidence observed in t
 `not verified` as "a check exists but its execution was not observed"
 (`conventions/feature-documents.md:241-243` at `1ccf8f3`). Its Test plan section asks only that a proof
 name "a real check: a test, a scenario with a pass condition, or a written manual procedure" (`:123-124`).
-Nothing covers proofs whose result depends on a model session.
+A proof that "cannot be executed" is already blocking (`:201-204`).
 
 Reviewer and dispatch. The reviewer agent may run "the repository's own tests to observe evidence. A
-result you did not observe is not evidence" (`plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:30-31`).
+result you did not observe is not evidence" (`plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:30-31`),
+and every command it runs must "leave the working tree, the index and every ref as they were" (`:22-24`).
 The protocol gives both review routes the repository, document, commit, kind, docs revision, binary and
-plugin pin (`plugins/vh-adlc/references/review-protocol.md:31-32`). It says nothing about which checks the
-reviewer may run or how to run a repository's harnesses, so a dispatch can tell the reviewer to judge
-from stored evidence.
+plugin pin (`plugins/vh-adlc/references/review-protocol.md:31-32`). The review skill's dispatch passes the
+same list (`plugins/vh-adlc/skills/vh-adlc-review/SKILL.md:50-52`), and so does the spec skill's review
+mode (`plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:88-89`). Nothing says how to run a repository's
+harnesses, so a dispatch can tell the reviewer to judge from stored evidence.
+
+Command route. A command-route reviewer's prompt is built by `reviewPrompt` from the reviewer agent, the
+identity fields, the instruction files and the lenses, and nothing else
+(`plugins/vh-adlc/scripts/loop/cli.ts:48-70`). `runReviewRoute` stops the CLI after 15 minutes unless
+`--timeout-ms` is given (`plugins/vh-adlc/scripts/loop/review-route.ts:230`). The CLI runs in its own PID
+namespace (`plugins/vh-adlc/references/loop-settings.md:117-119`). Stackweaver routes implementation
+reviews to `codex exec -s workspace-write`, whose sandbox cannot start headless Claude Code sessions.
 
 Implementer. The implement skill ticks a criterion "only when verification you observed in this run
 establishes it" (`plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:110-111`). That covers what the
 implementer saw, not what a reviewer can repeat.
 
 What happened. In `spec-review-convergence`, the reviewer and author trials first ran as dispatched
-subagents, and the reviewer judged the scenarios from their stored summaries without running them. R-20 returned AC-02
-to AC-07, AC-09 and AC-10 `not verified` and AC-11 `untested`
+subagents, and the reviewer judged the scenarios from their stored summaries without running them. R-20
+returned AC-02 to AC-07, AC-09 and AC-10 `not verified` and AC-11 `untested`
 (`docs/specs/spec-review-convergence.md:534`). Its F-03 found no transcript for the author trials (`:1667`),
 and R-19 F-08 found trials that had run on text a later commit reworded (`:1607`). The fix was
 `tests/vh-adlc/evidence/review-convergence/trials/run.ts`, which starts each trial as a headless session
-in an isolated profile and keeps its transcript, and `collect.py`, which commits redacted copies with raw
-and redacted hashes. R-22 to R-24 reran every trial with it and met all ten criteria (`:536-538`). Even
-then, R-22 relied on ad hoc trials for two clauses the committed runner did not cover (`:1811`).
+in an isolated profile, writes outside the checkout and keeps its transcript, and `collect.py`, which
+commits redacted copies with raw and redacted hashes. R-22 to R-24 reran every trial with it and met all
+ten criteria (`:536-538`). Even then, R-22 relied on ad hoc trials for two clauses the committed runner did
+not cover (`:1811`). The scenario runner, by contrast, writes its summaries into tracked files under
+`tests/vh-adlc/evidence/claude-code/` (`tests/vh-adlc/scenarios/run.ts:18`).
 
 A precedent for transcripts. In `host-cleanup`, R-22 met AC-11, which needed interactive Claude Code and
 Codex sessions, by reading raw transcripts whose sha256 values matched the procedure
@@ -107,83 +122,113 @@ which is why `collect.py` redacts their names and the home directory before comm
 
 In scope:
 
-- The Test plan rule for agent-session proofs in the shared feature-document convention, as a companion
-  change in `vhco-pro/docs` with the rules block unchanged, and the docs pins moved to it.
-- The reviewer agent, the review protocol, the implement skill and the spec skill's author mode.
+- The Test plan rule for agent-session proofs and the transcript case of `met` in the shared
+  feature-document convention, as a companion change in `vhco-pro/docs` with the rules block unchanged,
+  and the docs pins moved to it.
+- The reviewer agent, the review protocol, the review skill's dispatch and handoff, the spec skill's
+  author mode and review dispatch, and the implement skill.
+- The command review route: its prompt (`reviewPrompt`), its implementation-review timeout and its
+  reference text in `loop-settings.md`.
 - `docs/user-guides/workflows.md` and the compatibility page.
-- Static checks, reviewer scenarios and an author trial, all proved through a committed runner.
+- A glossary of the new terms, held by a check.
+- Static checks, a unit test of the command route, and reviewer and author trials run by a committed
+  runner under `tests/vh-adlc/evidence/agent-proofs/`.
 - A minor plugin version above the default branch's version when the feature merges.
 
 Out of scope:
 
-- A shared runner library. Each repository writes its own runner; `spec-review-convergence`'s runner stays
-  an example, not a packaged tool.
+- A shared runner library. Each repository writes its own runner; this feature's runner and
+  `spec-review-convergence`'s stay examples, not a packaged tool.
+- Changing the scenario runner. Its cases keep writing summaries into the tree; a runner that meets this
+  feature's rule writes outside the checkout.
 - Rewriting earlier features' evidence. Completed features keep their reviews.
-- Choosing a model or host for the runs. The runner uses the repository's harness and the host default.
+- Choosing a model or host for the runs. A runner uses the repository's harness and the host default.
 
 ## Design
 
+### Glossary
+
+| Term | Meaning | Not called |
+| --- | --- | --- |
+| Agent-session proof | A proof whose pass condition depends on what a model does in a session: a reviewer's records, an author's commits, a report. | agent test, AI check |
+| Runner | A committed script that repeats agent-session proofs unattended from a clean checkout, writing only outside it, given its output directory. | harness wrapper, trial script |
+| Runner inputs | The files a runner declares its sessions read, such as the plugin directory and its fixture paths. | read set, watched files |
+| Transcript manifest | The file beside committed transcripts that records, per run, the checkout, each runner input's tree or blob id and whether any had uncommitted changes, and each transcript's raw and redacted sha256. | run log, hash list |
+| Proof that needs a person | A proof that cannot run unattended, such as a GUI or interactive session, proved by a written procedure and kept transcripts. | manual trial, human run |
+
 ### Agent-session proofs
 
-A proof is an agent-session proof when its pass condition depends on what a model does in a session: a
-reviewer's records, an author's commits, a report. Its Test Plan row names:
+The Test Plan row of an agent-session proof names the runner's path and the command that runs it, the
+fixtures it builds or uses, and the pass condition, judged from the run's output, records or commits. The
+row names them even before the runner exists, the same way a row names a test implementation will write;
+it never points at a later task. A dispatched subagent with no kept transcript is not a runner. A row
+whose agent-session proof names no runner is blocking under the existing definition, because the proof
+cannot be executed. A proof that needs a person names a written procedure instead.
 
-- a committed runner that repeats it unattended from a clean checkout, with the command;
-- the fixtures it builds, or the committed fixtures it uses;
-- the pass condition, judged from the run's output, records or commits.
+### A run counts for its inputs
 
-A dispatched subagent with no kept transcript is not a runner. A proof that needs a person at the
-keyboard, such as a GUI pass, names a written procedure instead, and the person running it keeps the raw
-transcripts and records their sha256 values in the evidence.
-
-### Transcripts and `met`
-
-The convention's definition of `met` gains one case: for a proof that needs a person, reading raw
-transcripts whose sha256 values match the recorded ones counts as observing it. A proof that runs
-unattended is always rerun by the reviewer.
+A runner declares its runner inputs. Its transcript manifest records each input's tree or blob id and
+whether any had uncommitted changes. A run counts only if none had uncommitted changes, and only while
+every input still has the recorded id; a change to any of them needs a new run before the criterion is
+ticked again. The evidence line for an agent-session proof names the runner command, the checkout and
+where the transcripts and manifest are.
 
 ### Keeping transcripts
 
-Transcripts are committed as redacted copies beside the feature's evidence. Redaction replaces account
-details a copied login adds, such as connector names and the home directory, and changes nothing else. A
-manifest records each transcript's raw and redacted sha256, the checkout the run used, and whether files
-the session reads had uncommitted changes. The raw files stay on the machine that ran them, at a path the
-manifest names.
+Transcripts are committed as redacted copies beside the feature's evidence, with the transcript manifest.
+Redaction replaces account details a copied login adds, such as connector names and the home directory,
+and changes nothing else. The raw files stay on the machine that ran them, at a path the manifest names.
 
-### A run counts for the text it ran on
+### Transcripts and `met`
 
-The evidence line for an agent-session proof names the runner command, the commit it ran at, and where its
-transcript is kept. The run counts only if no file the session reads had uncommitted changes, and only for
-that text. A later change to the operation, agent or reference text the session reads, or to its fixture,
-needs a new run before the criterion is ticked again.
+The convention's definition of `met` gains one case: for a proof that needs a person, reading its kept
+transcripts counts as observing it when a transcript's sha256 matches the value the manifest records. The
+raw file or the committed redacted copy both count. A proof that runs unattended is always rerun by the
+reviewer.
 
 ### Implement
 
-The implement skill proves an agent-session criterion only through its runner, at the commit under test,
-and keeps the transcripts as described above. It never ticks from a dispatched subagent run that left no
-transcript. After a change to text the session reads, it reruns before the next review.
+The implement skill proves an agent-session criterion only through its runner, with no uncommitted
+change to any runner input, and commits the redacted transcripts and the transcript manifest. It never
+ticks from a dispatched subagent run that left no transcript. After a change to a runner input, it reruns
+before the next review.
 
-### Review dispatch and the reviewer
+### Review dispatch
 
-The review protocol adds to what both routes receive: the commands that run the repository's harnesses,
-where kept transcripts are, and that harness output the reviewer writes into the tree must be restored. A
-dispatch never limits which checks the reviewer may run.
+Every dispatch, on either route, adds to the identity fields: the runner command named in each current
+Test Plan row, the verification commands in the repository's `AGENTS.md`, and where kept transcripts and
+manifests are. A dispatch never limits which checks the reviewer runs. The review skill's dispatch and its
+handoff, and the spec skill's review dispatch, pass the same list. The reviewer keeps its rule to leave
+the working tree, index and refs as they were; runners write outside the checkout, so there is nothing to
+restore.
 
-The reviewer agent repeats an agent-session proof with its runner at the target commit. A stored summary
-or record alone is not observation. When a proof needs a person, the reviewer reads the raw transcripts and
-checks their sha256 values against the recorded ones.
+### Command route
+
+`reviewPrompt` carries the same added fields as the host route. `runReviewRoute` gives an implementation
+review two hours unless `--timeout-ms` sets another limit; a spec review keeps 15 minutes.
+`loop-settings.md` says both. A command route whose sandbox cannot start a runner returns `not verified`
+for that criterion with the reason; a host-route review can then meet it. The repository's route choice
+stands.
+
+### The reviewer
+
+The reviewer runs each agent-session proof once with its runner at the target commit, writing to a
+temporary directory outside the repository. A failed pass condition is `not met`, with the runner's result
+in `EVIDENCE`. A run that cannot start or finish is `not verified`, with the reason; the reviewer retries
+once only when the run did not start. A stored summary or record alone is never observation. For a proof
+that needs a person, it reads the kept transcripts and checks their sha256 against the manifest.
 
 ### Spec author mode
 
-When a criterion can only be proved by an agent session, the author names the runner in its Test Plan row,
-or adds a task to write it. A reviewer that finds an agent-session proof without a runner reports it as
-should-fix, because the proof cannot be repeated.
+When a criterion can only be proved by an agent session, the author names the runner's path and command,
+its fixtures and its pass condition in the Test Plan row.
 
 ### Pins and older consumers
 
-The Test plan rule is convention text, so a repository pinned to an earlier docs revision keeps today's
-Test Plan rules. The protocol, reviewer and implement changes rely on no convention text and apply on any
-pin. The compatibility page says which part depends on the pin.
+The Test plan rule, the missing-runner finding and the transcript case of `met` are convention text, so a
+repository pinned to an earlier docs revision keeps today's rules and its reviewer raises nothing new for
+them. The dispatch, command-route, reviewer-run and implement changes rely on no convention text and apply
+on any pin. The compatibility page says which part depends on the pin.
 
 ### Delivery
 
@@ -195,42 +240,53 @@ merge, it is merged in and the version moved again.
 ## Acceptance Criteria
 
 - [ ] AC-01: The published convention's Test plan section defines an agent-session proof, requires its row
-      to name a committed runner, its fixtures and its pass condition, and says a run counts only for the
-      text it ran on; its definition of `met` lets hash-matched raw transcripts stand in for a proof that
-      needs a person; its rules block is byte-identical to the previous pin's.
-- [ ] AC-02: The review protocol gives both routes the harness commands and the kept-transcript location,
-      says a dispatch never limits which checks the reviewer runs, and says harness output must be
-      restored; the reviewer agent says it repeats agent-session proofs with their runner, that a stored
-      summary alone is not observation, and that a proof needing a person is checked against its raw
-      transcripts' sha256 values.
-- [ ] AC-03: The implement skill proves agent-session criteria only through their runner at a commit with
-      no uncommitted change to the text the session reads, never ticks from a run without a kept
-      transcript, reruns after that text changes, and commits redacted transcripts with a manifest of raw
-      and redacted sha256 values; the spec skill's author mode names the runner in the Test Plan row.
+      to name the runner's path and command, its fixtures and its pass condition, says a row without a
+      runner cannot be executed, and says a run counts only while its runner inputs keep the recorded ids;
+      its definition of `met` lets hash-matched kept transcripts, raw or redacted, stand in for a proof
+      that needs a person; its rules block is byte-identical to the previous pin's.
+- [ ] AC-02: The review protocol, the review skill's dispatch and handoff, and the spec skill's review
+      dispatch pass the Test Plan runner commands, the `AGENTS.md` verification commands and the transcript
+      location, and the protocol says a dispatch never limits which checks the reviewer runs; the reviewer
+      agent says it runs each agent-session proof once outside the repository, returns `not met` on a
+      failed pass condition and `not verified` with the reason when a run cannot start or finish, retries
+      only a run that did not start, and checks a proof that needs a person against the manifest's sha256.
+- [ ] AC-03: The implement skill proves agent-session criteria only through their runner with no
+      uncommitted change to any runner input, never ticks from a run without a kept transcript, reruns after
+      a runner input changes, and commits redacted transcripts with a transcript manifest; the spec skill's
+      author mode names the runner's path and command, its fixtures and its pass condition in the row.
 - [ ] AC-04: A reviewer following the updated agent, reviewing a fixture whose committed run summary says
-      a criterion passed while its runner fails at the target commit, does not return that criterion
-      `met`; with a runner that passes, it returns `met` and its `EVIDENCE` names the runner command.
+      a criterion passed while its runner fails at the target commit, runs that runner and returns `not met`
+      with `EVIDENCE` reporting the failure; with a runner that passes, it runs it and returns `met` with
+      `EVIDENCE` naming the runner command.
 - [ ] AC-05: A reviewer following the updated agent, reviewing a fixture spec whose agent-session proof
-      names no runner, returns a should-fix finding on that row.
+      names no runner, returns a blocking finding whose `WHERE` names that Test Plan row.
 - [ ] AC-06: An author following the updated skill, drafting a feature whose criterion needs an agent
-      session, names a committed runner, its fixtures and its pass condition in the Test Plan row, or adds
-      a task to write the runner.
+      session, names a runner's path and command, its fixtures and its pass condition in the Test Plan row.
 - [ ] AC-07: `docs/user-guides/workflows.md` describes agent-session proofs and the runner rule, and the
-      compatibility page says the Test plan rule depends on the docs pin while the review and implement
-      changes apply on any pin.
+      compatibility page says the Test plan rule and the transcript case of `met` depend on the docs pin
+      while the dispatch, command-route, reviewer-run and implement changes apply on any pin.
 - [ ] AC-08: Every docs pin names the published docs commit or a later one, both manifests carry the same
-      version above the default branch's version, and `bun test tests/vh-adlc` has no failure that does
-      not also fail on the default branch on the same host.
+      version whose minor component is above the default branch's, and `bun test tests/vh-adlc` has no
+      failure that does not also fail on the default branch on the same host.
+- [ ] AC-09: The command-route prompt carries the Test Plan runner commands, the `AGENTS.md` verification
+      commands and the transcript location, and an implementation review gets a two-hour timeout unless
+      `--timeout-ms` is given, while a spec review keeps 15 minutes.
+- [ ] AC-10: The convention text, the plugin files this feature changes and the workflows guide use each
+      glossary term with its meaning and none of its rejected names.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01, AC-02, AC-03, AC-07 | `tests/vh-adlc/agent-proofs.test.ts` resolves the convention page through `vh-adlc knowledge` and checks each required sentence in it and in the plugin and guide files named by the criterion; it compares the rules block at the old and new pins byte for byte. |
-| AC-04 | Two scenario cases in `tests/vh-adlc/scenarios/run.ts` with the real reviewer, run by `bun tests/vh-adlc/scenarios/run.ts --phase 7 S17.stale-summary S17.runner-pass`. Each fixture has one criterion whose proof is a committed runner script; the runner is deterministic, so the cases test what the reviewer does rather than a model inside the runner. S17.stale-summary: the committed summary says pass and the runner exits 1; pass when the records do not return that criterion `met`. S17.runner-pass: the runner exits 0; pass when it is `met` and `EVIDENCE` names the runner command. |
-| AC-05 | Reviewer trial, run by a committed runner under `tests/vh-adlc/evidence/agent-proofs/`, on a fixture spec whose criterion is proved by "a subagent trial" with no runner; pass when a should-fix finding's `WHERE` names that Test Plan row. |
-| AC-06 | Author trial, run by the same committed runner, drafting a feature whose criterion is that an agent rates a seeded finding; pass when the Test Plan row names a committed runner command, its fixtures and its pass condition, or a task writes the runner. |
-| AC-08 | Check `AGENTS.md`, `plugins/vh-adlc/knowledge.md` and `plugins/vh-adlc/references/security-settings.md` name the published docs commit or a later one, and compare both manifests with the default branch's. Run `bun test tests/vh-adlc` on the feature branch and the same failing files on an export of the default branch; pass when every failure on the branch also fails there. |
+| AC-01 | `tests/vh-adlc/agent-proofs.test.ts` resolves `conventions/feature-documents.md` through `vh-adlc knowledge`, compares its rules block with the previous pin's byte for byte, and checks the Test plan and Review log sections, whitespace folded, case-insensitive. It requires "agent-session proof" (must pass: "An agent-session proof names its runner"; must fail: "an agent test names a script"), "runner" with "path" and "command" and "fixtures" and "pass condition" in one paragraph (must fail: a paragraph naming only "command"), "cannot be executed" in that paragraph, "runner inputs" with "recorded" (must fail: "the files the session reads"), and in the `met` definition "transcript" with "sha256" and "redacted" (must fail: the current definition text). |
+| AC-02, AC-03 | The same test reads the protocol, the review skill, the spec skill, the implement skill and the reviewer agent. Protocol, review skill Dispatch and handoff, and spec skill review step each require "Test Plan" with "runner command", "AGENTS.md" and "transcript" in one paragraph (must fail: today's dispatch list); the protocol requires "never limits which checks" (must fail: "may limit"). The agent requires "once", "not met", "not verified", "did not start" and "manifest" in its agent-session paragraph (must fail: today's text). The implement skill requires "runner inputs", "uncommitted", "transcript manifest" and "redacted" (must fail: today's step 3), and the spec skill author mode "path and command" with "pass condition" (must fail: "add a task"). |
+| AC-04 | Two trials run by `bun tests/vh-adlc/evidence/agent-proofs/trials/run.ts <output dir> stale-summary runner-pass`, with fixtures built by `tests/vh-adlc/evidence/agent-proofs/trials/build.py`. Each fixture has one criterion whose proof is a deterministic committed runner script, so the trial tests what the reviewer does, not a model inside the fixture runner. The runner judges each trial from the reviewer's records and its session tool log, writes outside the checkout, and keeps redacted transcripts with a transcript manifest under `tests/vh-adlc/evidence/agent-proofs/trials/runs/`. stale-summary: the committed summary says pass and the fixture runner exits 1; pass when the tool log shows the reviewer ran the fixture runner and the records give `not met` with `EVIDENCE` reporting the exit. runner-pass: the fixture runner exits 0; pass when the tool log shows the run and the records give `met` with `EVIDENCE` naming the runner command. |
+| AC-05 | Trial missing-runner, by the same runner: a fixture spec whose criterion is proved by "a subagent trial" with no runner; pass when a blocking finding's `WHERE` names that Test Plan row. |
+| AC-06 | Trial author-runner, by the same runner: an author drafts a feature whose criterion is that an agent rates a seeded finding; pass when the Test Plan row names a runner path and command, its fixtures and its pass condition. |
+| AC-07 | `agent-proofs.test.ts` reads the workflows guide and the compatibility page. The guide requires "agent-session proof" with "runner" (must fail: no mention). The page requires "docs pin" with "Test plan rule" and "any pin" with "dispatch" (must pass: "The Test plan rule depends on the docs pin; the dispatch changes apply on any pin"; must fail: "the reviewer keeps its previous behavior"). |
+| AC-08 | Check `AGENTS.md`, `plugins/vh-adlc/knowledge.md` and `plugins/vh-adlc/references/security-settings.md` name the published docs commit or a later one, and that both manifests match and their minor component is above the default branch's. Run `bun test tests/vh-adlc` on the feature branch and the same failing files on an export of the default branch; pass when every failure on the branch also fails there. |
+| AC-09 | `tests/vh-adlc/loop/review-agent-proofs.test.ts` calls `reviewPrompt` with a fixture document whose Test Plan names a runner command and a fixture `AGENTS.md`, and requires both commands and the transcript location in the prompt (must fail: today's prompt); it checks the timeout `runReviewRoute` applies is 7,200,000 ms for kind `implementation` and 900,000 ms for kind `spec` without `--timeout-ms`, and the given value with it. |
+| AC-10 | `agent-proofs.test.ts` holds each glossary term and its rejected names: every term appears in the convention text and the workflows guide, and no rejected name appears in the convention's Test plan section, the plugin files this feature changes or the guide. |
 
 ## Tasks
 
@@ -238,110 +294,13 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-The owner answered the first three questions on 2026-11-14: hash-matched transcripts can stand in for a
-proof that needs a person, transcripts are committed as redacted copies with raw and redacted hashes, and
-the Test Plan rule goes into the shared convention as well as the plugin. The questions below come from
-spec review R-1.
-
-### Q4: What does a command-route review do with an agent-session proof? (R-1 F-01)
-
-**Recommendation:** A. The command route's prompt carries the runner commands, implementation reviews get a
-timeout that fits a rerun, and when the route's sandbox cannot start a runner the reviewer returns
-`not verified` for that criterion, naming the reason.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Pass the commands, longer timeout, `not verified` when it cannot start** | Every route gets the same dispatch; a sandboxed route gives an honest verdict instead of timing out | A sandboxed route such as Codex `workspace-write` cannot meet those criteria; they need a host-route review |
-| **B. Review agent-session criteria on the host route** | Those criteria can always be met | Overrides the route the repository chose for implementation reviews |
-
-**Why this is yours:** It decides whether the repository's chosen review route or the proof's needs win.
-
-### Q5: Where do the harness commands in a dispatch come from? (R-1 F-02)
-
-**Recommendation:** A. The runner commands named in the current Test Plan rows, plus the verification
-commands in the repository's `AGENTS.md`.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Test Plan runner commands plus `AGENTS.md` commands** | The commands the criteria actually rely on, from the document under review | The dispatcher reads both sources |
-| **B. The loop settings' `verification_rungs`** | One machine-read source | Rungs list delivery checks, not per-criterion runners, and many repositories have no loop settings |
-
-**Why this is yours:** It fixes what every dispatch must carry.
-
-### Q6: How strict are the S17 reviewer scenarios? (R-1 F-04)
-
-**Recommendation:** A. S17.stale-summary passes only on `not met` with `EVIDENCE` that reports the runner's
-failure, and both cases check that the reviewer session ran the runner command at the target commit.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Require `not met` and an observed run** | The proof fails a reviewer that trusts the summary or skips the run | Depends on the session's tool log |
-| **B. Keep "not `met`"** | A simpler check | Passes a reviewer that returns `not verified` without running anything, which is what R-20 did |
-
-**Why this is yours:** It sets how hard the proof is.
-
-### Q7: What severity does a missing runner get? (R-1 F-06)
-
-**Recommendation:** A. Blocking, as the convention's existing definition of a proof that cannot be executed
-already says, stated in the new Test plan text, so no special severity is needed. On a pin without the new
-text the reviewer raises nothing new.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Blocking, from the existing definition** | One rule, no exception to the severity definitions | A missing runner stops acceptance until it is named |
-| **B. Should-fix, stated as an exception** | Drafts with a missing runner can still be accepted | An exception to the shared definitions the reviewer must carry |
-
-**Why this is yours:** It decides whether a missing runner blocks acceptance.
-
-### Q8: Can the author defer the runner to a task? (R-1 F-07)
-
-**Recommendation:** A. No. The Test Plan row always names the runner's path and command, even before the
-runner exists, the same way a row names a test that implementation will write.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Always name the path and command** | One row form that review can check | The author picks the runner's path while drafting |
-| **B. Allow a row that points at a future task** | Less to decide while drafting | Tasks exist only once a document is planned, so the row names nothing a review can check |
-
-**Why this is yours:** It decides how much the draft must fix up front.
-
-### Q9: How many runs count, and which verdict follows each outcome? (R-1 F-08)
-
-**Recommendation:** A. The reviewer runs each agent-session proof once. A failed pass condition gives
-`not met`. A run that cannot start or finish gives `not verified` with the reason. The reviewer may retry
-once only when the run did not start.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. One run, defined verdicts, one retry if it did not start** | Predictable verdicts and bounded cost | A model that passes most of the time can still fail one review |
-| **B. Best of three runs** | Tolerates an occasional model miss | Three times the cost, and a flaky proof can pass |
-
-**Why this is yours:** It trades review cost against tolerance for model variance.
-
-### Q10: What happens when the raw transcripts of a proof that needs a person cannot be read? (R-1 F-09)
-
-**Recommendation:** A. The committed redacted copy counts when its sha256 matches the recorded redacted
-hash. Redaction changes only account details, and the raw files stay for audit.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. A hash-matched redacted copy counts** | Any reviewer on any machine can meet the criterion | Relies on the redaction changing nothing that matters |
-| **B. Only raw transcripts count; otherwise `not verified`** | The strictest reading of your earlier answer | Only a reviewer on the machine that ran them, before cleanup, can meet such a criterion |
-
-**Why this is yours:** It refines your earlier answer on transcripts.
-
-### Q11: Which files decide whether a run still counts? (R-1 F-10)
-
-**Recommendation:** A. Each runner declares its inputs, such as the plugin directory and its fixture paths.
-The manifest records their tree or blob ids and whether any had uncommitted changes, and a change to any
-of them needs a new run.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Inputs the runner declares** | A precise, checkable rule per runner | Each runner lists its inputs |
-| **B. The whole repository tree** | Nothing to declare | Any unrelated commit forces a rerun of every paid session |
-
-**Why this is yours:** It trades rerun cost against precision.
+None. The owner answered Q1 to Q3 on 2026-11-14: hash-matched transcripts can stand in for a proof that
+needs a person, transcripts are committed as redacted copies with raw and redacted hashes, and the Test
+Plan rule goes into the shared convention as well as the plugin. After spec review R-1, the owner chose on
+2026-11-14: a command route that cannot start a runner returns `not verified` (Q4); dispatch commands come
+from the Test Plan and `AGENTS.md` (Q5); the reviewer trials require `not met` and an observed run (Q6); a
+missing runner is blocking (Q7); the row always names the runner (Q8); one run with defined verdicts (Q9);
+a hash-matched redacted copy counts (Q10); runners declare their inputs (Q11).
 
 ## Review Log
 
