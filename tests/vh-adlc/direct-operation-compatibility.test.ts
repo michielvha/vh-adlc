@@ -4,9 +4,10 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "../..");
 const baseline = "b313327b134bc5ecfa7167856d4b567f8701ba06";
-// The owner requested a conversational summary before accepting a completed spec.
-// Keep that intentional change as the spec baseline; other operation bodies retain theirs.
-const specSummaryBaseline = "116accd0a50e2c0da741a0ed6f762f177c61babd";
+// The owner requested a conversational summary before accepting a completed spec, and later accepted
+// docs/specs/spec-review-convergence.md, which changes author mode and review step 4. Keep that
+// intentional text as the spec baseline; other operation bodies retain theirs.
+const specSummaryBaseline = "13710414eeb5807bda4c787d548deea2f7fa5d54";
 test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resume"])("direct %s keeps its approved operation body", (name) => {
   const path = `plugins/vh-adlc/skills/vh-adlc-${name}/SKILL.md`;
   const revision = name === "spec" ? specSummaryBaseline : baseline;
@@ -67,5 +68,12 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
   }
   const prefix = current.slice(current.indexOf("## Generic intake"), current.indexOf("The plugin directory is two levels"));
   expect(prefix).toBe("## Generic intake\n\nFor generic vh-adlc requests without an operation name, follow `references/lifecycle.md`; then continue here.\n\n");
-  expect(body(current)).toBe(body(old.stdout.toString()));
+  // A baseline taken after loop settings landed carries the same section; compare both without it.
+  let previous = old.stdout.toString();
+  const oldLoop = previous.indexOf("## Loop routes\n");
+  if (oldLoop > 0) {
+    const next = previous.indexOf("\n## ", oldLoop + 1);
+    previous = (previous.slice(0, oldLoop) + previous.slice(next < 0 ? previous.length : next + 1)).replace(/\n+$/, "\n");
+  }
+  expect(body(current)).toBe(body(previous));
 });
