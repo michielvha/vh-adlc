@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "T1 to T17, T20 to T22 done locally; T18 and T19 (live label apply on vh-adlc and Stackweaver) wait for owner approval of each plan."
+status_description: "Every task done and every criterion has evidence on feat/shared-issue-labels; waits for an independent implementation review."
 issue: https://github.com/michielvha/vh-adlc/issues/83
 branch: feat/shared-issue-labels
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
@@ -367,8 +367,9 @@ once would make each other's reviews stale. So:
 - [x] AC-08: This repository has a `.vh-adlc/triage.yaml` that `vh-adlc settings read` accepts and a
       triage run in report-only mode reads.
       Evidence: on feat/shared-issue-labels at T15, `vh-adlc settings read --stdin` answered for `.vh-adlc/triage.yaml`; the triage CLI loaded it as configured settings, collected michielvha/vh-adlc read-only (10 issues, all collections complete) and saved a report to `/tmp/sil-t15/report.md` outside the checkout. This was the collect and report steps run directly, not an agent-driven sweep.
-- [ ] AC-09: `michielvha/vh-adlc` and `michielvha/stackweaver` each hold every standard label with
+- [x] AC-09: `michielvha/vh-adlc` and `michielvha/stackweaver` each hold every standard label with
       the standard color and description, and no issue in either lost a label.
+      Evidence: owner-approved applies on 2026-11-14 (helper at 3dbbce1): michielvha/vh-adlc created six labels, michielvha/stackweaver updated five; `gh label list` on each then shows all nine standard labels with the standard color and description; complete paginated snapshots (90 and 1082 issues and PRs) show no item lost a label and none changed during the window. Records: `tests/vh-adlc/labels/evidence/rollout-vh-adlc.md` and `rollout-stackweaver.md`.
 - [x] AC-10: The workflows user guide describes the standard label set and the helper, and the
       authority reference has the row for applying a label plan.
       Evidence: `bun test tests/vh-adlc/labels tests/vh-adlc/lifecycle/issue-labels.test.ts tests/vh-adlc/direct-operation-compatibility.test.ts tests/vh-adlc/triage/settings.test.ts tests/vh-adlc/settings-file.test.ts tests/vh-adlc/triage/execution.test.ts` at 3dbbce1: 158 pass, 0 fail. `vocabulary.test.ts` shows the workflows guide describes the set and helper and `references/authority.md` has the label-plan row.
@@ -439,7 +440,8 @@ shared-development-loop).
       Evidence: Procedure run on 661f5d0 and recorded in `tests/vh-adlc/labels/evidence/candidate-install.md`: isolated credential-free install of vh-adlc@labels-candidate succeeded; the installed cache holds the labels helper, vocabulary and reference; both manifests read 0.19.0; installed and source `plan` outputs are byte-identical (SHA-256 fb2418a7...) with only GET calls.
 - [x] T18 `tests/vh-adlc/labels/evidence/rollout-vh-adlc.md` - owner-approved `plan` and `apply` on `michielvha/vh-adlc` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
       Evidence: Owner-approved apply on michielvha/vh-adlc with digest 5a12f274...: six creates succeeded, complete; 90 issues and PRs before and after, none lost a label or changed during the window; recorded in `tests/vh-adlc/labels/evidence/rollout-vh-adlc.md` with plan, receipt and snapshots.
-- [ ] T19 `tests/vh-adlc/labels/evidence/rollout-stackweaver.md` - owner-approved `plan` and `apply` on `michielvha/stackweaver` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
+- [x] T19 `tests/vh-adlc/labels/evidence/rollout-stackweaver.md` - owner-approved `plan` and `apply` on `michielvha/stackweaver` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
+      Evidence: Owner-approved apply on michielvha/stackweaver from a clean clone with digest 2c509a0e...: five updates succeeded, complete; 1082 issues and PRs over 11 pages before and after, none lost a label or changed during the window; recorded in `tests/vh-adlc/labels/evidence/rollout-stackweaver.md` with plan, receipt and snapshots.
 
 ## Open Questions
 
