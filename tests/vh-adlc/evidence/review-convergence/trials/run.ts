@@ -184,7 +184,7 @@ async function main() {
         transcripts: files.map((x) => ({ file: relative(out, x.file), sha256: x.sha256 })),
       };
       if (t.kind === "author") {
-        writeFileSync(join(dir, "history.txt"), sh(t.repo.repo, "git", "log", "-p", "--format=commit %H%nAuthor: %an%n%n    %s%n", `${t.repo.commit}^..HEAD`));
+        writeFileSync(join(dir, "history.txt"), sh(t.repo.repo, "git", "log", "-p", "--format=commit %H%nAuthor: %an%n%n    %s%n", "HEAD"));
         if (existsSync(join(t.repo.repo, "tests", "check-timeout.sh"))) {
           const r = Bun.spawnSync(["sh", "tests/check-timeout.sh"], { cwd: t.repo.repo, stdout: "pipe", stderr: "pipe" });
           entry.check_timeout = `${r.stdout.toString().trim()} (exit ${r.exitCode})`;
