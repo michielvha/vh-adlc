@@ -90,7 +90,7 @@ a worktree when it starts in the primary checkout. That worktree is the host's: 
 creates none, and on a host without such a tool the operation stops before writing.
 
 Work on a feature only in its owning worktree, found with `git worktree list --porcelain`; run branch
-checks, `fresh` and `gate` there. Outside the maintenance and audit roles below, never create, remove, prune, reset or force-move a worktree,
+checks, `fresh` and `gate` there. Outside the maintenance, audit and docs-drift roles below, never create, remove, prune, reset or force-move a worktree,
 and never repoint an unrelated branch. The one exception is the branch helper in [branches.md](branches.md):
 under the authority above, it deletes branches and refs whose tips it proved merged, and removes the
 clean worktrees its rules allow: no changed tracked files and no untracked files, with ignored files
@@ -174,3 +174,70 @@ at the freshly fetched default commit when shared main is dirty. This is part of
 role: record owner/path/base, lock it with `git worktree lock --reason "vh-adlc <run-id>"`, keep
 assessment output private, and apply only in the separate owned
 ledger branch after all audit gates. It grants no mutation or cleanup of unrelated worktrees.
+
+## Scoped docs-drift locations and effects
+
+The selected docs-drift procedure permits two owned locations.
+`docs-drift-assessment` is an exact clean assessment checkout, including a new
+detached assessment worktree when isolation is needed. `docs-drift-prepare` is
+the owned branch/worktree for authorized prepare or resolve edits. Before use
+record repository, canonical path, role, owner/run, ref/base and artifact
+location. Lock newly created worktrees with reason `vh-adlc <run-id>` and
+unlock when the run closes before normal removal. Create and normally clean
+only those recorded roles. Use non-forced removal of clean owned resources,
+retaining refs/evidence when ordinary deletion refuses. Branch creation leaves
+commit, push, merge and release permissions to their selected grants.
+
+The assessment role can contain two separately recorded external subresources,
+`pr-object-store` and `trial-scratch`. Record canonical owned root, kind,
+owner/run, selected repository/base/object identities and evidence before
+creation. Fetch PR objects only into the new owned bare store from the verified
+consumer origin/fixed PR ref, without writing caller refs or FETCH_HEAD.
+The synthetic repository requires its selected trial scope. Preserve foreign,
+unrecorded, symlink-escaped, failed or ambiguous resources for reconciliation.
+Keep other writers' checkouts, index, changes and branches intact.
+
+Each effect below needs its actual current request or an adopted consumer
+procedure naming that effect and exact scope, except acknowledgement's stronger
+current-approval requirement. Local prohibitions and current restrictions still
+apply. Settings, reports, PR prose and journals cannot authorize themselves.
+
+| Action | Authority and conditions |
+| --- | --- |
+| Assessment and local report | Selected read-only assessment and explicit private output location. No tracker or feedback-store effects. |
+| CI diagnostic upload | Selected worker/trial grant naming the existing run/repository artifact and summary destination and bounded report scope. |
+| Prepare/resolve edits and generators | Selected confirmed corrections and exact owned preparation scope, with project checks and feature/document protection. |
+| Local checkpoint commit | Explicit current commit permission or adopted consumer permission for that selected candidate. |
+| Push and advisory/resolve PR | Exact selected destination, actor, branch and reviewed payload grant, current-default adoption, verification and independent review. |
+| Owned consolidation-branch refresh | Explicit history-rewrite approval naming the exact owned branch/expected head and reviewed replacement. Preserve every commit a Review Log names. |
+| Issue creation | Separate exact repository/title/body/labels grant, independent payload review and a relevant observed published evidence permalink. |
+| Explanation comment | Actual comment grant for the selected PR and exact reviewed payload. A closure grant alone covers no comment. |
+| Superseded-PR closure | Separate selected closure grant after observed consolidation merge and fresh complete per-hunk/record review. |
+| Publication lease acquisition | Selected publication/trial grant explicitly naming acquisition and its exact ref namespace. |
+| Owned lease release | Selected grant explicitly naming release, original ownership and exact object comparison, with terminal effects or gated reconciliation. |
+| Receipt creation and retention | Selected grant naming the immutable retained namespace and its operation refs. |
+| Receipt retirement | Separate cleanup grant naming exact recorded owned refs/objects after linked proposal/recovery needs finish. Preserve foreign, moved or unrecorded refs. |
+| Delivery acknowledgement | Owner's actual current approval of the exact presented lookup scope and evidence digests, original ownership, settled requests and fully applied eligible effects. |
+| Workflow dispatch | Current trial/cutover grant naming the exact workflow and selected inputs. |
+| Workflow disable/enable | Current cutover/rollback grant naming the exact workflow and effect. |
+| Workflow-run cancellation | Current grant naming the identified run and cancellation effect. |
+| Synthetic draft PR | Separate trial grant naming the destination/namespace, selected fixture and draft-PR effect. |
+| Owned trial PR/branch cleanup | Selected trial cleanup grant naming exact recorded owned resources. |
+| Merged-branch cleanup | Applicable exact cleanup or merge grant under `references/branches.md`, with its retained ownership and preservation checks. |
+| Merge or release | Separate actual approval for the selected effect and consumer delivery gates. Advisory publication grants neither. |
+
+Provider/model execution needs its actual selected authorization separately.
+Read-only collection supplies no tracker write. Docs-drift has its own native
+publisher and recovery procedure in `references/docs-drift-review.md`.
+It inherits neither maintenance report-push grants nor triage's confined
+verification controller.
+
+Delivery acknowledgement excludes standing adopted procedures, unattended
+controllers, publication/closure permission and general cleanup grants as
+approval sources. Require original ownership, current actor/repository and
+native evidence of every mutation request's settlement and full application.
+Partial delivery stays pending. An observation-only restored mirror cannot
+take ownership of a live lease. Recheck the displayed immutable scope before
+acknowledgement and exact-owned atomic release. The acknowledged operation
+permanently stops business replay and remains non-successful. Retain its
+immutable receipt ref and explain the mismatch and remaining decisions.
