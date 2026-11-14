@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner defaults recorded and R-2 findings addressed. Awaiting independent re-review."
+status_description: "Independent spec review R-3 returned no findings. Awaiting owner acceptance."
 issue: null
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
 covers:
@@ -27,7 +27,7 @@ VitePress has a Claude-specific agent for AWS architecture. It already uses a sh
 
 The agent decides which relationships to show and how to explain them. Each depicted relationship has a source or a visible label that identifies it as proposed. When the sources leave a link uncertain, the brief records the gap. Drawing and export use local tools. The project chooses the destination and controls any publication. Stackgraph stays a standalone deterministic tool. FlowStory playback and VitePress adoption can use the results of this first feature.
 
-The first release covers an AWS request path grounded in repository sources and an OCI-to-local design from a written brief. The agent renders in the same request when the sources support a useful view. The host supplies draw.io Desktop and the selected local provider assets. In the prototype check, both drawings exported twice with networking disabled and produced identical files on the second export. Independent review found gaps in the proof and the local setup contract. The revised proof requires actual invocation from both marketplace installs, a comparison between the brief and the drawing, and a local export and editor check. Those implementation checks and independent re-review are pending. Acceptance authorizes implementing and testing this scope under the feature lifecycle.
+The first release covers an AWS request path grounded in repository sources and an OCI-to-local design from a written brief. The agent renders in the same request when the sources support a useful view. The host supplies draw.io Desktop and the selected local provider assets. In the prototype check, both drawings exported twice with networking disabled and produced identical files on the second export. Independent review found gaps in the proof and the local setup contract. The revised proof requires actual invocation from both marketplace installs, a comparison between the brief and the drawing, and a local export and editor check. Independent spec review R-3 returned no findings. The native implementation checks are pending. Acceptance authorizes implementing and testing this scope under the feature lifecycle.
 
 ### Background
 
@@ -104,6 +104,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 
 | 2026-11-14 | R-1 | spec | `ed00017463b84fed13b97546271f7bda6dd299e1` | unknown | procedural | Six should-fix findings |
 | 2026-11-14 | R-2 | spec | `7a0263ea494dd46d0145a2392e691df045558111` | unknown | procedural | Two should-fix findings and one nit |
+| 2026-11-14 | R-3 | spec | `6593ed37147bd2bd6813e6e4d3e53066af7f8896` | unknown | procedural | No findings |
 
 ### R-1
 
@@ -171,6 +172,10 @@ SEVERITY: nit
 WHERE: Context > Owner summary, Sources
 EVIDENCE: The summary states that both prototypes exported with networking disabled. Sources links the Desktop release, which establishes the tool identity but cannot establish that execution. The resolved feature-document standard calls for a source or command and observed result for Context claims.
 PROPOSAL: Cite the prototype export command and observed result in Background or link to the recorded evidence. Keep the claim limited to the prototypes.
+
+### R-3
+
+NO FINDINGS
 
 ## Sources
 
