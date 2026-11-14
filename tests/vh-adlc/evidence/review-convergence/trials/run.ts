@@ -138,6 +138,18 @@ async function main() {
   const [outArg, ...only] = process.argv.slice(2);
   if (!outArg) throw new Error("usage: run.ts <output dir> [trial ...]");
   if (!existsSync(DOCS_CACHE)) throw new Error(`no docs cache at ${DOCS_CACHE}; run \`vh-adlc knowledge\` first`);
+  // A reviewer stops when a page the pinned route names is missing from the cache, so fetch every routed
+  // page through the binary before the cache is copied into the trial home.
+  const routed = new Set<string>();
+  for (const index of ["AGENTS.md", "README.md"]) {
+    const path = join(DOCS_CACHE, index);
+    if (existsSync(path)) for (const m of readFileSync(path, "utf8").matchAll(/(?:conventions|guides)\/[a-z0-9-]+\.md/g)) routed.add(m[0]);
+  }
+  for (const page of routed) {
+    if (existsSync(join(DOCS_CACHE, page))) continue;
+    sh(ROOT, BINARY, "knowledge", "--repo", ROOT, "--plugin-pin", PIN, "--page", page);
+    if (!existsSync(join(DOCS_CACHE, page))) throw new Error(`could not cache ${page} at ${PIN}`);
+  }
   const out = resolve(outArg);
   mkdirSync(out, { recursive: true });
 
