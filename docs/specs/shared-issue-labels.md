@@ -393,6 +393,7 @@ None.
 | 2026-11-13 | R-2 | spec | `be943c8` | unknown | procedural | Changes needed: 1 blocking, 2 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-13 | R-3 | spec | `cfc2f2d` | unknown | procedural | No findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-13 | R-3 | spec | `cfc2f2d` | n/a | n/a | accepted by owner |
+| 2026-11-14 | R-4 | spec | `da736bc` | unknown | procedural | Drift review after #87 and #88: 3 should-fix, no blocking finding; model identity not attested (Codex session header showed gpt-6.1-sol) |
 
 ### R-1
 
@@ -480,3 +481,27 @@ PROPOSAL: Name the affected plugin payload and marketplace delivery paths, and a
 ### R-3
 
 NO FINDINGS
+
+### R-4
+
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary and Background
+EVIDENCE: At da736bc, docs/specs/shared-issue-labels.md:124 says shared-development-loop has no issue-label rule, and lines 130-136 say the labeling parity split is not yet in the tree. However, docs/specs/shared-development-loop.md:757-758 records the completed split. Stackweaver at 4e4fcd4d has an investigate-labels-issue row in tests/agent-loop/parity.json and preserves its labeling rule in agents/loop-project.md:62 until this feature takes over. The summary at lines 46-48 still describes migration as a future loss of that rule.
+PROPOSAL: Refresh Context to describe the completed migration and the preserved local labeling rule. Describe this feature as replacing that temporary local rule with the shared contract.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary
+EVIDENCE: docs/specs/shared-issue-labels.md:85-87 says a new review must clear R-2 before the owner can accept. Its Review Log at lines 394-395 already records a clean R-3 and owner acceptance. The frontmatter instead identifies the current blocker as a drift re-review, and the observed vh-adlc fresh result reports R-3 stale because of covered-drift.
+PROPOSAL: Update the summary to distinguish the completed R-3 acceptance from the pending drift review. State that acceptance remains recorded while implementation waits for a current review.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks / T16
+EVIDENCE: docs/specs/shared-issue-labels.md:379 requires a minor version bump from the merged #78 version. git show 2c9d3af:plugins/vh-adlc/plugin.json gives 0.17.0, while both plugin manifests at da736bc already contain 0.18.0 following the lock update. Following T16 literally would select the existing version instead of giving this feature a new minor version.
+PROPOSAL: Base T16 on the current merged plugin version. At this review target, both manifests should advance from 0.18.0 to 0.19.0, with candidate installation checking that version.
