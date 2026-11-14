@@ -8,7 +8,7 @@ test("legend samples do not count as traffic and extra arrows between depicted c
   const output = mkdtempSync(join(tmpdir(), "vh-diagram-grade-"));
   try {
     const fixture = {
-      name: "legend-test",
+      name: "aws",
       source: "Client sends HTTPS 443 to the API.\n",
       question: "Show the request",
       shapes: [{ label: "Client" }, { label: "API" }],
@@ -31,11 +31,14 @@ test("legend samples do not count as traffic and extra arrows between depicted c
 | call | client | api | HTTPS 443 | documented | sources.md:1 |
 `);
     writeFileSync(join(output, "architecture.svg"), '<svg xmlns="http://www.w3.org/2000/svg"/>');
-    writeFileSync(drawing, page(""));
+    writeFileSync(drawing, page('<mxCell id="scope-note" parent="1" vertex="1" style="html=1;text;strokeColor=none" value="Log Bucket excluded"/>'));
     expect(gradeDiagram(fixture, output, "")).toEqual([]);
 
     writeFileSync(drawing, page('<mxCell id="unexpected" parent="1" edge="1" source="api" target="client"/>'));
     expect(gradeDiagram(fixture, output, "")).toContain("Unmapped connector in the drawing");
+
+    writeFileSync(drawing, page('<mxCell id="unmapped" parent="1" vertex="1" style="rounded=1" value="Log Bucket"/>'));
+    expect(gradeDiagram(fixture, output, "")).toContain("The deployment-only Log Bucket appears as a component");
 
     writeFileSync(join(output, "brief.md"), "# Missing evidence rows\n");
     expect(gradeDiagram(fixture, output, "")).toContain("Brief has the wrong number of components, boundaries or connectors");

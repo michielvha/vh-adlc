@@ -99,7 +99,7 @@ export function gradeDiagram(fixture: Fixture, output: string, response: string)
   }
   // The fixture names the excluded dependency explicitly. Catch it even if it
   // has no brief row, then inspect all remaining unlisted helper cells visually.
-  if (fixture.name === "aws" && xpath("count(//mxCell[@vertex='1' and contains(translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'log bucket') and not(starts-with(@style, 'text;'))])") !== "0") {
+  if (fixture.name === "aws" && xpath("count(//mxCell[@vertex='1' and contains(translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'log bucket') and not(contains(concat(';', @style, ';'), ';text;'))])") !== "0") {
     failures.push("The deployment-only Log Bucket appears as a component");
   }
   if (fixture.gap && !brief.toLowerCase().includes(fixture.gap)) failures.push("Missing unresolved detail in the brief");
