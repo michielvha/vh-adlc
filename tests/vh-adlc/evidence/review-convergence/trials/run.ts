@@ -99,10 +99,22 @@ const ANSWERS: Record<string, string> = {
     "The trial's owner answers your Open Question: a timeout exits 2, as Design says now. Apply the factual findings and this answer now as one revision in one commit on main, removing the question. Same trial rules as before. Report the commit hash and whether `tests/check-timeout.sh` still passes.",
 };
 
+// openQuestions says whether any feature document under the repository's docs/ has an Open Question; an
+// author drafting a new feature chooses its own path.
 function openQuestions(repo: string): boolean {
-  const doc = readFileSync(join(repo, "docs", "specs", "feature.md"), "utf8");
-  const section = doc.split(/^## Open Questions$/m)[1]?.split(/^## /m)[0] ?? "";
-  return /^### Q\d+/m.test(section);
+  const docs: string[] = [];
+  const walk = (dir: string) => {
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) walk(join(dir, e.name));
+      else if (e.name.endsWith(".md")) docs.push(join(dir, e.name));
+    }
+  };
+  walk(join(repo, "docs"));
+  return docs.some((path) => {
+    const section = readFileSync(path, "utf8").split(/^## Open Questions$/m)[1]?.split(/^## /m)[0] ?? "";
+    return /^### Q\d+/m.test(section);
+  });
 }
 
 function transcripts(p: Profile, dest: string): { file: string; sha256: string }[] {
@@ -193,6 +205,9 @@ async function main() {
       }
       manifest.push(entry);
       console.log(`${t.name}: ${turns.map((x) => (x.isError ? "error" : x.model)).join(", ")}`);
+    } catch (e) {
+      manifest.push({ trial: t.name, kind: t.kind, runner_error: String(e) });
+      console.log(`${t.name}: runner error: ${e}`);
     } finally {
       p.dispose();
     }
