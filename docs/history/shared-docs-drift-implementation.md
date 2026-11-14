@@ -494,3 +494,32 @@ WHERE: evidence/final-measured-summary.json, stages proposal-report and retained
 EVIDENCE: The final3 run filters audit-report.test.ts to "current checks carry|mixed proposal", with 8 of 16 tests run and 8 filtered out. It filters audit-session.test.ts to matching and proposal-supported-cli, with 2 of 9 tests run and 7 filtered out. The other affected cases last passed only in the earlier checkpoint run against a different source tree. They include "independent full proposal assessment triggers fresh result verification before delivery", the copied or oversized report cases and the normal-cli and partial-output sessions. The final3 tree changed audit-report.ts, report.ts and the fixtures after that checkpoint. The checkpoint run also recorded three failures that were fixed later. No measured run at the final source covers the unfiltered files these changes touch.
 PROPOSAL: Run audit-report.test.ts and audit-session.test.ts unfiltered at the final source state. Record the logs and counts in the measured summary.
 ```
+
+## Component diagnostic 114
+
+Exact local target `63464419f1ee0a36b9d9e75d6e2a17311089f71b`. Actual Copilot Opus 5.5 with procedural isolation. All 112 required chunks were read with no outside paths or private files sent. One should-fix finding and two nits remain. Original records are preserved before corrections. The complete unfiltered report/session evidence is accepted in this scoped review. Composite feature criteria remain open.
+
+```text
+MODEL: claude-opus-5.5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: shared/plugins/vh-adlc/scripts/docs-drift/report.ts, proposalDecision, the non-resolution_attention return branch (chunk 00086, lines 29 to 35). Also tests/vh-adlc/docs-drift/report.test.ts, "proposal overlap explanations identify the related original".
+EVIDENCE: context.md says F02 "Links include those related locators". proposalDecision computes `related`, and only the resolution_attention branch merges it into links (`links: [...new Set([...proposal.resolution_attention.links, ...related])]`). The default branch puts `explanation` in its reason, but it still returns `links: [proposal.locator]`, so the overlapping proposals named in the reason are not linked. The new pure test only covers the resolution_attention branch and only checks `reason`, never `links`. The native legacy-overlap case also checks only that PR11's reason names PR12. Neither test would catch the missing links in either branch.
+PROPOSAL: In the default branch, return `links: [proposal.locator, ...related]`. Add assertions that `item.links` contains the related locator in the resolution_attention pure case and in a default-branch case, for example the legacy-overlap or an unverifiable proposal without resolution_attention.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: shared/plugins/vh-adlc/scripts/docs-drift/current-proposal-verification.ts, verifyCurrentProposals, the oversize branch and the second bound check (chunk 00171, around lines 52 to 65), together with invalidateCurrentProposalVerification (chunk 00086, line 34, `result.evidence = null`).
+EVIDENCE: The first byte check counts the placeholder `evidence: { path: record, sha256: "0"*64 }`. Since F01, the oversize branch calls invalidateCurrentProposalVerification, which now nulls `evidence`. So the second check ("Configured bound cannot retain...") measures a result with no evidence pointer. After publishing, `evidence: { path, sha256 }` is added back without another check. The returned in-memory result can therefore exceed `limit` by the size of the pointer, roughly 150 bytes. Before F01 the placeholder survived invalidation and was counted. The retained file payload excludes evidence, so it stays bounded. The regression affects only the returned and embedded result's bound.
+PROPOSAL: In the oversize branch, re-add the placeholder evidence after invalidation when `record` is set, for example `evidence: record ? { path: record, sha256: "0".repeat(64) } : null`, so the second check counts the pointer. Alternatively, do the size check after the real evidence is attached.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: shared/plugins/vh-adlc/scripts/docs-drift/current-proposal-verification.ts, row diagnostics "Current proposal preparation failed. " + prepared.diagnostics.join(". ") and "Current proposal configured verification failed. " + verified.diagnostics.join(". ") (chunk 00171, lines 9 and 24). Also audit-report.ts markdown join (chunk 00171, lines 77 to 79).
+EVIDENCE: F03 now builds each line as `[locator, outcome, ...diagnostics].join(". ") + "."`. When the inner diagnostics array is empty, the row diagnostic ends with ". ", so the rendered line ends "...failed. ." This is the same kind of empty-separator defect F03 was meant to fix. The resolution_attention reason concatenation `reason + ". " + explanation` in report.ts doubles punctuation in the same way when the stored reason already ends with a period. The F03 test checks trailing whitespace only on the matching row, which has no diagnostics.
+PROPOSAL: Build these diagnostics as `["Current proposal preparation failed", ...prepared.diagnostics].join(". ")`, and do the same for configured verification. Optionally strip one trailing period from each segment before joining in the renderer and in proposalDecision.
+```

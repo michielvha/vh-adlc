@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { attentionProjection, buildReport, correctionProjection, renderReport } from "../../../plugins/vh-adlc/scripts/docs-drift/report";
+import { attentionProjection, buildReport, correctionProjection, joinReportSentences, renderReport } from "../../../plugins/vh-adlc/scripts/docs-drift/report";
 import type { AttentionInput, CorrectionInput, HistorySnapshot, ReportInput } from "../../../plugins/vh-adlc/scripts/docs-drift/report";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
@@ -258,7 +258,29 @@ test("proposal overlap explanations identify the related original", () => {
   current.proposals = [{ ...proposal, resolution_attention: detail }, { ...proposal, locator: "pr:7" }];
   const report = buildReport(current), item = report.attention.find(row => row.item.identity === "proposal:4")?.item;
   expect(item?.reason).toContain("pr:7");
+  expect(item?.links).toContain("pr:7");
+  expect(report.attention.find(row => row.item.identity === "proposal:pr:7")?.item.links).toContain("pr:4");
   expect(item?.inputs).toEqual(detail.inputs);
   expect(report.blocked_corrections).toEqual([correctionProjection(fix)]);
   expect(report.carried_delivery).toEqual([]);
+});
+
+
+test("a controller reason ending in a sentence keeps one separator", () => {
+  const current = input();
+  current.proposals = [{ locator: "pr:4", state: "open", assessment: "unverifiable", actor: "bot", head: "c".repeat(40),
+    body_sha256: digest("body"), reviewed: null, paths: ["docs/guide.md"],
+    evidence: { receipt_sha256: null, inputs_sha256: digest("inputs") },
+    resolution_attention: { ...attention(), reason: "Current support needs source review." } }];
+  const reason = buildReport(current).attention[0].item.reason;
+  expect(reason).not.toMatch(/\.\s*\./u);
+  expect(reason).toContain("Current support needs source review.");
+});
+
+
+test("report sentence joining handles empty diagnostics and existing punctuation", () => {
+  expect(joinReportSentences(["Verification failed", ""])).toBe("Verification failed.");
+  expect(joinReportSentences(["Verification failed. ", "Inspect source."])).toBe("Verification failed. Inspect source.");
+  expect(joinReportSentences(["Does source support it?", "Inspect it!"])).toBe("Does source support it? Inspect it!");
+  expect(joinReportSentences(["", "  "])).toBe("");
 });

@@ -11,7 +11,7 @@ import { parseDecisionPacket, projectAttentionProposals } from "./publication-de
 import { OUTPUT_LIMIT } from "./owned-process";
 import { PublicationScopeChanged } from "./publish";
 import { canonicalDigest, freezeJSON } from "./protocol";
-import { buildReport, renderReport, escapeReportText, type AttentionInput, type Report, type CorrectionInput, type Proposal } from "./report";
+import { buildReport, renderReport, escapeReportText, joinReportSentences, type AttentionInput, type Report, type CorrectionInput, type Proposal } from "./report";
 import { renderProposalAssessment, type ProposalAssessment } from "./proposal-assessment";
 import { renderAssessmentReport, type AssessmentReport } from "./assessment-report";
 import { resolutionSource } from "./resolve";
@@ -245,8 +245,8 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
       .replace(/^# Documentation drift report\n/u, "## Finding assessment\n") : "\n## Assessment gaps\n\nFinding counts and judgments are unavailable until the failed assessment checks are resolved.\n")
       + (proposalAssessment ? "\n" + renderProposalAssessment(proposalAssessment, "Proposal assessments independently reviewed") : "");
     if (result.proposal_verification) result.markdown += "\n## Current proposal verification\n\n"
-      + result.proposal_verification.proposals.map(row => ["- " + escapeReportText(row.locator), row.outcome,
-        ...row.diagnostics.map(escapeReportText)].join(". ") + ".").join("\n") + "\n";
+      + result.proposal_verification.proposals.map(row => joinReportSentences(["- " + escapeReportText(row.locator), row.outcome,
+        ...row.diagnostics.map(escapeReportText)])).join("\n") + "\n";
   } catch (error) {
     result.complete = false; result.report = null; result.markdown = null;
     if (result.proposal_verification) result.proposal_verification = invalidateCurrentProposalVerification(result.proposal_verification,

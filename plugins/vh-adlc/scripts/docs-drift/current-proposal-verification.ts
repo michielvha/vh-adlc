@@ -10,8 +10,8 @@ import { publishArtifact, readArtifact } from "./journal";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { inspectPreparation, prepareEdits } from "./preparation";
 import { readProposalDiff } from "./proposals";
-import { canonicalDigest, canonicalJSON, compareUTF8, freezeJSON, sha256, withinPrefix } from "./protocol";
-import type { CorrectionInput } from "./report";
+import { canonicalDigest, canonicalJSON, compareUTF8, freezeJSON, protocolPath, sha256, withinPrefix } from "./protocol";
+import { joinReportSentences, type CorrectionInput } from "./report";
 import type { Edit, ResolutionChange } from "./resolve";
 import { readResolutionProposal, type ResolutionProposal } from "./resolve-inputs";
 import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState, type Snapshot } from "./snapshot";
@@ -129,6 +129,21 @@ export function invalidateCurrentProposalVerification(input: CurrentProposalVeri
   return freezeJSON(result);
 }
 
+/** Pure presentation bound. Pending retention reserves its future reference here. */
+export function boundCurrentProposalVerification(input: CurrentProposalVerification, limit: number, pendingRecord?: string | null): CurrentProposalVerification {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > OUTPUT_LIMIT) throw Error("Current verification output bound required");
+  let result = structuredClone(input);
+  const pending = pendingRecord ? { path: protocolPath(pendingRecord), sha256: "0".repeat(64) } : null;
+  if (pendingRecord !== undefined) result.evidence = pending;
+  if (Buffer.byteLength(JSON.stringify(result) + "\n") > limit) {
+    result = { ...invalidateCurrentProposalVerification(result, "Current verification exceeds the retained entry bound"),
+      details_omitted: true, proposals: [], evidence: pending };
+    result.diagnostics = ["Current verification exceeds the retained entry bound. Inspect the original private records"];
+  }
+  if (Buffer.byteLength(JSON.stringify(result) + "\n") > limit) throw Error("Configured bound cannot retain an incomplete current verification result");
+  return result;
+}
+
 /** The report controller chooses supported IDs after reopening independent assessment review. */
 export async function verifyCurrentProposals(input: {
   repo: string; source: string; artifact_root: string; owner: string; run: string; proposals: Inputs; supported: number[];
@@ -177,7 +192,7 @@ export async function verifyCurrentProposals(input: {
           owner: options.owner, run: options.run + "/proposal-" + original.number };
         const prepared = await prepareEdits({ ...common, selection: selected.selection });
         if (prepared.state !== "prepared-uncommitted" || !prepared.checkout || !prepared.record_path)
-          throw Error("Current proposal preparation failed. " + prepared.diagnostics.join(". "));
+          throw Error(joinReportSentences(["Current proposal preparation failed", ...prepared.diagnostics]));
         const preparation = { path: relative(artifactRoot, prepared.record_path), sha256: sha256(readArtifact(prepared.record_path)) };
         readBoundArtifact({ source_repo: sourceRepo, artifact_root: artifactRoot, reference: preparation });
         row.preparation_reference = preparation;
@@ -191,7 +206,7 @@ export async function verifyCurrentProposals(input: {
         row.candidate_commit = candidate;
         const proofOptions = { ...common, selection: selected.selection, candidate_repo: checkout, candidate };
         const verified = await verifyCandidate(proofOptions);
-        if (!verified.complete || !verified.evidence) throw Error("Current proposal configured verification failed. " + verified.diagnostics.join(". "));
+        if (!verified.complete || !verified.evidence) throw Error(joinReportSentences(["Current proposal configured verification failed", ...verified.diagnostics]));
         const originalProof = { ...proofOptions, reference: verified.evidence };
         const proof = readCandidateVerificationArtifacts(originalProof);
         if (!proof.inspection?.object_store || !proof.scan) throw Error("Complete original current candidate proof required");
@@ -230,12 +245,7 @@ export async function verifyCurrentProposals(input: {
   }
   if (!result.complete) result = invalidateCurrentProposalVerification(result, "Current proposal proof is incomplete", result.scope_changed);
   const record = root === null ? null : "current-proposal-verification-" + randomUUID() + ".json";
-  if (record) result = { ...result, evidence: { path: record, sha256: "0".repeat(64) } };
-  if (Buffer.byteLength(JSON.stringify(result) + "\n") > limit) {
-    result = { ...invalidateCurrentProposalVerification(result, "Current verification exceeds the retained entry bound"), details_omitted: true, proposals: [] };
-    result.diagnostics = ["Current verification exceeds the retained entry bound. Inspect the original private records"];
-  }
-  if (Buffer.byteLength(JSON.stringify(result) + "\n") > limit) throw Error("Configured bound cannot retain an incomplete current verification result");
+  result = boundCurrentProposalVerification(result, limit, record);
   if (record && root !== null) {
     try {
       const { evidence: _evidence, ...payload } = result;
@@ -246,6 +256,7 @@ export async function verifyCurrentProposals(input: {
       result = { ...invalidateCurrentProposalVerification(result, error instanceof Error ? error.message : "Current verification retention failed"), evidence: null };
     }
   }
+  result = boundCurrentProposalVerification(result, limit);
   const completed = freezeJSON(result);
   if (completed.complete && completed.evidence && root && repo && recheck) {
     const scope = { source_repo: repo, artifact_root: root, reference: completed.evidence }, originalRecheck = recheck;
