@@ -5,7 +5,7 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 type Label = { name: string; color: string; description: string | null };
 const path = process.env.LABELS_FIXTURE;
 if (!path) throw new Error("fixture path missing");
-const state = JSON.parse(readFileSync(path, "utf8")) as { host: string; repository: string; actor: string; labels: Label[] };
+const state = JSON.parse(readFileSync(path, "utf8")) as { host: string; repository: string; actor: string; labels: Label[]; issues?: { number: number; title: string; body: string; labels: string[] }[] };
 const args = process.argv.slice(2);
 const flag = (name: string) => { const i = args.indexOf(name); return i < 0 ? undefined : args[i + 1]; };
 const method = flag("-X") ?? "GET";
@@ -17,9 +17,17 @@ const endpoint = args.find((arg) => arg.startsWith("repos/") || arg === "user");
 if (!endpoint) refuse("unexpected request");
 const out = (value: unknown) => writeFileSync(1, JSON.stringify(value));
 if (endpoint === "user") { out({ login: state.actor }); process.exit(0); }
+const save = () => writeFileSync(path, JSON.stringify(state));
+if (method === "POST" && endpoint === `repos/${state.repository}/issues`) {
+  // GitHub would create a missing label implicitly; record the request exactly as sent.
+  const body = JSON.parse(input) as { title: string; body: string; labels: string[] };
+  const issues = state.issues ??= [];
+  const number = issues.length + 1;
+  issues.push({ number, title: body.title, body: body.body, labels: body.labels });
+  save(); out({ number, html_url: `https://${state.host}/${state.repository}/issues/${number}` }); process.exit(0);
+}
 const prefix = `repos/${state.repository}/labels`;
 if (!endpoint!.startsWith(prefix)) refuse("unexpected repository");
-const save = () => writeFileSync(path, JSON.stringify(state));
 if (method === "GET") {
   const url = new URL(endpoint!, "https://fixture.invalid/");
   const size = Number(url.searchParams.get("per_page") ?? 30), page = Number(url.searchParams.get("page") ?? 1);

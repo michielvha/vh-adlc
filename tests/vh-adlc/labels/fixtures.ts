@@ -35,6 +35,7 @@ export function tracker(labels: FixtureLabel[], options: { actor?: string; host?
     calls: (): { method: string; args: string[]; input: unknown }[] => existsSync(state + ".calls") ? readFileSync(state + ".calls", "utf8").trim().split("\n").map((line) => JSON.parse(line)) : [],
     writes() { return this.calls().filter((call) => call.method !== "GET"); },
     labels: (): FixtureLabel[] => JSON.parse(readFileSync(state, "utf8")).labels,
+    issues: (): { number: number; title: string; body: string; labels: string[] }[] => JSON.parse(readFileSync(state, "utf8")).issues ?? [],
     edit(change: (labels: FixtureLabel[]) => void) { const value = JSON.parse(readFileSync(state, "utf8")); change(value.labels); writeFileSync(state, JSON.stringify(value)); },
   };
 }
