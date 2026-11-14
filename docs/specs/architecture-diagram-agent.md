@@ -115,6 +115,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | 2026-11-14 | R-4 | spec | `211db5a7ceb0510e7107b160efe8ce30babda981` | unknown | procedural | One should-fix finding in the task order |
 | 2026-11-14 | R-4 | spec | `211db5a7ceb0510e7107b160efe8ce30babda981` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-5 | implementation | `6693aea802f641cf7833073141ec0d5f8824900a` | unknown | procedural | Five criteria met and two should-fix findings |
+| 2026-11-14 | R-6 | spec | `48db37936eab67d416ccdbf53172b0d02a2765f7` | unknown | procedural | Three should-fix findings and one nit |
 
 ### R-1
 
@@ -231,6 +232,36 @@ SEVERITY: should-fix
 WHERE: Frontmatter covers and Test Plan AC-01
 EVIDENCE: The feature changes `tests/vh-adlc/maintenance/discovery.test.ts` and `tests/vh-adlc/triage/discovery.test.ts` to account for the installed skill in shared plugin discovery. Neither path is in accepted `covers`. Both are exercised by the repository's `bun test tests/vh-adlc` verification command.
 PROPOSAL: Include the two feature-dependent discovery tests in the reviewed coverage, or handle the test change with independently scoped maintenance before relying on it for this feature.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter covers, Design > Delivery, Test Plan AC-01
+EVIDENCE: At `48db37936eab67d416ccdbf53172b0d02a2765f7`, the diff against the merged main parent still changes `tests/vh-adlc/maintenance/discovery.test.ts` and `tests/vh-adlc/triage/discovery.test.ts` to accommodate the diagram skill. Neither path is in `covers`. These checks depend on the installed skill set and are part of the required package test suite. R-5 F-02 remains open.
+PROPOSAL: Include both discovery checks in the reviewed coverage and name their verification in AC-01, or deliver the changes through independently scoped maintenance.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Request and evidence, Test Plan AC-02
+EVIDENCE: The revised grader at `tests/vh-adlc/diagram/grade.ts:93-97` rejects an unlisted Log Bucket but leaves the general reverse mapping to visual inspection. I added an unlisted visible Redis Cluster to a scratch copy of an otherwise valid AWS fixture drawing. `gradeDiagram` returned `[]`. AC-02 says to verify the mapping in both directions and fail on an unrelated resource. Its proof names the runner without an explicit manual reverse-mapping step.
+PROPOSAL: Add a recorded manual check of unlisted visual cells against the fixture and brief, or implement and test the general reverse mapping in the runner.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Delivery, `docs/reference/marketplace.md:116`
+EVIDENCE: The marketplace reference claims that the diagram skill is included from plugin version `0.21.0`. The merged main parent has version `0.21.1` and no diagram skill. Both feature manifests at the reviewed commit give the candidate version as `0.22.0`. Users relying on the stated minimum could install a package that lacks the skill.
+PROPOSAL: Document the version that contains the feature and distinguish the candidate from confirmed availability in the published marketplace.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Owner summary, Tasks T6, Review Log R-5
+EVIDENCE: The summary calls the R-4 task-order fix future work and says the native implementation checks are pending. T6 and the R-5 record describe completed checks, including native runs, matched exports and editor drags. This is stale summary text outside the normative baseline.
+PROPOSAL: Refresh the summary to record the completed checks at their tested revision and the outstanding follow-ups on the refreshed target.
 
 ## Sources
 
