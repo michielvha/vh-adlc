@@ -716,3 +716,66 @@ test("detached worktrees sharing a folder name each read their own reflog, and a
   expect(onlyKept(plan, stale)).toContain(`${reflogOnly}: ${y.slice(0, 12)}`);
   expect(removals(plan)).toEqual([p1]);
 }, 120000);
+
+const pause = (path: string) => gitWith({ GIT_SEQUENCE_EDITOR: "sed -i '1i break'" }, path, "rebase", "-q", "-i", "main");
+const emptyOut = (path: string) => { for (const name of readdirSync(path)) rmSync(join(path, name), { recursive: true, force: true }); };
+
+test("a worktree entry whose directory is gone goes when its branch is merged or, detached, its HEAD is on the default branch, at any age", () => {
+  const f = repo(), admin = join(f.work, ".git", "worktrees");
+  const merged = f.merged("merged-gone"), detached = detach(f, "detached-gone", 0), unmerged = detach(f, "unmerged-gone", 0), rebasing = detach(f, "rebasing-gone", 0), emptied = f.merged("emptied");
+  commit(unmerged, "unmerged work");
+  pause(rebasing);
+  expect(existsSync(join(admin, "rebasing-gone", "rebase-merge"))).toBe(true);
+  for (const path of [merged, detached, unmerged, rebasing]) rmSync(path, { recursive: true, force: true });
+  emptyOut(emptied);
+  const plan = f.plan();
+  expect(removals(plan)).toEqual([detached, merged].sort());
+  expect(removal(plan, merged)?.branch).toBe("feat/merged-gone");
+  expect(removal(plan, detached)?.branch).toBeUndefined();
+  expect(summary(plan.operations)).toContain("delete-local:feat/merged-gone");
+  expect(onlyKept(plan, unmerged)).toContain("is not on main");
+  expect(onlyKept(plan, emptied)).toContain("exists without a .git file");
+  expect(localWhy(plan, "feat/emptied")).toContain(emptied);
+  expect(onlyKept(plan, rebasing)).toContain("rebase in progress");
+  const result = approve(f.options, plan);
+  expect(result.complete, JSON.stringify(result.outcomes)).toBe(true);
+  for (const path of [merged, detached]) expect(listed(f)).not.toContain(`worktree ${path}\n`);
+  for (const path of [unmerged, emptied, rebasing]) expect(listed(f)).toContain(`worktree ${path}\n`);
+  expect(existsSync(emptied)).toBe(true);
+  expect(locals(f.work)).toEqual(["feat/emptied", "main"]);
+}, 120000);
+
+test("a worktree entry whose directory is gone is kept while its admin directory holds submodule commits or staged changes", () => {
+  const f = repo(), lib = join(f.dir, "lib"), admin = join(f.work, ".git", "worktrees");
+  git(f.dir, "init", "-q", lib); commit(lib, "lib");
+  const sub = f.merged("sub", { setup: path => { git(path, "-c", "protocol.file.allow=always", "submodule", "add", "-q", lib, "lib"); } });
+  const own = commit(join(sub, "lib"), "submodule work");
+  const staged = f.merged("staged"), stagedDetached = detach(f, "staged-detached", 0);
+  for (const path of [staged, stagedDetached]) { put(path, { "staged.txt": "staged\n" }); git(path, "add", "staged.txt"); }
+  for (const path of [sub, staged, stagedDetached]) rmSync(path, { recursive: true, force: true });
+  const plan = f.plan();
+  expect(removals(plan)).toEqual([]);
+  expect(onlyKept(plan, sub)).toContain("modules/");
+  for (const path of [staged, stagedDetached]) expect(onlyKept(plan, path)).toContain("staged changes");
+  for (const name of ["feat/sub", "feat/staged"]) expect(summary(plan.operations)).not.toContain(`delete-local:${name}`);
+  approve(f.options, plan);
+  git(f.work, `--git-dir=${join(admin, "sub", "modules", "lib")}`, "cat-file", "-e", `${own}^{commit}`);
+  for (const name of ["staged", "staged-detached"]) expect(existsSync(join(admin, name, "index"))).toBe(true);
+  for (const path of [sub, staged, stagedDetached]) expect(listed(f)).toContain(`worktree ${path}\n`);
+  expect(locals(f.work)).toEqual(["feat/staged", "feat/sub", "main"]);
+}, 120000);
+
+test("a week-old branch with no commits of its own, paused in a rebase in a worktree moved by hand, keeps the entry and the branch", () => {
+  const f = repo(), path = join(f.dir, "paused"), moved = join(f.dir, "moved-by-hand");
+  aged(8, f.work, "worktree", "add", "-q", "-b", "feat/paused", path, "main");
+  pause(path);
+  expect(existsSync(join(f.work, ".git", "worktrees", "paused", "rebase-merge"))).toBe(true);
+  renameSync(path, moved);
+  const plan = f.plan();
+  expect(onlyKept(plan, path)).toContain("rebase in progress");
+  expect(summary(plan.operations)).not.toContain("delete-local:feat/paused");
+  expect(localWhy(plan, "feat/paused")).toContain("rebase in progress");
+  approve(f.options, plan);
+  expect(locals(f.work)).toContain("feat/paused");
+  expect(listed(f)).toContain(`worktree ${path}\n`);
+}, 120000);
