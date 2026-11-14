@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing on feat/shared-issue-labels; drift review R-4 applied, waiting for a clean current review before T1."
+status: draft
+status_description: "Back to draft on feat/shared-issue-labels: T12 found the skill bodies guarded by a test outside covers; revising covers and Design."
 issue: https://github.com/michielvha/vh-adlc/issues/83
 branch: feat/shared-issue-labels
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
