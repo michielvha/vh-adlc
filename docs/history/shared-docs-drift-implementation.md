@@ -757,3 +757,21 @@ WHERE: tests/vh-adlc/docs-drift/native-observation.test.ts, first case "one nati
 EVIDENCE: The deduplication case bounds total native calls loosely (calls < 30) and does not pin the exact replay count. A regression that drops deduplication for one method, or replays an entry twice, could still pass. The budget beyond retained bytes case shows the exact style is practical: it asserts toHaveLength(3) for repos/fixture/docs/pulls/2.
 PROPOSAL: Assert the exact number of calls per endpoint for the first case: one initial read and one replay for each distinct cached key, plus the two context reads at recheck.
 ```
+
+## Component diagnostic 125
+
+Exact local target `c413bb12fe75e713c340eb29d17ec14ea5782839`. Actual Copilot Opus 5.5 with procedural isolation qualifies all 90 required reads with unchanged packet hashes, no outside reads and no private files sent. The source/test review finds no defect and returns one evidence-attribution nit. Original return follows before the supplemental hash record. Full feature acceptance remains open.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: context.md, the combined attribution paragraph ("Every production-helper hash is identical across the two checkpoints. The current source/tests match the latter exactly. ... 14 distinct focused cases/362 assertions"); evidence/production-hash-equality.json; evidence/core-summary.json; evidence/test-only-summary.json.
+EVIDENCE: production-hash-equality.json has only an identical_production_files map, comparing core, test-only and current (c413bb1). That map has no entry under tests/vh-adlc. So the supplied evidence never shows that tests/vh-adlc/docs-drift/closure-api-budget.test.ts and closure-controller.test.ts had the same bytes at the core checkpoint, the test-only checkpoint and c413bb1. Both summaries report the same target, b2fe413, with the same three modified paths. The test-only checkpoint ran only the observation stage (11 cases, 332 assertions). The quota stage (2 cases, 18 assertions, 462 and 541 REST calls) and the changed-evidence stage (1 case, 12 assertions) ran only at the core checkpoint. The 362 total is 332 + 18 + 12. That sum is correct only if the quota and controller test bytes did not change between the checkpoints, and nothing supplied records that. delta.patch shows changes against the earlier base, not between the checkpoints. The source and test review itself found no defect. Current transport.ts uses an explicit 18-member frozen Reader. The five cached methods expire through active, and the thirteen others throw NativeObservationUnavailable before any I/O. NativeObservationUnavailable is a plain Error, so closure-worker leaves scope_changed false and currentState and publish return retryable pending. NativeObservationChanged still flows to PublicationScopeChanged and invalidation. The 18-call endpoint arithmetic is correct. The resume quota case shares one counter with no reset. The first-red log reproduces the pulls and expired-commit bypasses.
+PROPOSAL: Add sha256 values for the three modified test files at each checkpoint and at c413bb1 to production-hash-equality.json or a sibling record. Alternatively, limit the combined 14 cases/362 assertions claim to the files proved equal.
+
+Every required chunk was read in full with view. I did not run any tests myself. The counts above come from the supplied evidence logs and summaries.
+```
+
+The attribution nit is addressed by `component125-test-attribution.json`, SHA256 `f69671ad9bf0855598c0388dbac395b25e7ae497d9f5bd9d2b4bb832187cfa22`. Its three test-file records bind core, test-only and committed bytes. The quota and closure-controller files match at all three points. The observation file changes only for the additive negative lifecycle assertion and matches the test-only run at the reviewed commit. The unique counts are 11 + 2 + 1 cases and 332 + 18 + 12 assertions. The original review packet stays immutable.
