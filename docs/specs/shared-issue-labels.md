@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "R-9 follow-ups T23 to T25 done; waits for a fresh implementation review."
+status: complete
+status_description: "Complete at R-11: every criterion met on feat/shared-issue-labels; labels applied to vh-adlc and Stackweaver. Waits for the owner's ship request."
 issue: https://github.com/michielvha/vh-adlc/issues/83
 branch: feat/shared-issue-labels
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
