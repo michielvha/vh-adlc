@@ -380,7 +380,9 @@ test("a worktree with a directory the user cannot read, enter or write is kept, 
     for (const path of trees) expect(removal(plan, path)).toBeUndefined();
     expect(why(plan, sealed)).toContain("cannot read, enter or write scratch");
     for (const path of [readonly, noenter, noread]) expect(why(plan, path)).toContain("cannot read, enter or write node_modules/pkg");
-    expect(why(plan, hidden)).toContain("cannot read ignored path node_modules/");
+    expect(why(plan, noenter)).toContain("cannot read ignored path node_modules/");
+    // Git cannot open a mode 000 ignored directory, so it is named by the walk rather than listed as ignored.
+    expect(why(plan, hidden)).toContain("cannot read, enter or write node_modules");
     approve(f.options, twin);
   } finally {
     for (const [dir] of modes) chmodSync(dir, 0o755);
@@ -461,4 +463,17 @@ test("a linked worktree on the default branch or an unborn branch has a worktree
   expect(why(plan, onMain)).toContain("the default branch main is checked out");
   expect(why(plan, orphan)).toContain("unborn branch");
   expect(plan.operations.filter(o => o.kind === "remove-worktree")).toEqual([]);
+}, 120000);
+
+test("apply runs the item 1 checks again just before it removes a worktree", () => {
+  const f = repo();
+  const late = f.merged("late");
+  const plan = f.plan();
+  expect(removal(plan, late)?.branch).toBe("feat/late");
+  // The file lands after apply's fresh observation, while the remote branch is deleted.
+  const racing: Run = argv => { if (argv.includes("push") && argv.includes("--porcelain")) put(late, { "late.md": "late\n" }); return f.run(argv); };
+  const result = approve({ ...f.options, run: racing }, plan);
+  expect(result.outcomes.find(o => o.operation.kind === "remove-worktree")?.status).toBe("changed");
+  expect(readFileSync(join(late, "late.md"), "utf8")).toBe("late\n");
+  expect(locals(f.work)).toContain("feat/late");
 }, 120000);
