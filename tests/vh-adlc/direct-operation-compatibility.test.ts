@@ -8,9 +8,12 @@ const baseline = "b313327b134bc5ecfa7167856d4b567f8701ba06";
 // docs/specs/spec-review-convergence.md, which changes author mode and review step 4 (last at R-20). Keep that
 // intentional text as the spec baseline; other operation bodies retain theirs.
 const specSummaryBaseline = "8a07bb287b2b07b990630dd384cadeacec0949c2";
+// The owner approved the rule that an agent-behavior proof needs a committed script that reruns it
+// (docs/specs/reproducible-agent-proofs.md, parked in favour of this short rule). Keep it as the implement baseline.
+const implementBaseline = "8d5a639bf3626a95901a125c0aeeff3e24b0f335";
 test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resume"])("direct %s keeps its approved operation body", (name) => {
   const path = `plugins/vh-adlc/skills/vh-adlc-${name}/SKILL.md`;
-  const revision = name === "spec" ? specSummaryBaseline : baseline;
+  const revision = name === "spec" ? specSummaryBaseline : name === "implement" ? implementBaseline : baseline;
   const old = Bun.spawnSync(["git", "show", `${revision}:${path}`], { cwd: root, stdout: "pipe", stderr: "pipe" });
   expect(old.exitCode).toBe(0);
   const body = (text: string) => text.slice(text.indexOf("The plugin directory is two levels"));
