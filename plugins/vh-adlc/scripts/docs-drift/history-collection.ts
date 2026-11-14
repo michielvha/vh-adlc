@@ -2,6 +2,7 @@ import { realpathSync } from "node:fs";
 import type { WorkflowRunInput } from "../github-read";
 import { ArtifactChanged } from "./evidence-input";
 import { createAdoptedProducerVerifier } from "./history-producer";
+import { readLocalInvocationRegistry, type LocalHistoryContext } from "./local-history";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { canonicalDigest, freezeJSON } from "./protocol";
 import { PublicationScopeChanged } from "./publish";
@@ -26,6 +27,7 @@ type Result = {
 };
 const originalSnapshots = new WeakMap<object, HistorySnapshot>();
 const hostedEnvelopes = new WeakMap<object, (bytes: Uint8Array) => Buffer>();
+const localContexts = new WeakMap<object, LocalHistoryContext>();
 function readNativeRun(repository: ReturnType<typeof readNativeContext>["repository"], id: number, attempt?: number): WorkflowRunInput {
   try { return repository.run(id, attempt); }
   catch (error) {
@@ -53,6 +55,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
     complete: false, scope_changed: false, mode: null, captured_at, context: null, hosted_run_attempt: null, worker_input_sha256: null, current_default: null,
     history: [], receipts: [], diagnostics: [], details_omitted: false };
   let snapshot: HistorySnapshot | null = null, limit = OUTPUT_LIMIT, envelope: ((bytes: Uint8Array) => Buffer) | null = null;
+  let localContext: LocalHistoryContext | null = null;
   try {
     const { settings } = loadCommittedSettings(repo, options.source);
     limit = Math.min(limit, settings.reports.max_entry_bytes);
@@ -93,8 +96,18 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
       snapshot = collected; result.receipts = collected.receipts;
       if (!collected.complete) { result.diagnostics.push(...collected.diagnostics); throw Error("Required native report history collection incomplete"); }
     } else if (result.mode === "local-attestation") {
-      if (!options.owned_local_invocations) throw Error("Original local invocation registry required for adopted report history");
-      snapshot = collectLocalHistory({ repo, settings, context, invocations: options.owned_local_invocations });
+      if (!options.cache_directory || !facts.runtime?.component.component_sha256) throw Error("Original retained component required for local history");
+      localContext = { repo, cache_directory: options.cache_directory, settings, identity, store, current_default: currentDefault,
+        source: options.source, component_sha256: facts.runtime.component.component_sha256, run_id: options.run,
+        scope_sha256: context.scope_sha256, started_at: captured_at, recheck() {
+          const observed = native();
+          if (observed.default_commit !== currentDefault || canonicalDigest(observed.identity) !== canonicalDigest(identity))
+            throw new PublicationScopeChanged("Native local history source or actor changed");
+        } };
+      const recorded = options.owned_local_invocations ? { invocations: options.owned_local_invocations, diagnostics: [] }
+        : readLocalInvocationRegistry(localContext);
+      snapshot = collectLocalHistory({ repo, settings, context, invocations: recorded.invocations });
+      snapshot.diagnostics.unshift(...recorded.diagnostics);
     } else snapshot = { captured_at, records: [], diagnostics: ["Report history is disabled by the adopted interactive policy; no earlier attention can be carried"] };
     const final = native();
     if (final.default_commit !== currentDefault || canonicalDigest(final.identity) !== canonicalDigest(identity)
@@ -136,6 +149,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
   const completed = freezeJSON(result);
   if (completed.complete && snapshot) originalSnapshots.set(completed, copySnapshot(snapshot));
   if (completed.complete && envelope) hostedEnvelopes.set(completed, envelope);
+  if (completed.complete && localContext) localContexts.set(completed, localContext);
   return completed;
 }
 
@@ -151,4 +165,12 @@ export function createCollectedActionsEnvelope(result: Result, bytes: Uint8Array
   const envelope = hostedEnvelopes.get(result);
   if (!result.complete || !envelope) throw Error("Original hosted history collection required");
   return envelope(bytes);
+}
+
+/** Keep credentials inside the original native recheck closure. Serialized history cannot reproduce it. */
+export function readCollectedLocalHistoryContext(result: Result): LocalHistoryContext {
+  const context = localContexts.get(result);
+  if (!result.complete || !context) throw Error("Original local history collection required");
+  return Object.freeze({ ...context, settings: freezeJSON(structuredClone(context.settings)),
+    identity: freezeJSON({ ...context.identity }), store: freezeJSON({ ...context.store }) });
 }

@@ -4,7 +4,7 @@ import { collectAuditPublicationReceipts, readCollectedAuditPublicationReceipts 
 import { auditProposalReportInputs, deliveredAuditEditPaths } from "./audit-proposal-report";
 import { invalidateCurrentProposalVerification, recheckCurrentProposalVerification, verifyCurrentProposals, type CurrentProposalVerification } from "./current-proposal-verification";
 import { collectAssessmentReview } from "./assessment-review";
-import { collectNativeReportHistory, createCollectedActionsEnvelope, readCollectedReportHistory } from "./history-collection";
+import { collectNativeReportHistory, createCollectedActionsEnvelope, readCollectedLocalHistoryContext, readCollectedReportHistory } from "./history-collection";
 import { workerInputsDigest } from "./manifests";
 import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
 import { parseDecisionPacket, projectAttentionProposals } from "./publication-decisions";
@@ -287,4 +287,11 @@ export function createOriginalAuditReportEnvelope(result: Result): Buffer {
   const report = readOriginalAuditReport(result), history = reportHistories.get(result);
   if (!history) throw Error("Original audit report history required");
   return createCollectedActionsEnvelope(history, canonicalJSON(report));
+}
+
+export function readOriginalAuditLocalContext(result: Result) {
+  readOriginalAuditReport(result);
+  const history = reportHistories.get(result);
+  if (!history) throw Error("Original audit report history required");
+  return readCollectedLocalHistoryContext(history);
 }

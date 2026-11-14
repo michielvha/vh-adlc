@@ -2,6 +2,7 @@
 import { auditSessionOutput, runAuditSession } from "./audit-session";
 import { persistAuditOutput, type AuditOutputArtifacts } from "./report-output";
 import { persistHostedAuditOutput } from "./history-output";
+import { persistLocalAuditOutput } from "./local-history-output";
 import { collectAuditProposalInputs, auditProposalInputsOutput } from "./audit-proposal-inputs";
 import { collectNativeReportHistory, historyCollectionOutput } from "./history-collection";
 import { assessmentReviewOutput, collectAssessmentReviewTarget, collectAssessmentReview } from "./assessment-review";
@@ -636,7 +637,9 @@ export async function main(argv: string[]): Promise<number> {
         const attempt = process.env.GITHUB_RUN_ATTEMPT;
         const session = await runAuditSession({ ...input, environment: process.env,
           hosted_run_attempt: entry === "hosted" && attempt !== undefined && /^[1-9][0-9]*$/u.test(attempt) ? Number(attempt) : undefined });
-        const saved = (entry === "hosted" ? persistHostedAuditOutput : persistAuditOutput)({ repo, source: options.source, artifact_root: artifacts.root, session });
+        const persist = entry === "hosted" ? persistHostedAuditOutput
+          : settings.reports.interactive === "local-attestation" ? persistLocalAuditOutput : persistAuditOutput;
+        const saved = persist({ repo, source: options.source, artifact_root: artifacts.root, session });
         report = auditSessionOutput(session, Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes), saved);
       } else if (options.command === "collect-audit-proposal-inputs") {
         report = auditProposalInputsOutput(await collectAuditProposalInputs(input));

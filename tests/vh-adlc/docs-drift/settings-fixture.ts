@@ -31,7 +31,7 @@ export function settingsFixture() {
     reports: {
       hosted: "actions", interactive: "none", workflow_path: ".github/workflows/docs-drift.yml", workflow_id: null,
       artifact_name_template: "docs-drift-{run_id}-{run_attempt}", max_age_seconds: 604800, max_runs: 30,
-      max_archive_bytes: 1048576, max_entry_bytes: 524288, local_history_roots: [],
+      max_archive_bytes: 1048576, max_entry_bytes: 524288, local_history_roots: [] as string[],
       schema_version: 1, attention_version: 1, history_reader_argv: ["bun", "report-history.ts"],
     },
     runtime_loader: {

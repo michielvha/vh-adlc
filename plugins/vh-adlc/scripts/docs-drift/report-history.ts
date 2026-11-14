@@ -3,7 +3,7 @@ import { constants, closeSync, mkdirSync, writeFileSync, fstatSync, lstatSync, o
 import { join, relative, isAbsolute } from "node:path";
 import { GitHubReadError, type ArtifactInput, type JobInput, type PullRequestInput, type RepositoryReader, type WorkflowRunInput } from "../github-read";
 import { ArchiveSetupError, readReportArchive } from "./archive";
-import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, protocolPath, sha256 } from "./protocol";
+import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { reportTime } from "./report";
 import type { AttentionProjection, HistorySnapshot } from "./report";
 import type { Settings } from "./settings";
@@ -24,6 +24,21 @@ export type OwnedInvocation = {
   id: string; source_commit: string; component_sha256: string; request_sha256: string; scope_sha256: string;
   report_sha256: string; completed_at: string; invocation_sha256: string;
 };
+
+/** An owner attestation has a closed shape and binds all recorded invocation fields. */
+export function parseOwnedInvocation(value: unknown): OwnedInvocation {
+  const row = object(value), fields = ["origin", "context", "repository", "id", "source_commit", "component_sha256", "request_sha256",
+    "scope_sha256", "report_sha256", "completed_at", "invocation_sha256"];
+  if (Object.keys(row).length !== fields.length || fields.some(field => !Object.hasOwn(row, field))
+    || row.origin !== "local-attestation" || row.context !== "production") invalid("local invocation fields");
+  text(row.repository); text(row.id);
+  if (typeof row.source_commit !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(row.source_commit)) invalid("local source commit");
+  for (const field of ["component_sha256", "request_sha256", "scope_sha256", "report_sha256", "invocation_sha256"]) hash(row[field]);
+  reportTime(text(row.completed_at));
+  const { invocation_sha256, ...original } = row;
+  if (canonicalDigest(original) !== invocation_sha256) invalid("local invocation digest");
+  return freezeJSON({ ...row }) as OwnedInvocation;
+}
 
 export class HistoryEligibilityError extends Error {
   constructor(reason: string) { super(`ineligible docs-drift history ${reason}`); }
@@ -114,6 +129,17 @@ export function createActionsEnvelope(bytes: Uint8Array, input: { settings: Sett
     branch: run.head_branch, event: run.event, workflow_id: run.workflow_id, workflow_path: settings.reports.workflow_path,
     artifact_name: artifactName(settings, run), report_schema: report.schema, attention_version: 1,
     attention_sha256: canonicalDigest(report.attention), report_sha256: sha256(bytes), producer });
+}
+
+/** Create local owner-attestation bytes. The controller separately retains the original invocation. */
+export function createLocalEnvelope(bytes: Uint8Array, input: OwnedInvocation): Buffer {
+  const report = reportRecord(bytes), owned = parseOwnedInvocation(input);
+  if (report.repository !== owned.repository || report.run_id !== owned.id || report.source_commit !== owned.source_commit
+    || report.scope_sha256 !== owned.scope_sha256 || report.completed_at !== owned.completed_at || sha256(bytes) !== owned.report_sha256)
+    invalid("local report binding");
+  const { invocation_sha256, ...invocation } = owned;
+  return canonicalJSON({ schema: "docs-drift-provenance/v1", origin: "local-attestation", repository: owned.repository,
+    scope_sha256: owned.scope_sha256, context: "production", report_sha256: sha256(bytes), invocation, invocation_sha256 });
 }
 
 function nativeTerminal(run: WorkflowRunInput, jobs: HistoryJob[], producer: VerifiedProducer, outcome: unknown): void {

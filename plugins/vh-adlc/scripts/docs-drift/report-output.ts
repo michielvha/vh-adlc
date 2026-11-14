@@ -12,8 +12,9 @@ import { artifactDirectoryScope, captureRepositoryState, matchesRepositoryState 
 type Reference = { path: string; sha256: string };
 type Session = Awaited<ReturnType<typeof runAuditSession>>;
 export type AuditOutputArtifacts = { schema_version: 1; kind: "docs-drift-report-artifacts"; authority: "none"; source_commit: string;
-  complete: boolean; scope_changed: boolean; content: "report" | "diagnostic"; history_provenance: "absent" | "pending";
-  directory: string | null; files: { report_json: Reference | null; markdown: Reference | null; provenance_json?: Reference | null }; diagnostics: string[] };
+  complete: boolean; scope_changed: boolean; content: "report" | "diagnostic"; history_provenance: "absent" | "pending" | "local-attestation";
+  directory: string | null; files: { report_json: Reference | null; markdown: Reference | null; provenance_json?: Reference | null };
+  local_invocation?: Reference; diagnostics: string[] };
 
 /** Save selected local data only. Native/history provenance and every publication grant are separate. */
 export function persistAuditOutput(options: { repo: string; source: string; artifact_root: string; session: Session }) {

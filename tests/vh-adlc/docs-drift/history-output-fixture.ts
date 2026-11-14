@@ -1,5 +1,5 @@
 /** Owned Git, observed-shaped adoption and GET-only API fixtures. No hosted/model acceptance. */
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bindingFixture } from "./binding-fixture";
 import { commit, portableRecord, write } from "./adoption-fixture";
@@ -32,12 +32,18 @@ console.log(JSON.stringify({ type: "session.start", data: { sessionId: arg("--se
 console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-opus-5.5", content: "MODEL: claude-opus-5.5\\n" + records } }));
 `;
 
-export async function historyOutputFixture(roots: string[]) {
+export async function historyOutputFixture(roots: string[], options: { localHistory?: boolean; scannerCase?: "none" | "finding" } = {}) {
   const f = await bindingFixture(roots, false, { fullComponent: true,
+    scannerCase: options.scannerCase,
     role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source,
       argv: ["--no-auto-update"], client_program: client },
     prepareSource: fixture => {
       const settings = fixture.configured;
+      if (options.localHistory) {
+        settings.reports.interactive = "local-attestation";
+        settings.reports.local_history_roots = [".vh-adlc/docs-drift-history"];
+        mkdirSync(join(fixture.repo, ".vh-adlc/docs-drift-history"), { mode: 0o700 });
+      }
       settings.publication.adoption_record = ".vh-adlc/docs-drift-adoptions/history-output.yaml";
       write(fixture.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings));
       write(fixture.repo, settings.execution.scheduled_workflow, canonicalJSON({ on: { schedule: [{ cron: "0 3 * * *" }] },
@@ -81,13 +87,13 @@ if (historyValue !== undefined) { console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JS
   writeFileSync(executable, original.replace("  const sha = ", extra + "  const sha = "));
   const decisionBytes = canonicalJSON({ ...f.decisions, decisions: [] });
   writeFileSync(join(f.artifacts, "report-decisions.json"), decisionBytes, { mode: 0o600 });
-  const options = { ...f.options, run: "101", entry: "hosted" as const, hosted_run_attempt: 1,
+  const sessionOptions = { ...f.options, run: "101", entry: options.localHistory ? "copilot" as const : "hosted" as const, hosted_run_attempt: 1,
     decisions: { path: "report-decisions.json", sha256: sha256(decisionBytes) },
     environment: { PATH: f.native.environment.PATH, COPILOT_GITHUB_TOKEN: "synthetic-selected-provider" }, role_timeout_ms: 10000 };
-  return { ...f, options, runPath, run };
+  return { ...f, options: sessionOptions, runPath, run };
 }
 
-export function runHistoryOutput(f: Awaited<ReturnType<typeof historyOutputFixture>>, body: string, options: { session?: boolean } = {}) {
+export function runHistoryOutput(f: Awaited<ReturnType<typeof historyOutputFixture>>, body: string, options: { session?: boolean; timeoutMs?: number } = {}) {
   const bridge = join(f.artifacts, "history-output-bridge.ts"), output = join(f.artifacts, "history-output-result.json");
   writeFileSync(bridge, `import { readFileSync, writeFileSync } from "node:fs";
 const plugin = ${JSON.stringify(f.retained.directory)};
@@ -98,7 +104,7 @@ if (!session.complete) throw Error(JSON.stringify(session));`}
 ${body}
 writeFileSync(${JSON.stringify(output)}, JSON.stringify(result), { mode: 0o600 });
 `, { mode: 0o600 });
-  const child = Bun.spawnSync([process.execPath, bridge], { timeout: 480000,
+  const child = Bun.spawnSync([process.execPath, bridge], { timeout: options.timeoutMs ?? 480000,
     env: { ...process.env, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", PATH: f.native.environment.PATH,
       GH_TOKEN: "synthetic-read-token", COPILOT_GITHUB_TOKEN: "synthetic-selected-provider", GITHUB_RUN_ID: "101", GITHUB_RUN_ATTEMPT: "1" } });
   writeFileSync(join(f.artifacts, "history-output-process.stdout"), child.stdout, { mode: 0o600 });
