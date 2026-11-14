@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted by the owner at R-6; R-6's three should-fix gaps are listed for implementation. Next: tasks, then the companion vhco-pro/docs change."
+status: parked
+status_description: "Parked by the owner on 2026-11-14: build it only if agent-behavior proofs keep failing review. A two-sentence rule in the review protocol and the implement skill covers the common case."
 issue: null
 goal: "A criterion whose proof depends on what an agent session does can be met in an independent implementation review, because the reviewer can repeat the proof itself."
 covers:
@@ -33,6 +33,15 @@ to repeat them, so such criteria can reach `met` in an independent review.
 ## Context
 
 ### Owner summary
+
+**Parked.** On 2026-11-14 the owner parked this feature after acceptance. The problem it solves came up
+once, and the full design adds review time and process to every feature that has an agent-behavior
+proof. Instead, two sentences landed in vh-adlc 0.21.1: a review dispatch never tells the reviewer to skip
+a check (`plugins/vh-adlc/references/review-protocol.md`), and the implement skill proves an
+agent-behavior criterion with a committed script that reruns the session and keeps its transcript, never
+with a subagent's own report (`plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md`). Build the full design
+only if agent-behavior proofs keep coming back `not verified` despite that rule. The rest of this
+document is the accepted design, kept for that case.
 
 Some criteria can only be proved by watching an agent work: a reviewer rating a seeded finding, an author
 applying a review pass. Today an implementer can run those trials as dispatched subagents and tick the
