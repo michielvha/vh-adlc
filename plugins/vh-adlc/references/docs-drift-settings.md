@@ -90,7 +90,10 @@ pair, with the human-readable report available separately as intended.
 
 Hosted eligible history comes from bounded native run/job/artifact observations
 for the configured repository, workflow, attempt and selected source. Require
-terminal success and complete provenance. Interactive policy selects Actions,
+complete verified provenance and recorded completed collection. A failed run
+whose verified envelope records `new-attention` is eligible. Incomplete,
+technical-failure, cancelled or missing-provenance runs cannot establish a
+match. Interactive policy selects Actions,
 explicit local attestation or none. `local-attestation` requires declared local
 history roots. History is evidence used to identify already-carried attention.
 Unchanged items remain visible in the new report.

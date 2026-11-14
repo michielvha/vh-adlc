@@ -56,6 +56,12 @@ is observed published. Local private artifact links cannot supply that permalink
 
 Run `check-publication` with the complete original source/candidate/runtime/
 selection/verification/role-capture references and the exact authority packet.
+For adopted-procedure authority, first confirm that the committed current
+procedure actually permits each selected effect and its exact destination/scope.
+The helper binds procedure bytes and effect digests and reports owner attestation.
+It does not interpret prose permissions. An unchanged nonempty procedure alone
+cannot supply that semantic authority. Leave missing or ambiguous authority
+pending for the owner.
 After its checks and actual publication authority, use `publish` through the
 same production CLI/native transport. Preserve its returned journal location.
 All hosted and interactive delivery uses this common publisher. An approved
@@ -63,8 +69,10 @@ refresh uses its exact-owned branch-history checks. Follow every effect's
 separate scope from `references/authority.md`, including lease and receipt refs.
 The staged/current-default adoption gate still applies to issues and PRs.
 
-For post-merge resolution, use the closure worker-input, review-target and
-review-reading entries against the freshly collected closure basis. Bind the
+For post-merge resolution, run `collect-closure`, `collect-closure-target`,
+`collect-closure-worker-inputs`, `collect-closure-review-target` and
+`read-closure-review` in the order and with the distinct selection packets in
+`references/docs-drift.md`. Bind the
 actual merged head, current default/body, original selected proposals and exact
 explanation/close payload. `check-closure-publication` and `publish-closure`
 use the same native publisher and journal rules. See `references/docs-drift.md`

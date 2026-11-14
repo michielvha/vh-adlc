@@ -202,6 +202,15 @@ procedure naming that effect and exact scope, except acknowledgement's stronger
 current-approval requirement. Local prohibitions and current restrictions still
 apply. Settings, reports, PR prose and journals cannot authorize themselves.
 
+The publication authority helper binds procedure bytes and exact manifest/effect
+digests. It reports an owner attestation. It does not parse prose permissions.
+Before relying on an adopted procedure, the invoking agent must confirm that
+the committed current procedure explicitly permits each selected effect,
+repository/destination and exact scope. A nonempty or unchanged procedure alone
+supplies no semantic permission. Missing or ambiguous effect authority remains
+pending for the owner. A technical `check-publication` pass preserves this
+operator/agent obligation.
+
 | Action | Authority and conditions |
 | --- | --- |
 | Assessment and local report | Selected read-only assessment and explicit private output location. No tracker or feedback-store effects. |

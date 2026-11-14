@@ -775,3 +775,39 @@ Every required chunk was read in full with view. I did not run any tests myself.
 ```
 
 The attribution nit is addressed by `component125-test-attribution.json`, SHA256 `f69671ad9bf0855598c0388dbac395b25e7ae497d9f5bd9d2b4bb832187cfa22`. Its three test-file records bind core, test-only and committed bytes. The quota and closure-controller files match at all three points. The observation file changes only for the additive negative lifecycle assertion and matches the test-only run at the reviewed commit. The unique counts are 11 + 2 + 1 cases and 332 + 18 + 12 assertions. The original review packet stays immutable.
+
+## Component diagnostic 126
+
+Exact local target `6bede8acd13d4bc4276f77ca07c93a96a8dc05b4`. Actual Copilot Opus 5.5 qualifies all 106 required reads with unchanged packet hashes, procedural isolation, no outside reads and no private files sent. This source/procedure diagnostic returns three should-fix findings and one nit. The original return is preserved below before corrections. It supplies no installed-model or migration acceptance.
+
+```text
+MODEL: claude-opus-5.5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/references/docs-drift-settings.md, History and retention, first paragraph ("Require terminal success and complete provenance.")
+EVIDENCE: The accepted contract (Prior-report sources, Actions history candidate paragraph) says: "A failed run whose verified envelope records completed collection and `new-attention` is eligible: red first discovery must be carryable on the next run." Only incomplete, technical-failure, cancelled or missing-provenance reports are excluded. docs-drift.md also says unchanged items "can finish green when eligible prior evidence supports them". The settings reference makes terminal success a requirement. An agent or consumer reading that rule would treat every red first-discovery report as ineligible, so the same attention item could never be carried and later runs would stay `new-attention`.
+PROPOSAL: Replace the sentence with the contract rule. A hosted candidate must have complete verified provenance and recorded completed collection. A failed run whose envelope records `new-attention` is eligible. Incomplete, technical-failure, cancelled or missing-provenance runs cannot establish a match.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/references/authority.md, Scoped docs-drift locations and effects ("an adopted consumer procedure naming that effect and exact scope"), compared with scripts/docs-drift/publication-authority.ts readPublicationAuthority
+EVIDENCE: For `origin.kind === "adopted-procedure"`, publication-authority.ts checks only these things: the commit equals manifest source_commit, the path matches, the current-default bytes equal the source-commit bytes and the sha256, and the content is non-empty. It then grants every manifest effect. It never parses the procedure for a declared publication permission, effect list, repository or destination. In contrast, recovery-authority.ts requireProcedurePermission does require a `docs_drift_reconciliation` declaration naming the repository, operation prefix, lease/receipt refs and effects. The publication-authority test cases (matching, dirty-overlay, missing-context, wrong-path, changed-procedure, wrong-source) contain no unrelated-procedure or missing-effect refusal. So any unchanged non-empty project procedure grants push, PR, issue, comment and closure effects. The instruction suggests the helper enforces effect naming, but it does not.
+PROPOSAL: Either add a declared publication-permission check to the adopted-procedure branch, with an unrelated-procedure refusal case like the recovery suite, or state in authority.md and docs-drift-review.md that `check-publication` binds only the procedure bytes. In that case the agent must itself confirm that the adopted procedure names each effect and its exact scope before relying on it.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/references/docs-drift.md, Resolve selected proposals and Post-merge closure; docs-drift-review.md, post-merge paragraph
+EVIDENCE: Resolve gives a template only for `collect-proposals`, which takes only --repo and --source and only inventories PRs. It then says "The full proposal-input collection uses the owned assessment store" without naming a command. The CLI has both `collect-resolution`, which fetches selected complete PR diffs into an owned object store, and `collect-audit-proposal-inputs`, which collects full original diffs for audit. An agent could reasonably pick either one. Post-merge closure refers only to "the native resolution/closure collection commands" and "closure worker-input, review-target and review-reading entries". It never names `collect-closure`, `collect-closure-target`, `collect-closure-worker-inputs`, `collect-closure-review-target` or `read-closure-review`, or the order of their selection packets. procedure.test.ts validates only fenced text templates, so none of these steps has a checked grammar.
+PROPOSAL: Name `collect-resolution` as the resolve diff collector, and name the closure sequence in order: `collect-closure`, `collect-closure-target`, closure worker inputs, closure review target, closure review reading. Add text templates for at least `collect-resolution` and `collect-closure-target` so the existing grammar test covers them.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: plugins/vh-adlc/references/docs-drift.md, Setup and ownership ("plus applicable consumer language/project pages")
+EVIDENCE: settings.ts merges the five pinned DOCS_DRIFT_KNOWLEDGE_PAGES with the committed `knowledge_pages` field, and docs-drift-settings.md describes `knowledge_pages` as the additional pinned pages. The setup step tells the agent to pick "applicable" pages without referring to the committed field. Two agents could therefore load different knowledge sets.
+PROPOSAL: Say to request the five shared pages plus the committed `knowledge_pages` entries from `.vh-adlc/docs-drift.yaml`, and report any missing page at the existing handoff.
+```

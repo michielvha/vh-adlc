@@ -17,10 +17,13 @@ before scanning or writing. Settings presence supplies configuration only.
 ## Setup and ownership
 
 Read local instructions, then acquire the locked binary through Bash using
-`scripts/ensure-vh-adlc.sh` as `references/loop.md` describes. Request and read
+`scripts/ensure-vh-adlc.sh` as `references/loop.md` describes. Read the committed
+consumer settings through the strict reader described in the setup reference.
+Request and read
 `conventions/feature-documents.md`, `conventions/documentation.md`,
 `conventions/documentation-impact.md`, `conventions/delivery.md` and
-`guides/humanize-prose.md`, plus applicable consumer language/project pages.
+`guides/humanize-prose.md`, every committed `knowledge_pages` entry from
+`.vh-adlc/docs-drift.yaml` and any additional pages routed by local instructions.
 Report the resolved pin and prose guide. An unpinned consumer uses the installed
 plugin pin and receives a separate onboarding handoff. Missing knowledge stops
 at the missing-page/pin handoff. Missing `.vh-adlc/docs-drift.yaml` gets the
@@ -139,13 +142,25 @@ status until its committed verification and review are observed.
 Select exact PR scope, then obtain complete repository/PR identity, body,
 head/base/merge-base objects and full local diffs, including file inventories,
 renames and binary identities. `collect-proposals` inventories configured PRs.
-The full proposal-input collection uses the owned assessment store. Optional
+Use `collect-resolution` to fetch the selected complete PR diffs into the owned
+assessment store. Its canonical selection packet has exactly `schema_version: 1`,
+`source_commit` and the nonempty unique PR-number array `proposals`. Hash its
+original artifact bytes for the selection reference. Optional
 REST patch fields cannot replace those diffs. Incomplete selected inputs remain
 a readiness gap until completed or explicitly reselected.
 
 ```text
 bun <plugin>/scripts/docs-drift/cli.ts collect-proposals --repo <repo> --source <source>
 ```
+
+```text
+bun <plugin>/scripts/docs-drift/cli.ts collect-resolution --repo <repo> --source <source> \
+  --artifact-root <artifacts> --selection <selection> --selection-sha256 <sha256>
+```
+
+Audit's `collect-audit-proposal-inputs` uses the audit source/decision/runtime
+bindings to assess relevant open proposals. Resolve's explicitly selected PR
+batch uses `collect-resolution` above.
 
 Freshly scan the owned current base. Give every selected hunk an apply,
 apply-modified, already-fixed, wrong or defer disposition with current evidence.
@@ -164,11 +179,36 @@ the local proposal and publication handoff.
 
 ## Post-merge closure
 
-Start from the selected consolidation PR ID and current request. Use the native
-resolution/closure collection commands to read complete PR/merge inputs, exact
+Start from the selected consolidation PR ID and current request. Use
+`collect-closure` to read complete PR/merge inputs, exact
 head objects and the added resolve record from the full diff. A PR-body locator
 is a hint. Missing, ambiguous or mismatched records get a recovery handoff.
 The published immutable record enables another host to perform fresh review.
+
+The initial canonical closure selection has exactly `schema_version: 1`,
+`source_commit` and the positive PR number `consolidation`.
+
+```text
+bun <plugin>/scripts/docs-drift/cli.ts collect-closure --repo <repo> --source <source> \
+  --artifact-root <artifacts> --selection <selection> --selection-sha256 <sha256>
+```
+
+Next use a canonical target-selection packet containing those three fields
+plus a new `operation_id`, and collect the fresh model target.
+
+```text
+bun <plugin>/scripts/docs-drift/cli.ts collect-closure-target --repo <repo> --source <source> \
+  --artifact-root <artifacts> --selection <selection> --selection-sha256 <sha256>
+```
+
+Keep that target-selection packet and digest for `collect-closure-worker-inputs`
+with the approved cache, entry, launcher and settings arguments. Run the selected
+native worker under its actual execution grant and retain its original capture.
+Then `collect-closure-review-target` adds that worker capture/reference digest
+to the same target-selection/runtime arguments. Run the independent reviewer
+against its exact returned target and retain its original capture.
+`read-closure-review` adds both original role captures and digests. Preserve
+each command's collection diagnostics and returned identities.
 
 Require an observed merge and review every original hunk's disposition,
 delivered feedback and carry-forward. Compare the actual full merged diff and

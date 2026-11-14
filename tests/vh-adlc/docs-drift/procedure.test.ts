@@ -59,6 +59,8 @@ test("the content entry exposes its canonical procedure, setup and review refere
 test("documented command templates use the production CLI grammar", () => {
   const commands = templates();
   expect(commands.length).toBeGreaterThan(0);
+  for (const required of ["scan", "collect-resolution", "collect-closure", "collect-closure-target"])
+    expect(commands.map(template => template.argv[0])).toContain(required);
   for (const template of commands) {
     const parsed = argumentsForCommand(fill(template.argv));
     expect(parsed.command).toBe(template.argv[0]);
