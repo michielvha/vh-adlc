@@ -1,0 +1,28 @@
+MODEL: scripted-reviewer
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design
+EVIDENCE: Design defines no output for an empty name argument, so `./greet.sh ""` may print `Hello, .` and the criteria cannot tell.
+PROPOSAL: Add to Design that `greet.sh ""` prints `Hello, world.`
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design
+EVIDENCE: Design writes `greet.sh <name>` while every criterion writes `./greet.sh`.
+PROPOSAL: Write `./greet.sh <name>` in Design.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Scope
+EVIDENCE: Scope says "one name argument", which reads as at least one.
+PROPOSAL: Say "exactly one name argument" in Scope.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context
+EVIDENCE: Context does not say which script checks the output.
+PROPOSAL: Add the sentence "test.sh checks the output." to Context.

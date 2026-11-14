@@ -28,7 +28,7 @@ additional execution or publication permission.
 | Merge | Separate approval for that exact action, or the explicitly selected audit batch's current/adopted `conditional-merge` permission and all retained gates in [audit.md](audit.md). Either one also covers that PR's `after-merge` branch cleanup in [branches.md](branches.md) |
 | Rebuild/restart an owned audit verification runtime | Current explicit permission or adopted `live-verify` naming that exact owned development target and method, with all local ownership/restriction gates |
 | Tag, release, deploy, restart an unrelated/shared app, end a live session | Separate approval for that exact action; audit grants none of these effects |
-| Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action |
+| Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action; never a commit a Review Log row names, which no approval allows (see Preservation) |
 | Run `vh-adlc clean`, which removes `/tmp` entries and the project's temp root | The user's request for cleanup, or a session blocked on space; passing `--compose` or `--kind` needs the user's request for that flag |
 | Enabling automatic merged-branch deletion | The owner's yes to enabling it for that repository with `auto-delete --enable`, a request that already asks for it, or an approved plan digest that includes it, all from [branches.md](branches.md) |
 | Turning on free repository security settings with the security-settings helper's `apply` | The consumer's committed settings adopt `security_settings: apply` for a repository they name, on github.com. Among maintenance runs, only a full sweep whose request has `authorized_sweep` true may apply; a request flag that selects `check` or a pull-request scope gives `check`. Onboarding applies only as the committed settings decide. A continuation reuses the run's saved helper files and does not run the helper again. Adopting `apply` is the owner's agreement that `guides/onboard-a-repository.md` in vhco-pro/docs asks for. Nothing grants turning a setting off. See [security-settings.md](security-settings.md) |
@@ -77,6 +77,11 @@ check out over or overwrite changes the loop did not make, and stage explicit pa
 already hold someone else's staged work, and a plain `git commit` would take it too, so always name what
 you commit: `git commit -m <message> -- <path>...`. That commits only those paths and leaves the rest
 staged as it was. A conflicting concurrent edit to the same file stops the run with a question.
+
+No operation rebases, amends, squashes or otherwise rewrites a commit that a Review Log row names, or
+any commit before it on that branch, even with the owner's approval: the binary would then report every
+such review as `commit-unreachable` and stale. Bring default-branch work in with `git merge`, as review
+mode does for drift, and never rebase a branch whose commits a Review Log cites.
 
 A claim may also be made from a host worktree at the default-branch tip that is detached or on a branch
 this session created or was handed, through `scripts/loop/cli.ts claim`; it never advances an unrelated

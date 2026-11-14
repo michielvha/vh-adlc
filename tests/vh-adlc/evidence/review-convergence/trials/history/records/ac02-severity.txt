@@ -1,0 +1,42 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design
+EVIDENCE: Design says "count.sh already parses a `--json` flag (count.sh:3)". count.sh:3 is `wc -l < "$1"`, and the file has no option parsing at all. I ran `sh count.sh --json f.txt` at 36a2bf8 and it failed with "count.sh: line 3: --json: No such file or directory", exit 1. If an implementer only adds formatting, as the Design says, AC-01 still fails.
+PROPOSAL: Rewrite the Design to say that count.sh has no flag parsing today, and that the change adds `--json` parsing (state the accepted argument order) as well as the JSON formatting.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-02), Test Plan (AC-02 row)
+EVIDENCE: AC-02 says "The output is formatted nicely." and its proof is "Read the output". Neither one says what output is correct, so the proof passes any implementation, and two implementers could pick different formats.
+PROPOSAL: Replace AC-02 with an observable end state, for example the exact bytes printed (no padding, one trailing newline), and give its proof a command with a stated pass condition. Otherwise drop AC-02 and record why in the Review Log; never delete it silently.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary), Scope, Acceptance Criteria, Test Plan
+EVIDENCE: The Owner summary says "Text stays the default." and Scope says "Teh default output stays text." No criterion or Test Plan row checks the output when `--json` is absent, so an implementation that changes or breaks the plain text output would still pass AC-01 and AC-02.
+PROPOSAL: Add a criterion that `count.sh FILE` with no flag still prints only the line count as plain text, and add a Test Plan row for it with a concrete pass condition.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-01), Test Plan (AC-01 row)
+EVIDENCE: AC-01 says "a file of N lines". count.sh counts with `wc -l` (count.sh:3), which counts newline characters, so a file whose last line has no trailing newline reports N-1. The criterion does not say which count is correct, so two implementers could differ, and the proof's three-line fixture does not say whether it ends with a newline.
+PROPOSAL: Define N as the `wc -l` count (newline characters), or require the last unterminated line to be counted, and state in the Test Plan row whether the fixture ends with a newline.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: Background says "its usage line is at count.sh:9". count.sh has 3 lines, and the usage comment `# usage: count.sh FILE` is at count.sh:2.
+PROPOSAL: Change the citation to count.sh:2.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Scope
+EVIDENCE: Scope reads "Teh default output stays text."
+PROPOSAL: Correct "Teh" to "The".

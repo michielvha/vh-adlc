@@ -293,6 +293,14 @@ model does not satisfy that request.
 Review isolation is procedural: the reviewer has a shell that can still write.
 See the [compatibility details](../reference/compatibility.md).
 
+A spec review rates each finding blocking, should-fix or nit, using the definitions in
+the pinned feature-document convention; a lens your repository declares keeps its own
+severity. A nit never causes a revision on its own: when a pass's blocking or
+should-fix findings change the document, the same commit fixes that pass's nits, and
+the rest are listed in the conversation. The agent applies each pass's findings as one
+revision, after asking you about any judgement finding, so one pass's fixes do not
+seed the next pass's findings.
+
 A reviewer role can also run through an external command, such as the Codex CLI on
 a model from another vendor. A spec review then reads a read-only export of the
 commit; an implementation review runs in a private clone, where it may run checks.
@@ -336,7 +344,8 @@ publication, including when a sweep is selected through generic intake. It grant
 no dependency delivery permission.
 
 Merging, tagging, releasing, deploying, and destructive operations need separate
-approval. See the [authority reference](../../plugins/vh-adlc/references/authority.md)
+approval. No approval allows rewriting a commit that a Review Log row names: the
+agent brings in default-branch work by merge, so every review stays reachable. See the [authority reference](../../plugins/vh-adlc/references/authority.md)
 for the full contracts.
 
 ## Engineering conventions

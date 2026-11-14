@@ -1,0 +1,28 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan (AC-01 row); Acceptance Criteria (AC-01); Design; frontmatter goal; title paragraph
+EVIDENCE: The plainness requirement appears in five places, each worded differently, and none of them says what counts as jargon. The goal and the line under the title say "explains the prerequisites in plainer words". Design says "in plain sentences". AC-01 says "in plain sentences". The Test Plan row says "Compare the old and new paragraph: same commands and versions, no jargon terms". The row judges free text but lists no jargon terms and no must-pass or must-fail examples, which feature-documents.md (Test plan) asks for. The current paragraph at guide.md:3 reads "ensure idempotent provisioning of the toolchain via `make deps` (Go 1.27)". One reviewer could treat "toolchain" as plain and another could reject it, and a rewrite that keeps "idempotent" with different phrasing around it could pass a lenient reader. Two careful reviewers would reach different verdicts on the same output.
+PROPOSAL: Name the jargon terms the new paragraph must not contain (for example "idempotent", "provisioning", "ensure"), say whether "toolchain" is allowed, and give one must-pass and one must-fail example paragraph in the AC-01 row. Use the same definition of "plain" in the goal, Design and AC-01.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-01); Test Plan (AC-01 row); Design
+EVIDENCE: AC-01 and its proof check only that the commands and versions survive and that the wording is plain. Neither checks that the meaning survives. guide.md:3 says the setup is idempotent, which means running `make deps` again is safe, and it says Go 1.27 without saying whether the reader installs Go 1.27 first or whether `make deps` provisions it. The rewrite "Prerequisites: run `make deps` (Go 1.27)." keeps the same command and version in plain words, so it passes AC-01 and the Test Plan row, but it drops the rerun-safety fact. That fails the goal of explaining the prerequisites. A rewrite that turns Go 1.27 into "install Go 1.27 first" could also pass while changing what the reader does.
+PROPOSAL: Extend AC-01 and its proof to require that the new paragraph states the facts the old one carries: that `make deps` installs the toolchain, that running it again is safe, and whether Go 1.27 is a prerequisite or something `make deps` provides. Settle the Go 1.27 reading against the repository, or raise it as an open question if it cannot be settled.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Scope; Acceptance Criteria (AC-01); Test Plan (AC-01 row)
+EVIDENCE: Scope says "In scope: rewording one paragraph. Out of scope: changing any command." No criterion or proof checks that the rest of guide.md (the "# Install" heading at guide.md:1) stays unchanged, or that only the prerequisites paragraph changes. The command half of the scope limit is covered by AC-01's "same commands", but the one-paragraph limit is not.
+PROPOSAL: Add "and nothing else in guide.md changes" to the AC-01 proof, for example by checking the diff of guide.md.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: The Owner summary is one sentence: "Reword the prerequisites paragraph of the install guide." It leaves out the main constraint in Scope and Design (keep every command and version), the validation state (one manual comparison is planned and none has been observed), and the fact that the owner has no open decisions. feature-documents.md (Owner summary in Context) asks the summary to cover scope, defaults, validation state and owner decisions, and to separate planned checks from observed proof. A small feature can have a shorter summary.
+PROPOSAL: Add two or three sentences saying the rewrite keeps `make deps` and Go 1.27 unchanged, that the proof is a planned manual comparison that has not run yet, and that there are no owner decisions pending.
