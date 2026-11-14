@@ -396,6 +396,7 @@ None.
 | 2026-11-13 | R-3 | spec | `cfc2f2d` | unknown | procedural | No findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-13 | R-3 | spec | `cfc2f2d` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-4 | spec | `da736bc` | unknown | procedural | Drift review after #87 and #88: 3 should-fix, no blocking finding; model identity not attested (Codex session header showed gpt-6.1-sol) |
+| 2026-11-14 | R-5 | spec | `d0bb0f7` | unknown | procedural | No findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
 
 ### R-1
 
@@ -507,3 +508,7 @@ SEVERITY: should-fix
 WHERE: Tasks / T16
 EVIDENCE: docs/specs/shared-issue-labels.md:379 requires a minor version bump from the merged #78 version. git show 2c9d3af:plugins/vh-adlc/plugin.json gives 0.17.0, while both plugin manifests at da736bc already contain 0.18.0 following the lock update. Following T16 literally would select the existing version instead of giving this feature a new minor version.
 PROPOSAL: Base T16 on the current merged plugin version. At this review target, both manifests should advance from 0.18.0 to 0.19.0, with candidate installation checking that version.
+
+### R-5
+
+NO FINDINGS
