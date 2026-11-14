@@ -307,6 +307,7 @@ a hash-matched redacted copy counts (Q10); runners declare their inputs (Q11).
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-14 | R-1 | spec | `409d32d` | claude-opus-5-5 | procedural | Blocking: the command review route cannot carry the new dispatch or rerun agent sessions; eleven should-fix findings |
+| 2026-11-14 | R-2 | spec | `0442f4d` | claude-opus-5-5 | procedural | Clean: no blocking finding; ten should-fix findings and two nits |
 
 ### R-1
 
@@ -400,3 +401,89 @@ SEVERITY: should-fix
 WHERE: Scope ("A minor plugin version above the default branch's version"); Design, Delivery ("the new minor version"); AC-08 ("the same version above the default branch's version"); Test Plan, AC-08 row
 EVIDENCE: Scope and Delivery require a minor bump. AC-08 and its row require only a version above the default branch's, so a patch bump from 0.20.0 to 0.20.1 passes the proof although Scope says minor. Both manifests are at 0.20.0 today (plugins/vh-adlc/plugin.json:4, plugins/vh-adlc/.claude-plugin/plugin.json:3).
 PROPOSAL: Say "a minor version above" in AC-08 and make its row check that the minor component increased.
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Command route (first sentence); Design, Review dispatch (first paragraph); AC-09; Test Plan, AC-09 row; Context, Owner summary (third bullet)
+EVIDENCE: On the host route, a session reads the document and passes the commands. On the command route, `reviewPrompt` is code. Today it receives only the seven identity strings and the loop context (plugins/vh-adlc/scripts/loop/cli.ts:49-69), and at cli.ts:149 its `repository` field is the literal text "the current directory, a private clone of the reviewed commit". The design says `reviewPrompt` "carries the same added fields", but it defines no machine-readable form for "the runner command named in each current Test Plan row". Test Plan Proof cells are free prose, such as the AC-04 row here. AGENTS.md lists its commands as prose bullets under "Local commands and constraints" (AGENTS.md:19-25). Nothing says where "where kept transcripts and manifests are" comes from: the Test Plan, the evidence lines or a fixed path. Nothing says which revision the code reads them from either. cli.ts:145-146 reads the review policy at the reviewed commit, "never the working tree's". The AC-09 fixture supplies a Test Plan runner command and an AGENTS.md, but no transcript location, yet the row requires that location in the prompt. One implementer would paste the whole Test Plan table and AGENTS.md section. Another would regex backticked commands out of them. Each would write a different AC-09 test, and both would pass it.
+PROPOSAL: State how the command route gets each field: for example, the Proof cells of the current Test Plan and the AGENTS.md "Local commands" section, read verbatim at the reviewed commit, plus a named source for the transcript location. Make the AC-09 fixture supply that source.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Command route (last two sentences); Context, Owner summary (fourth bullet); Context, Background (Command route paragraph)
+EVIDENCE: The design says that after a command route returns `not verified`, "a host-route review can then meet it. The repository's route choice stands." The protocol and the review skill always dispatch the route `cli.ts route --operation review` returns (plugins/vh-adlc/references/review-protocol.md:5-7). When that route is `command`, cli.ts runs it (cli.ts:146-153). No operation offers a host-route implementation review in that case. `impl_review_clean` needs every criterion `met` or residualised in the latest implementation review (feature-documents.md:349). So in a repository whose `implementation_reviewer` is the sandboxed Codex route the Background describes, every agent-session criterion stays `not verified` or needs a residual. That repository is the case the goal names. One implementer would add a way to send one review to a host route. Another would treat the sentence as a description and build nothing. The Owner summary mentions only the `not verified` outcome, not this fallback.
+PROPOSAL: Either define how a host-route implementation review is dispatched when the configured route is `command` (who asks for it, and that it then counts as the latest review), or remove the fallback sentence and state in the Owner summary that such criteria need a residual on a sandboxed command route.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Glossary (Runner inputs; Transcript manifest); Design, A run counts for its inputs; Design, Implement; Context, Owner summary (second bullet); AC-01; AC-03; Test Plan, AC-01 row and AC-02, AC-03 row
+EVIDENCE: Runner inputs are defined as "the files a runner declares its sessions read, such as the plugin directory and its fixture paths". The runner script itself is not something its sessions read, and neither is the code that judges the pass condition. Here those are run.ts and build.py, which build the fixtures and judge each trial from records and tool logs (AC-04 row). Suppose a later commit loosens run.ts's pass check, or changes build.py so a fixture no longer seeds the defect. Under the design, the earlier run still counts, because "every input still has the recorded id". The manifest records the checkout (Glossary), but no rule makes a change to the runner void the run. This revision added runner inputs in answer to R-1 F-10.
+PROPOSAL: Define runner inputs to include the runner and any file it uses to build fixtures or judge the pass condition, and say so wherever the rule is stated.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Pins and older consumers; Design, The reviewer (last sentence); Design, Spec author mode; AC-02 (last clause); AC-07; Test Plan, AC-07 row
+EVIDENCE: Pins and older consumers puts the Test plan rule, the missing-runner finding and the transcript case of `met` in convention text. It says that the dispatch, command-route, reviewer-run and implement changes "apply on any pin". It does not place two plugin changes this feature makes. First, the spec skill's author mode tells authors to name a runner in the row (Spec author mode, AC-03). Second, the reviewer agent's paragraph checks a proof that needs a person against the manifest's sha256 (The reviewer, AC-02). On a pin without the new convention text, `met` still requires "executed evidence observed in this review" (feature-documents.md:241). The agent text would then tell the reviewer to accept hash-matched transcripts, which the pinned standard does not allow. AC-07 and its row repeat the incomplete list, so the compatibility page would leave both cases unstated.
+PROPOSAL: Say whether the author-mode rule and the reviewer's transcript check apply on an older pin. For the transcript check, the reviewer could apply it only when the resolved convention has the transcript case. Add both to AC-07 and its row.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-05 row and AC-06 row; AC-05; Design, Pins and older consumers; Design, Delivery
+EVIDENCE: The design makes the missing-runner finding convention text that "a repository pinned to an earlier docs revision" does not get. AC-02 does not put it in the reviewer agent. So the AC-05 trial tests the new rule only when its fixture repository pins the published companion docs commit. The AC-05 and AC-06 rows do not say which docs revision the fixtures pin. The existing example runner hard-codes the current pin (tests/vh-adlc/evidence/review-convergence/trials/run.ts:24, build.py:16). On the current pin, an unchanged reviewer can already rate the row blocking under "a proof ... cannot be executed" (feature-documents.md:201-204), or it can miss the row, so the trial neither shows nor isolates the new rule. On the new pin, the trial cannot run until the docs change is published, and the Delivery order does not mention that.
+PROPOSAL: State in the AC-05 and AC-06 rows that the fixtures pin the published docs commit carrying the new Test plan rule, and in Delivery that these trials run after that commit exists.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-04 row; AC-04; Design, Glossary (Agent-session proof)
+EVIDENCE: The glossary defines an agent-session proof as one "whose pass condition depends on what a model does in a session". The AC-04 fixture's proof is "a deterministic committed runner script", so by that definition it is not an agent-session proof. Its runner is one of "the repository's own tests", which today's reviewer may already run (plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:30-31). The new reviewer rules (run once, retry only a run that did not start, the manifest) then have nothing in the fixture to act on. This revision added the deterministic-runner sentence and the glossary. The tool-log check from R-1 F-04 now requires an observed run. It still does not show that the updated agent, not the existing test-running rule, made the reviewer run it.
+PROPOSAL: Have the fixture's Test Plan row present its proof as an agent-session proof under the new rule, naming the runner, its fixtures, a transcript manifest and kept transcripts, with the runner itself kept deterministic. Alternatively, say the trial covers only the rerun-instead-of-summary behaviour.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-01 row; Test Plan, AC-02, AC-03 row; Test Plan, AC-07 row
+EVIDENCE: The static checks leave clauses of composite criteria unchecked, so each row can pass on text that omits them. AC-02 says the agent runs each proof "outside the repository" and checks the "manifest's sha256". The row requires only "once", "not met", "not verified", "did not start" and "manifest". AC-03 requires the implement skill to rerun "after a runner input changes" and never tick "from a run without a kept transcript". The row requires only "runner inputs", "uncommitted", "transcript manifest" and "redacted". AC-07 requires the page to say that the transcript case of `met` depends on the pin and that the command-route, reviewer-run and implement changes apply on any pin. The row checks only "Test plan rule" and "dispatch". AC-01 requires the convention to "define" an agent-session proof. The row's must-pass example, "An agent-session proof names its runner", defines nothing. These rows are new text in this revision, written for R-1 F-12, so they have not passed review.
+PROPOSAL: Add a required phrase, with a must-fail example, for each unchecked clause: "outside the repository" and "sha256" for the agent; a rerun phrase and "kept transcript" for the implement skill; "transcript" with "docs pin", and "implement" and "command route" with "any pin", for the page; and a defining sentence for AC-01.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Command route (second sentence); AC-09; Test Plan, AC-09 row
+EVIDENCE: The design says "`runReviewRoute` gives an implementation review two hours unless `--timeout-ms` sets another limit". `--timeout-ms` is a CLI flag parsed in `main` (cli.ts:152). `runReviewRoute` receives `timeoutMs` and passes it straight to `runOwnedClient` inside the function (plugins/vh-adlc/scripts/loop/review-route.ts:229-230). Nothing it returns exposes that timeout. The AC-09 row "checks the timeout `runReviewRoute` applies" for each kind, with and without `--timeout-ms`. It does not say how a unit test observes this without running a client until it times out. One implementer would set the default in cli.ts, another in review-route.ts behind a new helper, and they would write different tests.
+PROPOSAL: Name the layer that picks the default and the observation point, for example an exported function of kind and the given value that both `main` and the test call.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-01 (last clause); Test Plan, AC-01 row; AC-08; Design, Delivery; Scope (first bullet)
+EVIDENCE: AC-01 requires the published convention's rules block to be "byte-identical to the previous pin's". The row resolves the convention "through `vh-adlc knowledge`", so it reads the page at the repository's new pin. AC-08 and Delivery allow that pin to be "the published docs commit or a later one". If the pin moves to a later docs commit that carries another feature's rules-block change, AC-01 fails although this feature's docs change kept the block unchanged. The document does not say whether the comparison is between the companion commit and its parent, or between the new pin and 1ccf8f3.
+PROPOSAL: Compare the rules block at the companion docs commit with its parent, or with 1ccf8f3, and name that commit in AC-01 and its row.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The reviewer (first sentence); Design, Keeping transcripts; Background, Copied logins; AC-02
+EVIDENCE: A runner of this kind copies the owner's Claude Code login into each profile when no token file exists (tests/vh-adlc/scenarios/host.ts:21-29). Its raw transcripts list the account's connectors (Background, Copied logins). The reviewer now runs such runners, "writing to a temporary directory outside the repository". The design does not say whether the reviewer or the runner removes that directory, the copied credentials or the raw transcripts afterwards. It also does not cover a run the route kills at its timeout. A PID-namespace kill skips the runner's own `finally { p.dispose() }` (tests/vh-adlc/evidence/review-convergence/trials/run.ts:226-228), so the copied login stays in the temp tree. The partial-failure path for a review run is undefined.
+PROPOSAL: Say that a runner keeps copied logins out of its output directory, and that the reviewer removes its own run directory after reading the result. State what is left behind when a run is killed.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (What happened; A precedent for transcripts; Command route paragraph); Context, Owner summary (cost paragraph)
+EVIDENCE: The host-cleanup precedent is R-23, not R-22. docs/specs/host-cleanup.md:1778 lies between `### R-23` (line 1746) and `### R-24` (line 1814), and R-22 there is a spec review (line 484). "R-22 relied on ad hoc trials for two clauses" overstates the source: R-22 ran one ad hoc trial, for the revisit clause (docs/specs/spec-review-convergence.md:1811-1812). "R-22 took about 30 minutes" and "Stackweaver routes implementation reviews to `codex exec -s workspace-write`, whose sandbox cannot start headless Claude Code sessions" have no citation. The second is supported by /home/m/code/stackweaver/.vh-adlc/loop.yaml (implementation_reviewer argv) for the route, but nothing cites the sandbox claim.
+PROPOSAL: Correct the review number and the clause count, and cite or remove the duration and the sandbox claim.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Keeping transcripts
+EVIDENCE: Redaction replaces "the home directory" in committed transcripts, yet the committed manifest names the raw files "at a path the manifest names", which on the running machine is usually under that home directory. The working example's manifest records hashes but no raw path (tests/vh-adlc/evidence/review-convergence/trials/runs/manifest.json), and collect.py redacts the home directory as `~` (collect.py:21-25).
+PROPOSAL: Say the manifest's raw path is redacted the same way, with the home directory as `~`.
