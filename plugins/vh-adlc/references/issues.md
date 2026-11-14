@@ -63,4 +63,26 @@ description. A mapping onto any existing label, even one a bot created, makes th
 
 The labels helper under `scripts/labels/` compares a repository with the set and, after the owner
 approves its exact label plan, creates the missing labels and corrects colors and descriptions. It
-never deletes or renames a label.
+never deletes or renames a label, and it leaves every label outside the set alone unless `label_map`
+names it. It needs Bun and an authenticated GitHub CLI.
+
+```sh
+bun "$plugin_dir/scripts/labels/cli.ts" plan --repo "$checkout" --output "$report_dir/labels-plan.json"
+```
+
+`plan` reads only. It writes the label plan to a new file and prints its digest, each standard label
+as present, missing or different, the labels it leaves unmanaged, and every write with its before and
+after values. The plan records the host, repository, authenticated account, a hash of the vocabulary,
+the effective names after `label_map` and the labels it read.
+
+Show the owner every write and the digest. Only after the owner approves that exact digest:
+
+```sh
+bun "$plugin_dir/scripts/labels/cli.ts" apply --repo "$checkout" \
+  --plan "$report_dir/labels-plan.json" --approved-digest APPROVED_SHA256
+```
+
+`apply` observes the repository again and refuses before any write unless the result is
+byte-identical to the approved plan, so a different account, repository, vocabulary, `label_map` or
+label means planning again. It then makes exactly the planned writes and prints a receipt; a failed
+write stops the rest and the receipt names what remains.

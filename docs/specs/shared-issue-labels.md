@@ -310,14 +310,16 @@ once would make each other's reviews stale. So:
 - [ ] AC-01: The plugin contains one vocabulary file and a reference page that list the same standard
       labels with the same names, colors and descriptions, use the glossary terms above, and say which
       operation applies each kind.
-- [ ] AC-02: For a repository with some standard labels missing, some with a different color or
+- [x] AC-02: For a repository with some standard labels missing, some with a different color or
       description and some non-standard labels, the helper's plan lists each standard label as
       present, missing or different, lists the others as unmanaged, and changes nothing on GitHub.
-- [ ] AC-03: After approval of its exact digest, apply leaves the repository holding every standard
+      Evidence: `bun test tests/vh-adlc/labels/plan.test.ts` on feat/shared-issue-labels at T8: 4 pass; present, missing, different and unmanaged classification with an empty write log on the fake GitHub. Fake tracker only; no live repository.
+- [x] AC-03: After approval of its exact digest, apply leaves the repository holding every standard
       label with the standard color and description, every other label unchanged, and no label
       deleted or renamed. Apply refuses before any write when the plan file changed, the digest
       differs, or the host, repository, authenticated actor, vocabulary, effective label names or
       repository labels differ from the plan.
+      Evidence: `bun test tests/vh-adlc/labels/apply.test.ts` on feat/shared-issue-labels at T8: approved apply yields the standard set with the unmanaged label unchanged and no rename; the eight refusal cases each throw with no write. Fake tracker only.
 - [ ] AC-04: An issue investigate files carries one type label and the state label the verdict table
       gives (`ready` for act now, `blocked` or `needs-decision` for track, none for a requested reject),
       and the owner saw those labels before creation; when a needed label is missing, no issue exists
@@ -377,7 +379,8 @@ shared-development-loop).
       Evidence: `bun test tests/vh-adlc/labels/plan.test.ts`: 4 pass, 0 fail. `bun test tests/vh-adlc/labels/typecheck.test.ts`: strict tsc passes. Manual CLI run against the fake gh printed digest 2ee819c8... equal to `sha256sum` of the written plan, and a second run refused the existing output. Also adds `tsconfig.json`, `typecheck.sh` and `tests/vh-adlc/labels/typecheck.test.ts`, mirroring the projects helper.
 - [x] T7 `tests/vh-adlc/labels/apply.test.ts` - failing approved apply that yields the standard set with no delete or rename call, and the eight refusal cases (edited plan, other digest, other repository, other host, other actor, edited vocabulary, edited `label_map`, changed repository label), each with an empty write log (AC-03)
       Evidence: `bun test tests/vh-adlc/labels/apply.test.ts`: 0 pass, 1 fail, "Cannot find module ../../../plugins/vh-adlc/scripts/labels/apply" (no apply yet). The file holds the approved apply, a CLI plan-then-apply case and the eight refusal cases.
-- [ ] T8 `plugins/vh-adlc/scripts/labels/apply.ts`, `plugins/vh-adlc/scripts/labels/cli.ts` - `apply` that revalidates every binding before writing, makes exactly the planned writes and writes a receipt; T7 passes (AC-03)
+- [x] T8 `plugins/vh-adlc/scripts/labels/apply.ts`, `plugins/vh-adlc/scripts/labels/cli.ts` - `apply` that revalidates every binding before writing, makes exactly the planned writes and writes a receipt; T7 passes (AC-03)
+      Evidence: `bun test tests/vh-adlc/labels`: 19 pass, 0 fail, including the approved apply, the CLI plan-then-apply run and all eight refusal cases with empty write logs. `references/issues.md` documents both commands.
 - [ ] T9 `tests/vh-adlc/triage/execution.test.ts`, `tests/vh-adlc/labels/vocabulary.test.ts` - a standard state label in a `labels` action outside the controller is denied, an approved `create-request` reaches the fake tracker with an empty labels array, and a failing check that `references/triage.md` names the vocabulary's state labels (AC-06)
 - [ ] T10 `plugins/vh-adlc/references/triage.md` - names the standard state labels and their mapped repository names as the labels triage verdicts use, controller rule unchanged; T9 passes (AC-06)
 - [ ] T11 `tests/vh-adlc/lifecycle/issue-labels.test.ts`, `tests/vh-adlc/lifecycle/feature-fixture.ts` - failing scenarios: investigate files for act now, track with a named prerequisite, track waiting on a decision and a requested reject; spec files a tracking issue; spec files where only the mapped type label exists; a missing-label case; each checks the pre-creation summary and the created issue's exact labels (AC-04, AC-05, AC-07)
