@@ -77,12 +77,16 @@ The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
-- [ ] AC-02: The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
-- [ ] AC-03: A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
-- [ ] AC-04: An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
-      Evidence: Review R-8 found AC-04 not met because the Codex retry published a partial directory after an export timeout.
-- [ ] AC-05: A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+- [x] AC-01: An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
+      Evidence: Both native hosts installed the candidate from their own local catalog and read the shared skill. The package and both discovery tests passed.
+- [x] AC-02: The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
+      Evidence: Regraded all native outputs with the final fixture checker and inspected the drawings and briefs in both directions. Unlisted cells were headings, labels, icon parts or legends. Both OCI briefs identify the unresolved restore path.
+- [x] AC-03: A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
+      Evidence: All four diagrams passed the pinned schema and reference checks and matched a fresh offline export. Drawing boundaries moved their children in the Desktop editor. The SVGs rendered at 390 px in Chromium and Firefox and were inspected at 900 px.
+- [x] AC-04: An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+      Evidence: The focused Bun tests passed the failed-export, invalid-SVG, changed-input, collision and retry cases. Both native `--case export-failure` runs attempted an export, reported the renderer error and left the final directory absent.
+- [x] AC-05: A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+      Evidence: The `--case intake` outputs rendered the AWS and proposed OCI views. The Codex and Claude missing-link transcripts asked how the restore would work and produced no final files.
 
 ## Test Plan
 
@@ -103,7 +107,8 @@ The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`.
 - [x] T6 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `tests/vh-adlc/check.test.ts`, `docs/reference/marketplace.md`, `docs/user-guides/workflows.md` - the package checker and export tests pass, followed by native fixture and intake runs on both hosts and rendered inspection (AC-01, AC-02, AC-03, AC-04, AC-05)
       Evidence: bun test tests/vh-adlc --timeout 20000 passed 1634 tests. Both native hosts produced the AWS and OCI outputs and requested clarification for the missing restore link. All four delivered SVGs matched offline re-exports, and all four editor boundary drags moved the child. Review R-5 recorded two follow-ups.
 
-- [ ] T7 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `docs/reference/marketplace.md`, `tests/vh-adlc/diagram/` - verify export failure handling, the reviewed fixture mapping and dense diagram readability (AC-01, AC-02, AC-03, AC-04)
+- [x] T7 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `docs/reference/marketplace.md`, `tests/vh-adlc/diagram/` - verify export failure handling, the reviewed fixture mapping and dense diagram readability (AC-01, AC-02, AC-03, AC-04)
+      Evidence: 82 focused tests passed. Both native renderer-failure tests passed. The final fixture checker accepted all six native intake results after correcting false positives for a legend and a scope note. The dense AWS preview still benefits from zoom for some recovery labels.
 
 ## Open Questions
 
