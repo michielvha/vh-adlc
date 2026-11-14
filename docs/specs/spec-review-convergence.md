@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Claimed on feat/spec-review-convergence; implementing T1 onward in the vh-adlc-review-convergence worktree."
+status: draft
+status_description: "Revising on feat/spec-review-convergence to settle the R-15 and R-16 gaps the implementation surfaced; T1, T12, T14, T15 and T13 are done."
 issue: null
 branch: feat/spec-review-convergence
 goal: "Spec review rates findings consistently, finds failure-mode gaps and every restatement in one pass, applies each pass's findings as one revision without applying nits, and never rewrites reviewed commits."
