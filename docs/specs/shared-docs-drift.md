@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "The owner approved full gate parity. Fresh Copilot R64 has no blocking or should-fix findings. Its one input nit is specified in T91. The reviewed revision is ready to re-enter implementation on the existing branch."
+status: in-progress
+status_description: "Accepted full gate parity is independently reviewed under R64. T91 is implementing its regression-tested matcher and ownership behavior. Current-source proposal verification, carried delivery, final reporting and migration work remain open."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
