@@ -76,6 +76,14 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     ]) expect(cleanup).toContain(requirement);
     current = current.slice(0, start) + current.slice(end);
   }
+  if (name === "spec") {
+    const dependencyReview = "- When operational dependencies change, apply the resolved feature-document standard's dependency\n"
+      + "  and recovery review. Explain why each affected dependency is needed, its owning component and\n"
+      + "  first-install/recovery paths while normal management or secret services are unavailable. Resolve\n"
+      + "  circular dependencies before acceptance and carry material recovery promises into failure scenarios.\n";
+    expect(current).toContain(dependencyReview);
+    current = current.replace(dependencyReview, "");
+  }
   const prefix = current.slice(current.indexOf("## Generic intake"), current.indexOf("The plugin directory is two levels"));
   expect(prefix).toBe("## Generic intake\n\nFor generic vh-adlc requests without an operation name, follow `references/lifecycle.md`; then continue here.\n\n");
   expect(body(current)).toBe(body(old.stdout.toString()));
