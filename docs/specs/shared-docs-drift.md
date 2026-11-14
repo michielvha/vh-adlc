@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Shared source and staged Stackweaver integration are implemented locally. Full-corpus scanner parity passes at its recorded commit; the native suite required an isolated retry. Publisher identity needs an owner decision. Installed/model/hosted, operator and migration acceptance remain open."
+status: draft
+status_description: "Revising publisher identity to preserve the existing scheduled bot and interactive owner. The owner selected that behavior; the revised contract is awaiting spec review. Existing source observations retain their recorded revisions."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
