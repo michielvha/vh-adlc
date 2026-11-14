@@ -42,6 +42,13 @@ export class LabelsGitHub {
     this.call(["-X", "POST", `repos/${repository}/labels`], { name, color: metadata.color, description: metadata.description });
   }
 
+  /** Creates an issue with exactly these labels; callers check the labels exist first. */
+  createIssue(repository: string, issue: { title: string; body: string; labels: string[] }): { number: number; url: string } {
+    const value = this.call(["-X", "POST", `repos/${repository}/issues`], issue) as { number?: unknown; html_url?: unknown };
+    if (!Number.isSafeInteger(value?.number) || typeof value.html_url !== "string" || value.html_url !== `https://${this.host}/${repository}/issues/${value.number}`) throw new Error("GitHub returned an unexpected issue identity");
+    return { number: value.number as number, url: value.html_url };
+  }
+
   /** Changes color and description only; a label is never renamed. */
   update(repository: string, name: string, metadata: Metadata): void {
     this.call(["-X", "PATCH", `repos/${repository}/labels/${encodeURIComponent(name)}`], { color: metadata.color, description: metadata.description });

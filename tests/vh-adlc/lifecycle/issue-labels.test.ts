@@ -14,7 +14,7 @@ function files(request: Parameters<typeof filingPreview>[2], expected: string[],
   const preview = filingPreview(root, f.gh(), request);
   expect(preview.preview.labels).toEqual(expected);
   expect(preview.preview.missing).toEqual([]);
-  expect(preview.text).toContain(JSON.stringify(expected));
+  expect(JSON.parse(preview.text).labels).toEqual(expected);
   const created = fileIssue(root, f.gh(), preview.text, preview.digest);
   expect(created.url).toBe("https://github.com/example/project/issues/1");
   expect(f.issues()).toEqual([{ number: 1, title: issue.title, body: issue.body, labels: expected }]);
