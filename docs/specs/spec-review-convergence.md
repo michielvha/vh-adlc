@@ -491,6 +491,7 @@ and R-16 F-01 to F-03 are applied. The owner accepts in advance if R-17 has no b
 | 2026-11-13 | R-15 | spec | `76f0480` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-16 | spec | `12370b8` | claude-opus-5-5 | procedural | Clean drift re-review after PR 87: no blocking finding; one should-fix and two nits, listed for implementation |
 | 2026-11-14 | R-17 | spec | `db1d531` | claude-opus-5-5 | procedural | Clean: no blocking finding; six should-fix and three nits, listed for implementation |
+| 2026-11-14 | R-17 | spec | `db1d531` | n/a | n/a | accepted by owner |
 
 ### R-1
 
