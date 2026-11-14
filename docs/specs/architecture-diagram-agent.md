@@ -113,6 +113,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | 2026-11-14 | R-3 | spec | `6593ed37147bd2bd6813e6e4d3e53066af7f8896` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-4 | spec | `211db5a7ceb0510e7107b160efe8ce30babda981` | unknown | procedural | One should-fix finding in the task order |
 | 2026-11-14 | R-4 | spec | `211db5a7ceb0510e7107b160efe8ce30babda981` | n/a | n/a | accepted by owner |
+| 2026-11-14 | R-5 | implementation | `6693aea802f641cf7833073141ec0d5f8824900a` | unknown | procedural | Five criteria met and two should-fix findings |
 
 ### R-1
 
@@ -193,6 +194,42 @@ SEVERITY: should-fix
 WHERE: Tasks T2 through T4
 EVIDENCE: T2 first adds files under the new skill directory. The task verification command in AGENTS.md runs tests/vh-adlc/check.test.ts. Lines 224-232 require a version change whenever the plugin subtree changes, and lines 235-245 reject an undeclared skill directory and require its SKILL.md once declared. The current sequence defers both manifest changes and the skill definition to T4, and no task names the checker. T2 cannot pass the required package verification in that order.
 PROPOSAL: Replan the unchecked tail after T1. Commit the failing fixture proof before introducing the skill, then land the helper, skill entry, checker declaration and both manifest changes together with the focused checker in the done condition.
+
+### R-5
+
+CRITERION: AC-01 An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
+VERDICT: met
+EVIDENCE: At `6693aea802f641cf7833073141ec0d5f8824900a`, `bun test tests/vh-adlc/check.test.ts` passed all 64 tests. I compared both installed packages with the catalog copies and reviewed candidate, matching all 154 files on each host. I matched completed installed-skill tool reads in all six native transcripts. Native sessions ran at `4d64cd2` and used byte-identical plugin, catalog and fixture inputs.
+
+CRITERION: AC-02 The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
+VERDICT: met
+EVIDENCE: At `6693aea802f641cf7833073141ec0d5f8824900a`, I applied committed `gradeDiagram` to both hosts' four rendered fixtures and got no failures. I separately compared the delivered drawings and briefs with the source lines and visually inspected all four renderings. Both AWS drawings show the three documented hops without the deployment-only Log Bucket. Both OCI drawings show the proposed backup path and omit the unresolved restore arrow, with the gap recorded in each brief. Manual comparison was necessary for the reverse mapping limitation in F-01.
+
+CRITERION: AC-03 A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
+VERDICT: met
+EVIDENCE: At `6693aea802f641cf7833073141ec0d5f8824900a`, I checked all four drawings with the pinned XSD, repeated the network-disabled Desktop 32.6.10 export and used `cmp` to match all four delivered SVGs byte for byte. In the Desktop editor I dragged each AWS Public Tier and each OCI-local Proxmox Host and observed the expected child move horizontally and vertically. The four standalone SVGs rendered at 390 by 844 in Chromium and Firefox, and I inspected the full-size screenshots for the fixture icons and connector legibility. The browser check exercised these fixture SVGs on a standalone page.
+
+CRITERION: AC-04 An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+VERDICT: met
+EVIDENCE: At `6693aea802f641cf7833073141ec0d5f8824900a`, `bun test tests/vh-adlc/diagram` passed all six tests. The output tests exercised a missing executable, a changed asset with no renderer invocation, a deliberately failed export, an occupied destination preserved byte for byte, two staged subprocesses yielding one complete publication and one collision, and a successful retry at an unused path. The controlled renderer was used for fault and collision cases.
+
+CRITERION: AC-05 A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+VERDICT: met
+EVIDENCE: At `6693aea802f641cf7833073141ec0d5f8824900a`, I checked the six completed native session transcripts and their output inventories, matched transcript and artifact digests to the sanitized manifests, and applied committed `gradeDiagram` to all six outputs. Both hosts rendered AWS and the partial OCI-local view in their initial requests. Each asked how the restore connects, which component initiates it and which way traffic travels in the clarification case. Neither clarification directory contained final output.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-02 and tests/vh-adlc/diagram/grade.ts
+EVIDENCE: The accepted proof requires bidirectional mapping and rejection of unrelated components. `grade.ts` lines 31-40 look up brief entries in the diagram, and line 56 counts connectors. In an isolated copy of the AWS fixture output, I added an unlisted visible Log Bucket vertex to the drawing without changing the brief. `gradeDiagram` still returned an empty failure list.
+PROPOSAL: Check for unmapped semantic vertices or record an explicit manual reverse-mapping check in the proof. Add the unlisted Log Bucket as a negative control.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter covers and Test Plan AC-01
+EVIDENCE: The feature changes `tests/vh-adlc/maintenance/discovery.test.ts` and `tests/vh-adlc/triage/discovery.test.ts` to account for the installed skill in shared plugin discovery. Neither path is in accepted `covers`. Both are exercised by the repository's `bun test tests/vh-adlc` verification command.
+PROPOSAL: Include the two feature-dependent discovery tests in the reviewed coverage, or handle the test change with independently scoped maintenance before relying on it for this feature.
 
 ## Sources
 
