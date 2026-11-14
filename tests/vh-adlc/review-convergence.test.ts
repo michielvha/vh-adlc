@@ -68,7 +68,8 @@ describe("resolved feature-document convention", () => {
 describe("user guides", () => {
   const guides = ["docs/get-started/first-feature.md", "docs/user-guides/workflows.md"].map((path) => ({
     path,
-    text: readFileSync(join(repo, path), "utf8"),
+    // Prose wraps at any word, so phrases are matched with whitespace collapsed.
+    text: readFileSync(join(repo, path), "utf8").replace(/\s+/g, " "),
   }));
 
   for (const guide of guides) {
