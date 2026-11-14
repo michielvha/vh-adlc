@@ -69,11 +69,11 @@ test("a sweep plan removes only proven-merged branches and applies only the exac
   f.write({ protected: ["main", "release"], pulls: [pr(1, "feat/squashed", squashed), pr(2, "feat/open", open, false), pr(3, "feat/moved", moved), pr(4, "feat/tree", tree)] });
 
   const { plan } = observe(f.options);
-  expect(summary(plan.operations)).toEqual(["enable-auto-delete", "delete-remote:feat/squashed", "delete-remote:feat/tree", "prune-tracking:refs/remotes/origin/gone", "delete-local:feat/squashed"]);
+  expect(summary(plan.operations)).toEqual(["enable-auto-delete", "delete-remote:feat/squashed", "delete-remote:feat/tree", "prune-tracking:refs/remotes/origin/gone", "remove-worktree:feat/tree", "delete-local:feat/squashed", "delete-local:feat/tree"]);
   expect(plan.kept).toContainEqual({ scope: "remote", branch: "feat/open", reason: "head of open PR #2" });
   expect(plan.kept).toContainEqual({ scope: "remote", branch: "feat/moved", reason: "unmerged commits" });
   expect(plan.kept).toContainEqual({ scope: "remote", branch: "release", reason: "protected" });
-  expect(plan.kept.find(k => k.scope === "local" && k.branch === "feat/tree")!.reason).toContain("pass --worktrees true");
+  expect(summary(observe({ ...f.options, worktrees: false }).plan.operations)).not.toContain("remove-worktree:feat/tree");
 
   const shim = join(f.dir, "bin"), planPath = join(f.dir, "plan.json");
   mkdirSync(shim); writeFileSync(join(shim, "gh"), `#!/bin/sh\nexec bun ${JSON.stringify(fakeGh)} "$@"\n`, { mode: 0o755 });

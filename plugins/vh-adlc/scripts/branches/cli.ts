@@ -5,8 +5,8 @@ import { afterMerge, apply, autoDelete, digest, observe } from "./branches";
 
 const usage = "usage: cli.ts plan --repo PATH --output FILE [--repository OWNER/NAME] [--worktrees true|false]\n       cli.ts apply --repo PATH --plan FILE --approved-digest SHA256\n       cli.ts after-merge --repo PATH --pull NUMBER [--repository OWNER/NAME] [--worktrees true|false]\n       cli.ts auto-delete (--repo PATH [--repository OWNER/NAME] | --repository OWNER/NAME) [--enable]";
 const flag = (value: string | undefined) => {
-  if (value === undefined || value === "false") return false;
-  if (value === "true") return true;
+  if (value === "false") return false;
+  if (value === undefined || value === "true") return true;
   throw new Error("--worktrees takes true or false");
 };
 

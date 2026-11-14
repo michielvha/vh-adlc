@@ -2,24 +2,26 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 
-export type Result = { code: number; stdout: string; stderr: string };
+export type Result = { code: number; stdout: string; stderr: string; timedOut?: boolean };
 export type Run = (argv: string[]) => Result;
 
 /** Fixed argv only: branch names, PR text and settings never reach a shell. */
 export const spawn: Run = argv => {
   const result = Bun.spawnSync(argv, { stdin: "ignore", stdout: "pipe", stderr: "pipe", timeout: 120000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GH_PROMPT_DISABLED: "1" } });
-  return { code: result.exitCode ?? 1, stdout: result.stdout.toString(), stderr: result.stderr.toString() };
+  return { code: result.exitCode ?? 1, stdout: result.stdout.toString(), stderr: result.stderr.toString(), timedOut: result.exitedDueToTimeout === true };
 };
 
 export type Operation =
   | { kind: "enable-auto-delete" }
   | { kind: "delete-remote"; branch: string; oid: string; proof: string }
   | { kind: "prune-tracking"; ref: string; oid: string }
-  | { kind: "remove-worktree"; path: string; branch: string; oid: string; proof: string }
+  | { kind: "remove-worktree"; path: string; branch?: string; oid: string; proof: string; ignored: Ignored[] }
   | { kind: "delete-local"; branch: string; oid: string; proof: string };
-export type Kept = { scope: "remote" | "local"; branch: string; reason: string };
+/** An ignored path as Git prints it, with the number of non-directory entries under it and their lstat bytes. */
+export type Ignored = { path: string; files: number; bytes: number };
+export type Kept = { scope: "remote" | "local"; branch: string; reason: string } | { scope: "worktree"; path: string; branch?: string; reason: string };
 export interface Plan {
-  schema_version: 1; repository: string; default_branch: string; default_oid: string;
+  schema_version: 2; repository: string; default_branch: string; default_oid: string;
   delete_branch_on_merge: boolean; worktrees: boolean; operations: Operation[]; kept: Kept[];
 }
 export type Outcome = { operation: Operation; status: "done" | "already-absent" | "changed" | "failed"; detail?: string };
@@ -146,9 +148,10 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
   if (!defaultOid || !checkout.hasCommit(defaultOid)) throw new Error(`default branch ${defaultBranch} not observed on origin`);
   const protectedNames = new Set(checkout.list(`repos/${checkout.repository}/branches?protected=true&per_page=100`).map(b => String(object(b, "branch").name)));
   const open = checkout.list(`repos/${checkout.repository}/pulls?state=open&per_page=100`).map(pull);
-  const plan: Plan = { schema_version: 1, repository: checkout.repository, default_branch: defaultBranch, default_oid: defaultOid, delete_branch_on_merge: autoDelete, worktrees: options.worktrees === true, operations: [], kept: [] };
+  const plan: Plan = { schema_version: 2, repository: checkout.repository, default_branch: defaultBranch, default_oid: defaultOid, delete_branch_on_merge: autoDelete, worktrees: options.worktrees !== false, operations: [], kept: [] };
   if (!autoDelete && !only) plan.operations.push({ kind: "enable-auto-delete" });
-  const keep = (scope: Kept["scope"], branch: string, reason: string) => { plan.kept.push({ scope, branch, reason }); };
+  const keep = (scope: "remote" | "local", branch: string, reason: string) => { plan.kept.push({ scope, branch, reason }); };
+  const keepTree = (tree: Worktree, reasons: string[]) => { plan.kept.push({ scope: "worktree", path: tree.path, ...(tree.branch ? { branch: tree.branch } : {}), reason: reasons.join("; ") }); };
 
   // A merged PR head or the default branch must contain the tip; nothing else proves the work is kept.
   let mainline: Set<string> | undefined;
@@ -190,9 +193,13 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
     const tree = trees.find(t => t.branch === branch);
     if (tree) {
       const dirty = !tree.prunable && checkout.git(["-C", tree.path, "status", "--porcelain", "--ignored"], true).trim() !== "";
-      const blocker = tree.busy ? "a worktree with a rebase or bisect in progress" : tree.path === main ? "the main worktree" : real(tree.path) === invoking ? "the invoking worktree" : tree.locked ? "a locked worktree" : tree.prunable ? "a worktree whose directory is missing" : dirty ? "a worktree with changed, untracked or ignored files" : !plan.worktrees ? "a clean worktree; pass --worktrees true to remove it" : "";
-      if (blocker) { keep("local", branch, `merged but checked out in ${blocker} (${tree.path})`); continue; }
-      plan.operations.push({ kind: "remove-worktree", path: tree.path, branch, oid, proof: r.proof });
+      const reasons = [
+        ...tree.busy ? ["rebase or bisect in progress"] : [], ...tree.path === main ? ["the main worktree"] : [], ...real(tree.path) === invoking ? ["the invoking worktree"] : [],
+        ...tree.locked ? ["locked"] : [], ...tree.prunable ? ["directory is missing"] : [], ...dirty ? ["changed, untracked or ignored files"] : [],
+        ...plan.worktrees ? [] : ["worktree removal is off (--worktrees false)"],
+      ];
+      if (reasons.length) { keepTree(tree, reasons); keep("local", branch, `merged but checked out in a kept worktree (${tree.path}): ${reasons.join("; ")}`); continue; }
+      plan.operations.push({ kind: "remove-worktree", path: tree.path, branch, oid, proof: r.proof, ignored: [] });
     }
     plan.operations.push({ kind: "delete-local", branch, oid, proof: r.proof });
   }
@@ -244,7 +251,7 @@ function execute(options: Options, approved: Operation[], only?: (branch: string
     if (op.kind === "delete-local" && blocked.has(op.branch)) { outcomes.push({ operation: op, status: "failed", detail: "its worktree was not removed" }); continue; }
     if (!fresh.plan.operations.some(candidate => same(candidate, op))) { outcomes.push({ operation: op, status: absent(fresh, op) ? "already-absent" : "changed" }); continue; }
     const outcome = perform(fresh.checkout, op, run);
-    if (outcome.status === "failed" && op.kind === "remove-worktree") blocked.add(op.branch);
+    if (outcome.status === "failed" && op.kind === "remove-worktree" && op.branch) blocked.add(op.branch);
     outcomes.push(outcome);
   }
   return outcomes;
@@ -253,8 +260,11 @@ const complete = (outcomes: Outcome[]) => outcomes.every(o => o.status === "done
 
 export function parsePlan(text: string): Plan {
   const plan = object(JSON.parse(text), "plan");
-  if (plan.schema_version !== 1 || typeof plan.repository !== "string" || typeof plan.worktrees !== "boolean" || !Array.isArray(plan.operations)) throw new Error("unsupported branch plan");
-  for (const op of plan.operations) if (!kinds.includes(object(op, "operation").kind as Operation["kind"])) throw new Error("unsupported branch operation");
+  if (plan.schema_version !== 2 || typeof plan.repository !== "string" || typeof plan.worktrees !== "boolean" || !Array.isArray(plan.operations)) throw new Error("unsupported branch plan");
+  for (const value of plan.operations) {
+    const op = object(value, "operation");
+    if (!kinds.includes(op.kind as Operation["kind"]) || (op.kind === "remove-worktree" && !Array.isArray(op.ignored))) throw new Error("unsupported branch operation");
+  }
   return plan as unknown as Plan;
 }
 
