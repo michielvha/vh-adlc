@@ -4,20 +4,27 @@ MODEL: claude-opus-5-5
 FINDING: F-01
 KIND: factual
 SEVERITY: should-fix
-WHERE: Test Plan (AC-01 row); Acceptance Criteria (AC-01); Context, Background
-EVIDENCE: The Test Plan row says "Compare the old and new paragraph: same commands and versions, no jargon terms". The row judges free text, but it lists no jargon terms and no must-pass or must-fail examples. conventions/feature-documents.md:126 requires those examples for a proof that judges free text with a pattern. Background says only "uses jargon (guide.md:3)" and does not name the terms. AC-01 says "in plain sentences" and never says which words have to go. guide.md:3 contains "ensure", "idempotent", "provisioning" and "toolchain". One implementer could keep "toolchain" and another could remove it, and both would pass or fail depending on who checks.
-PROPOSAL: Name the jargon terms that must not appear in the new paragraph, for example "idempotent" and "provisioning", in AC-01 and in the proof row. Add one must-pass example sentence and one must-fail example sentence to the row.
+WHERE: Acceptance Criteria (AC-01); Test Plan (AC-01 row); Design; frontmatter goal; title line 12
+EVIDENCE: AC-01 (docs/specs/feature.md:34) requires the paragraph to be "in plain sentences", which no one can observe or check consistently. The AC-01 proof (docs/specs/feature.md:40) checks something else, "no jargon terms", and never says which terms count as jargon. It gives no must-pass or must-fail examples, but the standard requires them when a proof judges free text with a pattern (conventions/feature-documents.md, Test plan). The jargon in the current text is in guide.md:3: "ensure idempotent provisioning of the toolchain". Two reviewers could reach opposite verdicts on the same rewrite, for example "Provision the toolchain with `make deps` (Go 1.27)." The criterion and its proof also test different properties.
+PROPOSAL: Restate AC-01 as an observable end state, for example: the paragraph names `make deps` and Go 1.27 and contains none of the words "idempotent", "provisioning" or "toolchain". Have the Test Plan row list those words as must-fail terms and give one must-pass example sentence.
 
 FINDING: F-02
 KIND: judgement
 SEVERITY: should-fix
-WHERE: Acceptance Criteria (AC-01); Design; Test Plan (AC-01 row)
-EVIDENCE: guide.md:3 reads "Prerequisites: ensure idempotent provisioning of the toolchain via `make deps` (Go 1.27)." Design and AC-01 only require keeping "every command and version". Neither requires keeping the meaning the jargon carries: that `make deps` installs the toolchain and is safe to run more than once. A rewrite such as "Run `make deps` (Go 1.27)." passes AC-01 and its proof, yet it drops that information. The paragraph would then be plainer but less informative, so a wrong implementation can pass the proof.
-PROPOSAL: Add to AC-01 and the proof that the new paragraph still says what `make deps` sets up and that it is safe to run again. Alternatively, raise as an Open Question whether dropping that information is acceptable.
+WHERE: Design; Acceptance Criteria (AC-01); Scope; Open Questions
+EVIDENCE: guide.md:3 says provisioning is "idempotent", meaning `make deps` is safe to run again. The Design (docs/specs/feature.md:30) only says to keep "every command and version it names". AC-01 checks only commands and versions. One implementer could write "Install Go 1.27, then run `make deps`." and drop the safe-to-rerun fact. Another could keep it as "you can run `make deps` again safely." Both pass AC-01 as written, so the proof passes either way. The document does not settle whether that meaning must survive the rewrite, and Open Questions says "None.".
+PROPOSAL: Decide whether the rewrite must keep the meaning of each original term, in particular that `make deps` is safe to rerun. Either add that requirement to Design and AC-01 or raise it as an Open Question for the owner.
 
 FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria; Open Questions
+EVIDENCE: The feature replaces user-facing terms in guide.md:3 ("idempotent", "provisioning", "toolchain") with plainer wording. The standard says "User-facing terms the feature introduces or changes appear in a glossary row and are held to it by a criterion" (conventions/feature-documents.md, Open questions). The document has no glossary and no criterion that fixes the replacement wording, so two implementers would pick different words.
+PROPOSAL: Add a glossary row for each term being replaced, giving the plain replacement, and have a criterion hold the rewritten paragraph to it. If the replacement wording is a judgement call, raise it as an Open Question.
+
+FINDING: F-04
 KIND: factual
 SEVERITY: nit
-WHERE: Context, Owner summary
-EVIDENCE: The Owner summary is one sentence: "Reword the prerequisites paragraph of the install guide." It does not give the out-of-scope limit from Scope ("Out of scope: changing any command") or the constraint from Design to keep every command and version. It also does not give the validation state. The proof is a planned manual comparison, and nothing has been observed yet. conventions/feature-documents.md:81 and :87 ask the summary to cover scope, approach and validation state, and to separate planned checks from observed proof.
-PROPOSAL: Add one or two sentences to the summary. Say that commands and versions stay unchanged, and that the proof is a planned manual comparison with no result observed yet.
+WHERE: Context (Owner summary)
+EVIDENCE: The Owner summary (docs/specs/feature.md:18) is one sentence. It leaves out the scope limit that no command changes (docs/specs/feature.md:26), the rule that every command and version is kept (docs/specs/feature.md:30), and the validation state: the proof is planned and nothing has been observed yet. conventions/feature-documents.md, "Owner summary in Context", asks for scope, approach, validation state and owner decisions, and says the summary must keep planned checks apart from observed proof.
+PROPOSAL: Add a sentence that commands and versions stay unchanged and only wording changes, and a sentence that the AC-01 comparison is planned and has not been run.

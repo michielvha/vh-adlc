@@ -4,41 +4,48 @@ MODEL: claude-opus-5-5
 FINDING: F-01
 KIND: factual
 SEVERITY: blocking
-WHERE: Test Plan, row AC-01; Design; Acceptance Criteria, AC-01
-EVIDENCE: Design calls `docs(readme): fix a link` a correct subject. The AC-01 row pattern `^[a-z]+: [a-z].*$` rejects it: `printf '%s\n' 'docs(readme): fix a link' | grep -Eq '^[a-z]+: [a-z].*$'` returned no match. The proof therefore fails a correct implementation. Commit 3a2f640 changed this row after R-1 (from `^[a-z]+: .+$` to `^[a-z]+: [a-z].*$`), so the row has not passed review at its current text. The earlier pattern also rejected the scoped form, so the defect predates that change and survived it.
+WHERE: Test Plan (AC-01 row); Design
+EVIDENCE: Design calls `docs(readme): fix a link` a correct subject. The AC-01 proof pattern `^[a-z]+: [a-z].*$` rejects it: `printf '%s\n' 'docs(readme): fix a link' | grep -Eq '^[a-z]+: [a-z].*$'` fails. The row has not passed review. R-1 reviewed 101303a, and dd5e32b changed the row from `^[a-z]+: .+$` to `^[a-z]+: [a-z].*$` after that. The previous pattern also rejected this subject, so the defect predates that change and the change did not fix it.
 PROPOSAL: Allow an optional parenthesised scope after the type, for example `^[a-z]+(\([a-z0-9-]+\))?: `, and add `docs(readme): fix a link` to the row's must-pass examples.
 
 FINDING: F-02
 KIND: factual
-SEVERITY: should-fix
-WHERE: Test Plan, row AC-01; Design; Acceptance Criteria, AC-01
-EVIDENCE: Design calls `fix: handle empty input.` a wrong subject because it ends with a period. The AC-01 row pattern accepts it: `grep -Eq '^[a-z]+: [a-z].*$'` matched `fix: handle empty input.`. The row's must-fail list holds only `handle empty input`, so an implementation that accepts a trailing period passes the proof. The row text changed in 3a2f640 after R-1's clean pass at 0b58093, so the nit rule for a free-text pattern row that has passed review does not apply.
-PROPOSAL: Make the pattern reject a trailing period, for example by ending it with `[^.]$`, and add `fix: handle empty input.` to the must-fail examples.
+SEVERITY: blocking
+WHERE: Test Plan (AC-01 row); Design
+EVIDENCE: Design defines a correct subject only as one that "starts with a type, a colon and a space" and does not end with a period. `fix: Handle empty input` meets that definition, but `grep -Eq '^[a-z]+: [a-z].*$'` rejects it. The previous revision (dd5e32b, "fixture: change the pattern row") added this rejection when it replaced `.+` with `[a-z].*`. Design never says the description must start in lower case.
+PROPOSAL: Either state in Design that the description must start with a lower case letter, raised as an Open Question because it is a format trade-off, or return the description part of the pattern to one that accepts any first character.
 
 FINDING: F-03
-KIND: judgement
+KIND: factual
 SEVERITY: should-fix
-WHERE: Design; Acceptance Criteria, AC-01; Test Plan, row AC-01; frontmatter goal
-EVIDENCE: The goal says "the team's format", AC-01 says "correct subjects" and "wrong ones", and Design defines the format only through examples. Several rules are left open: whether the type must come from a fixed list (feat, fix, docs and so on), whether the description must start in lowercase (the row pattern requires `[a-z]` after the space, but Design never says so), whether there is a length limit, and whether `!` breaking-change markers are allowed. AC-01 bundles accepting and rejecting into one composite criterion that defers to this unstated definition.
-PROPOSAL: State the full subject rule in Design, including the type set, scope, case, trailing punctuation and any length limit, and make the Test Plan pattern and examples cover each rule. Raise any of these choices that is a trade-off as an Open Question.
+WHERE: Test Plan (AC-01 row); Design
+EVIDENCE: Design calls `fix: handle empty input.` a wrong subject because it ends with a period. The pattern accepts it: `printf '%s\n' 'fix: handle empty input.' | grep -Eq '^[a-z]+: [a-z].*$'` succeeds. The row's must-fail examples list only `handle empty input`. So the proof passes an implementation that accepts trailing periods. This is not a nit, because the row changed in dd5e32b after R-1 reviewed 101303a and so has not passed review.
+PROPOSAL: End the pattern with `[^.]$` or something equivalent, and add `fix: handle empty input.` to the row's must-fail examples.
 
 FINDING: F-04
 KIND: judgement
 SEVERITY: should-fix
-WHERE: Design; Test Plan, row AC-01
-EVIDENCE: Design says "lint-msg.sh checks a commit subject" but does not say how the script receives the subject (argument, stdin, or a commit message file path as a `commit-msg` hook gets), how it takes the subject from a multi-line message, or what it signals on failure (exit code, message). The AC-01 proof, "lint-msg.sh matches the subject against" a pattern, describes code internals rather than a check someone can run. lint-msg.sh is currently `#!/bin/sh` / `exit 0` (lint-msg.sh:1-2), so the tree defines no interface either.
-PROPOSAL: Define the input, how the first line is extracted, and the exit status for accept and reject in Design. Rewrite the proof as a runnable scenario that calls lint-msg.sh with each example and checks the exit status.
+WHERE: Acceptance Criteria (AC-01); Design; Open Questions
+EVIDENCE: AC-01 reads "lint-msg.sh accepts correct subjects and rejects wrong ones." It does not define correct or wrong. Design gives examples but does not settle which types are allowed (any lower case word, or a fixed list such as fix, docs, feat), the syntax of the scope, what characters the description may use, or the maximum length. Open Questions says "None." The standard says every trade-off the document settles must be raised as an open question.
+PROPOSAL: Define the subject grammar in Design (allowed types, scope syntax, description rules) and refer to it from AC-01. Raise the choice between a fixed type list and any lower case word as an Open Question.
 
 FINDING: F-05
 KIND: judgement
 SEVERITY: should-fix
-WHERE: Context, Owner summary; Scope; Design
-EVIDENCE: The Owner summary says "Check commit subjects before a push", but no section mentions a push, a hook, or how lint-msg.sh is invoked or installed, so the claim has no support. The summary also leaves out the scope boundary (body out of scope), the approach, the format, and the validation state (nothing implemented or observed), all of which the standard asks the summary to cover.
-PROPOSAL: Either bring push-time or hook invocation into Scope and Design, or reword the summary to match the documented scope. Add the format, the approach, and a statement that no proof has been observed yet.
+WHERE: Design; Test Plan (AC-01 row); Context (Owner summary)
+EVIDENCE: Design does not say how lint-msg.sh gets the subject (argument, file path or stdin), which exit codes mean accept and reject, or what it prints. It also does not say how the script is invoked. The Owner summary says "Check commit subjects before a push", but Scope and Design never mention a push hook or any trigger. `ls -l lint-msg.sh` shows `-rw-r--r--`, so the script is not executable today. The proof "lint-msg.sh matches the subject against ..." describes how the script is built, not a check anyone can run. It names no command and no pass condition, such as an exit status for each example.
+PROPOSAL: Specify the interface and the trigger in Design, for example "reads the subject as $1, exits 0 to accept and 1 to reject, run from a pre-push hook" or drop the push claim. Rewrite the proof as a runnable check, for example a test script that runs lint-msg.sh on each must-pass and must-fail example and checks the exit codes.
 
 FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: The Owner summary is one sentence: "Check commit subjects before a push." It does not cover scope (subject only, not the body), the format rules, defaults, validation state (no proof has been observed, and R-1 is stale: `vh-adlc fresh` reports `baseline-changed` for R-1 at 101303a) or what changed since R-1 (the pattern row).
+PROPOSAL: Expand the summary to state scope, the subject rules, how and when the check runs, that nothing has been validated yet, and the pattern change made since R-1.
+
+FINDING: F-07
 KIND: factual
 SEVERITY: nit
-WHERE: Context, Background
-EVIDENCE: "lint-msg.sh accepts every subject today (lint-msg.sh:1)." Line 1 is `#!/bin/sh`; the statement that accepts everything is `exit 0` on line 2.
+WHERE: Context (Background)
+EVIDENCE: Background cites "lint-msg.sh:1" for the claim that the script accepts every subject. Line 1 is `#!/bin/sh`. The line that makes it accept everything is line 2, `exit 0`.
 PROPOSAL: Cite lint-msg.sh:2.

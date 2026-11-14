@@ -1,31 +1,24 @@
-commit dfb9b9cf773e2c38e80d82454a9177f8779994bd
+commit 9fb50752c04f6af037a3971afb8bf5aca85bcaa6
 Author: Trial Author
 
     Set the fetch.sh attempt limit to 4
 
 
 diff --git a/docs/specs/feature.md b/docs/specs/feature.md
-index bd781e9..4a0c2d5 100644
+index ef80d1f..f919a57 100644
 --- a/docs/specs/feature.md
 +++ b/docs/specs/feature.md
-@@ -15,10 +15,13 @@ fetch.sh retries a failed download a bounded number of times.
+@@ -15,7 +15,8 @@ fetch.sh retries a failed download a bounded number of times.
  
  ### Owner summary
  
 -fetch.sh makes at most 3 attempts at a download before giving up.
-+fetch.sh makes at most 4 attempts at a download before giving up, waiting two seconds between
-+attempts, then exits 1.
- 
--The attempt limit is waiting on an owner decision (Q1): Design currently says 5 while the rest of the
--document says 3, and review R-1 proposed 4.
-+The owner set the limit at 4 from their own knowledge of the mirror. The repository holds no
-+measurement behind that number. This revision changes Scope, Design, AC-01 and its proof, so review R-1
-+no longer applies and a new spec review is needed before acceptance. The retry check is planned and has
-+not run.
++fetch.sh makes at most 4 attempts at a download, waiting two seconds between them, then exits 1. The
++owner chose 4 from their own knowledge of the mirror; no measurement in this repository backs the number.
  
  ### Background
  
-@@ -26,21 +29,21 @@ fetch.sh downloads one URL with curl and stops on the first failure (fetch.sh:2)
+@@ -23,21 +24,21 @@ fetch.sh downloads one URL with curl and stops on the first failure (fetch.sh:2)
  
  ## Scope
  
@@ -51,85 +44,79 @@ index bd781e9..4a0c2d5 100644
  
  ## Tasks
  
-@@ -48,20 +51,7 @@ None yet; written once the document is planned.
+@@ -45,22 +46,7 @@ None yet; written once the document is planned.
  
  ## Open Questions
  
--### Q1: How many attempts should fetch.sh make before it gives up?
+-### Q1: How many attempts should fetch.sh make before it exits 1?
 -
--**Recommendation:** A. Keep 3, because the goal, Scope, AC-01 and its Test Plan row already say 3, and
--nothing in the repository measures a mirror that needs 4: fetch.sh is a single `curl` call with no retry
--(fetch.sh:2), and `grep -rn "flaky\|mirror" .` finds only the R-1 record.
+-**Recommendation:** A. Keep 3. Owner summary, Scope, AC-01 and its Test Plan row already say 3, and
+-nothing in the repository records the 4-attempt mirror measurement R-1 F-01 cites.
 -
 -| Option | You get | It costs |
 -| --- | --- | --- |
--| **A. 3 attempts** | Design changes to match the four places that already say 3 | A mirror that needs a fourth try still fails |
--| **B. 4 attempts** | R-1's proposal; one more try before giving up | Owner summary, Scope, AC-01 and its proof all change, on a measurement the repository does not hold |
--| **C. 5 attempts** | Design stays as written | Owner summary, Scope, AC-01 and its proof all change, and a failing download waits about 8 seconds before exit |
+-| **A. 3 attempts** | Design changes from 5 to 3; every other section already says 3 | If the flaky mirror really needs 4 attempts, it still fails |
+-| **B. 4 attempts (R-1 F-01's proposal)** | Covers the 4-attempt mirror recovery F-01 reports | Owner summary, Scope, Design, AC-01 and the Test Plan row all change, resting on a measurement not found in this repository |
+-| **C. 5 attempts** | Most room for a slow mirror; only Design already says it | Four other sections change, and a download that keeps failing waits 8 seconds before fetch.sh gives up |
 -
--**Why this is yours:** the limit trades recovery from slow mirrors against how long a dead URL takes to
--fail, and only you know which mirrors fetch.sh has to survive.
+-**Why this is yours:** R-1 F-01 is right that Design (5) contradicts the rest of the document (3), but
+-fixing it means picking the limit. `fetch.sh:2` has no retry or mirror logic, and searching the
+-repository history for `mirror`, `attempt`, `retr` and `flaky` finds nothing outside this document. That
+-leaves no measurement to settle the number, so it is a judgement about how long a failing download may
+-take.
 +None.
  
  ## Review Log
  
-commit f37852316b79977c7fa307615a6276e7141261ab
+commit e8ea1467ed28ac38247776906a77ad1bf7ea1289
 Author: Trial Author
 
-    Ask the owner to settle the fetch.sh attempt limit
+    Raise R-1 F-01 attempt limit as an open question
 
 
 diff --git a/docs/specs/feature.md b/docs/specs/feature.md
-index ac31767..bd781e9 100644
+index 0530f4e..ef80d1f 100644
 --- a/docs/specs/feature.md
 +++ b/docs/specs/feature.md
-@@ -17,6 +17,9 @@ fetch.sh retries a failed download a bounded number of times.
- 
- fetch.sh makes at most 3 attempts at a download before giving up.
- 
-+The attempt limit is waiting on an owner decision (Q1): Design currently says 5 while the rest of the
-+document says 3, and review R-1 proposed 4.
-+
- ### Background
- 
- fetch.sh downloads one URL with curl and stops on the first failure (fetch.sh:2).
-@@ -45,7 +48,20 @@ None yet; written once the document is planned.
+@@ -45,7 +45,22 @@ None yet; written once the document is planned.
  
  ## Open Questions
  
 -None.
-+### Q1: How many attempts should fetch.sh make before it gives up?
++### Q1: How many attempts should fetch.sh make before it exits 1?
 +
-+**Recommendation:** A. Keep 3, because the goal, Scope, AC-01 and its Test Plan row already say 3, and
-+nothing in the repository measures a mirror that needs 4: fetch.sh is a single `curl` call with no retry
-+(fetch.sh:2), and `grep -rn "flaky\|mirror" .` finds only the R-1 record.
++**Recommendation:** A. Keep 3. Owner summary, Scope, AC-01 and its Test Plan row already say 3, and
++nothing in the repository records the 4-attempt mirror measurement R-1 F-01 cites.
 +
 +| Option | You get | It costs |
 +| --- | --- | --- |
-+| **A. 3 attempts** | Design changes to match the four places that already say 3 | A mirror that needs a fourth try still fails |
-+| **B. 4 attempts** | R-1's proposal; one more try before giving up | Owner summary, Scope, AC-01 and its proof all change, on a measurement the repository does not hold |
-+| **C. 5 attempts** | Design stays as written | Owner summary, Scope, AC-01 and its proof all change, and a failing download waits about 8 seconds before exit |
++| **A. 3 attempts** | Design changes from 5 to 3; every other section already says 3 | If the flaky mirror really needs 4 attempts, it still fails |
++| **B. 4 attempts (R-1 F-01's proposal)** | Covers the 4-attempt mirror recovery F-01 reports | Owner summary, Scope, Design, AC-01 and the Test Plan row all change, resting on a measurement not found in this repository |
++| **C. 5 attempts** | Most room for a slow mirror; only Design already says it | Four other sections change, and a download that keeps failing waits 8 seconds before fetch.sh gives up |
 +
-+**Why this is yours:** the limit trades recovery from slow mirrors against how long a dead URL takes to
-+fail, and only you know which mirrors fetch.sh has to survive.
++**Why this is yours:** R-1 F-01 is right that Design (5) contradicts the rest of the document (3), but
++fixing it means picking the limit. `fetch.sh:2` has no retry or mirror logic, and searching the
++repository history for `mirror`, `attempt`, `retr` and `flaky` finds nothing outside this document. That
++leaves no measurement to settle the number, so it is a judgement about how long a failing download may
++take.
  
  ## Review Log
  
-commit f69b3edfc5e191837a5daeb35d596f651fef967c
+commit a0fbceb0a7caf4786c1e1a084a0f420239b14fd4
 Author: Fixture
 
     fixture: record R-1
 
 
 diff --git a/docs/specs/feature.md b/docs/specs/feature.md
-index 96234d1..ac31767 100644
+index 96234d1..0530f4e 100644
 --- a/docs/specs/feature.md
 +++ b/docs/specs/feature.md
 @@ -51,3 +51,13 @@ None.
  
  | Date | Review | Kind | Commit | Model | Isolation | Outcome |
  | --- | --- | --- | --- | --- | --- | --- |
-+| 2026-11-14 | R-1 | spec | `f743538` | fixture | procedural | One should-fix finding. |
++| 2026-11-14 | R-1 | spec | `028fe0e` | fixture | procedural | One should-fix finding. |
 +
 +### R-1
 +
@@ -139,7 +126,7 @@ index 96234d1..ac31767 100644
 +WHERE: Design
 +EVIDENCE: Design says at most 5 attempts while the rest of the document says 3; the measured flaky-mirror recovery in fetch.sh needs 4 attempts.
 +PROPOSAL: Use 4 attempts as the limit.
-commit f743538d17a21ff5dbf74fab2d147d72de7cb888
+commit 028fe0e8d3d66d8be6f1c794e38a09e06f58dcb9
 Author: Fixture
 
     fixture: AC-03 draft

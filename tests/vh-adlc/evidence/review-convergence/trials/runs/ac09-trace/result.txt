@@ -4,20 +4,34 @@ MODEL: claude-opus-5-5
 FINDING: F-01
 KIND: factual
 SEVERITY: blocking
-WHERE: Design; Context, Owner summary; Acceptance Criteria, AC-01; Test Plan, AC-01 row
-EVIDENCE: Commit 1a492e2 applied R-1 F-01 and changed only Design to "probe.sh passes `--max-time 10` to curl" (docs/specs/feature.md:30). The rest of the document still says 5 seconds. The Owner summary says "Stop waiting for a slow health check after 5 seconds" (docs/specs/feature.md:18). AC-01 says "A health check that takes longer than 5 seconds makes probe.sh exit 2" (docs/specs/feature.md:34). The Test Plan row says "A stub endpoint that sleeps 7 seconds makes probe.sh exit 2 after about 5 seconds" (docs/specs/feature.md:40). If probe.sh follows Design, curl waits up to 10 seconds, so a 7 second stub answers in time and probe.sh exits 0. A correct implementation of Design therefore fails AC-01 and its proof. This contradiction comes from the previous revision's partial application of R-1.
-PROPOSAL: Pick one timeout and state it in Design, the Owner summary, AC-01 and the Test Plan row. Make the stub sleep longer than that timeout and give the pass condition an explicit elapsed time bound, for example "exits 2 within timeout plus 1 second".
+WHERE: Context (Owner summary, line 18), Design (line 30), Acceptance Criteria (AC-01, line 34), Test Plan (AC-01 row, line 40)
+EVIDENCE: Commit fee90c4 applied R-1 F-01 only to Design, changing `--max-time 5` to `--max-time 10` (git show fee90c4 changes one line in docs/specs/feature.md). The other three locations still state 5 seconds: Owner summary "Stop waiting for a slow health check after 5 seconds.", AC-01 "longer than 5 seconds makes probe.sh exit 2", and the Test Plan row "A stub endpoint that sleeps 7 seconds makes probe.sh exit 2 after about 5 seconds". An implementation that follows Design gets a 7 second response within its 10 second limit and exits 0, so the Test Plan proof fails a correct implementation of Design, and AC-01 cannot be met without contradicting Design. `vh-adlc gate planned` reports spec_review_fresh stale (baseline-changed) and no acceptance row; lint passes because it does not compare values.
+PROPOSAL: Pick one timeout value, through the Open Question in F-03, and state it the same way in the Owner summary, Design, AC-01 and the Test Plan row. Set the stub sleep clearly above that value and the expected exit time to that value within a stated bound.
 
 FINDING: F-02
 KIND: judgement
 SEVERITY: should-fix
-WHERE: Design; Open Questions
-EVIDENCE: The timeout value is a trade-off the document settles, but Open Questions says "None." (docs/specs/feature.md:48). The standard says "Every trade-off the document settles is an open question". The previous revision moved the value from 5 to 10 seconds because of R-1's claim that "A 5 second timeout is shorter than the endpoint's documented warm-up". That warm-up documentation appears nowhere in the tree: `git ls-files` lists only AGENTS.md, docs/specs/feature.md and probe.sh, and the document has no Sources section. The change rests on an unsupported claim, and the owner never decided the value.
-PROPOSAL: Raise the timeout value as Q1 with the options (5 seconds, 10 seconds, or a configurable value) and what each costs. Cite the warm-up source in Sources if one exists; if not, drop the claim.
+WHERE: Design (line 30), Acceptance Criteria (AC-01, line 34)
+EVIDENCE: Design says probe.sh "exits 2 when the check times out" but does not define the exit status for other failures. probe.sh:2 runs `curl -fsS http://localhost/health >/dev/null` as its last command, so today the script exits with curl's own status: 7 for connection refused, 22 for an HTTP error under -f, 28 for a timeout. curl itself uses exit 2 for "failed to initialize", so passing curl's status through for non-timeout failures would make exit 2 ambiguous. One implementer would map only curl 28 to 2 and pass the rest through; another would map every failure to 2. Callers that read the current exit codes are affected by the change, and the document does not mention them.
+PROPOSAL: State the exit status for success, timeout and every other curl failure, and keep timeout distinct from curl's own exit 2. Add a criterion and Test Plan row for the non-timeout failure path.
 
 FINDING: F-03
 KIND: judgement
 SEVERITY: should-fix
-WHERE: Design; Acceptance Criteria, AC-01; Test Plan, AC-01 row
-EVIDENCE: Design only says probe.sh "exits 2 when the check times out" (docs/specs/feature.md:30). Today probe.sh runs `curl -fsS http://localhost/health >/dev/null` (probe.sh:2), so its exit status is curl's own: 28 on a timeout, 22 on an HTTP error, 7 on a refused connection. The document never says what probe.sh returns for a refused connection, a DNS failure or an HTTP error status, or whether those must stay different from 2. One implementer could map only curl exit 28 to 2. Another could exit 2 on any curl failure. The AC-01 proof passes both, so it cannot tell a script that reports every failure as a timeout from a correct one.
-PROPOSAL: State in Design the exit status for a timeout, for every other curl failure and for success. Add a Test Plan row, for example a refused connection that must not exit 2, so the proof fails an implementation that collapses every failure to 2.
+WHERE: Design (line 30), Open Questions (line 48)
+EVIDENCE: The timeout value is a trade-off the document settles: R-1 F-01 raised it from 5 to 10 seconds on the grounds of "the endpoint's documented warm-up", and commit fee90c4 applied that change. The standard says "Every trade-off the document settles is an open question, including one the author would answer the same way the owner would." Open Questions says "None.". The warm-up claim is not cited anywhere in the document, there is no Sources section, and nothing in the tree documents a warm-up time (git ls-files lists only AGENTS.md, docs/specs/feature.md and probe.sh).
+PROPOSAL: Raise the timeout value (for example 5 versus 10 seconds) as an Open Question for the owner, citing the warm-up documentation in Sources. Fold the answer into every location named in F-01.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan (AC-01 row, line 40), Acceptance Criteria (AC-01, line 34)
+EVIDENCE: The only proof is a slow stub with the result "exit 2 after about 5 seconds". "about" gives no bound, and no row checks that a fast, healthy endpoint still makes probe.sh exit 0. A script that sleeps and always exits 2 would pass this proof, and so would one that waits much longer than the timeout.
+PROPOSAL: Give the expected elapsed time a stated tolerance, and add a criterion with a Test Plan row showing that a healthy endpoint that answers well within the timeout makes probe.sh exit 0.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Context (Owner summary, line 18)
+EVIDENCE: The Owner summary is a single sentence: "Stop waiting for a slow health check after 5 seconds." It leaves out the new exit status 2, the out of scope retries from Scope, and the validation state (no check has been run). The standard asks the summary to cover scope, defaults, validation state and owner decisions and to separate planned checks from observed proof.
+PROPOSAL: Expand the Owner summary to give the agreed timeout, the exit status contract, the retry exclusion, and the fact that the proof is planned but not yet observed.

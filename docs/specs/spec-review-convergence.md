@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "R-20 findings fixed and every proof rerun at 1767ceb; waiting for a new independent implementation review."
+status_description: "R-20 findings fixed, main merged and every proof rerun at 58657f2; waiting for a new independent implementation review."
 issue: null
 branch: feat/spec-review-convergence
 goal: "Spec review rates findings consistently, finds failure-mode gaps and every restatement in one pass, applies each pass's findings as one revision without applying nits, and never rewrites reviewed commits."
@@ -82,7 +82,7 @@ performs. Five tasks were already done and stay done.
 
 Validation was observed on the branch. The reviewer and author trials, rerun as fresh headless sessions
 with their transcripts committed, and the scenario cases for the nit rule, the no-rewrite rule and the
-older pin all pass at `1767ceb`. The rules block comparison, the lint and gate runs under both pins and
+older pin all pass at `58657f2`. The rules block comparison, the lint and gate runs under both pins and
 the plugin test suite also pass. The evidence line under each criterion names the run.
 
 Accepting this authorizes the companion docs change, the plugin edits and their tests on a feature
@@ -336,26 +336,26 @@ reviewed revert of the docs and plugin edits and the pin.
       that lens's declared severity.
       Evidence: `bun test tests/vh-adlc/review-convergence.test.ts` at 6e67cf3: the resolved `1ccf8f3` convention defines the three severities and the lens precedence; reviewer trials ac02-severity (blocking, nit, should-fix, nit) and ac02-lens (should-fix for the lens) pass, records in `tests/vh-adlc/evidence/review-convergence/trials/history/records/`; reviewer is Claude Code subagents reporting `claude-opus-5-5`. ac02-lens was rerun on the final agent text after `1371041` reworded the lens sentence and passed again (`trials/history/records/ac02-lens-final.txt`).
       Evidence: R-20 at `4e4b873`: not verified.
-      Evidence: `bun test tests/vh-adlc/review-convergence.test.ts` passes (10 of 10) against the published `1ccf8f3` convention. Reviewer trials at `1767ceb`, run by `tests/vh-adlc/evidence/review-convergence/trials/run.ts` as fresh headless sessions reporting `claude-opus-5-5`: ac02-severity rates the false claim blocking, the wrong line number nit, the ambiguity should-fix and the wording slip nit; ac02-lens rates the slip should-fix under the declared lens (`tests/vh-adlc/evidence/review-convergence/trials/runs/`, transcripts and sha256 in `manifest.json`).
+      Evidence: `bun test tests/vh-adlc/review-convergence.test.ts` passes (10 of 10) against the published `1ccf8f3` convention. Reviewer trials at `58657f2` and `505bfab` (identical `plugins/`), run by `tests/vh-adlc/evidence/review-convergence/trials/run.ts` as fresh headless sessions reporting `claude-opus-5-5`: ac02-severity rates the false claim blocking, the wrong line number nit, the ambiguity should-fix and the wording slip nit; ac02-lens rates the slip should-fix under the declared lens (`tests/vh-adlc/evidence/review-convergence/trials/runs/`, transcripts and sha256 in `manifest.json`).
 - [x] AC-03: A reviewer following the updated agent reports, in one finding, every location of a rule a
       document states inconsistently, and an author following the updated skill changes every
       restatement in one commit.
       Evidence: reviewer trial ac03-restatement names all five locations in one finding; author trial author-ac03 changed every restatement in one commit (`9c572d4`) after the owner's answer; evidence in `trials/history/records/` and `trials/history/authors/`.
       Evidence: R-20 at `4e4b873`: not verified.
-      Evidence: At `1767ceb`: reviewer trial ac03-restatement names Design, Owner summary, Scope, AC-01 and the Test Plan row in F-01; author trial author-ac03 asks first with the baseline unchanged, then one commit sets all five places to 4 (`tests/vh-adlc/evidence/review-convergence/trials/runs/`).
+      Evidence: At `58657f2` (reviewer trials partly at `505bfab`, identical `plugins/`): reviewer trial ac03-restatement names Design, Owner summary, Scope, AC-01 and the Test Plan row in F-01; author trial author-ac03 asks first with the baseline unchanged (`e8ea146`), then one commit (`9fb5075`) sets all five places to 4 (`tests/vh-adlc/evidence/review-convergence/trials/runs/`).
 - [x] AC-04: A reviewer following the updated agent returns a failure-mode finding for each of the four
       questions a design that changes shared state or crosses a network boundary leaves undefined, and
       returns no failure-mode finding for a design that changes no state and crosses no boundary.
       Evidence: reviewer trials ac04-concurrency, ac04-retry, ac04-upgrade and ac04-partial each raise the open question first; ac04-wording raises no failure-mode finding (second run, after the cache held the prose guide).
       Evidence: R-20 at `4e4b873`: not verified.
-      Evidence: At `1767ceb`: reviewer trials ac04-concurrency, ac04-retry, ac04-upgrade and ac04-partial each raise the question their fixture leaves open; ac04-wording raises no failure-mode finding (`tests/vh-adlc/evidence/review-convergence/trials/runs/`).
+      Evidence: At `58657f2` (reviewer trials partly at `505bfab`, identical `plugins/`): reviewer trials ac04-concurrency, ac04-retry, ac04-upgrade and ac04-partial each raise the question their fixture leaves open; ac04-wording raises no failure-mode finding (`tests/vh-adlc/evidence/review-convergence/trials/runs/`).
 - [x] AC-05: The published convention requires must-pass and must-fail examples in a free-text pattern
       proof; on a row that has passed review at its current text, a reviewer rates a missed wrong output
       as a nit and a rejected correct output as blocking, and on a row changed since, rates a missed
       wrong output as should-fix.
       Evidence: `review-convergence.test.ts` finds the example requirement in the resolved Test plan section; reviewer trials ac05-passed (nit and blocking) and ac05-changed (should-fix) pass.
       Evidence: R-20 at `4e4b873`: not verified.
-      Evidence: `review-convergence.test.ts` finds the must-pass and must-fail requirement in the published Test plan section. At `1767ceb`: ac05-passed rates the missed wrong output nit, saying it only widens a reviewed row, and the rejected correct output blocking; ac05-changed rates the missed wrong output should-fix (`tests/vh-adlc/evidence/review-convergence/trials/runs/`).
+      Evidence: `review-convergence.test.ts` finds the must-pass and must-fail requirement in the published Test plan section. At `58657f2` (reviewer trials partly at `505bfab`, identical `plugins/`): ac05-passed rates the missed wrong output nit, saying it only widens a reviewed row, and the rejected correct output blocking; ac05-changed rates the missed wrong output should-fix (`tests/vh-adlc/evidence/review-convergence/trials/runs/`).
 - [x] AC-06: The rules block is byte-identical to the previous pin, the named historical specs give the
       same lint, `fresh` and gate results under both pins, the repository pin in `AGENTS.md` and every
       docs pin in the plugin point at the published docs commit or a later one containing it, both
@@ -364,13 +364,13 @@ reviewed revert of the docs and plugin edits and the pin.
       needed pin, and the plugin test suite passes.
       Evidence: rules block sha256 identical at `d8f07c9` and `1ccf8f3`; nine lint, fresh and gate results identical between clones differing only in the pin; `AGENTS.md`, `knowledge.md` and `references/security-settings.md` name `1ccf8f3`; manifests 0.19.0 above main's 0.18.1; S16.oldpin and S16.oldpin-reviewer pass; `bun test tests/vh-adlc` at 6e67cf3: 1579 pass, 2 environmental fails also failing on main; docs `npm run check` passed on https://github.com/vhco-pro/docs/pull/35.
       Evidence: R-20 at `4e4b873`: not verified.
-      Evidence: Rules block hashes the same at `d8f07c9` and `1ccf8f3`; lint, `fresh` and `gate planned` give identical results for the three named specs in clones differing only in the pin (also observed in R-20); every pin names `1ccf8f3`; both manifests are 0.19.0 against main's 0.18.1. At `1767ceb`: S16.oldpin (factual nit applied, report names the plugin pin), S16.oldpin-judgement (judgement nit becomes an Open Question) and S16.oldpin-reviewer (failure-mode gap raised) pass (`tests/vh-adlc/evidence/review-convergence/S16.oldpin*.md`). `bun test tests/vh-adlc`: see the AC-06 run below.
+      Evidence: Rules block hashes the same at `d8f07c9` and `1ccf8f3`; lint, `fresh` and `gate planned` give identical results for the three named specs in clones differing only in the pin (also observed in R-20); every pin names `1ccf8f3`; both manifests are 0.20.0 against main's 0.19.0, after merging main in (`1026453`). At `58657f2` (reviewer trials partly at `505bfab`, identical `plugins/`): S16.oldpin (factual nit applied, report names the plugin pin), S16.oldpin-judgement (judgement nit becomes an Open Question) and S16.oldpin-reviewer (failure-mode gap raised) pass (`tests/vh-adlc/evidence/review-convergence/S16.oldpin*.md`). `bun test tests/vh-adlc` at `58657f2` plus evidence: 1623 pass, 5 fail. Two are the Bubblewrap and real go mod tidy tests, which fail on main too. Three are 5 second timeouts in `tests/vh-adlc/audit/live-recovery.test.ts`, unchanged from main: rerun alone they gave 21 pass and 2 different timeouts, and the same file on an export of `origin/main` gave 22 pass and 1 timeout.
 - [x] AC-07: An author following the updated skill, drafting a feature that crosses a network boundary,
       states the behavior for concurrent requests, partial failure, retry or replay, and upgrade or
       rollback in Design, or raises an Open Question for any it cannot settle.
       Evidence: author trial author-ac07 states concurrency, partial failure, retry or replay, and upgrade or rollback in Design, with Open Questions for the open choices (`trials/history/authors/author-ac07.deploy-chat-notification.md`).
       Evidence: R-20 at `4e4b873`: not verified.
-      Evidence: At `1767ceb`: author trial author-ac07's Design has a subsection each for concurrent requests, partial failure, retry and replay, and upgrade and rollback, with Q1 to Q7 for the open choices; the draft is in `runs/author-ac07/history.txt` and the transcript beside it.
+      Evidence: At `58657f2` (reviewer trials partly at `505bfab`, identical `plugins/`): author trial author-ac07's Design has a paragraph each for concurrent requests, partial failure, retry and replay, and upgrade and rollback, with Q1 to Q10 for the open choices; the draft is in `runs/author-ac07/history.txt` and the transcript beside it.
 - [x] AC-08: The published convention states the nit rule beside the severity definitions, and
       `docs/get-started/first-feature.md` and `docs/user-guides/workflows.md` describe the severities,
       the nit rule and applying a pass's findings as one revision; the workflows guide also says no
@@ -384,14 +384,14 @@ reviewed revert of the docs and plugin edits and the pin.
       says in `EVIDENCE` when a finding traces to the previous revision's change.
       Evidence: author trials author-ac09 (one commit, check script passes, mechanism removed, behaviors and checks listed) and author-ac09-judgement (question first with the baseline unchanged, then one commit) pass; reviewer trial ac09-trace cites the previous revision's change.
       Evidence: R-20 at `4e4b873`: not verified.
-      Evidence: At `1767ceb`: author-ac09 applies both findings in one commit, `tests/check-timeout.sh` prints PASS, `--legacy` is gone, and the report lists the behaviors and checks walked; author-ac09-judgement raises the question with the baseline unchanged, then one commit applies F-01, F-02 and the answer; reviewer trial ac09-trace cites the previous revision's commit (`tests/vh-adlc/evidence/review-convergence/trials/runs/`).
+      Evidence: At `58657f2` (reviewer trials partly at `505bfab`, identical `plugins/`): author-ac09 applies both findings in one commit, `tests/check-timeout.sh` prints PASS, `--legacy` is gone, and the report lists the behaviors and checks walked; author-ac09-judgement raises the question with the baseline unchanged, then one commit applies F-01, F-02 and the answer; reviewer trial ac09-trace cites the previous revision's commit (`tests/vh-adlc/evidence/review-convergence/trials/runs/`).
 - [x] AC-10: `references/authority.md` forbids rewriting a commit a Review Log row names, with no
       approval exception, in both Preservation and its history-rewrite row; and when review mode brings
       default-branch work into a feature branch, it uses a merge, so every reviewed commit stays
       reachable.
       Evidence: `review-convergence.test.ts`: Preservation and the history-rewrite row both forbid rewriting a reviewed commit; scenario S16.drift passes 7 of 7 (drift merged, every reviewed commit an ancestor, no `commit-unreachable`).
       Evidence: R-20 at `4e4b873`: not verified.
-      Evidence: `review-convergence.test.ts` passes both authority checks. S16.drift at `1767ceb` passes 7 of 7: the drift comes in by merge, every reviewed commit is an ancestor of the tip, and `fresh` never reports `commit-unreachable` (`tests/vh-adlc/evidence/review-convergence/S16.drift.md`).
+      Evidence: `review-convergence.test.ts` passes both authority checks. S16.drift at `58657f2` passes 7 of 7: the drift comes in by merge, every reviewed commit is an ancestor of the tip, and `fresh` never reports `commit-unreachable` (`tests/vh-adlc/evidence/review-convergence/S16.drift.md`).
 - [x] AC-11: With the new convention, an author following the updated skill makes no commit that
       changes the normative baseline only to fix nits; fixes every nit of a pass, factual or judgement
       and in any section, in the same commit that applies that pass's blocking or should-fix findings to
@@ -400,7 +400,7 @@ reviewed revert of the docs and plugin edits and the pin.
       report and the owner-facing conversation summary, not in the document.
       Evidence: scenario S16.nits passes 8 of 8 with the T5 skill (`history/S16.nits.t5.md`): pass-1's blocking fix and all three nits land in one commit, no Open Question, pass-2's nit listed in the report and not applied; S7.7, S7.7.accept, S7.9 and S14.spec pass with the same skill. Rerun on the final skill text (plugin 0.19.0 at `606d495`): 8 of 8 again (`history/S16.nits.final.md`).
       Evidence: R-20 at `4e4b873`: untested.
-      Evidence: S16.nits at `1767ceb` passes 8 of 8 with the R-20 checks: exactly two passes; the one agent commit that changes the baseline adds the blocking fix and all three pass-1 nits; no Open Question; the pass-2 nit is unapplied and listed by its IDs (`tests/vh-adlc/evidence/review-convergence/S16.nits.md`). S7.7, S7.7.accept, S7.9 and S14.spec pass at `1767ceb`.
+      Evidence: S16.nits at `58657f2` passes 8 of 8 with the R-20 checks: exactly two passes; the one agent commit that changes the baseline adds the blocking fix and all three pass-1 nits; no Open Question; the pass-2 nit is unapplied and listed by its IDs (`tests/vh-adlc/evidence/review-convergence/S16.nits.md`). S7.7, S7.7.accept, S7.9 and S14.spec pass at `58657f2`.
 
 ## Test Plan
 

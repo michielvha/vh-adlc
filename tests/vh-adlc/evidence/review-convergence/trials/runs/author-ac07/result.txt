@@ -1,83 +1,90 @@
 === turn 1
-Conventions: vhco-pro/docs@1ccf8f3 (repository pin, `AGENTS.md`); prose edited with `guides/humanize-prose.md` at that revision.
+I wrote the feature document as a draft and committed it on `main`. It passes lint, no reviewer was dispatched, and nothing was pushed (the repository has no remote).
 
-I committed the draft as **`fed758f`** on `main` (`docs(spec): draft chat notification after each deploy [skip ci]`), adding `docs/specs/deploy-chat-notification.md`. The repository has no remote, so the commit has no URL and nothing was pushed. Following the trial rules, I sent nothing for review, created no issue (`issue: null`), and left all seven Open Questions unanswered.
+Conventions: vhco-pro/docs@1ccf8f3 (repository pin, `AGENTS.md`); prose edited with `guides/humanize-prose.md` at 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff.
 
-**Binary results**
+**Commit:** `2cb56ba` — "docs: draft chat notification after each deploy". It adds `docs/specs/deploy-chat-notification.md` with `status: draft` and `issue: null`.
+
+**`vh-adlc` results I acted on:**
 - `knowledge`: `"result":"answered"`, source `repository`, feature root `docs/specs/`. The repository is already pinned, so no onboarding commit was needed.
-- `find --slug deploy-chat-notification`: `"result":"answered"`, `documents: []`, so I created a new document.
+- `find --slug deploy-chat-notification`: `"result":"answered"`, `"documents":[]`, so creating a new document was allowed.
 - `lint`: `"result":"pass"`, no findings.
-- `next`: `"action":"owner decision"`, because the 7 Open Questions are unanswered.
-- Loop route: `{"role":"author","route":"host"}`. The `context` command listed no extra files to read.
+- `loop/cli.ts route`: author route `host`. `context` listed no extra files to read.
 
-## Design paragraphs, quoted
+**What the draft covers.** Today `deploy.sh` is two lines, and its exit status is whatever `ship-release` returns (`deploy.sh:1-2`). The draft keeps that status, then posts one message through `curl` to the URL in `DEPLOY_CHAT_WEBHOOK_URL`. The URL reaches `curl` on standard input, so it never shows up in the process list. There are 8 criteria, each tied to a case in a planned test, `tests/deploy_notify_test.sh`. None of those tests has been written or run. There are 10 Open Questions, all left unanswered as the trial rules require.
 
-**Concurrent requests**
-> `deploy.sh` has no lock today (`deploy.sh:1-2`) and this feature adds none. When two deploys run at the same time, on one host or several, each run posts its own message once its own `./ship-release` returns. The chat service orders them by arrival, which can differ from the order the deploys finished. Each message carries the revision, host and UTC finish time, so a reader can tell the two apart and see which finished last. The notify step shares no file or state between runs, so concurrent runs cannot corrupt each other's message.
+### Design paragraphs (quoted)
 
-**Partial failure**
-> The deploy and the notification are separate steps with no transaction between them, and the deploy always comes first. The cases are:
-> - Deploy succeeded, post failed (DNS, TLS, refused connection, non-2xx, timeout): the deploy stands, the script exits 0, and stderr carries the failure line. The channel shows nothing for that deploy.
-> - Deploy succeeded, post timed out after the service accepted it: the channel shows the message while stderr reports a failure. The script cannot tell this case from a lost request.
-> - Deploy failed: the script still posts the failure message (Q1) and exits with the deploy's code.
-> - `deploy.sh` is killed during the post: the deploy has already finished; the message may or may not arrive. The 10 second limit (Q3) bounds how long a hung webhook can hold the script.
+> **Partial failure.** `ship-release` has already finished before any network call, so a failure in the notification step cannot leave the deploy half done. The possible outcomes are:
+>
+> - DNS, TLS or connection failure, an HTTP status of 400 or above (`--fail`), or the 10-second limit: `curl` exits non-zero, and `notify_chat` prints one warning line, `deploy.sh: chat notification failed (curl exit <code>)`, and returns. The deploy keeps its status.
+> - The request reaches the service but the response is lost or arrives after the time limit: the message may appear in chat while `deploy.sh` warns that it failed. The warning therefore means delivery is unconfirmed, not that the message is absent.
+> - The operator interrupts `deploy.sh` during the post: `ship-release` has already finished, and the message may or may not have been sent. The shell's own status for the interruption applies.
 
-**Retry and replay**
-> The draft makes one attempt and does not retry (Q4). A retry after a timeout could post the same message twice, because the generic webhook takes no idempotency key and the case above shows a timed-out request may already have landed. Re-running `deploy.sh` by hand, for the same or another revision, is a new deploy and sends a new message; the team may see two messages for one revision, each with its own time. There is no stored "already notified" state to replay from or to deduplicate against.
+> **Retry and replay.** `notify_chat` makes one attempt and never retries (Q3). With no retry, the lost-response case above cannot produce a second copy of the message. Running `deploy.sh` again is a new deploy and posts a new message; the webhook has no idempotency key, so the same revision deployed twice appears twice, each with its own time. Nothing is queued for later delivery, so a failed message is not replayed.
 
-**Upgrade and rollback**
-> The feature adds no stored state, schema or file outside `deploy.sh`, so neither direction needs a migration.
-> - Upgrade on a host without `DEPLOY_CHAT_WEBHOOK_URL`: deploys behave as before plus one warning line on stderr and no post. Setting the variable turns the post on with no code change.
-> - Rolling back `deploy.sh` to the previous version: deploys stop posting. A variable left set is ignored. Nothing needs cleaning up.
-> - Deploying an older application revision with the new `deploy.sh`: the message names whatever revision `git rev-parse` reports in the working tree, so a rollback deploy shows up in chat like any other.
-> - Removing the webhook on the chat side: posts fail with a non-2xx response, which the partial failure rules above already cover; deploys keep working.
+> **Concurrent requests.** The function keeps no state: no temporary file, lock or cache. Two runs of `deploy.sh` that overlap, on one host or several, each send their own single post with their own fields, and the chat may show them in either order (Q10). If the service rate-limits and answers with an HTTP error, that run takes the failed-post path above.
 
-## Open Questions that cover these cases, quoted
+> **Upgrade and rollback.** The change adds no stored state, no file format and no required setting. After upgrading, a deploy without `DEPLOY_CHAT_WEBHOOK_URL` behaves as before apart from the one-line notice. Rolling back is `git revert` of the `deploy.sh` commit; the previous `deploy.sh` ignores the variable, so it can stay set. Deploying an older release with the new `deploy.sh` posts the older revision like any other deploy. A deploy run from a checkout older than this change has the old `deploy.sh` and posts nothing.
 
-> ### Q2: Should a failed notification ever change deploy.sh's exit status?
-> **Recommendation:** A. Never; a deploy that worked should not be reported as failed because chat was down.
+### Open Questions on those topics (quoted)
+
+> ### Q1: Should a failed chat post make the deploy fail?
+>
+> **Recommendation:** A. Keep the deploy's status; chat is a side channel and the release is already out.
 >
 > | Option | You get | It costs |
 > | --- | --- | --- |
-> | **A. Never** | Deploy pipelines see only the deploy's result | A broken webhook can go unnoticed except for a stderr line |
-> | **B. Fail on notify error** | Broken notifications get noticed at once | A chat outage makes successful deploys look failed and may trigger rollbacks or retries |
+> | **A. Warn only** | A deploy's result means only whether `ship-release` worked | A missed message is easy to overlook in stderr |
+> | **B. Fail the deploy** | Nobody misses a broken webhook | A chat outage marks good deploys as failed and may prompt needless re-runs |
 >
-> **Why this is yours:** It trades notification reliability against deploy pipeline behaviour.
+> **Why this is yours:** it decides what the deploy's exit status means to people and scripts that read it.
 
-> ### Q3: How long should deploy.sh wait for the webhook?
-> **Recommendation:** A. 10 seconds, which covers a slow TLS handshake without stalling a pipeline for long.
+> ### Q3: Should a failed post be retried?
+>
+> **Recommendation:** A. One attempt; a retry after a lost response would post a duplicate.
 >
 > | Option | You get | It costs |
 > | --- | --- | --- |
-> | **A. 10 seconds** | A bounded wait; AC-04 tests it | A very slow but working service may be cut off |
-> | **B. 30 seconds** | Fewer false timeouts | A hung webhook holds every deploy up to half a minute |
+> | **A. No retry** | Never a duplicate; the deploy waits at most 10 seconds | A brief network fault loses that message |
+> | **B. One retry on connection failure only** | Recovers from refused or dropped connections before any request is sent | Up to about 20 seconds of waiting; harder to test |
+> | **C. Several retries with backoff** | Best chance of delivery | Longer waits and possible duplicates when a response is lost |
 >
-> **Why this is yours:** The right bound depends on how the team runs deploys and how much delay it accepts.
+> **Why this is yours:** it trades message loss against duplicates and deploy time.
 
-> ### Q4: Should deploy.sh retry a failed post?
-> **Recommendation:** A. No retry; a timed-out post may already have landed, and a retry would then duplicate it.
+> ### Q5: What should happen when no webhook URL is configured?
+>
+> **Recommendation:** A. Skip with a one-line notice, so existing deploy setups keep working after the upgrade.
 >
 > | Option | You get | It costs |
 > | --- | --- | --- |
-> | **A. One attempt** | At most one message per deploy | Brief outages drop the message |
-> | **B. One retry after 2 seconds, only on connection errors and 5xx** | Survives brief blips | Up to 22 seconds of waiting; a 5xx after delivery can still duplicate |
+> | **A. Skip with a notice** | No setup needed before the first deploy with the new script | A forgotten variable silently stops messages, apart from the notice |
+> | **B. Fail the deploy** | Misconfiguration is caught at once | Every deploy location must be configured before upgrading |
 >
-> **Why this is yours:** It chooses between missed and duplicated messages.
+> **Why this is yours:** it sets how strict the upgrade is.
 
-> ### Q6: Should a missing webhook URL be a silent skip, a warning, or an error?
-> **Recommendation:** A. Warn on stderr and skip, so hosts without the variable keep deploying.
+> ### Q9: How long may the post take?
+>
+> **Recommendation:** A. 5 seconds to connect and 10 seconds in total.
 >
 > | Option | You get | It costs |
 > | --- | --- | --- |
-> | **A. Warn and skip** | Safe rollout host by host | A host missing the variable stays quiet in chat until someone reads the log |
-> | **B. Fail the deploy** | No host can deploy unannounced | Every host must have the secret before the next deploy |
+> | **A. 5 s connect, 10 s total** | A deploy is delayed by at most 10 seconds | A slow but working service may be cut off |
+> | **B. 30 s total** | Tolerates slow services | A dead service holds every deploy for 30 seconds |
 >
-> **Why this is yours:** It decides rollout order and whether notification is mandatory.
+> **Why this is yours:** it trades deploy latency against delivery on a slow network.
 
-The other three questions are not quoted here. Q1 asks whether to post after failed deploys, which affects the partial-failure case. Q5 asks which chat service's payload format to use. Q7 asks whether deploy hosts can be required to have `curl`.
+> ### Q10: Is it acceptable that overlapping deploys may post out of order?
+>
+> **Recommendation:** A. Accept it; each message carries its time and revision.
+>
+> | Option | You get | It costs |
+> | --- | --- | --- |
+> | **A. No ordering guarantee** | No lock or shared state | Chat order may differ from deploy order |
+> | **B. A lock file around the post** | Ordered posts on one host | Lock cleanup after a crash, and no ordering across hosts anyway |
+>
+> **Why this is yours:** it depends on whether the team runs overlapping deploys and reads chat order as deploy order.
 
-## Summary
-- **What it does:** after `./ship-release` finishes, `deploy.sh` makes one HTTPS POST to the URL in `DEPLOY_CHAT_WEBHOOK_URL`. The message gives the result, the revision, the host and the UTC time. The URL never appears in arguments or output, and the script always exits with the deploy's own code.
-- **Out of scope:** changes to `ship-release`, locking against concurrent deploys, other channels, and setting up or rotating the webhook secret.
-- **Tests:** a shell test against stub `ship-release` and `curl` commands, needing no network, plus one manual post to a real test channel. These are planned only; nothing has been run.
-- **What's left:** the owner needs to answer the 7 Open Questions, then a spec review and acceptance follow. None of that was done in this run.
+The other open questions are: Q2 (should failed deploys also post), Q4 (where the URL comes from), Q6 (what the message says), Q7 (which chat service and payload field; `text` is my unverified assumption) and Q8 (which HTTP client to use, and what to do when it is missing).
+
+**Still to do:** all 10 Open Questions need the owner's answers. After that the document needs a spec review, which I did not request, and the owner's acceptance. I made no pre-acceptance summary or acceptance request because the trial has no owner. No issue was created.

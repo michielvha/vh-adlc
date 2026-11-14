@@ -1,85 +1,76 @@
 === turn 1
-Conventions: vhco-pro/docs@1ccf8f3 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md at 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff.
-
-I turned R-1's one finding into an Open Question and committed it. The spec itself is unchanged. I've stopped here until you answer Q1.
+I've stopped at an owner decision. R-1's only finding needs you to pick the attempt limit, so I wrote it into the document as Open Question Q1 and changed nothing in Scope, Design, Acceptance Criteria or the Test Plan.
 
 ## Commit
 
-- `f378523` Ask the owner to settle the fetch.sh attempt limit. It is local on `main`, not pushed (trial rule).
+- **`e8ea146`** Raise R-1 F-01 attempt limit as an open question. It touches only `docs/specs/feature.md`, is local, and was not pushed.
 
-## What changed in `docs/specs/feature.md`
+## What changed and why
 
-- **Open Questions:** Q1 asks for the attempt limit, with three options: A (3), B (4), C (5). I recommend A, keeping 3. Four places already say 3: the goal, Scope, AC-01 and its Test Plan row. R-1 says a measured flaky mirror needs 4 attempts, but nothing in the repository backs that up. `fetch.sh:2` is one `curl` call with no retry, and searching for "flaky" or "mirror" finds only the R-1 record.
-- **Owner summary:** one added sentence saying the limit waits on Q1. This is outside the spec's binding sections, so R-1 stays fresh.
+R-1 F-01 (factual, should-fix) is right about the contradiction: Design says 5 attempts, while the Owner summary, Scope, AC-01 and its Test Plan row all say 3. But its proposal to use 4 rests on a "measured flaky-mirror recovery in fetch.sh" that I couldn't find. `fetch.sh` is two lines with no retry or mirror logic (`fetch.sh:2`), and searching all git history for `mirror`, `attempt`, `retr` and `flaky` finds nothing outside the spec. With no measurement to go on, picking the number is a judgement call, so it went to you as a question.
 
-## Why F-01 became a question
+**Q1: How many attempts should fetch.sh make before it exits 1?** I recommend A.
+- **A. Keep 3.** Only Design changes, from 5 to 3. If the mirror really needs 4 attempts, it will still fail.
+- **B. 4, as the reviewer proposed.** Five sections change, and the case for it is a measurement that isn't in the repository.
+- **C. 5.** Four sections change, and a download that keeps failing waits 8 seconds before giving up.
 
-F-01 is marked factual / should-fix. The mismatch it points at is real: Design says 5 attempts, everywhere else says 3. But fixing it means picking a number, and that trades recovery from slow mirrors against how long a dead URL takes to fail. That choice is yours, so I didn't edit Design or anything else in the binding sections.
+Once you answer, I'll make one commit that applies your choice to every place that states the limit (Owner summary, Scope, Design, AC-01, Test Plan row) and removes Q1. The R-1 pass stays as it is until a new independent review runs at that commit.
 
 ## Behaviors and checks walked
 
-- **Behaviors:** retry after a failed download, the attempt limit, the two-second wait between attempts (stated only in Design), and exit 1 once attempts run out.
-- **Checks:** AC-01 and its Test Plan row (a stub `curl` that always fails is called exactly 3 times, then fetch.sh exits 1). That check counts attempts, so it changes under options B or C. The repository has no test files or fixtures (`git ls-files` lists only `AGENTS.md`, the spec and `fetch.sh`).
-- **Nits:** the conventions page does state the nit rule. R-1 had no nits, so none are left unapplied.
+- **Behaviors:** retry after a failed download, the attempt limit, the 2-second wait between attempts, exit 1 once attempts run out, and the current no-retry behavior at `fetch.sh:2`.
+- **Places that state the limit:** the frontmatter goal and title line (both say "bounded", so neither depends on the number), Owner summary (3), Scope (3), Design (5), AC-01 (3), Test Plan row (3).
+- **Tests and fixtures:** the one Test Plan check is a stub curl that always fails and must be called exactly 3 times, with exit 1. It doesn't exist in the repository yet. Its count follows whatever you choose for Q1; nothing else in it changes.
+- **Nit rule:** the pinned `conventions/feature-documents.md` states it. R-1 had no nits, so none are left unapplied.
 
-## `vh-adlc` results
+## vh-adlc results
 
-- `knowledge`: `"result":"answered"`, source `repository`, pin `1ccf8f3`.
-- `find`: `"result":"answered"`, only `docs/specs/feature.md`. I extended that document.
-- `lint`: `"result":"pass"`.
-- `fresh`: `"result":"answered"`, R-1 at `f743538` is `"stale":false`. There is no remote, so I skipped `git fetch`.
-- `next`: `"action":"owner decision"`, because Open Questions holds 1 unanswered question.
-- I did not run `review check` against R-1. It needs the reviewer's returned file, and I only have the records already stored at HEAD.
+- `knowledge`: answered, revision `1ccf8f3…`, source repository, feature root `docs/specs/`.
+- `find`: answered, `docs/specs/feature.md`.
+- `lint`: pass, before and after the edit.
+- `gate draft`: pass, "vh-adlc gate draft: pass (rules 1, docs 1ccf8f3)".
+- `fresh` after the commit: R-1 at `028fe0e` is still current (`stale: false`), because Open Questions is outside the reviewed baseline.
+
+I didn't re-run `review check` because R-1 was already recorded at HEAD, and the command needs the reviewer's original returned text as a file. Loop `context` listed no extra files or lenses, and `route` returned author on the host.
+
+## Where the spec stands
+
+The draft is about fetch.sh retrying a failed download a bounded number of times, with parallel downloads out of scope. R-1's should-fix finding is still open and waits on Q1. Nothing is accepted. Acceptance needs your answer, the revision commit, a new review pass with no blocking findings, and then your explicit acceptance.
+
+I edited the prose using `guides/humanize-prose.md` at docs revision `1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff`.
+
+=== turn 2
+Your answer is in: every place the limit appears in the document now says 4, Q1 is removed, and Open Questions reads "None." It's one commit on main, local and not pushed.
+
+## Commit
+
+- **`9fb5075`** Set the fetch.sh attempt limit to 4
+
+## Every place that states the limit
+
+- **Owner summary** (`docs/specs/feature.md:18-19`): "fetch.sh makes at most 4 attempts at a download, waiting two seconds between them, then exits 1. The owner chose 4 from their own knowledge of the mirror; no measurement in this repository backs the number."
+- **Scope** (`:27`): "In scope: at most 4 attempts per download. Out of scope: parallel downloads."
+- **Design** (`:31`): "On a failed download, fetch.sh waits two seconds and tries again, for at most 4 attempts, then exits 1."
+- **AC-01** (`:35`): "- [ ] AC-01: A download that keeps failing is attempted exactly 4 times, then fetch.sh exits 1."
+- **Test Plan** (`:41`): "| AC-01 | A stub curl that always fails is called exactly 4 times and fetch.sh exits 1 |"
+
+The title line and the frontmatter goal only say "bounded", so they didn't need to change. The R-1 records under `### R-1` still mention 3, 4 and 5 attempts, because stored review records are kept word for word.
+
+## Behaviors and checks walked
+
+- **Behaviors:** retry after a failed download, the attempt limit (now 4), the 2-second wait (unchanged, so a download that keeps failing takes 6 seconds of waiting before exit 1), exit 1 once attempts run out, and the current no-retry behavior at `fetch.sh:2`.
+- **Test:** the one planned check, a stub curl that always fails, now expects exactly 4 calls and exit 1. It isn't written yet.
+- **Unchanged:** AC-01 had no tick or evidence to reset, and the status stays draft.
+- **Nits:** R-1 had none, so none are left unapplied.
+
+## vh-adlc results
+
+- `lint`: pass.
+- `gate draft`: "vh-adlc gate draft: pass (rules 1, docs 1ccf8f3)".
+- `fresh`: R-1 at `028fe0e` is now stale, with reason `baseline-changed`. That's expected after a change to the reviewed sections.
 
 ## What's left
 
-1. You answer Q1.
-2. In one commit I then fix Design, and also the owner summary, Scope, AC-01 and its proof if the answer isn't 3, and I clear Q1.
-3. That commit changes the spec's binding sections, which makes R-1 stale. A new independent review is needed before you can be asked to accept, and per the trial rules I won't start one.
+R-1's should-fix finding is applied, but it only counts as cleared once a new independent spec review runs at `9fb5075`. Under the trial rules I didn't start one. After that review comes back without blocking findings, the document goes to you for explicit acceptance before it can move to planned.
 
-## Where the spec stands
-
-fetch.sh should retry a failed download a limited number of times, then exit 1. Parallel downloads are out of scope. The only open decision is the attempt limit. The retry check is planned but has never been run, and there is no implementation yet. Acceptance isn't up for a decision yet: Q1 is open and a fresh review is still needed.
-
-=== turn 2
-Conventions: vhco-pro/docs@1ccf8f3 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md at 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff.
-
-The limit is now 4 everywhere in the spec, and Q1 is gone. Because this changed the spec's binding sections, R-1 is now out of date and a new spec review is needed. Per the trial rules I haven't started one.
-
-## Commit
-
-- `dfb9b9c` Set the fetch.sh attempt limit to 4. It is a single commit on `main`, not pushed.
-
-## Every place that now states the limit (`docs/specs/feature.md`)
-
-- Line 18, owner summary: "fetch.sh makes at most 4 attempts at a download before giving up, waiting two seconds between attempts, then exits 1."
-- Line 32, Scope: "In scope: at most 4 attempts per download."
-- Line 36, Design: "On a failed download, fetch.sh waits two seconds and tries again, for at most 4 attempts, then exits 1."
-- Line 40, AC-01: "A download that keeps failing is attempted exactly 4 times, then fetch.sh exits 1."
-- Line 46, Test Plan: "A stub curl that always fails is called exactly 4 times and fetch.sh exits 1"
-
-Two other places mention the limit without a number:
-
-- The goal (line 5) and the intro line (line 12) say only that retries are bounded, so they agree and needed no edit.
-- The stored R-1 record (line 62) still quotes the old 5, 3 and 4. I left it untouched because review records are kept exactly as returned.
-
-## What else changed
-
-- **Owner summary:** it now says the limit comes from your own knowledge of the mirror, with no measurement in the repository behind it. It also says R-1 no longer applies, a new review is needed before acceptance, and the retry check is planned but has never run.
-- **Open Questions:** Q1 removed; the section now reads "None."
-- **Unchanged:** there were no criterion ticks or evidence lines to reset. The status was already `draft`, so no gate step was needed. R-1 had no nits.
-
-## Behaviors and checks walked
-
-- **Behaviors:** retry after a failed download, the attempt limit (now 4), the two-second wait between attempts, and exit 1 once attempts run out.
-- **Checks:** AC-01 and its Test Plan row, which I re-read before changing the expected call count from 3 to 4. The repository has no tests or fixtures that would also need updating.
-
-## `vh-adlc` results
-
-- `lint`: `"result":"pass"`.
-- `fresh`: `"result":"answered"`, R-1 at `f743538` is `"stale":true` with reason `baseline-changed`. That is expected after this revision.
-- `next`: `"action":"spec review"`, because the latest spec review is stale.
-
-## Where the spec stands
-
-fetch.sh will try a failing download up to 4 times, two seconds apart, then exit 1. Parallel downloads stay out of scope. No questions are open. The next step is a fresh independent spec review at `dfb9b9c`, which I haven't started under the trial rules; your acceptance comes after that. Implementation still needs a separate go-ahead.
+I edited the prose using `guides/humanize-prose.md` at docs revision `1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff`.

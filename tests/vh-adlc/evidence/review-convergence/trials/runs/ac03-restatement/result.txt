@@ -1,50 +1,51 @@
 === turn 1
 MODEL: claude-opus-5-5
+
 FINDING: F-01
 KIND: factual
 SEVERITY: blocking
-WHERE: Design (line 30); also Context > Owner summary (line 18), Scope (line 26), Acceptance Criteria AC-01 (line 34), Test Plan AC-01 row (line 40)
-EVIDENCE: Design says "tries again, at most 5 times, then exits 1". Owner summary and Scope say "at most 3 times". AC-01 says "tried at most 3 times". The Test Plan row says the stub curl "is called exactly 3 times".
-PROPOSAL: Choose one bound and state it the same way in Design, Owner summary, Scope, AC-01 and the Test Plan row. An implementer who follows Design builds 5 retries, and the proof then fails.
+WHERE: Design (line 30); Context > Owner summary (line 18); Scope (line 26); Acceptance Criteria AC-01 (line 34); Test Plan AC-01 row (line 40)
+EVIDENCE: Design says "tries again, at most 5 times, then exits 1". The Owner summary says "at most 3 times", Scope says "at most 3 times", AC-01 says "tried at most 3 times" and the Test Plan says the stub curl "is called exactly 3 times". An implementer who follows Design builds 5 retries, and the AC-01 proof then fails.
+PROPOSAL: Choose one limit and state it the same way in Design, Owner summary, Scope, AC-01 and the Test Plan row.
 
 FINDING: F-02
 KIND: factual
 SEVERITY: should-fix
-WHERE: Context > Owner summary (line 18), Scope (line 26), Acceptance Criteria AC-01 (line 34), Test Plan AC-01 row (line 40); also frontmatter goal (line 5) and the summary line (line 12)
-EVIDENCE: The Owner summary and Scope say fetch.sh "retries a failed download at most 3 times", which allows 1 attempt plus 3 retries, so 4 curl calls. AC-01 and the Test Plan count total tries: "tried at most 3 times" and "called exactly 3 times". The goal and line 12 say only "a bounded number of times".
-PROPOSAL: Say whether the bound counts retries or total attempts, for example "at most 3 attempts in total (1 try plus 2 retries)", and use that same wording everywhere the bound appears.
+WHERE: Context > Owner summary (line 18); Scope (line 26); Design (line 30); Acceptance Criteria AC-01 (line 34); Test Plan AC-01 row (line 40)
+EVIDENCE: The Owner summary says fetch.sh "retries a failed download at most 3 times" and Scope says "retrying a failed download at most 3 times". Read literally, that is 1 attempt plus 3 retries, so 4 curl calls. AC-01 says the download is "tried at most 3 times" and the Test Plan expects curl "called exactly 3 times", so 3 calls in total. Design says "tries again, at most 5 times", which is a retry count. Two careful implementers would make 3 or 4 calls.
+PROPOSAL: Say whether the limit counts total attempts or retries after the first attempt, using the same word in every section, and make the Test Plan's call count match.
 
 FINDING: F-03
-KIND: factual
+KIND: judgement
 SEVERITY: should-fix
-WHERE: Acceptance Criteria AC-01 (line 34); also Test Plan AC-01 row (line 40)
-EVIDENCE: fetch.sh:2 is `curl -fsS -o out "$1" || exit 1`. It already tries once and exits 1, so it meets "tried at most 3 times, then fetch.sh exits 1" today with no change. The criterion can be ticked while the original problem remains. The proof says "exactly 3", so the criterion and its proof disagree.
-PROPOSAL: State the end state as an exact count, for example "A download that keeps failing is tried exactly 3 times, then fetch.sh exits 1", so that the criterion matches the proof.
+WHERE: Acceptance Criteria AC-01 (line 34); Test Plan AC-01 row (line 40); goal frontmatter (line 5)
+EVIDENCE: The only criterion covers a download that keeps failing. No criterion or proof covers a download that fails and then succeeds: fetch.sh should stop calling curl and exit 0. An implementation that always calls curl 3 times and exits 1, even after a successful attempt, meets AC-01 and passes its proof, yet does not deliver a working retry.
+PROPOSAL: Add a criterion and a Test Plan row where a stub curl fails once and then succeeds. The proof checks that curl is called exactly twice and that fetch.sh exits 0 with the output file in place.
 
 FINDING: F-04
-KIND: factual
+KIND: judgement
 SEVERITY: should-fix
-WHERE: Acceptance Criteria (line 34), Test Plan (line 40)
-EVIDENCE: Only a download that always fails is covered. No criterion or proof row checks that a download which fails and then succeeds on a later attempt stops retrying and exits 0. An implementation that retries even after a success, or that exits 1 after a successful retry, passes the AC-01 proof.
-PROPOSAL: Add a criterion that a download failing once and then succeeding makes exactly 2 curl calls and exits 0. Add a Test Plan row that uses a stub curl which fails on its first call only.
+WHERE: Design (line 30)
+EVIDENCE: Design says "On a failed download" without defining failure. fetch.sh:2 runs `curl -fsS`, so an HTTP 4xx such as 404 is a non-zero exit, just like a network error. One implementer retries every non-zero exit, including a permanent 404. Another retries only transient failures such as connection errors, timeouts and 5xx responses.
+PROPOSAL: State which curl failures trigger a retry, for example every non-zero exit, and if the choice is a trade-off raise it as an Open Question.
 
 FINDING: F-05
-KIND: factual
+KIND: judgement
 SEVERITY: should-fix
-WHERE: Design (line 30); also Context > Owner summary (line 18), Acceptance Criteria (line 34), Test Plan (line 40)
-EVIDENCE: Design says fetch.sh "waits two seconds and tries again". The Owner summary does not mention the wait, and no criterion or proof row checks it, so an implementation with no delay or a different delay passes AC-01. The design also does not say whether the wait comes after the final failure.
-PROPOSAL: Add a criterion and a proof for the delay between attempts, for example a stub sleep that records its argument, and say that no wait follows the last attempt. Mention the delay in the Owner summary.
+WHERE: Design (line 30)
+EVIDENCE: fetch.sh:2 writes to `out` with `curl -o out` and the request crosses a network boundary. Design does not say what happens to a partial or empty `out` left by a failed attempt, or what is left after the final failure before `exit 1`. The design also does not say whether a run that ends in exit 1 must leave no `out` file.
+PROPOSAL: Define the state of `out` after a failed attempt and after the final failure, for example "removed on final failure". If the state matters to callers, cover it in a criterion and proof.
 
 FINDING: F-06
 KIND: judgement
 SEVERITY: should-fix
-WHERE: Design (line 30)
-EVIDENCE: fetch.sh:2 writes to the file `out` with `curl -fsS -o out`. The design adds retries across a network boundary but does not say what happens to `out` after a failed attempt or after the final failure. curl can leave a partial or empty file there. Two implementers could leave it in place or remove it.
-PROPOSAL: State what happens to `out` between attempts and after the final failure, for example that it is removed before exit 1. Add a criterion and a Test Plan row for that behaviour.
+WHERE: Design (line 30); Acceptance Criteria (line 34); Test Plan (line 40); Context > Owner summary (line 18)
+EVIDENCE: Design sets a two second wait between attempts. No criterion or proof checks the wait, so an implementation with no wait or a different wait passes AC-01. The Owner summary leaves out this default even though the standard asks it to cover important defaults. The proof will also take about 4 seconds per run unless the wait can be overridden.
+PROPOSAL: Either add a criterion and proof for the wait, for example with an overridable delay the test sets, or remove the wait from Design. Then name the chosen default in the Owner summary.
 
 FINDING: F-07
 KIND: judgement
-SEVERITY: should-fix
-WHERE: Open Questions (line 48); also Design (line 30)
-EVIDENCE: Open Questions says "None.", but the document settles at least two trade-offs: the attempt bound (given as 3 and as 5) and the fixed two-second delay, with no backoff considered. The standard says "Every trade-off the document settles is an open question".
-PROPOSAL: Raise the retry bound and the delay policy (fixed delay or backoff) as owner questions with a recommendation, then fold the answers into Design, Scope and the criteria.
+SEVERITY: nit
+WHERE: Context > Owner summary (line 18)
+EVIDENCE: The summary has one sentence. It does not give the out of scope item (parallel downloads), the exit status, or the validation state, which is that only a planned check exists and no proof has been observed. conventions/feature-documents.md asks the summary to cover scope, defaults and validation state and to keep planned checks apart from observed proof.
+PROPOSAL: Expand the summary to a few sentences that name the scope boundary, the exit code and wait defaults, and say that the AC-01 proof is planned but not yet run.

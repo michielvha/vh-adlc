@@ -1,40 +1,31 @@
-commit 4d484a5755c8558cc2fbb85e58347f9e252a50ac
+commit dc3613b7565e7921e9a8e0fe7ffb546534995b21
 Author: Trial Author
 
-    docs(spec): apply R-1 with a 10 second timeout and exit 2
+    Apply R-1: 10 second timeout, drop --legacy, timeout exits 2
 
 
 diff --git a/docs/specs/feature.md b/docs/specs/feature.md
-index d23efd0..ef55591 100644
+index c89a68d..26cbf7c 100644
 --- a/docs/specs/feature.md
 +++ b/docs/specs/feature.md
-@@ -15,11 +15,16 @@ probe.sh gives up on a slow health check after a fixed timeout.
+@@ -15,9 +15,9 @@ probe.sh gives up on a slow health check after a fixed timeout.
  
  ### Owner summary
  
 -Stop waiting for a slow health check after 5 seconds.
-+probe.sh stops waiting for a slow health check after 10 seconds, which leaves room for the endpoint's
-+warm-up of up to 8 seconds. A timeout makes probe.sh exit 2. Other failures keep the exit status they
-+have today, and retries stay out of scope. The planned proof is `tests/check-timeout.sh` plus a stub
-+endpoint that sleeps 12 seconds; neither has been run against an implementation yet.
++probe.sh stops waiting for a slow health check after 10 seconds and exits 2. The limit leaves room for the endpoint's warm-up, which R-1 F-01 reports can take up to 8 seconds. Retries stay out of scope.
+ 
+-R-1 left one decision for the owner: whether a timeout exits 2 or 3 (Q1). Its other findings are applied once Q1 is answered.
++This revision applies spec review R-1: the timeout moves from 5 to 10 seconds (F-01), the `--legacy` flag is dropped because it behaved exactly like no flag (F-02), and the owner chose exit 2 for a timeout (F-03). No check has run against an implementation yet. `tests/check-timeout.sh` only confirms that Design and AC-01 name the same timeout, and the stub-endpoint scenario is planned. R-1 was a blocking pass, so a new review of this revision is needed before acceptance.
  
  ### Background
  
--probe.sh waits for the health endpoint with no timeout (probe.sh:2).
-+probe.sh waits for the health endpoint with no timeout (probe.sh:2). It calls the endpoint right after
-+start, and the endpoint's warm-up takes up to 8 seconds (R-1 F-01). Because the curl call is the script's
-+last command, probe.sh exits with curl's status (probe.sh:2).
- 
- ## Scope
- 
-@@ -27,11 +32,13 @@ In scope: a timeout on the health check. Out of scope: retries.
+@@ -29,11 +29,11 @@ In scope: a timeout on the health check. Out of scope: retries.
  
  ## Design
  
 -probe.sh passes `--max-time 5` to curl and exits 2 when the check times out. A `--legacy` flag also exists; it selects the same 5 second timeout and the same exit status as running without it.
-+probe.sh passes `--max-time 10` to curl and exits 2 when the check times out. curl exits 28 when that
-+limit runs out (`man curl`, EXIT CODES, curl 8.15.0), so probe.sh turns 28 into 2. Every other exit status
-+from curl passes through unchanged, as it does today.
++probe.sh passes `--max-time 10` to curl and exits 2 when the check times out. Ten seconds covers the endpoint's warm-up, which R-1 F-01 reports takes up to 8 seconds right after start.
  
  ## Acceptance Criteria
  
@@ -43,81 +34,76 @@ index d23efd0..ef55591 100644
  
  ## Test Plan
  
-@@ -45,23 +52,7 @@ None yet; written once the document is planned.
+@@ -47,16 +47,7 @@ None yet; written once the document is planned.
  
  ## Open Questions
  
--### Q1: What exit status should probe.sh return when the health check times out?
+-### Q1: Should a timed-out health check exit 2, like any other failure, or a separate 3?
 -
--**Recommendation:** C. Let curl's own exit status through. probe.sh then needs no code to map the
--timeout to another number, and callers can still tell a timeout apart from other failures.
--
--probe.sh ends with the curl call (probe.sh:2), so today it exits with whatever curl returns. Other
--failures do not exit 2 now: curl exits 22 for an HTTP error status under `-f`, and 28 when its time
--limit runs out (`man curl`, EXIT CODES, curl 8.15.0). Raised by R-1 F-03.
+-**Recommendation:** A. Exit 2. probe.sh has only one failure exit today (`curl -fsS` at probe.sh:2), so a caller that already treats any nonzero exit as unhealthy needs no change.
 -
 -| Option | You get | It costs |
 -| --- | --- | --- |
--| **A. Exit 2** | One fixed code for a timeout, as the draft Design says | probe.sh needs code to turn curl's 28 into 2; other failures still return curl's codes, so 2 is not shared with them |
--| **B. Exit 3** | A timeout code of its own, separate from any other failure | Same mapping code as A, and a number callers have to learn |
--| **C. Pass curl's status through** | No new code; a timeout exits 28, which already differs from other failures | The number belongs to curl, so a later switch to another HTTP client would change it |
+-| **A. Exit 2** | One failure status; Design, AC-01 and the Test Plan already say 2 | A caller cannot tell a slow endpoint from a failing one by the exit status alone |
+-| **B. Exit 3** | Callers can tell a timeout apart from other failures | Design, AC-01 and the Test Plan change, and every caller has to handle a second status |
 -
--**Why this is yours:** callers of probe.sh depend on its exit status, and which number they should see is a
--contract choice, not a fact the code settles.
+-**Why this is yours:** both statuses work; the choice depends on whether the callers of probe.sh need to treat a timeout differently, which the repository does not show.
 +None.
  
  ## Review Log
  
-commit f424014191c4c1cde665b85410059888f99af875
+commit 0c9775075828eae65b357bc544bbbbf0e44266b9
 Author: Trial Author
 
-    docs(spec): ask the owner how a probe timeout should exit
+    Ask the owner how a timeout should exit (R-1 F-03)
 
 
 diff --git a/docs/specs/feature.md b/docs/specs/feature.md
-index 2de2951..d23efd0 100644
+index a89cf0a..c89a68d 100644
 --- a/docs/specs/feature.md
 +++ b/docs/specs/feature.md
-@@ -45,7 +45,23 @@ None yet; written once the document is planned.
+@@ -17,6 +17,8 @@ probe.sh gives up on a slow health check after a fixed timeout.
+ 
+ Stop waiting for a slow health check after 5 seconds.
+ 
++R-1 left one decision for the owner: whether a timeout exits 2 or 3 (Q1). Its other findings are applied once Q1 is answered.
++
+ ### Background
+ 
+ probe.sh waits for the health endpoint with no timeout (probe.sh:2).
+@@ -45,7 +47,16 @@ None yet; written once the document is planned.
  
  ## Open Questions
  
 -None.
-+### Q1: What exit status should probe.sh return when the health check times out?
++### Q1: Should a timed-out health check exit 2, like any other failure, or a separate 3?
 +
-+**Recommendation:** C. Let curl's own exit status through. probe.sh then needs no code to map the
-+timeout to another number, and callers can still tell a timeout apart from other failures.
-+
-+probe.sh ends with the curl call (probe.sh:2), so today it exits with whatever curl returns. Other
-+failures do not exit 2 now: curl exits 22 for an HTTP error status under `-f`, and 28 when its time
-+limit runs out (`man curl`, EXIT CODES, curl 8.15.0). Raised by R-1 F-03.
++**Recommendation:** A. Exit 2. probe.sh has only one failure exit today (`curl -fsS` at probe.sh:2), so a caller that already treats any nonzero exit as unhealthy needs no change.
 +
 +| Option | You get | It costs |
 +| --- | --- | --- |
-+| **A. Exit 2** | One fixed code for a timeout, as the draft Design says | probe.sh needs code to turn curl's 28 into 2; other failures still return curl's codes, so 2 is not shared with them |
-+| **B. Exit 3** | A timeout code of its own, separate from any other failure | Same mapping code as A, and a number callers have to learn |
-+| **C. Pass curl's status through** | No new code; a timeout exits 28, which already differs from other failures | The number belongs to curl, so a later switch to another HTTP client would change it |
++| **A. Exit 2** | One failure status; Design, AC-01 and the Test Plan already say 2 | A caller cannot tell a slow endpoint from a failing one by the exit status alone |
++| **B. Exit 3** | Callers can tell a timeout apart from other failures | Design, AC-01 and the Test Plan change, and every caller has to handle a second status |
 +
-+**Why this is yours:** callers of probe.sh depend on its exit status, and which number they should see is a
-+contract choice, not a fact the code settles.
++**Why this is yours:** both statuses work; the choice depends on whether the callers of probe.sh need to treat a timeout differently, which the repository does not show.
  
  ## Review Log
  
-commit 1b4c80df88b9f9712678ef090a75194bf908d21c
+commit b91d8e1feb396d7738fa568afae686f806a274b7
 Author: Fixture
 
     fixture: record R-1
 
 
 diff --git a/docs/specs/feature.md b/docs/specs/feature.md
-index 55f5720..2de2951 100644
+index 55f5720..a89cf0a 100644
 --- a/docs/specs/feature.md
 +++ b/docs/specs/feature.md
 @@ -51,3 +51,27 @@ None.
  
  | Date | Review | Kind | Commit | Model | Isolation | Outcome |
  | --- | --- | --- | --- | --- | --- | --- |
-+| 2026-11-14 | R-1 | spec | `a977b9b` | fixture | procedural | Blocking findings. |
++| 2026-11-14 | R-1 | spec | `f51f718` | fixture | procedural | Blocking findings. |
 +
 +### R-1
 +
@@ -141,7 +127,7 @@ index 55f5720..2de2951 100644
 +WHERE: Design
 +EVIDENCE: Design does not say whether a timeout should exit 2, like other failures, or a distinct 3.
 +PROPOSAL: Decide the exit status for a timeout.
-commit 40a0f7df55ec98542c286483377d808e5b97f8c3
+commit a56923504f40449df11a2f44e207c5d83498eb20
 Author: Fixture
 
     fixture: make the check executable
@@ -150,7 +136,7 @@ Author: Fixture
 diff --git a/tests/check-timeout.sh b/tests/check-timeout.sh
 old mode 100644
 new mode 100755
-commit a977b9bab7b186e8117a14997e2a1facbebbfb5f
+commit f51f7183cb37cb61e662afe2c6e9361956af6489
 Author: Fixture
 
     fixture: AC-09 draft
