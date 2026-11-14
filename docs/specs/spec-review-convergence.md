@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted at R-17 and kept by the clean drift re-review R-18; R-17 and R-18 findings are listed for implementation."
+status: in-progress
+status_description: "In progress on feat/spec-review-convergence after the R-17 acceptance; T1, T12, T14, T15 and T13 are done, T2 is next."
 issue: null
 branch: feat/spec-review-convergence
 goal: "Spec review rates findings consistently, finds failure-mode gaps and every restatement in one pass, applies each pass's findings as one revision without applying nits, and never rewrites reviewed commits."
