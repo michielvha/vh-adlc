@@ -106,8 +106,11 @@ test("refused YAML, missing explicit settings and secret-bearing origins fail wi
   catch (error) { expect(String(error)).toContain("invalid maintenance settings"); expect(String(error)).not.toContain("private-value"); }
   expect(() => loadSettings(f.root, { settingsPath: "absent.yaml" })).toThrow();
   f.settings({ schema_version: 1 });
-  git(f.root, "remote", "set-url", "origin", "https://private-value@github.com/example/project.git");
-  try { loadSettings(f.root); throw Error("did not reject"); } catch (error) { expect(String(error)).not.toContain("private-value"); }
+  git(f.root, "remote", "set-url", "origin", "https://ghp_privatevalue0123456789abcdef0123456789@github.com/example/project.git");
+  try { loadSettings(f.root); throw Error("did not reject"); } catch (error) { expect(String(error)).not.toContain("privatevalue"); expect(String(error)).toContain("origin"); }
+  git(f.root, "remote", "set-url", "origin", "https://login-name@github.com/example/project.git");
+  const settings = loadSettings(f.root);
+  expect(settings.repository).toBe("example/project"); expect(JSON.stringify(settings)).not.toContain("login-name");
 });
 
 test.each(["json", "yml"])("a leftover .vh-adlc/maintenance.%s fails naming the YAML path, with or without --settings", suffix => {
