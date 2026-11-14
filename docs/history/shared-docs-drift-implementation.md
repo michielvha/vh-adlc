@@ -607,3 +607,24 @@ WHERE: tests/vh-adlc/docs-drift/history-output.test.ts, "retained hosted audit p
 EVIDENCE: The success case iterates only Object.values(saved.files). It never lists saved.directory. After this patch the success path depends on renameSync removing provenance.pending.json. The future uploader is meant to select exactly the canonical files from a complete pending result. Nothing asserts that a successful directory holds only report.json, report.md and provenance.json, with no provisional file left beside them. report-output.test.ts makes the matching directory assertion for local output: readdirSync(result.directory).sort() equals ["report.json", "report.md"].
 PROPOSAL: In the success case, assert that readdirSync(saved.directory).sort() equals ["provenance.json", "report.json", "report.md"].
 ```
+
+## Component diagnostic 119
+
+Exact local target `f57fbc90ac877e5a418e6f2f55c78a3d91f619c8`. Actual Copilot Opus 5.5 with procedural isolation. All 77 required chunks were read with unchanged packet hashes, no outside paths and no private files sent. The scoped refusal-classification source review has no blocking or should-fix findings and returns two test-coverage nits. The original records follow before their test-only correction. Full feature criteria remain open.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/docs-drift/history-output.test.ts, "late hosted refusals keep provisional evidence outside the upload pair", the bound, earlyRefusal and refused cases
+EVIDENCE: The tests do not check the directory for the three refusals that happen before provisional publication. For bound and earlyRefusal they check files.provenance_json null, history_provenance "absent", scope_changed and diagnostics. For refused they check that report_json and markdown are not null. None of the three reads the directory, so nothing shows that provenance.pending.json and provenance.json are both absent. The late cases and changedEnvelope do check the files with existsSync, and the success case checks readdirSync(saved.directory).sort() against ["provenance.json", "report.json", "report.md"]. context.md says a refused envelope leaves report.json and report.md retained, and that the expanded early-refusal test checks absent provenance. Suppose publishArtifact(provisional, bytes) moved ahead of the "Hosted provenance exceeds the configured retained entry bound" check in history-output.ts. An oversized or ineligible envelope would then leave a provisional file, and every current assertion would still pass, because files.provenance_json stays null on every refusal.
+PROPOSAL: Record readdirSync(saved.directory).sort() for bound, earlyRefusal and refused in the bridge. Assert it equals ["report.json", "report.md"], which also shows that no provisional or upload-named provenance file exists after an early refusal.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: plugins/vh-adlc/scripts/docs-drift/history-output.ts catch block, result.diagnostics = [...new Set(result.diagnostics)]; tests/vh-adlc/docs-drift/history-output.test.ts late "caller" case
+EVIDENCE: context.md says the catch path "deduplicates failure diagnostics". The late "caller" fault is the case that needs it. The in-try check throws PublicationScopeChanged("Caller changed during hosted report retention"). The catch pushes that message, and the new block pushes the same text again because matchesRepositoryState(repo, before) is still false. The test only asserts expect(saved.diagnostics, fault).toContain(diagnostics[fault]), and earlyRefusal also uses toContain. If the Set line were removed, the duplicate would come back and every assertion would still pass.
+PROPOSAL: In the late "caller" case, assert that the diagnostic appears exactly once, for example saved.diagnostics.filter(message => message === diagnostics.caller).length === 1. The deduplication would then have a regression test.
+```
