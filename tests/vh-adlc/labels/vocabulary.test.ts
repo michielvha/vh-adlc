@@ -72,3 +72,18 @@ describe("triage reference", () => {
     expect(text).toContain("label_map");
   });
 });
+
+describe("user guide and authority", () => {
+  test("the workflows guide describes the standard label set and the labels helper", () => {
+    const text = readFileSync(resolve(import.meta.dir, "../../../docs/user-guides/workflows.md"), "utf8");
+    for (const phrase of ["standard label set", "scripts/labels/cli.ts", "label plan", "references/issues.md"]) expect(text).toContain(phrase);
+    for (const label of vocabulary()) expect(text).toContain(`\`${label.name}\``);
+  });
+
+  test("the authority reference has a row for applying a label plan", () => {
+    const text = readFileSync(resolve(PKG, "references/authority.md"), "utf8");
+    const row = text.split("\n").find((line) => line.startsWith("| Apply a label plan"));
+    expect(row).toBeDefined();
+    expect(row).toContain("exact plan digest");
+  });
+});
