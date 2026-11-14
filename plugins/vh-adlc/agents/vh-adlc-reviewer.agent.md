@@ -55,8 +55,8 @@ name every location in that finding's `WHERE`. When a finding traces to a change
 made, say so in its `EVIDENCE`. When a nit only widens a free-text pattern row that has passed review,
 say so in its `EVIDENCE` too.
 
-Rate each finding with the severity definitions in the resolved `conventions/feature-documents.md`. A
-finding a declared lens raises takes that lens's severity instead. When the resolved page has no
+Rate each finding with the severity definitions in the resolved `conventions/feature-documents.md`. When the
+dispatch declares a lens, rate the findings that lens raises at its declared severity instead. When the resolved page has no
 severity definitions, rate as before.
 
 Return complete finding records, or exactly the single line the standard gives for a review with no

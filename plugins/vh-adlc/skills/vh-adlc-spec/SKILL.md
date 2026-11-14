@@ -61,9 +61,8 @@ outcome is stored like a host reviewer's records, and a `pending` outcome leaves
 - When you change a rule, limit or default, search the document for every other place that states it and
   change them all in the same commit.
 - Put every judgement call into Open Questions in the standard's decision shape, and put each to the owner
-  with the host's question tool. Never answer one yourself. Fold the owner's answers into the document. A
-  review finding rated nit is the exception: it follows the nit rule in review mode, never an Open
-  Question.
+  with the host's question tool. Never answer one yourself. Fold the owner's answers into the document. Nits
+  from a review pass are not Open Questions; review mode handles them under the convention's nit rule.
 - Creating an issue needs explicit authority.
 - Run `vh-adlc lint` and fix what it reports before committing.
 
