@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revising coverage for the shared plugin checker."
+status_description: "Plugin checker coverage added. Awaiting independent review of the revised scope."
 issue: null
 branch: feat/architecture-diagram-agent
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
@@ -14,6 +14,7 @@ covers:
   - docs/reference/marketplace.md
   - docs/user-guides/workflows.md
   - tests/vh-adlc/diagram/
+  - tests/vh-adlc/check.test.ts
 ---
 
 # Plan: Architecture diagram agent
@@ -28,7 +29,7 @@ VitePress has a Claude-specific agent for AWS architecture. It already uses a sh
 
 The agent decides which relationships to show and how to explain them. Each depicted relationship has a source or a visible label that identifies it as proposed. When the sources leave a link uncertain, the brief records the gap. Drawing and export use local tools. The project chooses the destination and controls any publication. Stackgraph stays a standalone deterministic tool. FlowStory playback and VitePress adoption can use the results of this first feature.
 
-The first release covers an AWS request path grounded in repository sources and an OCI-to-local design from a written brief. The agent renders in the same request when the sources support a useful view. The host supplies draw.io Desktop and the selected local provider assets. In the prototype check, both drawings exported twice with networking disabled and produced identical files on the second export. Independent review found gaps in the proof and the local setup contract. The revised proof requires actual invocation from both marketplace installs, a comparison between the brief and the drawing, and a local export and editor check. Independent spec review R-3 returned no findings. The native implementation checks are pending. Acceptance authorizes implementing and testing this scope under the feature lifecycle.
+The first release covers an AWS request path grounded in repository sources and an OCI-to-local design from a written brief. The agent renders in the same request when the sources support a useful view. The host supplies draw.io Desktop and the selected local provider assets. In the prototype check, both drawings exported twice with networking disabled and produced identical files on the second export. Independent review found gaps in the proof and the local setup contract. The revised proof requires actual invocation from both marketplace installs, a comparison between the brief and the drawing, and a local export and editor check. R-3 reviewed the original scope. The revised coverage includes the existing shared plugin checker that registers allowed skills. The updated scope awaits independent review. The native implementation checks are pending. Acceptance authorizes implementing and testing this scope under the feature lifecycle.
 
 ### Background
 
@@ -70,7 +71,7 @@ Work in a separate staging directory for each request. Create the final files un
 
 ### Delivery
 
-The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`. Update the two manifest versions together and document the operation in the user workflow. Before feature merge, exercise the actual catalog install from the candidate checkout in isolated Codex and Claude profiles, then run the native-host proofs against those installs. Before claiming marketplace availability or adopting the skill in VitePress, verify discovery from the published marketplace source. The packaged change is a plugin skill and supporting files. It requires no Go binary changes. [Codex marketplace](../../.agents/plugins/marketplace.json) · [Claude marketplace](../../.claude-plugin/marketplace.json) · [Marketplace migration precedent](../reference/marketplace.md#L34)
+The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`. Update the two manifest versions together, register the skill as a content operation in the shared plugin checker, and document the operation in the user workflow. Before feature merge, exercise the actual catalog install from the candidate checkout in isolated Codex and Claude profiles, then run the native-host proofs against those installs. Before claiming marketplace availability or adopting the skill in VitePress, verify discovery from the published marketplace source. The packaged change is a plugin skill and supporting files. It requires no Go binary changes. [Codex marketplace](../../.agents/plugins/marketplace.json) · [Claude marketplace](../../.claude-plugin/marketplace.json) · [Marketplace migration precedent](../reference/marketplace.md#L34)
 
 ## Acceptance Criteria
 
@@ -84,7 +85,7 @@ The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`.
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Run `bun tests/vh-adlc/diagram/run.ts --host <codex-or-claude> --case fixtures` once per host. Install from the candidate catalog in an isolated profile, verify installed content against the candidate, then give the fresh native session an explicit request naming the installed skill and the fixture sources. Retain a native skill activation event or the observed tool read of the installed skill file, plus the package identity, prompt and output manifest. Discovery or a self-reported invocation alone fails. Use those same sessions for AC-02. |
+| AC-01 | Run `bun tests/vh-adlc/diagram/run.ts --host <codex-or-claude> --case fixtures` once per host. Install from the candidate catalog in an isolated profile, verify installed content against the candidate, then give the fresh native session an explicit request naming the installed skill and the fixture sources. Retain a native skill activation event or the observed tool read of the installed skill file, plus the package identity, prompt and output manifest. Discovery or a self-reported invocation alone fails. Use those same sessions for AC-02. Run `bun test tests/vh-adlc/check.test.ts` to verify the operation is registered and both manifests are versioned together. |
 | AC-02 | Run the AC-01 runner against an AWS route fixture with a dependency-only decoy and a written OCI-to-local fixture with a proposed route and an unresolved restore link. Match semantic roles to the fixture expectations and verify the brief-to-cell ID mapping in both directions. Agent-chosen ID spelling may vary across runs. Check parents, endpoints, status, source locations and port labels. Fail on a depicted decoy traffic arrow, invented port, unrelated resource or unresolved arrow. Retain briefs, draw.io files, SVGs and redacted transcripts with the run manifest. |
 | AC-03 | Use both hosts' AC-01 fixture outputs. Check against the pinned XSD and resolve every parent and connector reference. Open each draw.io file, move a boundary and confirm its children move with it. Verify the configured input hashes against the committed expectations before the run. Re-export each session’s delivered draw.io file with networking disabled and the recorded Desktop version and settings. Compare the delivered SVG with that reference export for equivalent rendered content and geometry. Inspect the delivered SVG at documentation width and open or zoom it on a phone viewport. Fail on missing fixture icons, overlapping or clipped labels, or misleading routes. Preserve captures, tool versions, asset hashes and results. |
 | AC-04 | `bun test tests/vh-adlc/diagram` exercises a missing local prerequisite, a mismatched provider asset hash, a failed export, an occupied destination, a concurrent publish and a retry to an unused path. Synchronize two processes after successful staging, before publication to the same initially free destination. Require one complete winner and one collision. Compare the winner's files against its staged output and verify byte-for-byte preservation of the occupied destination. Failed requests expose no partial final directory. A hash mismatch identifies the affected asset and does not invoke the exporter. |
