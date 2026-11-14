@@ -11,7 +11,10 @@ const hash = (path: string) => createHash("sha256").update(readFileSync(path)).d
 const repo = resolve(import.meta.dir, "../../..");
 const { values } = parseArgs({ options: { host: { type: "string" }, case: { type: "string" } } });
 if (values.host !== "codex" && values.host !== "claude") throw Error("Use --host codex or --host claude");
-if (values.case !== "fixtures" && values.case !== "intake") throw Error("Use --case fixtures or --case intake");
+if (values.case !== "fixtures" && values.case !== "intake" && values.case !== "export-failure") {
+  throw Error("Use --case fixtures, --case intake or --case export-failure");
+}
+const exportFailure = values.case === "export-failure";
 const host = values.host;
 const output = process.env.VH_DIAGRAM_TRIAL_OUTPUT ?? mkdtempSync(join(tmpdir(), "vh-diagram-native-"));
 mkdirSync(output, { recursive: true, mode: 0o700 });
@@ -32,7 +35,7 @@ const expected = {
   VH_DIAGRAM_OCI: "e098244928cdd5257c1bc4696cf9f46fd289b4195208d699e5392bf79de69555",
 };
 const renderer = process.env.VH_DIAGRAM_DRAWIO;
-if (!renderer) throw Error("Set VH_DIAGRAM_DRAWIO to the local draw.io 32.6.10 executable or offline display wrapper");
+if (!renderer && !exportFailure) throw Error("Set VH_DIAGRAM_DRAWIO to the local draw.io 32.6.10 executable or offline display wrapper");
 for (const [key, digest] of Object.entries(expected)) {
   const path = process.env[key];
   if (!path || hash(path) !== digest) throw Error("Missing or mismatched fixture input: " + key);
@@ -92,8 +95,8 @@ try {
   if (command(["git", "status", "--porcelain", "--", "plugins/vh-adlc", "tests/vh-adlc/diagram", ".agents/plugins/marketplace.json", ".claude-plugin/marketplace.json"], repo)) throw Error("Commit the candidate and fixture runner before native proof");
   const commit = command(["git", "rev-parse", "HEAD"], repo);
   const hostVersion = command([host, "--version"]);
-  const drawioVersion = command([renderer, "--version"]);
-  if (!/^32\.6\.10$/.test(drawioVersion)) throw Error("Expected draw.io Desktop 32.6.10");
+  const drawioVersion = !exportFailure && renderer ? command([renderer, "--version"]) : null;
+  if (drawioVersion !== null && drawioVersion !== "32.6.10") throw Error("Expected draw.io Desktop 32.6.10");
   const catalogPath = host === "codex" ? ".agents/plugins/marketplace.json" : ".claude-plugin/marketplace.json";
   mkdirSync(catalog);
   cpSync(join(repo, catalogPath.split("/").slice(0, -1).join("/")), join(catalog, catalogPath.split("/").slice(0, -1).join("/")), { recursive: true });
@@ -104,7 +107,19 @@ try {
   const installed = installedPackage(join(profile, "plugins/cache/vhco-tools/vh-adlc"));
   if (!installed || JSON.stringify(packageSnapshot(installed)) !== JSON.stringify(packageSnapshot(candidate))) throw Error("Installed plugin differs from candidate");
   const skill = join(installed, "skills/vh-adlc-diagram/SKILL.md");
-  const cases = values.case === "fixtures" ? [aws, oci] : [aws, oci, incomplete];
+  const cases = exportFailure ? [aws] : values.case === "fixtures" ? [aws, oci] : [aws, oci, incomplete];
+  const failingRenderer = join(output, "failing-drawio");
+  const renderAttempt = join(output, "rejected-export");
+  if (exportFailure) {
+    writeFileSync(failingRenderer, `#!/bin/sh
+if [ "$1" = --version ]; then printf '%s\n' '32.6.10'; exit 0; fi
+if [ "$1" = --export ]; then
+  printf '%s\n' "draw.io failed to export (fixture renderer)" >&2
+  printf '%s\n' "$1" >> "$(dirname -- "$0")/rejected-export"
+fi
+exit 7
+`, { mode: 0o700 });
+  }
   const results = [];
   for (const fixture of cases) {
     const run = join(output, fixture.name);
@@ -115,7 +130,7 @@ try {
     writeFileSync(input, fixture.source);
     const prompt = `Use the installed vh-adlc-diagram skill. Read the installed skill at ${skill} with a native read or cat so this trial records its use. ${fixture.question}
 Read the supplied repository evidence or written design in ${input}. Put final files in ${destination} if the evidence supports a useful view. Put working files in ${project}. Render using the installed helper and configured local tools below. Draw a polished landscape diagram with grouping, readable connector labels and source-backed content. Use source labels for semantic items and cite sources.md line numbers in the brief.
-Draw.io local executable: ${renderer}
+Draw.io local executable: ${exportFailure ? failingRenderer : renderer}
 XML schema: ${process.env.VH_DIAGRAM_SCHEMA} SHA-256 ${expected.VH_DIAGRAM_SCHEMA}
 AWS shape index: ${process.env.VH_DIAGRAM_AWS} SHA-256 ${expected.VH_DIAGRAM_AWS}
 OCI library: ${process.env.VH_DIAGRAM_OCI} SHA-256 ${expected.VH_DIAGRAM_OCI}
@@ -131,13 +146,20 @@ This is a synthetic fixture. Do not change sources.md, the installed package, Gi
     const response = host === "codex"
       ? messages.findLast(event => event.type === "item.completed" && event.item?.type === "agent_message")?.item.text ?? ""
       : messages.findLast(event => event.type === "result")?.result ?? "";
-    const failures = gradeDiagram(fixture, destination, response);
+    const failures = exportFailure ? [] : gradeDiagram(fixture, destination, response);
+    if (exportFailure) {
+      if (!existsSync(renderAttempt)) failures.push("The configured renderer did not receive an export request");
+      if (existsSync(destination)) failures.push("A failed render wrote a final diagram directory");
+      if (!/(export|render)/i.test(response) || !/(fail|could not|unable|error)/i.test(response)) {
+        failures.push("The response did not report the render failure");
+      }
+    }
     const result = { fixture: fixture.name, activated: observedRead(raw, skill), outcome, failures, output: existsSync(destination) ? packageSnapshot(destination) : null };
     results.push(result);
-    writeFileSync(join(output, "manifest.json"), JSON.stringify({ commit, host, hostVersion, drawioVersion, inputs: expected, skill: hash(skill), results }, null, 2) + "\n");
+    writeFileSync(join(output, "manifest.json"), JSON.stringify({ commit, host, hostVersion, drawioVersion, mode: values.case, inputs: expected, skill: hash(skill), results }, null, 2) + "\n");
     console.log(JSON.stringify(result));
   }
-  if (results.some(r => r.outcome.exit_code !== 0 || !r.activated || r.failures.length > 0 || (r.fixture === incomplete.name ? Boolean(r.output) : !r.output))) process.exitCode = 1;
+  if (results.some(r => r.outcome.exit_code !== 0 || !r.activated || r.failures.length > 0 || (exportFailure || r.fixture === incomplete.name ? Boolean(r.output) : !r.output))) process.exitCode = 1;
 } finally {
   rmSync(profileAuth, { force: true });
 }
