@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Claim 12370b8 was pushed while the spec review was stale from #87 (its gate failed on spec_review_fresh); a drift re-review runs before any implementation."
+status_description: "Implementing on feat/shared-issue-labels; drift review R-4 applied, waiting for a clean current review before T1."
 issue: https://github.com/michielvha/vh-adlc/issues/83
 branch: feat/shared-issue-labels
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
@@ -44,8 +44,9 @@ about who may write a label, not which labels should exist. The result is that v
 repository has none of the four, and 9 of its 10 open issues carry no label at all.
 
 Stackweaver's investigate agent also labels every issue it files. vh-adlc's investigate has no such
-rule, so that habit would be lost when shared-development-loop (vh-adlc #78, in progress) moves
-Stackweaver onto the shared operations.
+rule. When shared-development-loop (vh-adlc #78) moved Stackweaver onto the shared operations, it kept
+the habit as a temporary local rule in Stackweaver's `agents/loop-project.md`. This feature replaces
+that local rule with a shared one every adopter gets.
 
 This feature adds a standard label set to the plugin: type labels (`bug`, `enhancement`,
 `documentation`, `refactor`, `security`) and the four state labels, each with a fixed color and
@@ -82,10 +83,13 @@ R-2 found one blocking and two should-fix issues. The spec now says plainly that
 you name becomes managed even if a bot created it, it names the plugin package and a candidate install
 check, and, at your choice, spec also files with mapped names.
 
-Every check named here is planned; nothing has run yet. A new independent review must clear R-2's
-blocking finding before you can accept. Accepting this document authorizes building it on a feature
-branch after #78 merges. Running the helper's apply against any real repository still needs your
-approval of that exact plan.
+R-3 was clean and you accepted it on 2026-11-13. #78 then merged, changing paths this document
+covers, so R-3 went stale from drift alone; the acceptance stands because the normative sections did
+not change. The drift review R-4 found three should-fix items in Context and Tasks, all applied.
+Implementation proceeds on `feat/shared-issue-labels` once a current review is clean.
+
+Every check named here is planned; nothing has run yet. Running the helper's apply against any real
+repository still needs your approval of that exact plan.
 
 ### Background
 
@@ -121,19 +125,17 @@ approval of that exact plan.
   `feat/shared-development-loop` when this document was accepted, and merged to `main` as `2c9d3af`
   (vh-adlc #87) on 2026-11-13. It covers `plugins/vh-adlc/skills/vh-adlc-investigate/` and plans a
   Stackweaver parity map with one row per legacy rule of `agents/investigate.md` (its task T25). Its
-  document does not mention issue labels (`grep -n -i label` finds no issue-label rule). Its `covers`
+  `covers`
   also lists `plugins/vh-adlc/skills/vh-adlc-spec/`, `plugins/vh-adlc/references/authority.md` and
   all of `tests/vh-adlc/` (`docs/specs/shared-development-loop.md:8-42` on
   `feat/shared-development-loop` at `645882b`). Since that merge, vh-adlc's investigate ends with one
   of the verdicts act now, track or reject, and keeps issue creation under `references/authority.md`
   (`plugins/vh-adlc/skills/vh-adlc-investigate/SKILL.md` at `2c9d3af`, Loop routes section).
-- That parity map, on Stackweaver's `feat/vh-adlc-development-loop` at `bedc6b5d`, puts the labeling
-  rule in row `investigate-files-issue` together with routine issue filing, and marks the whole row
-  superseded by the rule that investigate files an issue only on request
-  (`tests/agent-loop/parity.json`, `agents/loop-project.md:61`). The labeling half has no home there.
-  In a message on 2026-11-13, the #78 session agreed to split the row after its current review and
-  give the labeling half a local Stackweaver home until this feature takes it over; that change is not
-  yet in the tree.
+- Stackweaver's parity map, merged as Stackweaver `4e4fcd4d`, keeps routine issue filing superseded
+  in row `investigate-files-issue` and gives the labeling a separate row, `investigate-labels-issue`.
+  That row's local home is `agents/loop-project.md:62`: an issue investigate files on request gets one
+  type label and the state its verdict names, until this feature takes the rule over. The split is
+  recorded in `docs/specs/shared-development-loop.md:757-758` at `da736bc`.
 - The projects helper already follows an inventory, digest and approved-apply pattern
   (`plugins/vh-adlc/references/projects.md:105-111`, `plugins/vh-adlc/scripts/projects/apply.ts`).
 - Seventeen distinct repositories under the `michielvha`, `vhco-pro` and `LowGok` owners have a local
@@ -376,7 +378,7 @@ shared-development-loop).
 - [ ] T13 `tests/vh-adlc/labels/vocabulary.test.ts` - failing checks that `docs/user-guides/workflows.md` describes the label set and helper and that `references/authority.md` has the label-plan row (AC-10)
 - [ ] T14 `docs/user-guides/workflows.md`, `plugins/vh-adlc/references/authority.md` - the guide section and the authority row; T13 passes (AC-10)
 - [ ] T15 `.vh-adlc/triage.yaml` - vh-adlc's own triage settings; `vh-adlc settings read --stdin` accepts it and a report-only triage sweep with `--report-output` outside the checkout reads it, both outputs recorded (AC-08)
-- [ ] T16 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - minor version bump from the merged #78 version; `bun test tests/vh-adlc --timeout 60000`, `go test ./...`, `go vet ./...`, `golangci-lint run` and `go mod tidy -diff` pass (AC-11)
+- [ ] T16 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - minor version bump from the current merged version (0.18.0 at `da736bc`, so 0.19.0 unless main moves again); `bun test tests/vh-adlc --timeout 60000`, `go test ./...`, `go vet ./...`, `golangci-lint run` and `go mod tidy -diff` pass (AC-11)
 - [ ] T17 `tests/vh-adlc/labels/evidence/candidate-install.md` - the AC-11 procedure run on the branch head: installed files listed, both manifest versions compared, installed and source `plan` outputs byte-identical (AC-11)
 - [ ] T18 `tests/vh-adlc/labels/evidence/rollout-vh-adlc.md` - owner-approved `plan` and `apply` on `michielvha/vh-adlc` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
 - [ ] T19 `tests/vh-adlc/labels/evidence/rollout-stackweaver.md` - owner-approved `plan` and `apply` on `michielvha/stackweaver` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
