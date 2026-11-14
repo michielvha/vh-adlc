@@ -369,6 +369,7 @@ rung exit codes (F-04); verification commands follow the existing rungs-else-`AG
 | 2026-11-14 | R-1 | spec | `409d32d` | claude-opus-5-5 | procedural | Blocking: the command review route cannot carry the new dispatch or rerun agent sessions; eleven should-fix findings |
 | 2026-11-14 | R-2 | spec | `0442f4d` | claude-opus-5-5 | procedural | Clean: no blocking finding; ten should-fix findings and two nits |
 | 2026-11-14 | R-3 | spec | `6a90dae` | claude-opus-5-5 | procedural | Clean: no blocking finding; seven should-fix findings |
+| 2026-11-14 | R-4 | spec | `0661a35` | claude-opus-5-5 | procedural | Blocking: two static-check rows reject the criteria's own hyphenated wording; five should-fix findings and two nits |
 
 ### R-1
 
@@ -599,3 +600,61 @@ SEVERITY: should-fix
 WHERE: Test Plan, AC-02, AC-03 row; Test Plan, AC-07 row
 EVIDENCE: The rows leave some clauses of composite criteria unchecked, so each could pass on text that omits them. AC-02 requires the reviewer agent to remove its run directory and to check transcripts "only when the resolved convention has that case". The row requires neither a removal phrase nor a convention-condition phrase. AC-03 requires author mode to name "its fixtures", but the row requires only "path and command" with "pass condition" and "transcript". AC-07 requires the page to place "the missing-runner finding" under the docs pin and the "host-route request" and "reviewer-run" changes under any pin. The row checks only "Test plan rule" and "transcript" with "docs pin", and "dispatch", "command route", "implement" and "author" with "any pin". Its own must-pass example names neither the missing-runner finding nor the host-route request, so text that fails AC-07 passes the row. These rows were changed in this revision in answer to R-2 F-07, which named them, so they have not passed review.
 PROPOSAL: Add a required phrase for each unchecked clause: "remove" and a convention-condition phrase for the agent, "fixtures" for author mode, and "missing-runner" under the docs pin and "host route" and "reviewer" under any pin for the page. Make the AC-07 must-pass example contain them.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan, AC-07 row; Test Plan, AC-02, AC-03 row (review skill clause); AC-07; AC-02
+EVIDENCE: AC-07 requires the compatibility page to place "the missing-runner finding" under the docs pin and "the dispatch, command-route, host-route request, reviewer-run, implement and author-mode changes" under any pin. The AC-07 row checks for "missing runner", "command route" and "host route", and its only must-pass example uses the unhyphenated forms. AC-02 says the review skill offers "an owner-requested host-route implementation review", and the AC-02, AC-03 row requires "host route" in the review skill. Neither row says that hyphens fold to spaces or that matching ignores case. The AC-01 row says "whitespace folded, case-insensitive", but that applies only to the convention check. A page sentence that copies AC-07's own wording ("the missing-runner finding ... depend on the docs pin; the command-route, host-route request ... changes apply on any pin") meets AC-07 and fails the row. A review skill sentence that copies AC-02's "host-route implementation review" fails its row in the same way. Under feature-documents.md:130-131, a pattern that rejects a correct output is blocking. This revision added "missing runner" and "host route" in answer to R-3 F-07, whose proposal spelled the phrase "missing-runner". "command route" was already in the row at 6a90dae.
+PROPOSAL: State in both rows that the phrase checks fold hyphens and whitespace and ignore case, or list each hyphenated form as an accepted variant. Add a must-pass example that uses AC-07's hyphenated wording.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Keeping transcripts (second paragraph); Design, A run counts for its inputs (second paragraph); Design, Glossary (Runner); Design, Spec author mode; Scope, Out of scope (first bullet); Context, Owner summary (fourth and fifth bullets); AC-01; AC-03; AC-07; AC-10; Test Plan, AC-01 row, AC-04 row and AC-10 row
+EVIDENCE: The runner contract that answers R-3 F-01 and F-04 is stated only in this document's Design and glossary. It says a runner writes only to an output directory outside the checkout, exits 0, 126/127 or another code, prints one line per proof, takes its token from the environment, never copies a login, and exits 126 without a token. No criterion puts the contract into text an adopter or author reads. AC-01 and its row require path, command, fixtures, pass condition, transcript and runner inputs in the convention, but no exit codes and no token rule. AC-03 author mode and AC-07's guide check leave it out too. AC-10's test checks only that each glossary term appears, not its meaning. No row checks that this feature's own runner authenticates by token. The example the Out of scope bullet keeps "as an example" breaks both rules. tests/vh-adlc/evidence/review-convergence/trials/run.ts:17 imports `profile` from tests/vh-adlc/scenarios/host.ts, which copies ~/.claude/.credentials.json into the profile when no token file exists (host.ts:26-30). It also catches a trial's error, records `runner_error` and carries on without a non-zero exit (run.ts:224-226). host.ts also reads its token from a file (VH_ADLC_CLAUDE_TOKEN_FILE, host.ts:3-7, 19-20), not from the environment, and the design names no variable. On this host neither ~/.config/vh-adlc/claude-token nor CLAUDE_CODE_OAUTH_TOKEN exists. With every box ticked, an adopter's runner can still exit 1 on a rate limit, which the reviewer reads as `not met`, or copy a login that a timeout kill leaves behind. Both are the problems the R-3 answers were meant to remove. Those answers were applied in this revision.
+PROPOSAL: Put the runner contract (output only outside the checkout, the exit codes, one line per proof, token from a named environment variable, never copy a login, 126 without a token) into the convention text AC-01 adds and into author mode. Add required phrases for it to the AC-01 and AC-02, AC-03 rows. Add a check that this feature's runner exits 126 without the token and never reaches host.ts's login copy, and say that the review-convergence runner is not an example of the contract.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, A run counts for its inputs (first paragraph); Design, Keeping transcripts (first paragraph); Design, Glossary (Collect step; Transcript manifest); Design, Implement; AC-03; Test Plan, AC-04 row
+EVIDENCE: The collect step "writes redacted copies and the transcript manifest". The manifest records "each runner input's tree or blob id and whether any had uncommitted changes". Those values are only true at run time, and the design does not say who captures them then. The working example has the runner itself write manifest.json into its output directory during the run, with `checkout`, `plugin_dirty` and the agent and skill blobs (review-convergence/trials/run.ts:232-240). A collect step that computes ids and the dirty flag when it runs stamps a run made on uncommitted or older inputs with the current clean ids. A run would then count although it broke the rule the design states, and a later reviewer comparing ids would accept it. One implementer would record at run time and another at collect time. This traces to the collect step added in this revision for R-3 F-02.
+PROPOSAL: Require the runner to record the input ids and the dirty state in its output directory when it starts. Have the collect step copy them into the manifest and refuse to collect when any input's id differs from the recorded one.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, A run counts for its inputs (second paragraph); Design, The reviewer; Design, Glossary (Runner); Context, Owner summary (fourth bullet); AC-02; Test Plan, AC-02, AC-03 row; Test Plan, AC-04 row
+EVIDENCE: The design gives 126 or 127 "when a session could not start or finish", and the reviewer "retries once only when the run did not start". Exit codes do not separate those two cases, so one reviewer would retry on every 126 and another would never retry. One invocation can run several proofs: the AC-04 row runs `stale-summary runner-pass` together, and AC-05 and AC-06 use "the same runner". The design does not say which exit wins when one proof's pass condition fails and another session cannot finish. Nor does it say how a reviewer derives a per-criterion verdict when an invocation covers proofs of different criteria and exits 1 because only one failed. "Exit 0 with the proof's line passing is `met`" depends on a per-proof line whose result values are never defined. This traces to the exit-code contract added in this revision for R-3 F-04.
+PROPOSAL: Define the per-proof line, for example `<proof>: pass|fail|error|not started`. Derive each criterion's verdict from its own lines, with the exit code as the run summary and a stated precedence. Retry only on `not started`.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Command route (last two sentences); Design, The reviewer (first sentence); Context, Owner summary (fourth bullet and cost paragraph); AC-02
+EVIDENCE: The design gives the command route two hours because "a rerun of several paid sessions can outlast the command route's 15-minute limit". Its fallback for a sandboxed command route is a host-route implementation review, but it sets no time rule for that route. On Claude Code, the host this review runs on, the shell tool caps a foreground command at 600000 ms, and longer runs need `run_in_background` (up to 7200000 ms). A host-route reviewer that runs the AC-04 to AC-06 runner in the foreground is cut off after ten minutes. Under The reviewer, it then returns `not verified` for "a run that does not finish". The fallback that is meant to reach `met` would then fail for the duration the design itself expects. The reviewer agent text that AC-02 checks gives no instruction for long runs.
+PROPOSAL: Have the reviewer agent run a runner detached, or with the host's longest timeout, and wait for it to finish, and state the host-route time budget next to the command-route one. Add the phrase to the AC-02, AC-03 row.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Spec author mode; Design, Agent-session proofs (first sentence); AC-01; AC-03; AC-06; Test Plan, AC-01 row, AC-02, AC-03 row and AC-06 row; Context, Owner summary (first bullet)
+EVIDENCE: Agent-session proofs, the Owner summary, AC-03 and the AC-01, AC-02, AC-03 and AC-06 rows all require the row to name where transcripts and the manifest are kept. Spec author mode says only "the runner's path and command, its fixtures and its pass condition". AC-01 requires the convention row rule to name "the runner's path and command, its fixtures and its pass condition", with no transcript location, yet its row requires "transcript" in that paragraph. AC-06 requires the author to name "a runner's path and command, its fixtures and its pass condition", yet its row passes only when the row also names "its transcript location". Convention text or an author output that meets AC-01 or AC-06 as written fails the row. An implementer following Spec author mode builds an author mode that AC-03 rejects.
+PROPOSAL: Add the transcript location to Spec author mode, AC-01 and AC-06, so every statement of the row rule names the same five items.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (third bullet); AC-02 (first clause)
+EVIDENCE: The Owner summary says every dispatch carries "the verification commands from `AGENTS.md`", and AC-02 opens with "the `AGENTS.md` verification commands". After the R-3 F-05 answer, the Design says the verification commands are the `verification_rungs` commands when declared, otherwise the `AGENTS.md` "Local commands" section, otherwise "none". AC-02 restates that rule later in parentheses. The summary does not, so an owner reading it would expect Stackweaver's dispatch, which has rungs and no such section, to come from `AGENTS.md`.
+PROPOSAL: Say "the verification commands (rungs, else `AGENTS.md`, else none)" in the Owner summary, and drop "`AGENTS.md`" from AC-02's first clause.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan, AC-05 row and AC-06 row
+EVIDENCE: The rule this feature adds says an agent-session row names "the runner's path and the command that runs it" and where transcripts and the manifest go. The AC-05 and AC-06 rows say only "by the same runner". They give no command line with the trial id, unlike the AC-04 row's `bun tests/vh-adlc/evidence/agent-proofs/trials/run.ts <output dir> stale-summary runner-pass`. A reviewer given these Proof cells verbatim has to infer the command.
+PROPOSAL: Give each row its full command, for example `bun tests/vh-adlc/evidence/agent-proofs/trials/run.ts <output dir> missing-runner`, and say its transcripts go to the same runs directory.
