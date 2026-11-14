@@ -108,8 +108,10 @@ Take the first unchecked task. For each:
 2. Make the change. Re-run the test and watch it pass, then run the repository's own verification commands
    (its `AGENTS.md` lists them; ask if none is listed).
 3. Tick the task with an evidence line naming the command and what you observed. Tick a criterion only
-   when verification you observed in this run establishes it, with its own evidence line. Record what stays
-   untested.
+   when verification you observed in this run establishes it, with its own evidence line. When a
+   criterion's proof is what an agent does in a session, prove it with a committed script that reruns
+   that session and keeps its transcript, so the reviewer can run it too; a subagent's own report is not
+   evidence. Record what stays untested.
 4. Stage only the paths this task changed, plus the document, and commit once. Edit the message with
    `guides/humanize-prose.md` at the resolved revision. These commits change code, so they never carry the
    skip-CI marker. Do not push.

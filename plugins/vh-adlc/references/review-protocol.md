@@ -29,7 +29,8 @@ access where the host supports it. Do not copy or translate the reviewer into a 
 If that canonical file cannot be read, leave the review pending rather than invent its instructions.
 
 Both routes receive the repository directory, document path, exact commit, review kind, resolved docs
-revision, verified binary path and plugin pin. Neither route creates or switches a worktree. If the
+revision, verified binary path and plugin pin. A dispatch never tells the reviewer to skip a check or to
+judge from stored results instead of running it. Neither route creates or switches a worktree. If the
 host has neither independent route, or dispatch fails, write a self-contained
 handoff the owner runs elsewhere and leave the review visibly pending: whenever no review is stored, the
 report has a line that starts with the exact words `review pending`, followed by why. Self-review is never labelled
