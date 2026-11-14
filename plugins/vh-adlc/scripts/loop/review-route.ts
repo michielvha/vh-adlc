@@ -67,8 +67,8 @@ function fileDigest(root: string, path: string): string {
 
 /**
  * Everything a reviewer could change in the owning worktree: HEAD, every ref, index entries with their
- * flags, status, the ignored-file list and the contents of modified, untracked, ignored and
- * flag-hidden tracked files. Scratch directories are left out.
+ * flags, status, the ignored-file list and the contents of every tracked, untracked and ignored file.
+ * Scratch directories are left out.
  */
 export function snapshot(root: string, scratch: string[], scope: "full" | "owning" = "full"): Record<string, string> {
   const keep = (path: string) => !underScratch(path, scratch);
@@ -77,9 +77,11 @@ export function snapshot(root: string, scratch: string[], scope: "full" | "ownin
   const changed = entries.flatMap(entry => entry.from ? [entry.path, entry.from] : [entry.path]);
   const ignored = nulRecords(root, ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"]).filter(keep);
   const index = nulRecords(root, ["ls-files", "--stage", "-v", "-z"]);
-  const hidden = index.filter(line => /^[a-zS] /.test(line)).map(line => line.slice(line.indexOf("\t") + 1)).filter(keep);
+  // Every tracked file is hashed, clean or not: Git's stat cache can call a same-size rewrite with a
+  // restored modification time clean (for example under core.trustctime=false).
+  const tracked = index.map(line => line.slice(line.indexOf("\t") + 1)).filter(keep);
   const contents: string[] = [];
-  for (const path of [...changed, ...hidden]) contents.push(`${path}\t${fileDigest(root, path)}`);
+  for (const path of new Set([...changed, ...tracked])) contents.push(`${path}\t${fileDigest(root, path)}`);
   for (const path of ignored) {
     if (path.endsWith("/")) for (const entry of treeManifest(root, path, scratch)) contents.push(`ignored-tree\t${entry}`);
     else contents.push(`${path}\t${fileDigest(root, path)}`);
