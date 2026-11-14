@@ -1,25 +1,27 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { join } from "node:path";
+import { accessSync, constants, existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { join, relative, resolve, sep } from "node:path";
 
-export type Result = { code: number; stdout: string; stderr: string };
+export type Result = { code: number; stdout: string; stderr: string; timedOut?: boolean };
 export type Run = (argv: string[]) => Result;
 
 /** Fixed argv only: branch names, PR text and settings never reach a shell. */
 export const spawn: Run = argv => {
   const result = Bun.spawnSync(argv, { stdin: "ignore", stdout: "pipe", stderr: "pipe", timeout: 120000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GH_PROMPT_DISABLED: "1" } });
-  return { code: result.exitCode ?? 1, stdout: result.stdout.toString(), stderr: result.stderr.toString() };
+  return { code: result.exitCode ?? 1, stdout: result.stdout.toString(), stderr: result.stderr.toString(), timedOut: result.exitedDueToTimeout === true };
 };
 
 export type Operation =
   | { kind: "enable-auto-delete" }
   | { kind: "delete-remote"; branch: string; oid: string; proof: string }
   | { kind: "prune-tracking"; ref: string; oid: string }
-  | { kind: "remove-worktree"; path: string; branch: string; oid: string; proof: string }
+  | { kind: "remove-worktree"; path: string; branch?: string; oid: string; proof: string; ignored: Ignored[] }
   | { kind: "delete-local"; branch: string; oid: string; proof: string };
-export type Kept = { scope: "remote" | "local"; branch: string; reason: string };
+/** An ignored path as Git prints it, with the number of non-directory entries under it and their lstat bytes. */
+export type Ignored = { path: string; files: number; bytes: number };
+export type Kept = { scope: "remote" | "local"; branch: string; reason: string } | { scope: "worktree"; path: string; branch?: string; reason: string };
 export interface Plan {
-  schema_version: 1; repository: string; default_branch: string; default_oid: string;
+  schema_version: 2; repository: string; default_branch: string; default_oid: string;
   delete_branch_on_merge: boolean; worktrees: boolean; operations: Operation[]; kept: Kept[];
 }
 export type Outcome = { operation: Operation; status: "done" | "already-absent" | "changed" | "failed"; detail?: string };
@@ -32,7 +34,8 @@ export const digest = (text: string) => createHash("sha256").update(text).digest
 const same = (a: Operation, b: Operation) => JSON.stringify(a) === JSON.stringify(b);
 
 type Pull = { number: number; head: string; sha: string; repository: string; base: string; merged: boolean };
-type Worktree = { path: string; branch?: string; locked: boolean; prunable: boolean; busy: boolean };
+/** `lock` is the reason given to `git worktree lock`; `admin` is set only when exactly one admin directory names `<path>/.git`; `pointed` is where a present entry's `.git` leads; `state` names a rebase or bisect in progress. */
+type Worktree = { path: string; head?: string; branch?: string; locked: boolean; lock?: string; prunable: boolean; state: string[]; pointed?: string; admin?: string; problems: string[] };
 
 function object(value: unknown, what: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`unexpected ${what} shape`);
@@ -76,6 +79,7 @@ export class Checkout {
     return result.code === 0 ? result.stdout : "";
   }
   ok(args: string[]): boolean { return this.exec(["git", "-C", this.root, ...args]).code === 0; }
+  call(args: string[]): Result { return this.exec(["git", "-C", this.root, ...args]); }
   api(path: string): unknown {
     const result = this.exec(["gh", "api", "--hostname", this.hostname, path]);
     if (result.code !== 0) throw new Error(`GitHub request ${path.split("?")[0]} failed; verify access, network and rate limits`);
@@ -101,34 +105,181 @@ export class Checkout {
   ancestor(oid: string, of: string): boolean { return oid === of || this.ok(["merge-base", "--is-ancestor", oid, of]); }
 }
 
+/** `repo` is the --repo worktree and `cwd` the one holding the process's working directory; both are kept. */
+interface Context { checkout: Checkout; main?: string; repo: string; cwd?: string; worktrees: boolean }
 interface Observation {
   checkout: Checkout; plan: Plan; remote: Map<string, string>; tracking: Map<string, string>;
-  local: Map<string, string>; worktrees: Worktree[];
+  local: Map<string, string>; worktrees: Worktree[]; context: Context;
 }
+
+const few = (items: string[]) => items.slice(0, 3).join(", ") + (items.length > 3 ? ` and ${items.length - 3} more` : "");
+const present = (path: string) => { try { lstatSync(path); return true; } catch { return false; } };
 
 function worktrees(checkout: Checkout): Worktree[] {
   const entries: Worktree[] = [];
+  const common = resolve(checkout.root, checkout.git(["rev-parse", "--git-common-dir"]).trim());
+  // A relative gitdir, as worktree.useRelativePaths writes, is relative to the admin directory.
+  const names = (admin: string) => { try { return resolve(admin, readFileSync(join(admin, "gitdir"), "utf8").trim()); } catch { return undefined; } };
+  let admins: string[] | undefined;
   for (const block of checkout.git(["worktree", "list", "--porcelain"]).split("\n\n")) {
     const lines = block.split("\n").filter(Boolean), path = lines.find(l => l.startsWith("worktree "))?.slice(9);
     if (!path) continue;
     const flag = (name: string) => lines.some(l => l === name || l.startsWith(`${name} `));
-    let branch = lines.find(l => l.startsWith("branch refs/heads/"))?.slice(18), busy = false;
-    // A rebase or bisect detaches HEAD but still owns its branch; git branch -d refuses it too.
-    if (!branch && !flag("prunable")) {
-      const dir = checkout.git(["-C", path, "rev-parse", "--absolute-git-dir"], true).trim();
-      const read = (name: string) => { const file = join(dir, name); return dir && existsSync(file) ? readFileSync(file, "utf8").trim() : ""; };
-      const owner = read("rebase-merge/head-name") || read("rebase-apply/head-name") || (read("BISECT_START") && `refs/heads/${read("BISECT_START")}`);
-      if (owner.startsWith("refs/heads/")) { branch = owner.slice(11); busy = true; }
+    let branch = lines.find(l => l.startsWith("branch refs/heads/"))?.slice(18), pointed: string | undefined, admin: string | undefined;
+    const head = lines.find(l => l.startsWith("HEAD "))?.slice(5), state: string[] = [];
+    const prunable = flag("prunable"), problems: string[] = [], want = resolve(path, ".git");
+    if (!prunable) {
+      const found = checkout.call(["-C", path, "rev-parse", "--absolute-git-dir"]);
+      pointed = found.code === 0 && found.stdout.trim() ? found.stdout.trim() : undefined;
     }
-    entries.push({ path, branch, locked: flag("locked"), prunable: flag("prunable"), busy });
+    if (entries.length > 0) {
+      if (!prunable) {
+        if (!pointed) problems.push("admin directory not found: rev-parse --absolute-git-dir failed");
+        else if (names(pointed) !== want) problems.push(`admin directory ${pointed} does not name this path`);
+        else admin = pointed;
+      } else {
+        admins ??= (() => { try { return readdirSync(join(common, "worktrees")).map(name => join(common, "worktrees", name)); } catch { return []; } })();
+        const matches = admins.filter(dir => names(dir) === want);
+        if (matches.length === 1) admin = matches[0];
+        else problems.push(matches.length ? `admin directory ambiguous: ${matches.length} admin directories name this path` : "admin directory not found");
+      }
+    }
+    const dir = admin ?? pointed;
+    if (dir && entries.length > 0) {
+      for (const name of ["rebase-merge", "rebase-apply"]) if (existsSync(join(dir, name))) state.push(`rebase in progress (${name})`);
+      if (existsSync(join(dir, "BISECT_LOG"))) state.push("bisect in progress (BISECT_LOG)");
+    }
+    // A rebase or bisect detaches HEAD but still owns its branch; git branch -d refuses it too.
+    if (!branch && dir) {
+      const read = (name: string) => { const file = join(dir, name); return existsSync(file) ? readFileSync(file, "utf8").trim() : ""; };
+      const start = read("BISECT_START"), owner = read("rebase-merge/head-name") || read("rebase-apply/head-name") || (start && !/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(start) ? `refs/heads/${start}` : "");
+      if (owner.startsWith("refs/heads/")) {
+        branch = owner.slice(11);
+        if (!state.length) state.push("rebase or bisect in progress");
+      }
+    }
+    const lock = lines.find(l => l.startsWith("locked "))?.slice(7).trim();
+    entries.push({ path, head, branch, locked: flag("locked"), ...(lock ? { lock } : {}), prunable, state, pointed, admin, problems });
+  }
+  // Removing an entry deletes its admin directory, so one that another checkout uses keeps both.
+  for (const tree of entries.slice(1)) {
+    const other = tree.admin && entries.slice(1).find(o => o !== tree && (o.admin === tree.admin || o.pointed === tree.admin));
+    if (other) tree.problems.push(`admin directory ${tree.admin} is also used by ${other.path}`);
   }
   return entries;
+}
+
+type Walk = { files: number; bytes: number; blocked: string[]; unreadable: string[]; git: string[] };
+/** Walk without following symbolic links, counting non-directories and their lstat bytes; `skip` paths are walked elsewhere. */
+function walk(base: string, start: string, skip = new Set<string>(), w: Walk = { files: 0, bytes: 0, blocked: [], unreadable: [], git: [] }): Walk {
+  const rel = relative(base, start) || ".";
+  let stat;
+  try { stat = lstatSync(start); } catch { w.unreadable.push(rel); return w; }
+  if (!stat.isDirectory()) { w.files++; w.bytes += stat.size; return w; }
+  try { accessSync(start, constants.R_OK | constants.W_OK | constants.X_OK); } catch { w.blocked.push(rel); }
+  let entries: string[];
+  try { entries = readdirSync(start); } catch { w.unreadable.push(rel); return w; }
+  for (const name of entries) {
+    const child = join(start, name);
+    if (skip.has(child)) continue;
+    if (name === ".git") w.git.push(relative(base, child));
+    walk(base, child, skip, w);
+  }
+  return w;
+}
+
+/** Design item 1: every rule that keeps a worktree, and the ignored paths its removal would delete. */
+function inspect(checkout: Checkout, tree: Worktree, trees: Worktree[]): { reasons: string[]; ignored: Ignored[] } {
+  const reasons = [...tree.problems], ignored: Ignored[] = [];
+  if (tree.admin) {
+    const refs = checkout.call([`--git-dir=${tree.admin}`, "for-each-ref", "refs/worktree/"]);
+    if (refs.code !== 0 || refs.timedOut) reasons.push("per-worktree ref check failed");
+    else if (refs.stdout.trim()) reasons.push("has per-worktree refs under refs/worktree/");
+  }
+  if (tree.prunable) {
+    // Design item 4: removing the entry deletes its admin directory, with any submodule commits and staged blobs it holds.
+    if (present(tree.path)) reasons.push(present(join(tree.path, ".git")) ? "its directory exists though Git reports it missing" : "its directory exists without a .git file");
+    if (tree.admin) {
+      if (existsSync(join(tree.admin, "modules"))) reasons.push("submodule state: modules/ in its admin directory");
+      const index = checkout.call([`--git-dir=${tree.admin}`, "diff-index", "--cached", "--quiet", "HEAD"]);
+      if (index.timedOut) reasons.push("index check timed out");
+      else if (index.code === 1) reasons.push("staged changes in its index");
+      else if (index.code !== 0) reasons.push(`index check failed (exit ${index.code})`);
+    }
+    return { reasons, ignored };
+  }
+  for (const other of trees) if (other !== tree && other.path.startsWith(tree.path + sep)) reasons.push(`another worktree inside it: ${other.path}`);
+  const git = (...args: string[]) => checkout.call(["-C", tree.path, ...args]);
+  const failed = (r: Result, what: string) => r.timedOut ? `${what} timed out` : r.code !== 0 ? `${what} failed (exit ${r.code})` : r.stderr.trim() ? `${what} wrote to stderr: ${redact(r.stderr)}` : "";
+  const clean = git("status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none");
+  const shown = git("status", "--porcelain", "--ignored=traditional", "--untracked-files=normal");
+  const raw = git("status", "--porcelain", "--ignored=traditional", "--untracked-files=normal", "-z");
+  for (const r of [clean, shown, raw]) { const why = failed(r, "status check"); if (why && !reasons.includes(why)) reasons.push(why); }
+  if (clean.code === 0 && !clean.timedOut && clean.stdout.trim()) reasons.push("changed or untracked files");
+  const skip = new Set([join(tree.path, ".git")]);
+  const blocked: string[] = [];
+  if (shown.code === 0 && raw.code === 0 && !shown.timedOut && !raw.timedOut) {
+    // Display text comes from the quoted form; paths to walk from the -z form, entry for entry.
+    const display = shown.stdout.split("\n").filter(line => line.startsWith("!! ")).map(line => line.slice(3)), paths: string[] = [];
+    const fields = raw.stdout.split("\0");
+    for (let i = 0; i < fields.length; i++) {
+      const field = fields[i]!;
+      if (/^[RC]|^.[RC]/.test(field)) i++;
+      if (field.startsWith("!! ")) paths.push(field.slice(3));
+    }
+    if (display.length !== paths.length) reasons.push("ignored path listings disagree");
+    else paths.forEach((path, i) => {
+      const at = resolve(tree.path, path), w = walk(tree.path, at);
+      skip.add(at); blocked.push(...w.blocked);
+      ignored.push({ path: display[i]!, files: w.files, bytes: w.bytes });
+      if (w.unreadable.length) reasons.push(`cannot read ignored path ${display[i]}`);
+      if (w.git.length) reasons.push(`a .git inside ignored path ${display[i]}: ${few(w.git)}`);
+    });
+  }
+  const whole = walk(tree.path, tree.path, skip);
+  blocked.unshift(...whole.blocked);
+  if (blocked.length) reasons.push(`cannot read, enter or write ${few(blocked)}`);
+  if (whole.unreadable.length) reasons.push(`cannot walk ${few(whole.unreadable)}`);
+  const stage = git("ls-files", "-z", "-s"), tags = git("ls-files", "-z", "-v");
+  for (const r of [stage, tags]) { const why = failed(r, "index listing"); if (why && !reasons.includes(why)) reasons.push(why); }
+  if (tree.admin && existsSync(join(tree.admin, "modules"))) reasons.push("submodule state: modules/ in its admin directory");
+  if (stage.code === 0) {
+    const populated = stage.stdout.split("\0").filter(e => e.startsWith("160000 ")).map(e => e.slice(e.indexOf("\t") + 1)).filter(name => present(join(tree.path, name, ".git")));
+    if (populated.length) reasons.push(`submodule state: ${few(populated)} initialized`);
+  }
+  if (tags.code === 0) {
+    const entries = tags.stdout.split("\0").filter(Boolean).map(e => ({ tag: e[0]!, name: e.slice(2) }));
+    const assumed = entries.filter(e => e.tag !== e.tag.toUpperCase()).map(e => e.name);
+    const skipped = entries.filter(e => e.tag === "S" && present(join(tree.path, e.name))).map(e => e.name);
+    if (assumed.length) reasons.push(`assume-unchanged entry ${few(assumed)}`);
+    if (skipped.length) reasons.push(`skip-worktree entry ${few(skipped)} with its file on disk`);
+  }
+  return { reasons, ignored };
+}
+
+/** The rules that keep a worktree, from its entry and, when worktree removal is on, from inspect(). */
+function assess(c: Context, tree: Worktree, trees: Worktree[], extra: string[] = []): { reasons: string[]; ignored: Ignored[] } {
+  const reasons = [...extra, ...tree.state];
+  if (tree.path === c.main) reasons.push("the main worktree");
+  if (real(tree.path) === c.repo) reasons.push("the --repo worktree");
+  if (real(tree.path) === c.cwd) reasons.push("holds the process's working directory");
+  if (tree.locked) reasons.push(tree.lock ? `locked: ${tree.lock}` : "locked");
+  if (!c.worktrees) return { reasons: [...reasons, "worktree removal is off (--worktrees false)"], ignored: [] };
+  if (tree.path === c.main) return { reasons, ignored: [] };
+  const found = inspect(c.checkout, tree, trees);
+  return { reasons: [...reasons, ...found.reasons], ignored: found.ignored };
 }
 function refs(checkout: Checkout, prefix: string): Map<string, string> {
   const rows = checkout.git(["for-each-ref", "--format=%(refname)%00%(objectname)%00%(symref)", prefix]).split("\n").filter(Boolean).map(line => line.split("\0"));
   return new Map(rows.filter(([, , symref]) => !symref).map(([name, oid]) => [name!.slice(prefix.length), oid!]));
 }
 const real = (path: string) => { try { return realpathSync(path); } catch { return path; } };
+/** The worktree top-level holding the process's working directory: the deepest worktree path that contains it. */
+function holding(trees: Worktree[]): string | undefined {
+  let here: string;
+  try { here = real(process.cwd()); } catch { return undefined; }
+  return trees.map(t => real(t.path)).filter(p => here === p || here.startsWith(p.endsWith(sep) ? p : p + sep)).sort((a, b) => b.length - a.length)[0];
+}
 
 /** Observe remote and local state and classify every branch. It fetches but never deletes. */
 /** With `merged`, only containment in that PR's merged head proves a branch; otherwise any proof below applies. */
@@ -146,20 +297,37 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
   if (!defaultOid || !checkout.hasCommit(defaultOid)) throw new Error(`default branch ${defaultBranch} not observed on origin`);
   const protectedNames = new Set(checkout.list(`repos/${checkout.repository}/branches?protected=true&per_page=100`).map(b => String(object(b, "branch").name)));
   const open = checkout.list(`repos/${checkout.repository}/pulls?state=open&per_page=100`).map(pull);
-  const plan: Plan = { schema_version: 1, repository: checkout.repository, default_branch: defaultBranch, default_oid: defaultOid, delete_branch_on_merge: autoDelete, worktrees: options.worktrees === true, operations: [], kept: [] };
+  const plan: Plan = { schema_version: 2, repository: checkout.repository, default_branch: defaultBranch, default_oid: defaultOid, delete_branch_on_merge: autoDelete, worktrees: options.worktrees !== false, operations: [], kept: [] };
   if (!autoDelete && !only) plan.operations.push({ kind: "enable-auto-delete" });
-  const keep = (scope: Kept["scope"], branch: string, reason: string) => { plan.kept.push({ scope, branch, reason }); };
+  const keep = (scope: "remote" | "local", branch: string, reason: string) => { plan.kept.push({ scope, branch, reason }); };
+  const keepTree = (tree: Worktree, reasons: string[]) => { plan.kept.push({ scope: "worktree", path: tree.path, ...(tree.branch ? { branch: tree.branch } : {}), reason: reasons.join("; ") }); };
+  const seen = new Set<Worktree>();
 
   // A merged PR head or the default branch must contain the tip; nothing else proves the work is kept.
   let mainline: Set<string> | undefined;
-  const proof = (oid: string, name: string): { proof?: string; reason?: string } => {
+  /** Design item 2: a local branch's age is its oldest reflog entry, else its tip's committer date. */
+  const ageOf = (branch: string, oid: string): { old?: boolean; reason?: string } => {
+    const log = checkout.call(["reflog", "show", "--date=unix", `refs/heads/${branch}`]);
+    if (log.code !== 0 || log.timedOut) return { reason: "branch reflog unreadable" };
+    const stamps = log.stdout.split("\n").filter(Boolean).map(line => Number(/@\{(\d+)\}/.exec(line)?.[1]));
+    if (stamps.some(n => !Number.isFinite(n))) return { reason: "branch reflog unreadable" };
+    const dated = stamps.length ? stamps : [Number(checkout.git(["log", "-1", "--format=%ct", oid], true).trim() || NaN)];
+    const since = now - Math.min(...dated);
+    if (!Number.isFinite(since)) return { reason: "branch age unknown" };
+    return { old: since >= recentSeconds };
+  };
+  const proof = (oid: string, name: string, local?: string): { proof?: string; reason?: string } => {
     if (!checkout.hasCommit(oid)) return { reason: "tip commit unavailable locally" };
     if (merged) return checkout.hasCommit(merged.sha, merged.number) && checkout.ancestor(oid, merged.sha) ? { proof: `contained in merged PR #${merged.number} head ${merged.sha.slice(0, 12)}` } : { reason: `commits outside merged PR #${merged.number}` };
     for (const p of checkout.merged(name)) if (checkout.hasCommit(p.sha, p.number) && checkout.ancestor(oid, p.sha)) return { proof: `contained in merged PR #${p.number} head ${p.sha.slice(0, 12)}` };
-    if (oid === defaultOid) return { reason: `no commits beyond ${defaultBranch} and no merged PR` };
+    const own = (where: string, reason: string) => {
+      const a = local === undefined ? {} : ageOf(local, oid);
+      return a.old ? { proof: `${where}, at least 7 days old` } : { reason: a.reason ? `${reason}; ${a.reason}` : reason };
+    };
+    if (oid === defaultOid) return own(`no commits beyond ${defaultBranch}`, `no commits beyond ${defaultBranch} and no merged PR`);
     if (!checkout.ancestor(oid, defaultOid)) return { reason: "unmerged commits" };
     mainline ??= new Set(checkout.git(["rev-list", "--first-parent", defaultOid]).split("\n"));
-    if (mainline.has(oid)) return { reason: `points at a commit on ${defaultBranch}'s own history and has no merged PR` };
+    if (mainline.has(oid)) return own(`points at a commit on ${defaultBranch}'s own history`, `points at a commit on ${defaultBranch}'s own history and has no merged PR`);
     const age = now - Number(checkout.git(["log", "-1", "--format=%ct", oid]).trim());
     return age < recentSeconds ? { reason: "reachable from the default branch but committed within 7 days and no merged PR" } : { proof: `reachable from ${defaultBranch} ${defaultOid.slice(0, 12)}` };
   };
@@ -180,24 +348,99 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
   const tracking = refs(checkout, "refs/remotes/origin/");
   for (const [branch, oid] of [...tracking].sort()) if (!remote.has(branch) && (!only || only(branch))) plan.operations.push({ kind: "prune-tracking", ref: `refs/remotes/origin/${branch}`, oid });
 
-  const local = refs(checkout, "refs/heads/"), trees = worktrees(checkout), main = trees[0]?.path, invoking = real(checkout.root);
+  let format: string | undefined;
+  /** Design item 3: the rules that keep a detached worktree; a `prunable` one needs no minimum age (item 4). */
+  const loose = (tree: Worktree): string[] => {
+    const head = tree.head;
+    if (!head || !checkout.hasCommit(head)) return ["HEAD commit unavailable"];
+    const reasons: string[] = [];
+    if (!checkout.ancestor(head, defaultOid)) reasons.push(`HEAD ${head.slice(0, 12)} is not on ${defaultBranch}`);
+    // An entry without its own admin directory is already kept, and its reflog cannot be pinned down.
+    if (!tree.admin) return reasons;
+    const log = checkout.call([`--git-dir=${tree.admin}`, "reflog", "show", "--date=unix", "--format=%H %gd", "HEAD"]);
+    if (log.code !== 0 || log.timedOut) return [...reasons, `HEAD reflog unreadable: reflog show ${log.timedOut ? "timed out" : `failed (exit ${log.code})`}`];
+    const entries = log.stdout.split("\n").filter(Boolean).map(line => /^([0-9a-f]{40}|[0-9a-f]{64}) HEAD@\{(\d+)\}$/.exec(line));
+    if (entries.some(e => !e)) return [...reasons, "HEAD reflog unreadable: unexpected reflog show output"];
+    const named = new Set(entries.map(e => e![1]!));
+    if (!tree.prunable) {
+      const stamps = entries.map(e => Number(e![2]));
+      const since = now - (stamps.length ? Math.min(...stamps) : Number(checkout.git(["log", "-1", "--format=%ct", head], true).trim() || NaN));
+      if (!Number.isFinite(since)) reasons.push("HEAD age unknown");
+      else if (since < recentSeconds) reasons.push(stamps.length ? "HEAD reflog starts within 7 days" : "HEAD committed within 7 days");
+    }
+    format ??= checkout.git(["rev-parse", "--show-ref-format"], true).trim();
+    if (format === "reftable") {
+      if (entries.length) reasons.push(`reftable storage and its HEAD reflog has ${entries.length} entries`);
+    } else if (format !== "files") reasons.push("ref storage format unknown");
+    else {
+      // reflog show prints only the value each entry moved to; logs/HEAD also holds the one it moved from.
+      const file = join(tree.admin, "logs", "HEAD");
+      let lines: string[] = [];
+      try { if (present(file)) lines = readFileSync(file, "utf8").split("\n").filter(Boolean); } catch { return [...reasons, "HEAD reflog unreadable: cannot read logs/HEAD"]; }
+      if (lines.length !== entries.length) return [...reasons, `HEAD reflog unreadable: logs/HEAD has ${lines.length} entries, reflog show printed ${entries.length}`];
+      for (const line of lines) {
+        const m = /^([0-9a-f]{40}|[0-9a-f]{64}) ([0-9a-f]{40}|[0-9a-f]{64}) /.exec(line);
+        if (!m) return [...reasons, "HEAD reflog unreadable: unexpected logs/HEAD line"];
+        for (const oid of [m[1]!, m[2]!]) if (!/^0+$/.test(oid)) named.add(oid);
+      }
+    }
+    if (named.size) {
+      // Stale tracking refs do not count: the same plan prunes them before it removes worktrees.
+      const live = [...remote.keys()].map(b => `refs/remotes/origin/${b}`);
+      const unique = checkout.call(["rev-list", ...named, "--not", "--branches", ...live]);
+      if (unique.code !== 0 || unique.timedOut) reasons.push(`HEAD reflog check failed: rev-list ${unique.timedOut ? "timed out" : `exit ${unique.code}`}`);
+      else if (unique.stdout.trim()) reasons.push(`HEAD reflog names commits on no branch: ${few(unique.stdout.split("\n").filter(Boolean).map(oid => oid.slice(0, 12)))}`);
+    }
+    return reasons;
+  };
+
+  const local = refs(checkout, "refs/heads/"), trees = worktrees(checkout);
+  const context: Context = { checkout, main: trees[0]?.path, repo: real(checkout.root), cwd: holding(trees), worktrees: plan.worktrees };
   for (const [branch, oid] of [...local].sort()) {
     const upstream = checkout.git(["for-each-ref", "--format=%(upstream)", `refs/heads/${branch}`]).trim();
     const name = upstream.startsWith("refs/remotes/origin/") ? upstream.slice("refs/remotes/origin/".length) : branch;
     if (branch === defaultBranch || (only && !only(branch) && !only(name))) continue;
-    const r = proof(oid, name);
-    if (!r.proof) { keep("local", branch, r.reason!); continue; }
-    const tree = trees.find(t => t.branch === branch);
-    if (tree) {
-      const dirty = !tree.prunable && checkout.git(["-C", tree.path, "status", "--porcelain", "--ignored"], true).trim() !== "";
-      const blocker = tree.busy ? "a worktree with a rebase or bisect in progress" : tree.path === main ? "the main worktree" : real(tree.path) === invoking ? "the invoking worktree" : tree.locked ? "a locked worktree" : tree.prunable ? "a worktree whose directory is missing" : dirty ? "a worktree with changed, untracked or ignored files" : !plan.worktrees ? "a clean worktree; pass --worktrees true to remove it" : "";
-      if (blocker) { keep("local", branch, `merged but checked out in ${blocker} (${tree.path})`); continue; }
-      plan.operations.push({ kind: "remove-worktree", path: tree.path, branch, oid, proof: r.proof });
+    // `git worktree add --force` can check one branch out in several worktrees.
+    const r = proof(oid, name, branch), on = trees.filter(t => t.branch === branch);
+    for (const tree of on) seen.add(tree);
+    if (!r.proof) {
+      keep("local", branch, r.reason!);
+      for (const tree of on) keepTree(tree, assess(context, tree, trees, [`its branch is kept: ${r.reason}`]).reasons);
+      continue;
     }
+    const held: string[] = [];
+    for (const tree of on) {
+      const { reasons, ignored } = assess(context, tree, trees);
+      // after-merge never deletes ignored files the owner has not seen in a plan.
+      if (merged && ignored.length) reasons.push("holds ignored files; remove it through an approved plan");
+      if (reasons.length) { keepTree(tree, reasons); held.push(`merged but checked out in a kept worktree (${tree.path}): ${reasons.join("; ")}`); }
+      else plan.operations.push({ kind: "remove-worktree", path: tree.path, branch, oid, proof: r.proof, ignored });
+    }
+    if (held.length) { keep("local", branch, held.join("; ")); continue; }
     plan.operations.push({ kind: "delete-local", branch, oid, proof: r.proof });
   }
+  // Linked worktrees that no branch above covers: detached, on the default branch or on an unborn branch.
+  for (const tree of trees.slice(1)) {
+    if (seen.has(tree) || (only && !(tree.branch && only(tree.branch)))) continue;
+    if (!tree.branch) {
+      const { reasons, ignored } = assess(context, tree, trees, loose(tree));
+      if (reasons.length) keepTree(tree, reasons);
+      else plan.operations.push({ kind: "remove-worktree", path: tree.path, oid: tree.head!, proof: `HEAD reachable from ${defaultBranch}, ${tree.prunable ? "directory gone" : "at least 7 days old"}, and no other commit only its HEAD reflog names`, ignored });
+      continue;
+    }
+    const rule = tree.branch === defaultBranch ? `the default branch ${defaultBranch} is checked out` : local.has(tree.branch) ? "its branch is out of scope" : "unborn branch";
+    keepTree(tree, assess(context, tree, trees, [rule]).reasons);
+  }
   plan.operations.sort((a, b) => kinds.indexOf(a.kind) - kinds.indexOf(b.kind));
-  return { checkout, plan, remote, tracking, local, worktrees: trees };
+  return { checkout, plan, remote, tracking, local, worktrees: trees, context };
+}
+
+/** Run the item 1 checks again just before removal; a different result means the worktree changed after the plan. */
+function unchanged(o: Observation, op: Extract<Operation, { kind: "remove-worktree" }>): boolean {
+  const trees = worktrees(o.checkout), tree = trees.find(t => t.path === op.path && t.branch === op.branch && (op.branch !== undefined || t.head === op.oid));
+  if (!tree) return false;
+  const { reasons, ignored } = assess(o.context, tree, trees);
+  return reasons.length === 0 && same({ ...op, ignored }, op);
 }
 
 function absent(o: Observation, op: Operation): boolean {
@@ -239,12 +482,14 @@ function perform(checkout: Checkout, op: Operation, run: Run): Outcome {
 
 /** Re-observe, then perform each approved operation only if a fresh plan still proposes it unchanged. */
 function execute(options: Options, approved: Operation[], only?: (branch: string) => boolean, merged?: Pull): Outcome[] {
-  const fresh = observe(options, only, merged), run = options.run ?? spawn, outcomes: Outcome[] = [], blocked = new Set<string>();
+  const fresh = observe(options, only, merged), run = options.run ?? spawn, outcomes: Outcome[] = [], removed = new Set<string>();
   for (const op of approved) {
-    if (op.kind === "delete-local" && blocked.has(op.branch)) { outcomes.push({ operation: op, status: "failed", detail: "its worktree was not removed" }); continue; }
     if (!fresh.plan.operations.some(candidate => same(candidate, op))) { outcomes.push({ operation: op, status: absent(fresh, op) ? "already-absent" : "changed" }); continue; }
+    // `git update-ref -d` deletes a branch even while a worktree has it checked out.
+    if (op.kind === "delete-local" && !fresh.worktrees.filter(t => t.branch === op.branch).every(t => removed.has(t.path))) { outcomes.push({ operation: op, status: "failed", detail: "its worktree was not removed" }); continue; }
+    if (op.kind === "remove-worktree" && !unchanged(fresh, op)) { outcomes.push({ operation: op, status: "changed" }); continue; }
     const outcome = perform(fresh.checkout, op, run);
-    if (outcome.status === "failed" && op.kind === "remove-worktree") blocked.add(op.branch);
+    if (outcome.status === "done" && op.kind === "remove-worktree") removed.add(op.path);
     outcomes.push(outcome);
   }
   return outcomes;
@@ -253,8 +498,11 @@ const complete = (outcomes: Outcome[]) => outcomes.every(o => o.status === "done
 
 export function parsePlan(text: string): Plan {
   const plan = object(JSON.parse(text), "plan");
-  if (plan.schema_version !== 1 || typeof plan.repository !== "string" || typeof plan.worktrees !== "boolean" || !Array.isArray(plan.operations)) throw new Error("unsupported branch plan");
-  for (const op of plan.operations) if (!kinds.includes(object(op, "operation").kind as Operation["kind"])) throw new Error("unsupported branch operation");
+  if (plan.schema_version !== 2 || typeof plan.repository !== "string" || typeof plan.worktrees !== "boolean" || !Array.isArray(plan.operations)) throw new Error("unsupported branch plan");
+  for (const value of plan.operations) {
+    const op = object(value, "operation");
+    if (!kinds.includes(op.kind as Operation["kind"]) || (op.kind === "remove-worktree" && !Array.isArray(op.ignored))) throw new Error("unsupported branch operation");
+  }
   return plan as unknown as Plan;
 }
 

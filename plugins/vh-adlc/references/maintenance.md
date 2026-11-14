@@ -148,13 +148,16 @@ coverage gap.
 The sweep also checks branch hygiene in each repository in scope that has a local checkout,
 using the plan step in [branches.md](branches.md). This reads GitHub and fetches; it deletes
 nothing. Store the plan file in the run's private journal directory. Record in the report the
-automatic-deletion setting, each proposed operation with its proof, each kept branch with its
-reason, and the plan digest. A repository without a checkout, or whose plan fails, is a visible
+automatic-deletion setting, each proposed operation with its proof and, for a `remove-worktree`,
+its ignored paths, each kept branch and each `worktree` kept record with its reason, and the plan
+digest. A repository without a checkout, or whose plan fails, is a visible
 coverage gap.
 
 Removal follows the sweep's normal selection. Apply only the exact presented digest after the owner
-selects it, or straight away when the sweep request already asked for stale-branch removal. Worktree
-removal needs the owner to ask for it. Record each apply outcome in the report and journal; a
+selects it, or straight away when the sweep request already asked for stale-branch removal. Either
+covers the plan's worktree removals; no separate request is needed. When a `remove-worktree` operation
+lists ignored paths, present the plan with those lists and apply it only after the owner approves its
+digest, even when the request already asked for removal. Record each apply outcome in the report and journal; a
 `changed` or failed operation stays visible for the next sweep.
 
 ## Save a durable report
@@ -221,7 +224,7 @@ Without commit authority, save a generic uncommitted report in report_dir. A rea
 uses explicit --report-output or automatic `<run>/drafts/report.md`, leaving source/index unchanged.
 A commit request or explicit consumer rule permits a fresh local report-only worktree/ref, including
 before dependency selection. `candidate` creates `chore/maintenance-report-<run-id>-<step-id>` from
-the recorded fetched default commit. Record its repository/base/owner/new path/ref; never reuse an
+the recorded fetched default commit, locked with the reason `vh-adlc <run-id>`. Record its repository/base/owner/new path/ref; never reuse an
 occupied location or switch another session's branch. Run the actual applicable checks and generator
 there. Index inputs are committed default documents plus this report, so committed index drift can
 be repaired; unpublished/untracked documents and another session's dirty target indexes are excluded.
@@ -269,8 +272,8 @@ After publication, the tracked report in the owning main checkout is authoritati
 same-run update uses another fresh owned report candidate from the current fetched default base,
 not an edit/commit directly in shared main. Verify its prefix/digest and permitted header changes,
 append there, regenerate allowed indexes, run checks and follow the same transfer/push path. Old
-preparation refs are frozen receipts. Clean owned worktrees may be removed normally; keep refs if
-non-forced deletion refuses. No report grant includes task records, repair/evidence refs, dependency
+preparation refs are frozen receipts. When the run closes, unlock a clean owned worktree with
+`git worktree unlock` and remove it normally; keep refs if non-forced deletion refuses. No report grant includes task records, repair/evidence refs, dependency
 changes, branch-protection bypass, rebase, reset, stash or force push.
 
 While a candidate or transferred commit is unpushed/diverged/restricted/unsafe to sync, capture later
@@ -428,7 +431,10 @@ review pending. Do not replace independent review with self-review or start anot
 Use only authorized selected maintenance roles: batch source, primary evidence, selected related
 source, needed fresh clone, and the local report-only role. Choose fresh run-specific paths/refs,
 record ownership and never repoint/reuse an occupied ref. Preserve evidence outside outgoing source.
-Normal cleanup is non-forced and only for clean owned worktrees. A squash may leave its source ref
+Lock every worktree the run creates with the reason `vh-adlc <run-id>`
+(`git worktree add --lock --reason` or `git worktree lock --reason`), so a branch sweep or
+`after-merge` keeps it while the run is pending. Normal cleanup is non-forced and only for clean owned worktrees; run `git worktree unlock`
+when the run closes, before removing one. A squash may leave its source ref
 unreachable from main; retain it when ordinary branch deletion refuses. Other worktrees stay untouched.
 
 Execute only the selected unchanged batch and local policy's conditions. Explicitly approved local
