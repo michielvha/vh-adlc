@@ -730,3 +730,22 @@ esac
  const post=readFileSync(log,"utf8").split("\n").find(line=>line.includes("POST"))!;
  expect(JSON.parse(post.split("\t")[1]).labels).toEqual([]);
 });
+
+test("a mapped state label is a verdict: denied without proof, published under the mapped name with it",async()=>{
+ const f=setup({label_map:{ready:"ready-for-work"}});
+ expect(f.config.label_map.ready).toBe("ready-for-work");
+ f.inventory.labels=[{id:1,name:"ready-for-work",description:"Verified ready work",color:"0e8a16"}];
+ f.adapter.labels=async()=>structuredClone(f.inventory.labels);
+ const action:Action={id:"tag",kind:"labels",issue:1,labels:["ready-for-work"]};
+ withVerificationBoundary(()=>{
+  const unproven=buildReport(f.config,f.inventory,[{number:1,state:"open",remaining:"Transport remains",evidence:[{kind:"source",path:"src/app.ts",line:1,detail:"Export source",verified:true}]}]);
+  expect(()=>planBatch(f.config,f.inventory,unproven,[action])).toThrow();
+ });
+ const proof=(pass:"primary"|"adversarial")=>[{kind:"source",path:"src/app.ts",line:1,detail:"Observed canonical scope",verified:true,receipt:inspectSources(f.config,["src/app.ts"],pass).receipt}];
+ const report=buildReport(f.config,f.inventory,[{number:1,state:"open",remaining:"Transport remains",evidence:proof("primary"),adversarial:proof("adversarial")}]);
+ const batch=planBatch(f.config,f.inventory,report,[action]);
+ const result=await executeBatch(f.config,batch,approveBatch(batch,["tag"],"Approve this exact observed ready verdict"),f.adapter,{journal:f.journal});
+ expect(result.completed).toEqual(["tag"]);
+ expect(f.log.map(entry=>entry.kind==="labels"?entry.labels:null)).toEqual([["ready-for-work"]]);
+ expect(f.issues.get(1)!.labels).toEqual(["ready-for-work"]);
+});

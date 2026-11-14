@@ -27,6 +27,13 @@ describe("investigate files an issue on request", () => {
   test("a requested reject gets the type label only", () => files({ operation: "investigate", type: "refactor", verdict: "reject", ...issue }, ["refactor"]));
 });
 
+describe("investigate with a mapped state label", () => {
+  test("it files under the repository's name when only the mapped label exists", () => {
+    const labels = all().map((label) => label.name === "ready" ? { ...label, name: "ready-for-work" } : label);
+    files({ operation: "investigate", type: "bug", verdict: "act now", ...issue }, ["bug", "ready-for-work"], { settings: "schema_version: 1\nlabel_map:\n  ready: ready-for-work\n", labels });
+  });
+});
+
 describe("spec files a tracking issue", () => {
   test("it gets one type label and no state label", () => files({ operation: "spec", type: "enhancement", ...issue }, ["enhancement"]));
   test("it uses the mapped name when only the mapped type label exists", () => {
