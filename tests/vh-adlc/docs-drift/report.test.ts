@@ -232,3 +232,17 @@ test("a failed assessment does not present an empty recorded decision list as a 
   expect(report.outcome).toBe("failed"); expect(markdown).not.toContain("No unresolved content decisions.\n");
   expect(markdown).toContain("No unresolved content decisions are recorded in this failed report.");
 });
+
+test("controller proposal attention retains its assessment without bypassing overlap protection", () => {
+  const current = input(), fix = correction(), detail = { ...attention(), identity: "proposal:4", reason: "Current assessment remains unknown" };
+  current.corrections = [fix];
+  current.proposals = [{ locator: "pr:4", state: "open", assessment: "unverifiable", actor: "bot", head: "c".repeat(40),
+    body_sha256: digest("body"), reviewed: null, paths: [fix.path], resolution_attention: detail,
+    evidence: { receipt_sha256: digest("receipt"), inputs_sha256: digest("current evidence") } }];
+  const result = buildReport(current);
+  expect(result.attention).toHaveLength(1);
+  expect(result.attention[0].item).toEqual(detail);
+  expect(result.blocked_corrections).toEqual([correctionProjection(fix)]);
+  expect(result.carried_delivery).toEqual([]);
+  expect(result.success).toBe(false);
+});

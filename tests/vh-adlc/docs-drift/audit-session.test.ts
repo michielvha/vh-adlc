@@ -39,8 +39,10 @@ if (request.kind === "docs-drift-audit-worker-request") {
     const proposed = canonicalJSON({ schema_version: 1, kind: "docs-drift-proposal-assessment", source_commit: request.source_commit,
       inputs_sha256: request.proposal_inputs_sha256, proposals: request.proposals.map(row => {
         const original = JSON.parse(readFileSync(join(request.artifact_root, row.inputs_reference.path)));
-        return { number: row.number, binding_sha256: row.binding_sha256, hunks: original.hunks.map(hunk => ({ id: hunk.id, verdict: "unknown",
-          reason: "Synthetic semantic assessment remains unknown", recommendation: "Inspect this full original hunk", evidence: [] })) };
+        const supported = ${JSON.stringify(fault)} === "proposal-supported-cli", source = readFileSync(join(request.source_checkout, "docs/guide.md"));
+        const quote = { path: "docs/guide.md", sha256: digest(source), start: 0, end: source.length, quote_sha256: digest(source) };
+        return { number: row.number, binding_sha256: row.binding_sha256, hunks: original.hunks.map(hunk => ({ id: hunk.id, verdict: supported ? "supported" : "unknown",
+          reason: "Synthetic semantic assessment remains unknown", recommendation: "Inspect this full original hunk", evidence: supported ? [quote] : [] })) };
       }) });
     writeFileSync(join(request.artifact_root, request.outputs.proposal_assessment), proposed, { mode: 0o600 });
     proposal_assessment = { path: request.outputs.proposal_assessment, sha256: digest(proposed) };
@@ -56,13 +58,13 @@ console.log(JSON.stringify({ type: "session.start", data: { sessionId: arg("--se
 console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-opus-5.5", content: "MODEL: claude-opus-5.5\\n" + records } }));
 `; }
 
-test.each(["matching", "proposal", "normal-cli", "normal-cli-partial-output", "unretained", "invalid-worker", "request-change", "review-findings"])("retained normal audit session starts before roles and publishes no effects: %s", async fault => {
+test.each(["matching", "proposal", "proposal-supported-cli", "normal-cli", "normal-cli-partial-output", "unretained", "invalid-worker", "request-change", "review-findings"])("retained normal audit session starts before roles and publishes no effects: %s", async fault => {
   try {
     await import("../../../plugins/vh-adlc/scripts/docs-drift/audit-session");
-    const f = await bindingFixture(roots, false, { fullComponent: true, mutableInventory: fault === "proposal", role: { model: role.requested_model, native_model: role.adopted_model,
+    const f = await bindingFixture(roots, false, { fullComponent: true, mutableInventory: fault.startsWith("proposal"), role: { model: role.requested_model, native_model: role.adopted_model,
       identity_source: role.identity_source, argv: ["--no-auto-update"], client_program: client(fault) },
       beforeCandidate: input => {
-        if (fault !== "proposal") return;
+        if (!fault.startsWith("proposal")) return;
         const root = dirname(input.artifacts), candidate = join(root, "existing-audit-proposal"), origin = join(root, "binding-origin");
         git(root, "clone", "--no-local", "--no-checkout", input.repo, candidate); git(candidate, "checkout", "--detach", input.source);
         put(candidate, "docs/guide.md", "# Full existing audit proposal\n"); const head = commitAll(candidate);
@@ -112,12 +114,15 @@ spyOn(fs, "linkSync").mockImplementation((from, to) => {
 const { main } = await import(${JSON.stringify(join(f.retained.directory, "scripts/docs-drift/cli.ts"))});
 process.exitCode = await main(${JSON.stringify(cliArgs)});
 `, { mode: 0o600 });
-    const cliCase = ["normal-cli", "normal-cli-partial-output"].includes(fault);
-    const argv = fault === "normal-cli" ? [globalThis.process.execPath, join(f.retained.directory, "scripts/docs-drift/cli.ts"), ...cliArgs]
+    const cliCase = ["proposal-supported-cli", "normal-cli", "normal-cli-partial-output"].includes(fault);
+    const argv = ["normal-cli", "proposal-supported-cli"].includes(fault) ? [globalThis.process.execPath, join(f.retained.directory, "scripts/docs-drift/cli.ts"), ...cliArgs]
       : [globalThis.process.execPath, bridge];
     const before = captureRepositoryState(f.repo), process = Bun.spawnSync(argv, { env: { ...globalThis.process.env, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
       PATH: f.native.environment.PATH, GH_TOKEN: "synthetic-read-token", COPILOT_GITHUB_TOKEN: "synthetic-selected-provider" }, timeout: 210000 });
-    expect(process.exitCode, process.stderr.toString()).toBe(fault === "normal-cli-partial-output" ? 2 : 0);
+    writeFileSync(join(f.artifacts, "audit-session-process.stdout"), process.stdout, { mode: 0o600 });
+    writeFileSync(join(f.artifacts, "audit-session-process.stderr"), process.stderr, { mode: 0o600 });
+    const expectedExit = fault === "normal-cli-partial-output" ? 2 : fault === "proposal-supported-cli" ? 1 : 0;
+    expect(process.exitCode, process.stderr.toString()).toBe(expectedExit);
     const cli = cliCase ? JSON.parse(process.stdout.toString()) : null;
     const result = cli ? cli.audit_session : JSON.parse(readFileSync(output, "utf8"));
     if (cli) {
@@ -139,7 +144,7 @@ process.exitCode = await main(${JSON.stringify(cliArgs)});
         expect(cli.diagnostics).toContainEqual({ code: "audit-output", message: "Synthetic retained command markdown failure" });
       } else expect(readFileSync(join(f.artifacts, saved.files.markdown.path), "utf8")).toBe(result.report.markdown);
     }
-    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(["matching", "proposal", "normal-cli", "normal-cli-partial-output"].includes(fault)); expect(result.authority).toBe("none");
+    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(["matching", "proposal", "proposal-supported-cli", "normal-cli", "normal-cli-partial-output"].includes(fault)); expect(result.authority).toBe("none");
     expect(result.start.complete).toBe(true);
     if (fault === "matching") {
       const probes = JSON.parse(readFileSync(join(f.artifacts, "wrapped-output-scope.json"), "utf8")), { denied } = probes;
@@ -168,15 +173,23 @@ process.exitCode = await main(${JSON.stringify(cliArgs)});
       expect(result.scope_changed).toBe(true); expect(result.report).toBeNull(); expect(result.reviewer).toBeNull();
       expect(result.diagnostics.join("\n")).toContain("request artifact changed");
     }
-    if (["matching", "proposal", "normal-cli", "normal-cli-partial-output"].includes(fault)) {
+    if (["matching", "proposal", "proposal-supported-cli", "normal-cli", "normal-cli-partial-output"].includes(fault)) {
       expect(result.report.complete).toBe(true); expect(result.report.report.collection_complete).toBe(true);
       expect(result.report.publication_receipts?.complete, JSON.stringify(result.report.diagnostics)).toBe(true);
-      expect(result.report.publication_receipts.required_proposals).toBe(fault === "proposal" ? 1 : 0);
+      expect(result.report.publication_receipts.required_proposals).toBe(fault.startsWith("proposal") ? 1 : 0);
       expect(result.report.counts.eligible_publications).toBe(0);
       expect(result.report.report.published).toEqual([]); expect(result.report.report.failures).toEqual([]);
       expect(new Date(result.start.started_at).getTime()).toBeLessThanOrEqual(new Date(result.report.report.completed_at).getTime());
       expect(order[0].context).not.toBe(order[1].context);
-      expect(result.report.counts.assessed_proposals).toBe(fault === "proposal" ? 1 : 0);
+      expect(result.report.counts.assessed_proposals).toBe(fault.startsWith("proposal") ? 1 : 0);
+      if (fault === "proposal-supported-cli") {
+        expect(cli.outcome).toBe("attention");
+        expect(result.report.counts.verified_proposals).toBe(1);
+        expect(result.report.counts.unverified_proposals).toBe(0);
+        expect(result.report.proposal_verification.proposals[0]).toMatchObject({ number: 11, outcome: "verified" });
+        expect(result.report.proposal_verification.proposals[0].verification_reference.sha256).toMatch(/^[a-f0-9]{64}$/u);
+        expect(result.report.markdown).toContain("Current proposal verification");
+      }
       if (fault === "proposal") {
         expect(result.report.counts.unverified_proposals).toBe(1); expect(result.report.report.success).toBe(false);
         expect(result.report.report.outcome).toBe("new-attention"); expect(result.report.report.carried_delivery).toEqual([]);

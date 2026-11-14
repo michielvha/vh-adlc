@@ -449,3 +449,12 @@ WHERE: evidence/t23-audit-receipts-report-checkpoint-summary.json, the retained-
 EVIDENCE: The new `publication_receipts?.complete` assertion runs for the matching, proposal, normal-cli and normal-cli-partial-output faults. The checkpoint's retained-session stage uses the pattern `(matching|proposal|normal-cli)$`. Because of the `$` anchor, normal-cli-partial-output does not match. The retained-session log shows 3 passes and 5 filtered out. The receipts integration through the partial-output CLI path therefore has no green evidence in this checkpoint.
 PROPOSAL: Add normal-cli-partial-output to the retained-session pattern, or drop it from the assertion's case list if this checkpoint deliberately leaves that path out, and record the result.
 ```
+
+## Component diagnostic 112
+
+Exact local target `df071517da40b5a92c90abf64651c67f24dfa94c`. Actual Copilot Opus 5.5 with procedural isolation. All 95 required chunks were read with no outside paths or private files sent. The scoped coverage implementation review returned no findings. Composite feature criteria and migration checks remain open.
+
+```text
+MODEL: claude-opus-5.5
+NO FINDINGS
+```

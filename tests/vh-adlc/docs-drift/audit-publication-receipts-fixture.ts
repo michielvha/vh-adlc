@@ -14,8 +14,8 @@ import { effectMarker, validateReviewedManifest, type Effect } from "../../../pl
 import { sealPlan, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
-export async function auditReceiptFixture(roots: string[]) {
-  const f = await auditProposalInputsFixture(roots, "multiple", { role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source } });
+export async function auditReceiptFixture(roots: string[], options: { single?: boolean; currentResult?: boolean } = {}) {
+  const f = await auditProposalInputsFixture(roots, options.single ? "matching" : "multiple", { role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source } });
   const snapshot = captureSnapshot(f.repo, f.source), head = f.proposalHead, settings = snapshot.settings;
   const store = createOwnedObjectStore({ parent: f.artifacts, evidence_directory: f.artifacts, source_repo: f.candidate,
     source_commit: f.source, repository: settings.repository, owner: "synthetic-receipt", run: "publication" });
@@ -33,11 +33,20 @@ export async function auditReceiptFixture(roots: string[]) {
       labels: ["documentation"], draft: inventory[0].draft } },
     { id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } },
   ];
-  const correction = { repository: settings.repository, scope_sha256: snapshot.protocol.bindings.scope_sha256,
+  let correction = { repository: settings.repository, scope_sha256: snapshot.protocol.bindings.scope_sha256,
     identity: "correction-" + canonicalDigest({ path: "docs/guide.md" }), path: "docs/guide.md",
     patch_sha256: sha256(readOwnedPatch(store, settings.repository, f.source, head, ["docs/guide.md"])),
     postimage_sha256: sha256(readGit(store.root, "show", head + ":docs/guide.md")), verification_sha256: hash("synthetic normalized result"),
     inputs_sha256: canonicalDigest(resolutionSource(snapshot)) };
+  if (options.currentResult) {
+    const { deriveCorrectionBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/correction-bindings");
+    const { readCandidateVerificationArtifacts } = await import("../../../plugins/vh-adlc/scripts/docs-drift/verification-evidence");
+    if (!f.verified.evidence) throw Error("Original candidate result required for the retained fixture receipt");
+    const proof = readCandidateVerificationArtifacts({ ...f.options, reference: f.verified.evidence });
+    if (!proof.inspection?.object_store || !proof.scan) throw Error("Complete original candidate result required");
+    [correction] = deriveCorrectionBindings({ source: snapshot, candidate: captureSnapshot(f.candidate, head),
+      store: proof.inspection.object_store, paths: ["docs/guide.md"], scan: proof.scan });
+  }
   const selected = { ...bindings, ...deriveSourceWorkerInputs(snapshot), candidate_commit: head, candidate_tree: tree,
     diff_sha256: sha256(readOwnedPatch(store, settings.repository, f.source, head)), delivery_sha256: deliveryDigest([correction], []) };
   const input = fixture(selected, effects), plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,

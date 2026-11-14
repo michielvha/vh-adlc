@@ -23,6 +23,7 @@ export type Proposal = {
   actor: string; head: string; body_sha256: string; paths: string[];
   reviewed: { actor: string; head: string; body_sha256: string; corrections: string[]; attention: AttentionProjection[] } | null;
   evidence: { receipt_sha256: string | null; inputs_sha256: string };
+  resolution_attention?: AttentionInput;
 };
 /** Internal handoff from the provenance reader. Never populate from a report/CLI approval flag. */
 export type HistorySnapshot = {
@@ -104,6 +105,7 @@ function samePayload(proposal: Proposal): boolean {
 }
 
 function proposalDecision(input: ReportInput, proposal: Proposal, reason: string): AttentionInput {
+  if (proposal.resolution_attention) return proposal.resolution_attention;
   return {
     repository: input.repository, scope_sha256: input.scope_sha256, identity: `proposal:${proposal.locator}`,
     disposition: "needs-resolution", reason, owner_action: "Select a separate resolve assessment for the existing proposal",

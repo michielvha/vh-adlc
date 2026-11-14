@@ -10,7 +10,7 @@ import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
 import { readGit } from "./git";
 import { workerInputDigest, type Bindings } from "./manifests";
 import { publishArtifact } from "./journal";
-import { readCandidatePatch } from "./preparation";
+import { deriveCorrectionBindings } from "./correction-bindings";
 import { deriveWorkerInputs } from "./publication-worker";
 import { collectPublicationInputs } from "./publication-inputs";
 import { collectPublicationProposals as collectProposals } from "./proposals";
@@ -99,16 +99,8 @@ export async function collectPublicationBindings(input: Options): Promise<Result
         throw new PublicationScopeChanged("Resolve record decisions or complete original bindings changed");
     }
     const sourceBinding = resolutionSource(snapshot), sourceInputs = canonicalDigest(sourceBinding), candidateSnapshot = captureSnapshot(candidateRepo, options.candidate);
-    const verificationBinding = canonicalDigest({ commands: snapshot.settings.verification_commands, documents: candidateSnapshot.protocol.bindings.documents,
-      detectors: verified.scan.detectors.map(({ input_sha256: _input, ...detector }) => detector), findings: verified.scan.findings,
-      suppressed_findings: verified.scan.suppressed_findings, stale_suppressions: verified.scan.stale_suppressions });
-    const postimages = new Map(candidateSnapshot.blobs.map(blob => [blob.path, blob]));
-    result.corrections = candidate.changed_paths.filter(path => path !== options.resolution_record?.path).map(path => ({
-      repository: snapshot.settings.repository, scope_sha256: snapshot.protocol.bindings.scope_sha256, identity: "correction-" + canonicalDigest({ path }), path,
-      patch_sha256: sha256(readCandidatePatch(store, snapshot.settings.repository, options.source, options.candidate, [path])),
-      postimage_sha256: postimages.has(path) ? sha256(postimages.get(path)!.bytes) : canonicalDigest({ path, absent: true }),
-      verification_sha256: verificationBinding, inputs_sha256: sourceInputs,
-    }));
+    result.corrections = deriveCorrectionBindings({ source: snapshot, candidate: candidateSnapshot, store,
+      paths: candidate.changed_paths.filter(path => path !== options.resolution_record?.path), scan: verified.scan });
     result.attention = projectAttentionProposals(packet.attention, { repository: snapshot.settings.repository,
       scope_sha256: snapshot.protocol.bindings.scope_sha256, inputs_sha256: sourceInputs });
     const proposalBytes = canonicalJSON(projectCurrentProposals(result.proposals.proposals, result.resolution?.inputs_sha256 ?? null, options.inventory_context));

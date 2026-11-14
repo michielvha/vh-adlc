@@ -10,7 +10,7 @@ import { nativeReader, runtimeFixture } from "./runtime-fixture";
 import { commitAll, git, put } from "./repository-fixture";
 
 export async function bindingFixture(roots: string[], incompleteInventory: boolean, options: {
-  scannerCase?: "none" | "finding"; coordinated?: boolean; sourceInsideCandidate?: boolean; sourceCheckNeedsRepair?: boolean; mutableInventory?: boolean; fullComponent?: boolean; legacy_ids?: number[]; role?: Parameters<typeof runtimeFixture>[3];
+  scannerCase?: "none" | "finding"; sourceGuide?: string; coordinated?: boolean; sourceInsideCandidate?: boolean; sourceCheckNeedsRepair?: boolean; mutableInventory?: boolean; fullComponent?: boolean; legacy_ids?: number[]; role?: Parameters<typeof runtimeFixture>[3];
   beforeCandidate?: (input: { repo: string; source: string; artifacts: string; baseline: Awaited<ReturnType<typeof verifyCandidate>>; selection: unknown; decisions: Uint8Array; worker_options: WorkerCollectionOptions }) => void | Promise<void>;
 } = {}) {
   const { sourceInsideCandidate = false, sourceCheckNeedsRepair = false, beforeCandidate } = options;
@@ -26,6 +26,7 @@ export async function bindingFixture(roots: string[], incompleteInventory: boole
     put(repo, "docs/internal/plans/active.md", template.replace("status: draft", "status: in-progress\nbranch: feat/other-writer")
       .replace("  - src/\n  - config.yml", "  - docs/guide.md"));
   }
+  if (options.sourceGuide !== undefined) put(repo, "docs/guide.md", options.sourceGuide);
   const source = commitAll(repo), candidate = join(f.root, "binding-candidate"), origin = join(f.root, "binding-origin"), artifacts = sourceInsideCandidate ? f.root : join(f.root, "binding-artifacts");
   if (!sourceInsideCandidate) mkdirSync(artifacts, { mode: 0o700 });
   git(f.root, "clone", "--no-local", "--no-checkout", repo, origin); git(origin, "update-ref", "refs/heads/main", source);

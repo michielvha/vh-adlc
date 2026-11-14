@@ -1,6 +1,8 @@
 import { realpathSync } from "node:fs";
 import { collectAuditProposalInputs, readCollectedAuditProposals } from "./audit-proposal-inputs";
 import { collectAuditPublicationReceipts, readCollectedAuditPublicationReceipts } from "./audit-publication-receipts";
+import { auditProposalReportInputs, deliveredAuditEditPaths } from "./audit-proposal-report";
+import { invalidateCurrentProposalVerification, recheckCurrentProposalVerification, verifyCurrentProposals, type CurrentProposalVerification } from "./current-proposal-verification";
 import { collectAssessmentReview } from "./assessment-review";
 import { collectNativeReportHistory, readCollectedReportHistory } from "./history-collection";
 import { workerInputsDigest } from "./manifests";
@@ -9,7 +11,7 @@ import { parseDecisionPacket, projectAttentionProposals } from "./publication-de
 import { OUTPUT_LIMIT } from "./owned-process";
 import { PublicationScopeChanged } from "./publish";
 import { canonicalDigest, freezeJSON } from "./protocol";
-import { buildReport, renderReport, type AttentionInput, type Report } from "./report";
+import { buildReport, renderReport, escapeReportText, type AttentionInput, type Report, type CorrectionInput, type Proposal } from "./report";
 import { renderProposalAssessment, type ProposalAssessment } from "./proposal-assessment";
 import { renderAssessmentReport, type AssessmentReport } from "./assessment-report";
 import { resolutionSource } from "./resolve";
@@ -24,13 +26,13 @@ type Start = {
 };
 type Counts = {
   proposed_edits: number | null; required_proposals: number | null; collected_proposals: number | null;
-  assessed_proposals: number | null; unassessed_proposals: number | null; unverified_proposals: number | null;
+  assessed_proposals: number | null; unassessed_proposals: number | null; verified_proposals: number | null; unverified_proposals: number | null;
   eligible_publications: number | null; findings: AssessmentReport["counts"] | null; review_nits: number | null;
 };
 type Result = {
   schema_version: 1; kind: "docs-drift-audit-report"; authority: "none"; source_commit: string;
   complete: boolean; scope_changed: boolean; details_omitted: boolean; diagnostics: string[];
-  counts: Counts; publication_receipts: Awaited<ReturnType<typeof collectAuditPublicationReceipts>> | null; report: Report | null; markdown: string | null;
+  counts: Counts; proposal_verification: CurrentProposalVerification | null; publication_receipts: Awaited<ReturnType<typeof collectAuditPublicationReceipts>> | null; report: Report | null; markdown: string | null;
 };
 type Context = {
   options: Options; before: string; limit: number;
@@ -94,15 +96,18 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
   const options = original.options, repo = realpathSync(options.repo), snapshot = captureSnapshot(repo, options.source), historyContext = original.history.context;
   if (!historyContext) throw Error("Original complete audit report run required");
   const result: Result = { schema_version: 1, kind: "docs-drift-audit-report", authority: "none", source_commit: options.source,
-    complete: false, scope_changed: false, details_omitted: false, diagnostics: [], publication_receipts: null, report: null, markdown: null,
+    complete: false, scope_changed: false, details_omitted: false, diagnostics: [], proposal_verification: null, publication_receipts: null, report: null, markdown: null,
     counts: { proposed_edits: null, required_proposals: original.proposals.required_proposals, collected_proposals: original.proposals.collected_proposals,
-      assessed_proposals: null, unassessed_proposals: original.proposals.required_proposals, unverified_proposals: null,
+      assessed_proposals: null, unassessed_proposals: original.proposals.required_proposals, verified_proposals: null, unverified_proposals: null,
       eligible_publications: null, findings: null, review_nits: null } };
   const attention: AttentionInput[] = [], failures: Report["failures"] = [], history = readCollectedReportHistory(original.history);
   const addFailure = (code: string, message: string) => {
     result.diagnostics.push(message);
     if (!failures.some(failure => failure.code === code && failure.message === message)) failures.push({ code, message });
   };
+  let delivery: { corrections: CorrectionInput[]; proposals: Proposal[] } = { corrections: [], proposals: [] };
+  let proposalInputs: Parameters<typeof auditProposalReportInputs>[0] | null = null;
+  let editAttention: AttentionInput[] = [];
   let assessment: AssessmentReport | null = null, proposalAssessment: ProposalAssessment | null = null, collectionComplete = false;
   try {
     if (!matchesRepositoryState(repo, original.before)) throw new AuditReportFailure("audit-caller-changed", "Caller changed since the audit report started");
@@ -150,7 +155,7 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
     for (const stale of assessment.stale_suppressions) attention.push(item({ identity: "stale-suppression:" + stale.id, disposition: "needs-resolution",
       reason: stale.reason, owner_action: "Review and refresh or retire this stale suppression", rule: { stale_suppression: stale },
       title: "Stale documentation suppression " + stale.id, links: [] }));
-    for (const edit of review.manifest.selection.edits) attention.push(item({ identity: "edit:" + edit.id, disposition: "needs-resolution",
+    for (const edit of review.manifest.selection.edits) editAttention.push(item({ identity: "edit:" + edit.id, disposition: "needs-resolution",
       reason: "This independently reviewed proposal has no completed delivery in the report-only operation",
       owner_action: "Select preparation and delivery under their applicable permission", rule: { edit_sha256: canonicalDigest(edit) },
       title: "Proposed documentation correction " + edit.path, links: [] }));
@@ -161,26 +166,59 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
       throw new AuditReportFailure("audit-proposal-assessment-incomplete", "Reviewed proposal assessment is incomplete");
     result.counts.assessed_proposals = proposalAssessment?.counts.assessed_proposals ?? 0;
     result.counts.unassessed_proposals = proposalAssessment?.counts.unassessed_proposals ?? current.required_proposals;
-    result.counts.unverified_proposals = current.required_proposals;
-    for (const proposal of readCollectedAuditProposals(current)) {
-      const judgment = proposalAssessment?.proposals.find(row => row.number === proposal.number && row.binding_sha256 === proposal.binding_sha256);
-      const publication = receiptRows.find(row => row.number === proposal.number && row.binding_sha256 === proposal.binding_sha256);
-      if (!publication) throw new AuditReportFailure("audit-publication-inputs-incomplete", "Original current proposal receipt binding required");
-      attention.push(item({ identity: "proposal:" + proposal.number, disposition: judgment ? proposalAttentionDisposition(judgment.assessment) : "unknown",
-        reason: judgment ? "Current source assessment: " + judgment.assessment + "; historical shared receipt "
-          + (publication.eligibility === "reviewed" ? "is eligible" : "is not eligible") + "; current result verification and carried delivery are not established"
-          : "Full native proposal inputs are collected; current semantic support has not been assessed for this report",
-        owner_action: judgment ? "Review every hunk recommendation under Existing proposal assessments before selecting verification, delivery or resolution"
-          : "Complete the current support assessment before carrying or resolving this proposal",
-        rule: { number: proposal.number, head_sha: proposal.head_sha, base_sha: proposal.base_sha, binding_sha256: proposal.binding_sha256,
-          assessment_sha256: judgment ? canonicalDigest(judgment) : null, verification: "unverified", delivery: "unverified",
-          publication: { eligibility: publication.eligibility, receipt_sha256: publication.receipt ? canonicalDigest(publication.receipt) : null } },
-        title: "Existing audit proposal " + proposal.number + (judgment ? " awaits verification and delivery review" : " remains unassessed"),
-        links: ["https://" + snapshot.settings.hostname + "/" + snapshot.settings.repository + "/pull/" + proposal.number] }));
+    const supported = proposalAssessment?.proposals.filter(row => row.assessment === "supported").map(row => row.number) ?? [];
+    result.proposal_verification = await verifyCurrentProposals({ repo, source: options.source, artifact_root: options.artifact_root,
+      owner: options.owner, run: options.run, proposals: current, supported });
+    result.scope_changed ||= result.proposal_verification.scope_changed;
+    proposalInputs = { snapshot, current, receipts: result.publication_receipts,
+      assessment: proposalAssessment, verification: result.proposal_verification };
+    delivery = auditProposalReportInputs(proposalInputs);
+    if (!result.proposal_verification.complete) {
+      collectionComplete = false;
+      for (const message of result.proposal_verification.diagnostics) addFailure("audit-proposal-verification-diagnostic", message);
+      throw new AuditReportFailure("audit-proposal-verification-incomplete", "Required current proposal verification failed");
     }
+    if (supported.length) {
+      const finalInputs = await collectAuditProposalInputs(options);
+      result.scope_changed ||= finalInputs.scope_changed;
+      if (!finalInputs.complete) {
+        collectionComplete = false;
+        throw new AuditReportFailure("audit-collection-incomplete", "Final current proposal inputs unavailable after verification");
+      }
+      if (finalInputs.inputs_sha256 !== current.inputs_sha256 || finalInputs.worker_input_sha256 !== current.worker_input_sha256) {
+        collectionComplete = false;
+        throw new PublicationScopeChanged("Original audit proposal inputs changed during current verification");
+      }
+      const finalReceipts = await collectAuditPublicationReceipts({ repo, source: options.source, artifact_root: options.artifact_root,
+        credential: options.credential, path: options.path, proposals: finalInputs });
+      result.scope_changed ||= finalReceipts.scope_changed;
+      if (!finalReceipts.complete) {
+        collectionComplete = false;
+        throw new AuditReportFailure("audit-publication-inputs-incomplete", "Final native publication receipts unavailable after verification");
+      }
+      if (canonicalDigest(readCollectedAuditPublicationReceipts(finalReceipts)) !== canonicalDigest(receiptRows)) {
+        collectionComplete = false;
+        throw new PublicationScopeChanged("Native reviewed publication changed during current verification");
+      }
+      const finalReview = await collectAssessmentReview({ ...options, ...structuredClone(roles) });
+      result.scope_changed ||= finalReview.scope_changed;
+      if (!finalReview.complete || !finalReview.manifest || !finalReview.review)
+        throw new AuditReportFailure("audit-review-incomplete", "Original independent review unavailable after current verification");
+      if (finalReview.target_sha256 !== review.target_sha256 || canonicalDigest(finalReview.review) !== canonicalDigest(review.review))
+        throw new PublicationScopeChanged("Original independent review changed during current verification");
+    }
+    recheckCurrentProposalVerification(result.proposal_verification);
+    result.counts.verified_proposals = result.proposal_verification.verified_proposals;
+    result.counts.unverified_proposals = (current.required_proposals ?? 0) - result.proposal_verification.verified_proposals;
+    const basis = buildReport({ ...historyContext, source_commit: options.source, completed_at: new Date().toISOString(),
+      collection_complete: collectionComplete, failures, attention, ...delivery, published: [], history });
+    const delivered = deliveredAuditEditPaths({ edits: review.manifest.selection.edits, snapshot,
+      verification: result.proposal_verification, report: basis });
     if (result.counts.unassessed_proposals !== 0) {
       throw new AuditReportFailure("audit-proposal-unassessed", "Existing audit proposals require complete current semantic assessment");
     }
+    const deliveredEdits = new Set(review.manifest.selection.edits.filter(edit => delivered.has(edit.path)).map(edit => "edit:" + edit.id));
+    editAttention = editAttention.filter(row => !deliveredEdits.has(row.identity));
     result.complete = true;
   } catch (error) { result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
     addFailure(error instanceof AuditReportFailure ? error.code : error instanceof ArtifactChanged || error instanceof PublicationScopeChanged ? "audit-scope-changed" : "audit-report-incomplete",
@@ -188,17 +226,32 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
   if (!matchesRepositoryState(repo, original.before)) {
     result.complete = false; collectionComplete = false; addFailure("audit-caller-changed", "Caller changed during audit report completion");
   }
+  if (!result.complete) {
+    if (result.proposal_verification) result.proposal_verification = invalidateCurrentProposalVerification(result.proposal_verification,
+      "Final audit proof is incomplete", result.scope_changed);
+    if (proposalInputs && result.proposal_verification)
+      delivery = auditProposalReportInputs({ ...proposalInputs, verification: result.proposal_verification });
+    delivery = { corrections: [], proposals: delivery.proposals.map(proposal => ({ ...proposal, reviewed: null })) };
+    result.counts.verified_proposals = 0;
+    result.counts.unverified_proposals = result.counts.required_proposals;
+  }
   result.diagnostics = [...new Set(result.diagnostics)];
   if (!result.complete && !failures.length) addFailure("audit-report-incomplete", "Final audit assessment is incomplete");
   try {
     result.report = buildReport({ ...historyContext, source_commit: options.source, completed_at: new Date().toISOString(),
-      collection_complete: collectionComplete, failures, attention, corrections: [], proposals: [], published: [], history });
+      collection_complete: collectionComplete, failures, attention: [...attention, ...editAttention], ...delivery, published: [], history });
     result.markdown = renderReport(result.report) + (assessment ? "\n" + renderAssessmentReport(assessment,
       ["Finding assessments independently reviewed", ...(result.counts.review_nits ? [result.counts.review_nits + " minor review finding(s) remain in the original records"] : [])])
       .replace(/^# Documentation drift report\n/u, "## Finding assessment\n") : "\n## Assessment gaps\n\nFinding counts and judgments are unavailable until the failed assessment checks are resolved.\n")
       + (proposalAssessment ? "\n" + renderProposalAssessment(proposalAssessment, "Proposal assessments independently reviewed") : "");
+    if (result.proposal_verification) result.markdown += "\n## Current proposal verification\n\n"
+      + result.proposal_verification.proposals.map(row => "- " + escapeReportText(row.locator) + ". " + row.outcome + ". "
+        + row.diagnostics.map(escapeReportText).join(". ")).join("\n") + "\n";
   } catch (error) {
     result.complete = false; result.report = null; result.markdown = null;
+    if (result.proposal_verification) result.proposal_verification = invalidateCurrentProposalVerification(result.proposal_verification,
+      "Final report projection failed", result.scope_changed);
+    result.counts.verified_proposals = 0; result.counts.unverified_proposals = result.counts.required_proposals;
     result.diagnostics.push(error instanceof Error ? error.message : "Final report projection unavailable");
   }
   const completed = boundAuditReport(result, original.limit);
@@ -211,7 +264,8 @@ export function boundAuditReport(input: Result, limit: number): Result {
   if (!Number.isSafeInteger(limit) || limit < 1 || limit > OUTPUT_LIMIT) throw Error("Final report output bound required");
   const result = structuredClone(input);
   if (Buffer.byteLength(JSON.stringify(result) + "\n") > limit) {
-    result.complete = false; result.details_omitted = true; result.publication_receipts = null; result.report = null; result.markdown = null;
+    result.complete = false; result.details_omitted = true; result.proposal_verification = null; result.publication_receipts = null; result.report = null; result.markdown = null;
+    result.counts.verified_proposals = 0; result.counts.unverified_proposals = result.counts.required_proposals;
     result.diagnostics = ["Final report exceeds the retained entry bound; inspect the original source and role records"];
     if (Buffer.byteLength(JSON.stringify(result) + "\n") > limit) throw Error("Configured output bound cannot hold the incomplete final report");
   }

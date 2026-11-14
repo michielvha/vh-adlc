@@ -11,7 +11,7 @@ import { auditReceiptFixture } from "./audit-publication-receipts-fixture";
 import { collectWorkerInputs } from "../../../plugins/vh-adlc/scripts/docs-drift/publication-worker";
 import { readCollectedAuditProposals } from "../../../plugins/vh-adlc/scripts/docs-drift/audit-proposal-inputs";
 import { roleRuntimeDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
-import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { collectAssessmentReviewTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/assessment-review";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 
@@ -118,7 +118,7 @@ test("a final report refuses a bound that cannot retain even its incomplete summ
 });
 
 
-test("independent full proposal assessment removes the unassessed gap while leaving verification and delivery pending", async () => {
+test("independent full proposal assessment triggers fresh result verification before delivery", async () => {
   try {
     const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/audit-report");
     const f = await assessmentReviewFixture(roots, { proposals: true, proposalAssessments: true }), before = captureRepositoryState(f.repo);
@@ -143,8 +143,12 @@ test("independent full proposal assessment removes the unassessed gap while leav
     const result = await api.completeAuditReport(begun, { worker_capture: f.worker, reviewer_capture: reviewer });
     expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
     expect(result.report).toMatchObject({ collection_complete: true, outcome: "new-attention", published: [], carried_delivery: [] });
-    expect(result.counts).toMatchObject({ required_proposals: 1, collected_proposals: 1, assessed_proposals: 1, unassessed_proposals: 0, unverified_proposals: 1 });
-    expect(result.report?.attention.find(item => item.item.identity === "proposal:11")?.item.reason).toContain("current result verification and carried delivery are not established");
+    expect(result.counts).toMatchObject({ required_proposals: 1, collected_proposals: 1, assessed_proposals: 1, unassessed_proposals: 0,
+      verified_proposals: 1, unverified_proposals: 0 });
+    expect(result.proposal_verification).toMatchObject({ complete: true, verified_proposals: 1 });
+    expect(result.proposal_verification?.proposals[0]).toMatchObject({ number: 11, outcome: "verified" });
+    expect(result.proposal_verification?.proposals[0].verification_reference?.sha256).toMatch(/^[a-f0-9]{64}$/u);
+    expect(result.report?.attention.find(item => item.item.identity === "proposal:11")?.item.reason).toContain("current result verification passed");
     expect(result.markdown).toContain("Proposal assessments independently reviewed");
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveRoots = true; throw error; }
@@ -232,10 +236,92 @@ test("an independently reviewed mixed proposal routes to resolution and retains 
     const result = await api.completeAuditReport(begun, { worker_capture: f.worker, reviewer_capture: reviewer });
     expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
     const item = result.report?.attention.find(entry => entry.item.identity === "proposal:11")?.item;
-    expect(item?.disposition).toBe("needs-resolution"); expect(item?.reason).toContain("assessment: mixed");
+    expect(item?.disposition).toBe("needs-resolution"); expect(item?.reason).toContain("assessment is mixed");
     expect(item?.owner_action).toContain("every hunk recommendation");
     for (const hunk of judgment.hunks) expect(result.markdown).toContain(hunk.recommendation);
     expect(result.counts).toMatchObject({ assessed_proposals: 1, unassessed_proposals: 0, unverified_proposals: 1 });
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { preserveRoots = true; throw error; }
+}, 245000);
+
+
+test.each(["matching", "mismatch", "legacy-overlap", "proposal-changed", "receipt-disappeared", "review-changed", "proof-changed"])("current checks carry only the exact eligible result and preserve conflicts for %s", async fault => {
+  try {
+    const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/audit-report"), f = await auditReceiptFixture(roots, { single: fault !== "legacy-overlap", currentResult: fault !== "mismatch" });
+    const current = await collectWorkerInputs(f.options), inputs = await collectAuditProposalInputs(f.options);
+    if (!current.complete || !current.worker_input_sha256 || !current.facts?.runtime || !current.source_verification?.evidence || !inputs.complete)
+      throw Error("Complete original source and receipt fixture required");
+    const assessment = retainSyntheticArtifact(f.artifacts, "receipt-report-finding-assessment.json", canonicalJSON({ schema_version: 1,
+      kind: "docs-drift-assessment", source_commit: f.source, source_verification_sha256: current.source_verification.evidence.sha256,
+      findings: (current.source_verification.scan?.findings ?? []).map(finding => ({ id: finding.id, verdict: "unknown",
+        reason: "Synthetic current-source uncertainty", recommendation: "Inspect this source", evidence: [] })) }));
+    const quoteBytes = readFileSync(join(f.repo, "docs/guide.md")), quote = { path: "docs/guide.md", sha256: sha256(quoteBytes),
+      start: 0, end: quoteBytes.length, quote_sha256: sha256(quoteBytes) };
+    const proposalAssessment = retainSyntheticArtifact(f.artifacts, "receipt-report-proposal-assessment.json", canonicalJSON({ schema_version: 1,
+      kind: "docs-drift-proposal-assessment", source_commit: f.source, inputs_sha256: inputs.inputs_sha256,
+      proposals: readCollectedAuditProposals(inputs).map(proposal => ({ number: proposal.number, binding_sha256: proposal.binding_sha256,
+        hunks: proposal.hunks.map(hunk => ({ id: hunk.id, verdict: "supported", reason: "Full original proposal is supported by the current source",
+          recommendation: "Verify this full proposal before carrying delivery", evidence: [quote] })) })) }));
+    const worker = captureSyntheticRole(f.artifacts, f.source, "worker", roleRuntimeDigest(current.facts.runtime, "worker"),
+      evidence("receipt-report-worker", current.worker_input_sha256, canonicalJSON({ input_sha256: current.worker_input_sha256,
+        edits: structuredClone(f.selection.edits), publication: null, assessment, proposal_assessment: proposalAssessment }).toString()));
+    const begun = await api.beginAuditReport(f.options); expect(begun.complete, JSON.stringify(begun.diagnostics)).toBe(true);
+    const target = await collectAssessmentReviewTarget({ ...f.options, worker_capture: worker });
+    if (!target.complete || !target.reviewer_runtime_sha256 || !target.target_sha256) throw Error("Complete original receipt-report target required");
+    const reviewer = captureSyntheticRole(f.artifacts, f.source, "reviewer", target.reviewer_runtime_sha256,
+      evidence("receipt-report-reviewer", target.target_sha256, "NO FINDINGS\n"));
+    const lateChange = ["proposal-changed", "receipt-disappeared", "review-changed", "proof-changed"].includes(fault);
+    if (lateChange) {
+      const executable = join(f.root, "native-bin/gh"), original = join(f.root, "native-bin/gh-original");
+      copyFileSync(executable, original);
+      writeFileSync(executable, `#!${process.execPath}
+const fs = require("node:fs"), path = require("node:path"), root = ${JSON.stringify(f.artifacts)}, fault = ${JSON.stringify(fault)};
+const proof = fs.readdirSync(root).find(name => name.startsWith("current-proposal-verification-")), marker = path.join(root, "late-proof-change");
+if (proof && !fs.existsSync(marker)) {
+  fs.writeFileSync(marker, fault);
+  if (fault === "proposal-changed") {
+    const file = ${JSON.stringify(f.inventoryFile)}, inventory = JSON.parse(fs.readFileSync(file));
+    inventory[0].body = "Preserve the changed native proposal after current checks"; fs.writeFileSync(file, JSON.stringify(inventory));
+  } else if (fault === "receipt-disappeared") fs.writeFileSync(${JSON.stringify(f.receipt.faultsPath)}, JSON.stringify({ missing_ref: true }));
+  else if (fault === "review-changed") fs.writeFileSync(path.join(root, ${JSON.stringify(reviewer.path)}), "Preserve changed independent review after current checks\\n");
+  else {
+    const record = JSON.parse(fs.readFileSync(path.join(root, proof))), reference = record.proposals[0].verification_reference;
+    fs.writeFileSync(path.join(root, reference.path), "Preserve changed current verification proof\\n");
+  }
+}
+const result = Bun.spawnSync([${JSON.stringify(process.execPath)}, ${JSON.stringify(original)}, ...process.argv.slice(2)], { env: process.env, stdout: "inherit", stderr: "inherit" });
+process.exit(result.exitCode);
+`, { mode: 0o700 });
+    }
+    const before = captureRepositoryState(f.repo), result = await api.completeAuditReport(begun, { worker_capture: worker, reviewer_capture: reviewer });
+    if (lateChange) {
+      expect(result.complete).toBe(false); expect(result.scope_changed).toBe(true);
+      expect(result.report).toMatchObject({ outcome: "failed", success: false, carried_delivery: [] });
+      expect(result.counts).toMatchObject({ verified_proposals: 0, unverified_proposals: 1 });
+      expect(result.proposal_verification).toMatchObject({ complete: false, verified_proposals: 0 });
+      expect(result.proposal_verification?.proposals[0]).toMatchObject({ outcome: "incomplete", verification_reference: null, corrections: [] });
+      expect(result.report?.attention.find(row => row.item.identity === "proposal:11")?.item.rule).toMatchObject({ verification: "unverified" });
+      expect(result.report?.attention.some(row => row.item.identity === "edit:guide-fix")).toBe(true);
+      expect(captureRepositoryState(f.repo)).toEqual(before);
+      return;
+    }
+    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+    const expected = fault === "legacy-overlap" ? 2 : 1;
+    expect(result.counts).toMatchObject({ required_proposals: expected, assessed_proposals: expected, unassessed_proposals: 0,
+      verified_proposals: expected, unverified_proposals: 0, eligible_publications: 1 });
+    expect(result.proposal_verification?.proposals.every(row => row.outcome === "verified")).toBe(true);
+    expect(result.report?.published).toEqual([]);
+    if (fault === "matching") {
+      expect(result.report).toMatchObject({ outcome: "carried-delivery", success: true, attention: [], pending_corrections: [], blocked_corrections: [] });
+      expect(result.report?.carried_delivery).toHaveLength(1);
+      expect(result.report?.carried_delivery[0].locator).toBe("https://github.com/fixture/docs/pull/11");
+      expect(result.markdown).toContain("https://github.com/fixture/docs/pull/11");
+    } else {
+      expect(result.report).toMatchObject({ outcome: "new-attention", success: false, carried_delivery: [], pending_corrections: [] });
+      expect(result.report?.attention.find(row => row.item.identity === "proposal:" + (fault === "legacy-overlap" ? 12 : 11))).toBeObject();
+      expect(result.report?.blocked_corrections.length).toBeGreaterThan(0);
+      expect(result.report?.attention.some(row => row.item.identity === "edit:guide-fix")).toBe(true);
+    }
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveRoots = true; throw error; }
 }, 245000);

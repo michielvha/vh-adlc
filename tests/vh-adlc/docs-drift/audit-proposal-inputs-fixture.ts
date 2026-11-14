@@ -7,9 +7,10 @@ import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/proto
 
 export const auditInputFaults = ["empty", "matching", "multiple", "partial-missing", "early-missing", "oversized-first", "missing-objects", "changed-after-fetch", "oversized-inputs"] as const;
 export async function auditProposalInputsFixture(roots: string[], fault: typeof auditInputFaults[number], options: {
-  multiHunks?: boolean; role?: NonNullable<Parameters<typeof bindingFixture>[2]>["role"];
+  multiHunks?: boolean; sourceGuide?: string; coordinated?: boolean; sourceCheckNeedsRepair?: boolean; role?: NonNullable<Parameters<typeof bindingFixture>[2]>["role"];
 } = {}) {
-  const f = await bindingFixture(roots, false, { mutableInventory: true, role: options.role });
+  const f = await bindingFixture(roots, false, { mutableInventory: true, role: options.role, sourceGuide: options.sourceGuide,
+    coordinated: options.coordinated, sourceCheckNeedsRepair: options.sourceCheckNeedsRepair });
     let head = f.head;
     if (options.multiHunks) { put(f.candidate, "docs/extra.md", "# A second independent proposal hunk\n"); head = commitAll(f.candidate); }
     if (fault === "oversized-inputs" || fault === "oversized-first") { put(f.candidate, "docs/guide.md", "# " + "x".repeat(600000) + "\n"); head = commitAll(f.candidate); }
