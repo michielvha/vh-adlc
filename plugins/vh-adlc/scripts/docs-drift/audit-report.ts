@@ -4,13 +4,13 @@ import { collectAuditPublicationReceipts, readCollectedAuditPublicationReceipts 
 import { auditProposalReportInputs, deliveredAuditEditPaths } from "./audit-proposal-report";
 import { invalidateCurrentProposalVerification, recheckCurrentProposalVerification, verifyCurrentProposals, type CurrentProposalVerification } from "./current-proposal-verification";
 import { collectAssessmentReview } from "./assessment-review";
-import { collectNativeReportHistory, readCollectedReportHistory } from "./history-collection";
+import { collectNativeReportHistory, createCollectedActionsEnvelope, readCollectedReportHistory } from "./history-collection";
 import { workerInputsDigest } from "./manifests";
 import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
 import { parseDecisionPacket, projectAttentionProposals } from "./publication-decisions";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { PublicationScopeChanged } from "./publish";
-import { canonicalDigest, freezeJSON } from "./protocol";
+import { canonicalDigest, canonicalJSON, freezeJSON } from "./protocol";
 import { buildReport, renderReport, escapeReportText, joinReportSentences, type AttentionInput, type Report, type CorrectionInput, type Proposal } from "./report";
 import { renderProposalAssessment, type ProposalAssessment } from "./proposal-assessment";
 import { renderAssessmentReport, type AssessmentReport } from "./assessment-report";
@@ -40,6 +40,7 @@ type Context = {
   proposals: Awaited<ReturnType<typeof collectAuditProposalInputs>>;
 };
 const runs = new WeakMap<object, Context>(), reports = new WeakMap<object, Report>();
+const reportHistories = new WeakMap<object, Context["history"]>();
 const completing = new WeakSet<object>(), consumed = new WeakSet<object>();
 class AuditReportFailure extends Error {
   constructor(readonly code: string, message: string) { super(message); }
@@ -255,7 +256,9 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
     result.diagnostics.push(error instanceof Error ? error.message : "Final report projection unavailable");
   }
   const completed = boundAuditReport(result, original.limit);
-  if (completed.complete && completed.report) { reports.set(completed, completed.report); consumed.add(start); }
+  if (completed.complete && completed.report) {
+    reports.set(completed, completed.report); reportHistories.set(completed, original.history); consumed.add(start);
+  }
   return completed;
 }
 
@@ -277,4 +280,11 @@ export function readOriginalAuditReport(result: Result): Report {
   const report = reports.get(result);
   if (!result.complete || !report) throw Error("Original completed audit report required");
   return freezeJSON(structuredClone(report));
+}
+
+/** Preserve the actual completed report and its original hosted history collection. */
+export function createOriginalAuditReportEnvelope(result: Result): Buffer {
+  const report = readOriginalAuditReport(result), history = reportHistories.get(result);
+  if (!history) throw Error("Original audit report history required");
+  return createCollectedActionsEnvelope(history, canonicalJSON(report));
 }

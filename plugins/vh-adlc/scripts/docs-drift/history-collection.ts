@@ -6,7 +6,7 @@ import { OUTPUT_LIMIT } from "./owned-process";
 import { canonicalDigest, freezeJSON } from "./protocol";
 import { PublicationScopeChanged } from "./publish";
 import { collectWorkerInputs, type WorkerCollectionOptions } from "./publication-worker";
-import { collectActionsHistory, collectLocalHistory, type HistoryContext, type OwnedInvocation } from "./report-history";
+import { collectActionsHistory, collectLocalHistory, createActionsEnvelope, createProducerSource, type HistoryContext, type OwnedInvocation } from "./report-history";
 import type { HistorySnapshot } from "./report";
 import { loadCommittedSettings } from "./settings";
 import { captureRepositoryState, matchesRepositoryState } from "./snapshot";
@@ -25,6 +25,7 @@ type Result = {
   diagnostics: string[]; details_omitted: boolean;
 };
 const originalSnapshots = new WeakMap<object, HistorySnapshot>();
+const hostedEnvelopes = new WeakMap<object, (bytes: Uint8Array) => Buffer>();
 function readNativeRun(repository: ReturnType<typeof readNativeContext>["repository"], id: number, attempt?: number): WorkflowRunInput {
   try { return repository.run(id, attempt); }
   catch (error) {
@@ -51,7 +52,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
   const result: Result = { schema_version: 1, kind: "docs-drift-history-collection", authority: "none", source_commit: options.source,
     complete: false, scope_changed: false, mode: null, captured_at, context: null, hosted_run_attempt: null, worker_input_sha256: null, current_default: null,
     history: [], receipts: [], diagnostics: [], details_omitted: false };
-  let snapshot: HistorySnapshot | null = null, limit = OUTPUT_LIMIT;
+  let snapshot: HistorySnapshot | null = null, limit = OUTPUT_LIMIT, envelope: ((bytes: Uint8Array) => Buffer) | null = null;
   try {
     const { settings } = loadCommittedSettings(repo, options.source);
     limit = Math.min(limit, settings.reports.max_entry_bytes);
@@ -99,6 +100,26 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
     if (final.default_commit !== currentDefault || canonicalDigest(final.identity) !== canonicalDigest(identity)
       || (run && runBinding(readNativeRun(final.repository, run.id, run.run_attempt)) !== runBinding(run)))
       throw new PublicationScopeChanged("Native history source, actor or invocation changed during collection");
+    if (run) envelope = bytes => {
+      const beforeOutput = canonicalDigest(captureRepositoryState(repo)), observed = native();
+      if (observed.default_commit !== currentDefault || canonicalDigest(observed.identity) !== canonicalDigest(identity))
+        throw new PublicationScopeChanged("Native history source or actor changed before output");
+      const currentRun = readNativeRun(observed.repository, run.id, run.run_attempt);
+      if (runBinding(currentRun) !== runBinding(run)) throw new PublicationScopeChanged("Current native scheduled run changed before output");
+      const producer = createAdoptedProducerVerifier({ store, current_default: currentDefault, identity })(
+        createProducerSource(observed.repository, run.head_sha), currentRun);
+      if (!producer) throw Error("Adopted native history producer required for hosted output");
+      const report = JSON.parse(Buffer.from(bytes).toString("utf8"));
+      if (report.scope_sha256 !== context.scope_sha256 || report.started_at !== context.started_at)
+        throw new PublicationScopeChanged("Original hosted report context changed");
+      const output = createActionsEnvelope(bytes, { settings, run: currentRun, producer });
+      const after = native();
+      if (after.default_commit !== currentDefault || canonicalDigest(after.identity) !== canonicalDigest(identity)
+        || runBinding(readNativeRun(after.repository, run.id, run.run_attempt)) !== runBinding(run))
+        throw new PublicationScopeChanged("Native history source, actor or invocation changed during output");
+      if (!matchesRepositoryState(repo, beforeOutput)) throw new PublicationScopeChanged("Caller changed during hosted history output");
+      return output;
+    };
     result.history = snapshot.records.map(({ bytes: _bytes, ...record }) => record);
     result.diagnostics.push(...snapshot.diagnostics); result.complete = true;
   } catch (error) {
@@ -114,6 +135,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
   }
   const completed = freezeJSON(result);
   if (completed.complete && snapshot) originalSnapshots.set(completed, copySnapshot(snapshot));
+  if (completed.complete && envelope) hostedEnvelopes.set(completed, envelope);
   return completed;
 }
 
@@ -122,4 +144,11 @@ export function readCollectedReportHistory(result: Result): HistorySnapshot {
   const snapshot = originalSnapshots.get(result);
   if (!snapshot || !result.complete) throw Error("Original native history collection required");
   return copySnapshot(snapshot);
+}
+
+/** Prepare upload input through an original hosted collection and freshly observed native bindings. */
+export function createCollectedActionsEnvelope(result: Result, bytes: Uint8Array): Buffer {
+  const envelope = hostedEnvelopes.get(result);
+  if (!result.complete || !envelope) throw Error("Original hosted history collection required");
+  return envelope(bytes);
 }
