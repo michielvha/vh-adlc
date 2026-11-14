@@ -490,6 +490,7 @@ and R-16 F-01 to F-03 are applied. The owner accepts in advance if R-17 has no b
 | 2026-11-13 | R-15 | spec | `76f0480` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix and two nits |
 | 2026-11-13 | R-15 | spec | `76f0480` | n/a | n/a | accepted by owner |
 | 2026-11-13 | R-16 | spec | `12370b8` | claude-opus-5-5 | procedural | Clean drift re-review after PR 87: no blocking finding; one should-fix and two nits, listed for implementation |
+| 2026-11-14 | R-17 | spec | `db1d531` | claude-opus-5-5 | procedural | Clean: no blocking finding; six should-fix and three nits, listed for implementation |
 
 ### R-1
 
@@ -1369,3 +1370,68 @@ SEVERITY: nit
 WHERE: Context, Background, Pins (lines 136-139); Design, Delivery (lines 295-299); Acceptance Criteria AC-06 (lines 331-336); Test Plan AC-06 row (line 367); Tasks T3 (line 382)
 EVIDENCE: Background presents one docs SHA shared by the repository pin and the plugin. At 12370b8, AGENTS.md:4 and plugins/vh-adlc/references/security-settings.md:5 name d8f07c9dd69038375a535af8ad586086688f85ab, while plugins/vh-adlc/knowledge.md:5 and :7 name c70769ebf43ea03a4bdffb3cda51954eb05b35a7, moved alone by 2c9d3af. "The previous pin" in AC-06 and "the old pin" in its row and T3 now name two commits: the repository comparison restores d8f07c9 in AGENTS.md, while the old-pin fixture takes revision A from the plugin pin (tests/vh-adlc/fixtures/build.ts:112-117), which is c70769e. A diff of the cached pages shows conventions/feature-documents.md identical at both commits, so the rules block comparison passes either way.
 PROPOSAL: Note in Background that the plugin pin and the repository pin now differ, and name which commit "the previous pin" means in AC-06, its row and T3 (or say that both are compared).
+
+### R-17
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Nits ride along or are listed (lines 204-214); Design, Applying a pass's findings as one revision (lines 218-224); Design, Delivery (lines 307-314); Acceptance Criteria AC-11 (lines 369-374); Tasks T2 and T5 (lines 403, 407)
+EVIDENCE: The nit rule has the author fix every nit of a pass "in any section and of either kind, without raising a judgement nit as an Open Question". The pinned convention says of Open Questions "Only the owner answers them" (conventions/feature-documents.md:139) and "Every trade-off the document settles is an open question, including one the author would answer the same way the owner would" (:154-155). The spec skill's author mode says "Put every judgement call into Open Questions ... Never answer one yourself" (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:58 at db1d531), and review mode step 4 and the protocol say "Turn judgement findings into Open Questions" (SKILL.md:81, plugins/vh-adlc/references/review-protocol.md:96). Design and T2 put the nit rule only "beside the severity definitions", and T5 changes only review mode and the protocol's Records paragraph. The published convention would then contradict its own Open questions section, and an author reading the unchanged author-mode bullet may still raise a judgement nit, which fails AC-11's "raises no nit as an Open Question". This document's own restatement rule asks for every such location to be named.
+PROPOSAL: Name in Design, T2 and T5 every restatement the nit rule overrides: an exception for nits in the convention's Open questions section, the author-mode bullet at SKILL.md:58, review mode step 4 and review-protocol.md:96.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Applying a pass's findings as one revision (lines 218-224); Design, Behaviors these rules touch (lines 190-194); Acceptance Criteria AC-09 (lines 359-364); Test Plan AC-09 row (line 387)
+EVIDENCE: Design has the author raise a pass's judgement findings as Open Questions "without changing the baseline, and once the owner has answered it applies every factual finding to be applied, every answer and the nits" in one commit. Today the factual findings are applied in the same run (SKILL.md:81), so nothing waits. Under the new order, a run that stops for the owner leaves that pass's factual findings and nits unapplied, and nothing records that they are pending except the stored records. In a later session, if the folded answer leaves the baseline unchanged, the pass stays fresh and clean, so `vh-adlc next` returns owner acceptance (conventions/feature-documents.md:279), and the resume skill follows `next` (plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md, Continue table). The held findings are then dropped. If the answer changes the baseline, `next` says spec review and they are dropped the same way. The Behaviors list says "an interrupted or resumed run" was checked, but the AC-09 second trial gets the owner's scripted answer in the same run, and the resume skill is not in covers. This is the partial-failure path the document's own failure-mode check asks about.
+PROPOSAL: State where the pending pass is recorded when its Open Questions are raised (for example the questions or status_description name R-n and say its factual findings and nits await the answers), and that the spec and resume operations apply that pass's held findings with the answers before dispatching or asking for acceptance. Add an AC-09 variant where the answer arrives in a separate session with no resume.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-11 (lines 369-374); Test Plan AC-11 row (line 389); Design, Free-text checks (lines 286-292); Tasks T4 and T6 (lines 405-406)
+EVIDENCE: AC-11 requires that the author fixes every nit of the pass "except a free-text widening nit, which stays listed". The AC-11 row's first pass holds a factual nit on Design, a judgement nit on Scope and a factual nit on Context, and no free-text widening nit, and the AC-05 trial checks only the reviewer's rating. An author that applies a widening nit alongside a blocking fix passes every listed proof, and that is the regex-tuning loop the Context cites (blog-visual-reading R-40, R-44, R-45). The records also have no field that marks a nit as a free-text widening, and neither T4 nor Design asks the reviewer to say so, so the author must infer it from the text.
+PROPOSAL: Add a widening nit on a passed free-text row to the first pass of the AC-11 scenario and pass only when it is listed and not applied. Have the reviewer agent say in `EVIDENCE` when a nit is a free-text widening.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Failure-mode check (lines 269-275); Context, Owner summary (lines 55-56); Acceptance Criteria AC-04 (lines 339-341); Test Plan AC-04 row (line 382)
+EVIDENCE: Design and the Owner summary trigger the check where the design "changes state, runs concurrently, or crosses a process or network boundary". AC-04 says "a design that changes shared state or crosses a network boundary". Almost every feature writes some file, so under the Design reading nearly every spec draws the four questions and new findings, which works against the goal of fewer passes. Under the AC-04 reading only shared state counts. The AC-04 row's third and fourth fixtures are described only as "a design that defines concurrency, partial failure and retry but not upgrade or rollback" and "a design that defines concurrency, retry and upgrade but not partial failure", without saying they change state or cross a boundary, and no fixture changes only private local state, so the two readings are never told apart.
+PROPOSAL: Pick one trigger and use it in Design, the Owner summary, AC-04 and AC-07. Give fixtures three and four an explicit state change or boundary, and add a fixture that changes only private local state with its expected result.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (lines 73-74); Design, Delivery (lines 316-318); Acceptance Criteria AC-06 (lines 346-351); Tasks T11 (line 410)
+EVIDENCE: `git merge-base --is-ancestor origin/main HEAD` fails: origin/main is at da736bc, which holds f4e5793 (#88) moving both manifests from 0.17.0 to 0.18.0 and the lock to 0.26.0, while the branch still has 0.17.0. `vh-adlc fresh` on this document reports `covered-drift` for plugins/vh-adlc/plugin.json and plugins/vh-adlc/.claude-plugin/plugin.json. T11 moves to "one version above the version current at the time" and AC-06 asks only for "higher than the version before the change". The version check only requires the version to differ from origin/main (tests/vh-adlc/check.test.ts:224-232). So 0.17.1 passes AC-06 and the check although it is lower than the published 0.18.0, and a branch-relative bump to 0.18.0 duplicates a released version. The Owner summary says only that the branch starts from a main holding 2c9d3af.
+PROPOSAL: State that the default branch is merged into the feature branch before T3 and T11, and that the new version is above the default branch's version at that point. Make AC-06 and T11 say the same.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-08 row (line 386); Acceptance Criteria AC-08 (lines 355-358); Tasks T1 (line 393)
+EVIDENCE: For the convention, the AC-08 check in tests/vh-adlc/review-convergence.test.ts only looks for the sentence "a nit on the normative baseline never causes a revision on its own" in the Review log section. The nit rule in Design also requires a pass's nits to ride along with its blocking or should-fix baseline fixes, the free-text widening exception, and listing unapplied nits in the report and conversation. A published convention that carries only the first sentence passes the row, so a proof can pass on a wrong implementation, which this document's own should-fix definition covers.
+PROPOSAL: Extend the AC-08 check to the ride-along clause, the free-text exception and the listing rule, or say in the row that the T2 independent review checks those parts.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Severity definitions (lines 251-265)
+EVIDENCE: The nit definition is "a citation slip that changes nothing an implementer builds or a proof checks", but the should-fix definition makes widening a passed free-text row a nit, and that does change what the proof checks. The lens paragraph sits under the "(convention)" heading, while lenses are a plugin concept (plugins/vh-adlc/references/loop-settings.md:42) and T4 puts the precedence in the reviewer agent, so it is unclear whether the shared convention gets the lens sentence.
+PROPOSAL: Add the free-text widening case to the nit definition, and say whether the lens precedence goes in the convention or only in the reviewer agent.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 40-42 and 83-85)
+EVIDENCE: The summary says the stopping rule draft is "parked until `shared-development-loop` lands", and later says that feature "landed first (`2c9d3af`)"; docs/specs/shared-development-loop.md has `status: complete`. It also says "Validation is planned, not observed", while T13 and T15 record observed passes, and running `bun test tests/vh-adlc/review-convergence.test.ts` at db1d531 gives 2 pass (both authority checks) and 6 fail.
+PROPOSAL: Say the stopping rule draft waits to be reviewed against the landed loop, and say which checks have already been observed (the AC-10 authority checks and S16.drift) and which are still planned.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-11 row (line 389)
+EVIDENCE: The row passes only when "the document does not list" the second pass's nit, but the convention stores the reviewer's records verbatim under `### R-<n>` (conventions/feature-documents.md:164-165), so that nit's ID and text are always in the document.
+PROPOSAL: Say that the check excludes the Review Log and its record subsections.
