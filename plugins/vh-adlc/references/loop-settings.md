@@ -109,7 +109,11 @@ rejected push keeps the local claim commit, creates no feature branch and report
 host's own worktree tool for a worktree, or to stop before writing.
 
 `bun scripts/loop/cli.ts context --repo <dir>` prints the reading list (instruction files, then the
-project procedure) and the lenses.
+project procedure), the lenses, and `plugin`: the running plugin version and, where the host keeps an
+install record, the installed one. A host keeps the plugin a session started with, so after an update
+`plugin.stale` is true until the session restarts, and operations stop before writing. When a `vh-adlc`
+on PATH reports another version than the plugin's lock, `plugin.binary_warning` says so, and operations
+run only the binary `scripts/ensure-vh-adlc.sh` prints.
 
 Only `spec_reviewer` and `implementation_reviewer` accept a `command` route; settings that give one to
 `author` or `implementer` are refused, naming the role. Agent and skill files never name a model.
