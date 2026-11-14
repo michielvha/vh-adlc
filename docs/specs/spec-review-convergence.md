@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "In progress on feat/spec-review-convergence after the R-17 acceptance; T1, T12, T14, T15 and T13 are done, T2 is next."
+status_description: "Every task done and every criterion ticked with observed evidence on feat/spec-review-convergence; waiting for an independent implementation review."
 issue: null
 branch: feat/spec-review-convergence
 goal: "Spec review rates findings consistently, finds failure-mode gaps and every restatement in one pass, applies each pass's findings as one revision without applying nits, and never rewrites reviewed commits."
@@ -328,50 +328,60 @@ reviewed revert of the docs and plugin edits and the pin.
 
 ## Acceptance Criteria
 
-- [ ] AC-02: The published convention defines blocking, should-fix and nit as this document's Design
+- [x] AC-02: The published convention defines blocking, should-fix and nit as this document's Design
       states, and a reviewer following the updated agent rates a seeded false claim the design depends
       on blocking, a seeded harmless wrong line number nit, a seeded ambiguity that allows two different
       implementations should-fix, a seeded wording issue nit, and a finding a declared lens raises at
       that lens's declared severity.
-- [ ] AC-03: A reviewer following the updated agent reports, in one finding, every location of a rule a
+      Evidence: `bun test tests/vh-adlc/review-convergence.test.ts` at 6e67cf3: the resolved `1ccf8f3` convention defines the three severities and the lens precedence; reviewer trials ac02-severity (blocking, nit, should-fix, nit) and ac02-lens (should-fix for the lens) pass, records in `tests/vh-adlc/evidence/review-convergence/trials/records/`; reviewer is Claude Code subagents reporting `claude-opus-5-5`.
+- [x] AC-03: A reviewer following the updated agent reports, in one finding, every location of a rule a
       document states inconsistently, and an author following the updated skill changes every
       restatement in one commit.
-- [ ] AC-04: A reviewer following the updated agent returns a failure-mode finding for each of the four
+      Evidence: reviewer trial ac03-restatement names all five locations in one finding; author trial author-ac03 changed every restatement in one commit (`9c572d4`) after the owner's answer; evidence in `trials/records/` and `trials/authors/`.
+- [x] AC-04: A reviewer following the updated agent returns a failure-mode finding for each of the four
       questions a design that changes shared state or crosses a network boundary leaves undefined, and
       returns no failure-mode finding for a design that changes no state and crosses no boundary.
-- [ ] AC-05: The published convention requires must-pass and must-fail examples in a free-text pattern
+      Evidence: reviewer trials ac04-concurrency, ac04-retry, ac04-upgrade and ac04-partial each raise the open question first; ac04-wording raises no failure-mode finding (second run, after the cache held the prose guide).
+- [x] AC-05: The published convention requires must-pass and must-fail examples in a free-text pattern
       proof; on a row that has passed review at its current text, a reviewer rates a missed wrong output
       as a nit and a rejected correct output as blocking, and on a row changed since, rates a missed
       wrong output as should-fix.
-- [ ] AC-06: The rules block is byte-identical to the previous pin, the named historical specs give the
+      Evidence: `review-convergence.test.ts` finds the example requirement in the resolved Test plan section; reviewer trials ac05-passed (nit and blocking) and ac05-changed (should-fix) pass.
+- [x] AC-06: The rules block is byte-identical to the previous pin, the named historical specs give the
       same lint, `fresh` and gate results under both pins, the repository pin in `AGENTS.md` and every
       docs pin in the plugin point at the published docs commit or a later one containing it, both
       manifests carry the same version, higher than the version before the change, a repository on the
       previous pin keeps today's behavior for the convention-dependent parts and its report names the
       needed pin, and the plugin test suite passes.
-- [ ] AC-07: An author following the updated skill, drafting a feature that crosses a network boundary,
+      Evidence: rules block sha256 identical at `d8f07c9` and `1ccf8f3`; nine lint, fresh and gate results identical between clones differing only in the pin; `AGENTS.md`, `knowledge.md` and `references/security-settings.md` name `1ccf8f3`; manifests 0.19.0 above main's 0.18.1; S16.oldpin and S16.oldpin-reviewer pass; `bun test tests/vh-adlc` at 6e67cf3: 1579 pass, 2 environmental fails also failing on main; docs `npm run check` passed on https://github.com/vhco-pro/docs/pull/35.
+- [x] AC-07: An author following the updated skill, drafting a feature that crosses a network boundary,
       states the behavior for concurrent requests, partial failure, retry or replay, and upgrade or
       rollback in Design, or raises an Open Question for any it cannot settle.
-- [ ] AC-08: The published convention states the nit rule beside the severity definitions, and
+      Evidence: author trial author-ac07 states concurrency, partial failure, retry or replay, and upgrade or rollback in Design, with Open Questions for the open choices (`trials/authors/author-ac07.deploy-chat-notification.md`).
+- [x] AC-08: The published convention states the nit rule beside the severity definitions, and
       `docs/get-started/first-feature.md` and `docs/user-guides/workflows.md` describe the severities,
       the nit rule and applying a pass's findings as one revision; the workflows guide also says no
       approval allows rewriting a commit that a Review Log row names.
-- [ ] AC-09: An author following the updated skill raises a pass's judgement findings other than nits
+      Evidence: `review-convergence.test.ts`: the resolved Review log states the nit rule with its ride-along, widening exception and listing parts; both guides carry the severities, the nit rule and the one-revision rule; the workflows guide says no approval allows rewriting a reviewed commit (10 pass).
+- [x] AC-09: An author following the updated skill raises a pass's judgement findings other than nits
       first and then applies its factual findings and the answers as one revision in one commit that keeps every test
       or scenario the document names consistent with the change, removes a mechanism rather than adding
       one when both behave the same, revisits a previous revision's change when a finding traces to it,
       and lists the behaviors and checks it walked in its report; a reviewer following the updated agent
       says in `EVIDENCE` when a finding traces to the previous revision's change.
-- [ ] AC-10: `references/authority.md` forbids rewriting a commit a Review Log row names, with no
+      Evidence: author trials author-ac09 (one commit, check script passes, mechanism removed, behaviors and checks listed) and author-ac09-judgement (question first with the baseline unchanged, then one commit) pass; reviewer trial ac09-trace cites the previous revision's change.
+- [x] AC-10: `references/authority.md` forbids rewriting a commit a Review Log row names, with no
       approval exception, in both Preservation and its history-rewrite row; and when review mode brings
       default-branch work into a feature branch, it uses a merge, so every reviewed commit stays
       reachable.
-- [ ] AC-11: With the new convention, an author following the updated skill makes no commit that
+      Evidence: `review-convergence.test.ts`: Preservation and the history-rewrite row both forbid rewriting a reviewed commit; scenario S16.drift passes 7 of 7 (drift merged, every reviewed commit an ancestor, no `commit-unreachable`).
+- [x] AC-11: With the new convention, an author following the updated skill makes no commit that
       changes the normative baseline only to fix nits; fixes every nit of a pass, factual or judgement
       and in any section, in the same commit that applies that pass's blocking or should-fix findings to
       the baseline, except a free-text widening nit, which stays listed; raises no nit as an Open
       Question; and lists every nit it did not apply, from every pass it handled, with its ID in its
       report and the owner-facing conversation summary, not in the document.
+      Evidence: scenario S16.nits passes 8 of 8 with the T5 skill (`S16.nits.t5.md`): pass-1's blocking fix and all three nits land in one commit, no Open Question, pass-2's nit listed in the report and not applied; S7.7, S7.7.accept, S7.9 and S14.spec pass with the same skill.
 
 ## Test Plan
 
