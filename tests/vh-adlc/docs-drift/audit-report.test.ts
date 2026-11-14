@@ -298,7 +298,7 @@ process.exit(result.exitCode);
       expect(result.complete).toBe(false); expect(result.scope_changed).toBe(true);
       expect(result.report).toMatchObject({ outcome: "failed", success: false, carried_delivery: [] });
       expect(result.counts).toMatchObject({ verified_proposals: 0, unverified_proposals: 1 });
-      expect(result.proposal_verification).toMatchObject({ complete: false, verified_proposals: 0 });
+      expect(result.proposal_verification).toMatchObject({ complete: false, verified_proposals: 0, evidence: null });
       expect(result.proposal_verification?.proposals[0]).toMatchObject({ outcome: "incomplete", verification_reference: null, corrections: [] });
       expect(result.report?.attention.find(row => row.item.identity === "proposal:11")?.item.rule).toMatchObject({ verification: "unverified" });
       expect(result.report?.attention.some(row => row.item.identity === "edit:guide-fix")).toBe(true);
@@ -316,10 +316,15 @@ process.exit(result.exitCode);
       expect(result.report?.carried_delivery).toHaveLength(1);
       expect(result.report?.carried_delivery[0].locator).toBe("https://github.com/fixture/docs/pull/11");
       expect(result.markdown).toContain("https://github.com/fixture/docs/pull/11");
+      const verificationLine = result.markdown?.split("## Current proposal verification\n\n")[1]?.split("\n")[0];
+      expect(verificationLine).toBeString();
+      expect(verificationLine).toBe(verificationLine?.trimEnd());
     } else {
       expect(result.report).toMatchObject({ outcome: "new-attention", success: false, carried_delivery: [], pending_corrections: [] });
       expect(result.report?.attention.find(row => row.item.identity === "proposal:" + (fault === "legacy-overlap" ? 12 : 11))).toBeObject();
       expect(result.report?.blocked_corrections.length).toBeGreaterThan(0);
+      if (fault === "legacy-overlap") expect(result.report?.attention.find(row => row.item.identity === "proposal:11")?.item.reason)
+        .toContain("https://github.com/fixture/docs/pull/12");
       expect(result.report?.attention.some(row => row.item.identity === "edit:guide-fix")).toBe(true);
     }
     expect(captureRepositoryState(f.repo)).toEqual(before);

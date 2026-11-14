@@ -105,10 +105,15 @@ function samePayload(proposal: Proposal): boolean {
 }
 
 function proposalDecision(input: ReportInput, proposal: Proposal, reason: string): AttentionInput {
-  if (proposal.resolution_attention) return proposal.resolution_attention;
+  const related = input.proposals.filter(other => other.locator !== proposal.locator && other.state === "open"
+    && other.paths.some(path => proposal.paths.includes(path))).map(other => other.locator).sort(compareUTF8);
+  const explanation = reason + (related.length ? ". Documentation paths also overlap " + related.join(", ") : "");
+  if (proposal.resolution_attention) return { ...proposal.resolution_attention,
+    reason: proposal.resolution_attention.reason + ". " + explanation,
+    links: [...new Set([...proposal.resolution_attention.links, ...related])] };
   return {
     repository: input.repository, scope_sha256: input.scope_sha256, identity: `proposal:${proposal.locator}`,
-    disposition: "needs-resolution", reason, owner_action: "Select a separate resolve assessment for the existing proposal",
+    disposition: "needs-resolution", reason: explanation, owner_action: "Select a separate resolve assessment for the existing proposal",
     rule: { version: 1, kind: "proposal-support", actor: proposal.actor, head: proposal.head, body_sha256: proposal.body_sha256, paths: [...proposal.paths].sort(compareUTF8) },
     inputs: { receipt: proposal.evidence.receipt_sha256, assessment: proposal.evidence.inputs_sha256 }, required_inputs: ["receipt", "assessment"],
     title: `Existing proposal ${proposal.locator} needs resolution`, links: [proposal.locator],
@@ -188,7 +193,8 @@ export function buildReport(input: ReportInput): Report {
     const conflict = !supported || matched.length !== overlapping.length;
     if (conflict) {
       for (const [id] of overlapping) blocked.add(id);
-      items.push(proposalDecision(input, proposal, supported ? "New and existing corrections overlap" : `Proposal support is ${proposal.assessment}; reviewed payload cannot be carried`));
+      items.push(proposalDecision(input, proposal, supported ? "Current corrections differ from the retained reviewed delivery"
+        : `Proposal support is ${proposal.assessment}. Its reviewed payload needs current verification`));
     } else {
       for (const [id] of matched) carried.push({ correction_sha256: id, locator: proposal.locator });
       for (const projection of proposal.reviewed?.attention ?? []) {

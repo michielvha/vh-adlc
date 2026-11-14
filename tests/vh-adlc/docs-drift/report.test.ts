@@ -241,8 +241,24 @@ test("controller proposal attention retains its assessment without bypassing ove
     evidence: { receipt_sha256: digest("receipt"), inputs_sha256: digest("current evidence") } }];
   const result = buildReport(current);
   expect(result.attention).toHaveLength(1);
-  expect(result.attention[0].item).toEqual(detail);
+  expect(result.attention[0].item).toMatchObject({ ...detail, reason: expect.stringContaining("unverifiable") });
+  expect(result.attention[0].item.inputs).toEqual(detail.inputs);
   expect(result.blocked_corrections).toEqual([correctionProjection(fix)]);
   expect(result.carried_delivery).toEqual([]);
   expect(result.success).toBe(false);
+});
+
+
+test("proposal overlap explanations identify the related original", () => {
+  const current = input(), fix = correction(), detail = { ...attention(), identity: "proposal:4" };
+  current.corrections = [fix];
+  const proposal = { locator: "pr:4", state: "open" as const, assessment: "unverifiable" as const, actor: "bot",
+    head: "c".repeat(40), body_sha256: digest("body"), reviewed: null, paths: [fix.path],
+    evidence: { receipt_sha256: null, inputs_sha256: digest("current evidence") } };
+  current.proposals = [{ ...proposal, resolution_attention: detail }, { ...proposal, locator: "pr:7" }];
+  const report = buildReport(current), item = report.attention.find(row => row.item.identity === "proposal:4")?.item;
+  expect(item?.reason).toContain("pr:7");
+  expect(item?.inputs).toEqual(detail.inputs);
+  expect(report.blocked_corrections).toEqual([correctionProjection(fix)]);
+  expect(report.carried_delivery).toEqual([]);
 });

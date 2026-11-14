@@ -458,3 +458,39 @@ Exact local target `df071517da40b5a92c90abf64651c67f24dfa94c`. Actual Copilot Op
 MODEL: claude-opus-5.5
 NO FINDINGS
 ```
+
+## Component diagnostic 113
+
+Exact local target `11d8fe626236c941daa5418bbe39d5529f3b10b0`. Actual Copilot Opus 5.5 with procedural isolation. All 125 required chunks were read with no outside paths or private files sent. Two should-fix findings and two nits remain. The original return is preserved before corrections. Composite criteria remain open.
+
+```text
+MODEL: claude-opus-5.5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/docs-drift/current-proposal-verification.ts invalidateCurrentProposalVerification (about lines 113 to 126). Its callers in plugins/vh-adlc/scripts/docs-drift/audit-report.ts (about lines 229 to 237 and 251 to 253). tests/vh-adlc/docs-drift/audit-report.test.ts in the lateChange cases proposal-changed, receipt-disappeared, review-changed and proof-changed.
+EVIDENCE: Invalidation clears each row's outcome, verification_reference, corrections and postimages and sets complete to false. It keeps the top-level evidence reference. audit-report.ts calls invalidation only after the current proof has already been retained as complete with verified rows, and that happens when the final recheck or recollection fails. The invalidated proposal_verification therefore still points to a retained summary file that claims a complete, verified result. The accepted contract says incomplete or changed scope clears the current successful proof fields. The lateChange assertions check complete false, outcome incomplete, a null verification_reference and empty corrections. They never check proposal_verification.evidence, so a stale pointer passes. The final3 proposal-report log shows all eight cases passing without catching this.
+PROPOSAL: Set evidence to null when invalidating, or replace it with a reference to retained invalidation evidence. Add an assertion on proposal_verification.evidence to each lateChange case.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: plugins/vh-adlc/scripts/docs-drift/report.ts proposalDecision. tests/vh-adlc/docs-drift/report.test.ts "controller proposal attention retains its assessment without bypassing overlap protection". tests/vh-adlc/docs-drift/audit-report.test.ts legacy-overlap and mismatch cases.
+EVIDENCE: When resolution_attention is present, proposalDecision returns it unchanged. That discards the reason the report computed, such as an overlapping legacy proposal on the same path. The report test expects the attention item to equal the controller detail, so the item never states the overlap cause. The audit-report legacy-overlap and mismatch cases check only that attention exists and blocked_corrections is nonempty. They do not check that the reason names the blocking proposal. An owner reading the item cannot tell that an overlapping legacy PR blocked delivery.
+PROPOSAL: Add the overlap or blocking cause to the returned item's reason without changing its bound identity or inputs. In the legacy-overlap case, assert that the reason text names the overlapping proposal.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: plugins/vh-adlc/scripts/docs-drift/audit-report.ts, markdown "Current proposal verification" line (about line 248).
+EVIDENCE: The line is built as the row summary followed by ". " and the joined diagnostics. When a row has no diagnostics, the rendered line ends with a dangling ". ".
+PROPOSAL: Add the separator only when diagnostics are present.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: evidence/final-measured-summary.json, stages proposal-report and retained-cli. Also evidence/t92-current-delivery-checkpoint-current-delivery.log.
+EVIDENCE: The final3 run filters audit-report.test.ts to "current checks carry|mixed proposal", with 8 of 16 tests run and 8 filtered out. It filters audit-session.test.ts to matching and proposal-supported-cli, with 2 of 9 tests run and 7 filtered out. The other affected cases last passed only in the earlier checkpoint run against a different source tree. They include "independent full proposal assessment triggers fresh result verification before delivery", the copied or oversized report cases and the normal-cli and partial-output sessions. The final3 tree changed audit-report.ts, report.ts and the fixtures after that checkpoint. The checkpoint run also recorded three failures that were fixed later. No measured run at the final source covers the unfiltered files these changes touch.
+PROPOSAL: Run audit-report.test.ts and audit-session.test.ts unfiltered at the final source state. Record the logs and counts in the measured summary.
+```

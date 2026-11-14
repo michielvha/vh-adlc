@@ -118,6 +118,7 @@ export function invalidateCurrentProposalVerification(input: CurrentProposalVeri
   result.complete = false;
   result.scope_changed ||= scopeChanged;
   result.verified_proposals = 0;
+  result.evidence = null;
   result.diagnostics = [...new Set([...result.diagnostics, message])];
   for (const row of result.proposals) if (row.outcome === "verified") {
     row.outcome = "incomplete";
