@@ -329,7 +329,7 @@ const closureRoleCommands = ["collect-closure-worker-inputs", "collect-closure-r
 const coordinationCommands = ["check-edits", "prepare", "check-candidate", "verify-candidate", "check-verification", "collect-publication-inputs"];
 const selectionCommands = [...closureRoleCommands, "check-edits", "prepare", "collect-resolution", "collect-closure", "collect-closure-target", ...candidateCommands];
 
-function argumentsForCommand(argv: string[]) {
+export function argumentsForCommand(argv: string[]) {
   const command = argv[0];
   if (!["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", ...originalInputCommands, ...auditSessionCommands, ...assessmentReviewCommands, ...selectionCommands, ...recoveryCommands, ...retainedCommands].includes(command)) throw Error("unknown docs-drift command");
   const needsArtifacts = ["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", ...originalInputCommands, ...auditSessionCommands, ...assessmentReviewCommands, ...selectionCommands, ...recoveryCommands, ...retainedCommands].includes(command);
