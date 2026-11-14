@@ -223,6 +223,10 @@ func (h *Host) Mark(name, content string) {
 	must(h.env.t, os.WriteFile(filepath.Join(h.Dir, name), []byte(content), 0o600))
 }
 
+// HangOn makes the next SSH call to the host whose command or script
+// contains text never return, as a hung client does.
+func (h *Host) HangOn(text string) { h.Mark("hang", text) }
+
 // Unmark deletes a marker file.
 func (h *Host) Unmark(name string) {
 	if err := os.Remove(filepath.Join(h.Dir, name)); err != nil && !os.IsNotExist(err) {

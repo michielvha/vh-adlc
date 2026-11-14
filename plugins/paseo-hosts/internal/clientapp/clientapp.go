@@ -51,6 +51,10 @@ var (
 	AliveInterval = 2 * time.Second
 )
 
+// windowsForceWait is how long stop.ps1 waits for the app after
+// Stop-Process.
+const windowsForceWait = 10 * time.Second
+
 const (
 	registryKey       = "@paseo:daemon-registry"
 	clientIDKey       = "@paseo:client-id-v1"
@@ -126,7 +130,7 @@ func (a *App) Add(ctx context.Context, c link.Client, e *registry.Entry, passwor
 	if err != nil {
 		return err
 	}
-	if _, err := c.Run(ctx, tunnelScript, tunnelPS, remote.Vars{
+	if _, err := c.Run(remote.WithDeadline(ctx, remote.Deadline(TunnelTimeout)), tunnelScript, tunnelPS, remote.Vars{
 		"name": host, "port": strconv.Itoa(e.ListenPort), "wait_ms": ms(TunnelTimeout),
 	}); err != nil {
 		if forced {
@@ -463,10 +467,10 @@ func (r *run) recover(ctx context.Context) (bool, error) {
 	r.losses++
 	r.a.Report.Step("The app window on %s stopped answering; restarting the app", r.c.Alias)
 	r.closePage()
-	wait := ms(QuitTimeout)
+	wait := QuitTimeout
 	if r.c.Kind == link.Windows {
 		// window.close() needs the page, so Windows stops the process.
-		wait = "0"
+		wait = 0
 	}
 	stopped, err := r.stop(ctx, wait, "KILL")
 	r.closeForward()
@@ -512,7 +516,8 @@ func (r *run) debugLaunch(ctx context.Context) error {
 		port := 20000 + rand.IntN(40000)
 		if err := r.a.launch(ctx, r.c, strconv.Itoa(port)); err != nil {
 			var f *remote.Failure
-			if !errors.As(err, &f) {
+			var to *remote.Timeout
+			if !errors.As(err, &f) && !errors.As(err, &to) {
 				return remoteError("starting the Paseo app", err)
 			}
 			last = err
@@ -583,7 +588,7 @@ func (r *run) finish(ctx context.Context) error {
 		closeWindow(ctx, r.fwd.addr)
 	}
 	r.closePage()
-	stopped, err := r.stop(ctx, ms(QuitTimeout), "KILL")
+	stopped, err := r.stop(ctx, QuitTimeout, "KILL")
 	r.closeForward()
 	if stopped == "KILL" {
 		r.a.Report.Partial("the app on %s did not quit within %v and was force-stopped", r.c.Alias, QuitTimeout)
@@ -603,8 +608,8 @@ func (r *run) forceStopped() {
 
 // stop quits the app and waits as quit and wait does. It reports how the
 // app stopped even when the wait gave up on an installer.
-func (r *run) stop(ctx context.Context, waitMS, fallback string) (string, error) {
-	stopped, installing, err := r.a.stop(ctx, r.c, waitMS, fallback)
+func (r *run) stop(ctx context.Context, wait time.Duration, fallback string) (string, error) {
+	stopped, installing, err := r.a.stop(ctx, r.c, wait, fallback)
 	if err == nil && installing {
 		r.installing = true
 		err = &installingError{client: r.c.Alias}
@@ -614,10 +619,10 @@ func (r *run) stop(ctx context.Context, waitMS, fallback string) (string, error)
 
 // quitAndWait quits the app as step 2 does and waits.
 func (r *run) quitAndWait(ctx context.Context) error {
-	wait := ms(QuitTimeout)
+	wait := QuitTimeout
 	if r.c.Kind == link.Windows {
 		// The app holds none of the CLI's writes yet.
-		wait = "0"
+		wait = 0
 	}
 	r.closePage()
 	_, err := r.stop(ctx, wait, "TERM")
@@ -804,14 +809,21 @@ func (a *App) keepCopy(client, raw string) (string, error) {
 	return "", errors.New("every copy name for the next minute is taken")
 }
 
-// stop quits the app: AppleScript on macOS, then fallback after wait_ms;
-// on Windows Stop-Process, at once when wait_ms is 0. Then it waits at
+// stop quits the app: AppleScript on macOS, then fallback after wait;
+// on Windows Stop-Process, at once when wait is 0. Then it waits at
 // least QuitFloor and until no app update installer runs, for up to
 // InstallerTimeout. It reports how the app stopped, none, graceful or the
 // fallback, and whether an installer still ran at the end of the wait.
-func (a *App) stop(ctx context.Context, c link.Client, waitMS, fallback string) (string, bool, error) {
+func (a *App) stop(ctx context.Context, c link.Client, wait time.Duration, fallback string) (string, bool, error) {
+	// The snippet waits again after the fallback: the quit wait on macOS,
+	// 10 seconds on Windows.
+	force := wait
+	if c.Kind == link.Windows {
+		force = windowsForceWait
+	}
+	ctx = remote.WithDeadline(ctx, remote.Deadline(wait+force+InstallerTimeout))
 	out, err := c.Run(ctx, stopScript, stopPS, remote.Vars{
-		"app": c.App, "wait_ms": waitMS, "fallback": fallback,
+		"app": c.App, "wait_ms": ms(wait), "fallback": fallback,
 		"floor_ms": ms(QuitFloor), "limit_ms": ms(InstallerTimeout),
 	})
 	if err != nil {
@@ -824,13 +836,14 @@ func (a *App) stop(ctx context.Context, c link.Client, waitMS, fallback string) 
 
 // launch starts the app, with a debugging port unless debugPort is empty.
 func (a *App) launch(ctx context.Context, c link.Client, debugPort string) error {
+	ctx = remote.WithDeadline(ctx, remote.Deadline(LaunchTimeout))
 	_, err := c.Run(ctx, launchScript, launchPS, remote.Vars{"app": c.App, "debug_port": debugPort, "wait_ms": ms(LaunchTimeout)})
 	return err
 }
 
 // running reports whether the app's main process runs.
 func (a *App) running(ctx context.Context, c link.Client) (bool, error) {
-	out, err := c.Run(ctx, runningScript, runningPS, remote.Vars{"app": c.App})
+	out, err := c.Run(remote.WithDeadline(ctx, remote.Deadline(0)), runningScript, runningPS, remote.Vars{"app": c.App})
 	if err != nil {
 		return false, remoteError("checking that the Paseo app runs", err)
 	}

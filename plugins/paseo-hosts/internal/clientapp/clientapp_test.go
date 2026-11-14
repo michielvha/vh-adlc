@@ -26,9 +26,11 @@ import (
 
 func TestMain(m *testing.M) {
 	if clientapp.CommitDelay != 8*time.Second || clientapp.QuitTimeout != 20*time.Second || clientapp.TunnelTimeout != 30*time.Second ||
-		clientapp.LaunchTimeout != 60*time.Second || clientapp.QuitFloor != 3*time.Second || clientapp.InstallerTimeout != 120*time.Second {
+		clientapp.LaunchTimeout != 60*time.Second || clientapp.QuitFloor != 3*time.Second || clientapp.InstallerTimeout != 120*time.Second ||
+		remote.Margin != 30*time.Second {
 		panic("clientapp waits differ from the Design")
 	}
+	remote.Margin = 2 * time.Second
 	clientapp.CommitDelay = 300 * time.Millisecond
 	clientapp.QuitTimeout = 500 * time.Millisecond
 	clientapp.SettleDelay = 50 * time.Millisecond
@@ -465,6 +467,80 @@ func TestDebugLaunchAttempts(t *testing.T) {
 		if !w.app.happened("quit", at[0], at[1]) {
 			t.Fatalf("no quit after the first attempt: %q", w.app.kinds())
 		}
+		w.check(t)
+	})
+}
+
+// The opening comments of the macOS snippets, which a hang marker matches.
+const (
+	stopSnippet   = "Quits the Paseo app on a Mac"
+	launchSnippet = "Starts the Paseo app on a Mac"
+)
+
+func TestHungClientCalls(t *testing.T) {
+	before := "[" + otherHost + "]"
+	timedOut := func(t *testing.T, err error, step string) {
+		t.Helper()
+		if !regexp.MustCompile(step + `: mac: timed out after \d`).MatchString(err.Error()) {
+			t.Fatalf("error %q does not say %s timed out", err, step)
+		}
+	}
+	t.Run("a launch on the first attempt", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.mac.HangOn(launchSnippet)
+		if err := w.add(); err != nil {
+			t.Fatalf("Add: %v\n%s", err, w.out)
+		}
+		if w.mac.Marked("hang") {
+			t.Fatal("no launch call hung")
+		}
+		w.linked(t)
+		// The hung attempt never reached the app.
+		w.debugLaunches(t, 1, true)
+		w.check(t)
+	})
+	t.Run("a stop in step 2", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.mac.HangOn(stopSnippet)
+		err := w.add()
+		mustExit1(t, err)
+		timedOut(t, err, "quitting the Paseo app")
+		w.restoredTo(t, before)
+		w.debugLaunches(t, 0, true)
+		w.check(t)
+	})
+	t.Run("a stop during a rollback", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.reject = rejectSrv
+		w.app.onReload = func(n int) {
+			if n == 1 {
+				w.mac.HangOn(stopSnippet)
+			}
+		}
+		err := w.add()
+		mustExit1(t, err)
+		if !strings.Contains(err.Error(), "could not confirm that its previous host list is restored") {
+			t.Fatalf("error %q is not an unconfirmed rollback", err)
+		}
+		timedOut(t, err, "quitting the Paseo app")
+		w.keptCopy(t, err, before)
+		w.check(t)
+	})
+	t.Run("a stop after a window lost in step 4", func(t *testing.T) {
+		w := newWorld(t, 6767, before)
+		w.app.loseReloads = 1
+		w.app.onReload = func(n int) {
+			if n == 1 {
+				w.mac.HangOn(stopSnippet)
+			}
+		}
+		err := w.add()
+		mustExit1(t, err)
+		if !strings.Contains(err.Error(), "could not tell whether the app on mac kept the change") {
+			t.Fatalf("error %q is not an unconfirmed outcome", err)
+		}
+		timedOut(t, err, "quitting the Paseo app")
+		w.keptCopy(t, err, before)
 		w.check(t)
 	})
 }

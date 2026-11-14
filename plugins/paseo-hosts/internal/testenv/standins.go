@@ -196,7 +196,31 @@ func sshMain(args []string) int {
 		}
 		return fail(1, "testenv: unsupported forced command %q", key.command)
 	}
-	return runRemote(dir, strings.Join(a.cmd, " "))
+	command := strings.Join(a.cmd, " ")
+	stdin, hang := hangs(dir, command)
+	if hang {
+		time.Sleep(time.Hour)
+		return 255
+	}
+	return runRemote(dir, command, stdin)
+}
+
+// hangs reads the script and reports whether this call never returns: the
+// host's hang marker holds text the command or the script contains. The
+// marker is used up by the call it matches.
+func hangs(dir, command string) (io.Reader, bool) {
+	text, ok := marker(dir, "hang")
+	if !ok {
+		return os.Stdin, false
+	}
+	script, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return bytes.NewReader(script), false
+	}
+	if strings.Contains(command+"\n"+string(script), text) && os.Remove(filepath.Join(dir, "hang")) == nil {
+		return nil, true
+	}
+	return bytes.NewReader(script), false
 }
 
 func sshConfigDump(dest string) int {
@@ -397,10 +421,10 @@ func tunnel(dir string, key *keyLine, target string) int {
 	return 0
 }
 
-func runRemote(dir, command string) int {
+func runRemote(dir, command string, stdin io.Reader) int {
 	if k, _ := marker(dir, "kind"); k == Windows {
 		if command == Bootstrap {
-			return runPwsh(dir)
+			return runPwsh(dir, stdin)
 		}
 		word, _, _ := strings.Cut(command, " ")
 		if _, ok := marker(dir, "git-unix-tools"); ok && word == "uname" {
@@ -415,7 +439,7 @@ func runRemote(dir, command string) int {
 	cmd := exec.Command(filepath.Join(root(), "sys", "bash"), "-c", command)
 	cmd.Dir = filepath.Join(dir, "home")
 	cmd.Env = hostEnv(dir)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = stdin, os.Stdout, os.Stderr
 	return exitCode(cmd.Run())
 }
 
@@ -423,12 +447,12 @@ func runRemote(dir, command string) int {
 const pwshShims = `function icacls { [IO.File]::AppendAllText((Join-Path $env:PASEO_TESTENV_HOSTDIR 'icacls.log'), ((@($args) | ForEach-Object { [string]$_ }) -join ' ') + "` + "`" + `n"); $global:LASTEXITCODE = 0 }
 `
 
-func runPwsh(dir string) int {
+func runPwsh(dir string, stdin io.Reader) int {
 	pwsh := realTool(root(), "pwsh")
 	if pwsh == "pwsh" {
 		return fail(127, "testenv: pwsh is not installed")
 	}
-	script, err := io.ReadAll(os.Stdin)
+	script, err := io.ReadAll(stdin)
 	if err != nil {
 		return fail(255, "testenv: %v", err)
 	}
