@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Complete: R-21 spec re-review clean and R-22 implementation review met all ten criteria at 35beccd; the should-fix findings both reviews listed are follow-ups for a later revision."
+status_description: "Complete: R-21 spec re-review clean, and R-24 implementation review met all ten criteria at 30d5bad; the should-fix findings the reviews listed are follow-ups for a later revision."
 issue: null
 branch: feat/spec-review-convergence
 goal: "Spec review rates findings consistently, finds failure-mode gaps and every restatement in one pass, applies each pass's findings as one revision without applying nits, and never rewrites reviewed commits."
@@ -535,6 +535,7 @@ and R-16 F-01 to F-03 are applied. The owner accepts in advance if R-17 has no b
 | 2026-11-14 | R-21 | spec | `35beccd` | claude-opus-5-5 | procedural | Clean drift re-review after PR 91: no blocking finding; eight should-fix and four nits, listed for implementation |
 | 2026-11-14 | R-22 | implementation | `35beccd77a679f6f75f3870284c453278b1e074e` | claude-opus-5-5 | procedural | All ten criteria met, with the trials and scenarios rerun in the review; one should-fix finding on Test Plan coverage and one nit |
 | 2026-11-14 | R-23 | implementation | `07b9eaa36dfe55c0e044e1fd9ea1f86d3a7c02a8` | claude-opus-5-5 | procedural | Re-check after the macOS cache fix: all ten criteria met with the trials and scenarios rerun; two should-fix findings and two nits |
+| 2026-11-14 | R-24 | implementation | `30d5bad6c8ae3b448599ee841e0cdc0227b81b6c` | claude-opus-5-5 | procedural | Re-check after the trial prompt fix: all ten criteria met with the trials and scenarios rerun; one should-fix finding on Test Plan coverage and two nits |
 
 ### R-1
 
@@ -1902,4 +1903,71 @@ KIND: factual
 SEVERITY: nit
 WHERE: frontmatter (status, status_description)
 EVIDENCE: 0599ae6 set `status: complete`, citing R-22 at 35beccd. Then 07b9eaa changed two covered paths, tests/vh-adlc/review-convergence.test.ts and trials/run.ts. At 07b9eaa, `vh-adlc fresh` reports R-22 covered-changed for both, and `vh-adlc gate complete` fails on impl_review_fresh. The document claims complete while its gate does not pass until a new implementation review is stored.
+PROPOSAL: When this review is stored, update status_description to name it and rerun `vh-adlc gate complete`.
+
+### R-24
+
+CRITERION: AC-02 The published convention defines blocking, should-fix and nit as this document's Design states, and a reviewer following the updated agent rates a seeded false claim the design depends on blocking, a seeded harmless wrong line number nit, a seeded ambiguity that allows two different implementations should-fix, a seeded wording issue nit, and a finding a declared lens raises at that lens's declared severity.
+VERDICT: met
+EVIDENCE: At 30d5bad, `git diff 07b9eaa 30d5bad` touches only the Review Log and the cache path in the trial prompts; plugins/ is unchanged since 35beccd. On Linux the new CACHE_HINT is the same `~/.cache/vh-adlc/docs/<pin>/` text as before (the ac02-severity transcript shows it), and on darwin it names `~/Library/Caches`, where the runner copies the cache. `bun test tests/vh-adlc/review-convergence.test.ts` gave 10 pass, 0 fail. The cached 1ccf8f3 conventions/feature-documents.md is byte-identical to `git show 1ccf8f3:` in the vhco-pro/docs checkout, 1ccf8f3 is on its origin/main, and its blocking, should-fix and nit definitions and lens sentence match Design (the nit definition adds the widening case Design states under should-fix). I ran `bun tests/vh-adlc/evidence/review-convergence/trials/run.ts <scratch dir>` with every trial; the manifest shows checkout 30d5bad, plugin_dirty false and every turn claude-opus-5-5. ac02-severity: F-01 (count.sh:3 does not parse `--json`) blocking, F-05 (count.sh:9 usage line) nit, F-02 ("formatted nicely") should-fix, F-06 ("Teh") nit. ac02-lens: F-05 rates "Teh" should-fix under the declared spelling lens. Limitation: one run of each trial; the macOS prompt path was not run on macOS.
+CRITERION: AC-03 A reviewer following the updated agent reports, in one finding, every location of a rule a document states inconsistently, and an author following the updated skill changes every restatement in one commit.
+VERDICT: met
+EVIDENCE: Trials run at 30d5bad. ac03-restatement: F-01's WHERE names Design, Owner summary, Scope, AC-01 and the Test Plan AC-01 row. author-ac03: commit 8f7a840 adds only Q1 and leaves the baseline unchanged; after the scripted answer, the one commit bc21f48 sets the Owner summary, Scope, Design, AC-01 and the Test Plan row to 4 attempts, and the only other numbers left are inside the stored R-1 record. Limitation: one run each; the fixture differs from the Test Plan row's wording (see F-02).
+CRITERION: AC-04 A reviewer following the updated agent returns a failure-mode finding for each of the four questions a design that changes shared state or crosses a network boundary leaves undefined, and returns no failure-mode finding for a design that changes no state and crosses no boundary.
+VERDICT: met
+EVIDENCE: Trials run at 30d5bad. ac04-concurrency F-01: parallel runs both read counter.txt and lose an update, no lock. ac04-retry F-01: no retry or replay behavior for the POST, and a rerun can send a second status. ac04-upgrade F-01: no format version in state.json or the cache key across upgrade or rollback. ac04-partial F-01: the append succeeds and the latest.txt overwrite fails, with nothing defined. ac04-wording returned should-fix and nit findings on the criterion, the proof, the glossary, Scope and the summary, and no failure-mode finding. Limitation: one run; the first four also raised failure-mode findings on questions their fixtures claim to define (see F-02).
+CRITERION: AC-05 The published convention requires must-pass and must-fail examples in a free-text pattern proof; on a row that has passed review at its current text, a reviewer rates a missed wrong output as a nit and a rejected correct output as blocking, and on a row changed since, rates a missed wrong output as should-fix.
+VERDICT: met
+EVIDENCE: The Test plan check in review-convergence.test.ts passes, and I read the 1ccf8f3 Test plan section, which requires must-pass and must-fail examples and states the passed-row rule. Trials run at 30d5bad. ac05-passed: F-02 rates the missed `fix: handle empty input.` nit, saying it only widens a row that passed review at 801a0ed, and F-01 rates the rejected `docs(readme): fix a link` blocking. ac05-changed: F-03 rates the missed `fix: handle empty input.` should-fix, noting the row changed. Limitation: one run each.
+CRITERION: AC-06 The rules block is byte-identical to the previous pin, the named historical specs give the same lint, `fresh` and gate results under both pins, the repository pin in `AGENTS.md` and every docs pin in the plugin point at the published docs commit or a later one containing it, both manifests carry the same version, higher than the version before the change, a repository on the previous pin keeps today's behavior for the convention-dependent parts and its report names the needed pin, and the plugin test suite passes.
+VERDICT: met
+EVIDENCE: Observed at 30d5bad:
+- The vh-adlc-rules block from `git show` in the vhco-pro/docs checkout hashes to sha256 85055a4c... at both d8f07c9 and 1ccf8f3.
+- Two scratch clones at 30d5bad, one with an added commit restoring the d8f07c9 pin in AGENTS.md, both with clean trees: lint, fresh and gate planned for shared-docs-drift, seo-assessment and owner-readable-specifications resolved 1ccf8f3 and d8f07c9 and gave identical result, failing and findings (9 of 9).
+- AGENTS.md:4, knowledge.md:5 and :7 and security-settings.md:5 name 1ccf8f3; no d8f07c9 or c70769e remains in AGENTS.md or plugins/.
+- Both manifests read 0.20.0, against 0.19.0 on origin/main 9c44bf7, an ancestor of HEAD.
+- `npm run check` on an export of docs 1ccf8f3 passed (34 Markdown files, rules block checked).
+- `bun tests/vh-adlc/scenarios/run.ts --phase 7` passed S16.oldpin (previous pin resolved, lone factual nit applied as before, report names the plugin pin), S16.oldpin-judgement (judgement nit became an Open Question, not applied) and S16.oldpin-reviewer (names.log concurrency gap raised), each on plugin 0.20.0 at 30d5bad.
+- `bun test tests/vh-adlc` with go on PATH: 1625 pass, 3 fail, all 5 second timeouts in tests/vh-adlc/audit/live-recovery.test.ts. That file and plugins/vh-adlc/scripts/audit are unchanged from origin/main; run alone it gave 23 pass, 0 fail at the default timeout and again with `--timeout 30000`, and the origin/main export gave 23 pass.
+Limitation: the full suite was not green in one run. The old-pin checks cover nit handling and the failure-mode check; old-pin severity and free-text rating rest on reading the agent text.
+CRITERION: AC-07 An author following the updated skill, drafting a feature that crosses a network boundary, states the behavior for concurrent requests, partial failure, retry or replay, and upgrade or rollback in Design, or raises an Open Question for any it cannot settle.
+VERDICT: met
+EVIDENCE: Ran author-ac07 at 30d5bad. Commit f01a682 drafts docs for the chat webhook. Its Design has subsections Concurrent requests (no lock, two deploys post independently in either order), Partial failure (release succeeds and POST fails, POST times out after acceptance, release fails, interrupt during POST), Retry and replay (one attempt, a lost response would duplicate on retry) and Upgrade and rollback (deploy before the URL is set, revert to abde20c). Q1 to Q8 hold the open choices, including Q4 on time limits and Q7 on retry. Limitation: one run.
+CRITERION: AC-08 The published convention states the nit rule beside the severity definitions, and `docs/get-started/first-feature.md` and `docs/user-guides/workflows.md` describe the severities, the nit rule and applying a pass's findings as one revision; the workflows guide also says no approval allows rewriting a commit that a Review Log row names.
+VERDICT: met
+EVIDENCE: review-convergence.test.ts at 30d5bad gave 10 pass. I read the 1ccf8f3 Review log section, where the nit rule follows the definitions and the lens sentence, first-feature.md lines 42 to 47 and workflows.md lines 288 to 294, which state the three severities, the nit rule and one revision per pass, and workflows.md line 339: "No approval allows rewriting a commit that a Review Log row names". Neither guide changed since 35beccd. Limitation: none.
+CRITERION: AC-09 An author following the updated skill raises a pass's judgement findings other than nits first and then applies its factual findings and the answers as one revision in one commit that keeps every test or scenario the document names consistent with the change, removes a mechanism rather than adding one when both behave the same, revisits a previous revision's change when a finding traces to it, and lists the behaviors and checks it walked in its report; a reviewer following the updated agent says in `EVIDENCE` when a finding traces to the previous revision's change.
+VERDICT: met
+EVIDENCE: Trials run at 30d5bad:
+- author-ac09: the one commit e71fbcb sets 10 seconds in the summary, Design and AC-01 and drops `--legacy` (left only in the R-1 record); `sh tests/check-timeout.sh` prints PASS, and the report lists the behaviors and checks walked.
+- author-ac09-judgement: 0895ade adds only Q1 for the judgement F-03, baseline unchanged; after the answer, the one commit dfbf978 applies F-01, F-02 and the answer, and the check prints PASS.
+- ac09-trace: F-01 says commit 10381bd applied R-1 F-01 to Design alone.
+- The revisit clause has no planned check, so I built a scratch fixture outside the repository and ran an ad hoc headless author session on the 30d5bad skill. Its previous revision 885c8f6 met R-1 by adding a `--slow-start` flag, and the stored R-2 F-01 traces to it. The one commit 431308e names 885c8f6 as revisited, removes the flag and sets one 10 second limit in the summary, Design and AC-01; check-timeout.sh prints PASS.
+Limitation: the revisit part rests on that ad hoc trial, outside the Test Plan (see F-01). One run of each trial.
+CRITERION: AC-10 `references/authority.md` forbids rewriting a commit a Review Log row names, with no approval exception, in both Preservation and its history-rewrite row; and when review mode brings default-branch work into a feature branch, it uses a merge, so every reviewed commit stays reachable.
+VERDICT: met
+EVIDENCE: review-convergence.test.ts passes both authority checks. authority.md:31 says "never a commit a Review Log row names, which no approval allows", and Preservation (authority.md:81-84) forbids it "even with the owner's approval". `bun tests/vh-adlc/scenarios/run.ts --phase 7 S16.drift` at 30d5bad passed 7 of 7: the feature branch holds the moved default branch, the claim commit is still on it, a second review row was stored, every commit the Review Log names is an ancestor of the tip, and fresh never reported commit-unreachable. Limitation: one run.
+CRITERION: AC-11 With the new convention, an author following the updated skill makes no commit that changes the normative baseline only to fix nits; fixes every nit of a pass, factual or judgement and in any section, in the same commit that applies that pass's blocking or should-fix findings to the baseline, except a free-text widening nit, which stays listed; raises no nit as an Open Question; and lists every nit it did not apply, from every pass it handled, with its ID in its report and the owner-facing conversation summary, not in the document.
+VERDICT: met
+EVIDENCE: `bun tests/vh-adlc/scenarios/run.ts --phase 7 S16.nits` at 30d5bad passed 8 of 8: exactly two passes stored, one agent commit changes the baseline with the blocking fix and all three pass-1 nits, no nit became an Open Question, the pass-2 nit is not applied outside the records, and the report lists it by its IDs. S7.7, S7.7.accept, S7.9 and S14.spec also passed. S16.nits seeds no widening nit, so I ran an ad hoc headless author session on the 30d5bad skill with a scratch fixture: R-1 NO FINDINGS at the row's current text, then R-2 with a should-fix on Design, a citation nit on Background and a free-text widening nit (F-03) on the Test Plan row. The one commit c0adc5d applied the should-fix and the citation nit together and left the Test Plan row unchanged; the report lists R-2 F-03 as not applied with the widening reason, and no Open Question was raised. Limitation: the widening exception rests on that ad hoc trial, outside the Test Plan (see F-01). In headless runs the report is the conversation summary.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-09 row and AC-11 row; Acceptance Criteria, AC-09 and AC-11
+EVIDENCE: Unchanged from R-23 F-02 and R-22 F-01 at 30d5bad. build_authors.py stores only R-1 against a first draft for author-ac09 and author-ac09-judgement, so no finding traces to a previous revision, and canned/nits/pass-1.txt and pass-2.txt hold no free-text widening nit. Both planned proofs would pass an author that patches on top of the previous change or applies a widening nit. In this review both clauses passed only in ad hoc headless trials on fixtures I built outside the repository.
+PROPOSAL: Add an author trial whose stored pass traces to a mechanism the previous revision added, passing when the revision commit removes or redoes that change, and add a widening nit on a passed row to the AC-11 scenario, passing when the row is unchanged and the report lists the nit's ID.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, AC-04 row and AC-03 row
+EVIDENCE: Unchanged from R-23 F-03 and R-22 F-02. The AC-04 row passes when each fixture draws a finding "on exactly the question it leaves undefined", but in this run ac04-concurrency also raised retry failure and upgrade findings, and ac04-partial raised retry, concurrency and upgrade findings. The AC-03 row describes "a stored blocking pass" and "four locations", while build_authors.py AC03_R1 is one should-fix finding and the fixture states the limit in five places.
+PROPOSAL: Reword the AC-04 row to pass on a failure-mode finding aimed at the question each fixture leaves undefined, and make the AC-03 row match the fixture, the next time a revision touches those rows.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter (status_description)
+EVIDENCE: Unchanged from R-23 F-04. status_description still says "R-22 implementation review met all ten criteria at 35beccd". At 30d5bad, `vh-adlc fresh` reports R-23 stale (covered-changed, trials/run.ts) and `vh-adlc gate complete` fails on impl_review_fresh, so the document claims complete on a review that no longer decides it.
 PROPOSAL: When this review is stored, update status_description to name it and rerun `vh-adlc gate complete`.
