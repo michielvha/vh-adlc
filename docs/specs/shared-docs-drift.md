@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The owner accepted R-77 and selected Claude Code Opus 5.5 for development reviews. The unrequested runtime-reviewer extension is withdrawn. Preliminary parity and final adoption-receipt tasks are separated, awaiting fresh review before implementation resumes."
+status_description: "The owner accepted R-77 and selected Claude Code Opus 5.5 for development reviews. R-81 requires an explicit interpretation of the old Copilot-review proof wording. Q1 records the narrow development-review clarification before the next review and implementation gates."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -73,7 +73,7 @@ The accepted publisher revision preserves scheduled `github-actions[bot]` and in
 
 Existing scalar settings and the new entry map use exact numeric account IDs and case-insensitive login matching. Native account acquisition resolves the authenticated ID to GitHub's REST login before constructing the typed identity. Original evidence and review digests retain their recorded bytes. Configured publisher edits, including casing, keep the protected trial/adoption process. Mapped settings require every publisher in discovery authors and a discovery prefix covering the publishing branches. Existing scalar validation remains supported.
 
-The owner selected Claude Code Opus 5.5 for our spec, source, implementation and preliminary migration-parity reviews. The preliminary parity review happens before release. Final adoption evidence comes later from the candidate's protected runtime reviewer at the released, installed and frozen C. This distinction preserves the accepted runtime provider and credential configuration. The unrequested extension into automated reviewer settings is withdrawn.
+The owner selected Claude Code Opus 5.5 for this feature's development spec, source, implementation and preliminary migration-parity reviews. The preliminary parity review happens before release. Final adoption evidence comes later from the candidate's protected runtime reviewer at the released, installed and frozen C. This distinction preserves the accepted runtime provider and credential configuration. The unrequested extension into automated reviewer settings is withdrawn.
 
 The base implementation and staged consumer exist locally. Publisher tasks T111 to T113 are next. The existing 217 settings, adoption, upgrade, trial-definition and discovery tests pass, along with eighteen upstream delivery tests. Owned fixtures reproduce the current interactive-owner refusal and unsupported entry map. The latest Claude Code findings are addressed for a fresh pass. Actual marketplace, installed-model, hosted, operator, paired migration and rollback checks remain open. GUI tests remain deferred. Local implementation and testing are authorized. Shipment and live trials retain their separate approval steps.
 
@@ -1322,8 +1322,9 @@ Code tasks add and run the regression before the behavior change. Each task is o
 
   Canonical R62. Actual requested Copilot Opus 5.5 reviews clean merged `ca5d3aba55c8543b164cf503dae66bf2d427d5ae` and qualifies all 157 required chunks, with no outside paths or private files sent. It returns one should-fix owner choice about the new gate's double-star support and three factual prose nits, with no further receipt-code findings in its supplied scope. Its original returned records are stored verbatim under R-62 before changes. An initial fenced wrapper fails `review check` equality; storing the plain original records passes without altering the return. The three prose nits are corrected. Q1 surfaces the coverage choice and the summary explains its effect; the accepted Scope/Design/criteria/Test Plan/covers remain unchanged. Further implementation waits for that actual decision and the required reviewed normative revision. Local verification remains green and is not a claim of migration readiness.
 
-- [ ] T37 `Stackweaver cutover C/D and rollback evidence, docs/specs/shared-docs-drift.md` - After passing installed/trial/paired checks and explicit cutover authority, observe legacy drainage/freeze and final proposal inventory. After the released pin, actual installation/trials and frozen legacy inventory are final, review C through the candidate's protected execution.entries.copilot.reviewer client/model binding. Retain the native paired-review result and exact C, installed-payload and receipt-target inputs, then verify record-only D, deliver the gated migration and observe routing/enablement. Rehearse and verify conflict-safe rollback under its exact scope. (AC-06, AC-07)
+- [ ] T37 `Stackweaver cutover C/D and rollback evidence, docs/specs/shared-docs-drift.md` - After passing installed/trial checks, the T33 preliminary parity review and explicit cutover authority, observe legacy drainage/freeze and final proposal inventory. After the released pin, actual installation/trials and frozen legacy inventory are final, review C through the candidate's protected execution.entries.copilot.reviewer client/model binding. Retain the native paired-review result and exact C, installed-payload and receipt-target inputs, operator-verify the retained paired-review artifact, then verify record-only D, deliver the gated migration and observe routing/enablement. Rehearse and verify conflict-safe rollback under its exact scope. (AC-06, AC-07)
 - [ ] T38 `docs/specs/shared-docs-drift.md, docs/specs/shared-workflow-migration.md, docs/reference/compatibility.md` - Run final exact-payload Claude Code Opus 5.5 review and required gates against original acceptance evidence. Record criterion outcomes, published/current routing and remaining capability limits. Mark completion only on the complete gate and authorized final delivery. (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07)
+
 
 
 
@@ -1331,7 +1332,16 @@ Code tasks add and run the regression before the behavior change. Each task is o
 
 ## Open Questions
 
-None. The owner selected preservation of both existing publisher identities on 2026-11-14.
+### Q1: Does the Claude Code review choice apply to development reviews while automated docs-drift reviewers retain their configured providers?
+
+**Recommendation.** Use Claude Code Opus 5.5 for development spec, code, implementation and preliminary migration-parity reviews. Clarify Design and the AC-07 proof to name those development reviews separately from the configured runtime review evidence observed in T35 and final C receipt in T37. This preserves automatic publishing behavior and credential bindings.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Development reviews use Claude Code** | The requested development reviewer, with existing automatic reviewer configuration and explicit runtime proof tasks | A narrow wording revision and fresh Claude Code review |
+| **B. Automatic reviewers use Claude Code too** | Claude Code reviews during every scheduled and interactive docs-drift operation | Explicit reviewer credential references, protected bindings and fresh affected-entry trials |
+
+**Why this is yours.** R-81 found that the accepted Design and AC-07 phrase "requested Copilot Opus 5.5 independent reviews" can mean either development reviews or automatic operation evidence. The pinned feature-document standard assigns that meaning and the resulting provider choice to the owner. The current development-review request is already applied to every new independent review launched in this run.
 
 ## Review Log
 
@@ -1843,7 +1853,7 @@ FINDING: F-03
 KIND: judgement
 SEVERITY: nit
 WHERE: docs/specs/shared-docs-drift.md, Context "Owner summary", fourth paragraph (spec 00002 line 16).
-EVIDENCE: The summary says "The owner selected Claude Code Opus 5.5 for our spec, source, implementation and preliminary migration-parity reviews." The word "our" carries over the conversation's wording, and the reader cannot tell whose reviews it means. documentation.md (00001 lines 10 to 11) says to "Keep the current or intended state, not the conversation that produced it". The detailed Context paragraph uses neutral wording: "development spec, scoped source, implementation and preliminary paired-parity reviews" (spec 00006 line 27). Nothing an implementer builds changes.
+EVIDENCE: The summary says "The owner selected Claude Code Opus 5.5 for this feature's development spec, source, implementation and preliminary migration-parity reviews." The word "our" carries over the conversation's wording, and the reader cannot tell whose reviews it means. documentation.md (00001 lines 10 to 11) says to "Keep the current or intended state, not the conversation that produced it". The detailed Context paragraph uses neutral wording: "development spec, scoped source, implementation and preliminary paired-parity reviews" (spec 00006 line 27). Nothing an implementer builds changes.
 PROPOSAL: Replace "for our spec, source, implementation" with "for this feature's development spec, source, implementation".
 
 
