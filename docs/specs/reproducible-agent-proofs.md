@@ -36,7 +36,7 @@ to repeat them, so such criteria can reach `met` in an independent review.
 
 **Parked.** On 2026-11-14 the owner parked this feature after acceptance. The problem it solves came up
 once, and the full design adds review time and process to every feature that has an agent-behavior
-proof. Instead, two sentences landed in vh-adlc 0.20.1: a review dispatch never tells the reviewer to skip
+proof. Instead, two sentences landed in vh-adlc 0.21.1: a review dispatch never tells the reviewer to skip
 a check (`plugins/vh-adlc/references/review-protocol.md`), and the implement skill proves an
 agent-behavior criterion with a committed script that reruns the session and keeps its transcript, never
 with a subagent's own report (`plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md`). Build the full design

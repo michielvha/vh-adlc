@@ -203,6 +203,12 @@ export function appendFindings(config: Settings, snap: Snapshot, findings: NewFi
   verifyRenderedInventory(config, snap, readFileSync(join(config.root, config.ledger_path), "utf8"), bytes, findings.map(f => f.id), []);
   return { bytes, digest: hash(bytes), eligible: false, reason: "Private proposal only; checked candidate and separate ledger authority are required for application." };
 }
+/** The lock reason `git worktree list` shows for `path`: undefined when unlocked, "" when locked without a reason. */
+function lockReason(root: string, path: string): string | undefined {
+  const fields = gitBytes(root, "worktree", "list", "--porcelain", "-z").toString().split("\0\0").map(entry => entry.split("\0")).find(entry => entry[0] === "worktree " + path);
+  const line = fields?.find(field => field === "locked" || field.startsWith("locked "));
+  return line === undefined ? undefined : line.slice(7);
+}
 export function applyLedgerCandidate(config: Settings, snap: Snapshot, candidate: Candidate, document: Document, options: {
   path: string; commit: boolean; request: AuthorityOptions["request"]; refresh?: AuthorityOptions["refresh"]; restrictions?: AuthorityOptions["restrictions"]; prohibited_effects?: AuthorityOptions["prohibited_effects"];
 }): OwnedLedger {
@@ -232,9 +238,12 @@ export function applyLedgerCandidate(config: Settings, snap: Snapshot, candidate
     const info = lstatSync(owner_file);
     if (!info.isFile() || info.isSymbolicLink() || info.mode & 0o077 || process.getuid && info.uid !== process.getuid() || readFileSync(owner_file, "utf8") !== canonicalJSON(ownership) + "\n") fail("owned worktree intent conflicts");
   } else publishJSON(owner_file, ownership);
-  if (!existsSync(options.path)) git(config.root, "worktree", "add", "-b", branch, options.path, observed.default_commit);
+  // Branch cleanup keeps a locked worktree, so a sweep during this run leaves it alone.
+  const lock = "vh-adlc " + candidate.run_id;
+  if (!existsSync(options.path)) git(config.root, "worktree", "add", "--lock", "--reason", lock, "-b", branch, options.path, observed.default_commit);
   if (lstatSync(options.path).isSymbolicLink() || git(options.path, "symbolic-ref", "--short", "HEAD") !== branch ||
       realpathSync(git(options.path, "rev-parse", "--path-format=absolute", "--git-common-dir")) !== ownership.common_dir) fail("owned worktree identity conflicts");
+  if (lockReason(config.root, options.path) === undefined) git(config.root, "worktree", "lock", "--reason", lock, options.path);
   loadSettings(options.path, { settingsPath: config.settings_path });
   const head = git(options.path, "rev-parse", "HEAD");
   if (head !== observed.default_commit) {
@@ -271,7 +280,13 @@ export function cleanupOwnedLedger(config: Settings, owned: OwnedLedger, options
     try { git(config.root, "merge-base", "--is-ancestor", owned.commit, "refs/remotes/origin/" + saved.default_branch); published = true; } catch { /* Private or squash-unreachable evidence refs stay retained. */ }
   }
   if (!published || git(owned.path, "status", "--porcelain")) return { removed: false, reason: "Keep private ledger work and its ref." };
-  git(config.root, "worktree", "remove", owned.path);
+  const lock = lockReason(config.root, owned.path);
+  if (lock !== undefined) git(config.root, "worktree", "unlock", owned.path);
+  try { git(config.root, "worktree", "remove", owned.path); } catch (error) {
+    // A failed removal leaves the worktree locked again, as the run left it.
+    if (lock !== undefined) git(config.root, "worktree", "lock", ...(lock ? ["--reason", lock] : []), owned.path);
+    throw error;
+  }
   try { git(config.root, "branch", "-d", owned.branch); } catch { return { removed: true, reason: "Worktree removed; ref retained because ordinary deletion refused." }; }
   return { removed: true, reason: "Clean owned worktree removed with ordinary Git operations." };
 }

@@ -329,3 +329,28 @@ test("a current restriction still exposes the existing transferred pending repor
   expect(publicationReadiness(config, run.header.run_id, candidate.step_id, restricted)).toMatchObject({ ready: false, head: laterHead, remote: otherRemote, transferred: true, pending_commit: head, remote_contains: false });
   expect(readFileSync(join(f.root, ".git/index"))).toEqual(laterIndex); expect(readFileSync(join(f.root, "unrelated-later.txt"), "utf8")).toBe("keep later main work\n");
 });
+
+/** The `locked` line `git worktree list --porcelain` prints for `path`, or "" when it is not locked. */
+const lockOf = (root: string, path: string) => git(root, "worktree", "list", "--porcelain").split("\n\n").find(block => block.startsWith(`worktree ${path}\n`))?.split("\n").find(line => line.startsWith("locked")) ?? "";
+
+test("a fresh report candidate worktree is locked with its run's reason", () => {
+  const f = project(), { config, standing, commit } = adopted(f), { run } = saved(f, config), authority = permission(config, standing, run.header.run_id);
+  const candidate = beginCandidate(config, run.header.run_id, authority, { default_commit: commit });
+  expect(lockOf(f.root, candidate.worktree)).toBe(`locked vh-adlc ${run.header.run_id}`);
+});
+
+test.each(["nothing", "ref", "unlocked worktree", "locked worktree"])("a resumed candidate intent with %s left behind ends with its worktree locked with the run's reason", left => {
+  const f = project(), { config, standing, commit } = adopted(f), { run, report } = saved(f, config), authority = permission(config, standing, run.header.run_id);
+  const current = readRun(config, run.header.run_id), step = randomUUID(), ref = `chore/maintenance-report-${run.header.run_id}-${step}`;
+  const worktree = join(dirname(f.root), `.vh-adlc-maintenance-${basename(f.root)}-${run.header.run_id}-${step}`), archive_path = join(run.run_dir, `archives/report-${step}.md`);
+  mkdirSync(join(run.run_dir, "archives"), { mode: 0o700 });
+  const candidate = { step_id: step, run_id: run.header.run_id, worktree, ref, base: commit, report_path: authority.report_path, report_digest: report.digest,
+    allowed_paths: [authority.report_path], permission_binding: authority.binding, archive_path, archive_digest: report.digest, state: "intent", original: { path: report.path, digest: report.digest, inode: report.inode }, refresh_of: null };
+  appendRun(config, run.header.run_id, current, { ...current.state, authority: authority as never, operations: [{ kind: "report-candidate", step_id: step, candidate }] }, "intent");
+  if (left === "ref") git(f.root, "branch", ref, commit);
+  if (left === "unlocked worktree") git(f.root, "worktree", "add", "-q", "-b", ref, worktree, commit);
+  if (left === "locked worktree") git(f.root, "worktree", "add", "-q", "--lock", "--reason", `vh-adlc ${run.header.run_id}`, "-b", ref, worktree, commit);
+  const resumed = beginCandidate(config, run.header.run_id, authority, { default_commit: commit });
+  expect(resumed.state).toBe("prepared");
+  expect(lockOf(f.root, worktree)).toBe(`locked vh-adlc ${run.header.run_id}`);
+});
