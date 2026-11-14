@@ -27,6 +27,10 @@ export type Settings = {
   page_budget: number | null;
 };
 
+/** A standard label with the name this repository uses for it (references/issues.md). */
+export type StandardLabel = { name: string; kind: "type" | "state"; color: string; description: string };
+export type EffectiveLabel = StandardLabel & { standard: string };
+
 export type Comment = { id: number; author: string; body: string; created_at: string };
 export type Issue = {
   number: number; title: string; body: string; state: "open" | "closed";

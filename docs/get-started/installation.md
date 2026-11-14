@@ -137,6 +137,10 @@ Maintenance uses an agent procedure with observed evidence, rather than triage's
 managed publication controller. The other feature operations continue to use the
 verified binary without requiring Bun.
 
+When you adopt vh-adlc in a repository, bring it to the standard issue labels with the labels helper
+from plugin 0.19.0: run its `plan`, review the writes and approve the digest before `apply`. The helper
+needs Bun and an authenticated `gh`; see [Issue labels](../user-guides/workflows.md#issue-labels).
+
 Persistent codebase audit requires plugin 0.8.0+, Bun and Git. Create the
 [audit settings and project procedure](../../plugins/vh-adlc/references/audit-settings.md) in the
 consumer repository before running its helpers. Use `.vh-adlc/audit.yaml`, declare the required language

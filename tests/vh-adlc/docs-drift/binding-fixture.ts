@@ -97,4 +97,3 @@ const result = Bun.spawnSync([${JSON.stringify(executable)}, ...args], { stdout:
       credential: "synthetic-read-token", path: native.environment.PATH, cache_directory: f.selection.cache_directory,
       entry: "copilot" as const, launcher_path: f.selection.launcher_path, settings_path: join(repo, ".vh-adlc/docs-drift.yaml") } };
 }
-

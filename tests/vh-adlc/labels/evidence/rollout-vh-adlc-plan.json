@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "host": "github.com",
+  "repository": "michielvha/vh-adlc",
+  "actor": "michielvha",
+  "vocabulary_sha256": "c9e2862ced1819e9569f99434ca0f09686dc10367ee137c19e03cd21dab02e70",
+  "effective_names": {
+    "bug": "bug",
+    "enhancement": "enhancement",
+    "documentation": "documentation",
+    "refactor": "refactor",
+    "security": "security",
+    "ready": "ready",
+    "blocked": "blocked",
+    "partial": "partial",
+    "needs-decision": "needs-decision"
+  },
+  "labels_read": [
+    {
+      "name": "accessibility",
+      "color": "f143ab",
+      "description": "Barrier affecting people with disabilities"
+    },
+    {
+      "name": "bug",
+      "color": "d73a4a",
+      "description": "Something isn't working"
+    },
+    {
+      "name": "documentation",
+      "color": "0075ca",
+      "description": "Improvements or additions to documentation"
+    },
+    {
+      "name": "duplicate",
+      "color": "cfd3d7",
+      "description": "This issue or pull request already exists"
+    },
+    {
+      "name": "enhancement",
+      "color": "a2eeef",
+      "description": "New feature or request"
+    },
+    {
+      "name": "good first issue",
+      "color": "7057ff",
+      "description": "Good for newcomers"
+    },
+    {
+      "name": "help wanted",
+      "color": "008672",
+      "description": "Extra attention is needed"
+    },
+    {
+      "name": "invalid",
+      "color": "e4e669",
+      "description": "This doesn't seem right"
+    },
+    {
+      "name": "question",
+      "color": "d876e3",
+      "description": "Further information is requested"
+    },
+    {
+      "name": "release:preview",
+      "color": "1d76db",
+      "description": "Tag and publish a prerelease for each push while this PR is open"
+    },
+    {
+      "name": "wontfix",
+      "color": "ffffff",
+      "description": "This will not be worked on"
+    }
+  ],
+  "standard": [
+    {
+      "standard": "bug",
+      "name": "bug",
+      "kind": "type",
+      "status": "present"
+    },
+    {
+      "standard": "enhancement",
+      "name": "enhancement",
+      "kind": "type",
+      "status": "present"
+    },
+    {
+      "standard": "documentation",
+      "name": "documentation",
+      "kind": "type",
+      "status": "present"
+    },
+    {
+      "standard": "refactor",
+      "name": "refactor",
+      "kind": "type",
+      "status": "missing"
+    },
+    {
+      "standard": "security",
+      "name": "security",
+      "kind": "type",
+      "status": "missing"
+    },
+    {
+      "standard": "ready",
+      "name": "ready",
+      "kind": "state",
+      "status": "missing"
+    },
+    {
+      "standard": "blocked",
+      "name": "blocked",
+      "kind": "state",
+      "status": "missing"
+    },
+    {
+      "standard": "partial",
+      "name": "partial",
+      "kind": "state",
+      "status": "missing"
+    },
+    {
+      "standard": "needs-decision",
+      "name": "needs-decision",
+      "kind": "state",
+      "status": "missing"
+    }
+  ],
+  "unmanaged": [
+    "accessibility",
+    "duplicate",
+    "good first issue",
+    "help wanted",
+    "invalid",
+    "question",
+    "release:preview",
+    "wontfix"
+  ],
+  "writes": [
+    {
+      "action": "create",
+      "name": "refactor",
+      "before": null,
+      "after": {
+        "color": "2f6dc8",
+        "description": "Code change that keeps behavior the same"
+      }
+    },
+    {
+      "action": "create",
+      "name": "security",
+      "before": null,
+      "after": {
+        "color": "d93f0b",
+        "description": "Security weakness or hardening"
+      }
+    },
+    {
+      "action": "create",
+      "name": "ready",
+      "before": null,
+      "after": {
+        "color": "0e8a16",
+        "description": "Verified unblocked, scope understood - safe to pick up"
+      }
+    },
+    {
+      "action": "create",
+      "name": "blocked",
+      "before": null,
+      "after": {
+        "color": "b60205",
+        "description": "Named prerequisite missing; the issue or its document names it"
+      }
+    },
+    {
+      "action": "create",
+      "name": "partial",
+      "before": null,
+      "after": {
+        "color": "fbca04",
+        "description": "Some phases shipped; the issue or its document names what remains"
+      }
+    },
+    {
+      "action": "create",
+      "name": "needs-decision",
+      "before": null,
+      "after": {
+        "color": "5319e7",
+        "description": "Needs a product or architecture call before work starts"
+      }
+    }
+  ]
+}

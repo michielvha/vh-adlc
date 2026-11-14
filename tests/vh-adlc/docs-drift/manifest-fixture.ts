@@ -38,4 +38,3 @@ export function fixture(selectedBindings = bindings, selectedEffects?: Effect[],
   const grants = effects.map(effect => ({ manifest_sha256: manifestDigest(manifest), effect_id: effect.id, effect_sha256: effectDigest([effect]) }));
   return { manifest, current: structuredClone(manifest), worker, reviewer, grants, policy: { worker: role, reviewer: role } };
 }
-

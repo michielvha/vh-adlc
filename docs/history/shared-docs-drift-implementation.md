@@ -722,3 +722,38 @@ WHERE: shared/docs/specs/shared-docs-drift.md, Context, "Current implementation 
 EVIDENCE: The sentence "T92 [U+2013] T95 retain current-result verification and exact carried-delivery evidence." contains an en dash (U+2013) between the task IDs. A native grep for U+2013/U+2014 across all supplied chunks finds only this line. guides/humanize-prose.md section 8 says the documentation convention in these repositories forbids em and en dashes in prose a reader sees. The Owner summary area of this spec is part of the spec/history documentation that this patch is allowed to change. The test-only correction itself is sound. Bun's spy on the fs namespace intercepts the named `opendirSync` import in local-history.ts, as the passing `opened > 0` assertion in each legacy call shows. In the legacy variant, every original, unsaved and z-newer record is renamed to the timestamp/digest layout. With descending order, five newer unsaved files and `by-invocation` come before the saved record's prefix, so adding a max_runs entry counter would make the case fail. The wrongFirst order forces the same-stamp refusal and the continued traversal. The bound case refuses at bytes.length - 1 and accepts the same file at bytes.length with no diagnostics. The checkpoint log shows 33 passing cases and 154 assertions.
 PROPOSAL: Replace the en dash with plain wording, for example "T92 to T95 retain current-result verification and exact carried-delivery evidence."
 ```
+
+## Component diagnostic 124
+
+Exact local target `729ad5a553262a1c580703767f44e743c9a0dbd7`. Actual Copilot Opus 5.5 with procedural isolation. All 107 required chunks were read with unchanged packet hashes, no outside paths and no private files sent. The native process exits zero and its group is reaped. The review returns two should-fix findings and two nits. Original return SHA256 is `f650e946f1ea4de4a87adfb7e9fc4f44afd544de76ab0dc1859d258415f7a2a4`. Original records follow before correction. T105 is reopened for the exposed reader surface, lifecycle error classification, combined crash/resume budget and exact endpoint counts.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/docs-drift/transport.ts, withNativeObservation, the repository object built as Object.freeze({ ...initial.repository, repository, ref, pull, mergedPull, comments }) (source excerpt transport.ts lines around 190 to 202; delta.patch chunk 00171).
+EVIDENCE: Only five reader methods go through cached(). The spread copies every other method of createRepositoryReader unchanged and bound to the initial reader: publicationPull, pulls, workflow, run, runs, recentRuns, jobs, artifacts, artifact, commit, tree, blob and trace (github-read.ts chunks 00256 and 00341). Those methods have no active check, no deduplication and no entry in checks. A read made through them during a phase is never replayed by recheck(). After the phase ends they keep working on the retained reader, although the cached methods throw "Native observation has finished". The expiry test only calls expired.reader.pull(1) (native-observation.test.ts chunk 00001 line 64). The current scoped callers in resolution-entry and the closure collectors only call pull, mergedPull, comments, repository and ref, so nothing escapes the replay yet. The handle still offers the guarantee for its whole surface and does not enforce it. A later caller using pulls(base) or publicationPull inside a phase would quietly skip both the replay and the expiry rule.
+PROPOSAL: Build the observed repository object from an explicit allowlist instead of spreading initial.repository. Every exposed method should either go through cached() or throw NativeObservationChanged when called through an observation. Extend the expiry test so that it calls at least one method that is not currently wrapped, such as pulls or commit, and expects a throw.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: transport.ts, readNativeContext and cached(), the throws "Original active native observation required" and "Native observation has finished"; closure-controller.ts currentState, which maps NativeObservationChanged to PublicationScopeChanged.
+EVIDENCE: NativeObservationChanged extends ArtifactChanged. The same class is thrown for a material change in remote inputs and for handle lifecycle misuse: an expired handle, a JSON clone, or a handle used after the WeakMap entry is deleted. currentState converts any NativeObservationChanged into PublicationScopeChanged. The publish gate and resumeClosure treat that as a persistent invalidation of the batch. A programming error in handle use would therefore permanently invalidate a valid reviewed batch, when it should fail as a retryable internal error. Scope mismatch inside readNativeContext correctly calls invalidate(), but the two lifecycle throws do not describe remote change.
+PROPOSAL: Throw a separate error type for lifecycle misuse that does not extend ArtifactChanged, for example a plain Error subclass. Keep NativeObservationChanged for the scope mismatch, the digest mismatch and the identity or commit mismatch. Update the expiry and JSON clone assertions in native-observation.test.ts to match.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: tests/vh-adlc/docs-drift/closure-api-budget.test.ts (single case, calls controller.publishClosure only); closure-controller.ts resumeClosure.
+EVIDENCE: The quota regression measures 201 preparation and 261 execution REST calls for publishClosure alone (corrected checkpoint quota log). resumeClosure follows a different read path. It does an uncached readNativeContext and a full collection outside any observation phase, then runs a currentState observation phase plus replay for each remaining effect gate. The recovery and CLI closure cases that exercise resume passed in the corrected checkpoint (4 cases with 48 assertions and 1 case with 17 assertions). Those cases run without rest_request_limit, so nothing shows that a publish followed by a resume of the same batch stays within the 1,000 request Actions allowance. The first red run hit the limit at exactly 1,001 requests on the publish path. A resume after a partial publish adds a second full collection and further gates on top of the publish calls already spent, and a real Actions job counts both against the same token budget.
+PROPOSAL: Add a quota case to closure-api-budget.test.ts that injects a lost outcome during publishClosure, as the recovery test does, and then completes it with resumeClosure. Assert that preparation plus all execution REST calls stay at or below 1,000. Alternatively, bound resume on its own and document the combined figure in the evidence.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: tests/vh-adlc/docs-drift/native-observation.test.ts, first case "one native observation deduplicates repeated reads and replays its original inputs".
+EVIDENCE: The deduplication case bounds total native calls loosely (calls < 30) and does not pin the exact replay count. A regression that drops deduplication for one method, or replays an entry twice, could still pass. The budget beyond retained bytes case shows the exact style is practical: it asserts toHaveLength(3) for repos/fixture/docs/pulls/2.
+PROPOSAL: Assert the exact number of calls per endpoint for the first case: one initial read and one replay for each distinct cached key, plus the two context reads at recheck.
+```

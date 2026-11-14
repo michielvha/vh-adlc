@@ -93,4 +93,3 @@ export function deliverRecord(f: ReturnType<typeof source>, record: ReturnType<t
   write(f.repo, f.configured.publication.adoption_record, canonicalJSON(record));
   return commit(f.repo, "synthetic portable attestation child");
 }
-

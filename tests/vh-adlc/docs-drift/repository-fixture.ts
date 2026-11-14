@@ -40,4 +40,3 @@ export function commitAll(repo: string): string {
   git(repo, "commit", "-qm", "fixture update");
   return git(repo, "rev-parse", "HEAD");
 }
-
