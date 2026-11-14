@@ -1,11 +1,11 @@
 /** Owned native-service integration with the ordinary Actions-token REST allowance. No live API or model operation. */
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { originalClosureFixture } from "./original-closure-fixture";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 
-test("one original closure completes within the ordinary Actions REST allowance", async () => {
+test.each(["publish", "lost-outcome-resume"])("one original closure stays within the ordinary Actions REST allowance through %s", async mode => {
   const roots: string[] = [];
   try {
     const f = await originalClosureFixture(roots), before = captureRepositoryState(f.repo);
@@ -17,9 +17,28 @@ test("one original closure completes within the ordinary Actions REST allowance"
     writeFileSync(f.service.statePath, JSON.stringify(state), { mode: 0o600 });
     const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/closure-controller") =
       await import(join(f.adopted.retained.directory, "scripts/docs-drift/closure-controller.ts"));
-    const result = await controller.publishClosure(f.publication);
+    let result: Awaited<ReturnType<typeof controller.publishClosure>>;
+    if (mode === "lost-outcome-resume") {
+      const journal: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/journal") =
+        await import(join(f.adopted.retained.directory, "scripts/docs-drift/journal.ts"));
+      const append = journal.appendOutcome;
+      let injected = false;
+      const fault = spyOn(journal, "appendOutcome").mockImplementation((current, effectID, outcome) => {
+        if (effectID === "close-1" && !injected) {
+          injected = true;
+          throw Error("Synthetic lost closure outcome within the shared REST allowance");
+        }
+        return append(current, effectID, outcome);
+      });
+      let pending: Awaited<ReturnType<typeof controller.publishClosure>>;
+      try { pending = await controller.publishClosure(f.publication); }
+      finally { fault.mockRestore(); }
+      expect(injected).toBe(true);
+      expect(pending.state, pending.reason ?? undefined).toBe("pending");
+      result = await controller.resumeClosure({ ...f.publication, journal_directory: pending.journal.directory });
+    } else result = await controller.publishClosure(f.publication);
     const observed = JSON.parse(readFileSync(f.service.statePath, "utf8"));
-    console.error("Owned closure REST counts", JSON.stringify({ preparation, execution: observed.rest_requests, total: preparation + observed.rest_requests }));
+    console.error("Owned closure REST counts", JSON.stringify({ mode, preparation, execution: observed.rest_requests, total: preparation + observed.rest_requests }));
     expect(result.state, result.reason ?? undefined).toBe("complete");
     expect(preparation + observed.rest_requests).toBeLessThanOrEqual(1000);
     expect(observed.prs.find((pr: { number: number }) => pr.number === 1).state).toBe("closed");

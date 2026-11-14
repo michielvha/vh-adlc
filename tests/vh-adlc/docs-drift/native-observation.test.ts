@@ -6,7 +6,8 @@ import { source } from "./adoption-fixture";
 import { nativeReader } from "./runtime-fixture";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { OUTPUT_LIMIT } from "../../../plugins/vh-adlc/scripts/docs-drift/owned-process";
-import { NativeObservationChanged, readNativeContext, withNativeObservation, type NativeObservation } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
+import { ArtifactChanged } from "../../../plugins/vh-adlc/scripts/docs-drift/evidence-input";
+import { NativeObservationChanged, NativeObservationUnavailable, readNativeContext, withNativeObservation, type NativeObservation } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
 
 const roots: string[] = [];
 let failed = false;
@@ -44,8 +45,14 @@ test("one native observation deduplicates repeated reads and replays its origina
         mutated.body = "Caller mutation";
       }
     });
-    expect(f.calls().length).toBeLessThan(30);
-    expect(f.calls().every(call => call.provider === null && call.credential && call.enterprise)).toBe(true);
+    const calls = f.calls();
+    expect(calls).toHaveLength(18);
+    expect(calls.filter(call => call.args.includes("repos/fixture/docs"))).toHaveLength(5);
+    expect(calls.filter(call => call.args.includes("repos/fixture/docs/git/ref/heads/main"))).toHaveLength(5);
+    expect(calls.filter(call => call.args.includes("repos/fixture/docs/git/commits/" + f.candidate))).toHaveLength(3);
+    expect(calls.filter(call => call.args.includes("repos/fixture/docs/pulls/1"))).toHaveLength(2);
+    expect(calls.filter(call => call.args.includes("graphql"))).toHaveLength(3);
+    expect(calls.every(call => call.provider === null && call.credential && call.enterprise)).toBe(true);
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { failed = true; throw error; }
 }, 90000);
@@ -53,15 +60,28 @@ test("one native observation deduplicates repeated reads and replays its origina
 test("native observation handles and cached readers expire and cannot be recreated from JSON", async () => {
   try {
     const f = fixture();
+    expect(new NativeObservationUnavailable()).not.toBeInstanceOf(ArtifactChanged);
     const expired = await withNativeObservation(f.scope, async observation => {
       const reader = readNativeContext({ ...f.scope, observation }).repository;
       reader.pull(1);
       const copied = JSON.parse(JSON.stringify(observation)) as NativeObservation;
-      expect(() => readNativeContext({ ...f.scope, observation: copied })).toThrow(NativeObservationChanged);
+      expect(() => readNativeContext({ ...f.scope, observation: copied })).toThrow(NativeObservationUnavailable);
       return { observation, reader };
     });
-    expect(() => readNativeContext({ ...f.scope, observation: expired.observation })).toThrow(NativeObservationChanged);
-    expect(() => expired.reader.pull(1)).toThrow(NativeObservationChanged);
+    expect(() => readNativeContext({ ...f.scope, observation: expired.observation })).toThrow(NativeObservationUnavailable);
+    expect(() => expired.reader.pull(1)).toThrow(NativeObservationUnavailable);
+    expect(() => expired.reader.commit(f.candidate)).toThrow(NativeObservationUnavailable);
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+test("only checked reader methods are available inside a native observation", async () => {
+  try {
+    const f = fixture();
+    await withNativeObservation(f.scope, async observation => {
+      const reader = readNativeContext({ ...f.scope, observation }).repository;
+      expect(() => reader.pulls("main")).toThrow(NativeObservationUnavailable);
+      expect(() => reader.commit(f.candidate)).toThrow(NativeObservationUnavailable);
+    });
   } catch (error) { failed = true; throw error; }
 }, 90000);
 

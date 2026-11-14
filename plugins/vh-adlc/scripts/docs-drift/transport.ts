@@ -141,6 +141,7 @@ type NativeContext = { identity: PublicationIdentity; default_commit: string; re
 const observationBrand = Symbol("native-observation");
 export type NativeObservation = Readonly<{ [observationBrand]: true }>;
 export class NativeObservationChanged extends ArtifactChanged {}
+export class NativeObservationUnavailable extends Error {}
 type Observation = {
   scope: Required<NativeContextOptions>; context: NativeContext; invalidate(reason: string): never;
 };
@@ -157,7 +158,7 @@ function nativeContext(options: NativeContextOptions): NativeContext {
 export function readNativeContext(options: NativeContextOptions & { observation?: NativeObservation }): NativeContext {
   if (options.observation === undefined) return nativeContext(options);
   const observed = nativeObservations.get(options.observation);
-  if (!observed) throw new NativeObservationChanged("Original active native observation required");
+  if (!observed) throw new NativeObservationUnavailable("Original active native observation required");
   const scope = observed.scope;
   if (options.hostname !== scope.hostname || options.repository !== scope.repository || options.credential !== scope.credential
     || (options.path ?? process.env.PATH ?? "/usr/bin:/bin") !== scope.path || (options.timeout_ms ?? 30000) !== scope.timeout_ms)
@@ -177,7 +178,7 @@ export async function withNativeObservation<T>(options: NativeContextOptions, ru
   function cached<Args extends (number | string)[], Value>(read: (reader: Reader, ...args: Args) => Value) {
     const values = new Map<string, { digest: string; retained?: { value: Value } }>();
     return (...args: Args): Value => {
-      if (!active) throw new NativeObservationChanged("Native observation has finished");
+      if (!active) throw new NativeObservationUnavailable("Native observation has finished");
       const key = canonicalJSON(args).toString(), prior = values.get(key);
       if (prior?.retained) return structuredClone(prior.retained.value);
       const value = read(initial.repository, ...args), bytes = canonicalJSON(value), digest = sha256(bytes);
@@ -192,7 +193,8 @@ export async function withNativeObservation<T>(options: NativeContextOptions, ru
       return value;
     };
   }
-  const repository = Object.freeze({ ...initial.repository,
+  function unavailable(): never { throw new NativeObservationUnavailable("Native reader method unavailable during shared validation"); }
+  const repository = Object.freeze({
     repository: cached(reader => reader.repository()),
     ref: cached((reader, ref: string) => reader.ref(ref)),
     pull: cached((reader, number: number) => reader.pull(number)),
@@ -202,6 +204,19 @@ export async function withNativeObservation<T>(options: NativeContextOptions, ru
       if (!page.complete) throw Error("Incomplete native comments collection");
       return page;
     }),
+    publicationPull: unavailable,
+    pulls: unavailable,
+    workflow: unavailable,
+    run: unavailable,
+    runs: unavailable,
+    recentRuns: unavailable,
+    jobs: unavailable,
+    artifacts: unavailable,
+    artifact: unavailable,
+    commit: unavailable,
+    tree: unavailable,
+    blob: unavailable,
+    trace: unavailable,
   });
   function recheck() {
     if (changed !== null) throw new NativeObservationChanged(changed);
