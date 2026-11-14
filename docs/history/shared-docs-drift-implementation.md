@@ -523,3 +523,18 @@ WHERE: shared/plugins/vh-adlc/scripts/docs-drift/current-proposal-verification.t
 EVIDENCE: F03 now builds each line as `[locator, outcome, ...diagnostics].join(". ") + "."`. When the inner diagnostics array is empty, the row diagnostic ends with ". ", so the rendered line ends "...failed. ." This is the same kind of empty-separator defect F03 was meant to fix. The resolution_attention reason concatenation `reason + ". " + explanation` in report.ts doubles punctuation in the same way when the stored reason already ends with a period. The F03 test checks trailing whitespace only on the matching row, which has no diagnostics.
 PROPOSAL: Build these diagnostics as `["Current proposal preparation failed", ...prepared.diagnostics].join(". ")`, and do the same for configured verification. Optionally strip one trailing period from each segment before joining in the renderer and in proposalDecision.
 ```
+
+## Component diagnostic 115
+
+Exact local target `06cfc283f22dc8648108d412c5ac3c115140c278`. Actual Copilot Opus 5.5 with procedural isolation. All 121 required chunks were read with no outside paths or private files sent. One should-fix rendered-punctuation finding remains. Original return is preserved before corrections. Composite feature criteria remain open.
+
+```text
+MODEL: claude-opus-5.5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: shared/plugins/vh-adlc/scripts/docs-drift/report.ts: proposalDecision and joinReportSentences (chunk 00086), and the renderReport Decisions line (chunk 00256). Test gap in shared/tests/vh-adlc/docs-drift/report.test.ts, "a controller reason ending in a sentence keeps one separator" (chunk 00256).
+EVIDENCE: joinReportSentences appends "." to every segment that lacks terminal punctuation (`/[.!?]$/u.test(value) ? value : value + "."`). proposalDecision now builds both reasons with it. The default branch uses `reason: explanation` and the controller branch uses `reason: joinReportSentences([proposal.resolution_attention.reason, explanation])`. So every proposal decision reason now ends with a period. renderReport still renders `- ${prose(entry.item.title)}. ${prose(entry.item.reason)}. ${prose(entry.item.owner_action)}.`, and prose does not touch periods. The Markdown Decisions line for every existing proposal therefore reads "...needs current verification.. Select a separate resolve assessment...". The retained first red log shows that before T94 the reason was "Current support needs source review.. Proposal support is unverifiable. Its reviewed payload needs current verification", with the doubled period inside and none at the end, so it rendered with one trailing period. T94 fixes the item.reason field but moves a doubled period into the rendered owner report on every proposal decision, including the default branch, which had none before. That is the defect class F03 targets. The new test checks only `buildReport(current).attention[0].item.reason` against `/\.\s*\./u`. No pure test, and none of the focused checkpoint stages (pure-reports, normal-report, retained-cli), asserts on renderReport output for a proposal decision, so the regression passes every supplied log.
+PROPOSAL: Render the decision line through the shared helper, for example `"- " + joinReportSentences([prose(entry.item.title), prose(entry.item.reason), prose(entry.item.owner_action)])`, and treat match_reason, failure.message and history diagnostics the same way. Alternatively, keep attention reasons unterminated, but that is more fragile. Extend the controller reason test, or add a sibling, so it renders the report with renderReport and asserts the Decisions output has no `/\.\s*\./u` for both the controller branch and the default overlapping proposal.
+```

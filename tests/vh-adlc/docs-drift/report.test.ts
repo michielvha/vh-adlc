@@ -259,6 +259,8 @@ test("proposal overlap explanations identify the related original", () => {
   const report = buildReport(current), item = report.attention.find(row => row.item.identity === "proposal:4")?.item;
   expect(item?.reason).toContain("pr:7");
   expect(item?.links).toContain("pr:7");
+  const decisions = renderReport(report).split("## Decisions\n\n")[1]?.split("## Recommendations")[0];
+  expect(decisions).not.toMatch(/\.\s*\./u);
   expect(report.attention.find(row => row.item.identity === "proposal:pr:7")?.item.links).toContain("pr:4");
   expect(item?.inputs).toEqual(detail.inputs);
   expect(report.blocked_corrections).toEqual([correctionProjection(fix)]);
@@ -272,9 +274,10 @@ test("a controller reason ending in a sentence keeps one separator", () => {
     body_sha256: digest("body"), reviewed: null, paths: ["docs/guide.md"],
     evidence: { receipt_sha256: null, inputs_sha256: digest("inputs") },
     resolution_attention: { ...attention(), reason: "Current support needs source review." } }];
-  const reason = buildReport(current).attention[0].item.reason;
+  const report = buildReport(current), reason = report.attention[0].item.reason;
   expect(reason).not.toMatch(/\.\s*\./u);
   expect(reason).toContain("Current support needs source review.");
+  expect(renderReport(report).split("## Decisions\n\n")[1]?.split("## Recommendations")[0]).not.toMatch(/\.\s*\./u);
 });
 
 
@@ -283,4 +286,20 @@ test("report sentence joining handles empty diagnostics and existing punctuation
   expect(joinReportSentences(["Verification failed. ", "Inspect source."])).toBe("Verification failed. Inspect source.");
   expect(joinReportSentences(["Does source support it?", "Inspect it!"])).toBe("Does source support it? Inspect it!");
   expect(joinReportSentences(["", "  "])).toBe("");
+});
+
+
+test("rendered decision, match, failure and history sentences retain one terminal mark", () => {
+  const current = input();
+  current.attention = [{ ...attention(), title: "Verify this claim.", reason: "Source support remains unknown.", owner_action: "Inspect the source." }];
+  current.failures = [{ code: "collection", message: "Collection stopped." }];
+  current.history.diagnostics = ["An earlier report is unavailable."];
+  const report = buildReport(current);
+  report.attention[0].match_reason = "No current match.";
+  const rendered = renderReport(report);
+  expect(rendered).not.toMatch(/\.\s*\./u);
+  expect(rendered).toContain("Verify this claim. Source support remains unknown. Inspect the source.");
+  expect(rendered).toContain("No current match.");
+  expect(rendered).toContain("Resolve collection. Collection stopped.");
+  expect(rendered).toContain("An earlier report is unavailable.");
 });

@@ -256,17 +256,18 @@ export function renderReport(report: Report): string {
   if (!report.published.length && !report.carried_delivery.length) lines.push("No completed correction delivery.");
   lines.push("", "## Decisions", "");
   for (const entry of report.attention) {
-    lines.push(`- ${prose(entry.item.title)}. ${prose(entry.item.reason)}. ${prose(entry.item.owner_action)}.`);
-    lines.push(`  ${prose(entry.match_reason)}.`);
-    if (entry.carried_from.length) lines.push(`  Previously surfaced in ${entry.carried_from.map(prose).join(", ")}.`);
-    if (entry.item.links.length) lines.push(`  Evidence ${entry.item.links.map(prose).join(", ")}.`);
+    lines.push("- " + joinReportSentences([prose(entry.item.title), prose(entry.item.reason), prose(entry.item.owner_action)]));
+    lines.push("  " + joinReportSentences([prose(entry.match_reason)]));
+    if (entry.carried_from.length) lines.push("  " + joinReportSentences(["Previously surfaced in " + entry.carried_from.map(prose).join(", ")]));
+    if (entry.item.links.length) lines.push("  " + joinReportSentences(["Evidence " + entry.item.links.map(prose).join(", ")]));
   }
   if (!count) lines.push(report.outcome === "failed" ? "No unresolved content decisions are recorded in this failed report." : "No unresolved content decisions.");
   lines.push("", "## Recommendations", "");
-  if (report.failures.length) for (const failure of report.failures) lines.push(`- Resolve ${prose(failure.code)}. ${prose(failure.message)}.`);
+  if (report.failures.length) for (const failure of report.failures)
+    lines.push("- " + joinReportSentences(["Resolve " + prose(failure.code), prose(failure.message)]));
   else if (count) lines.push("Use the listed owner actions to select the next assessment.");
   else lines.push("Review the listed deliveries through the normal project workflow.");
   lines.push("", "## Verification", "", `Required collection ${report.collection_complete ? "complete" : "incomplete"}. ${count} unresolved item${count === 1 ? " remains" : "s remain"}.`, "");
-  for (const diagnostic of report.history_diagnostics) lines.push(`- ${prose(diagnostic)}.`);
+  for (const diagnostic of report.history_diagnostics) lines.push("- " + joinReportSentences([prose(diagnostic)]));
   return lines.join("\n") + "\n";
 }
