@@ -95,7 +95,8 @@ The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`.
 
 - [x] T1 `tests/vh-adlc/diagram/output.test.ts` - the staging and export contract fails before the shared helper exists (AC-03, AC-04)
       Evidence: bun test tests/vh-adlc/diagram/output.test.ts returned four expected failures before the export helper existed.
-- [ ] T5 `tests/vh-adlc/diagram/` - fixture runner and committed scenarios reject the package when the skill is absent (AC-01, AC-02, AC-03, AC-05)
+- [x] T5 `tests/vh-adlc/diagram/` - fixture runner and committed scenarios reject the package when the skill is absent (AC-01, AC-02, AC-03, AC-05)
+      Evidence: bun test tests/vh-adlc/diagram/discovery.test.ts rejected the candidate because the declared skill had no SKILL.md.
 - [ ] T6 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `tests/vh-adlc/check.test.ts`, `docs/reference/marketplace.md`, `docs/user-guides/workflows.md` - the package checker and export tests pass, followed by native fixture and intake runs on both hosts and rendered inspection (AC-01, AC-02, AC-03, AC-04, AC-05)
 
 ## Open Questions
