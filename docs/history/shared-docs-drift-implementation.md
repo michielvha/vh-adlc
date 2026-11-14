@@ -862,3 +862,12 @@ WHERE: plugins/vh-adlc/examples/docs-drift/basic/.vh-adlc/docs-drift.yaml, `exec
 EVIDENCE: The guide says worker and reviewer roles bind a client, a full model and a native identity-source event/field. None of the six example roles declares `identity_source`, which settings.ts accepts as null. The `claude` entry's worker and reviewer are bound to `client: copilot-linux`, the only client defined. The README and project procedure name only the client distribution and model values as placeholders. A consumer who replaces just those labelled values keeps a Claude entry that launches a Copilot client and roles without native identity, so review stays pending.
 PROPOSAL: Add a commented placeholder `identity_source` to each role and a separate placeholder Claude client for the `claude` entry. Alternatively, list both as required replacements in the README and the project procedure.
 ```
+
+## Component diagnostic 129
+
+Exact committed target `e565d42961162718cafc34134e9684225b0a3fd7`. Actual Copilot Opus 5.5 qualifies all 169 required reads with unchanged packet hashes, procedural isolation, no outside reads and no private files sent. The scoped skill, guides, examples and public setup re-review returns NO FINDINGS. Original return follows. Full feature and migration acceptance remain open.
+
+```text
+MODEL: claude-opus-5.5
+NO FINDINGS
+```
