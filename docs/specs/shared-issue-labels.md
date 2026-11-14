@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Back to draft on feat/shared-issue-labels: T12 found the skill bodies guarded by a test outside covers; revising covers and Design."
+status_description: "Revised in draft (covers and Design for the skills' issue-label sections and the file step); waits for a spec review and owner re-acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/83
 branch: feat/shared-issue-labels
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
@@ -22,6 +22,7 @@ covers:
   - tests/vh-adlc/triage/execution.test.ts
   - tests/vh-adlc/triage/settings.test.ts
   - tests/vh-adlc/settings-file.test.ts
+  - tests/vh-adlc/direct-operation-compatibility.test.ts
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
 ---
@@ -86,10 +87,18 @@ check, and, at your choice, spec also files with mapped names.
 R-3 was clean and you accepted it on 2026-11-13. #78 then merged, changing paths this document
 covers, so R-3 went stale from drift alone; the acceptance stands because the normative sections did
 not change. The drift review R-4 found three should-fix items in Context and Tasks, all applied.
-Implementation proceeds on `feat/shared-issue-labels` once a current review is clean.
+Implementation then started on `feat/shared-issue-labels`.
 
-Every check named here is planned; nothing has run yet. Running the helper's apply against any real
-repository still needs your approval of that exact plan.
+This revision changes two things since your R-3 acceptance. During T12, a test outside `covers`
+turned out to guard the investigate and spec skill bodies, so `covers` now lists it and the Design
+says each skill keeps its label rule in its own `## Issue labels` section, which that test checks.
+The Design also now names the helper's `file` step, which both skills use to preview the labels
+and then create the issue. Scope and criteria are unchanged. As the standard requires, the criterion
+ticks were reset; the finished tasks T1 to T11 stay checked.
+
+Implementation so far is local on the feature branch: the label set, the `label_map` rule and the
+helper's `plan` and `apply` exist with passing tests against a fake GitHub. Running the helper's apply
+against any real repository still needs your approval of that exact plan.
 
 ### Background
 
@@ -272,6 +281,19 @@ exact plan digest for that repository.
 - Triage: the reference names the standard state labels and, through `label_map`, their repository
   names. A missing standard label still blocks its use under `references/triage.md:206-208`.
 
+Both operations file through one deterministic step of the labels helper, so the same rules hold on
+every host. `cli.ts file` takes the operation, the type label, the verdict (investigate only), the
+title and the body. It resolves the labels through the verdict table and `label_map`, reads the
+repository's labels and the authenticated account, and writes a preview with a digest without
+filing anything. With `--preview` and the owner-approved digest, it repeats the observation and
+creates the issue only when the preview is unchanged and no label is missing; GitHub never gets the
+chance to create a label implicitly.
+
+Each skill states this rule in its own `## Issue labels` section. The rest of each skill body stays
+byte-identical: `tests/vh-adlc/direct-operation-compatibility.test.ts` strips that section, checks
+its required phrases and compares the remainder with the approved baseline, as it already does for
+`## Loop routes`.
+
 ### vh-adlc's own settings
 
 `.vh-adlc/triage.yaml` in this repository: `repository: michielvha/vh-adlc`, source roots `cmd`,
@@ -310,26 +332,23 @@ once would make each other's reviews stale. So:
 - [ ] AC-01: The plugin contains one vocabulary file and a reference page that list the same standard
       labels with the same names, colors and descriptions, use the glossary terms above, and say which
       operation applies each kind.
-- [x] AC-02: For a repository with some standard labels missing, some with a different color or
+- [ ] AC-02: For a repository with some standard labels missing, some with a different color or
       description and some non-standard labels, the helper's plan lists each standard label as
       present, missing or different, lists the others as unmanaged, and changes nothing on GitHub.
-      Evidence: `bun test tests/vh-adlc/labels/plan.test.ts` on feat/shared-issue-labels at T8: 4 pass; present, missing, different and unmanaged classification with an empty write log on the fake GitHub. Fake tracker only; no live repository.
-- [x] AC-03: After approval of its exact digest, apply leaves the repository holding every standard
+- [ ] AC-03: After approval of its exact digest, apply leaves the repository holding every standard
       label with the standard color and description, every other label unchanged, and no label
       deleted or renamed. Apply refuses before any write when the plan file changed, the digest
       differs, or the host, repository, authenticated actor, vocabulary, effective label names or
       repository labels differ from the plan.
-      Evidence: `bun test tests/vh-adlc/labels/apply.test.ts` on feat/shared-issue-labels at T8: approved apply yields the standard set with the unmanaged label unchanged and no rename; the eight refusal cases each throw with no write. Fake tracker only.
 - [ ] AC-04: An issue investigate files carries one type label and the state label the verdict table
       gives (`ready` for act now, `blocked` or `needs-decision` for track, none for a requested reject),
       and the owner saw those labels before creation; when a needed label is missing, no issue exists
       and the result names the helper's plan.
 - [ ] AC-05: An issue spec files under acceptance or request carries one type label and no state
       label.
-- [x] AC-06: Triage's reference names the standard state labels as the labels its verdicts use, a
+- [ ] AC-06: Triage's reference names the standard state labels as the labels its verdicts use, a
       state label applied outside the controller is still denied, and a triage `create-request` issue
       is created with no labels.
-      Evidence: on feat/shared-issue-labels at T10, `bun test tests/vh-adlc/labels/vocabulary.test.ts` (5 pass) shows `references/triage.md` names the four state labels; `bun test tests/vh-adlc/triage/execution.test.ts -t "state label applied outside|create-request reaches GitHub"` (2 pass) shows each is denied outside the controller and the real adapter posts create-request with `labels: []` to a fake gh.
 - [ ] AC-07: A `label_map` entry makes the plan, triage, investigate and spec treat the mapped
       repository label as the standard one, a mapping onto a label outside the standard set appears in
       the plan as a managed label with its color and description change, and an entry keyed by a non-standard name changes nothing. A map in
@@ -353,7 +372,7 @@ once would make each other's reviews stale. So:
 | AC-01 | `tests/vh-adlc/labels/vocabulary.test.ts` parses the vocabulary file and the table in `references/issues.md` and fails on any difference or missing glossary term. |
 | AC-02 | `tests/vh-adlc/labels/plan.test.ts` runs `plan` against a fake GitHub CLI fixture (pattern of `tests/vh-adlc/projects/fake-gh.ts`) and asserts the classification and an empty write log. |
 | AC-03 | `tests/vh-adlc/labels/apply.test.ts`: approved apply on the fixture yields the standard set and an unchanged unmanaged set with no delete or rename calls. Negative cases each refuse with an empty write log: an edited plan, another digest, another origin repository, another host, another authenticated actor, an edited vocabulary file, an edited `label_map`, and a fake repository label changed between plan and apply. |
-| AC-04, AC-05 | Lifecycle scenario fixtures in `tests/vh-adlc/lifecycle/` grade investigate runs for act now, track with a named prerequisite, track waiting on a decision and a requested reject, plus a spec run, each filing against the fake tracker. Each passes only when the created issue carries exactly the expected labels and the pre-creation summary showed them; a missing-label case passes only with no issue created and the helper's plan named. |
+| AC-04, AC-05 | `tests/vh-adlc/direct-operation-compatibility.test.ts` requires each skill's `## Issue labels` section to name `scripts/labels/cli.ts file`, `references/issues.md` and the preview before creation, with the rest of the body unchanged. Lifecycle scenario fixtures in `tests/vh-adlc/lifecycle/` grade investigate runs for act now, track with a named prerequisite, track waiting on a decision and a requested reject, plus a spec run, each filing against the fake tracker. Each passes only when the created issue carries exactly the expected labels and the pre-creation summary showed them; a missing-label case passes only with no issue created and the helper's plan named. |
 | AC-06 | Extend `tests/vh-adlc/triage/execution.test.ts`: a `labels` action with a standard state label outside the controller is denied, and an approved `create-request` reaches the fake tracker with an empty labels array; a reference test checks the state label list against the vocabulary file. |
 | AC-07 | `tests/vh-adlc/triage/settings.test.ts` and `tests/vh-adlc/settings-file.test.ts`: a mapped label is used by plan and by the triage, investigate and spec label payloads, with a spec filing scenario in `tests/vh-adlc/lifecycle/` where only the mapped type label exists checking both the preview and the created issue; a mapping onto a non-standard label shows as a managed metadata change in the plan; a non-standard key changes nothing; `ready: blocked` and `bug: Enhancement` are refused with the fixed reason; a copy of Stackweaver's `.vh-adlc/triage.yaml` reads. |
 | AC-08 | Run `vh-adlc settings read --stdin < .vh-adlc/triage.yaml` and a report-only `vh-adlc-triage sweep` with `--report-output` outside the checkout; record both outputs. |
@@ -388,7 +407,9 @@ shared-development-loop).
       Evidence: `bun test tests/vh-adlc/labels/vocabulary.test.ts`: 5 pass, 0 fail; the triage reference names the four state labels, `references/issues.md` and `label_map`.
 - [x] T11 `tests/vh-adlc/lifecycle/issue-labels.test.ts`, `tests/vh-adlc/lifecycle/feature-fixture.ts` - failing scenarios: investigate files for act now, track with a named prerequisite, track waiting on a decision and a requested reject; spec files a tracking issue; spec files where only the mapped type label exists; a missing-label case; each checks the pre-creation summary and the created issue's exact labels (AC-04, AC-05, AC-07)
       Evidence: `bun test tests/vh-adlc/lifecycle/issue-labels.test.ts`: 0 pass, 1 fail, "Cannot find module ../../../plugins/vh-adlc/scripts/labels/issue" (no filing helper yet). The scenarios drive the deterministic filing step the skills will call, against the labels fake tracker, which now records created issues (`tests/vh-adlc/labels/fake-gh.ts`, `fixtures.ts`); `feature-fixture.ts` needed no change. No live agent run is involved.
-- [ ] T12 `plugins/vh-adlc/skills/vh-adlc-investigate/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` - label rules that point at `references/issues.md`, including mapped names, the preview before creation and the missing-label stop; T11 passes (AC-04, AC-05, AC-07)
+- [ ] T12 `plugins/vh-adlc/scripts/labels/issue.ts`, `plugins/vh-adlc/scripts/labels/github.ts`, `plugins/vh-adlc/scripts/labels/cli.ts` - the `file` step: preview with digest, then creation only when unchanged and no label is missing; T11 passes (AC-04, AC-05, AC-07)
+- [ ] T20 `tests/vh-adlc/direct-operation-compatibility.test.ts` - failing check that investigate and spec each have an `## Issue labels` section naming `scripts/labels/cli.ts file`, `references/issues.md` and the preview, with the rest of the body unchanged (AC-04, AC-05)
+- [ ] T21 `plugins/vh-adlc/skills/vh-adlc-investigate/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` - the `## Issue labels` sections; T20 and T11 pass (AC-04, AC-05, AC-07)
 - [ ] T13 `tests/vh-adlc/labels/vocabulary.test.ts` - failing checks that `docs/user-guides/workflows.md` describes the label set and helper and that `references/authority.md` has the label-plan row (AC-10)
 - [ ] T14 `docs/user-guides/workflows.md`, `plugins/vh-adlc/references/authority.md` - the guide section and the authority row; T13 passes (AC-10)
 - [ ] T15 `.vh-adlc/triage.yaml` - vh-adlc's own triage settings; `vh-adlc settings read --stdin` accepts it and a report-only triage sweep with `--report-output` outside the checkout reads it, both outputs recorded (AC-08)
