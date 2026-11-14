@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Awaiting decisions on the first provider fixtures and the brief approval step before independent spec review."
+status_description: "Awaiting decisions on the first provider fixtures and the brief approval step after the first independent spec review."
 issue: null
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
 covers:
@@ -117,6 +117,52 @@ None yet; written once the document is planned.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+
+| 2026-11-14 | R-1 | spec | `ed00017463b84fed13b97546271f7bda6dd299e1` | unknown | procedural | Six should-fix findings |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context > Owner summary, Scope, Design > Request and evidence, Acceptance Criteria AC-01, Test Plan AC-01 and AC-02
+EVIDENCE: The draft promises that an explicit architecture diagram request reaches the shared skill on both hosts. The AC-01 proof stops at installation and discovery. AC-02 starts the fixture runner without specifying how the host receives the request or how the runner establishes that it selected the installed skill. Both rows could pass with a discoverable skill that the host never uses.
+PROPOSAL: Run an explicit architecture request from a fresh native session and retain evidence that the host loaded the installed candidate skill and followed its procedure. Let that same session supply the AC-02 artifacts.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Request and evidence and Editable diagram and export, Acceptance Criteria AC-02 and AC-03, Test Plan AC-02
+EVIDENCE: The design requires each depicted item and cell to have a stable identifier but gives no mapping between the evidence brief and the diagram. AC-02 compares IDs with committed fixture expectations without defining which IDs must match. An exact comparison could reject a correct pair of outputs using different valid IDs. Independent checks of each artifact could also miss cases where the diagram and brief disagree.
+PROPOSAL: Define how rendered objects and connectors map to entries in the brief, and whether the fixture supplies any required IDs. Compare structure and source references through that mapping, require completeness in both directions, and use the check to enforce the documented meaning of Proposed and Unresolved.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context > Owner summary and Background, Design > Editable diagram and export and Delivery, Acceptance Criteria AC-03 and AC-04, Test Plan AC-03 and AC-04, Open Questions Q1
+EVIDENCE: The design requires local verified provider shapes, a recorded Desktop version and a pinned reference. The proof assumes a pinned editor and exporter, but the spec leaves the supported runtime prerequisites, how the selected shapes are located and distributed, and what the user receives when those inputs are unavailable undefined. The pinned upstream README describes Desktop as a separate dependency and distinguishes its local and hosted paths. Candidate marketplace installation alone would not establish that the export is available.
+PROPOSAL: Decide who supplies Desktop and the selected provider assets, define the supported setup and failure behavior, and pin and record the runtime, schema and shape inputs used by the proof. Verify that the selected fixture exports with external requests blocked and that missing prerequisites leave existing output intact.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Editable diagram and export, Acceptance Criteria AC-04, Test Plan AC-04
+EVIDENCE: The design says two requests can run concurrently and a final directory is exposed in a single no-replace operation. The proof checks existing files and partial files but never states that the two-process case starts at a free destination and must produce exactly one complete winner and a reported collision. Both processes could decline the request, leave the destination absent and satisfy the stated checks.
+PROPOSAL: Synchronize two requests targeting the same initially unused path. Require one valid complete directory, one collision result, and evidence that the losing request changed none of the winning files. Retain the existing-target and failed-export checks.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context > Owner summary, Design > Request and evidence, Acceptance Criteria AC-05, Test Plan AC-05, Open Questions Q2
+EVIDENCE: The pause option implies a second interaction, but the first response and later approval inputs are undefined. AC-05's sufficient case only says it follows Q2. If the owner chooses the pause, this permits implementations that resume a different draft or render after its cited sources have changed. The proof also lacks a case for a useful partial view, which the design explicitly allows.
+PROPOSAL: After the owner answers Q2, specify and exercise the selected sufficient-input behavior and a useful partial view. If the pause is selected, say what identifies the reviewed brief and how the continuation handles a changed brief or stale source.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter covers, Design > Delivery, Acceptance Criteria AC-01, Test Plan AC-01
+EVIDENCE: Both catalogs at the reviewed commit resolve the same package path. The draft makes both native catalog installs part of the feature and its proof, but `covers` omits `.agents/plugins/marketplace.json` and `.claude-plugin/marketplace.json`. Changing either source can invalidate the claimed discovery behavior without changing a listed path. The pinned standard requires `covers` to include every path whose change can affect the feature.
+PROPOSAL: Include the two marketplace catalogs in `covers` and account for any separate runtime or asset paths introduced by the decision in F-03.
 
 ## Sources
 
