@@ -93,7 +93,9 @@ review. Store what it returned after that line, byte for byte, under `### R-<n>`
 it, then confirm with `review check` against the same text. Review IDs continue from the highest one in
 the document.
 
-After a spec review, apply factual findings, turn judgement findings into Open Questions for the owner
-without answering them, and never relabel a blocking pass as clean: only a new independent pass clears it.
+After a spec review, apply the pass's findings as one revision as the spec skill's review mode says: turn
+judgement findings other than nits into Open Questions for the owner without answering them, follow the
+resolved convention's nit rule for nits, and never relabel a blocking pass as clean: only a new independent
+pass clears it.
 After an implementation review, untick every criterion it did not return as `met` and add an evidence line
 naming the review and its verdict.
