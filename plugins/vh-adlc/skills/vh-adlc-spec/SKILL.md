@@ -55,6 +55,10 @@ outcome is stored like a host reviewer's records, and a `pending` outcome leaves
 - Ground every claim in a citation you gathered in this run: a `file:line`, a command and its output, or a
   source you read and list. Measure rather than remember.
 - Write criteria as end states, each with a Test Plan row naming a real check.
+- When operational dependencies change, apply the resolved feature-document standard's dependency
+  and recovery review. Explain why each affected dependency is needed, its owning component and
+  first-install/recovery paths while normal management or secret services are unavailable. Resolve
+  circular dependencies before acceptance and carry material recovery promises into failure scenarios.
 - Put every judgement call into Open Questions in the standard's decision shape, and put each to the owner
   with the host's question tool. Never answer one yourself. Fold the owner's answers into the document.
 - Creating an issue needs explicit authority.

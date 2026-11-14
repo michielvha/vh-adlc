@@ -40,6 +40,12 @@ contradicts them gets a finding, and a needed change to them is raised as a judg
 Open Question, never assumed. Apply each declared lens the dispatch lists as a check at its severity. Check any Owner summary against the detailed scope, defaults, permission limits, decisions and proof.
 Return a finding for a material contradiction, omission or unsupported result. A historical document
 without that subsection stays eligible; its absence alone is not a format failure.
+For changed operational dependencies, check necessity, component ownership, first installation and
+recovery while normal management or secret services are unavailable. Challenge added infrastructure
+when an existing component can perform the required operation. Return findings for an unresolved
+circular dependency, an inaccessible recovery credential or an unsupported dependency justification.
+Check material recovery promises against criteria and failure scenarios. Apply the resolved standard's
+dependency and recovery guidance when present; its absence alone is not a historical format failure.
 Then attack the design and the criteria: what does the artifact look like when every box is
 ticked, and does the original problem survive? Look for contradictions, unobservable criteria, missing
 Test Plan rows and anything the binary would read differently from the author. Return complete finding
@@ -51,6 +57,8 @@ For every current criterion, execute or inspect what establishes it yourself, an
 standard defines from what you observed, applying its rules for composite criteria. Return one
 criterion record per current criterion, every ID exactly once, with the criterion's exact accepted text.
 Then add finding records for any defect you found.
+For accepted dependency and recovery requirements, inspect or execute their failure scenarios and
+report any untested path using the existing criterion verdicts.
 
 ## Output
 
