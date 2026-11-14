@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-13 after clean spec review R-21 at 5f2f2d1. Covered drift made that review stale; the R-22 fixes are applied and a new independent spec review is next."
+status: in-progress
+status_description: "Claimed on feat/worktree-cleanup after the R-22 fixes; implementing the tasks test-first."
+branch: feat/worktree-cleanup
 issue: null
 goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept; only commits that a branch worktree's HEAD reflog or a deleted branch's own reflog alone still names, such as copies from before a rebase or amend, go with them."
 covers:
