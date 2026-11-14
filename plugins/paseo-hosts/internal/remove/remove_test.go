@@ -23,8 +23,15 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	remote.Margin = 5 * time.Second
 	testenv.Main(m)
+}
+
+// shortMargin shortens the deadline margin for one test, so a hung call
+// times out quickly while every other test keeps the real margin.
+func shortMargin(t *testing.T, d time.Duration) {
+	m := remote.Margin
+	remote.Margin = d
+	t.Cleanup(func() { remote.Margin = m })
 }
 
 const (
@@ -377,6 +384,7 @@ func TestUnlinkStopsAtAHungAliasBlockDelete(t *testing.T) {
 	w := onboarded(t)
 	mac := w.client(t, "mac", false)
 	w.link(t, "mac", true)
+	shortMargin(t, 5*time.Second)
 	mac.HangOn("Deletes a server's alias block")
 	_, err := w.run(t, true, remove.Options{Clients: []string{"mac"}})
 	if report.Code(err) != report.ExitFailed || !strings.Contains(err.Error(), "deleting the alias block") || !strings.Contains(err.Error(), "timed out after") {

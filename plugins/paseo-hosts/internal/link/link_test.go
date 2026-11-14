@@ -18,8 +18,15 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	remote.Margin = 5 * time.Second
 	testenv.Main(m)
+}
+
+// shortMargin shortens the deadline margin for one test, so a hung call
+// times out quickly while every other test keeps the real margin.
+func shortMargin(t *testing.T, d time.Duration) {
+	m := remote.Margin
+	remote.Margin = d
+	t.Cleanup(func() { remote.Margin = m })
 }
 
 type world struct {
@@ -257,6 +264,7 @@ func TestHungClientCallsUnderLink(t *testing.T) {
 			w.e.Trust(w.srv, "srv", false)
 			before := w.srv.Read(".ssh/authorized_keys")
 			var app []appCall
+			shortMargin(t, 5*time.Second)
 			_, err := w.link(t, tc.client, false, &app)
 			timedOut(t, err, tc.step)
 			entry, _ := registry.Load(w.cfg.Dir, "srv")
@@ -273,6 +281,7 @@ func TestHungClientCallsUnderLink(t *testing.T) {
 		w.e.Client("mac", testenv.Darwin).HangOn("writes the alias block on a Mac")
 		w.e.Trust(w.srv, "srv", false)
 		var app []appCall
+		shortMargin(t, 5*time.Second)
 		_, err := w.link(t, "mac", true, &app)
 		timedOut(t, err, "writing the alias block")
 		entry, _ := registry.Load(w.cfg.Dir, "srv")

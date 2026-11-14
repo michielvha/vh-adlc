@@ -30,7 +30,6 @@ func TestMain(m *testing.M) {
 		remote.Margin != 30*time.Second {
 		panic("clientapp waits differ from the Design")
 	}
-	remote.Margin = 2 * time.Second
 	clientapp.CommitDelay = 300 * time.Millisecond
 	clientapp.QuitTimeout = 500 * time.Millisecond
 	clientapp.SettleDelay = 50 * time.Millisecond
@@ -477,7 +476,16 @@ const (
 	launchSnippet = "Starts the Paseo app on a Mac"
 )
 
+// shortMargin shortens the deadline margin for one test, so a hung call
+// times out quickly while every other test keeps the real margin.
+func shortMargin(t *testing.T, d time.Duration) {
+	m := remote.Margin
+	remote.Margin = d
+	t.Cleanup(func() { remote.Margin = m })
+}
+
 func TestHungClientCalls(t *testing.T) {
+	shortMargin(t, 2*time.Second)
 	before := "[" + otherHost + "]"
 	timedOut := func(t *testing.T, err error, step string) {
 		t.Helper()
