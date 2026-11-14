@@ -293,6 +293,10 @@ the rest are listed in the conversation. The agent applies each pass's findings 
 revision, after asking you about any judgement finding, so one pass's fixes do not
 seed the next pass's findings.
 
+An implementation review never skips a check it is able to run. When a criterion depends on what an
+agent does in a session, the implementer proves it with a committed script that reruns that session and
+keeps its transcript, so the reviewer can rerun it; a subagent's own report does not count as evidence.
+
 A reviewer role can also run through an external command, such as the Codex CLI on
 a model from another vendor. A spec review then reads a read-only export of the
 commit; an implementation review runs in a private clone, where it may run checks.
