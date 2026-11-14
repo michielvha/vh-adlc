@@ -56,8 +56,8 @@ made, say so in its `EVIDENCE`. When a nit only widens a free-text pattern row t
 say so in its `EVIDENCE` too.
 
 Rate each finding with the severity definitions in the resolved `conventions/feature-documents.md`. When the
-dispatch declares a lens, rate the findings that lens raises at its declared severity instead. When the resolved page has no
-severity definitions, rate as before.
+dispatch declares a lens, rate the findings that lens raises at its declared severity instead. When the resolved page only
+lists the severity names without defining them, rate as before.
 
 Return complete finding records, or exactly the single line the standard gives for a review with no
 findings.

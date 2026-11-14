@@ -40,7 +40,7 @@ function sha256(path: string): string {
 }
 
 function build(script: string, out: string): Repo[] {
-  return sh(HERE, "python3", "-I", join(HERE, script), out)
+  return sh(HERE, "python3", "-I", "-B", join(HERE, script), out)
     .split("\n")
     .filter(Boolean)
     .map((l) => JSON.parse(l) as Repo);

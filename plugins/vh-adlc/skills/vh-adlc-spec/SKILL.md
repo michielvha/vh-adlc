@@ -62,8 +62,8 @@ outcome is stored like a host reviewer's records, and a `pending` outcome leaves
   change them all in the same commit.
 - Put every judgement call into Open Questions in the standard's decision shape, and put each to the owner
   with the host's question tool. Never answer one yourself. Fold the owner's answers into the document. When
-  the resolved convention defines the review severities, nits from a review pass are not Open Questions;
-  review mode handles them under its nit rule.
+  the resolved convention states the nit rule, nits from a review pass are not Open Questions; review
+  mode handles them under that rule.
 - Creating an issue needs explicit authority.
 - Run `vh-adlc lint` and fix what it reports before committing.
 
@@ -88,22 +88,23 @@ outcome is stored like a host reviewer's records, and a `pending` outcome leaves
 4. Apply the pass's findings as one revision. First list the behaviors the design touches and every
    test, scenario and fixture the criteria and Test Plan name. Walk each finding, and every change it
    implies, through all of them, and re-read each named test or scenario before changing what it checks.
-   Turn judgement findings into Open Questions for the owner first, without changing the baseline; under
-   the nit rule below, nits are the exception. Once the owner has answered, apply every factual finding to be applied and every answer in
+   Turn judgement findings into Open Questions for the owner first, without changing the baseline; when
+   the nit rule below applies, nits are the exception. Once the owner has answered, apply every factual finding to be applied and every answer in
    one commit. Where a finding can be met by removing a mechanism or by adding one with the same
    behavior, remove it; where they behave differently, the choice is an Open Question recommending
    removal. Where a finding traces to a change the previous revision made, revisit that change instead of
    patching on top of it. List the behaviors and checks you walked in the report. A blocking pass is
    cleared only by a new independent pass at the new commit.
 
-   When the resolved `conventions/feature-documents.md` defines the severities, follow its nit rule in
-   that same commit: fix every nit of the pass, factual or judgement and in any section, only when the
-   pass's blocking or should-fix findings change the normative baseline, and never a free-text widening
-   nit. Raise no nit as an Open Question. List every nit you did not apply, from every pass this run
+   The nit rule applies when the resolved `conventions/feature-documents.md` states it: its Review log
+   section says a nit on the normative baseline never causes a revision on its own. A page that only
+   lists `nit` as a record value does not state it. When it applies, follow it in that same commit: fix
+   every nit of the pass, factual or judgement and in any section, only when the pass's blocking or
+   should-fix findings change the normative baseline, and never a free-text widening nit. Raise no nit as an Open Question. List every nit you did not apply, from every pass this run
    handled, with its review and finding IDs and one line, in your report and the owner-facing summary,
-   not in the document. When the resolved page has no severity definitions, treat a nit like any other finding
-   of its kind, so a judgement nit becomes an Open Question, and say in the report that the nit rule needs
-   the plugin's own pin from `knowledge.md`.
+   not in the document. When the resolved page does not state it, apply a factual nit like any other factual
+   finding and turn a judgement nit into an Open Question, as before the rule, and say in the report that
+   the nit rule needs the plugin's own pin from `knowledge.md`.
 5. When a clean review at X exists and Open Questions is empty, present the owner-facing summary below,
    then ask the owner to accept. On acceptance in session, append the acceptance row at X, run
    `vh-adlc gate planned`, and on a pass move the status and commit with the gate's line.

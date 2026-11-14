@@ -31,7 +31,7 @@ AC03_DOC = spec(
     plan="| AC-01 | A stub curl that always fails is called exactly 3 times and fetch.sh exits 1 |",
     covers="fetch.sh",
 )
-AC03_R1 = ("FINDING: F-01\nKIND: factual\nSEVERITY: blocking\nWHERE: Design\nEVIDENCE: Design says at most 5 "
+AC03_R1 = ("FINDING: F-01\nKIND: factual\nSEVERITY: should-fix\nWHERE: Design\nEVIDENCE: Design says at most 5 "
            "attempts while the rest of the document says 3; the measured flaky-mirror recovery in fetch.sh needs 4 "
            "attempts.\nPROPOSAL: Use 4 attempts as the limit.\n")
 
@@ -86,7 +86,7 @@ def build(out):
     r = repo("author-ac03")
     first = commit(r, {"AGENTS.md": AGENTS, "fetch.sh": "#!/bin/sh\ncurl -fsS -o out \"$1\" || exit 1\n", DOC: AC03_DOC},
                    "fixture: AC-03 draft")
-    x = commit(r, {DOC: stored(AC03_DOC, first, AC03_R1, "One blocking finding.")}, "fixture: record R-1")
+    x = commit(r, {DOC: stored(AC03_DOC, first, AC03_R1, "One should-fix finding.")}, "fixture: record R-1")
     rows.append(("author-ac03", r, x))
 
     for name, records in (("author-ac09", AC09_R1), ("author-ac09-judgement", AC09_R1_JUDGEMENT)):
