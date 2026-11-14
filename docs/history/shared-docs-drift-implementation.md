@@ -653,3 +653,30 @@ PROPOSAL: Add three fault cases in the same test.each:
 3. A source commit whose committed settings select another interactive mode.
 Each case expects invocations [] and the record diagnostic.
 ```
+
+## Component diagnostic 121
+
+Exact local target `445ca6280c202fec06b380c07ae6b1b001455716`. Actual Copilot Opus 5.5 with procedural isolation. All 105 required chunks were read with unchanged packet hashes, no outside paths and no private files sent. The scoped lookup correction review returns one should-fix coverage item and one wording nit. Original records follow before correction. Full feature acceptance remains open.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: tests/vh-adlc/docs-drift/local-history.test.ts, the fault list `test.each([...])("local invocation records are private, source-bound and activated last: %s")` (lines 53 to 101) and the saved-pair `test.each(["current", "legacy"])` (lines 115 to 163). Code under test: plugins/vh-adlc/scripts/docs-drift/local-history.ts, `createLocalInvocationReader`, the inner `read` closure (key-set, normalized identity and `canonicalJSON(invocation).equals(canonicalJSON(wanted))` checks) and the streamed legacy loop with `try { return read(root, entry.name, entry.name.slice(-69, -5)); } catch { }`.
+EVIDENCE: In the indexed layout, `read` is called with `sha256(expected)`, where `expected` already holds the normalized identity, the closed four-key wrapper and `wanted`. So readBoundArtifact refuses every altered indexed record on its digest alone. That covers "changed", "foreign" (actor_id++), "fields" (extra key) and the rewritten-invocation cases. In the legacy layout, the digest comes from the filename, so it only proves that the bytes match their own name. There, the identity check, the exact key set, `schema_version`/`kind` and the invocation-equality check are the only guards. The equality check matters most, because the loop deliberately tries every same-millisecond file and swallows failures. Without it, another run stamped in the same millisecond would be returned for `wanted`. The only legacy cases are positive: "legacy-casing" and the saved-pair "legacy" variant. No legacy case has a foreign identity, an extra field, a different invocation under the matching stamp prefix, a filename digest that does not match the bytes, or a symlink or hardlink under a legacy name. context.md asks for "both storage layouts", "altered/missing records" and "exact legacy wrapper digests". With the current tests, removing the key-set, identity or invocation-equality check from `read` would still pass all 23 cases, and so would accepting any file whose stamp prefix matches.
+PROPOSAL: Add legacy-layout negative cases to the same fault matrix. Write each record under the root as `stamp(completed_at)-sha256(bytes).json`, the same way "legacy-casing" does, and use:
+1. A foreign actor_id.
+2. An extra wrapper field.
+3. Two records with the same stamp but different invocations. The reader must return the requested invocation and refuse the other.
+4. A filename digest that does not match the bytes.
+5. A symlink and a hardlink under a legacy name.
+Each refused case expects null and exactly one record diagnostic.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/docs-drift/local-history.test.ts, the saved-pair test lines 142 to 147 (`unsaved-` loop, `future`, `old-scope`). Context claim in context.md paragraph 3.
+EVIDENCE: context.md says the current tests carry the saved attention "even with more than max_runs newer unsaved eligible records plus wrong-scope and at-start records". Since T101, `collectLocalHistory` calls `readInvocation` lazily and only for the invocation named by each saved pair's envelope. The only saved pair is `history/saved`, so the reader opens only that one record. The unsaved, `future` and `old-scope` records are staged but never read or counted, and no assertion would notice if they were missing or if the reader rejected them. The test is still a valid regression: the first-red logs show the old registry window failing it. But the at-start and wrong-scope refusals it claims are covered only by the separate "at-start", "after-start" and "scope" fault cases. Nothing exercises the saved-pair window (max_runs = 2) with more than one saved pair either.
+PROPOSAL: Either remove the inert entries and narrow the context wording to "newer unsaved records cannot displace the saved pair", or make them do work. For example, save extra pairs whose envelopes name the `future` and `old-scope` invocations, assert that each one adds the reader diagnostic while the eligible pair still carries, and add a case where more than max_runs saved directories exist, so the single remaining window is pinned.
+```

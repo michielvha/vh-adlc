@@ -1,6 +1,6 @@
 /** Owned Git and observed-shaped invocation metadata fixtures, without model or hosted acceptance. */
 import { afterAll, expect, test } from "bun:test";
-import { chmodSync, linkSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, linkSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { source, portableRecord, deliverRecord, runtimeIdentity, pin, write, commit } from "./adoption-fixture";
 import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -112,7 +112,7 @@ test("oversized invocation metadata is refused before cache records are created"
   } catch (error) { failed = true; throw error; }
 }, 90000);
 
-test.each(["current", "legacy"])("saved reports survive newer unsaved and ineligible invocation records: %s", async layout => {
+test.each(["current", "legacy"])("newer unsaved records cannot displace the saved report: %s", async layout => {
   try {
     const { createLocalInvocationReader, stageLocalInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/local-history");
     const f = fixture(), settings = f.context.settings;
@@ -122,11 +122,12 @@ test.each(["current", "legacy"])("saved reports survive newer unsaved and inelig
       disposition: "unknown" as const, reason: "Source verification pending", owner_action: "Choose the behavior",
       rule: { detector: "claims" }, inputs: { guide: sha256(Buffer.from("guide")) }, required_inputs: ["guide"],
       title: "Behavior decision", links: [] }];
-    const bytes = canonicalJSON(buildReport({ repository: settings.repository, scope_sha256: f.context.scope_sha256,
+    const savedReport = buildReport({ repository: settings.repository, scope_sha256: f.context.scope_sha256,
       run_id: f.invocation.id, source_commit: f.invocation.source_commit,
       started_at: new Date(Date.parse(f.invocation.completed_at) - 1000).toISOString(), completed_at: f.invocation.completed_at,
       collection_complete: true, failures: [], attention, corrections: [], proposals: [], published: [],
-      history: { captured_at: new Date(Date.parse(f.invocation.completed_at) - 2000).toISOString(), records: [], diagnostics: [] } }));
+      history: { captured_at: new Date(Date.parse(f.invocation.completed_at) - 2000).toISOString(), records: [], diagnostics: [] } });
+    const bytes = canonicalJSON(savedReport);
     const { invocation_sha256: _digest, ...original } = f.invocation;
     const saved = { ...original, report_sha256: sha256(bytes) }, invocation = { ...saved, invocation_sha256: canonicalDigest(saved) };
     const staged = stageLocalInvocation(f.context, invocation); staged.activate(() => {});
@@ -138,16 +139,13 @@ test.each(["current", "legacy"])("saved reports survive newer unsaved and inelig
     const pair = join(f.repo, "history", "saved"); mkdirSync(pair, { recursive: true, mode: 0o700 });
     writeFileSync(join(pair, "report.json"), bytes, { mode: 0o600 });
     writeFileSync(join(pair, "provenance.json"), createLocalEnvelope(bytes, invocation), { mode: 0o600 });
+    const savedTime = new Date(invocation.completed_at);
+    for (const name of ["report.json", "provenance.json"]) utimesSync(join(pair, name), savedTime, savedTime);
     for (let i = 0; i < settings.reports.max_runs + 3; i++) {
       const entry = { ...saved, id: "unsaved-" + i,
         completed_at: new Date(Date.parse(invocation.completed_at) + 1000 + i).toISOString() };
       stageLocalInvocation({ ...f.context, run_id: entry.id }, { ...entry, invocation_sha256: canonicalDigest(entry) }).activate(() => {});
     }
-    const future = { ...saved, id: "future", completed_at: f.context.started_at };
-    stageLocalInvocation({ ...f.context, run_id: future.id }, { ...future, invocation_sha256: canonicalDigest(future) }).activate(() => {});
-    const otherScope = { ...saved, id: "old-scope", scope_sha256: sha256(Buffer.from("old scope")) };
-    stageLocalInvocation({ ...f.context, run_id: otherScope.id, scope_sha256: otherScope.scope_sha256 },
-      { ...otherScope, invocation_sha256: canonicalDigest(otherScope) }).activate(() => {});
     const recorded = createLocalInvocationReader(f.context);
     const history = collectLocalHistory({ repo: f.repo, settings,
       context: { repository: settings.repository, scope_sha256: f.context.scope_sha256, run_id: "current", started_at: f.context.started_at },
@@ -160,5 +158,63 @@ test.each(["current", "legacy"])("saved reports survive newer unsaved and inelig
       failures: [], attention, corrections: [], proposals: [], published: [], history });
     expect(current.outcome).toBe("carried-attention");
     expect(current.success).toBe(true);
+    // The one collection window also caps saved pairs, independently of registry size.
+    for (const name of ["z-newer-1", "z-newer-2"]) {
+      const laterBytes = canonicalJSON({ ...savedReport, run_id: name });
+      const later = { ...saved, id: name, report_sha256: sha256(laterBytes) };
+      const laterInvocation = { ...later, invocation_sha256: canonicalDigest(later) };
+      stageLocalInvocation({ ...f.context, run_id: name }, laterInvocation).activate(() => {});
+      const directory = join(f.repo, "history", name); mkdirSync(directory, { mode: 0o700 });
+      writeFileSync(join(directory, "report.json"), laterBytes, { mode: 0o600 });
+      writeFileSync(join(directory, "provenance.json"), createLocalEnvelope(laterBytes, laterInvocation), { mode: 0o600 });
+      for (const file of ["report.json", "provenance.json"]) utimesSync(join(directory, file), savedTime, savedTime);
+    }
+    const inspected: string[] = [];
+    const bounded = collectLocalHistory({ repo: f.repo, settings,
+      context: { repository: settings.repository, scope_sha256: f.context.scope_sha256, run_id: "current", started_at: f.context.started_at },
+      readInvocation: wanted => { inspected.push(wanted.id); return recorded.read(wanted); } });
+    expect(bounded.records).toHaveLength(settings.reports.max_runs);
+    expect(bounded.diagnostics).toEqual([]);
+    expect(inspected).toEqual(["z-newer-2", "z-newer-1"]);
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+test.each(["foreign", "fields", "schema", "kind", "invocation", "digest", "noncanonical", "bound", "symlink", "hardlink"])("legacy invocation records require exact original metadata: %s", async fault => {
+  try {
+    const { createLocalInvocationReader, stageLocalInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/local-history");
+    const f = fixture(), before = captureRepositoryState(f.repo);
+    const staged = stageLocalInvocation(f.context, f.invocation); staged.activate(() => {});
+    const path = join(f.cache, staged.reference.path), root = dirname(dirname(path));
+    renameSync(path, path + ".original");
+    const record: Record<string, unknown> = { schema_version: 1, kind: "docs-drift-local-invocation",
+      identity: { hostname: f.context.settings.hostname, ...f.context.identity }, invocation: f.invocation };
+    if (fault === "foreign") record.identity = { hostname: f.context.settings.hostname, ...f.context.identity, actor_id: f.context.identity.actor_id + 1 };
+    if (fault === "fields") record.extra = true;
+    if (fault === "schema") record.schema_version = 2;
+    if (fault === "kind") record.kind = "foreign-invocation";
+    if (fault === "invocation") {
+      const { invocation_sha256: _digest, ...original } = f.invocation, other = { ...original, id: "same-millisecond-other" };
+      record.invocation = { ...other, invocation_sha256: canonicalDigest(other) };
+    }
+    const prefix = new Date(f.invocation.completed_at).toISOString().replaceAll(/[-:.]/gu, "") + "-";
+    const bytes = fault === "noncanonical" ? Buffer.concat([canonicalJSON(record), Buffer.from(" ")]) : canonicalJSON(record);
+    if (fault === "bound") f.context.settings.reports.max_entry_bytes = bytes.length - 1;
+    const digest = fault === "digest" ? sha256(Buffer.from("different metadata")) : sha256(bytes);
+    const legacy = join(root, prefix + digest + ".json");
+    writeFileSync(legacy, bytes, { mode: 0o600 });
+    if (fault === "symlink") { renameSync(legacy, legacy + ".target"); symlinkSync(legacy + ".target", legacy); }
+    if (fault === "hardlink") linkSync(legacy, legacy + ".linked");
+    const refused = createLocalInvocationReader(f.context);
+    expect(refused.read(f.invocation)).toBeNull();
+    expect(refused.diagnostics).toHaveLength(1);
+    if (fault === "invocation") {
+      // Both files share the timestamp. The wrong invocation must be skipped without hiding the requested record.
+      const wanted = canonicalJSON({ ...record, invocation: f.invocation });
+      writeFileSync(join(root, prefix + sha256(wanted) + ".json"), wanted, { mode: 0o600 });
+      const matched = createLocalInvocationReader(f.context);
+      expect(matched.read(f.invocation)).toEqual(f.invocation);
+      expect(matched.diagnostics).toEqual([]);
+    }
+    expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { failed = true; throw error; }
 }, 90000);
