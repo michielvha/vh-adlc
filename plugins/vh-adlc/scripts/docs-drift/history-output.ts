@@ -46,6 +46,11 @@ export function persistHostedAuditOutput(options: Parameters<typeof persistAudit
     result.complete = false; result.history_provenance = "absent";
     result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Hosted report provenance unavailable");
+    if (repo !== null && before !== null && !matchesRepositoryState(repo, before)) {
+      result.scope_changed = true;
+      result.diagnostics.push("Caller changed during hosted report retention");
+    }
+    result.diagnostics = [...new Set(result.diagnostics)];
   }
   return freezeJSON(result);
 }
