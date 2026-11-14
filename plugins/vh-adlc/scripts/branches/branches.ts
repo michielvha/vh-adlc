@@ -278,14 +278,29 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
 
   // A merged PR head or the default branch must contain the tip; nothing else proves the work is kept.
   let mainline: Set<string> | undefined;
-  const proof = (oid: string, name: string): { proof?: string; reason?: string } => {
+  /** Design item 2: a local branch's age is its oldest reflog entry, else its tip's committer date. */
+  const ageOf = (branch: string, oid: string): { days?: number; reason?: string } => {
+    const log = checkout.call(["reflog", "show", "--date=unix", `refs/heads/${branch}`]);
+    if (log.code !== 0 || log.timedOut) return { reason: "branch reflog unreadable" };
+    const stamps = log.stdout.split("\n").filter(Boolean).map(line => Number(/@\{(\d+)\}/.exec(line)?.[1]));
+    if (stamps.some(n => !Number.isFinite(n))) return { reason: "branch reflog unreadable" };
+    const dated = stamps.length ? stamps : [Number(checkout.git(["log", "-1", "--format=%ct", oid], true).trim() || NaN)];
+    const since = now - Math.min(...dated);
+    if (!Number.isFinite(since)) return { reason: "branch age unknown" };
+    return since < recentSeconds ? {} : { days: Math.floor(since / (24 * 3600)) };
+  };
+  const proof = (oid: string, name: string, local?: string): { proof?: string; reason?: string } => {
     if (!checkout.hasCommit(oid)) return { reason: "tip commit unavailable locally" };
     if (merged) return checkout.hasCommit(merged.sha, merged.number) && checkout.ancestor(oid, merged.sha) ? { proof: `contained in merged PR #${merged.number} head ${merged.sha.slice(0, 12)}` } : { reason: `commits outside merged PR #${merged.number}` };
     for (const p of checkout.merged(name)) if (checkout.hasCommit(p.sha, p.number) && checkout.ancestor(oid, p.sha)) return { proof: `contained in merged PR #${p.number} head ${p.sha.slice(0, 12)}` };
-    if (oid === defaultOid) return { reason: `no commits beyond ${defaultBranch} and no merged PR` };
+    const own = (where: string, reason: string) => {
+      const a = local === undefined ? {} : ageOf(local, oid);
+      return a.days !== undefined ? { proof: `${where}, ${a.days} days old` } : { reason: a.reason ? `${reason}; ${a.reason}` : reason };
+    };
+    if (oid === defaultOid) return own(`no commits beyond ${defaultBranch}`, `no commits beyond ${defaultBranch} and no merged PR`);
     if (!checkout.ancestor(oid, defaultOid)) return { reason: "unmerged commits" };
     mainline ??= new Set(checkout.git(["rev-list", "--first-parent", defaultOid]).split("\n"));
-    if (mainline.has(oid)) return { reason: `points at a commit on ${defaultBranch}'s own history and has no merged PR` };
+    if (mainline.has(oid)) return own(`points at a commit on ${defaultBranch}'s own history`, `points at a commit on ${defaultBranch}'s own history and has no merged PR`);
     const age = now - Number(checkout.git(["log", "-1", "--format=%ct", oid]).trim());
     return age < recentSeconds ? { reason: "reachable from the default branch but committed within 7 days and no merged PR" } : { proof: `reachable from ${defaultBranch} ${defaultOid.slice(0, 12)}` };
   };
@@ -313,7 +328,7 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
     const name = upstream.startsWith("refs/remotes/origin/") ? upstream.slice("refs/remotes/origin/".length) : branch;
     if (branch === defaultBranch || (only && !only(branch) && !only(name))) continue;
     // `git worktree add --force` can check one branch out in several worktrees.
-    const r = proof(oid, name), on = trees.filter(t => t.branch === branch);
+    const r = proof(oid, name, branch), on = trees.filter(t => t.branch === branch);
     for (const tree of on) seen.add(tree);
     if (!r.proof) {
       keep("local", branch, r.reason!);
