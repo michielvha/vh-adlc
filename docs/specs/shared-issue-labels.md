@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised in draft; R-6 applied (covers fixture, file CLI test task T22); waits for a spec review and owner re-acceptance."
+status: planned
+status_description: "Re-accepted by the owner at R-7, still current after the R-8 drift review; re-entering implementation."
 issue: https://github.com/michielvha/vh-adlc/issues/83
 branch: feat/shared-issue-labels
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
@@ -437,6 +437,8 @@ None.
 | 2026-11-14 | R-5 | spec | `d0bb0f7` | unknown | procedural | No findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-14 | R-6 | spec | `cc3096a` | unknown | procedural | Revision review: 1 blocking, 1 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-14 | R-7 | spec | `d53f54a` | unknown | procedural | No findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
+| 2026-11-14 | R-7 | spec | `d53f54a` | n/a | n/a | accepted by owner |
+| 2026-11-14 | R-8 | spec | `bf67dc5` | unknown | procedural | Drift review after #89: no findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
 
 ### R-1
 
@@ -571,5 +573,9 @@ EVIDENCE: docs/specs/shared-issue-labels.md:284-290 requires cli.ts file to prev
 PROPOSAL: Add a failing test task before T12 that executes the actual file CLI against the fake tracker, covering preview-only behavior and approved creation. Include changed-preview, wrong-digest and changed-observation cases that must refuse with no issue created and an empty write log.
 
 ### R-7
+
+NO FINDINGS
+
+### R-8
 
 NO FINDINGS
