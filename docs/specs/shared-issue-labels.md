@@ -436,6 +436,7 @@ None.
 | 2026-11-14 | R-4 | spec | `da736bc` | unknown | procedural | Drift review after #87 and #88: 3 should-fix, no blocking finding; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-14 | R-5 | spec | `d0bb0f7` | unknown | procedural | No findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-14 | R-6 | spec | `cc3096a` | unknown | procedural | Revision review: 1 blocking, 1 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
+| 2026-11-14 | R-7 | spec | `d53f54a` | unknown | procedural | No findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
 
 ### R-1
 
@@ -568,3 +569,7 @@ SEVERITY: should-fix
 WHERE: Design / Operations; Test Plan / AC-04 and AC-05; Tasks / T12, T20 and T21
 EVIDENCE: docs/specs/shared-issue-labels.md:284-290 requires cli.ts file to preview without writing and create only after approval of an unchanged preview. However, the T11 scenarios call filingPreview and fileIssue directly (tests/vh-adlc/lifecycle/issue-labels.test.ts:12-20), and their refusal cases cover initially missing labels and invalid inputs, without changing the digest, account, repository or labels between preview and creation. T20 checks skill phrases. These checks can pass while the CLI rejects file or filing ignores changes after approval.
 PROPOSAL: Add a failing test task before T12 that executes the actual file CLI against the fake tracker, covering preview-only behavior and approved creation. Include changed-preview, wrong-digest and changed-observation cases that must refuse with no issue created and an empty write log.
+
+### R-7
+
+NO FINDINGS
