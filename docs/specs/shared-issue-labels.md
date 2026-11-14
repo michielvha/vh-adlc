@@ -326,9 +326,10 @@ once would make each other's reviews stale. So:
       and the result names the helper's plan.
 - [ ] AC-05: An issue spec files under acceptance or request carries one type label and no state
       label.
-- [ ] AC-06: Triage's reference names the standard state labels as the labels its verdicts use, a
+- [x] AC-06: Triage's reference names the standard state labels as the labels its verdicts use, a
       state label applied outside the controller is still denied, and a triage `create-request` issue
       is created with no labels.
+      Evidence: on feat/shared-issue-labels at T10, `bun test tests/vh-adlc/labels/vocabulary.test.ts` (5 pass) shows `references/triage.md` names the four state labels; `bun test tests/vh-adlc/triage/execution.test.ts -t "state label applied outside|create-request reaches GitHub"` (2 pass) shows each is denied outside the controller and the real adapter posts create-request with `labels: []` to a fake gh.
 - [ ] AC-07: A `label_map` entry makes the plan, triage, investigate and spec treat the mapped
       repository label as the standard one, a mapping onto a label outside the standard set appears in
       the plan as a managed label with its color and description change, and an entry keyed by a non-standard name changes nothing. A map in
@@ -383,7 +384,8 @@ shared-development-loop).
       Evidence: `bun test tests/vh-adlc/labels`: 19 pass, 0 fail, including the approved apply, the CLI plan-then-apply run and all eight refusal cases with empty write logs. `references/issues.md` documents both commands.
 - [x] T9 `tests/vh-adlc/triage/execution.test.ts`, `tests/vh-adlc/labels/vocabulary.test.ts` - a standard state label in a `labels` action outside the controller is denied, an approved `create-request` reaches the fake tracker with an empty labels array, and a failing check that `references/triage.md` names the vocabulary's state labels (AC-06)
       Evidence: `bun test tests/vh-adlc/triage/execution.test.ts -t ...`: both new tests pass at once, since they guard existing behavior (each standard state label is denied outside the controller; the real GitHub adapter posts create-request with `labels: []`). `bun test tests/vh-adlc/labels/vocabulary.test.ts`: 4 pass, 1 fail, "triage reference names the vocabulary state labels", the stated failing check.
-- [ ] T10 `plugins/vh-adlc/references/triage.md` - names the standard state labels and their mapped repository names as the labels triage verdicts use, controller rule unchanged; T9 passes (AC-06)
+- [x] T10 `plugins/vh-adlc/references/triage.md` - names the standard state labels and their mapped repository names as the labels triage verdicts use, controller rule unchanged; T9 passes (AC-06)
+      Evidence: `bun test tests/vh-adlc/labels/vocabulary.test.ts`: 5 pass, 0 fail; the triage reference names the four state labels, `references/issues.md` and `label_map`.
 - [ ] T11 `tests/vh-adlc/lifecycle/issue-labels.test.ts`, `tests/vh-adlc/lifecycle/feature-fixture.ts` - failing scenarios: investigate files for act now, track with a named prerequisite, track waiting on a decision and a requested reject; spec files a tracking issue; spec files where only the mapped type label exists; a missing-label case; each checks the pre-creation summary and the created issue's exact labels (AC-04, AC-05, AC-07)
 - [ ] T12 `plugins/vh-adlc/skills/vh-adlc-investigate/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` - label rules that point at `references/issues.md`, including mapped names, the preview before creation and the missing-label stop; T11 passes (AC-04, AC-05, AC-07)
 - [ ] T13 `tests/vh-adlc/labels/vocabulary.test.ts` - failing checks that `docs/user-guides/workflows.md` describes the label set and helper and that `references/authority.md` has the label-plan row (AC-10)
