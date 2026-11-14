@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing the shared skill and verifying native Codex and Claude runs."
+status: draft
+status_description: "Refreshing coverage and visual verification after review R-6."
 issue: null
 branch: feat/architecture-diagram-agent
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
