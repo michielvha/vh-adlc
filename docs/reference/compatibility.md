@@ -166,6 +166,11 @@ Hosts may register the reviewer agent directly or dispatch a generic independent
 the same reviewer file. If neither capability is available, the review stays pending with a handoff.
 The primary session never substitutes self-review for independence.
 
+Review severities, the nit rule and one revision per pass need plugin 0.19.0 and a resolved docs
+revision of `1ccf8f3` or later. When a repository pins an earlier revision, the
+reviewer and the spec operation keep their previous behavior: findings are rated without the shared
+definitions and every nit is applied.
+
 ## Article operation
 
 The article and promotion procedure is packaged as `vh-adlc-blog`. Its source

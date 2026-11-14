@@ -333,7 +333,7 @@ reviewed revert of the docs and plugin edits and the pin.
       on blocking, a seeded harmless wrong line number nit, a seeded ambiguity that allows two different
       implementations should-fix, a seeded wording issue nit, and a finding a declared lens raises at
       that lens's declared severity.
-      Evidence: `bun test tests/vh-adlc/review-convergence.test.ts` at 6e67cf3: the resolved `1ccf8f3` convention defines the three severities and the lens precedence; reviewer trials ac02-severity (blocking, nit, should-fix, nit) and ac02-lens (should-fix for the lens) pass, records in `tests/vh-adlc/evidence/review-convergence/trials/records/`; reviewer is Claude Code subagents reporting `claude-opus-5-5`.
+      Evidence: `bun test tests/vh-adlc/review-convergence.test.ts` at 6e67cf3: the resolved `1ccf8f3` convention defines the three severities and the lens precedence; reviewer trials ac02-severity (blocking, nit, should-fix, nit) and ac02-lens (should-fix for the lens) pass, records in `tests/vh-adlc/evidence/review-convergence/trials/records/`; reviewer is Claude Code subagents reporting `claude-opus-5-5`. ac02-lens was rerun on the final agent text after `1371041` reworded the lens sentence and passed again (`trials/records/ac02-lens-final.txt`).
 - [x] AC-03: A reviewer following the updated agent reports, in one finding, every location of a rule a
       document states inconsistently, and an author following the updated skill changes every
       restatement in one commit.
@@ -381,7 +381,7 @@ reviewed revert of the docs and plugin edits and the pin.
       the baseline, except a free-text widening nit, which stays listed; raises no nit as an Open
       Question; and lists every nit it did not apply, from every pass it handled, with its ID in its
       report and the owner-facing conversation summary, not in the document.
-      Evidence: scenario S16.nits passes 8 of 8 with the T5 skill (`S16.nits.t5.md`): pass-1's blocking fix and all three nits land in one commit, no Open Question, pass-2's nit listed in the report and not applied; S7.7, S7.7.accept, S7.9 and S14.spec pass with the same skill.
+      Evidence: scenario S16.nits passes 8 of 8 with the T5 skill (`S16.nits.t5.md`): pass-1's blocking fix and all three nits land in one commit, no Open Question, pass-2's nit listed in the report and not applied; S7.7, S7.7.accept, S7.9 and S14.spec pass with the same skill. Rerun on the final skill text (plugin 0.19.0 at `606d495`): 8 of 8 again (`S16.nits.final.md`).
 
 ## Test Plan
 

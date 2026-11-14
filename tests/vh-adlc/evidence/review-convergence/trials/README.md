@@ -23,3 +23,7 @@ independent subagent on Claude Code, reporting `MODEL: claude-opus-5-5`, with th
 The AC-04 fixtures were written to leave exactly one question open, but each also drew further real
 findings about gaps in the small fixtures (for example the unspecified lock behaviour); the pass
 condition is that the open question is raised, which it was in every case.
+
+`ac02-lens` was rerun on 2026-11-14 against the final reviewer agent text (commit `1371041`, which
+reworded the lens sentence after the first run), on a repository rebuilt by `build.py`. It passed again:
+F-07 rates the misspelling should-fix and cites the spelling lens (`records/ac02-lens-final.txt`).

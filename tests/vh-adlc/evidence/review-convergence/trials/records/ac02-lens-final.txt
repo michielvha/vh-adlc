@@ -1,0 +1,49 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design
+EVIDENCE: Design says "count.sh already parses a `--json` flag (count.sh:3), so the change only formats the existing count". At 9404631, count.sh:3 is `wc -l < "$1"`, and the file has no flag parsing anywhere (it is three lines long). I observed `sh count.sh --json <three-line file>` print "count.sh: line 3: --json: No such file or directory" and exit 1. An implementer who follows the Design would only add formatting, and `count.sh --json FILE` would still treat `--json` as the file name. AC-01 would fail.
+PROPOSAL: Rewrite the Design to say count.sh takes only a positional FILE (count.sh:2-3), and that the change adds `--json` argument parsing as well as the JSON formatting. Add a Task for the parsing.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: Background says "its usage line is at count.sh:9". count.sh has three lines, and the usage comment `# usage: count.sh FILE` is at count.sh:2.
+PROPOSAL: Change the citation to count.sh:2.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-02), Test Plan (AC-02 row)
+EVIDENCE: "AC-02: The output is formatted nicely." with the proof "Read the output". Nobody can observe "nicely", and the proof has no pass condition, so any output passes it. It also overlaps with AC-01, which already fixes the exact output `{"lines": N}`. Two implementers would read "nicely" differently, for example pretty-printed over several lines versus the one-line form in AC-01.
+PROPOSAL: Remove AC-02 or replace it with an exact end state, for example "the JSON output is a single line ending in a newline that `jq -e .lines` parses as an integer". Give it a Test Plan row with that command and its expected result.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary), Scope, Acceptance Criteria, Test Plan
+EVIDENCE: The Owner summary says "Text stays the default." and Scope says "Teh default output stays text." No criterion or Test Plan row checks that `count.sh FILE` without `--json` still prints the plain count. An implementation that breaks or changes the text output would still meet every criterion.
+PROPOSAL: Add a criterion that `count.sh FILE` prints only the line count as plain text, unchanged from today, and add a Test Plan row that runs it on the three-line fixture and expects `3`.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Acceptance Criteria (AC-01), Test Plan (AC-01 row)
+EVIDENCE: The AC-01 proof uses `fixture.txt` "for a three-line fixture", but the tree at 9404631 holds no such file and the row does not say how to create it. "A file of N lines" is also undefined for a last line with no trailing newline: `wc -l` counts newlines, so it reports 2 for a three-line file without one. Neither the Design nor AC-01 says which count is intended, so two implementers could produce different N.
+PROPOSAL: Define N in AC-01 (for example "the number of newline characters, as `wc -l` reports") and give the proof row an exact fixture, for example `printf 'a\nb\nc\n' > fixture.txt`, before running the command.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Acceptance Criteria
+EVIDENCE: The Design defines only the success case of `count.sh --json FILE`. It does not say what happens with `count.sh FILE --json`, `--json` without a FILE, an unknown flag, or a missing or unreadable file. In JSON mode, one implementer might print an error to stderr and exit non-zero while another prints a JSON error object. No criterion covers any of these cases.
+PROPOSAL: State the accepted argument order and the error behaviour (for example, a message on stderr, a non-zero exit and no stdout output in either mode). Add a criterion and a Test Plan row for a missing file with `--json`.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope
+EVIDENCE: Spelling lens. Scope, line 26: "Teh default output stays text." "Teh" is a misspelling of "The". I found no other misspelled English words in the document's prose.
+PROPOSAL: Change "Teh" to "The".
