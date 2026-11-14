@@ -450,6 +450,8 @@ shared-development-loop).
       Evidence: `bun test tests/vh-adlc/labels`: 30 pass, 0 fail, including the T23 fault case (receipt returned, complete false, reconciled false, remaining from this run). `references/issues.md` explains `reconciled: false`.
 - [x] T25 `tests/vh-adlc/lifecycle/issue-labels.test.ts`, `tests/vh-adlc/triage/execution.test.ts` - mapped-name scenarios: investigate files with `label_map` `ready: ready-for-work` where only `ready-for-work` exists and the created issue carries it; a triage `labels` action with the mapped name is denied without proof and, with current proof, reaches the tracker under the mapped name (R-9 F-02; AC-07)
       Evidence: `bun test tests/vh-adlc/lifecycle/issue-labels.test.ts`: 10 pass, including investigate filing as `ready-for-work` under `label_map` `ready: ready-for-work`. `bun test tests/vh-adlc/triage/execution.test.ts`: 58 pass; the mapped label is refused without proof and, with current primary and adversarial proof, published under `ready-for-work`. Both passed on first run, so they guard behavior the existing code already had; the first triage run was blocked only because the test adapter lacked the label in its live vocabulary, fixed in the test.
+- [x] T26 `plugins/vh-adlc/references/issues.md` - say that `plan` prints counts, the digest and the writes while the saved plan holds each status and unmanaged name; `vocabulary.test.ts` passes (R-10 F-01; AC-01)
+      Evidence: `bun test tests/vh-adlc/labels/vocabulary.test.ts`: 7 pass; the reference now matches what `cli.ts plan` prints (counts, digest, writes) and what the saved plan holds.
 
 ## Open Questions
 

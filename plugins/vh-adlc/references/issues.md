@@ -70,10 +70,11 @@ names it. It needs Bun and an authenticated GitHub CLI.
 bun "$plugin_dir/scripts/labels/cli.ts" plan --repo "$checkout" --output "$report_dir/labels-plan.json"
 ```
 
-`plan` reads only. It writes the label plan to a new file and prints its digest, each standard label
-as present, missing or different, the labels it leaves unmanaged, and every write with its before and
-after values. The plan records the host, repository, authenticated account, a hash of the vocabulary,
-the effective names after `label_map` and the labels it read.
+`plan` reads only. It writes the label plan to a new file and prints the digest, how many standard
+labels are present, missing or different, how many labels it leaves unmanaged, and every write with its
+before and after values. The saved plan lists each standard label's status and every unmanaged label by
+name, and records the host, repository, authenticated account, a hash of the vocabulary, the effective
+names after `label_map` and the labels it read.
 
 Show the owner every write and the digest. Only after the owner approves that exact digest:
 
