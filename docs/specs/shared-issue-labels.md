@@ -445,7 +445,8 @@ shared-development-loop).
       Evidence: Owner-approved apply on michielvha/stackweaver from a clean clone with digest 2c509a0e...: five updates succeeded, complete; 1082 issues and PRs over 11 pages before and after, none lost a label or changed during the window; recorded in `tests/vh-adlc/labels/evidence/rollout-stackweaver.md` with plan, receipt and snapshots.
 - [x] T23 `tests/vh-adlc/labels/apply.test.ts` - failing fault test: the first planned write succeeds, the second fails and the final readback fails; apply must still return a receipt with the succeeded outcome, `complete: false` and no claimed reconciliation (R-9 F-01; AC-03)
       Evidence: `bun test tests/vh-adlc/labels/apply.test.ts`: 10 pass, 1 fail; apply throws "GitHub request failed" from the final readback instead of returning its receipt, the R-9 F-01 defect. The fake gh gained fault injection (`fail_after_writes`) for this case.
-- [ ] T24 `plugins/vh-adlc/scripts/labels/apply.ts` - keep the recorded outcomes when the final observation fails and mark the remainder unknown; T23 passes (R-9 F-01; AC-03)
+- [x] T24 `plugins/vh-adlc/scripts/labels/apply.ts` - keep the recorded outcomes when the final observation fails and mark the remainder unknown; T23 passes (R-9 F-01; AC-03)
+      Evidence: `bun test tests/vh-adlc/labels`: 30 pass, 0 fail, including the T23 fault case (receipt returned, complete false, reconciled false, remaining from this run). `references/issues.md` explains `reconciled: false`.
 - [ ] T25 `tests/vh-adlc/lifecycle/issue-labels.test.ts`, `tests/vh-adlc/triage/execution.test.ts` - mapped-name scenarios: investigate files with `label_map` `ready: ready-for-work` where only `ready-for-work` exists and the created issue carries it; a triage `labels` action with the mapped name is denied without proof and, with current proof, reaches the tracker under the mapped name (R-9 F-02; AC-07)
 
 ## Open Questions

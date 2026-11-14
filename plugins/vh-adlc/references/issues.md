@@ -85,4 +85,6 @@ bun "$plugin_dir/scripts/labels/cli.ts" apply --repo "$checkout" \
 `apply` observes the repository again and refuses before any write unless the result is
 byte-identical to the approved plan, so a different account, repository, vocabulary, `label_map` or
 label means planning again. It then makes exactly the planned writes and prints a receipt; a failed
-write stops the rest and the receipt names what remains.
+write stops the rest and the receipt names what remains. `reconciled: false` means apply could not
+read the repository back, so its list of remaining writes comes from this run alone; plan again before
+any retry.

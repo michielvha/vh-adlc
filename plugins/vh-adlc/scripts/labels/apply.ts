@@ -2,7 +2,7 @@ import type { LabelsGitHub } from "./github";
 import { buildPlan, digest, type LabelPlan, type Write } from "./plan";
 
 export type Outcome = { action: Write["action"]; name: string; status: "succeeded" | "failed" | "not_attempted" };
-export type Receipt = { schema_version: 1; complete: boolean; plan_digest: string; repository: string; actor: string; outcomes: Outcome[]; remaining: string[] };
+export type Receipt = { schema_version: 1; complete: boolean; reconciled: boolean; plan_digest: string; repository: string; actor: string; outcomes: Outcome[]; remaining: string[] };
 
 /**
  * Apply an approved label plan. A fresh observation must reproduce the approved bytes exactly, so a
@@ -26,9 +26,14 @@ export function apply(root: string, gh: LabelsGitHub, text: string, approvedDige
       break;
     }
   }
-  const after = buildPlan(root, gh).plan;
+  const base = { schema_version: 1 as const, plan_digest: approvedDigest, repository: approved.repository, actor: approved.actor, outcomes };
+  let after: LabelPlan;
+  try { after = buildPlan(root, gh).plan; } catch {
+    // Without a readback, report what this run did and treat every other planned write as remaining.
+    return { ...base, complete: false, reconciled: false, remaining: outcomes.filter((outcome) => outcome.status !== "succeeded").map((outcome) => outcome.name) };
+  }
   return {
-    schema_version: 1, plan_digest: approvedDigest, repository: approved.repository, actor: approved.actor, outcomes,
+    ...base, reconciled: true,
     complete: outcomes.every((outcome) => outcome.status === "succeeded") && after.writes.length === 0,
     remaining: after.writes.map((write) => write.name),
   };
