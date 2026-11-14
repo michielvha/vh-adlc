@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-4 reviewed plugin checker coverage. Awaiting renewed acceptance before replanning unchecked tasks."
+status: planned
+status_description: "Accepted after R-4 with the unchecked tasks reordered."
 issue: null
 branch: feat/architecture-diagram-agent
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
@@ -95,9 +95,8 @@ The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`.
 
 - [x] T1 `tests/vh-adlc/diagram/output.test.ts` - the staging and export contract fails before the shared helper exists (AC-03, AC-04)
       Evidence: bun test tests/vh-adlc/diagram/output.test.ts returned four expected failures before the export helper existed.
-- [ ] T2 `plugins/vh-adlc/skills/vh-adlc-diagram/scripts/export.ts` - local export, checked inputs, failure recovery and exclusive publication pass the output tests (AC-03, AC-04)
-- [ ] T3 `tests/vh-adlc/diagram/` - fixture runner and committed scenarios enforce installation, invocation, diagram semantics and intake behavior, with discovery failing before the skill exists (AC-01, AC-02, AC-03, AC-05)
-- [ ] T4 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `docs/reference/marketplace.md`, `docs/user-guides/workflows.md` - both native hosts load the installed skill and the fixture and intake checks and rendered-output review pass (AC-01, AC-02, AC-03, AC-05)
+- [ ] T5 `tests/vh-adlc/diagram/` - fixture runner and committed scenarios reject the package when the skill is absent (AC-01, AC-02, AC-03, AC-05)
+- [ ] T6 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `tests/vh-adlc/check.test.ts`, `docs/reference/marketplace.md`, `docs/user-guides/workflows.md` - the package checker and export tests pass, followed by native fixture and intake runs on both hosts and rendered inspection (AC-01, AC-02, AC-03, AC-04, AC-05)
 
 ## Open Questions
 
@@ -112,6 +111,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | 2026-11-14 | R-3 | spec | `6593ed37147bd2bd6813e6e4d3e53066af7f8896` | unknown | procedural | No findings |
 | 2026-11-14 | R-3 | spec | `6593ed37147bd2bd6813e6e4d3e53066af7f8896` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-4 | spec | `211db5a7ceb0510e7107b160efe8ce30babda981` | unknown | procedural | One should-fix finding in the task order |
+| 2026-11-14 | R-4 | spec | `211db5a7ceb0510e7107b160efe8ce30babda981` | n/a | n/a | accepted by owner |
 
 ### R-1
 
