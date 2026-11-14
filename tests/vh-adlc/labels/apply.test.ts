@@ -1,6 +1,6 @@
 // Apply makes exactly the approved writes, or refuses before any write when anything it was bound to changed.
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { apply } from "../../../plugins/vh-adlc/scripts/labels/apply";
 import { buildPlan, digest } from "../../../plugins/vh-adlc/scripts/labels/plan";
@@ -96,5 +96,20 @@ describe("apply refuses before any write", () => {
     const root = checkout(), f = tracker(start()), { text, digest: sha } = buildPlan(root, f.gh());
     f.edit((labels) => { labels[0].color = "123456"; });
     refuses(() => apply(root, f.gh(), text, sha), f);
+  });
+});
+
+describe("a failure during apply", () => {
+  test("a failed write followed by a failed readback still returns a receipt naming what remains", () => {
+    const root = checkout(), f = tracker(start()), { plan, text, digest: sha } = buildPlan(root, f.gh());
+    const state = JSON.parse(readFileSync(f.state, "utf8")); state.fail_after_writes = 1; writeFileSync(f.state, JSON.stringify(state));
+    const receipt = apply(root, f.gh(), text, sha);
+    expect(receipt.complete).toBe(false);
+    expect(receipt.reconciled).toBe(false);
+    expect(receipt.outcomes[0].status).toBe("succeeded");
+    expect(receipt.outcomes[1].status).toBe("failed");
+    expect(receipt.outcomes.slice(2).every((outcome) => outcome.status === "not_attempted")).toBe(true);
+    expect(receipt.remaining).toEqual(plan.writes.slice(1).map((write) => write.name));
+    expect(f.writes().filter((call) => call.method !== "GET").length).toBe(2);
   });
 });

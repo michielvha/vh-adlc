@@ -5,19 +5,21 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 type Label = { name: string; color: string; description: string | null };
 const path = process.env.LABELS_FIXTURE;
 if (!path) throw new Error("fixture path missing");
-const state = JSON.parse(readFileSync(path, "utf8")) as { host: string; repository: string; actor: string; labels: Label[]; issues?: { number: number; title: string; body: string; labels: string[] }[] };
+const state = JSON.parse(readFileSync(path, "utf8")) as { host: string; repository: string; actor: string; labels: Label[]; issues?: { number: number; title: string; body: string; labels: string[] }[]; fail_after_writes?: number; writes_done?: number };
 const args = process.argv.slice(2);
 const flag = (name: string) => { const i = args.indexOf(name); return i < 0 ? undefined : args[i + 1]; };
 const method = flag("-X") ?? "GET";
 const input = args.includes("--input") ? readFileSync(0, "utf8") : "";
 appendFileSync(path + ".calls", JSON.stringify({ method, args, input: input ? JSON.parse(input) : null }) + "\n");
 const refuse = (message: string): never => { process.stderr.write(message); process.exit(1); };
+// Fault injection: after this many successful writes, every further request fails.
+if (state.fail_after_writes !== undefined && (state.writes_done ?? 0) >= state.fail_after_writes) refuse("injected failure");
 if (args[0] !== "api" || flag("--hostname") !== state.host) refuse("unexpected host");
 const endpoint = args.find((arg) => arg.startsWith("repos/") || arg === "user");
 if (!endpoint) refuse("unexpected request");
 const out = (value: unknown) => writeFileSync(1, JSON.stringify(value));
 if (endpoint === "user") { out({ login: state.actor }); process.exit(0); }
-const save = () => writeFileSync(path, JSON.stringify(state));
+const save = () => { if (method !== "GET") state.writes_done = (state.writes_done ?? 0) + 1; writeFileSync(path, JSON.stringify(state)); };
 if (method === "POST" && endpoint === `repos/${state.repository}/issues`) {
   // GitHub would create a missing label implicitly; record the request exactly as sent.
   const body = JSON.parse(input) as { title: string; body: string; labels: string[] };
