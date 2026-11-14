@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/michielvha/logger"
 )
@@ -24,6 +25,31 @@ const Bootstrap = `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy By
 
 // ErrUnreachable marks an ssh connection failure (exit 255).
 var ErrUnreachable = errors.New("unreachable over SSH")
+
+// Margin is what a deadline adds to twice a snippet's own longest wait.
+// Tests shorten it.
+var Margin = 30 * time.Second
+
+// Deadline is the deadline for a call whose snippet waits at most wait by
+// its own timers.
+func Deadline(wait time.Duration) time.Duration { return 2*wait + Margin }
+
+type deadlineKey struct{}
+
+// WithDeadline gives the calls made with ctx a deadline of d each.
+func WithDeadline(ctx context.Context, d time.Duration) context.Context {
+	return context.WithValue(ctx, deadlineKey{}, d)
+}
+
+var errDeadline = errors.New("deadline passed")
+
+// Timeout is a call that passed its deadline; its ssh process was killed.
+type Timeout struct {
+	Alias string
+	After time.Duration
+}
+
+func (t *Timeout) Error() string { return fmt.Sprintf("%s: timed out after %s", t.Alias, t.After) }
 
 // Vars are the values a snippet receives in its preamble.
 type Vars map[string]string
@@ -85,7 +111,15 @@ func Command(ctx context.Context, alias string, command ...string) (Output, erro
 func run(ctx context.Context, alias, stdin string, command ...string) (Output, error) {
 	args := append([]string{"-o", "BatchMode=yes", "-o", "ConnectTimeout=15", alias}, command...)
 	logger.Debug("ssh", "alias", alias, "command", strings.Join(command, " "))
+	d, timed := ctx.Value(deadlineKey{}).(time.Duration)
+	if timed {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeoutCause(ctx, d, errDeadline)
+		defer cancel()
+	}
 	cmd := exec.CommandContext(ctx, "ssh", args...)
+	// A process ssh leaves behind can hold its output open after the kill.
+	cmd.WaitDelay = 2 * time.Second
 	cmd.Stdin = strings.NewReader(stdin)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
@@ -98,6 +132,9 @@ func run(ctx context.Context, alias, stdin string, command ...string) (Output, e
 	}
 	if err == nil {
 		return out, nil
+	}
+	if timed && errors.Is(context.Cause(ctx), errDeadline) {
+		return out, &Timeout{Alias: alias, After: d}
 	}
 	var ee *exec.ExitError
 	if !errors.As(err, &ee) {
