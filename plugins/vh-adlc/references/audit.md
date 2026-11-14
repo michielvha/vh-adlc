@@ -217,7 +217,9 @@ the ledger cleanup does this for its own worktree. Keep pending/unpublished ledg
 After a permitted merge, confirm the PR's merged head is the reviewed head and its base is the selected
 base, then run `after-merge` from [branches.md](branches.md) for that PR. It removes the just-merged
 head remotely and locally with expected-tip conditional deletion, only while each tip is contained in
-the head GitHub recorded for that merged PR.
+the head GitHub recorded for that merged PR. It also removes that PR's clean worktree under the rules in
+[branches.md](branches.md). It keeps one that holds ignored files, is locked, or is the main, `--repo` or
+current worktree, and a kept worktree keeps its branch with a reason.
 Reconcile an absent head after lost acknowledgement. A changed/unknown tip is kept and reported; this
 creates no general branch-cleanup or repository-setting permission. Never prune, reset,
 force-delete or clean unrelated worktrees/index entries. Cleanup cannot discard a pending resource intent.
