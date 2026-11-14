@@ -320,6 +320,7 @@ Design and the AC-01 and AC-09 tests made exact.
 | 2026-11-14 | R-3 | spec | `6a90dae` | claude-opus-5-5 | procedural | Clean: no blocking finding; seven should-fix findings |
 | 2026-11-14 | R-4 | spec | `0661a35` | claude-opus-5-5 | procedural | Blocking: two static-check rows reject the criteria's own hyphenated wording; five should-fix findings and two nits |
 | 2026-11-14 | R-5 | spec | `c378677` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix findings and two nits, all from text the cut dropped |
+| 2026-11-14 | R-6 | spec | `e2785fe` | claude-opus-5-5 | procedural | Clean: no blocking finding; three should-fix findings and one nit, listed for implementation |
 
 ### R-1
 
@@ -659,3 +660,33 @@ SEVERITY: nit
 WHERE: Scope (third bullet, "its reference text in `loop-settings.md`"); Design, Command route; Test Plan, AC-02, AC-03, AC-07, AC-10 row
 EVIDENCE: Scope puts the command route's reference text in plugins/vh-adlc/references/loop-settings.md in scope, and covers lists that file. This revision removed the Design sentence "`loop-settings.md` says both" (git diff 0661a35 c378677). No criterion names loop-settings.md, and the written-procedure row's file list leaves it out. Today that file says nothing about the review timeout or the prompt contents (grep for "timeout" and "prompt" in it finds only the argv placeholder row at line 37).
 PROPOSAL: Restore the sentence saying what loop-settings.md gains, and add the file to the list in the AC-02 row, or remove it from Scope.
+
+### R-6
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The rule (first paragraph, last sentence); Design, Glossary (Proof that needs a person); Design, Spec author mode; Design, Implement (last sentence); AC-01; AC-03; Test Plan, AC-01 row; Test Plan, AC-02, AC-03, AC-07, AC-10 row; Context, Owner summary (sixth bullet)
+EVIDENCE: This traces to how this revision applied R-5 F-01 (git diff c378677 e2785fe). That finding proposed saying "that the procedure names the inputs it exercises and that the implement operation records their ids when the procedure runs, and add that clause to AC-01 and AC-03". The revision put the first half into Design, The rule ("the procedure names the inputs it exercises, such as the plugin tree or the binary's revision") and into the glossary, but into no criterion. AC-01's Test plan clauses list only the agent-session definition, the five things, the missing runner and runner inputs. Its transcript clause adds only "with the sha256 and exercised-input conditions". AC-03 covers the implementer recording "the ids of the inputs its procedure names", and its author-mode clause still says only "names the five things". Spec author mode in Design likewise says nothing about a procedure's inputs. Both written-procedure rows quote a sentence per clause, so they cannot catch the gap. With every box ticked, the convention and the spec skill can both say nothing about a procedure naming its inputs. An author then writes a procedure that names none, implement records an empty list, and the reviewer's condition that "the inputs the procedure exercised ... still have the recorded ids" holds vacuously. That reopens the stale-trial gap of R-3 F-03 and R-5 F-01.
+PROPOSAL: Add to AC-01 that the Test plan section says a proof that needs a person names a written procedure that names the inputs it exercises, and add the same to Spec author mode and to AC-03's author-mode clause. Consider also stating that a procedure naming no input cannot use the transcript case.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Transcripts (first and second paragraphs); Design, The rule (second paragraph); Design, Glossary (Transcript manifest); Design, Implement (last sentence); Design, The reviewer (last sentence); AC-01 (transcript clause); Context, Owner summary (sixth bullet)
+EVIDENCE: This revision makes the transcript manifest record, for a proof that needs a person, "the ids ... of the inputs a procedure exercised and whether any had uncommitted changes". But the rule that a run on uncommitted inputs does not count sits in The rule's second paragraph, which speaks only of "the runner inputs". The transcript case has only two conditions: a sha256 match, and that the inputs "still have the recorded ids". AC-01 repeats just those ("with the sha256 and exercised-input conditions"). No text says what the reviewer does with a person's manifest that records uncommitted changes. If the recorded id is a commit or HEAD tree id, a run on a dirty plugin tree records the clean id and passes. In the same way, Transcripts' first paragraph keeps the evidence directory "outside every directory the runner declares as an input", for runners only. If a procedure names an input that contains the evidence directory, committing that proof's own transcripts changes the recorded id, and the check can never pass. Two careful implementers of the reviewer agent and the implement skill would handle both cases differently. This traces to this revision's extension of the manifest to the person case.
+PROPOSAL: State that a person's run on uncommitted named inputs does not count, so the reviewer rejects a manifest that records uncommitted changes, and that the evidence directory lies outside every input the procedure names. Carry both conditions into AC-01's transcript clause.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Review dispatch; Design, Command route; Context, Owner summary (third bullet); AC-02; AC-09; Test Plan, AC-09 row
+EVIDENCE: Design says the verification commands are "the `verification_rungs` commands when the loop settings declare them". A rung is either `always` or `{paths: [...]}` "matched against the whole feature delta", and it carries either a `command` or "Instead of a command: a written procedure" (plugins/vh-adlc/references/loop-settings.md:48-52; feature delta defined at :54-55). The adopter the Background names, Stackweaver, declares seven rungs (/home/m/code/stackweaver/.vh-adlc/loop.yaml:80-107). Only two have a `command`. Five are `procedure` rungs, including named-e2e at :91, which reruns every E2E spec a Test Plan row names. Five are path-filtered (:87, :94, :98, :102, :106). The design does not say whether procedure rungs go into the dispatch, or whether the path condition filters rungs, which would leave a spec review with no feature delta to match. The AC-09 row requires only "the rung commands", so a `reviewPrompt` that drops every procedure rung passes. One implementer would pass only the `command` fields of applicable rungs, and another every rung verbatim. No earlier pass raised this.
+PROPOSAL: Say the dispatch carries every declared rung verbatim (name, condition, and command or procedure) whatever its path condition, or name the filter chosen. Give the AC-09 rungs fixture a procedure rung and a path-filtered rung, and have the row require both in the prompt.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (Copied logins)
+EVIDENCE: The document cites `tests/vh-adlc/scenarios/host.ts:21-29` for the scenario host copying the owner's login. Line 21 is the warning and line 29 the existence check. The copy itself, `copyFileSync(OWNER_CREDENTIALS, join(config, ".credentials.json"))`, is at line 30.
+PROPOSAL: Cite `tests/vh-adlc/scenarios/host.ts:21-30`.
