@@ -579,3 +579,31 @@ EVIDENCE: history-output.ts has three refusals that no test reaches:
 The "copied" and "wrapped" cases fail early inside the base persistAuditOutput, which returns saved before any hosted-specific code runs. They show the base refusal, not the hosted report-identity check. The required checkpoint log (t96-hosted-output-checkpoint-hosted-output.log) shows only the two existing cases.
 PROPOSAL: Add focused cases inside the existing bridge. Replace the retained report.json after the base save and before the envelope step, configure a provenance bound smaller than the envelope, and change native state between the two envelope calls. Each should assert complete false, the specific diagnostic and the scope_changed value.
 ```
+
+## Component diagnostic 118
+
+Exact local target `bdfda4c2b6d5337665a36d7cc5f1dd177d8865af`. Actual Copilot Opus 5.5 with procedural isolation. All 76 required chunks were read with unchanged packet hashes, no outside paths and no private files sent. The scoped staged-provenance diagnostic returns one should-fix item and two nits. The original records follow before corrections. Full feature criteria remain open.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/docs-drift/history-output.ts, persistHostedAuditOutput. The try block covers the base report identity check through renameSync, the catch block, and the deleted post-catch caller check (delta.patch, history-output.ts hunk).
+EVIDENCE: The patch removes the unconditional post-catch block "if (repo !== null && before !== null && !matchesRepositoryState(repo, before)) { result.complete = false; result.scope_changed = true; ... "Caller changed during hosted report retention" }". It replaces that block with one check inside the try, placed after the second createOriginalAuditReportEnvelope call and before renameSync. Moving the final gate ahead of the rename is right for F01. However, any refusal thrown earlier now skips the caller comparison completely. That covers the oversize throw "Hosted provenance exceeds the configured retained entry bound", a HistoryEligibilityError from the first envelope call, a publishArtifact failure for provenance.pending.json, and a non-ArtifactChanged readBoundArtifact error. In those cases a concurrent caller change no longer sets scope_changed or adds the "Caller changed during hosted report retention" diagnostic. The envelope callback in history-collection.ts checks the caller only inside its own window (beforeOutput). It cannot see a change between the end of persistAuditOutput and the envelope call, or after that call returns. Before this patch, every hosted refusal recorded such a change. No regression combines an early refusal with a caller change. The "bound" case even asserts scope_changed false without changing the caller.
+PROPOSAL: Keep the in-try check as the last step before renameSync. In the catch path also run matchesRepositoryState(repo, before) when repo and before are set, then set scope_changed and push the caller diagnostic. Refusals then keep the earlier classification, and no check runs after the rename. Add a bridge case that changes docs/guide.md while forcing an early refusal, such as the oversize or eligibility mock, and assert scope_changed true with the caller diagnostic.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/docs-drift/history-output.test.ts, "late hosted refusals keep provisional evidence outside the upload pair".
+EVIDENCE: For the "run", "reopen" and "caller" faults the test asserts complete false, scope_changed true, a null provenance_json and the file state. It never asserts which guard refused. The expected diagnostics are "Current native scheduled run changed before output" from the second envelope call, the readBoundArtifact digest refusal on provenance.pending.json, and "Caller changed during hosted report retention". If a guard were reordered or removed and a different check happened to catch the fault, the test would still pass. The changedEnvelope case also fails after provenance.pending.json is published, so it is a post-publication refusal of the kind F01 targets. Yet it does not record or assert upload_file_exists false and provisional_file_exists true. It checks only that files.provenance_json is null.
+PROPOSAL: Assert the specific diagnostic for each late fault. For changedEnvelope, add the same existsSync checks used in the late loop, so every post-publication refusal is shown to leave no upload-named provenance.json.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/docs-drift/history-output.test.ts, "retained hosted audit prepares bounded native pre-upload history provenance".
+EVIDENCE: The success case iterates only Object.values(saved.files). It never lists saved.directory. After this patch the success path depends on renameSync removing provenance.pending.json. The future uploader is meant to select exactly the canonical files from a complete pending result. Nothing asserts that a successful directory holds only report.json, report.md and provenance.json, with no provisional file left beside them. report-output.test.ts makes the matching directory assertion for local output: readdirSync(result.directory).sort() equals ["report.json", "report.md"].
+PROPOSAL: In the success case, assert that readdirSync(saved.directory).sort() equals ["provenance.json", "report.json", "report.md"].
+```
