@@ -24,7 +24,9 @@ const SKILL = join(PLUGIN, "skills", "vh-adlc-spec", "SKILL.md");
 const PIN = "1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff";
 const BINARY = process.env.VH_ADLC_BINARY ?? "/usr/local/bin/vh-adlc";
 const MODEL = process.env.VH_ADLC_TRIAL_MODEL ?? "claude-opus-5-5";
-const DOCS_CACHE = join(process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache"), "vh-adlc", "docs", PIN);
+// The binary caches under ~/Library/Caches on macOS and the XDG cache directory elsewhere.
+const cacheRoot = (home: string) => (process.platform === "darwin" ? join(home, "Library", "Caches") : join(home, ".cache"));
+const DOCS_CACHE = join(process.platform === "darwin" ? cacheRoot(homedir()) : process.env.XDG_CACHE_HOME || cacheRoot(homedir()), "vh-adlc", "docs", PIN);
 
 type Repo = { name: string; repo: string; commit: string };
 type Trial = { name: string; kind: "reviewer" | "author"; repo: Repo; prompts: (r: Repo) => string[] };
@@ -154,8 +156,8 @@ async function main() {
   mkdirSync(out, { recursive: true });
 
   const home = join(out, "home");
-  mkdirSync(join(home, ".cache", "vh-adlc", "docs"), { recursive: true });
-  cpSync(DOCS_CACHE, join(home, ".cache", "vh-adlc", "docs", PIN), { recursive: true });
+  mkdirSync(join(cacheRoot(home), "vh-adlc", "docs"), { recursive: true });
+  cpSync(DOCS_CACHE, join(cacheRoot(home), "vh-adlc", "docs", PIN), { recursive: true });
   writeFileSync(join(home, ".gitconfig"), "[user]\n\tname = Trial Author\n\temail = trial@example.invalid\n[init]\n\tdefaultBranch = main\n");
 
   const reviewers = build("build.py", join(out, "repos"));

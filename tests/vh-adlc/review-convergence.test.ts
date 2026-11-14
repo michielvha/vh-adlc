@@ -24,7 +24,8 @@ function resolvedPage(page: string): string {
   const run = Bun.spawnSync([binary, "knowledge", "--repo", repo, "--plugin-pin", pluginPin(), "--page", page], { stdout: "pipe", stderr: "pipe" });
   const report = JSON.parse(run.stdout.toString());
   if (report.result !== "answered") throw new Error(`knowledge did not answer: ${run.stdout.toString()}`);
-  const cache = process.env.XDG_CACHE_HOME ?? join(homedir(), ".cache");
+  // The binary caches under ~/Library/Caches on macOS and the XDG cache directory elsewhere.
+  const cache = process.platform === "darwin" ? join(homedir(), "Library", "Caches") : process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
   return readFileSync(join(cache, "vh-adlc", "docs", report.knowledge.revision, page), "utf8");
 }
 
