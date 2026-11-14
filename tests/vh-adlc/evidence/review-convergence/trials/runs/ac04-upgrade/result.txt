@@ -1,0 +1,57 @@
+=== turn 1
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Scope; Context (Owner summary)
+EVIDENCE: Design line 30 says "cache.sh writes results to state.json as a new JSON object keyed by input hash" but gives the object no format version. It also does not say what a run does when state.json already exists and cannot be parsed or has another shape, or when it was written by a newer or older cache.sh. Today's script keeps no state at all (cache.sh:1-2), so this release is the first version that writes state.json. The document never defines what happens on the upgrade (the first run with no file, or a stray file of the same name), on rollback (old cache.sh ignores the file, which leaves stale entries that a later upgrade would trust), or on a future format change. Scope line 26 rules out only expiry.
+PROPOSAL: Add a format version field to state.json. Define what happens when the file is missing, unparseable or carries an unknown version (for example: treat it as empty, recompute and rewrite). State what rollback to the stateless script leaves behind and whether re-upgrading trusts those entries. Then add a criterion and a Test Plan row for the unreadable or old-format case.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: Design line 30: "A failed rename is retried once." Nothing says what happens when the retry also fails: the exit status, whether the computed result is still printed, and whether state.json.tmp is removed or left in place. It also does not say what a later run does when it finds a state.json.tmp left by a crash, or whether a result is cached when compute exits non-zero (cache.sh:2 runs `compute "$1"` without checking its status).
+PROPOSAL: Define the outcome after the second rename fails (exit code, output, temp file cleanup), how a run treats a leftover state.json.tmp, and that a failed compute is not cached. Cover at least the failed compute case with a criterion.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: Design line 30: "Only one cache.sh runs at a time, guarded by flock." It does not name the lock file, and it does not say whether a second concurrent run waits, times out or exits, or with what status. If the lock is taken on state.json itself, the rename that replaces state.json breaks the lock: a waiting run then locks the old inode while a third run locks the new one. flock(1) is also not POSIX, and cache.sh is `#!/bin/sh` (cache.sh:1).
+PROPOSAL: Name a dedicated lock file that is separate from state.json and is never renamed. State whether contention blocks or fails and the resulting exit status, and name flock as a required dependency.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria (AC-01)
+EVIDENCE: Design line 30 keys entries by "input hash" but names neither the hash function nor what the input is: only `$1`, or `$1` plus the compute version. It also does not say where state.json lives (the working directory, the script directory or a state directory), and it gives no JSON tool for a sh script. Two implementers would write caches that disagree on keys and location, and AC-01's "reads its result from state.json" could refer to different files.
+PROPOSAL: Specify the key derivation (the hash tool and exactly what is hashed), the path of state.json (and state.json.tmp on the same filesystem), and the JSON tool the script depends on.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan (AC-01 row); Acceptance Criteria (AC-01)
+EVIDENCE: Test Plan line 40: "Run cache.sh twice with one input and see the second run skip the computation". It names no way to observe the skip, such as a stub `compute` that counts its calls, and no pass condition on output. AC-01 line 34 only requires that the second run "reads its result from state.json". It does not require the second run to print the same result as the first. An implementation that reads the file but prints nothing or a wrong value would pass both.
+PROPOSAL: Restate AC-01 as the end state: a second run with the same input prints the same result as the first without invoking compute. Make the proof a scripted check with a stub compute on PATH that records each call. The check passes when the call count is 1 after two runs and the outputs are byte-identical.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Design
+EVIDENCE: Open Questions line 48 says "None." while Design line 30 settles several trade-offs with no recorded owner answer: serialising all runs with flock instead of allowing concurrent readers, one JSON file instead of one file per key, retrying a failed rename exactly once, and leaving the cache with no bound because expiry is out of scope (line 26). The standard says "Every trade-off the document settles is an open question" and that "None." means every question has been answered.
+PROPOSAL: Raise these choices as open questions in the standard format with a recommendation each, or show where the owner answered them and fold the answers in.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary)
+EVIDENCE: Owner summary line 18 is one sentence: "Keep computed results across runs in state.json." It leaves out the single-run flock limit, the crash safety and retry behaviour, that expiry is out of scope so the file grows without bound, the upgrade and rollback behaviour, the validation state (nothing observed; the only proof is planned), and the decisions left to the owner. The standard asks the summary to cover scope, approach, defaults, trade-offs, validation state and owner decisions, and migration or recovery where it matters.
+PROPOSAL: Expand the summary to a few short paragraphs covering those points. Keep it consistent with Design and say plainly that no proof has run yet.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: Background line 22 cites cache.sh:1 for "recomputes every result on each run today", but cache.sh:1 is `#!/bin/sh`. The compute call is at cache.sh:2 (`compute "$1"`).
+PROPOSAL: Cite cache.sh:2.

@@ -1,0 +1,138 @@
+Subject: fixture: record R-1
+
+
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+index 55f5720..4d4b652 100644
+--- a/docs/specs/feature.md
++++ b/docs/specs/feature.md
+@@ -51,3 +51,27 @@ None.
+ 
+ | Date | Review | Kind | Commit | Model | Isolation | Outcome |
+ | --- | --- | --- | --- | --- | --- | --- |
++| 2026-11-14 | R-1 | spec | `0c49696` | fixture | procedural | Blocking findings. |
++
++### R-1
++
++FINDING: F-01
++KIND: factual
++SEVERITY: blocking
++WHERE: Design
++EVIDENCE: The endpoint's warm-up takes up to 8 seconds (probe.sh:2 calls it right after start), so a 5 second timeout fails healthy starts.
++PROPOSAL: Use a 10 second timeout in Design.
++
++FINDING: F-02
++KIND: factual
++SEVERITY: should-fix
++WHERE: Design
++EVIDENCE: The `--legacy` flag has exactly the behavior of no flag, so two implementers could keep or drop it.
++PROPOSAL: Remove the `--legacy` flag from Design, or document why it is kept.
++
++FINDING: F-03
++KIND: judgement
++SEVERITY: should-fix
++WHERE: Design
++EVIDENCE: Design does not say whether a timeout should exit 2, like other failures, or a distinct 3.
++PROPOSAL: Decide the exit status for a timeout.
+commit 07b67e48ec44570010d87b8bd72bdf61e3a41996
+Subject: docs(spec): ask the owner which exit status a timeout returns
+
+
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+index 4d4b652..e6116ae 100644
+--- a/docs/specs/feature.md
++++ b/docs/specs/feature.md
+@@ -45,7 +45,24 @@ None yet; written once the document is planned.
+ 
+ ## Open Questions
+ 
+-None.
++### Q1: Which exit status should probe.sh return when the health check times out?
++
++Raised by R-1 F-03. probe.sh ends with the curl call (probe.sh:2), so today it exits with curl's own
++status. With curl 8.15.0, a refused connection exits 7, an HTTP 503 under `-f` exits 22, and a call cut
++off by its time limit exits 28 (measured on 2026-11-14 against 127.0.0.1:1, a local server answering 503,
++and the unroutable 10.255.255.1 with a 1 second limit). No failure exits 2 today.
++
++**Recommendation:** C. It matches how every other failure already exits and needs no exit handling in
++probe.sh.
++
++| Option | You get | It costs |
++| --- | --- | --- |
++| **A. Exit 2, as Design says now** | Design, AC-01 and the Test Plan keep their current exit status | probe.sh must map curl's 28 to 2, a status no other failure uses |
++| **B. Exit 3, distinct from other failures** | A status reserved for timeouts | probe.sh must map 28 to 3; AC-01, the Test Plan row and Design change; callers can already tell 28 apart from 7 and 22 |
++| **C. Pass curl's 28 through** | No mapping code; a timeout reports like every other failure, with curl's status | AC-01, the Test Plan row and Design change to 28; the contract follows curl's numbering |
++
++**Why this is yours:** it sets the exit contract that callers of probe.sh depend on, and the document
++cannot derive it from the code.
+ 
+ ## Review Log
+ 
+commit 62a9ede6e9ac69d2ce3c7f5389c680a942e1f9ab
+Subject: docs(spec): apply R-1 with the owner's exit status answer
+
+
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+index e6116ae..947380b 100644
+--- a/docs/specs/feature.md
++++ b/docs/specs/feature.md
+@@ -15,7 +15,16 @@ probe.sh gives up on a slow health check after a fixed timeout.
+ 
+ ### Owner summary
+ 
+-Stop waiting for a slow health check after 5 seconds.
++probe.sh waits on the health endpoint with no time limit, so a hung endpoint hangs the probe. This
++change makes probe.sh give up after 10 seconds and exit 2. Other failures keep the status curl returns
++today. Retries stay out of scope.
++
++The limit is 10 seconds because R-1 F-01 reports an endpoint warm-up of up to 8 seconds; nothing in this
++repository shows that figure. You chose exit 2 for a timeout (former Q1). The design no longer has a
++`--legacy` flag, which would have behaved exactly like no flag.
++
++Validation is planned, not run: `tests/check-timeout.sh` checks that Design and AC-01 state the same
++limit, and a stub endpoint that sleeps 12 seconds must make probe.sh exit 2.
+ 
+ ### Background
+ 
+@@ -27,11 +36,14 @@ In scope: a timeout on the health check. Out of scope: retries.
+ 
+ ## Design
+ 
+-probe.sh passes `--max-time 5` to curl and exits 2 when the check times out. A `--legacy` flag also exists; it selects the same 5 second timeout and the same exit status as running without it.
++probe.sh passes `--max-time 10` to curl and exits 2 when the check times out. curl reports a timeout as
++status 28, so probe.sh maps 28 to 2; every other failure keeps curl's own status, as it does today
++(probe.sh:2). With curl 8.15.0 on 2026-11-14, a call cut off by its time limit exited 28, a refused
++connection 7 and an HTTP 503 under `-f` 22.
+ 
+ ## Acceptance Criteria
+ 
+-- [ ] AC-01: A health check that takes longer than 5 seconds makes probe.sh exit 2.
++- [ ] AC-01: A health check that takes longer than 10 seconds makes probe.sh exit 2.
+ 
+ ## Test Plan
+ 
+@@ -45,24 +57,7 @@ None yet; written once the document is planned.
+ 
+ ## Open Questions
+ 
+-### Q1: Which exit status should probe.sh return when the health check times out?
+-
+-Raised by R-1 F-03. probe.sh ends with the curl call (probe.sh:2), so today it exits with curl's own
+-status. With curl 8.15.0, a refused connection exits 7, an HTTP 503 under `-f` exits 22, and a call cut
+-off by its time limit exits 28 (measured on 2026-11-14 against 127.0.0.1:1, a local server answering 503,
+-and the unroutable 10.255.255.1 with a 1 second limit). No failure exits 2 today.
+-
+-**Recommendation:** C. It matches how every other failure already exits and needs no exit handling in
+-probe.sh.
+-
+-| Option | You get | It costs |
+-| --- | --- | --- |
+-| **A. Exit 2, as Design says now** | Design, AC-01 and the Test Plan keep their current exit status | probe.sh must map curl's 28 to 2, a status no other failure uses |
+-| **B. Exit 3, distinct from other failures** | A status reserved for timeouts | probe.sh must map 28 to 3; AC-01, the Test Plan row and Design change; callers can already tell 28 apart from 7 and 22 |
+-| **C. Pass curl's 28 through** | No mapping code; a timeout reports like every other failure, with curl's status | AC-01, the Test Plan row and Design change to 28; the contract follows curl's numbering |
+-
+-**Why this is yours:** it sets the exit contract that callers of probe.sh depend on, and the document
+-cannot derive it from the code.
++None.
+ 
+ ## Review Log
+ 

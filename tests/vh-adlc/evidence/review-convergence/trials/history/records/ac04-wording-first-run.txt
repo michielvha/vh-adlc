@@ -1,0 +1,7 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Review dispatch, convention page guides/humanize-prose.md at revision 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff
+EVIDENCE: The reviewer instructions say records must follow guides/humanize-prose.md at the resolved revision, and that a page that cannot be read gets one finding and the review stops. The binary's cache directory /home/m/.cache/vh-adlc/docs/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/ holds only conventions/feature-documents.md. Running find on that directory lists no guides/humanize-prose.md, and no local clone holds commit 1ccf8f3 (git cat-file -e across /home/m/code returned nothing). The page cannot be read, so no review of docs/specs/feature.md at 07c50888e1579c0ee431df5befce99f98b5d829c was done.
+PROPOSAL: Fill the cache for revision 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff with guides/humanize-prose.md, and any other pages the review needs, then dispatch the spec review again at the same commit.

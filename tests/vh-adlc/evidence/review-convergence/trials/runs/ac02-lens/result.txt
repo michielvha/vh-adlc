@@ -1,0 +1,50 @@
+=== turn 1
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design; Context (Owner summary)
+EVIDENCE: Design says "count.sh already parses a `--json` flag (count.sh:3)". At commit 86bbd04, count.sh:3 is `wc -l < "$1"` and the file has three lines. Nothing parses any flag. With `count.sh --json FILE`, `$1` is `--json`, so the script tries to read a file named `--json`. Design says the change "only formats the existing count", so an implementer who follows it would never add flag parsing, and AC-01 could not be met.
+PROPOSAL: Rewrite Design to state that count.sh parses no arguments today. Describe the parsing to add: `--json` before FILE, a missing FILE, and an unknown flag. Remove the false citation.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-02); Test Plan (AC-02 row)
+EVIDENCE: AC-02 reads "The output is formatted nicely." Its proof is "Read the output", which has no pass condition. The standard requires criteria to be observable end states and proofs to be "a scenario with a pass condition". "Nicely" could mean pretty-printed JSON across several lines, which contradicts the exact `{"lines": N}` in AC-01. It could also mean something else, so two implementers would build different output, and any output passes this proof.
+PROPOSAL: Replace AC-02 with an exact, observable format, for example one line of JSON followed by a newline with no surrounding whitespace, or fold it into AC-01. Give the proof an exact expected output.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope; Context (Owner summary); Acceptance Criteria; Test Plan
+EVIDENCE: Scope says the default output "stays text" and the Owner summary says "Text stays the default". No criterion or Test Plan row checks the output without `--json`, so an implementation that changes or breaks the default text output passes every listed proof.
+PROPOSAL: Add a criterion that `count.sh FILE` without `--json` prints the same output as at 86bbd04. Add a Test Plan row that compares that output on a fixture.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-01); Test Plan (AC-01 row)
+EVIDENCE: AC-01 says "a file of N lines". The current count comes from `wc -l`, which counts newline characters, so a file whose last line has no trailing newline reports N-1. Some `wc` implementations also pad the number with spaces. The proof uses only "a three-line fixture" and never defines it, so one implementer could pass the count through unchanged and another could correct it, and both would pass. The fixture file `fixture.txt` is not in the tree (`git ls-files` lists only AGENTS.md, count.sh and docs/specs/feature.md).
+PROPOSAL: State whether N means newline count, as `wc -l` gives it, or logical lines. State that N is a bare integer with no padding. Name the fixture's exact contents in the Test Plan row, including whether it ends with a newline.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope
+EVIDENCE: Declared lens `spelling`. Scope reads "Teh default output stays text." "Teh" is a misspelling of "The".
+PROPOSAL: Change "Teh" to "The".
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: Background says "its usage line is at count.sh:9". count.sh has three lines, and the usage comment `# usage: count.sh FILE` is at count.sh:2.
+PROPOSAL: Cite count.sh:2.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design; Acceptance Criteria
+EVIDENCE: The feature adds a user-facing flag, `--json`, and the output key `lines`. The standard says "User-facing terms the feature introduces or changes appear in a glossary row and are held to it by a criterion". The document has no glossary. The usage comment at count.sh:2 does not mention `--json`, and no criterion requires it to.
+PROPOSAL: Add a glossary row for `--json` and the `lines` key. Consider a criterion that the usage line documents the flag.

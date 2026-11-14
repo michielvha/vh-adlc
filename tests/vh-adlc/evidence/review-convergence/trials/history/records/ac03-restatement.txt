@@ -1,0 +1,42 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (docs/specs/feature.md:30); the same limit is also stated in Context > Owner summary (line 18), Scope (line 26), Acceptance Criteria AC-01 (line 34) and Test Plan row AC-01 (line 40); frontmatter goal (line 5) and the opening line (line 12) only say "a bounded number"
+EVIDENCE: Design line 30 says "tries again, at most 5 times, then exits 1". Owner summary line 18 says "at most 3 times", Scope line 26 says "at most 3 times", AC-01 line 34 says "tried at most 3 times" and the Test Plan row at line 40 says "called exactly 3 times". An implementer who follows Design builds a script whose stub curl is called more than 3 times, so it fails AC-01 and its proof.
+PROPOSAL: Choose one limit and state it the same way in Design, Owner summary, Scope, AC-01 and the Test Plan row, and make goal and line 12 name it or point to it.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context > Owner summary (line 18), Scope (line 26), Acceptance Criteria AC-01 (line 34), Test Plan row AC-01 (line 40), Design (line 30), frontmatter goal (line 5), opening line (line 12)
+EVIDENCE: The Owner summary ("retries a failed download at most 3 times") and Scope ("retrying a failed download at most 3 times") count retries, which means 1 first attempt plus up to 3 retries, so 4 curl calls. AC-01 ("tried at most 3 times") and the Test Plan ("called exactly 3 times") count total attempts, so 3 calls. Design ("tries again, at most 5 times") can be read either way. Two careful implementers would build 3 or 4 attempts, and the 4-attempt build fails the proof.
+PROPOSAL: Say in every location whether the number counts total attempts or retries after the first attempt, for example "at most 3 attempts in total (1 try and 2 retries)".
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-01 (line 34); Test Plan row AC-01 (line 40)
+EVIDENCE: AC-01 only sets an upper bound: "tried at most 3 times, then fetch.sh exits 1". The current fetch.sh:2 (`curl -fsS -o out "$1" || exit 1`) already calls curl once and exits 1 on failure, so it meets AC-01 as written with no change and the original problem, no retry at all, survives a ticked criterion. Only the Test Plan row says "exactly 3 times", so the criterion and its proof disagree.
+PROPOSAL: Restate AC-01 as the end state the feature delivers, for example "A download that keeps failing is attempted exactly N times, then fetch.sh exits 1", so that it matches the proof and fails on the unchanged script.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria; Test Plan
+EVIDENCE: The goal (line 5) is retrying failed downloads, and the point of retrying is that a transient failure can then succeed. No criterion or Test Plan row covers a download that fails once and then succeeds (fetch.sh should stop retrying and exit 0), or a download that succeeds on the first try (curl called once). A script that always runs every attempt, or that exits 1 even after a later attempt succeeds, passes the only proof given.
+PROPOSAL: Add a criterion and a Test Plan row where a stub curl fails once and then succeeds, with a pass condition of exactly 2 calls and exit 0, and one where the first call succeeds, with a pass condition of 1 call and exit 0.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (line 30); Acceptance Criteria; Test Plan
+EVIDENCE: Design says fetch.sh "waits two seconds and tries again", but no criterion or Test Plan row checks the wait, so an implementation with no wait or a different wait passes the proof. Design also does not say whether the wait comes after the final failure, which changes how long the failing case takes before exit 1.
+PROPOSAL: Either add the wait to a criterion with a proof that observes it (for example a stub sleep that records its arguments, with no sleep after the last attempt), or raise the wait as an Open Question and drop it from Design if it is not required.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (line 30)
+EVIDENCE: fetch.sh:2 writes to the file `out` with `curl -fsS -o out`. The design crosses a network boundary and writes state, but it does not say what happens to a partial or empty `out` left by a failed attempt, whether a retry overwrites it, or whether `out` is removed when fetch.sh gives up and exits 1. Two implementers could leave a partial `out` behind or delete it.
+PROPOSAL: State in Design what `out` contains after each outcome (success after retry, and final failure), and cover the final failure case in the AC-01 proof.

@@ -1,0 +1,37 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Scope; Owner summary
+EVIDENCE: Design says "cache.sh writes results to state.json as a new JSON object keyed by input hash" and Scope says "Out of scope: cache expiry." The key holds only the input hash. Nothing in the key identifies the version of cache.sh or of `compute` (cache.sh:2). The document never says what happens on upgrade or rollback. Say a new cache.sh or compute ships, or a user rolls back and then upgrades again over a state.json written earlier. The new run will serve results the old code computed, and with expiry out of scope nothing ever removes them. The document also does not say what a run does when it finds a state.json in an unknown or older layout. That covers a file that is not a JSON object or has a different shape.
+PROPOSAL: Define a format or code version in state.json, or put it in the key. State what a run does on a version mismatch or an unreadable file: discard and rebuild, or fail. Add a criterion and a Test Plan row covering a run after a version change.
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: Design leaves several paths open: "Only one cache.sh runs at a time, guarded by flock." "A write goes to state.json.tmp and is renamed." "A failed rename is retried once." It does not say whether a second concurrent run waits on the lock or exits, or which file is locked. It does not say whether the read of state.json happens under the lock. It does not say what happens when the retried rename also fails: does the run exit non-zero, or print the computed result without caching it? It does not say how a run treats a leftover state.json.tmp or a truncated or invalid state.json. It does not say where state.json lives: the working directory, beside the script, or another path. "A new JSON object" can be read as replacing the whole file each run, which drops earlier entries, or as adding a key to the existing object. Two careful implementers would build different behaviour on every one of these points.
+PROPOSAL: Name the state and lock file paths. State block or fail for a busy lock, and that a run reads and merges under the lock. State the outcome and exit status after a second failed rename, and the handling of a corrupt state.json or a stale .tmp file. Say that each write merges a new key into the existing object.
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-01); Test Plan (AC-01 row)
+EVIDENCE: AC-01 is the only criterion: "A second run with the same input reads its result from state.json." Its proof is "Run cache.sh twice with one input and see the second run skip the computation". The row does not say how the skip is observed, for example a stub compute that records its invocations. It has no pass condition that the second run outputs the same result as the first. So a run that skips compute and prints a wrong or empty value passes. The Design promises flock exclusion, atomic write by rename and a single retry, but no criterion or proof covers them. Every box can be ticked on an implementation with no lock and a direct non-atomic write to state.json, which would leave a corrupt cache after a crash.
+PROPOSAL: Make the AC-01 proof name a stub compute that counts calls. Its pass condition should be one call over two runs, with identical output both times. Add criteria and Test Plan rows for the concurrent-run behaviour, for an interrupted write leaving the last complete state.json, and for the failed-rename outcome.
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions
+EVIDENCE: Open Questions says "None.", and the standard says "None." means every question has been answered. The Review Log is empty, and the document records no owner answers. The Design and Scope still settle trade-offs the standard says must be raised as questions: serialising with flock instead of failing fast, retrying a rename exactly once, keying only by input hash, and leaving expiry out of scope, which lets the cache grow without bound and never invalidates.
+PROPOSAL: Raise each of these trade-offs as a Q entry with a recommendation and an options table, or fold in the owner's recorded answers.
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: The Owner summary is one sentence: "Keep computed results across runs in state.json." The standard asks the summary to cover scope, approach, defaults, trade-offs and validation state. This one omits the out-of-scope expiry and its consequence that cached results are never invalidated. It also omits the lock and atomic write approach, and it does not say that nothing has been proved yet.
+PROPOSAL: Expand the summary to state the key choice, that there is no expiry and what that means, the lock and atomic write approach, and that the only proof so far is a planned check.
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: Background cites "cache.sh recomputes every result on each run today (cache.sh:1)". Running `cat -n cache.sh` at 2c5463021c5e136eff53440b6aeae4e054e6d5a7 shows line 1 is `#!/bin/sh` and line 2 is `compute "$1"`.
+PROPOSAL: Cite cache.sh:2.

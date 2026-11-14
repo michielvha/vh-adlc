@@ -2,7 +2,7 @@
 
 GitHub offers free security settings that a repository has to switch on itself. Which of them a
 repository should have, by its visibility, is decided by
-[Repository security](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/conventions/repository-security.md)
+[Repository security](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/conventions/repository-security.md)
 at the plugin's docs pin; this page does not restate it. It covers how vh-adlc checks those settings
 and, when the consumer has opted in, turns them on. Maintenance sweeps and onboarding both use it.
 The plugin root is two directories above a skill's own directory.

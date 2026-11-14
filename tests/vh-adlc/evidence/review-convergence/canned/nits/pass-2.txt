@@ -1,0 +1,7 @@
+MODEL: scripted-reviewer
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Scope
+EVIDENCE: The out-of-scope sentence names extra arguments but not flags.
+PROPOSAL: Change "more than one argument" to "more than one argument or any flag" in Scope.

@@ -1,0 +1,42 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan (AC-01 row); Design
+EVIDENCE: Design gives `docs(readme): fix a link` as a correct subject, but the AC-01 proof pattern `^[a-z]+: .+$` rejects it. I ran printf 'docs(readme): fix a link\n' | grep -Eq '^[a-z]+: .+$' and it did not match. This row passed review: R-1 is clean at 2334454, and that commit already held the row's current text, because git diff 2334454 dd4fc97 only adds the Review Log row and subsection. A pattern that rejects a correct output is still blocking, because the proof would fail a correct implementation.
+PROPOSAL: Change the pattern to allow an optional parenthesised scope, for example `^[a-z]+(\([a-z0-9-]+\))?: .+$`, and add `docs(readme): fix a link` to the row's must-pass examples.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan (AC-01 row); Design
+EVIDENCE: Design calls `fix: handle empty input.` wrong because it ends with a period, but `^[a-z]+: .+$` matches it (observed with grep -E), and the must-fail list leaves it out. The finding only widens a free-text pattern row that has passed review (R-1 clean at 2334454 with the row's current text) so it catches more wrong output. That makes it a nit to list, not apply.
+PROPOSAL: List it in the report. If a later revision touches the row, end the pattern with `[^.]$` and add `fix: handle empty input.` as a must-fail example.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Test Plan (AC-01 row); Acceptance Criteria (AC-01); frontmatter goal
+EVIDENCE: Design says "A correct subject starts with a type, a colon and a space" but never says what counts as a type. The goal refers to "the team's format" without a definition or a citation. The proof accepts any lowercase word: printf 'banana: x\n' | grep -E '^[a-z]+: .+$' matches. One implementer could accept any lowercase word while another checks a fixed list such as feat, fix and docs. Both would pass the current proof.
+PROPOSAL: Define the allowed types in Design, either as an explicit list or as any lowercase word, and cite where the team's format comes from. Then make the AC-01 pattern and examples match that definition.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria (AC-01); Test Plan (AC-01 row)
+EVIDENCE: Design says "lint-msg.sh checks a commit subject" but never says how the script receives it (argument, stdin, or a commit message file as a commit-msg hook would pass), what it does with a multi-line message, or which exit status means accept or reject. The proof says "lint-msg.sh matches the subject against" a pattern. That describes the implementation; it is not a runnable check with an invocation and a pass condition. So AC-01's "accepts" and "rejects" cannot be observed in a defined way.
+PROPOSAL: State the interface in Design: the input source, that only the first line is checked, and exit 0 to accept and nonzero to reject. Rewrite the proof as a command that runs lint-msg.sh on each must-pass and must-fail example and checks its exit status.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary); Scope; Design
+EVIDENCE: The whole Owner summary is "Check commit subjects before a push." Scope and Design never mention a push or a hook, so "before a push" is unsupported, and it could lead an implementer to add a pre-push hook that is not in scope. The summary also leaves out the scope limit (subject only, body out of scope), the approach and the validation state. Nothing is implemented, no proof has been observed, and the document is unaccepted (gate planned fails on accepted).
+PROPOSAL: Rewrite the Owner summary to match Scope and Design: what the script checks, that the body is out of scope, when it runs if that is decided, and that nothing has been built or proven yet. Otherwise, add the push integration to Scope and Design.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: The claim "lint-msg.sh accepts every subject today (lint-msg.sh:1)" is true, but line 1 of lint-msg.sh is `#!/bin/sh`. The statement that makes it true, `exit 0`, is on line 2.
+PROPOSAL: Cite lint-msg.sh:2.

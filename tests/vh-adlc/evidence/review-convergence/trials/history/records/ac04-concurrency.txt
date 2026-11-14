@@ -1,0 +1,49 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design; Context > Background; frontmatter goal; title paragraph ("Every run of build.sh adds one to a shared counter file.")
+EVIDENCE: Background says "Several build.sh runs start in parallel from CI on the same host". Design says "build.sh reads counter.txt, adds one and writes it back" through "counter.txt.tmp" renamed over counter.txt, with no lock. Two parallel runs can both read 4 and both write 5, so one build is lost. Both runs also write the same fixed name counter.txt.tmp, so one run can rename the other's partial or overwritten file, or find its tmp already renamed away (ENOENT); the single retry then fails too. The rename makes each write atomic but does not make the read, add, write sequence atomic. A build.sh built exactly as designed breaks the goal "Every run of build.sh adds one" in the parallel case the document itself describes.
+PROPOSAL: Define how concurrent runs serialise the whole read, increment and write: for example an exclusive flock on a lock file held across it, or a per-process unique tmp name plus a lock. Then state what a run does when it cannot get the lock in time.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-01; Test Plan row AC-01
+EVIDENCE: AC-01 reads "After a run, counter.txt holds the previous value plus one." The only proof is "Run build.sh once on counter.txt holding 4 and read 5". With parallel runs, "the previous value" is ambiguous. A racy implementation with lost updates passes both the criterion and the proof, so every box can be ticked while the problem stated in Background survives.
+PROPOSAL: Add a criterion that N concurrent runs starting from value V leave counter.txt at exactly V+N with no counter.txt.tmp left behind. Add a Test Plan row for it that starts, say, 20 runs in parallel from 4 and reads 24, repeated enough times to expose the race.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (upgrade and rollback sentence)
+EVIDENCE: Design says "counter.txt holds a single integer, the format the previous version also wrote, so an upgrade reads the old file unchanged". At 5a7d170, build.sh is only "#!/bin/sh" and "make" (build.sh:1-2). It writes no counter, and `git ls-files` shows no counter.txt in the tree. The previous version wrote no file, so the first run after the upgrade finds no counter.txt, and the document never says what happens then.
+PROPOSAL: Remove the claim about a previous format. State the first-run behaviour: a missing counter.txt is treated as 0, or the run fails. State rollback honestly: the old build.sh ignores counter.txt, so runs made after a rollback are not counted.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Scope
+EVIDENCE: Design leaves these partial failure paths undefined. It does not say whether a run whose retried rename still fails exits non-zero, keeps building or silently drops the count. It does not say what happens to a stale counter.txt.tmp left by a failed or killed run. It does not say what happens when counter.txt holds something other than an integer. It does not say whether the count happens before or after `make` (build.sh:2), or whether a failed make, or a CI retry of a failed job, still counts as a run. Two careful implementers would choose differently on each of these.
+PROPOSAL: Specify each path in Design: exit status and message when the rename retry fails, cleanup of a stale tmp, handling of a corrupt counter, and where the increment sits relative to make and its exit status. Add a criterion and Test Plan row for each path that changes observable behaviour.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Design
+EVIDENCE: Open Questions says "None." and the Review Log holds no answered decisions. Design settles several trade-offs on its own: write to a temp file and rename, retry the rename exactly once, keep a plain single-integer format, and use no locking. The standard says "Every trade-off the document settles is an open question" and "'None.' means every question has been answered, not that none was asked."
+PROPOSAL: Raise the concurrency mechanism (lock file versus append-only log counted on read) and the failure policy (fail the build or warn and continue when the count cannot be written) as owner questions in the standard format. Fold the answers into Design.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Background
+EVIDENCE: "Several build.sh runs start in parallel from CI on the same host (build.sh:1)". build.sh:1 is "#!/bin/sh", and the tree at 5a7d170 holds only AGENTS.md, build.sh and the document. It has no CI configuration, so nothing in it shows parallel runs.
+PROPOSAL: Cite the CI configuration or an observed run log that shows parallel runs on one host, or mark the claim as an owner-supplied fact.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Context > Owner summary
+EVIDENCE: The whole Owner summary is "Count builds across all runs in counter.txt." It leaves out the parallel runs the design has to survive, the temp file and rename approach, the rename retry, the behaviour on failure and on first run, and the validation state. It does not say that the single-run proof is planned and that nothing has been observed. The standard asks it to cover these points and to keep planned checks apart from observed proof.
+PROPOSAL: Expand the summary to cover the problem, the parallel runs, the approach and its defaults, the failure behaviour, and that no proof has run yet. Keep it consistent with Design once F-01 to F-05 are resolved.
