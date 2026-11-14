@@ -54,6 +54,22 @@ describe("CI reporting", () => {
   test("without a declared policy the report follows the pushed commit's runs", () => {
     expect(ciReport(loadLoopSettings(repository("schema_version: 1\n"), { overridePath: null }))).toEqual({ state: "follow runs", reason: "automatic CI", dispatch: false });
   });
+  test("a private repository on automatic CI gets a warning, never a block", () => {
+    const automatic = loadLoopSettings(repository("schema_version: 1\n"), { overridePath: null });
+    for (const visibility of ["private", "internal"] as const) {
+      const report = ciReport(automatic, visibility);
+      expect(report.state).toBe("follow runs");
+      expect(report.warning).toContain("ci_trigger: manual");
+    }
+  });
+  test("a public, unknown or manual repository gets no warning", () => {
+    const automatic = loadLoopSettings(repository("schema_version: 1\n"), { overridePath: null });
+    const manual = loadLoopSettings(repository(base()), { overridePath: null });
+    expect(ciReport(automatic, "public").warning).toBeUndefined();
+    expect(ciReport(automatic, "unknown").warning).toBeUndefined();
+    expect(ciReport(automatic).warning).toBeUndefined();
+    expect(ciReport(manual, "private").warning).toBeUndefined();
+  });
 });
 
 describe("the skip marker", () => {
