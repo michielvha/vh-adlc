@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, readFileSync, realpathSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
-import { loadSettings, ownership, sourcePath } from "../../../plugins/vh-adlc/scripts/triage/settings";
+import { effectiveLabels, loadSettings, ownership, sourcePath } from "../../../plugins/vh-adlc/scripts/triage/settings";
 import { fixture, git } from "./fixtures";
 import { blockYAML } from "../settings-yaml";
 
@@ -175,4 +175,33 @@ test("a relative source spelling resolves to the same canonical source", () => {
   const f = project(); f.settings({ schema_version: 1, source_roots: ["./src"] });
   const config = loadSettings(f.root);
   expect(sourcePath(config, "src/app.ts")).toBe(true);
+});
+
+// label_map: a standard label mapped to a repository's own name (references/issues.md).
+test("label_map resolves effective names and ignores entries keyed by non-standard names", () => {
+  const f = project();
+  f.settings({ schema_version: 1, label_map: { bug: "defect", "major-upgrade": "major-upgrade", custom: "ready" } });
+  const names = Object.fromEntries(effectiveLabels(loadSettings(f.root)).map((label) => [label.standard, label.name]));
+  expect(names).toEqual({ bug: "defect", enhancement: "enhancement", documentation: "documentation", refactor: "refactor",
+    security: "security", ready: "ready", blocked: "blocked", partial: "partial", "needs-decision": "needs-decision" });
+});
+
+test("label_map refuses two standard labels sharing one effective name, case-insensitively", () => {
+  for (const label_map of [{ ready: "blocked" }, { bug: "Enhancement" }, { bug: "triage", enhancement: "TRIAGE" }]) {
+    const f = project();
+    f.settings({ schema_version: 1, label_map });
+    expect(() => loadSettings(f.root)).toThrow("invalid triage settings: label_map maps two standard labels to one repository label");
+  }
+});
+
+test("a copy of Stackweaver's triage settings still reads, with identity label names", () => {
+  const f = project();
+  for (const path of ["docs/internal/codebase-audit-2026-06-analysis.md", "docs/internal/tfe-compatibility/index.md",
+    "docs/internal/plans/features/RBAC_MASTER_PLAN.md", "distribution/.keep"]) f.write(path, "# Source\n");
+  git(f.root, "add", "docs", "distribution"); git(f.root, "commit", "-qm", "test: seed Stackweaver-shaped sources");
+  const copy = readFileSync(join(import.meta.dir, "stackweaver-triage.yaml"), "utf8").replace("repository: michielvha/stackweaver", "repository: example/project");
+  f.write(".vh-adlc/triage.yaml", copy);
+  const config = loadSettings(f.root);
+  expect(config.label_map["major-upgrade"]).toBe("major-upgrade");
+  expect(effectiveLabels(config).every((label) => label.name === label.standard)).toBe(true);
 });

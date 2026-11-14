@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "plan_digest": "2c509a0eda636105ada531159790052ee25c38d67655a13cb709f14fbe9f9a73",
+  "repository": "michielvha/stackweaver",
+  "actor": "michielvha",
+  "outcomes": [
+    {
+      "action": "update",
+      "name": "refactor",
+      "status": "succeeded"
+    },
+    {
+      "action": "update",
+      "name": "security",
+      "status": "succeeded"
+    },
+    {
+      "action": "update",
+      "name": "blocked",
+      "status": "succeeded"
+    },
+    {
+      "action": "update",
+      "name": "partial",
+      "status": "succeeded"
+    },
+    {
+      "action": "update",
+      "name": "needs-decision",
+      "status": "succeeded"
+    }
+  ],
+  "complete": true,
+  "remaining": []
+}
