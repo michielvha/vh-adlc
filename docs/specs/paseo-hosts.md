@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Implemented and reviewed (R-45); AC-12 waits for the merge, tracked in issue #77."
+status_description: "Implemented and reviewed (R-46); AC-12 waits for the merge, tracked in issue #77."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 branch: feat/paseo-hosts
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
@@ -236,42 +236,42 @@ Both catalogs point at `./plugins/paseo-hosts` on the default branch, as they do
 ## Acceptance Criteria
 
 - [x] AC-01: After `paseo-hosts onboard <alias>` on a server that meets the prerequisites, the server runs the pinned Paseo daemon as an enabled `paseo.service` user unit on loopback with the relay off, no Tailscale Serve route points at the daemon port, the server's Paseo config holds a bcrypt hash and no plaintext password, and the plaintext password is absent from the server and its only file on the operator host is in `PASEO_HOSTS_DIR` with mode 600.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-02: `onboard` succeeds only when a connection without a password is rejected and the stored password is accepted over the server's `PASEO_URL`. With `--publish`, the server also has exactly one tailnet-only HTTPS route to the daemon and its health endpoint answers.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-03: Running `onboard` again on an onboarded server, including one whose registry the local tool wrote with port 6867, keeps its password, daemon port, `PASEO_CLIENTS`, `PASEO_CLIENT_HOST` and `PASEO_CLIENT_PORT`, leaves one unit and at most one route, and passes verification. A `--listen-port` that differs from the recorded port exits 2 and changes nothing.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-04: After `paseo-hosts link <alias>` with a macOS or a Windows client, the client's dedicated key opens a tunnel to the daemon port on the server, and the same key is refused a shell command, a forward to any other port and every TCP remote forward when the server user cannot bind port 1. The client trusts the server's host key under `PASEO_CLIENT_HOST` and `PASEO_CLIENT_PORT`. Running `link` again leaves one `authorized_keys` line for the key and one alias block on the client.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-05: After `link`, the Paseo desktop app on the client lists the server under its alias with a Remote SSH connection and the stored password, keeps every host it listed before, runs without a debugging port in the user's session, and has opened its SSH tunnel to the server, also when the app installs a downloaded update as it quits and the install ends within 2 minutes, when each debug launch answers within three attempts, and when its window stops answering or the app exits by itself after a reload at most twice, as long as each forward opens and the quit in step 5 completes gracefully within 20 seconds. When that quit is a force-stop, `link` succeeds only if the app's tunnel appears, and otherwise exits 1 saying the app may not have saved the change.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-06: When the app does not keep a change from `link`, `unlink` or `remove`, its window stops answering or the app exits by itself after a reload at most twice in that command, it deletes the restored list at most once, any update it installs on a quit ends within 2 minutes, each debug launch answers within three attempts, each forward opens and each quit the CLI makes of an app instance it wrote to since that instance launched completes gracefully within 20 seconds, the command exits non-zero, and after the relaunch that ends the command the app lists exactly the hosts it listed before and runs without a debugging port. AC-16 covers the paths beyond those bounds.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-07: After `paseo-hosts remove <alias>`, no client it unlinked lists the server in its app or has its alias block, the server's `authorized_keys` has no line that permits only the daemon port with `command="/bin/false"`, `paseo.service` no longer exists, nothing listens on the daemon port, no Serve route points at it, `~/.local/share/paseo/runtime` and `state/config.json` are gone, the registry files and password are gone, and no app backup in `PASEO_HOSTS_DIR` holds the server's entry. The rest of the server's Paseo state and workspace remain unless `--purge` was given. When the server has a tunnel-only key line that belongs to no client `remove` will unlink, `remove` without a `--client` for it or `--no-clients` exits 3 and changes nothing. `unlink` removes only that client's entry, block and key line; `unlink --server-only` removes that client's key line and registry record without contacting it, after which `remove` completes; for a recorded client with no key line it drops the client, and for an unrecorded client whose key line has no `paseo-hosts:<client>` comment it exits 1 and changes nothing. With the server unreachable, `remove --skip-server` removes the app entry and alias block of every recorded client it can reach, drops and reports any client it cannot reach, which keeps its entry and block, and deletes the registry files, and with no client recorded or named it exits 3 unless `--no-clients` is given. Other servers and hosts in the apps are unchanged.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-08: The plugin works from an operator host whose settings come only from the variables in Design: with a fresh `PASEO_HOSTS_DIR` and `PASEO_HOSTS_CLIENT` set, every SSH command targets the given server and client aliases, and `link` without a client alias exits 3 naming `PASEO_HOSTS_CLIENT`. The plugin's files contain no host, user or tailnet name.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-09: Registry files written by the local tool, including one without `PASEO_PUBLISHED` or `PASEO_CLIENTS`, work unchanged with `verify`, `status`, `list`, `link`, `unlink` and `remove`. `status <alias>` prints every field listed under link, in human output and under those keys in `--json`. A registry line that is not `KEY=value` is rejected without being executed.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-10: No plaintext password appears in a process argument list, in a log record or in the output of any command other than `password`.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-11: Human output meets `conventions/terminal-output.md`: labelled status lines on standard error, no colour when `NO_COLOR` is non-empty or the stream is not a terminal, and ASCII words with `--plain`. With `--json`, standard output holds only one JSON object per command, `--help` included, with the documented fields, and the exit code matches the documented meaning.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [ ] AC-12: The plugin installs from the vhco-tools marketplace in Codex and Claude, and in a new session a request to add a Paseo server leads the agent to the skill, which runs `onboard` and `link` and reports the result without showing the password.
-      Evidence: R-45 returned `not verified` at `1217897`: it can be checked only after the merge.
+      Evidence: R-46 returned `not verified` at `51feaf4`: it can be checked only after the merge.
       Residual: https://github.com/michielvha/vh-adlc/issues/77
 - [x] AC-13: The README, the skill and the CLI help use the terms in Design with those meanings, and the plugin's marketplace row describes it in the same terms.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-14: The wrapper in an installed copy of the plugin, outside the repository, builds and runs `paseo-hosts --help` starting from an empty Go module cache, fetching its dependencies through the module proxy and verifying them against `go.sum`.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-15: `link --no-app` sets up the key, host key and alias block as `link` does, records the client, changes neither the desktop app nor the clipboard and prints no password; a later `link` without `--no-app` adds the app entry, and `unlink` of a client without the app removes its block and key line.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-16: When `link`, `unlink` or `remove` rolls back a change the app did not keep and cannot confirm the app's previous host list, or, after a lost window and before it knows whether the app kept the change, loses the window a third time, cannot debug-launch the app or open its forward, or gives up on an installer, it exits 1 and names a copy of the app backup, `PASEO_HOSTS_DIR/app-registry-<client>.<UTC time>.backup.json`, which holds the host list the app had before the command; later commands change it only by deleting the entry of a server they unlink or remove. When the app had no host list, the message says so and no copy is written.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-17: When an app update installer still runs 2 minutes after `link`, `unlink` or `remove` quits the app, the command exits 1, leaves the app stopped and says to run it again once the update has installed; during a rollback, the message is one of the two step 5 gives, with this reason added, and after a window lost in step 4 it names the kept copy AC-16 describes.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 - [x] AC-18: A Windows client runs each snippet the CLI sends, also when the script reaches it seconds after the SSH session starts, and a snippet's warning writes nothing to standard error. Every SSH call to a desktop client that has not finished by its deadline, twice its snippet's own longest wait plus 30 seconds, ends with its `ssh` process killed and an error that names the step and says it timed out. A debug launch counts such a call as a failed attempt; any other such call fails the command as a failed snippet at that point does, so `link`, `unlink` and `remove` never wait on a hung client call past its deadline.
-      Evidence: R-45 returned `met` at `1217897`; see its record for what it observed.
+      Evidence: R-46 returned `met` at `51feaf4`; see its record for what it observed.
 
 ## Test Plan
 
@@ -462,6 +462,7 @@ None.
 | 2026-11-14 | R-44 | spec | `b0916807a30ca6884847d9b7f682f13fd8203a76` | unknown | procedural | No blocking finding: one should-fix factual finding (AC-18 does not repeat the Design's exception for the debugging-port forward) and four factual nits (a `uname -s` timeout case, the macOS worst-case sum, the owner summary, a CI line citation); model identity not attested. |
 | 2026-11-14 | R-44 | spec | `b0916807a30ca6884847d9b7f682f13fd8203a76` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-45 | implementation | `121789787beb93369f4d46a26de6a66eaacf8c36` | unknown | procedural | AC-01 to AC-11 and AC-13 to AC-18 met, AC-12 not verified until the merge (issue #77), with one should-fix finding to restore its residual line; model identity not attested. |
+| 2026-11-14 | R-46 | implementation | `51feaf4fdc1a87e55a7c7f3cbd326d144616fafe` | unknown | procedural | After the test-only CI fix: AC-01 to AC-11 and AC-13 to AC-18 met, AC-12 not verified until the merge (issue #77); model identity not attested. |
 
 ### R-1
 
@@ -2257,6 +2258,116 @@ SEVERITY: should-fix
 WHERE: docs/specs/paseo-hosts.md, Acceptance Criteria, AC-12 (line 249)
 EVIDENCE: AC-12 can be checked only after the merge, so this review records it as not verified. Issue #77 is OPEN and tracks it. The Owner summary and the R-22 log row say it is tracked as issue #77. However, line 249 has no `Residual:` line, because the normative revision reset it. `vh-adlc gate complete docs/specs/paseo-hosts.md --repo /home/m/code/vh-adlc-paseo-hosts-spec --plugin-pin 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff` lists AC-12 among the criteria "not ticked with evidence or residualised". R-41's F-02 raised the same gap.
 PROPOSAL: Once the owner confirms it, add `Residual: https://github.com/michielvha/vh-adlc/issues/77` under AC-12, so the gate can accept it as not verified.
+
+### R-46
+
+CRITERION: AC-01 After `paseo-hosts onboard <alias>` on a server that meets the prerequisites, the server runs the pinned Paseo daemon as an enabled `paseo.service` user unit on loopback with the relay off, no Tailscale Serve route points at the daemon port, the server's Paseo config holds a bcrypt hash and no plaintext password, and the plaintext password is absent from the server and its only file on the operator host is in `PASEO_HOSTS_DIR` with mode 600.
+VERDICT: met
+EVIDENCE: At 51feaf4 I checked `git diff 1217897..51feaf4` myself: only clientapp_test.go, link_test.go, remove_test.go and the document changed, and the production code is identical. In plugins/paseo-hosts, `go test -race -count=1 ./...` passed all 12 packages, internal/onboard included, and the JSON run had 134 passes and 1 env-gated skip. CI run 43593508137 for 51feaf4 passed the paseo-hosts job. Live manual step 1 used a release build made with the wrapper flags, after my own `remove arch-1`. `onboard arch-1` exited 0. The unit is enabled and active, exactly 1 unit exists, and only 127.0.0.1:6767 listens. config.json has listen 127.0.0.1:6767, relay false, a $2b$ hash and no plaintext. There are 0 Serve lines for 6767. I fed the password over stdin to grep on arch-1: 0 hits under ~/.local/share/paseo, ~/.config, ~/.ssh, ~/.bash_history, the systemd unit dirs, the journal for the last 15 minutes and ps. On the operator host, arch-1.password and arch-1.env are mode 600, and no other file under ~/.config, ~/.local/state, ~/.cache/paseo-hosts* or ~/.bash_history held it.
+
+CRITERION: AC-02 `onboard` succeeds only when a connection without a password is rejected and the stored password is accepted over the server's `PASEO_URL`. With `--publish`, the server also has exactly one tailnet-only HTTPS route to the daemon and its health endpoint answers.
+VERDICT: met
+EVIDENCE: The internal/onboard tests passed in the race run at 51feaf4, including the case where a stand-in daemon accepts a password-less connection. Live step 3: `onboard arch-1 --publish` exited 0 and set PASEO_PUBLISHED=yes. Serve had exactly 1 route for the daemon, https on 8956, tailnet only, proxying to 127.0.0.1:6767. curl on /api/health returned 200, and `verify arch-1` exited 0, including HTTPS health.
+
+CRITERION: AC-03 Running `onboard` again on an onboarded server, including one whose registry the local tool wrote with port 6867, keeps its password, daemon port, `PASEO_CLIENTS`, `PASEO_CLIENT_HOST` and `PASEO_CLIENT_PORT`, leaves one unit and at most one route, and passes verification. A `--listen-port` that differs from the recorded port exits 2 and changes nothing.
+VERDICT: met
+EVIDENCE: The internal/onboard tests passed at 51feaf4, including the re-run on a local-tool registry at 6867. Live step 2: a repeated `onboard arch-1` exited 0, and the sha256 of arch-1.password and arch-1.env was unchanged. `onboard arch-1 --listen-port 6868` exited 2 with "already runs on port 6767; linked clients name that port, so --listen-port 6868 is refused". Both shas and the unit's ActiveEnterTimestamp were unchanged. After the publish, a plain `onboard` exited 0, removed the 8956 route (0 Serve lines for 6767) and kept the password. At the end, arch-1.env's non-secret lines matched my copy from before the review, including PASEO_CLIENTS=macbook-pro,win-main.
+
+CRITERION: AC-04 After `paseo-hosts link <alias>` with a macOS or a Windows client, the client's dedicated key opens a tunnel to the daemon port on the server, and the same key is refused a shell command, a forward to any other port and every TCP remote forward when the server user cannot bind port 1. The client trusts the server's host key under `PASEO_CLIENT_HOST` and `PASEO_CLIENT_PORT`. Running `link` again leaves one `authorized_keys` line for the key and one alias block on the client.
+VERDICT: met
+EVIDENCE: The internal/link tests passed at 51feaf4, and the sshd and pwsh cases ran rather than skipped. On arch-1, ip_unprivileged_port_start is 1024 and the user is sysadmin. Results with the key, through alias paseo-arch-1:
+- Mac (step 4): a shell command returned rc 1. `-W 127.0.0.1:22` failed with "administratively prohibited". `-W 127.0.0.1:6767` got HTTP/1.1 200. `-R 127.0.0.1:47123:127.0.0.1:6767` failed with "remote port forwarding failed", and arch-1 had 0 listeners on 47123.
+- win-main (step 6): the same refusals for a shell command, `-W 22` and `-R 47123`. An `-L` forward to 6767 returned health 200.
+
+Each client has 1 known_hosts entry, and its block has StrictHostKeyChecking yes and IdentitiesOnly yes. The key line is `restrict,port-forwarding,permitopen="127.0.0.1:6767",permitlisten="127.0.0.1:1",command="/bin/false"`. After 6 links of the Mac and 6 of win-main, arch-1 has exactly 2 paseo-hosts lines (macbook-pro, win-main) and each client has 1 block.
+
+CRITERION: AC-05 After `link`, the Paseo desktop app on the client lists the server under its alias with a Remote SSH connection and the stored password, keeps every host it listed before, runs without a debugging port in the user's session, and has opened its SSH tunnel to the server, also when the app installs a downloaded update as it quits and the install ends within 2 minutes, when each debug launch answers within three attempts, and when its window stops answering or the app exits by itself after a reload at most twice, as long as each forward opens and the quit in step 5 completes gracefully within 20 seconds. When that quit is a force-stop, `link` succeeds only if the app's tunnel appears, and otherwise exits 1 saying the app may not have saved the change.
+VERDICT: met
+EVIDENCE: The clientapp tests (race and paseotest) passed at 51feaf4.
+
+Steps 4 and 6, after each link, by parsing localStorage read-only:
+- Mac: fedora-43 kept, arch-1 added as ssh:paseo-arch-1, 0 debugging-port processes and a tunnel process.
+- win-main: win-main and fedora-43 kept, arch-1 added. The app runs in session 1 with its window on the desktop. There is a paseo-arch-1 tunnel and no DevTools port (the only other listener answered 401).
+
+Step 9:
+- Mac stand-in, 60 s, args containing sh.paseo.desktop.ShipIt: the main process exited at 12:41:41.9 with the stand-in still running, the stand-in ended at 12:42:37.7 and the next start was at 12:42:38.1. `link` exited 0 after a lost window and one failed debug-launch attempt. Pid 67465 was still running without a debugging port 70 s after `link` exited.
+- Mac stand-in that ran `open -a Paseo` as it ended: `link` exited 0 ("started again before its debug launch", then a lost window), and the app ended without a debugging port.
+- win-main stand-in, ph-standin.exe under @getpaseodesktop-updater: the main process exited at 12:47:28.4 with the stand-in running, the stand-in ended at 12:48:19.7, the next start was at 12:48:22.2, and `link` exited 0. The app was still running in session 1 without a debugging port 68 s later.
+
+The debug logs show installer sh.paseo.desktop.ShipIt (CFBundleIdentifier sh.paseo.desktop) and @getpaseodesktop-updater (updaterCacheDirName '@getpaseodesktop-updater'), both with installer_source file. The Windows quit was KILL, and `link` succeeded because the tunnel appeared. Pending updates: the Mac has Paseo-0.15.4-arm64.zip and Windows has Paseo-Setup-0.15.4-x64.exe, the same version as installed.
+
+CRITERION: AC-06 When the app does not keep a change from `link`, `unlink` or `remove`, its window stops answering or the app exits by itself after a reload at most twice in that command, it deletes the restored list at most once, any update it installs on a quit ends within 2 minutes, each debug launch answers within three attempts, each forward opens and each quit the CLI makes of an app instance it wrote to since that instance launched completes gracefully within 20 seconds, the command exits non-zero, and after the relaunch that ends the command the app lists exactly the hosts it listed before and runs without a debugging port. AC-16 covers the paths beyond those bounds.
+VERDICT: met
+EVIDENCE: The paseotest clientapp race run passed at 51feaf4, covering the rejection, the lost window, the deleted restore and the unlink rejection. Live step 5 used a paseotest build with PASEO_HOSTS_TEST_REJECT_ENTRY=1, 3 runs on each desktop. Each run exited 1 with "did not keep the change; its previous host list is restored", with 0 "timed out" lines and 0 password hits. I parsed read-only 90 s after each run:
+- Mac: fedora-43 and arch-1 at seq 2474, 2490 and 2507.
+- win-main: win-main, fedora-43 and arch-1 at seq 1082, 1093 and 1104.
+
+Each time, the tunnels were back with new pids, there were 0 debugging-port processes and 0 kept copies.
+
+CRITERION: AC-07 After `paseo-hosts remove <alias>`, no client it unlinked lists the server in its app or has its alias block, the server's `authorized_keys` has no line that permits only the daemon port with `command="/bin/false"`, `paseo.service` no longer exists, nothing listens on the daemon port, no Serve route points at it, `~/.local/share/paseo/runtime` and `state/config.json` are gone, the registry files and password are gone, and no app backup in `PASEO_HOSTS_DIR` holds the server's entry. The rest of the server's Paseo state and workspace remain unless `--purge` was given. When the server has a tunnel-only key line that belongs to no client `remove` will unlink, `remove` without a `--client` for it or `--no-clients` exits 3 and changes nothing. `unlink` removes only that client's entry, block and key line; `unlink --server-only` removes that client's key line and registry record without contacting it, after which `remove` completes; for a recorded client with no key line it drops the client, and for an unrecorded client whose key line has no `paseo-hosts:<client>` comment it exits 1 and changes nothing. With the server unreachable, `remove --skip-server` removes the app entry and alias block of every recorded client it can reach, drops and reports any client it cannot reach, which keeps its entry and block, and deletes the registry files, and with no client recorded or named it exits 3 unless `--no-clients` is given. Other servers and hosts in the apps are unchanged.
+VERDICT: met
+EVIDENCE: The internal/remove and internal/link tests passed at 51feaf4, covering the exit 3 cases, --server-only, --skip-server and the unrecorded client. Live step 7:
+- `unlink arch-1 --client win-main` exited 0. The PC listed win-main and fedora-43 with no block, and its fedora-43 tunnel stayed. arch-1 kept only the paseo-hosts:macbook-pro line, and PASEO_CLIENTS became macbook-pro.
+- `remove arch-1` exited 0. The Mac listed only fedora-43, with no block and no tunnel.
+- On arch-1 after the remove: paseo.service was not found, nothing listened on 6767, there were 0 Serve lines for 6767 (the 67 other lines were unchanged) and 0 /bin/false lines. runtime and config.json were gone, while 14 state entries and the workspace remained.
+- On the operator host, arch-1.env and arch-1.password were gone, and all 3 backups had 0 matches for the serverId or paseo-arch-1.
+
+CRITERION: AC-08 The plugin works from an operator host whose settings come only from the variables in Design: with a fresh `PASEO_HOSTS_DIR` and `PASEO_HOSTS_CLIENT` set, every SSH command targets the given server and client aliases, and `link` without a client alias exits 3 naming `PASEO_HOSTS_CLIENT`. The plugin's files contain no host, user or tailnet name.
+VERDICT: met
+EVIDENCE: The testenv and cmd tests passed at 51feaf4. Live, `link arch-1` with PASEO_HOSTS_CLIENT unset exited 3 with "no client alias: pass --client or set PASEO_HOSTS_CLIENT". In every live debug log, the ssh aliases were only the given server and client. TestNoForbiddenNames passed with the operator host, the user, home paths, the tailnet name, arch-1, sysadmin, macbook-pro, win-main, mike and the 3 tailnet IPs. git grep found none of them in plugins/paseo-hosts or tests/paseo-hosts. "michielvh" appears only as the module and GitHub owner path.
+
+CRITERION: AC-09 Registry files written by the local tool, including one without `PASEO_PUBLISHED` or `PASEO_CLIENTS`, work unchanged with `verify`, `status`, `list`, `link`, `unlink` and `remove`. `status <alias>` prints every field listed under link, in human output and under those keys in `--json`. A registry line that is not `KEY=value` is rejected without being executed.
+VERDICT: met
+EVIDENCE: The internal/registry tests passed at 51feaf4, including the rejection of a non KEY=value line without execution. Live, fedora-43.env (local-tool, no PASEO_CLIENTS, CLIENT_HOST or CLIENT_PORT) worked with `status fedora-43 --json` (clients [], exposure tailnet), `verify fedora-43` (rc 0, HTTPS included) and `list`/`list --json`. `status arch-1` printed alias, ssh, exposure, daemon port, url, the client macbook-pro with its Remote SSH ssh://paseo-arch-1?daemonPort=6767, and agents. `--json` used the keys alias, ssh, exposure, daemon_port, url, clients[name, remote_ssh] and agents.
+
+CRITERION: AC-10 No plaintext password appears in a process argument list, in a log record or in the output of any command other than `password`.
+VERDICT: met
+EVIDENCE: The tests that assert the password is absent from every stream passed at 51feaf4. In every live run (onboard, publish, link, unlink, remove, 6 rollbacks and 4 step 9 links), the stdout and the debug-level stderr had 0 matches against every password file, old and new. A ps sampler on the operator host took 225 samples during the win-main link with 0 hits. On arch-1, ps, the journal for the last 15 minutes and the unit file had 0 hits.
+
+CRITERION: AC-11 Human output meets `conventions/terminal-output.md`: labelled status lines on standard error, no colour when `NO_COLOR` is non-empty or the stream is not a terminal, and ASCII words with `--plain`. With `--json`, standard output holds only one JSON object per command, `--help` included, with the documented fields, and the exit code matches the documented meaning.
+VERDICT: met
+EVIDENCE: The report and cmd tests passed at 51feaf4. Live, `verify --plain` wrote 0 bytes to stdout and "OK Passed:" lines to stderr, with 0 non-ASCII and 0 ESC bytes.
+
+On a pty, colour came with NO_COLOR unset or empty and not with NO_COLOR=0 or 1, and `--plain` gave ASCII. On a pipe there was no ESC.
+
+`verify nosuch --json` exited 3 with one object, result config. An unknown command exited 2. `--help --json` and `link --help --json` each gave one object with command, data.usage, result and schema_version.
+
+CRITERION: AC-12 The plugin installs from the vhco-tools marketplace in Codex and Claude, and in a new session a request to add a Paseo server leads the agent to the skill, which runs `onboard` and `link` and reports the result without showing the password.
+VERDICT: not verified
+EVIDENCE: I did not run the install from either catalog or a new agent session. The catalogs point at the default branch, and the plugin is not merged. The document carries `Residual: https://github.com/michielvha/vh-adlc/issues/77`, and issue 77 is OPEN. I read SKILL.md: it triggers on adding a Paseo server, runs `onboard` then `link`, and forbids showing the password. Limitations: no install or session was observed.
+
+CRITERION: AC-13 The README, the skill and the CLI help use the terms in Design with those meanings, and the plugin's marketplace row describes it in the same terms.
+VERDICT: met
+EVIDENCE: A diff of the README Terms table against the Design Terms rows from Operator host to Remove showed them identical. The README prose, SKILL.md and `--help` use app backup and kept copy with the Design meanings. Both catalogs describe it as "Onboard Linux servers as SSH-only Paseo daemons and link the Paseo desktop app on Macs and Windows PCs to them". docs/reference/marketplace.md and the repo README row use the same terms. I found no mismatch.
+
+CRITERION: AC-14 The wrapper in an installed copy of the plugin, outside the repository, builds and runs `paseo-hosts --help` starting from an empty Go module cache, fetching its dependencies through the module proxy and verifying them against `go.sum`.
+VERDICT: met
+EVIDENCE: I ran a copy of the plugin outside the repository with empty GOMODCACHE, GOCACHE and PASEO_HOSTS_CACHE and with GOFLAGS, GOPROXY and GOSUMDB unset. The wrapper exited 0, printed `--help` and printed "go: downloading github.com/michielvha/logger v0.1.0" and "github.com/coder/websocket v1.8.15". `bun test tests/paseo-hosts` passed locally and in CI for 51feaf4 ("an installed copy builds and runs --help from an empty module cache"). `go mod tidy -diff` was clean.
+
+CRITERION: AC-15 `link --no-app` sets up the key, host key and alias block as `link` does, records the client, changes neither the desktop app nor the clipboard and prints no password; a later `link` without `--no-app` adds the app entry, and `unlink` of a client without the app removes its block and key line.
+VERDICT: met
+EVIDENCE: The internal/link tests the Test Plan names for AC-15 passed in the race run at 51feaf4 and in CI run 43593508137. They cover `--no-app` writing the key line, host key and block with no clipboard or app call and no password in any stream, a later link adding the entry, and unlink without the app removing the block and key line. The Test Plan has no live step for this criterion, and I ran none.
+
+CRITERION: AC-16 When `link`, `unlink` or `remove` rolls back a change the app did not keep and cannot confirm the app's previous host list, or, after a lost window and before it knows whether the app kept the change, loses the window a third time, cannot debug-launch the app or open its forward, or gives up on an installer, it exits 1 and names a copy of the app backup, `PASEO_HOSTS_DIR/app-registry-<client>.<UTC time>.backup.json`, which holds the host list the app had before the command; later commands change it only by deleting the entry of a server they unlink or remove. When the app had no host list, the message says so and no copy is written.
+VERDICT: met
+EVIDENCE: The clientapp tests passed at 51feaf4 in both the race run and the paseotest race run, and CI for 51feaf4 passed. They cover:
+- an unconfirmed rollback, a third lost window and a failed debug launch or forward after a lost window, each with a named kept copy;
+- later commands only deleting the unlinked server's entry from kept copies;
+- the no-host-list message with no copy.
+
+The hang tests that now use shortMargin still assert the kept copy. Live, no command hit these paths, and 0 kept copies were written. That is consistent, because every rollback was confirmed.
+
+CRITERION: AC-17 When an app update installer still runs 2 minutes after `link`, `unlink` or `remove` quits the app, the command exits 1, leaves the app stopped and says to run it again once the update has installed; during a rollback, the message is one of the two step 5 gives, with this reason added, and after a window lost in step 4 it names the kept copy AC-16 describes.
+VERDICT: met
+EVIDENCE: The clientapp installer tests passed at 51feaf4. Live step 9 on win-main: a 150 s ph-standin.exe ran under %LOCALAPPDATA%\@getpaseodesktop-updater. `link arch-1 --client win-main` exited 1 after 2m10s with "an app update on win-main was still installing after 2m0s, so the app is left stopped; run it again once the update has installed; the app's host list on win-main is unchanged". The monitor showed no Paseo main process from 12:50:06 until the stand-in ended at 12:52:29. I then started the app in session 1. It listed win-main, fedora-43 and arch-1 (seq 1117), with both tunnels up and no debugging port.
+
+CRITERION: AC-18 A Windows client runs each snippet the CLI sends, also when the script reaches it seconds after the SSH session starts, and a snippet's warning writes nothing to standard error. Every SSH call to a desktop client that has not finished by its deadline, twice its snippet's own longest wait plus 30 seconds, ends with its `ssh` process killed and an error that names the step and says it timed out. A debug launch counts such a call as a failed attempt; any other such call fails the command as a failed snippet at that point does, so `link`, `unlink` and `remove` never wait on a hung client call past its deadline.
+VERDICT: met
+EVIDENCE: Code at 51feaf4: remote.Deadline is 2*wait + Margin (30 s). WithDeadline wraps every client snippet call: the tunnel, running and stop/launch calls in clientapp, the key, alias block, tunnel and probe calls in link, and the unblock and client-pub calls in remove.
+
+The 51feaf4 change applies shortMargin only to the hang tests in clientapp, link and remove, and production code is unchanged. Those tests passed in my race and paseotest runs and in CI run 43593508137 for 51feaf4 (link 31.5 s). The earlier CI failure (run 43591483974 at f78c5e4) was TestLinkWindowsTwiceKeepsOneKeyLineAndOneBlock timing out its pwsh probe under the package-wide 5 s margin. Passing the remote tests confirm a hung stand-in ssh ends at its deadline with a timed-out error and no leftover process.
+
+Live step 10 on win-main (Windows 10.0.26300, OpenSSH_for_Windows_9.5p2): I sent a snippet that writes a warning and then a value to `ssh win-main <bootstrap>` 10 s after the session started. It printed the value, exited 0 and wrote 0 bytes to stderr. 0 EncodedCommand PowerShell processes remained. All live Windows runs had 0 "timed out" lines.
 
 ## Sources
 
