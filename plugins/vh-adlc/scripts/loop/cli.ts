@@ -21,6 +21,7 @@ import { join } from "node:path";
 import { loadLoopSettings, loadLoopSettingsAt, routeFor, type LoopOperation } from "./settings";
 import { runReviewRoute } from "./review-route";
 import { loopContext, type LoopContext } from "./procedure";
+import { cacheReviewPages } from "./pages";
 import { applicableRungs, featureDelta, mayAdvance, runRungs } from "./rungs";
 import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, skipMarker } from "./delivery";
 import { claim, isolation } from "./claim";
@@ -146,6 +147,12 @@ export async function main(argv: string[]): Promise<number> {
     const route = routeFor(policy, kind === "spec" ? "spec review" : "review");
     if (route.route !== "command" || !route.argv) { console.log(JSON.stringify({ status: "host", ...route })); return 0; }
     const document = need(options, "document"), commit = need(options, "commit");
+    // The reviewer reads every routed page from the cache and may not be able to fetch one itself.
+    const pages = cacheReviewPages({ repo, commit, revision: need(options, "docs-revision"), binary: need(options, "binary"), pluginPin: need(options, "plugin-pin") });
+    if (pages.missing.length) {
+      console.log(JSON.stringify({ role: route.role, status: "pending", reason: `convention pages the reviewer reads could not be cached: ${pages.missing.join(", ")} (${pages.reason})` }));
+      return 3;
+    }
     const prompt = reviewPrompt({ repository: kind === "spec" ? "the current directory, a read-only export of the commit" : "the current directory, a private clone of the reviewed commit",
       document, commit, kind, docsRevision: need(options, "docs-revision"), binary: need(options, "binary"), pluginPin: need(options, "plugin-pin") }, loopContext(policy));
     const outcome = await runReviewRoute({ repo, commit, kind, document, route: { model: route.model!, argv: route.argv, ...(route.model_attestation ? { model_attestation: route.model_attestation } : {}) }, prompt,

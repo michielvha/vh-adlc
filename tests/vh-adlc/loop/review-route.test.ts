@@ -5,6 +5,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSy
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { runReviewRoute, type ReviewOutcome } from "../../../plugins/vh-adlc/scripts/loop/review-route";
+import { pagesStub } from "./pages-stub";
 
 const made: string[] = [];
 afterAll(() => {
@@ -279,10 +280,10 @@ describe("review policy comes from the reviewed commit", () => {
     const committed = `schema_version: 1\ninstruction_files: [AGENTS.md]\nlenses:\n  - name: satellite\n    check: A new component names its satellite.\n    severity: blocking\nroles:\n  spec_reviewer:\n    route: command\n    model: gpt-6.1-sol\n    argv: [${stubScript}, "{model}", "{prompt}"]\n`;
     const { root, commit } = repository(dir => { mkdirSync(join(dir, ".vh-adlc")); writeFileSync(join(dir, ".vh-adlc/loop.yaml"), committed); });
     writeFileSync(join(root, ".vh-adlc/loop.yaml"), `schema_version: 1\nroles:\n  spec_reviewer:\n    route: command\n    model: gpt-6.1-sol\n    argv: [${stubScript}, "{model}", "{prompt}"]\n`);
-    const cli = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts");
+    const cli = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/loop/cli.ts"), pages = pagesStub();
     const run = Bun.spawnSync([process.execPath, cli, "review", "--repo", root, "--document", "docs/specs/feature.md", "--commit", commit, "--kind", "spec",
-      "--docs-revision", "abc", "--binary", "/bin/false", "--plugin-pin", "def"], { stdout: "pipe", stderr: "pipe", timeout: 60_000,
-      env: { ...process.env, XDG_CONFIG_HOME: join(stubDir, "no-override") } });
+      "--docs-revision", "abc", "--binary", pages.binary, "--plugin-pin", "def"], { stdout: "pipe", stderr: "pipe", timeout: 60_000,
+      env: { ...process.env, XDG_CONFIG_HOME: join(stubDir, "no-override"), ...pages.env } });
     const outcome = JSON.parse(run.stdout.toString() || "{}");
     expect(outcome).toMatchObject({ status: "ready", records: "NO FINDINGS\n" });
   });

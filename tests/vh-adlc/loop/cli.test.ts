@@ -1,6 +1,8 @@
 // The loop entry: route lookup and a command-route review run end to end through the CLI.
 import { afterAll, describe, expect, test } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { pagesStub } from "./pages-stub";
+const STUB = pagesStub();
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -23,8 +25,9 @@ function repo(files: Record<string, string>) {
   git(root, "init", "-q", "-b", "main"); git(root, "config", "user.name", "t"); git(root, "config", "user.email", "t@example.invalid"); git(root, "add", "-A"); git(root, "commit", "-q", "-m", "f");
   return { root, commit: git(root, "rev-parse", "HEAD") };
 }
-function cli(...args: string[]) {
-  const run = Bun.spawnSync([process.execPath, CLI, ...args], { stdout: "pipe", stderr: "pipe", env: { ...process.env, XDG_CONFIG_HOME: join(tmpdir(), "vh-loop-cli-no-override") }, timeout: 60_000 });
+function cli(...args: string[]) { return cliWith({}, ...args); }
+function cliWith(env: Record<string, string>, ...args: string[]) {
+  const run = Bun.spawnSync([process.execPath, CLI, ...args], { stdout: "pipe", stderr: "pipe", env: { ...process.env, XDG_CONFIG_HOME: join(tmpdir(), "vh-loop-cli-no-override"), ...env }, timeout: 60_000 });
   return { code: run.exitCode, json: JSON.parse(run.stdout.toString() || "{}") };
 }
 
@@ -48,8 +51,8 @@ describe("route", () => {
 describe("review", () => {
   test("a host route prints the route and runs nothing", () => {
     const { root, commit } = repo({});
-    const run = cli("review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "spec",
-      "--docs-revision", "abc", "--binary", "/bin/false", "--plugin-pin", "def");
+    const run = cliWith(STUB.env, "review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "spec",
+      "--docs-revision", "abc", "--binary", STUB.binary, "--plugin-pin", "def");
     expect(run).toEqual({ code: 0, json: { status: "host", role: "spec_reviewer", route: "host" } });
   });
 
@@ -60,10 +63,43 @@ describe("review", () => {
     writeFileSync(stub, `#!/bin/bash\nprompt="$2"\ncommit=$(grep -o 'Commit: [0-9a-f]*' <<<"$prompt" | cut -d' ' -f2)\ngrep -q 'TARGET line' <<<"$prompt" || exit 9\nprintf 'MODEL: %s\\nTARGET: %s\\n\\nNO FINDINGS\\n' "$1" "$commit"\n`);
     chmodSync(stub, 0o700);
     const { root, commit } = repo({ ".vh-adlc/loop.yaml": `schema_version: 1\nroles:\n  spec_reviewer:\n    route: command\n    model: gpt-6.1-sol\n    argv: [${stub}, "{model}", "{prompt}"]\n` });
-    const run = cli("review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "spec",
-      "--docs-revision", "abc", "--binary", "/bin/false", "--plugin-pin", "def");
+    const run = cliWith(STUB.env, "review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "spec",
+      "--docs-revision", "abc", "--binary", STUB.binary, "--plugin-pin", "def");
     expect(run.code).toBe(0);
     expect(run.json).toMatchObject({ role: "spec_reviewer", status: "ready", model: "gpt-6.1-sol", target: commit, records: "NO FINDINGS\n" });
+  });
+});
+
+describe("review pages", () => {
+  function reviewer() {
+    const stubDir = realpathSync(mkdtempSync(join(tmpdir(), "vh-loop-cli-pages-")));
+    made.push(stubDir);
+    const stub = join(stubDir, "reviewer.sh"), ran = join(stubDir, "ran");
+    writeFileSync(stub, `#!/bin/bash\ntouch ${ran}\nprompt="$2"; commit=$(grep -o 'Commit: [0-9a-f]*' <<<"$prompt" | cut -d' ' -f2)\nprintf 'MODEL: %s\\nTARGET: %s\\n\\nNO FINDINGS\\n' "$1" "$commit"\n`);
+    chmodSync(stub, 0o700);
+    return { stub, ran };
+  }
+  const routed = (stub: string) => ({ "AGENTS.md": "For tests, read conventions/frontend-testing.md and guides/humanize-prose.md.\n",
+    ".vh-adlc/loop.yaml": `schema_version: 1\nroles:\n  spec_reviewer:\n    route: command\n    model: gpt-6.1-sol\n    argv: [${stub}, "{model}", "{prompt}"]\n` });
+
+  test("every page the repository routes is cached before the reviewer starts", () => {
+    const { stub } = reviewer(), pages = pagesStub("abc");
+    const { root, commit } = repo(routed(stub));
+    const run = cliWith(pages.env, "review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "spec",
+      "--docs-revision", "abc", "--binary", pages.binary, "--plugin-pin", "def");
+    expect(run.json).toMatchObject({ status: "ready" });
+    for (const page of ["conventions/feature-documents.md", "conventions/frontend-testing.md", "guides/humanize-prose.md"])
+      expect([page, existsSync(join(pages.cache, "vh-adlc", "docs", "abc", page))]).toEqual([page, true]);
+  });
+
+  test("a routed page that cannot be cached leaves the review pending without starting the reviewer", () => {
+    const { stub, ran } = reviewer(), pages = pagesStub("abc", { fail: true });
+    const { root, commit } = repo(routed(stub));
+    const run = cliWith(pages.env, "review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "spec",
+      "--docs-revision", "abc", "--binary", pages.binary, "--plugin-pin", "def");
+    expect([run.code, run.json.status]).toEqual([3, "pending"]);
+    expect(run.json.reason).toContain("conventions/frontend-testing.md");
+    expect(existsSync(ran)).toBe(false);
   });
 });
 
@@ -94,7 +130,7 @@ describe("implementation dispatch", () => {
     writeFileSync(stub, `#!/bin/bash\nprompt="$2"; commit=$(grep -o 'Commit: [0-9a-f]*' <<<"$prompt" | cut -d' ' -f2)\ngrep -q 'Repository directory: the current directory, a private clone of the reviewed commit' <<<"$prompt" || exit 9\nprintf 'MODEL: %s\\nTARGET: %s\\n\\nNO FINDINGS\\n' "$1" "$commit"\n`);
     chmodSync(stub, 0o700);
     const { root, commit } = repo({ ".vh-adlc/loop.yaml": `schema_version: 1\nroles:\n  implementation_reviewer:\n    route: command\n    model: gpt-6.1-sol\n    argv: [${stub}, "{model}", "{prompt}"]\n` });
-    const run = cli("review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "implementation", "--docs-revision", "abc", "--binary", "/bin/false", "--plugin-pin", "def");
+    const run = cliWith(STUB.env, "review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "implementation", "--docs-revision", "abc", "--binary", STUB.binary, "--plugin-pin", "def");
     expect(run.json).toMatchObject({ status: "ready" });
   });
 });
