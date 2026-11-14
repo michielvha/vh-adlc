@@ -1189,12 +1189,15 @@ const CONVERGENCE_SCENARIOS: Scenario[] = [
           const body = doc.split(/^## Review Log$/m)[0];
           const openQuestions = section(doc, "Open Questions");
           // Oldest first: the agent commits that change the normative baseline, and what each adds.
+          // The review records quote the nit texts, so only the body before the Review Log counts, and code
+          // formatting is ignored (an author may write `test.sh`).
           const at = (ref: string) => show(f, ref, FEATURE_PATH) ?? "";
+          const prose = (doc: string) => doc.split(/^## Review Log$/m)[0].replaceAll("`", "");
           const nitTexts = ["./greet.sh <name>", "exactly one name argument", "test.sh checks the output"];
           const changing = agentLog(f, f.project, "--reverse", "--all").filter((x) => normative(at(x.hash)) !== normative(at(`${x.hash}^`)));
           const fix = changing[0];
-          const before = fix ? at(`${fix.hash}^`) : "";
-          const atFix = fix ? at(fix.hash) : "";
+          const before = fix ? prose(at(`${fix.hash}^`)) : "";
+          const atFix = fix ? prose(at(fix.hash)) : "";
           const reports = turns.map((t) => t.result).join("\n");
           return [
             { name: "exactly two review passes were stored", ok: /### R-1\b/.test(doc) && /### R-2\b/.test(doc) && !/### R-3\b/.test(doc) },
