@@ -36,6 +36,9 @@ test("legend samples do not count as traffic and extra arrows between depicted c
 
     writeFileSync(drawing, page('<mxCell id="unexpected" parent="1" edge="1" source="api" target="client"/>'));
     expect(gradeDiagram(fixture, output, "")).toContain("Unmapped connector in the drawing");
+
+    writeFileSync(join(output, "brief.md"), "# Missing evidence rows\n");
+    expect(gradeDiagram(fixture, output, "")).toContain("Brief has the wrong number of components, boundaries or connectors");
   } finally {
     rmSync(output, { recursive: true, force: true });
   }

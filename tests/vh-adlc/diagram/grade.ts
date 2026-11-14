@@ -77,7 +77,7 @@ export function gradeDiagram(fixture: Fixture, output: string, response: string)
   // must still have a corresponding connector row.
   const endpointIds = shapes.map(row => "'" + row[0] + "'");
   const touchesDepicted = endpointIds.flatMap(id => ["@source=" + id, "@target=" + id]).join(" or ");
-  if (xpath("count(//mxCell[@edge='1' and (" + touchesDepicted + ")])") !== String(links.length)) {
+  if (touchesDepicted && xpath("count(//mxCell[@edge='1' and (" + touchesDepicted + ")])") !== String(links.length)) {
     failures.push("Unmapped connector in the drawing");
   }
   for (const link of fixture.links) {
