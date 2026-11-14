@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Plugin checker coverage added. Awaiting independent review of the revised scope."
+status_description: "R-4 reviewed plugin checker coverage. Awaiting renewed acceptance before replanning unchecked tasks."
 issue: null
 branch: feat/architecture-diagram-agent
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
@@ -29,7 +29,7 @@ VitePress has a Claude-specific agent for AWS architecture. It already uses a sh
 
 The agent decides which relationships to show and how to explain them. Each depicted relationship has a source or a visible label that identifies it as proposed. When the sources leave a link uncertain, the brief records the gap. Drawing and export use local tools. The project chooses the destination and controls any publication. Stackgraph stays a standalone deterministic tool. FlowStory playback and VitePress adoption can use the results of this first feature.
 
-The first release covers an AWS request path grounded in repository sources and an OCI-to-local design from a written brief. The agent renders in the same request when the sources support a useful view. The host supplies draw.io Desktop and the selected local provider assets. In the prototype check, both drawings exported twice with networking disabled and produced identical files on the second export. Independent review found gaps in the proof and the local setup contract. The revised proof requires actual invocation from both marketplace installs, a comparison between the brief and the drawing, and a local export and editor check. R-3 reviewed the original scope. The revised coverage includes the existing shared plugin checker that registers allowed skills. The updated scope awaits independent review. The native implementation checks are pending. Acceptance authorizes implementing and testing this scope under the feature lifecycle.
+The first release covers an AWS request path grounded in repository sources and an OCI-to-local design from a written brief. The agent renders in the same request when the sources support a useful view. The host supplies draw.io Desktop and the selected local provider assets. In the prototype check, both drawings exported twice with networking disabled and produced identical files on the second export. Independent review found gaps in the proof and the local setup contract. The revised proof requires actual invocation from both marketplace installs, a comparison between the brief and the drawing, and a local export and editor check. R-3 reviewed the original scope. The revised coverage includes the existing shared plugin checker that registers allowed skills. Independent review R-4 identified a task ordering issue that the implementation plan will address. The native implementation checks are pending. Acceptance authorizes implementing and testing this scope under the feature lifecycle.
 
 ### Background
 
@@ -111,6 +111,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | 2026-11-14 | R-2 | spec | `7a0263ea494dd46d0145a2392e691df045558111` | unknown | procedural | Two should-fix findings and one nit |
 | 2026-11-14 | R-3 | spec | `6593ed37147bd2bd6813e6e4d3e53066af7f8896` | unknown | procedural | No findings |
 | 2026-11-14 | R-3 | spec | `6593ed37147bd2bd6813e6e4d3e53066af7f8896` | n/a | n/a | accepted by owner |
+| 2026-11-14 | R-4 | spec | `211db5a7ceb0510e7107b160efe8ce30babda981` | unknown | procedural | One should-fix finding in the task order |
 
 ### R-1
 
@@ -182,6 +183,15 @@ PROPOSAL: Cite the prototype export command and observed result in Background or
 ### R-3
 
 NO FINDINGS
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks T2 through T4
+EVIDENCE: T2 first adds files under the new skill directory. The task verification command in AGENTS.md runs tests/vh-adlc/check.test.ts. Lines 224-232 require a version change whenever the plugin subtree changes, and lines 235-245 reject an undeclared skill directory and require its SKILL.md once declared. The current sequence defers both manifest changes and the skill definition to T4, and no task names the checker. T2 cannot pass the required package verification in that order.
+PROPOSAL: Replan the unchecked tail after T1. Commit the failing fixture proof before introducing the skill, then land the helper, skill entry, checker declaration and both manifest changes together with the focused checker in the done condition.
 
 ## Sources
 
