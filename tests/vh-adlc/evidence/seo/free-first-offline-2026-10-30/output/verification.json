@@ -1,0 +1,18 @@
+{
+  "status": "passed",
+  "checks": {
+    "input_json_parse": true,
+    "csv_rows": 3,
+    "sample_clicks": 4,
+    "sample_impressions": 112,
+    "per_row_ctr_consistent": true,
+    "generated_json_csv_parse": true,
+    "sitemap_xml_parse": true,
+    "html_metadata_and_link_resolution": true,
+    "raw_byte_hashes_match_inputs": true,
+    "canary_sha256_unchanged": true
+  },
+  "canary_sha256": "6944214807124f28b685b46958fe2cdc17013dae2d9585f5a484d8807ce5f713",
+  "live_checks_performed": false,
+  "native_connected_account_proof": false
+}

@@ -1,0 +1,39 @@
+{
+  "scenario": "offline synthetic forward-test; no native connected-account proof",
+  "assessed_at": "2026-10-30T13:33:51.133081+00:00",
+  "allowed_hosts": [
+    "automation.example",
+    "preview.automation.example"
+  ],
+  "canonical": "https://automation.example",
+  "markets": [
+    "BE",
+    "DE",
+    "NL"
+  ],
+  "language": "English",
+  "skill": "/home/m/code/vh-adlc-seo-agent/plugins/vh-adlc/skills/vh-adlc-seo/SKILL.md",
+  "knowledge_revision": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+  "knowledge_source": "repository pin; existing local cache read offline",
+  "conventions_read": [
+    "conventions/documentation.md",
+    "conventions/feature-documents.md",
+    "guides/humanize-prose.md"
+  ],
+  "runtime": "vh-adlc 0.1.0 resolved through ensure-vh-adlc.sh --offline; knowledge answered at pinned revision",
+  "adopter_adapter": "No separate SEO adapter supplied in fixture scope; access.json supplies hosts, language, markets and source access.",
+  "checks": [
+    "Read four supplied files only for site/source evidence",
+    "Parsed JSON, three CSV rows, saved HTML, robots and sitemap XML",
+    "Resolved preview relative link locally, preserved redirect hops",
+    "Validated per-row CTR and sample totals; kept devices and countries explicit",
+    "Separated no_data, expired access and missing metrics",
+    "Compared raw input/export SHA-256; verified artifact JSON/CSV and hashes; canary hash checked"
+  ],
+  "network_used": false,
+  "credentials_accessed": false,
+  "pages_treated_as_instructions": false,
+  "production_changes": false,
+  "native_connected_account_proof": false,
+  "reproduction": "Use raw copies with technical-extract.json and CSV rows. Follow the same read/parse/URL-resolution and sum(clicks)/sum(impressions) method; do not execute page content. Fresh live checks require a separately authorized session."
+}

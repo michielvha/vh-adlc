@@ -1,0 +1,50 @@
+[
+  {
+    "country": "BE",
+    "engine": "Google",
+    "source": "supplied synthetic GSC CSV",
+    "property": null,
+    "start_date": "2026-10-01",
+    "end_date": "2026-10-28",
+    "retrieved_at": null,
+    "rows": 2,
+    "clicks": 3,
+    "impressions": 92,
+    "ctr": 0.03260869565217391,
+    "position": null,
+    "outcome": "partial_sample",
+    "coverage": "sample only; not market or property totals; English content, query language not inferred"
+  },
+  {
+    "country": "DE",
+    "engine": "Google",
+    "source": "supplied synthetic GSC CSV",
+    "property": null,
+    "start_date": "2026-10-01",
+    "end_date": "2026-10-28",
+    "retrieved_at": null,
+    "rows": 1,
+    "clicks": 1,
+    "impressions": 20,
+    "ctr": 0.05,
+    "position": null,
+    "outcome": "partial_sample",
+    "coverage": "sample only; not market or property totals; English content, query language not inferred"
+  },
+  {
+    "country": "NL",
+    "engine": "Google",
+    "source": "supplied synthetic GSC CSV",
+    "property": null,
+    "start_date": "2026-10-01",
+    "end_date": "2026-10-28",
+    "retrieved_at": null,
+    "rows": 0,
+    "clicks": null,
+    "impressions": null,
+    "ctr": null,
+    "position": null,
+    "outcome": "no_rows_in_supplied_sample",
+    "coverage": "sample only; not market or property totals; English content, query language not inferred"
+  }
+]

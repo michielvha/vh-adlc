@@ -20,7 +20,7 @@ const SCHEDULE: Record<number, string[]> = {
   7: ["ship", "triage", "maintenance", "audit", "projects"],
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
-const CONTENT_OPERATIONS = ["blog", "docs-impact"];
+const CONTENT_OPERATIONS = ["blog", "docs-impact", "seo"];
 // Host operations call the vh-adlc binary on PATH, unverified and without
 // knowledge, as references/loop.md's exception allows.
 const HOST_OPERATIONS = ["clean"];

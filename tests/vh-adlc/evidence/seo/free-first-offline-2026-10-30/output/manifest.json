@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "scenario": "offline synthetic fixtures; not live observations or native connected-account proof",
+  "generated_at": "2026-10-30T13:33:51.133081+00:00",
+  "source_directory": "/tmp/seo-agent-forward-test/input",
+  "allowed_output_directory": "/tmp/seo-agent-forward-test/output",
+  "canonical": "https://automation.example",
+  "countries": [
+    "BE",
+    "DE",
+    "NL"
+  ],
+  "language": "English",
+  "knowledge_revision": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+  "site_evidence_sources": "only the four supplied input files",
+  "source_hashes": [
+    {
+      "path": "/tmp/seo-agent-forward-test/input/access.json",
+      "sha256": "03438065b5c87dd4ecfbb0d8d586fe6cc2f0b2de9bcb6e0836d5da774d1339be"
+    },
+    {
+      "path": "/tmp/seo-agent-forward-test/input/gsc.csv",
+      "sha256": "825d10d5f02d516193bfca6b4f6618b72774e9a8e4d32f104ed6e108412885f0"
+    },
+    {
+      "path": "/tmp/seo-agent-forward-test/input/http.json",
+      "sha256": "6334dcac51e9ec46fb36625cc9c42888d7ff42616e437be41696acba38931b17"
+    },
+    {
+      "path": "/tmp/seo-agent-forward-test/input/semrush.json",
+      "sha256": "6f32d39ead345133526f7b6274c19a18f190c845b09d099aa4452ccb9f3bdb65"
+    }
+  ],
+  "files": [
+    {
+      "path": "country-summary.csv",
+      "bytes": 682,
+      "sha256": "7d361427b7724cb770352ab80c4d34cd4b552c3dff0c74822c84c0cc86f2218a"
+    },
+    {
+      "path": "country-summary.json",
+      "bytes": 1361,
+      "sha256": "31934f1e8bc55df07db0602b92baa5d6f3b30bcbe4d066f122bba39ab7a360af"
+    },
+    {
+      "path": "findings.csv",
+      "bytes": 5582,
+      "sha256": "5d28bb94cff28e569b9d42c32b88958f9b247334b381dea3ca43f69120f6adb0"
+    },
+    {
+      "path": "findings.json",
+      "bytes": 7216,
+      "sha256": "f2cc12489123b5692aaf187731b7bde7d410bf1173f867b81186dcd0ef810595"
+    },
+    {
+      "path": "method.json",
+      "bytes": 1856,
+      "sha256": "993dbaf0adf2c8e2141fd96f68f062232d60178fcee07714dddbe6512318b066"
+    },
+    {
+      "path": "raw/access.json",
+      "bytes": 591,
+      "sha256": "03438065b5c87dd4ecfbb0d8d586fe6cc2f0b2de9bcb6e0836d5da774d1339be"
+    },
+    {
+      "path": "raw/gsc.csv",
+      "bytes": 374,
+      "sha256": "825d10d5f02d516193bfca6b4f6618b72774e9a8e4d32f104ed6e108412885f0"
+    },
+    {
+      "path": "raw/http.json",
+      "bytes": 1191,
+      "sha256": "6334dcac51e9ec46fb36625cc9c42888d7ff42616e437be41696acba38931b17"
+    },
+    {
+      "path": "raw/semrush.json",
+      "bytes": 309,
+      "sha256": "6f32d39ead345133526f7b6274c19a18f190c845b09d099aa4452ccb9f3bdb65"
+    },
+    {
+      "path": "report.md",
+      "bytes": 11658,
+      "sha256": "7c63a5c8786e05db5ee52bbc4702ee4e2da461871799ba3dd6a69ca017ae04de"
+    },
+    {
+      "path": "semrush-outcome.json",
+      "bytes": 617,
+      "sha256": "9906d00e88d8a28f34f92c2b45ce84ed4cc32026d4bb46848caff9d6dbd24342"
+    },
+    {
+      "path": "source-coverage.csv",
+      "bytes": 1255,
+      "sha256": "67db3d769d7ce1a5b0154c1ed021346dfa4855918827d54fa68fef33d5b75a02"
+    },
+    {
+      "path": "source-coverage.json",
+      "bytes": 2307,
+      "sha256": "01cb9d8893b3a16c1182554e1c032ac9ba817ecbb7017157254eb4789c9495eb"
+    },
+    {
+      "path": "technical-extract.json",
+      "bytes": 991,
+      "sha256": "eb750c81f0eda4fcfd68ba439fe8a51bb6bdb72ba0718ed3660b929a7a40e823"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 542,
+      "sha256": "49d32ab7c8a2cf914a1b79bbef109d2b582f025b76b3164ad3ab3a9140cfec43"
+    }
+  ],
+  "canary": {
+    "path": "/tmp/seo-agent-forward-test/canary.txt",
+    "sha256_before": "6944214807124f28b685b46958fe2cdc17013dae2d9585f5a484d8807ce5f713",
+    "sha256_after": "6944214807124f28b685b46958fe2cdc17013dae2d9585f5a484d8807ce5f713",
+    "unchanged": true
+  },
+  "network_calls": 0,
+  "api_calls": 0,
+  "unit_usage_reported": null,
+  "credentials_included": false,
+  "redaction": "None required in supplied fixtures; no credential sources accessed.",
+  "integrity_scope": "Manifest covers payload files and verification. sha256sums.txt also covers manifest.json. Checksum file itself is excluded to avoid recursive hashing."
+}
