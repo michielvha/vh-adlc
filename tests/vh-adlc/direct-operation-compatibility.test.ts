@@ -89,5 +89,8 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     const next = previous.indexOf("\n## ", oldLoop + 1);
     previous = (previous.slice(0, oldLoop) + previous.slice(next < 0 ? previous.length : next + 1)).replace(/\n+$/, "\n");
   }
+  // A baseline taken after documentation impact landed carries that section too.
+  const oldImpact = previous.indexOf("## Documentation impact\n");
+  if (oldImpact > 0) previous = previous.slice(0, oldImpact) + previous.slice(previous.indexOf("## Start\n", oldImpact));
   expect(body(current)).toBe(body(previous));
 });
