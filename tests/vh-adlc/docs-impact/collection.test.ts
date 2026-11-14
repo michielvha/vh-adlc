@@ -63,7 +63,9 @@ test("several roots retain staged scope, tracked generated docs and explicit ign
   expect(fingerprint(root)).toBe(index);
 });
 
-test("ordinary feature coverage and the actual pinned freshness matcher retain distinct semantics", () => {
+// Updated when the lock moved to 0.26.0: the shared development loop (#78, AC-06) aligned the binary's
+// `**` with this matcher, so the pinned freshness check now also reports src/deep/a.ts under src/**.
+test("ordinary feature coverage and the actual pinned freshness matcher agree on double-star coverage", () => {
   const template = readFileSync(join(import.meta.dir, '../../../internal/testrepo/testdata/docs/conforming.md'), 'utf8');
   const feature = template.replace('covers:\n  - src/\n  - config.yml', 'covers: ["src/**", "src/q?.ts", "src/[ab].ts", "area/", "docs/specs/**"]');
   const root = fixture({ "docs/specs/feature.md": feature, "src/deep/a.ts": "old\n", "src/q1.ts": "old\n", "src/a.ts": "old\n", "area/sub/app.ts": "old\n" }, declaration + 'Feature documents: docs/specs/\n');
@@ -81,7 +83,7 @@ test("ordinary feature coverage and the actual pinned freshness matcher retain d
   const after = Bun.spawnSync(args, { stdout: 'pipe', stderr: 'pipe' }); expect(after.exitCode).toBe(before.exitCode); expect(after.stdout).toEqual(before.stdout);
   const fresh = JSON.parse(after.stdout.toString());
   expect(fresh.data, after.stdout.toString()).not.toBeNull();
-  expect(fresh.data.feature_tree.paths).toEqual(['area/sub/app.ts', 'src/a.ts', 'src/q1.ts']);
+  expect(fresh.data.feature_tree.paths).toEqual(['area/sub/app.ts', 'src/a.ts', 'src/deep/a.ts', 'src/q1.ts']);
 });
 
 test('an ordinary covered doc repair still makes the actual feature review stale', () => {
