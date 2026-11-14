@@ -91,7 +91,10 @@ The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/diagram/output.test.ts` - the staging and export contract fails before the shared helper exists (AC-03, AC-04)
+- [ ] T2 `plugins/vh-adlc/skills/vh-adlc-diagram/scripts/export.ts` - local export, checked inputs, failure recovery and exclusive publication pass the output tests (AC-03, AC-04)
+- [ ] T3 `tests/vh-adlc/diagram/` - fixture runner and committed scenarios enforce installation, invocation, diagram semantics and intake behavior, with discovery failing before the skill exists (AC-01, AC-02, AC-03, AC-05)
+- [ ] T4 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `docs/reference/marketplace.md`, `docs/user-guides/workflows.md` - both native hosts load the installed skill and the fixture and intake checks and rendered-output review pass (AC-01, AC-02, AC-03, AC-05)
 
 ## Open Questions
 
