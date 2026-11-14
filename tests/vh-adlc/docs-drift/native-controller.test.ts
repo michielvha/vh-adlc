@@ -27,7 +27,7 @@ test("the retained native controller publishes one exact PR and settles its real
   } catch (error) { console.error("Preserved failed native fixture roots", JSON.stringify(roots)); throw error; }
 }, 365000);
 
-test("the normal retained publish CLI delivers its exact approved batch without changing caller work", async () => {
+test("the normal retained publish and resume CLI delivers its exact approved batch once without changing caller work", async () => {
   const roots: string[] = [];
   try {
     const { publicationCLIArguments } = await import("./original-publication-fixture");
@@ -38,15 +38,22 @@ test("the normal retained publish CLI delivers its exact approved batch without 
     put(f.repo, "docs/guide.md", "Preserve another source draft\n"); put(f.candidate, "docs/guide.md", "Preserve another candidate draft\n");
     const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
     const environment = Object.fromEntries(Object.entries(f.native.environment).filter((pair): pair is [string, string] => typeof pair[1] === "string"));
-    const completion = await executeOwnedProcess({ argv: publicationCLIArguments(f, "publish"), cwd: f.repo, env: environment, capture: "memory", watched_outputs: [],
-      stdout: join(f.artifacts, "native-cli.stdout"), stderr: join(f.artifacts, "native-cli.stderr"), timeout_ms: 300000, started: () => {} });
-    const { captured, ...processMetadata } = completion;
-    writeFileSync(join(f.artifacts, "native-cli.stdout"), captured?.stdout ?? new Uint8Array(), { mode: 0o600 });
-    writeFileSync(join(f.artifacts, "native-cli.stderr"), captured?.stderr ?? new Uint8Array(), { mode: 0o600 });
-    writeFileSync(join(f.artifacts, "native-cli-process.json"), canonicalJSON(processMetadata), { mode: 0o600 });
-    expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
-    expect(completion.exit_code, Buffer.from(completion.captured?.stderr ?? []).toString() + Buffer.from(completion.captured?.stdout ?? []).toString().slice(0, 8192)).toBe(0);
-    const report = JSON.parse(Buffer.from(completion.captured?.stdout ?? []).toString());
+    async function invoke(command: "publish" | "resume", journal?: string) {
+      const name = "native-cli-" + command;
+      const completion = await executeOwnedProcess({ argv: publicationCLIArguments(f, command, journal), cwd: f.repo, env: environment,
+        capture: "memory", watched_outputs: [], stdout: join(f.artifacts, name + ".stdout"), stderr: join(f.artifacts, name + ".stderr"),
+        timeout_ms: 600000, started: () => {} });
+      const { captured, ...processMetadata } = completion;
+      writeFileSync(join(f.artifacts, name + ".stdout"), captured?.stdout ?? new Uint8Array(), { mode: 0o600 });
+      writeFileSync(join(f.artifacts, name + ".stderr"), captured?.stderr ?? new Uint8Array(), { mode: 0o600 });
+      writeFileSync(join(f.artifacts, name + "-process.json"), canonicalJSON(processMetadata), { mode: 0o600 });
+      expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
+      expect(completion.exit_code, Buffer.from(captured?.stderr ?? []).toString() + Buffer.from(captured?.stdout ?? []).toString().slice(0, 8192)).toBe(0);
+      const report = JSON.parse(Buffer.from(captured?.stdout ?? []).toString());
+      expect(report.command).toBe(command);
+      return report;
+    }
+    const report = await invoke("publish");
     expect(report.command).toBe("publish"); expect(report.publication_effects.state).toBe("complete");
     const state = JSON.parse(readFileSync(service.statePath, "utf8")); expect(state.prs).toHaveLength(1);
     const retainedJournal = readJournal(report.publication_effects.journal.directory, f.repo);
@@ -55,11 +62,19 @@ test("the normal retained publish CLI delivers its exact approved batch without 
     expect(state.prs[0].body).toBe(delivered.payload.body);
     expect(report.publication_effects.journal.sha256).toBe(retainedJournal.digest);
     expect(JSON.stringify(report)).not.toContain("Exact synthetic source correction");
+    const resumed = await invoke("resume", retainedJournal.directory);
+    expect(resumed.publication_effects.state).toBe("complete");
+    expect(resumed.publication_effects.journal.directory).toBe(retainedJournal.directory);
+    expect(resumed.publication_effects.journal.sha256).toBe(readJournal(retainedJournal.directory, f.repo).digest);
+    const afterResume = JSON.parse(readFileSync(service.statePath, "utf8"));
+    expect(afterResume.prs).toHaveLength(1);
+    expect(afterResume.prs[0].number).toBe(state.prs[0].number);
+    expect(afterResume.prs[0].body).toBe(delivered.payload.body);
     expect(readGit(f.origin, "for-each-ref", "--format=%(refname)", "refs/heads/docs-drift-lease").toString()).toBe("");
     expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
     for (const root of roots) rmSync(root, { recursive: true, force: true });
   } catch (error) { console.error("Preserved failed native CLI fixture roots", JSON.stringify(roots)); throw error; }
-}, 365000);
+}, 1500000);
 
 test("the retained controller resumes a delivered PR after its journal outcome write fails", async () => {
   const roots: string[] = [];

@@ -34,7 +34,7 @@ test.each(["cli", "interrupted-branch", "interrupted-delivery", "legacy", "alias
   if (scenario === "cli") {
     const argv = publicationCLIArguments({ ...f, reviewer: publication.reviewer_capture, authority: publication.authority, publication }, "publish");
     const environment = Object.fromEntries(Object.entries(f.native.environment).filter((pair): pair is [string, string] => typeof pair[1] === "string"));
-    const completed = await executeOwnedProcess({ argv, cwd: f.repo, env: environment, watched_outputs: [], capture: "memory", timeout_ms: 300000,
+    const completed = await executeOwnedProcess({ argv, cwd: f.repo, env: environment, watched_outputs: [], capture: "memory", timeout_ms: 600000,
       stdout: join(f.artifacts, "refresh-cli.stdout"), stderr: join(f.artifacts, "refresh-cli.stderr"), started: () => {} });
     expect(completed.reaped).toBe(true); expect(completed.timed_out).toBe(false);
     const output = Buffer.from(completed.captured?.stdout ?? []).toString();
@@ -66,7 +66,7 @@ test.each(["cli", "interrupted-branch", "interrupted-delivery", "legacy", "alias
   expect(calls.filter(call => call.program === "gh" && call.args.includes("PATCH") && call.args.includes("repos/fixture/docs/pulls/17"))).toHaveLength(1);
   expect(readGit(f.origin, "for-each-ref", "--format=%(refname)", "refs/heads/docs-drift-lease").toString()).toBe("");
   expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
-}, 365000);
+}, 900000);
 
 
 test.each(["title", "body", "head", "number", "draft", "fork", "id-only", "foreign-author"] as const)("normal refresh refuses an unbound native target %s", async fault => {

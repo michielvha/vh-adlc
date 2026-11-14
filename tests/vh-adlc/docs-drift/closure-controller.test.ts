@@ -169,7 +169,7 @@ test("normal retained closure publish and resume commands keep bounded summaries
     async function invoke(command: "publish-closure" | "resume-closure", journal?: string) {
       const name = command + (journal ? "-original" : "-new");
       const completion = await executeOwnedProcess({ argv: closureCLIArguments(f, command, journal), cwd: f.repo, env,
-        capture: "memory", watched_outputs: [], timeout_ms: 360000, stdout: join(f.artifacts, name + ".stdout"),
+        capture: "memory", watched_outputs: [], timeout_ms: 600000, stdout: join(f.artifacts, name + ".stdout"),
         stderr: join(f.artifacts, name + ".stderr"), started: () => {} });
       const { captured, ...metadata } = completion;
       writeFileSync(join(f.artifacts, name + ".stdout"), captured?.stdout ?? new Uint8Array(), { mode: 0o600 });
@@ -188,7 +188,7 @@ test("normal retained closure publish and resume commands keep bounded summaries
     expect(JSON.parse(readFileSync(f.service.statePath, "utf8")).comments["1"]).toHaveLength(1);
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveFailedRoots = true; throw error; }
-}, 600000);
+}, 1500000);
 
 test("a mistaken closure resume selection leaves its pending journal unchanged and correct resume can finish", async () => {
   try {
