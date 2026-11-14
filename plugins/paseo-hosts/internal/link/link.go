@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/config"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/registry"
@@ -55,6 +56,10 @@ type Client struct {
 	// App is the desktop app's path, set when the probe looked for it.
 	App string
 }
+
+// tunnelWait is the longest the tunnel check waits by its own timers, in
+// its Windows snippet.
+const tunnelWait = 35 * time.Second
 
 // Run runs a platform's snippet on the client.
 func (c Client) Run(ctx context.Context, bash, powershell string, vars remote.Vars) (remote.Output, error) {
@@ -133,7 +138,7 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	}
 
 	rep.Step("Setting up SSH access from %s to %s", o.Client, o.Alias)
-	out, err := client.Run(ctx, keyScript, keyPS, remote.Vars{"key_name": cfg.ClientKey})
+	out, err := client.Run(remote.WithDeadline(ctx, remote.Deadline(0)), keyScript, keyPS, remote.Vars{"key_name": cfg.ClientKey})
 	if err != nil {
 		return nil, remoteError("creating the client key", err)
 	}
@@ -150,7 +155,7 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	rep.Pass("tunnel-only key line for %s on %s", o.Client, o.Alias)
 
 	name := SSHAlias(o.Alias)
-	if _, err := client.Run(ctx, clientSSHScript, clientSSHPS, remote.Vars{
+	if _, err := client.Run(remote.WithDeadline(ctx, remote.Deadline(0)), clientSSHScript, clientSSHPS, remote.Vars{
 		"name":       name,
 		"known_name": KnownName(entry.ClientHost, entry.ClientPort),
 		"host_keys":  strings.Join(hostKeys, "\n"),
@@ -163,7 +168,8 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 	}
 	rep.Pass("alias %s on %s", name, o.Client)
 
-	if _, err := client.Run(ctx, tunnelScript, tunnelPS, remote.Vars{"name": name, "port": strconv.Itoa(entry.ListenPort)}); err != nil {
+	tctx := remote.WithDeadline(ctx, remote.Deadline(tunnelWait))
+	if _, err := client.Run(tctx, tunnelScript, tunnelPS, remote.Vars{"name": name, "port": strconv.Itoa(entry.ListenPort)}); err != nil {
 		return nil, remoteError("checking the tunnel", err)
 	}
 	rep.Pass("the tunnel answers and a shell command is refused")
@@ -195,9 +201,14 @@ func ProbeForApp(ctx context.Context, alias string) (Client, error) {
 // probe takes needApp as yes, no or optional.
 func probe(ctx context.Context, alias, needApp string) (Client, error) {
 	c := Client{Alias: alias}
+	ctx = remote.WithDeadline(ctx, remote.Deadline(0))
 	out, err := remote.Command(ctx, alias, "uname", "-s")
 	if errors.Is(err, remote.ErrUnreachable) {
 		return c, &report.Error{Code: report.ExitFailed, Msg: err.Error(), Err: err}
+	}
+	var to *remote.Timeout
+	if errors.As(err, &to) {
+		return c, remoteError("the uname -s probe", err)
 	}
 	if err == nil && strings.TrimSpace(out.Text) == "Darwin" {
 		c.Kind = Darwin
@@ -212,6 +223,9 @@ func probe(ctx context.Context, alias, needApp string) (Client, error) {
 	}
 	answer := strings.TrimSpace(out.Text)
 	ps, err := remote.PowerShell(ctx, alias, probeScript, remote.Vars{"need_app": needApp})
+	if errors.As(err, &to) {
+		return c, remoteError("the PowerShell probe", err)
+	}
 	if ps.Values["OS"] != "Windows_NT" {
 		if answer == "" {
 			answer = "no answer"

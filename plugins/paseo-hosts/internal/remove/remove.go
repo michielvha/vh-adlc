@@ -261,7 +261,7 @@ func (o Options) unlinkClient(ctx context.Context, entry *registry.Entry, c link
 		cr.App = true
 	}
 	name := link.SSHAlias(o.Alias)
-	if _, err := c.Run(ctx, unblockScript, unblockPS, remote.Vars{"name": name}); err != nil {
+	if _, err := c.Run(remote.WithDeadline(ctx, remote.Deadline(0)), unblockScript, unblockPS, remote.Vars{"name": name}); err != nil {
 		return cr, remoteError("deleting the alias block", err)
 	}
 	rep.Pass("no %s alias block on %s", name, c.Alias)
@@ -336,7 +336,7 @@ func (o Options) serverID(ctx context.Context, entry *registry.Entry) string {
 }
 
 func readPub(ctx context.Context, c link.Client, keyName string) (string, error) {
-	out, err := c.Run(ctx, clientPubScript, clientPubPS, remote.Vars{"key_name": keyName})
+	out, err := c.Run(remote.WithDeadline(ctx, remote.Deadline(0)), clientPubScript, clientPubPS, remote.Vars{"key_name": keyName})
 	if err != nil {
 		return "", remoteError("reading the client key", err)
 	}

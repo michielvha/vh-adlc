@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/config"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/link"
@@ -16,7 +17,10 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/testenv"
 )
 
-func TestMain(m *testing.M) { testenv.Main(m) }
+func TestMain(m *testing.M) {
+	remote.Margin = 5 * time.Second
+	testenv.Main(m)
+}
 
 type world struct {
 	e   *testenv.Env
@@ -223,6 +227,59 @@ func TestHostKeysForAClientHostAndPort2222(t *testing.T) {
 	if !strings.Contains(cfg, "HostName srv.example.test") || !strings.Contains(cfg, "Port 2222") {
 		t.Fatalf("client ssh config:\n%s", cfg)
 	}
+}
+
+func TestHungClientCallsUnderLink(t *testing.T) {
+	timedOut := func(t *testing.T, err error, step string) {
+		t.Helper()
+		if report.Code(err) != report.ExitFailed || !strings.Contains(err.Error(), step) || !strings.Contains(err.Error(), "timed out after") {
+			t.Fatalf("want exit 1 saying %s timed out, got %d: %v", step, report.Code(err), err)
+		}
+	}
+	powerShellCalls := func(w *world) int {
+		n := 0
+		for _, c := range w.e.CallsTo("ssh") {
+			if slices.Contains(c.Args, testenv.Bootstrap) {
+				n++
+			}
+		}
+		return n
+	}
+	for _, tc := range []struct {
+		name, client, kind, hang, step string
+	}{
+		{"the PowerShell probe after a failing uname -s", "pc", testenv.Windows, "Identifies a Windows client", "PowerShell probe"},
+		{"the uname -s probe", "mac", testenv.Darwin, "uname -s", "uname -s probe"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := onboarded(t, testenv.ServerOptions{DNS: "srv.tail.test"}, "srv.tail.test", 22)
+			w.e.Client(tc.client, tc.kind).HangOn(tc.hang)
+			w.e.Trust(w.srv, "srv", false)
+			before := w.srv.Read(".ssh/authorized_keys")
+			var app []appCall
+			_, err := w.link(t, tc.client, false, &app)
+			timedOut(t, err, tc.step)
+			entry, _ := registry.Load(w.cfg.Dir, "srv")
+			if len(entry.Clients) != 0 || w.srv.Read(".ssh/authorized_keys") != before || len(app) != 0 {
+				t.Fatal("the probe changed the registry, the server or the app")
+			}
+			if tc.kind == testenv.Darwin && powerShellCalls(w) != 0 {
+				t.Fatal("a uname -s timeout fell through to the PowerShell probe")
+			}
+		})
+	}
+	t.Run("the alias block write", func(t *testing.T) {
+		w := onboarded(t, testenv.ServerOptions{DNS: "srv.tail.test"}, "srv.tail.test", 22)
+		w.e.Client("mac", testenv.Darwin).HangOn("writes the alias block on a Mac")
+		w.e.Trust(w.srv, "srv", false)
+		var app []appCall
+		_, err := w.link(t, "mac", true, &app)
+		timedOut(t, err, "writing the alias block")
+		entry, _ := registry.Load(w.cfg.Dir, "srv")
+		if !slices.Contains(entry.Clients, "mac") {
+			t.Fatalf("PASEO_CLIENTS %q lacks mac", entry.Clients)
+		}
+	})
 }
 
 func TestProbeStopsBeforeAnyChange(t *testing.T) {

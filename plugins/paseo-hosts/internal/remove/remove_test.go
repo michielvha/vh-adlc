@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/clientapp"
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/config"
@@ -21,7 +22,10 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/testenv"
 )
 
-func TestMain(m *testing.M) { testenv.Main(m) }
+func TestMain(m *testing.M) {
+	remote.Margin = 5 * time.Second
+	testenv.Main(m)
+}
 
 const (
 	appFile   = ".paseo-app.json"
@@ -366,6 +370,20 @@ func TestUnlinkOneClientAndBackups(t *testing.T) {
 	}
 	if !w.serverExists() || !w.registryExists() {
 		t.Fatal("unlink removed the server")
+	}
+}
+
+func TestUnlinkStopsAtAHungAliasBlockDelete(t *testing.T) {
+	w := onboarded(t)
+	mac := w.client(t, "mac", false)
+	w.link(t, "mac", true)
+	mac.HangOn("Deletes a server's alias block")
+	_, err := w.run(t, true, remove.Options{Clients: []string{"mac"}})
+	if report.Code(err) != report.ExitFailed || !strings.Contains(err.Error(), "deleting the alias block") || !strings.Contains(err.Error(), "timed out after") {
+		t.Fatalf("want exit 1 saying deleting the alias block timed out, got %d: %v", report.Code(err), err)
+	}
+	if !slices.Equal(w.clients(t), []string{"mac"}) {
+		t.Fatalf("PASEO_CLIENTS %q after a failed unlink", w.clients(t))
 	}
 }
 
