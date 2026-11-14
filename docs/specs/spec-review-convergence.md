@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: complete
 status_description: "Complete: R-21 spec re-review clean and R-22 implementation review met all ten criteria at 35beccd; the should-fix findings both reviews listed are follow-ups for a later revision."
 issue: null
 branch: feat/spec-review-convergence
