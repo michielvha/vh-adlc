@@ -437,7 +437,8 @@ shared-development-loop).
       Evidence: Manifests 0.18.1 to 0.19.0. `bun test tests/vh-adlc --timeout 60000`: 1615 pass, 0 fail across 136 files. `go test ./...` ok; `go vet ./...` exit 0; golangci-lint v2.15.0 (installed to a temporary GOBIN) `config verify` exit 0 and `run` 0 issues; `go mod tidy -diff` exit 0.
 - [x] T17 `tests/vh-adlc/labels/evidence/candidate-install.md` - the AC-11 procedure run on the branch head: installed files listed, both manifest versions compared, installed and source `plan` outputs byte-identical (AC-11)
       Evidence: Procedure run on 661f5d0 and recorded in `tests/vh-adlc/labels/evidence/candidate-install.md`: isolated credential-free install of vh-adlc@labels-candidate succeeded; the installed cache holds the labels helper, vocabulary and reference; both manifests read 0.19.0; installed and source `plan` outputs are byte-identical (SHA-256 fb2418a7...) with only GET calls.
-- [ ] T18 `tests/vh-adlc/labels/evidence/rollout-vh-adlc.md` - owner-approved `plan` and `apply` on `michielvha/vh-adlc` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
+- [x] T18 `tests/vh-adlc/labels/evidence/rollout-vh-adlc.md` - owner-approved `plan` and `apply` on `michielvha/vh-adlc` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
+      Evidence: Owner-approved apply on michielvha/vh-adlc with digest 5a12f274...: six creates succeeded, complete; 90 issues and PRs before and after, none lost a label or changed during the window; recorded in `tests/vh-adlc/labels/evidence/rollout-vh-adlc.md` with plan, receipt and snapshots.
 - [ ] T19 `tests/vh-adlc/labels/evidence/rollout-stackweaver.md` - owner-approved `plan` and `apply` on `michielvha/stackweaver` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
 
 ## Open Questions
