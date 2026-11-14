@@ -1,6 +1,6 @@
 {
   "name": "vh-adlc",
-  "version": "0.18.1",
+  "version": "0.19.0",
   "description": "Shared lifecycle, dependency/security maintenance and article/promotion drafting and documentation impact, with project-specific rules and independent review.",
   "author": {
     "name": "Michiel VH"
