@@ -1,0 +1,7 @@
+# Replace these placeholders from a verified published release before hosted use.
+schema_version: 1
+source_repository: michielvha/vh-adlc
+source_commit: '0000000000000000000000000000000000000000'
+source_release: v0.0.0-example
+plugin_version: 0.0.0-example
+component_sha256: '0000000000000000000000000000000000000000000000000000000000000000'
