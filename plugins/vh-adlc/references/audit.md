@@ -99,9 +99,11 @@ Generic reverify/full stays private. Tracked application requires current explic
 permission or an adopted rule; a local commit additionally needs ledger-commit. Neither grants push.
 Every permitted application, even without a commit, goes in a new owned
 `chore/audit-ledger-<run-id>` worktree at the freshly fetched clean committed default source that
-was assessed. A dirty or diverged-feature assessment stays private; re-assess the correct base
+was assessed. `apply` creates it locked with the reason `vh-adlc <run-id>`, so a branch sweep or
+`after-merge` keeps it while the run is pending. A dirty or diverged-feature assessment stays private; re-assess the correct base
 before canonical application. When shared main is dirty, the owned audit-ledger role may record a
-separate clean detached assessment worktree at the freshly fetched default commit. Keep its owner,
+separate clean detached assessment worktree at the freshly fetched default commit. Lock it right
+after creating it with `git worktree lock --reason "vh-adlc <run-id>" <path>`. Keep its owner,
 path and base in private run evidence. Its output stays private; apply into the separately owned ledger
 branch only after the normal checks. Commit identity and cleanliness establish the assessed default
 base, not a local branch name. Never switch or write into shared dirty main or unrelated work.
@@ -209,7 +211,9 @@ Keep the fetched Scope baseline for later delta scans after branch deletion, nev
 pre-squash Verified source as the sole comparison baseline.
 
 Ordinary cleanup covers clean owned audit-ledger and audit-repair roles only after evidence/outcomes
-are retained/published/safely superseded. Keep pending/unpublished ledger commits and evidence refs.
+are retained/published/safely superseded. Lock every worktree the run creates with the reason
+`vh-adlc <run-id>`, and run `git worktree unlock` when the run closes, before its own normal removal;
+the ledger cleanup does this for its own worktree. Keep pending/unpublished ledger commits and evidence refs.
 After a permitted merge, confirm the PR's merged head is the reviewed head and its base is the selected
 base, then run `after-merge` from [branches.md](branches.md) for that PR. It removes the just-merged
 head remotely and locally with expected-tip conditional deletion, only while each tip is contained in
