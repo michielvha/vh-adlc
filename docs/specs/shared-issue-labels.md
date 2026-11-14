@@ -470,6 +470,7 @@ None.
 | 2026-11-14 | R-7 | spec | `d53f54a` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-8 | spec | `bf67dc5` | unknown | procedural | Drift review after #89: no findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-14 | R-9 | implementation | `4cd4f7d` | unknown | procedural | Ten criteria met, AC-07 untested; 2 should-fix findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
+| 2026-11-14 | R-10 | implementation | `4463d20` | unknown | procedural | All eleven criteria met; one nit on the plan output wording; model identity not attested (Codex session header showed gpt-6.1-sol) |
 
 ### R-1
 
@@ -672,3 +673,58 @@ SEVERITY: should-fix
 WHERE: docs/specs/shared-issue-labels.md, Test Plan / AC-07
 EVIDENCE: The accepted proof requires mapped triage, investigate and spec payloads. The executed tests cover mapped planning and spec filing, while triage/settings.test.ts checks only effective-name resolution and settings compatibility. lifecycle/issue-labels.test.ts has no mapped-investigate scenario, and no triage test exercises a mapped label payload. The 222 passing tests therefore leave part of AC-07 untested.
 PROPOSAL: Add and execute scenarios using non-standard mapped names for investigate filing and triage label publication. Assert the resulting GitHub payloads and retain the existing controller restrictions.
+
+### R-10
+
+TARGET: 4463d20821cd582ab546fd4543ce7bd209af5146
+
+CRITERION: AC-01 The plugin contains one vocabulary file and a reference page that list the same standard labels with the same names, colors and descriptions, use the glossary terms above, and say which operation applies each kind.
+VERDICT: met
+EVIDENCE: Executed the dispatched focused Bun suite at the target: 225 pass, 0 fail. vocabulary.test.ts establishes table equality, glossary terms and operation rules.
+
+CRITERION: AC-02 For a repository with some standard labels missing, some with a different color or description and some non-standard labels, the helper's plan lists each standard label as present, missing or different, lists the others as unmanaged, and changes nothing on GitHub.
+VERDICT: met
+EVIDENCE: Observed plan.test.ts passing at the target, covering every classification with an empty write log. Independently executed source and installed plan commands against fake GitHub; both used GET requests only and saved the required classifications.
+
+CRITERION: AC-03 After approval of its exact digest, apply leaves the repository holding every standard label with the standard color and description, every other label unchanged, and no label deleted or renamed. Apply refuses before any write when the plan file changed, the digest differs, or the host, repository, authenticated actor, vocabulary, effective label names or repository labels differ from the plan.
+VERDICT: met
+EVIDENCE: Observed apply.test.ts passing at the target, including approved application, preservation of unmanaged labels and all eight changed-binding refusals with empty write logs. Independently fault-tested the actual CLI: after one successful write, a failed write and failed readback, it exited 1 and returned the accumulated outcomes, remaining writes, complete false and reconciled false. Verification used fake GitHub.
+
+CRITERION: AC-04 An issue investigate files carries one type label and the state label the verdict table gives (`ready` for act now, `blocked` or `needs-decision` for track, none for a requested reject), and the owner saw those labels before creation; when a needed label is missing, no issue exists and the result names the helper's plan.
+VERDICT: met
+EVIDENCE: Observed lifecycle/issue-labels.test.ts, labels/file.test.ts and direct-operation-compatibility.test.ts passing at the target. They establish each verdict outcome, previewed labels, approved creation and missing-label refusal without writes. Inspected the investigate skill's requirement to show the preview before creation. No live agent filed an issue.
+
+CRITERION: AC-05 An issue spec files under acceptance or request carries one type label and no state label.
+VERDICT: met
+EVIDENCE: Observed spec filing scenarios passing at the target, including mapped type labels and refusal of a state verdict. Inspected the spec skill's mandatory helper route and filing rule. Verification used fake GitHub.
+
+CRITERION: AC-06 Triage's reference names the standard state labels as the labels its verdicts use, a state label applied outside the controller is still denied, and a triage `create-request` issue is created with no labels.
+VERDICT: met
+EVIDENCE: Observed vocabulary.test.ts and triage/execution.test.ts passing at the target. Every standard state label is denied outside the controller, and the real GitHub adapter sends an empty labels array for create-request. Inspected the corresponding reference text.
+
+CRITERION: AC-07 A `label_map` entry makes the plan, triage, investigate and spec treat the mapped repository label as the standard one, a mapping onto a label outside the standard set appears in the plan as a managed label with its color and description change, and an entry keyed by a non-standard name changes nothing. A map in which two standard labels share an effective name, case-insensitively, is refused when read. Stackweaver's current settings file still reads, and the triage settings reference describes these rules.
+VERDICT: met
+EVIDENCE: Observed mapped planning, investigate filing and spec filing scenarios passing at the target. The new triage scenario denies the mapped state label without proof and publishes ready-for-work with proof. Passing settings tests establish ignored non-standard keys, managed metadata changes, collision refusal and Stackweaver compatibility. cmp confirmed the fixture matches Stackweaver's current settings. Inspected the settings reference. Publication checks used fake adapters.
+
+CRITERION: AC-08 This repository has a `.vh-adlc/triage.yaml` that `vh-adlc settings read` accepts and a triage run in report-only mode reads.
+VERDICT: met
+EVIDENCE: Executed /usr/local/bin/vh-adlc settings read --stdin at the target: answered, exit 0. Executed triage settings, collect --mode sweep and report: all exited 0, the configured YAML was loaded, 10 issues were collected and every collection reported complete. Report saved under /tmp/sil-review-report-lmpxkqb3. No batch execution occurred.
+
+CRITERION: AC-09 `michielvha/vh-adlc` and `michielvha/stackweaver` each hold every standard label with the standard color and description, and no issue in either lost a label.
+VERDICT: met
+EVIDENCE: Executed read-only gh label list commands for both repositories and verified all nine standard definitions against the vocabulary. Independently compared retained before/after snapshots: 90 unique items for vh-adlc and 1082 for Stackweaver, with no missing item, lost label or changed updated_at value. Recomputed plan hashes matched the successful receipts. Historical preservation relies on the retained snapshots; no rollout was repeated.
+
+CRITERION: AC-10 The workflows user guide describes the standard label set and the helper, and the authority reference has the row for applying a label plan.
+VERDICT: met
+EVIDENCE: Inspected the workflows guide and authority row at the target and observed their vocabulary.test.ts checks passing.
+
+CRITERION: AC-11 A plugin installed from the branch's marketplace package, in an isolated profile, contains the labels helper and vocabulary file, both manifests carry the bumped version, and the installed `plan` produces the same label plan as the source helper for the same fixture.
+VERDICT: met
+EVIDENCE: Archived the exact target and installed its package through a local marketplace into a fresh credential-free profile under /tmp/sil-review-install-q3g6rbyu. Installation exited 0. Installed helper and reference files matched the target archive; both manifests read 0.19.0. Installed and source plan commands exited 0, used GET requests only and produced byte-identical plans with SHA-256 37c87c38bf152a593dbece57e7ef038de2fa1e01620df03c4696e161c88692dd. No published marketplace was checked.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: plugins/vh-adlc/references/issues.md:73-75
+EVIDENCE: The reference says plan prints each standard label's classification and the unmanaged labels. Executing cli.ts plan at the target printed numeric counts for present, missing, different and unmanaged, plus the writes. Individual classifications and unmanaged names appear only in the saved plan file, as cli.ts:49-54 confirms.
+PROPOSAL: Clarify that the saved plan contains individual classifications and unmanaged names, while stdout prints counts, the digest and planned writes.
