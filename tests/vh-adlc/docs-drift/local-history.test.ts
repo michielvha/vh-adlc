@@ -1,9 +1,10 @@
 /** Owned Git and observed-shaped invocation metadata fixtures, without model or hosted acceptance. */
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
+import * as fs from "node:fs";
 import { chmodSync, linkSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { source, portableRecord, deliverRecord, runtimeIdentity, pin, write, commit } from "./adoption-fixture";
-import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { canonicalDigest, canonicalJSON, compareUTF8, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { buildReport } from "../../../plugins/vh-adlc/scripts/docs-drift/report";
 import { collectLocalHistory, createLocalEnvelope } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { loadCommittedSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
@@ -16,6 +17,24 @@ afterAll(() => {
   if (failed) console.error("Preserved failed owned local-history metadata roots", JSON.stringify(roots));
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
+function withDirectoryOrder<T>(root: string, compare: (left: string, right: string) => number, run: () => T): T {
+  const open = fs.opendirSync;
+  let opened = 0;
+  const ordered = spyOn(fs, "opendirSync").mockImplementation((...args: Parameters<typeof fs.opendirSync>) => {
+    const directory = open(...args);
+    if (String(args[0]) === root) {
+      opened++;
+      const entries = fs.readdirSync(root, { withFileTypes: true }).sort((left, right) => compare(left.name, right.name));
+      directory.readSync = () => entries.shift() ?? null;
+    }
+    return directory;
+  });
+  try {
+    const result = run();
+    expect(opened).toBeGreaterThan(0);
+    return result;
+  } finally { ordered.mockRestore(); }
+}
 function fixture(expired = false, nonLocal = false) {
   const f = source(roots);
   f.configured.reports.interactive = "local-attestation"; f.configured.reports.local_history_roots = ["history"];
@@ -130,12 +149,16 @@ test.each(["current", "legacy"])("newer unsaved records cannot displace the save
     const bytes = canonicalJSON(savedReport);
     const { invocation_sha256: _digest, ...original } = f.invocation;
     const saved = { ...original, report_sha256: sha256(bytes) }, invocation = { ...saved, invocation_sha256: canonicalDigest(saved) };
-    const staged = stageLocalInvocation(f.context, invocation); staged.activate(() => {});
-    if (layout === "legacy") {
+    function register(value: OwnedInvocation) {
+      const staged = stageLocalInvocation({ ...f.context, run_id: value.id }, value); staged.activate(() => {});
       const path = join(f.cache, staged.reference.path), root = dirname(path);
-      const name = new Date(invocation.completed_at).toISOString().replaceAll(/[-:.]/gu, "") + "-" + staged.reference.sha256 + ".json";
-      if (!path.endsWith(name)) renameSync(path, join(dirname(root), name));
+      if (layout === "legacy") {
+        const name = new Date(value.completed_at).toISOString().replaceAll(/[-:.]/gu, "") + "-" + staged.reference.sha256 + ".json";
+        renameSync(path, join(dirname(root), name));
+      }
+      return staged.reference;
     }
+    const originalReference = register(invocation), registryRoot = dirname(dirname(join(f.cache, originalReference.path)));
     const pair = join(f.repo, "history", "saved"); mkdirSync(pair, { recursive: true, mode: 0o700 });
     writeFileSync(join(pair, "report.json"), bytes, { mode: 0o600 });
     writeFileSync(join(pair, "provenance.json"), createLocalEnvelope(bytes, invocation), { mode: 0o600 });
@@ -144,12 +167,14 @@ test.each(["current", "legacy"])("newer unsaved records cannot displace the save
     for (let i = 0; i < settings.reports.max_runs + 3; i++) {
       const entry = { ...saved, id: "unsaved-" + i,
         completed_at: new Date(Date.parse(invocation.completed_at) + 1000 + i).toISOString() };
-      stageLocalInvocation({ ...f.context, run_id: entry.id }, { ...entry, invocation_sha256: canonicalDigest(entry) }).activate(() => {});
+      register({ ...entry, invocation_sha256: canonicalDigest(entry) });
     }
     const recorded = createLocalInvocationReader(f.context);
-    const history = collectLocalHistory({ repo: f.repo, settings,
+    const collect = () => collectLocalHistory({ repo: f.repo, settings,
       context: { repository: settings.repository, scope_sha256: f.context.scope_sha256, run_id: "current", started_at: f.context.started_at },
       readInvocation: recorded.read });
+    const descending = (left: string, right: string) => compareUTF8(right, left);
+    const history = layout === "legacy" ? withDirectoryOrder(registryRoot, descending, collect) : collect();
     expect(history.records, JSON.stringify({ collection: history.diagnostics, registry: recorded.diagnostics })).toHaveLength(1);
     expect(history.records[0]?.sha256).toBe(sha256(bytes));
     const current = buildReport({ repository: settings.repository, scope_sha256: f.context.scope_sha256,
@@ -163,16 +188,17 @@ test.each(["current", "legacy"])("newer unsaved records cannot displace the save
       const laterBytes = canonicalJSON({ ...savedReport, run_id: name });
       const later = { ...saved, id: name, report_sha256: sha256(laterBytes) };
       const laterInvocation = { ...later, invocation_sha256: canonicalDigest(later) };
-      stageLocalInvocation({ ...f.context, run_id: name }, laterInvocation).activate(() => {});
+      register(laterInvocation);
       const directory = join(f.repo, "history", name); mkdirSync(directory, { mode: 0o700 });
       writeFileSync(join(directory, "report.json"), laterBytes, { mode: 0o600 });
       writeFileSync(join(directory, "provenance.json"), createLocalEnvelope(laterBytes, laterInvocation), { mode: 0o600 });
       for (const file of ["report.json", "provenance.json"]) utimesSync(join(directory, file), savedTime, savedTime);
     }
     const inspected: string[] = [];
-    const bounded = collectLocalHistory({ repo: f.repo, settings,
+    const collectBounded = () => collectLocalHistory({ repo: f.repo, settings,
       context: { repository: settings.repository, scope_sha256: f.context.scope_sha256, run_id: "current", started_at: f.context.started_at },
       readInvocation: wanted => { inspected.push(wanted.id); return recorded.read(wanted); } });
+    const bounded = layout === "legacy" ? withDirectoryOrder(registryRoot, descending, collectBounded) : collectBounded();
     expect(bounded.records).toHaveLength(settings.reports.max_runs);
     expect(bounded.diagnostics).toEqual([]);
     expect(inspected).toEqual(["z-newer-2", "z-newer-1"]);
@@ -207,12 +233,23 @@ test.each(["foreign", "fields", "schema", "kind", "invocation", "digest", "nonca
     const refused = createLocalInvocationReader(f.context);
     expect(refused.read(f.invocation)).toBeNull();
     expect(refused.diagnostics).toHaveLength(1);
+    if (fault === "bound") {
+      f.context.settings.reports.max_entry_bytes = bytes.length;
+      const atLimit = createLocalInvocationReader(f.context);
+      expect(atLimit.read(f.invocation)).toEqual(f.invocation);
+      expect(atLimit.diagnostics).toEqual([]);
+    }
     if (fault === "invocation") {
       // Both files share the timestamp. The wrong invocation must be skipped without hiding the requested record.
       const wanted = canonicalJSON({ ...record, invocation: f.invocation });
       writeFileSync(join(root, prefix + sha256(wanted) + ".json"), wanted, { mode: 0o600 });
       const matched = createLocalInvocationReader(f.context);
-      expect(matched.read(f.invocation)).toEqual(f.invocation);
+      const wrongFirst = (left: string, right: string) => {
+        if (left === basename(legacy)) return -1;
+        if (right === basename(legacy)) return 1;
+        return compareUTF8(left, right);
+      };
+      expect(withDirectoryOrder(root, wrongFirst, () => matched.read(f.invocation))).toEqual(f.invocation);
       expect(matched.diagnostics).toEqual([]);
     }
     expect(captureRepositoryState(f.repo)).toEqual(before);

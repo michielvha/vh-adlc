@@ -680,3 +680,31 @@ WHERE: tests/vh-adlc/docs-drift/local-history.test.ts, the saved-pair test lines
 EVIDENCE: context.md says the current tests carry the saved attention "even with more than max_runs newer unsaved eligible records plus wrong-scope and at-start records". Since T101, `collectLocalHistory` calls `readInvocation` lazily and only for the invocation named by each saved pair's envelope. The only saved pair is `history/saved`, so the reader opens only that one record. The unsaved, `future` and `old-scope` records are staged but never read or counted, and no assertion would notice if they were missing or if the reader rejected them. The test is still a valid regression: the first-red logs show the old registry window failing it. But the at-start and wrong-scope refusals it claims are covered only by the separate "at-start", "after-start" and "scope" fault cases. Nothing exercises the saved-pair window (max_runs = 2) with more than one saved pair either.
 PROPOSAL: Either remove the inert entries and narrow the context wording to "newer unsaved records cannot displace the saved pair", or make them do work. For example, save extra pairs whose envelopes name the `future` and `old-scope` invocations, assert that each one adds the reader diagnostic while the eligible pair still carries, and add a case where more than max_runs saved directories exist, so the single remaining window is pinned.
 ```
+
+## Component diagnostic 122
+
+Exact local target `bfe8bc52b1c6295836c8a333bb9e515d3ba883c7`. Actual Copilot Opus 5.5 with procedural isolation. All 62 required chunks were read with unchanged packet hashes, no outside paths and no private files sent. The test-only follow-up returns two should-fix test-construction findings and one byte-boundary nit. Original records follow before correction. Full feature acceptance remains open.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: tests/vh-adlc/docs-drift/local-history.test.ts, case "legacy invocation records require exact original metadata: invocation", the second phase after `// Both files share the timestamp.` Code under test: plugins/vh-adlc/scripts/docs-drift/local-history.ts, the `createLocalInvocationReader` legacy loop `while ((entry = directory.readSync()) !== null) { ... try { return read(root, entry.name, ...); } catch { /* A different invocation can share the same millisecond. */ } }`.
+EVIDENCE: The first phase does test the equality guard. With only the other invocation's file present, `read` must return null. The second phase writes the requested record beside it and expects `matched.read(f.invocation)` to equal `f.invocation`. That proves the reader skips past a wrong invocation only when `opendirSync().readSync()` returns the other file first. The filesystem decides that order, and the test does not control it. Both filenames contain `sha256` of bytes that depend on `Date.now()`, so the order can change from run to run. When the requested file comes first, the case passes even if the inner `try/catch` is removed or the loop stops at the first matching prefix. context.md asks whether same-stamp matching "is actually exercised". The case proves that the other invocation alone is refused and that the requested record is found when both exist. It does not reliably prove that the reader continues past the refusal.
+PROPOSAL: Make the order deterministic. For example, use `spyOn(fs, "opendirSync")` the way local-history-output.test.ts already uses `spyOn(fs, ...)`, and return the other entry before the requested one. Another option is to run the second phase under both orders. Then assert the requested result and no diagnostics.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: tests/vh-adlc/docs-drift/local-history.test.ts, `test.each(["current", "legacy"])("newer unsaved records cannot displace the saved report: %s")`, the `legacy` variant: the `unsaved-` loop and the `z-newer-1`/`z-newer-2` loop.
+EVIDENCE: In the `legacy` variant, only the saved invocation is renamed to the timestamp-addressed name in the registry root (`renameSync(path, join(dirname(root), name))`). Every `unsaved-N` record and both `z-newer-*` records come from `stageLocalInvocation` and stay in the indexed `by-invocation/` layout. The legacy root therefore holds one legacy file. No newer legacy record can ever compete with it, so the variant does not test the production claim that legacy records stay readable "without a second max_runs window". Adding a max_runs entry counter to the legacy loop would still pass with max_runs = 2. Also, the two pairs in the window are both indexed in this variant, so the window assertion reads no legacy record. context.md says the regression covers "both current and legacy storage layouts", but the legacy half covers only the single saved lookup.
+PROPOSAL: In the `legacy` variant, rename each `unsaved-N` and `z-newer-*` record to its `stamp(completed_at)-sha256(bytes).json` name in the registry root, as the saved record already is. Then more than max_runs newer legacy files share the directory with the saved record, and the window reads legacy records. Keep the same assertions.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/docs-drift/local-history.test.ts, case "legacy invocation records require exact original metadata: bound" (`f.context.settings.reports.max_entry_bytes = bytes.length - 1`). Code under test: local-history.ts `if (bytes.length > Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes))`.
+EVIDENCE: The case checks only a limit one byte under the record size. No case accepts a legacy record whose size equals the limit. If `>` changed to `>=`, the matrix would still pass, so the boundary of the retained-byte guard is not pinned.
+PROPOSAL: Add an at-limit control: set `max_entry_bytes = bytes.length` and expect the legacy record to be returned with no diagnostics, next to the existing one-byte-under refusal.
+```
