@@ -31,7 +31,8 @@ set -eu
 printf ran >> "${rendered}"
 [ "${"$"}{VH_TEST_EXPORT_FAIL:-}" != 1 ] || exit 7
 while [ "$1" != --output ]; do shift; done
-printf '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20"/></svg>' > "$2"
+if [ "${"$"}{VH_TEST_MUTATE_SOURCE:-}" = 1 ]; then printf '\n' >> "$3"; fi
+printf '%s' "${"$"}{VH_TEST_SVG:-<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><rect width='20' height='20'/></svg>}" > "$2"
 `, { mode: 0o700 });
   const args = (destination = target) => [
     "bun", tool, "--diagram", source, "--brief", brief, "--output", destination, "--drawio", renderer,
@@ -100,4 +101,25 @@ done
   expect(readFileSync(join(f.target, "architecture.drawio"), "utf8")).toEqual(readFileSync(f.source, "utf8"));
   expect(readFileSync(join(f.target, "architecture.svg"), "utf8")).toContain("<rect width=");
   expect(readFileSync(join(f.target, "brief.md"), "utf8")).toBe("# Evidence\n");
+});
+
+test("a successful renderer exit with only SVG definitions leaves no published diagram", () => {
+  const f = fixture();
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg"><defs><rect width="20" height="20"/></defs><g/></svg>';
+  const result = run(f.args(), { ...process.env, VH_TEST_SVG: svg });
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain("returned an empty or invalid SVG");
+  expect(readdirSync(f.dir)).not.toContain("diagram");
+  expect(readdirSync(f.dir).some(name => name.startsWith(".vh-diagram-"))).toBe(false);
+  expect(run(f.args()).exitCode).toBe(0);
+});
+
+test("a renderer that modifies the staged drawing leaves no published diagram", () => {
+  const f = fixture();
+  const source = readFileSync(f.source, "utf8");
+  const result = run(f.args(), { ...process.env, VH_TEST_MUTATE_SOURCE: "1" });
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toContain("changed the staged drawing");
+  expect(readFileSync(f.source, "utf8")).toBe(source);
+  expect(readdirSync(f.dir)).not.toContain("diagram");
 });

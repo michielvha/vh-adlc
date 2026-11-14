@@ -6,7 +6,10 @@ import { parseArgs } from "node:util";
 function command(args: string[], description: string): string {
   const result = Bun.spawnSync(args, { stdout: "pipe", stderr: "pipe", timeout: 60_000 });
   if (result.exitCode !== 0) {
-    throw new Error(description + ": " + result.stderr.toString().trim().slice(0, 1600));
+    const detail = result.exitedDueToTimeout
+      ? "command timed out after 60 seconds"
+      : result.stderr.toString().trim().slice(0, 1600) || (result.signalCode ?? "exit " + result.exitCode);
+    throw new Error(description + ": " + detail);
   }
   return result.stdout.toString().trim();
 }
@@ -21,10 +24,14 @@ function present(path: string): boolean {
   }
 }
 
+function digestFile(path: string): string {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
+}
+
 function verifyHash(path: string, expected: string): void {
   if (!/^[0-9a-f]{64}$/.test(expected)) throw new Error("Expected a lowercase SHA-256 for " + path);
   if (!present(path)) throw new Error("Missing configured asset: " + path);
-  const actual = createHash("sha256").update(readFileSync(path)).digest("hex");
+  const actual = digestFile(path);
   if (actual !== expected) throw new Error("SHA-256 mismatch: " + path);
 }
 
@@ -34,7 +41,10 @@ function validateFile(path: string, kind: "diagram" | "svg", schema?: string): v
   const checked = kind === "svg" ? source.replace('<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">', "") : source;
   if (/<!DOCTYPE|<!ENTITY/i.test(checked)) throw new Error("Document type and entity declarations are unsupported: " + path);
   if (kind === "svg") {
-    const count = command(["xmllint", "--nonet", "--xpath", "count(/*[local-name()='svg' and namespace-uri()='http://www.w3.org/2000/svg']/*)", path], "SVG validation failed");
+    const root = "/*[local-name()='svg' and namespace-uri()='http://www.w3.org/2000/svg']";
+    const graphic = "contains('|path|rect|circle|ellipse|line|polyline|polygon|text|image|use|foreignObject|', concat('|', local-name(), '|'))";
+    const definition = "ancestor::*[contains('|defs|clipPath|mask|marker|pattern|symbol|', concat('|', local-name(), '|'))]";
+    const count = command(["xmllint", "--nonet", "--xpath", "count(" + root + "//*[namespace-uri()='http://www.w3.org/2000/svg' and " + graphic + " and not(" + definition + ")])", path], "SVG validation failed");
     if (!(Number(count) > 0)) throw new Error("draw.io export returned an empty or invalid SVG");
     return;
   }
@@ -98,7 +108,9 @@ function main() {
     copyFileSync(brief, savedBrief);
     if (!readFileSync(savedBrief, "utf8").trim()) throw new Error("The brief is empty");
     validateFile(saved, "diagram", schemaPath);
+    const validatedDrawing = digestFile(saved);
     command([drawio, "--export", "--format", "svg", "--border", "12", "--output", svg, saved], "draw.io export failed (check the local graphical environment)");
+    if (digestFile(saved) !== validatedDrawing) throw new Error("draw.io export changed the staged drawing");
     if (!present(svg)) throw new Error("draw.io export failed to produce an SVG");
     validateFile(svg, "svg");
     try {
