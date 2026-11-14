@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
-import { afterMerge, apply, digest, observe, parseOrigin, spawn, type Run } from "../../../plugins/vh-adlc/scripts/branches/branches";
+import { delimiter, dirname, join, resolve } from "node:path";
+import { afterMerge, apply, digest, observe, parseOrigin, spawn, type Operation, type Options, type Plan, type Run } from "../../../plugins/vh-adlc/scripts/branches/branches";
 
 const fakeGh = resolve(import.meta.dir, "fake-gh.ts"), cli = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/branches/cli.ts");
 const identity = { GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.invalid", GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.invalid" };
@@ -27,7 +27,7 @@ function branch(work: string, name: string): string {
 const pr = (number: number, ref: string, sha: string, merged = true) => ({ number, state: merged ? "closed" : "open", merged_at: merged ? "2026-11-01T00:00:00Z" : null, head: { ref, sha, repo: { full_name: "acme/demo" } }, base: { ref: "main" } });
 
 function fixture(pulls: (f: { work: string; origin: string }) => unknown[] = () => []) {
-  const dir = mkdtempSync(join(tmpdir(), "vh-branches-")), origin = join(dir, "origin.git"), work = join(dir, "work"), state = join(dir, "state.json");
+  const dir = realpathSync(mkdtempSync(join(tmpdir(), "vh-branches-"))), origin = join(dir, "origin.git"), work = join(dir, "work"), state = join(dir, "state.json");
   git(dir, "init", "-q", "--bare", origin); git(dir, "clone", "-q", origin, work);
   commit(work, "base"); git(work, "push", "-q", "origin", "HEAD:main");
   const write = (value: Record<string, unknown>) => writeFileSync(state, JSON.stringify({ repository: "acme/demo", repo: { default_branch: "main", delete_branch_on_merge: false }, protected: [], pulls: [], ...value }));
@@ -43,6 +43,32 @@ function fixture(pulls: (f: { work: string; origin: string }) => unknown[] = () 
 const heads = (origin: string) => bare(origin, "for-each-ref", "--format=%(refname:short)", "refs/heads").split("\n").filter(Boolean).sort();
 const locals = (work: string) => git(work, "for-each-ref", "--format=%(refname:short)", "refs/heads").split("\n").filter(Boolean).sort();
 const summary = (ops: { kind: string; branch?: string; ref?: string }[]) => ops.map(op => op.branch ?? op.ref ? `${op.kind}:${op.branch ?? op.ref}` : op.kind);
+const ignores = ["node_modules/", ".env", "build out/", "caché/", ".claude/"].join("\n") + "\n";
+function put(root: string, files: Record<string, string>) {
+  for (const [name, text] of Object.entries(files)) { mkdirSync(dirname(join(root, name)), { recursive: true }); writeFileSync(join(root, name), text); }
+}
+const listing = (root: string) => (readdirSync(root, { recursive: true }) as string[]).sort();
+/** A fixture whose main ignores build output; `merged` adds a worktree on a new branch with one merged-PR commit. */
+function repo(quiet = false) {
+  const f = fixture(), pulls: unknown[] = [];
+  if (quiet) git(f.work, "config", "status.showUntrackedFiles", "no");
+  put(f.work, { ".gitignore": ignores }); git(f.work, "add", ".gitignore"); git(f.work, "commit", "-q", "-m", "ignore build output"); git(f.work, "push", "-q", "origin", "main");
+  const merged = (name: string, opts: { at?: string; add?: string[]; setup?: (path: string) => void } = {}) => {
+    const path = opts.at ?? join(f.dir, name), ref = `feat/${name}`;
+    git(f.work, ...(opts.add ?? []), "worktree", "add", "-q", "-b", ref, path, "main");
+    put(path, { [`${name}.txt`]: `${name}\n` }); opts.setup?.(path);
+    git(path, "add", "-A"); git(path, "commit", "-q", "-m", name); git(path, "push", "-q", "-u", "origin", ref);
+    pulls.push(pr(pulls.length + 1, ref, git(path, "rev-parse", "HEAD"))); f.write({ pulls });
+    return path;
+  };
+  return { ...f, merged, plan: (run?: Run) => observe(run ? { ...f.options, run } : f.options).plan };
+}
+const approve = (options: Options, plan: Plan) => { const text = JSON.stringify(plan); return apply(options, text, digest(text)); };
+const removal = (plan: Plan, path: string) => plan.operations.find((o): o is Extract<Operation, { kind: "remove-worktree" }> => o.kind === "remove-worktree" && o.path === path);
+const keptTrees = (plan: Plan, path: string) => plan.kept.filter(k => k.scope === "worktree" && k.path === path).map(k => k.reason);
+const why = (plan: Plan, path: string) => keptTrees(plan, path).join(" | ");
+const localWhy = (plan: Plan, branch: string) => plan.kept.find(k => k.scope === "local" && k.branch === branch)?.reason ?? "";
+const listed = (f: { work: string }) => git(f.work, "worktree", "list", "--porcelain");
 /** Runs cli.ts with the fake gh first on PATH. */
 function cliFor(f: { dir: string; state: string }) {
   const shim = join(f.dir, "bin");
@@ -265,3 +291,174 @@ test("apply refuses a plan written in the previous format", () => {
   expect(applied.err).toContain("unsupported branch plan");
   expect(locals(f.work)).toContain("feat/old");
 }, 60000);
+
+for (const quiet of [false, true]) test(`a merged worktree holding only ignored files is planned with each ignored path's files and bytes, then removed with its branch${quiet ? " under status.showUntrackedFiles=no" : ""}`, () => {
+  const f = repo(quiet);
+  const deps = f.merged("deps"), names = f.merged("names");
+  put(deps, { "node_modules/a/index.js": "module.exports = 1;\n", "node_modules/b/package.json": "{}\n", ".env": "TOKEN=x\n" });
+  symlinkSync("../a", join(deps, "node_modules/b/a"));
+  put(names, { "build out/x.o": "12345", "caché/y": "ab" });
+  const plan = f.plan();
+  expect(removal(plan, deps)).toMatchObject({ branch: "feat/deps", ignored: [{ path: ".env", files: 1, bytes: 8 }, { path: "node_modules/", files: 3, bytes: 27 }] });
+  expect(removal(plan, names)?.ignored).toEqual([{ path: '"build out/"', files: 1, bytes: 5 }, { path: '"cach\\303\\251/"', files: 1, bytes: 2 }]);
+  const result = approve(f.options, plan);
+  expect(result.complete, JSON.stringify(result.outcomes)).toBe(true);
+  for (const path of [deps, names]) { expect(existsSync(path)).toBe(false); expect(listed(f)).not.toContain(path); }
+  expect(locals(f.work)).toEqual(["main"]);
+}, 120000);
+
+for (const quiet of [false, true]) test(`a worktree with a changed or untracked file beside ignored node_modules is kept and survives apply${quiet ? " under status.showUntrackedFiles=no" : ""}`, () => {
+  const f = repo(quiet);
+  const changed = f.merged("changed"), untracked = f.merged("untracked");
+  for (const path of [changed, untracked]) put(path, { "node_modules/a/index.js": "x\n" });
+  const twin = f.plan();
+  expect([removal(twin, changed)?.branch, removal(twin, untracked)?.branch]).toEqual(["feat/changed", "feat/untracked"]);
+  put(changed, { "changed.txt": "edited\n" }); put(untracked, { "notes.md": "draft\n" });
+  const plan = f.plan();
+  for (const [path, name] of [[changed, "changed"], [untracked, "untracked"]] as const) {
+    expect(removal(plan, path)).toBeUndefined();
+    expect(why(plan, path)).toContain("changed or untracked files");
+    expect(localWhy(plan, `feat/${name}`)).toContain(path);
+  }
+  const before = [listing(changed), listing(untracked)];
+  approve(f.options, twin);
+  expect([listing(changed), listing(untracked)]).toEqual(before);
+  expect(readFileSync(join(changed, "changed.txt"), "utf8")).toBe("edited\n");
+  for (const path of [changed, untracked]) expect(listed(f)).toContain(`worktree ${path}`);
+  expect(locals(f.work)).toEqual(["feat/changed", "feat/untracked", "main"]);
+}, 120000);
+
+test("a worktree with another worktree or any .git inside its ignored .claude/ is kept", () => {
+  const f = repo();
+  const outer = f.merged("outer"), holder = f.merged("holder");
+  const inner = join(outer, ".claude", "worktrees", "inner"), nested = join(holder, ".claude", "repo");
+  git(f.work, "worktree", "add", "-q", "-b", "feat/inner", inner, "main"); put(inner, { "wip.txt": "wip\n" });
+  git(f.dir, "init", "-q", nested); put(nested, { "notes.txt": "notes\n" });
+  const plan = f.plan();
+  expect(removal(plan, outer)).toBeUndefined();
+  expect(why(plan, outer)).toContain(`another worktree inside it: ${inner}`);
+  expect(removal(plan, holder)).toBeUndefined();
+  expect(why(plan, holder)).toContain(".git inside ignored path .claude/");
+  expect(localWhy(plan, "feat/holder")).toContain(holder);
+}, 120000);
+
+test("a worktree with an initialized or a deinitialized submodule is kept", () => {
+  const f = repo(), lib = join(f.dir, "lib");
+  git(f.dir, "init", "-q", lib); commit(lib, "lib");
+  const sub = (path: string) => { git(path, "-c", "protocol.file.allow=always", "submodule", "add", "-q", lib, "lib"); };
+  const live = f.merged("live", { setup: sub }), gone = f.merged("gone", { setup: sub });
+  git(gone, "submodule", "deinit", "-q", "-f", "lib");
+  expect(existsSync(join(f.work, ".git", "worktrees", "gone", "modules"))).toBe(true);
+  const plan = f.plan();
+  for (const path of [live, gone]) { expect(removal(plan, path)).toBeUndefined(); expect(why(plan, path)).toContain("submodule"); }
+}, 120000);
+
+test("a worktree hiding a change behind skip-worktree or assume-unchanged is kept", () => {
+  const f = repo();
+  const skip = f.merged("skip"), assume = f.merged("assume");
+  put(skip, { "skip.txt": "hidden\n" }); git(skip, "update-index", "--skip-worktree", "skip.txt");
+  put(assume, { "assume.txt": "hidden\n" }); git(assume, "update-index", "--assume-unchanged", "assume.txt");
+  expect(git(skip, "status", "--porcelain") + git(assume, "status", "--porcelain")).toBe("");
+  const plan = f.plan();
+  expect(removal(plan, skip)).toBeUndefined();
+  expect(why(plan, skip)).toContain("skip-worktree entry skip.txt");
+  expect(removal(plan, assume)).toBeUndefined();
+  expect(why(plan, assume)).toContain("assume-unchanged entry assume.txt");
+}, 120000);
+
+test("a worktree with a directory the user cannot read, enter or write is kept, and apply leaves every file", () => {
+  const f = repo();
+  const sealed = f.merged("sealed"), readonly = f.merged("readonly"), noenter = f.merged("noenter"), noread = f.merged("noread"), hidden = f.merged("hidden");
+  for (const path of [readonly, noenter, noread, hidden]) put(path, { "node_modules/pkg/index.js": "x\n" });
+  const twin = f.plan();
+  put(sealed, { "scratch/data.txt": "data\n" });
+  const trees = [sealed, readonly, noenter, noread, hidden], before = trees.map(listing);
+  const modes: [string, number][] = [[join(sealed, "scratch"), 0o000], [join(readonly, "node_modules/pkg"), 0o555], [join(noenter, "node_modules/pkg"), 0o600], [join(noread, "node_modules/pkg"), 0o300], [join(hidden, "node_modules"), 0o000]];
+  try {
+    for (const [dir, mode] of modes) chmodSync(dir, mode);
+    const plan = f.plan();
+    for (const path of trees) expect(removal(plan, path)).toBeUndefined();
+    expect(why(plan, sealed)).toContain("cannot read, enter or write scratch");
+    for (const path of [readonly, noenter, noread]) expect(why(plan, path)).toContain("cannot read, enter or write node_modules/pkg");
+    expect(why(plan, hidden)).toContain("cannot read ignored path node_modules/");
+    approve(f.options, twin);
+  } finally {
+    for (const [dir] of modes) chmodSync(dir, 0o755);
+  }
+  expect(trees.map(listing)).toEqual(before);
+  for (const path of trees) expect(listed(f)).toContain(`worktree ${path}`);
+  expect(locals(f.work)).toEqual(["feat/hidden", "feat/noenter", "feat/noread", "feat/readonly", "feat/sealed", "main"]);
+}, 120000);
+
+test("a worktree whose status check fails, times out or writes to stderr is kept", () => {
+  const f = repo();
+  const failing = f.merged("failing"), slow = f.merged("slow"), noisy = f.merged("noisy");
+  const run: Run = argv => {
+    if (!argv.includes("status")) return f.run(argv);
+    if (argv.includes(failing)) return { code: 128, stdout: "", stderr: "fatal: index file corrupt\n" };
+    if (argv.includes(slow)) return { code: 1, stdout: "", stderr: "", timedOut: true };
+    const real = f.run(argv);
+    return argv.includes(noisy) ? { ...real, stderr: "warning: could not open directory 'x/': Permission denied\n" } : real;
+  };
+  const plan = f.plan(run);
+  for (const path of [failing, slow, noisy]) expect(removal(plan, path)).toBeUndefined();
+  expect(why(plan, failing)).toContain("status check failed (exit 128)");
+  expect(why(plan, slow)).toContain("status check timed out");
+  expect(why(plan, noisy)).toContain("status check wrote to stderr");
+}, 120000);
+
+test("a worktree with a per-worktree ref is kept with its directory present or missing", () => {
+  const f = repo();
+  const here = f.merged("here"), gone = f.merged("gone");
+  for (const path of [here, gone]) git(path, "update-ref", "refs/worktree/keep", "HEAD");
+  rmSync(gone, { recursive: true, force: true });
+  const plan = f.plan();
+  for (const path of [here, gone]) { expect(removal(plan, path)).toBeUndefined(); expect(why(plan, path)).toContain("per-worktree ref"); }
+}, 120000);
+
+for (const onBranch of [false, true]) test(`two admin directories naming one missing path keep every entry with that path (${onBranch ? "one on a merged branch" : "both detached"})`, () => {
+  const f = repo(), p1 = join(f.dir, "p1", "w"), p2 = join(f.dir, "p2", "w"), admin = join(f.work, ".git", "worktrees");
+  git(f.work, "worktree", "add", "-q", "--detach", p1, "main");
+  if (onBranch) f.merged("w", { at: p2 }); else git(f.work, "worktree", "add", "-q", "--detach", p2, "main");
+  rmSync(p2, { recursive: true, force: true });
+  copyFileSync(join(admin, "w1", "gitdir"), join(admin, "w", "gitdir"));
+  const plan = f.plan();
+  expect(keptTrees(plan, p2)).toHaveLength(2);
+  for (const reason of keptTrees(plan, p2)) expect(reason).toContain("admin directory");
+  expect(plan.operations.filter(o => o.kind === "remove-worktree")).toEqual([]);
+  if (onBranch) expect(localWhy(plan, "feat/w")).toContain(p2);
+}, 120000);
+
+test("a checkout moved over another's path keeps both entries and the admin directory it uses", () => {
+  const f = repo(), p1 = join(f.dir, "p1", "w"), p2 = join(f.dir, "p2", "w");
+  f.merged("a", { at: p1 }); f.merged("b", { at: p2 });
+  rmSync(p1, { recursive: true, force: true }); renameSync(p2, p1);
+  const plan = f.plan();
+  for (const path of [p1, p2]) expect(why(plan, path)).toContain("admin directory");
+  expect(plan.operations.filter(o => o.kind === "remove-worktree")).toEqual([]);
+  approve(f.options, plan);
+  expect(existsSync(join(f.work, ".git", "worktrees", "w1"))).toBe(true);
+  expect(locals(f.work)).toEqual(["feat/a", "feat/b", "main"]);
+}, 120000);
+
+test("a worktree added with relative paths is matched to its admin directory and removed like any other", () => {
+  const f = repo();
+  const rel = f.merged("rel", { add: ["-c", "worktree.useRelativePaths=true"] });
+  put(rel, { ".env": "A=1\n" });
+  expect(readFileSync(join(f.work, ".git", "worktrees", "rel", "gitdir"), "utf8")).not.toStartWith("/");
+  const plan = f.plan();
+  expect(removal(plan, rel)?.ignored).toEqual([{ path: ".env", files: 1, bytes: 4 }]);
+  expect(approve(f.options, plan).complete).toBe(true);
+  expect(existsSync(rel)).toBe(false);
+  expect(locals(f.work)).toEqual(["main"]);
+}, 120000);
+
+test("a linked worktree on the default branch or an unborn branch has a worktree kept record", () => {
+  const f = repo(), onMain = join(f.dir, "on-main"), orphan = join(f.dir, "orphan");
+  git(f.work, "worktree", "add", "-q", "--force", onMain, "main");
+  git(f.work, "worktree", "add", "-q", "--orphan", "-b", "feat/orphan", orphan);
+  const plan = f.plan();
+  expect(why(plan, onMain)).toContain("the default branch main is checked out");
+  expect(why(plan, orphan)).toContain("unborn branch");
+  expect(plan.operations.filter(o => o.kind === "remove-worktree")).toEqual([]);
+}, 120000);
