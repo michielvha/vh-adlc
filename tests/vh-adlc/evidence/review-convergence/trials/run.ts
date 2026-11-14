@@ -48,7 +48,9 @@ function build(script: string, out: string): Repo[] {
     .map((l) => JSON.parse(l) as Repo);
 }
 
-const DOCS = `the docs pages are cached under ~/.cache/vh-adlc/docs/${PIN}/`;
+// Where the sessions find the cache the runner fills, named the way a session sees its own home.
+const CACHE_HINT = `${process.platform === "darwin" ? "~/Library/Caches" : "~/.cache"}/vh-adlc/docs/${PIN}/`;
+const DOCS = `the docs pages are cached under ${CACHE_HINT}`;
 const AUTHOR_SETUP = `Follow the spec skill at ${SKILL} (read it first; the plugin directory for its \`references/\` paths is ${PLUGIN}). Use the binary ${BINARY} with \`--plugin-pin ${PIN}\`; ${DOCS}.`;
 
 function reviewerPrompt(r: Repo, lens = ""): string {
@@ -59,7 +61,7 @@ Dispatch:
 - Document path: docs/specs/feature.md
 - Commit: ${r.commit}
 - Review kind: spec
-- Resolved vhco-pro/docs revision: ${PIN} (cached pages under ~/.cache/vh-adlc/docs/${PIN}/)
+- Resolved vhco-pro/docs revision: ${PIN} (cached pages under ${CACHE_HINT})
 - Verified vh-adlc binary: ${BINARY}
 - Plugin pin: ${PIN}${lens}
 
