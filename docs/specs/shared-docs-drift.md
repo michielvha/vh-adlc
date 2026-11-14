@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Local receipt fixes and repository gates pass. Copilot R62 returns one owner choice about newly valid double-star feature coverage and three corrected prose nits. Main is reconciled locally; accepted normative scope remains unchanged pending that decision and spec re-review. Current-result verification, carried delivery and migration remain open."
+status: draft
+status_description: "The owner selected full current-gate coverage parity on 2026-11-14. Revising the accepted matcher requirement for a fresh Copilot spec review. Verified receipt work is retained on the feature branch."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
