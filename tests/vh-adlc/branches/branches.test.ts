@@ -6,11 +6,17 @@ import { afterMerge, apply, digest, observe, parseOrigin, spawn, type Operation,
 
 const fakeGh = resolve(import.meta.dir, "fake-gh.ts"), cli = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/branches/cli.ts");
 const identity = { GIT_AUTHOR_NAME: "Fixture", GIT_AUTHOR_EMAIL: "fixture@example.invalid", GIT_COMMITTER_NAME: "Fixture", GIT_COMMITTER_EMAIL: "fixture@example.invalid" };
-function git(cwd: string, ...args: string[]): string {
-  const r = Bun.spawnSync(["git", "-C", cwd, "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main", ...args], { stdout: "pipe", stderr: "pipe", env: { ...process.env, ...identity } });
+function gitWith(env: Record<string, string>, cwd: string, ...args: string[]): string {
+  const r = Bun.spawnSync(["git", "-C", cwd, "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main", ...args], { stdout: "pipe", stderr: "pipe", env: { ...process.env, ...identity, ...env } });
   if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr}`);
   return r.stdout.toString().trim();
 }
+const git = (cwd: string, ...args: string[]) => gitWith({}, cwd, ...args);
+/** Runs git as if `days` days ago: commits and reflog entries take this date. */
+const aged = (days: number, cwd: string, ...args: string[]) => {
+  const when = `@${Math.floor(Date.now() / 1000 - days * 24 * 3600)} +0000`;
+  return gitWith({ GIT_COMMITTER_DATE: when, GIT_AUTHOR_DATE: when }, cwd, ...args);
+};
 const bare = (origin: string, ...args: string[]) => git(origin, `--git-dir=${origin}`, ...args);
 function commit(work: string, name: string): string {
   writeFileSync(join(work, name.replace(/\W/g, "-") + ".txt"), name + "\n");
@@ -550,4 +556,47 @@ test("a branch checked out in two worktrees stays until both are removed", () =>
   expect(readFileSync(join(second, "notes.md"), "utf8")).toBe("draft\n");
   expect(listed(f)).toContain(`worktree ${second}`);
   expect(locals(f.work)).toContain("feat/twice");
+}, 120000);
+
+test("a local branch with no commits of its own goes at seven days old, aged by its oldest reflog entry or else its tip's date", () => {
+  const f = repo();
+  put(f.work, { "eight.txt": "8\n" }); git(f.work, "add", "-A"); aged(8, f.work, "commit", "-q", "-m", "eight days ago");
+  const eight = git(f.work, "rev-parse", "HEAD");
+  put(f.work, { "one.txt": "1\n" }); git(f.work, "add", "-A"); aged(1, f.work, "commit", "-q", "-m", "one day ago");
+  const one = git(f.work, "rev-parse", "HEAD");
+  commit(f.work, "today"); git(f.work, "push", "-q", "origin", "main");
+  const tip = join(f.dir, "tip");
+  aged(8, f.work, "worktree", "add", "-q", "-b", "feat/tip", tip, "main");
+  aged(8, f.work, "branch", "feat/older", one);
+  aged(1, f.work, "branch", "feat/young", eight);
+  git(f.work, "branch", "feat/expired-old", eight); git(f.work, "branch", "feat/expired-young", one);
+  for (const name of ["feat/expired-old", "feat/expired-young"]) rmSync(join(f.work, ".git", "logs", "refs", "heads", name));
+  expect(git(f.work, "reflog", "show", "refs/heads/feat/expired-old")).toBe("");
+  const plan = f.plan(), ops = summary(plan.operations);
+  expect(ops).toEqual(expect.arrayContaining(["remove-worktree:feat/tip", "delete-local:feat/tip", "delete-local:feat/older", "delete-local:feat/expired-old"]));
+  expect(removal(plan, tip)?.branch).toBe("feat/tip");
+  for (const name of ["feat/young", "feat/expired-young"]) {
+    expect(ops).not.toContain(`delete-local:${name}`);
+    expect(localWhy(plan, name)).toContain("points at a commit on main's own history");
+  }
+  const result = approve(f.options, plan);
+  expect(result.complete, JSON.stringify(result.outcomes)).toBe(true);
+  expect(existsSync(tip)).toBe(false);
+  expect(listed(f)).not.toContain(tip);
+  expect(locals(f.work)).toEqual(["feat/expired-young", "feat/young", "main"]);
+}, 120000);
+
+test("a seven-day-old branch at the default tip stays, with a reason, while its worktree is kept", () => {
+  const f = repo(), busy = join(f.dir, "busy"), held = join(f.dir, "held");
+  aged(8, f.work, "worktree", "add", "-q", "-b", "feat/busy", busy, "main");
+  aged(8, f.work, "worktree", "add", "-q", "-b", "feat/held", held, "main");
+  put(busy, { "notes.md": "draft\n" });
+  git(f.work, "worktree", "lock", "--reason", "vh-adlc test-run", held);
+  const plan = f.plan(), ops = summary(plan.operations);
+  for (const [path, name, rule] of [[busy, "feat/busy", "changed or untracked files"], [held, "feat/held", "locked"]] as const) {
+    expect(ops).not.toContain(`remove-worktree:${name}`);
+    expect(ops).not.toContain(`delete-local:${name}`);
+    expect(why(plan, path)).toContain(rule);
+    expect(localWhy(plan, name)).toContain(`merged but checked out in a kept worktree (${path})`);
+  }
 }, 120000);
