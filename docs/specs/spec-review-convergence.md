@@ -511,6 +511,7 @@ and R-16 F-01 to F-03 are applied. The owner accepts in advance if R-17 has no b
 | 2026-11-14 | R-17 | spec | `db1d531` | claude-opus-5-5 | procedural | Clean: no blocking finding; six should-fix and three nits, listed for implementation |
 | 2026-11-14 | R-17 | spec | `db1d531` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-18 | spec | `94f54d5` | claude-opus-5-5 | procedural | Clean drift re-review after PR 88: no blocking finding; six should-fix and four nits, listed for implementation |
+| 2026-11-14 | R-19 | spec | `7cd780a` | claude-opus-5-5 | procedural | Clean drift re-review after PR 89: no blocking finding; four should-fix and five nits, listed for implementation |
 
 ### R-1
 
@@ -1527,3 +1528,68 @@ SEVERITY: nit
 WHERE: Tasks T12 (line 395); Acceptance Criteria AC-08 (lines 355-358)
 EVIDENCE: The document maps the workflows-guide sentence "no approval allows rewriting a commit that a Review Log row names" to AC-08, in AC-08, its Test Plan row and T12. The test names it "(AC-10, R-15 F-06)" (tests/vh-adlc/review-convergence.test.ts:71). An implementation review that maps tests to criteria by name would then file it under the wrong criterion.
 PROPOSAL: Rename the test to cite AC-08, matching the document.
+
+### R-19
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Applying a pass's findings as one revision (lines 216-230); Design, Behaviors these rules touch (lines 188-194); Context, Owner summary (lines 59-64); Acceptance Criteria AC-09 (lines 366-371); Test Plan AC-09 row (line 397)
+EVIDENCE: The design has the author raise a pass's judgement findings first and hold back its factual findings and nits until the owner answers. Nothing records that they are waiting. The implementation at 7cd780a follows the design: review mode step 4 says to raise the questions "first, without changing the baseline. Once the owner has answered, apply every factual finding" (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:87-96), and names no place where the pending pass is written down. If the answer arrives in a later session and leaves the baseline unchanged, the review stays fresh and clean and `next` returns owner acceptance (conventions/feature-documents.md:313 at 1ccf8f3). The resume skill runs `vh-adlc fresh` and `vh-adlc next` and continues with that step (plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md:25), so the held findings are dropped. The Behaviors list claims "an interrupted or resumed run" was checked, but the author-ac09-judgement trial gets its answer in the same run, and the resume skill is not in covers. This is the same gap as R-17 F-02 and R-18 F-02, and the implementation left it open.
+PROPOSAL: State where a pending pass is recorded when its questions are raised, for example in status_description or beside the questions, naming R-n and saying its factual findings and nits wait for the answers. Require the spec and resume operations to apply them with the answers before dispatching a review or asking for acceptance, and add an AC-09 case where the answer arrives in a separate session.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-11 (lines 378-383); Test Plan AC-11 row (line 399); Design, Nits ride along or are listed (lines 202-214); Context, Owner summary (lines 50-54); Tasks T6 (line 419)
+EVIDENCE: AC-11 makes a free-text widening nit the one nit that "stays listed" instead of riding along. The AC-11 scenario's first pass (tests/vh-adlc/evidence/review-convergence/canned/nits/pass-1.txt) holds one blocking finding and three nits: a factual nit on Design, a judgement nit on Scope and a factual nit on Context. None is a widening nit. The AC-05 trial checks only how the reviewer rates such a nit. The reviewer half of R-18 F-03 is now in place, because the agent says to flag a widening nit in `EVIDENCE` (plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:55-56). The author half is still unproved: an author that applied a widening nit alongside a blocking fix would pass every listed proof, which is the regex-tuning loop the Context cites from blog-visual-reading R-40, R-44 and R-45.
+PROPOSAL: Add a widening nit on a passed free-text row to the AC-11 scenario's first pass, with the reviewer's widening note in its `EVIDENCE`, and pass only when that nit is listed and not applied.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Failure-mode check (lines 267-275); Context, Owner summary (lines 55-56); Acceptance Criteria AC-04 (lines 341-343) and AC-07 (lines 357-359); Test Plan AC-04 row (line 392)
+EVIDENCE: Design and the Owner summary apply the check when a design "changes state, runs concurrently, or crosses a process or network boundary". The implemented agent and skill use the same wording (vh-adlc-reviewer.agent.md:47, vh-adlc-spec/SKILL.md:58). AC-04 says "changes shared state or crosses a network boundary", and AC-07 says only "crosses a network boundary". The AC-04 row does not say whether fixtures three and four change state or cross a boundary, and no fixture changes only private local state. The trials (tests/vh-adlc/evidence/review-convergence/trials/build.py:139-195) therefore cannot tell the broader trigger the agent ships from the narrower one the criterion states, and the broader one draws the four questions on almost any spec that writes a file. Unchanged since R-17 F-04 and R-18 F-04.
+PROPOSAL: Use one trigger in Design, the Owner summary, AC-04 and AC-07. Give fixtures three and four an explicit state change or boundary, and add a fixture that changes only private local state, with its expected result.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Delivery (lines 316-318); Acceptance Criteria AC-06 (lines 350-355); Tasks T11 (line 427); Context, Owner summary (lines 73-75)
+EVIDENCE: The result holds at this commit. `git merge-base --is-ancestor origin/main 7cd780a` succeeds, origin/main (957db34) has both manifests at 0.18.1, and the branch has 0.19.0 (plugins/vh-adlc/plugin.json:4, plugins/vh-adlc/.claude-plugin/plugin.json:3). The text that governs it has not changed, though. AC-06 asks only for a version "higher than the version before the change", and T11 for "one version above the version current at the time". Neither names the default branch's version, and Delivery does not require merging the default branch in first. The branch is not merged yet. If main publishes 0.19.0 or higher before then, the branch still passes AC-06 as written while duplicating or undercutting a released version. Same as R-18 F-05. The T11 evidence shows the merge-first step was done in practice (db66788).
+PROPOSAL: In Delivery, AC-06 and T11, say that the new version is above the default branch's version at the time of the merge, and that the default branch is merged in and the version moved again if it has moved since.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Severity definitions (lines 249-265); Design, Nits ride along or are listed (lines 202-214); Tasks T2 (line 413)
+EVIDENCE: AC-02 requires the published convention to define the severities "as this document's Design states". The published page at 1ccf8f3 contains three things the Design does not describe. Its nit bullet adds "Widening a free-text pattern row that has passed review to catch more wrong output is also a nit" (conventions/feature-documents.md:208-210). Its lens paragraph sits in the convention (:212-213), while Design leaves open whether the lens sentence belongs in the convention or only in the reviewer agent. Its Open questions section gains "A review finding rated nit is the exception" (:161-163). T2's evidence records the last two as applied from R-17 F-01 and F-07. None of them conflicts with the Design, but the Design no longer describes what was published. Follows R-18 F-01 and F-07.
+PROPOSAL: Add the widening sentence to Design's nit bullet, say the lens precedence goes into the convention, and name the Open questions exception in the nit rule subsection.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (lines 40-42, 76-85)
+EVIDENCE: Several statements are out of date at 7cd780a. The summary says "Validation is planned, not observed", but every criterion is ticked with observed evidence. `bun test tests/vh-adlc/review-convergence.test.ts` gives 10 pass, 0 fail in this review, and `bun test tests/vh-adlc` gives 1578 pass and 3 fail: the Bubblewrap clean test, the real go mod tidy test, and a 5000 ms timeout in tests/vh-adlc/audit/live-recovery.test.ts. The summary describes material changes only "Since the acceptance at R-15", but the latest acceptance is R-17 (line 512). It still calls the stopping-rule draft "parked until `shared-development-loop` lands", although that feature is complete (docs/specs/shared-development-loop.md:2). Context sits outside the normative baseline, so this can be fixed at any time. Same as R-18 F-08.
+PROPOSAL: Say which proofs have been observed and on which commit, name R-17 as the latest acceptance, and say that the stopping-rule draft now waits for review against the landed loop.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-11 row (line 399); Acceptance Criteria AC-11 (lines 378-383)
+EVIDENCE: The row passes only when "the document does not list" the second pass's nit. The convention stores review records verbatim under `### R-<n>` (conventions/feature-documents.md:172-173), so that nit's ID and text are always in the document. The implemented check reads "the pass-2 nit is not applied outside the review records" (tests/vh-adlc/evidence/review-convergence/S16.nits.t5.md, Checks), which is narrower than the row's text. Same as R-18 F-09.
+PROPOSAL: Say in the row and in AC-11 that the check excludes the Review Log and its record subsections.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-02, AC-03, AC-04, AC-05, AC-07, AC-09 and AC-11 evidence lines (lines 336-384); Tasks T4, T5 and T6 evidence (lines 418-422)
+EVIDENCE: The reviewer trials were committed in e7d019f, and the author trials and the T5 scenario runs date from a4d2333 or earlier. S16.nits.t5.md and S7.7.md both record "Plugin | vh-adlc 0.18.1 at 86b31b7", a commit that holds neither the committed T5 text nor 1371041. Commit 1371041 later reworded the reviewer agent's lens sentence, the sentence ac02-lens exercises, and the skill's author-mode nit exception. No trial or scenario was rerun on the final text. The AC-02 evidence says "at 6e67cf3" only for the static test, and the other evidence lines name no revision for the trials. T6's own done condition, a failing run, was never observed, because S16.nits passed 8 of 8 on the pre-T5 skill. Its evidence says so honestly, but it means the case does not tell the T5 skill text apart from the previous one. The rewording looks equivalent in meaning, so no result is shown to be wrong.
+PROPOSAL: Name the agent and skill revision each trial and scenario ran against in its evidence line. Before the implementation review, rerun ac02-lens and S16.nits on the final text, or record the reason the 1371041 rewording does not need a rerun.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter covers (lines 7-22)
+EVIDENCE: `git diff --stat origin/main...7cd780a` shows that the feature changed tests/vh-adlc/direct-operation-compatibility.test.ts, which now freezes the spec skill body at this feature's commit 1371041 ("later accepted docs/specs/spec-review-convergence.md, which changes author mode and review step 4"). It also regenerated tests/vh-adlc/evidence/claude-code/S7.7.md, S7.7.accept.md, S7.9.md and S14.spec.md, the proofs AC-11 names. None of these paths is in covers. The convention says covers lists "every path whose change can affect the feature" (conventions/feature-documents.md:43-44). A later change to the compatibility test, which guards this feature's skill text, therefore neither marks the reviews stale nor blocks `feature_tree_clean`.
+PROPOSAL: Add tests/vh-adlc/direct-operation-compatibility.test.ts and the four regenerated S7.7, S7.7.accept, S7.9 and S14.spec evidence files to covers when a revision next touches the baseline.
