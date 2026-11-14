@@ -80,7 +80,7 @@ export function buildClaudeRoleInvocation(input: LaunchOptions) {
   const { options, runtime, selected, context, profile, env } = prepareRole(input, "claude");
   const args: string[] = [];
   for (let index = 0; index < selected.argv.length; index += 2) {
-    if (index !== 0 || selected.argv[index] !== "--effort" || !["low", "medium", "high", "max"].includes(selected.argv[index + 1]))
+    if (index !== 0 || selected.argv[index] !== "--effort" || !["low", "medium", "high", "xhigh", "max"].includes(selected.argv[index + 1]))
       fail("unsupported protected Claude role argv");
     args.push(selected.argv[index], selected.argv[index + 1]);
   }

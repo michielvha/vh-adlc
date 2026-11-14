@@ -95,3 +95,14 @@ test("a Claude reviewer receives only read tools and the explicitly selected API
   expect(result.argv[result.argv.indexOf("--setting-sources") + 1]).toBe("");
   expect(JSON.parse(result.argv[result.argv.indexOf("--settings") + 1])).toEqual({ disableAllHooks: true });
 });
+
+test("Claude forwards the documented xhigh effort and refuses an undocumented value", async () => {
+  const { buildClaudeRoleInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-launch");
+  const selected = runtime(), worker = { ...selected.worker, client: { provider: "claude" }, argv: ["--effort", "xhigh"] };
+  const input = { runtime: { ...selected, loader: { ...selected.loader, provider: "claude" as const, credential_references: [] }, worker },
+    role: "worker" as const, cwd: "/owned/source", artifact_root: "/owned/artifacts", prompt: "Bounded source review", environment: {} };
+  const result = buildClaudeRoleInvocation(input);
+  expect(result.argv[result.argv.indexOf("--effort") + 1]).toBe("xhigh");
+  worker.argv = ["--effort", "undocumented"];
+  expect(() => buildClaudeRoleInvocation(input)).toThrow("unsupported protected Claude role argv");
+});

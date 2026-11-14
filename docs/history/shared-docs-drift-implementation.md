@@ -944,3 +944,19 @@ correspondence. All 114 native cases are observed passing across these two runs.
 The full run remains recorded as failed. The final full-feature suite remains T31.
 Fresh committed Copilot source review and actual native/hosted migration acceptance
 remain pending.
+
+## Component diagnostic 133
+
+Exact committed target `105aef30134897380e48d89e81c26c8b0e03324e`. Actual Copilot Opus 5.5 returns one should-fix for the documented Claude xhigh effort value. Original return follows before correction. Qualification is retained in its native validation record.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: shared/plugins/vh-adlc/scripts/docs-drift/role-launch.ts, buildClaudeRoleInvocation effort allowlist (chunk 00061 line 23)
+EVIDENCE: The Claude role argv check accepts only ["low", "medium", "high", "max"] after "--effort". The supplied observed help for Claude Code 2.1.325 (evidence/claude-native-help-20261114.txt chunk 00061 lines 24 to 25) lists the values as "low, medium, high, xhigh, max". The Copilot path in the same file does accept xhigh through its tuning set (chunk 00001 line 11). context.md says that only unsupported argv should end in an explicit setup failure. A protected Claude role that selects "--effort xhigh", a value the pinned client documents, is therefore refused as "unsupported protected Claude role argv". No test covers this, because role-launch.test.ts and audit-session.test.ts use only "--effort high".
+PROPOSAL: Add "xhigh" to the Claude effort allowlist so that it matches the observed client help. Add one focused role-launch case showing that ["--effort", "xhigh"] is forwarded while an undocumented value is still refused.
+```
+
+Diagnostic 133 correction. The documented xhigh value first fails the builder guard. The allowlist now includes it, with positive forwarding and invalid-value refusal. The frozen checkpoint passes 33 launch cases/84 assertions and all declared repository stages, preserving source/index/HEAD/status. Actual installed model-operation and hosted acceptance remain pending.
