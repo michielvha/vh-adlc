@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "R-9 implementation review: AC-07 untested and two should-fix findings; follow-up tasks next."
+status_description: "R-9 follow-ups T23 to T25 done; waits for a fresh implementation review."
 issue: https://github.com/michielvha/vh-adlc/issues/83
 branch: feat/shared-issue-labels
 goal: "Every repository that adopts vh-adlc carries the same issue labels, and vh-adlc operations apply them the same way in each one."
@@ -357,7 +357,7 @@ once would make each other's reviews stale. So:
       state label applied outside the controller is still denied, and a triage `create-request` issue
       is created with no labels.
       Evidence: `bun test tests/vh-adlc/labels tests/vh-adlc/lifecycle/issue-labels.test.ts tests/vh-adlc/direct-operation-compatibility.test.ts tests/vh-adlc/triage/settings.test.ts tests/vh-adlc/settings-file.test.ts tests/vh-adlc/triage/execution.test.ts` at 3dbbce1: 158 pass, 0 fail. each standard state label is denied outside the controller, a create-request reaches a fake gh with `labels: []`, and `references/triage.md` names the four state labels.
-- [ ] AC-07: A `label_map` entry makes the plan, triage, investigate and spec treat the mapped
+- [x] AC-07: A `label_map` entry makes the plan, triage, investigate and spec treat the mapped
       repository label as the standard one, a mapping onto a label outside the standard set appears in
       the plan as a managed label with its color and description change, and an entry keyed by a non-standard name changes nothing. A map in
       which two standard labels share an effective name, case-insensitively, is refused when read.
@@ -365,6 +365,7 @@ once would make each other's reviews stale. So:
       these rules.
       Evidence: `bun test tests/vh-adlc/labels tests/vh-adlc/lifecycle/issue-labels.test.ts tests/vh-adlc/direct-operation-compatibility.test.ts tests/vh-adlc/triage/settings.test.ts tests/vh-adlc/settings-file.test.ts tests/vh-adlc/triage/execution.test.ts` at 3dbbce1: 158 pass, 0 fail. mapped names are used by plan, investigate and spec filing (spec scenario with only `defect`); a mapping onto `dependencies` shows as a managed change; non-standard keys change nothing; `ready: blocked` and `bug: Enhancement` are refused; the Stackweaver settings copy reads; `references/triage-settings.md` states these rules. Triage applies labels through its existing actions, which use the names the batch shows.
       Evidence: R-9 returned untested: no executed mapped-name scenario for investigate filing or a triage label payload (R-9 F-02).
+      Evidence: at 912bae1, `bun test tests/vh-adlc --timeout 60000`: 1618 pass, 0 fail. Mapped names are used by plan (`plan.test.ts`), investigate filing (`ready-for-work` scenario) and spec filing (`defect` scenario) in `issue-labels.test.ts`, and a mapped triage state label is refused without proof and published under its mapped name with proof (`triage/execution.test.ts`); a mapping onto `dependencies` shows as a managed change; non-standard keys change nothing; `ready: blocked` and `bug: Enhancement` are refused; the Stackweaver settings copy reads; `references/triage-settings.md` states the rules. Fake GitHub and fake triage adapter only.
 - [x] AC-08: This repository has a `.vh-adlc/triage.yaml` that `vh-adlc settings read` accepts and a
       triage run in report-only mode reads.
       Evidence: on feat/shared-issue-labels at T15, `vh-adlc settings read --stdin` answered for `.vh-adlc/triage.yaml`; the triage CLI loaded it as configured settings, collected michielvha/vh-adlc read-only (10 issues, all collections complete) and saved a report to `/tmp/sil-t15/report.md` outside the checkout. This was the collect and report steps run directly, not an agent-driven sweep.
