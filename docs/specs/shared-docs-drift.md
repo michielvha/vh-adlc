@@ -1367,6 +1367,7 @@ None. The owner selected preservation of both existing publisher identities on 2
 | 2026-11-14 | R-64 | spec | `b8215035127e92160f0f26fb132626b34d8c4f29` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-65 | spec | `11d8fe626236c941daa5418bbe39d5529f3b10b0` | claude-opus-5.5 | procedural | No blocking or should-fix findings. One status-description nit. All 136 required chunks read. Unchanged accepted normative baseline. |
 | 2026-11-14 | R-66 | spec | `f7c49559348b156b844ba391c825865dc19c6685` | claude-opus-5.5 | procedural | 1 should-fix on task-state prose and 2 nits, corrected outside the normative baseline. All 190 required chunks read. |
+| 2026-11-14 | R-67 | spec | `943a1170e8e3f561443f9fb356e5121a502b265f` | claude-opus-5.5 | procedural | 1 should-fix on cross-entry post-merge closure and 2 nits. All 163 required chunks read. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -1509,6 +1510,29 @@ SEVERITY: nit
 WHERE: Sources, the "Current engineering entry point" item (chunk 01409 line 32); Context upstream-integration paragraph (chunk 00001 line 82).
 EVIDENCE: The Sources item links AGENTS.md, terminal-output.md and delivery.md at d8f07c9. It says "The preserving upstream integration selects this pin". The Context paragraph and current-lint.json/current-fresh.json say AGENTS now resolves engineering rules at 1ccf8f3. upstream-contract.patch moves the pin from d8f07c9 to 1ccf8f3. No Source entry names 1ccf8f3, so the item labelled "current" points to a superseded pin. This is covered upstream drift picked up by the T106 integration.
 PROPOSAL: Relabel the d8f07c9 item as the earlier T40 integration pin. Add a "Current engineering entry point" item linking AGENTS.md (and any newly applicable pages) at 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff, noting that the T106 preserving integration selects it.
+
+### R-67
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Publisher identity by entry, the cross-entry history paragraph (spec chunk 00265 line 13). Design, the fresh post-merge closure paragraph (spec chunk 00249 line 1, "Another host follows the same entry, checks and authority rules"). Test Plan AC-06 row (spec chunk 00531 line 1). T112 (spec chunk 01065 line 14). Source site closure-inputs.ts `nativeShape` (excerpt lines 33 to 38).
+EVIDENCE: The revision says "a reviewed owner consolidation can be assessed by the bot". It also says producer actors are validated "under its own immutable source settings, recorded entry and adopted identity", and that a current actor is not accepted "merely because it occurs somewhere in the current map". The existing post-merge closure design lets a fresh session start from only the consolidation PR ID. It also lets an unattended resume adopt the post-merge resolve entry, so the account that closes the originals can differ from the account that published the consolidation. The current closure collector rejects any merged consolidation whose `proposal.actor !== settings.publication.actor`, which is the single current scalar. The revision's Test Plan covers only these cross-entry paths: proposal/history collection in both directions, owner resolution of a bot-authored legacy proposal, lease races, and interrupted publication recovery. Neither the AC-06 row nor T112 has a case where the merged consolidation's producer differs from the entry doing the closure. Neither covers closing reviewed, non-legacy shared originals that the other configured publisher authored. The closure design paragraph was not updated to name producer-entry validation. One implementer could keep the single-actor closure check, and another could validate against the producer's entry. A proof built from the listed cases would pass either way.
+PROPOSAL: In the post-merge closure paragraph, state that the merged consolidation and each selected original are validated against the producing operation's recorded entry and adopted identity under its own source settings. The closing session's explanation and closure stay attributed to its own exact mutating publisher. Add two cases to the AC-06 Test Plan row and T112. First, an owner-published consolidation merges and is closed by the hosted entry. Second, the owner closes bot-published reviewed originals. Each case should include a refusal for a current-map-only or altered producer actor/ID.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T29, "Staged consumer progress" last sentence (spec chunk 01065 line 17).
+EVIDENCE: The text still reads "T29 stays open pending Q2's publisher-contract correction and later actual installed/runtime migration observations." This revision resolves Q2: Open Questions now reads "None. The owner selected preservation of both existing publisher identities on 2026-11-14". The publisher-contract correction is now planned work in the new T111 to T113, placed directly before T29. The sentence traces to text this revision kept unchanged while removing Q2.
+PROPOSAL: Change the ending to "T29 stays open pending the T111 to T113 publisher-by-entry implementation and later actual installed/runtime migration observations."
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T111, T112 and T113 (spec chunk 01065 lines 13 to 15; publisher-revision.patch 00081).
+EVIDENCE: The pinned convention says each task names its files, a done condition and the "criteria it advances" (feature-documents.md 00071 to 00141). The template example ends with "(AC-01)". Every other task line in this document ends with its AC tags, for example T29 "(AC-01, AC-06)" and T37 "(AC-06, AC-07)". The three tasks this revision adds have no criteria tag. The revision itself ties this work to the new identity text in AC-05 and AC-06.
+PROPOSAL: End T111 and T112 with "(AC-05, AC-06)". End T113 with "(AC-01, AC-06)", adding AC-07 if its migration checks are meant to count toward that criterion.
 
 ## Sources
 
