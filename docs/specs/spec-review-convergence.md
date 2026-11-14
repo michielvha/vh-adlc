@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised to settle the R-15 and R-16 gaps before the convention text is written; waiting for spec review R-17, which the owner accepts in advance if it has no blocking finding."
+status: planned
+status_description: "Accepted at R-17 and kept by the clean drift re-review R-18; R-17 and R-18 findings are listed for implementation."
 issue: null
 branch: feat/spec-review-convergence
 goal: "Spec review rates findings consistently, finds failure-mode gaps and every restatement in one pass, applies each pass's findings as one revision without applying nits, and never rewrites reviewed commits."
