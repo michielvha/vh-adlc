@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Claimed on feat/worktree-cleanup after the R-22 fixes; implementing the tasks test-first."
+status_description: "T1 to T19 done on feat/worktree-cleanup with origin/main merged in; no criterion ticked yet; implementation review next."
 branch: feat/worktree-cleanup
 issue: null
 goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept; only commits that a branch worktree's HEAD reflog or a deleted branch's own reflog alone still names, such as copies from before a rebase or amend, go with them."
@@ -124,7 +124,9 @@ from before a rebase, and they go with their worktree. Deleting a branch deletes
 On the same day 3 Stackweaver branches without a worktree, each older than seven days, had reflogs
 that alone named 5 commits, copies from before an amend or rebase, and those go with the branch.
 
-Nothing is implemented. The checks below are planned, not run. Spec review R-1 found two blocking
+T1 to T18 are implemented test-first on the feature branch, each with recorded task evidence, and
+T19 ran the Stackweaver plan check without applying the plan. No criterion is ticked yet; that waits
+for an implementation review. Spec review R-1 found two blocking
 issues: missing-directory entries could drop unmerged detached commits, and `after-merge` would delete
 ignored files the owner never saw. Design items 4 and 5 close both. Spec review R-2 found two more:
 with `status.showUntrackedFiles=no` the ignored list came back empty, and a worktree nested inside an
@@ -172,8 +174,9 @@ review R-20 found that an entry whose directory is gone still keeps its staged c
 index, and a real Stackweaver entry has some; design item 4 now keeps such an entry. Spec review
 R-21 found nothing, and the owner accepted the document on 2026-11-13. Work that landed on the
 default branch afterwards moved three cited lines, and spec review R-22 also found one test case that
-no task covered; both are fixed without changing the design. Implementation on the feature branch is
-next; pushing it, a PR, merging and releasing each still need their own approval.
+no task covered; both are fixed without changing the design. After the branch merged the default
+branch in, spec review R-23 found three citation and status nits, now fixed. An implementation review
+is next; pushing the branch, a PR, merging and releasing each still need their own approval.
 
 ### Background
 
@@ -202,7 +205,7 @@ These reasons come from the helper:
 - `branches.ts:183-198` only walks local branches, so a detached worktree is never considered.
 - `branches.ts:193` keeps a worktree whose directory is missing.
 - Worktree removal happens only with `--worktrees true` (`branches.ts:193`, `references/branches.md:49`,
-  `references/branches.md:88-90`). `references/authority.md:35` and `references/authority.md:90-91`,
+  `references/branches.md:88-90`). `references/authority.md:35` and `references/authority.md:95-96`,
   `references/maintenance.md:156-157` and `skills/vh-adlc-ship/SKILL.md:122-123` all require the owner
   to ask for worktree cleanup.
 
@@ -213,7 +216,7 @@ refused a worktree with an untracked file: `fatal: '../w2' contains modified or 
 ../w3` removed its stale entry, and `git worktree list` went from 2 entries to 1.
 
 The pinned delivery convention (`conventions/delivery.md:26-27` at
-`vhco-pro/docs@d8f07c9`) says to remove a worktree only when the owner asks, only when it is clean, and
+`vhco-pro/docs@1ccf8f3`) says to remove a worktree only when the owner asks, only when it is clean, and
 only with `git worktree remove` without `--force`.
 
 ## Scope
@@ -557,7 +560,7 @@ Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives wer
       Evidence: read each file after editing. `references/branches.md` gives the no-own-commits branch rule, the clean worktree and ignored-paths meanings, the detached and missing-directory rules, every keep rule including the `--repo` and working-directory worktrees and the lock reason, the `worktree` kept record, `after-merge`'s scope and ignored-files reason, `[--worktrees false]`, and the digest stop, and no longer asks for a worktree request. `references/authority.md` makes the plan digest or merge approval the request, adds the digest stop to the branch-cleanup row, and tells maintenance and audit roles, including the detached assessment worktree, to lock with `vh-adlc <run-id>` and unlock when the run closes. `references/maintenance.md` drops the worktree request, adds the digest stop, ignored paths and `worktree` kept records to the report, the locked report candidate, and lock and unlock for every run worktree. `references/audit.md` has the ledger worktree created locked, `git worktree lock` for the assessment worktree, and unlock before normal removal. The maintenance skill's step 7 covers clean worktrees with their ignored files and the digest stop. The ship skill says `after-merge` removes the clean worktree, keeps the one it runs from, and that the next sweep removes a feature shipped from its owning worktree. `docs/user-guides/workflows.md` gives the clean worktree, ignored paths and `worktree` kept record meanings and the digest stop. `grep -rn -i "worktree cleanup\|worktrees true"` over the seven files finds no worktree request left. `bun test` over the 38 test files that read these documents: 661 pass, 1 fail, `maintenance/discovery.test.ts` with the skill at 5522 characters against its 5000 limit; after shortening step 7, `bun test tests/vh-adlc/maintenance/discovery.test.ts` 4 pass, 0 fail.
 - [x] T18 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - bump the plugin minor version in both; `bun test tests/vh-adlc` passes (AC-08)
       Evidence: origin/main (6a90dae) already carries 0.20.0 from another feature, and `check.test.ts` "a package change comes with a version change" compares with origin/main, so both manifests move from 0.19.0 to 0.21.0; `bun test tests/vh-adlc/check.test.ts` 64 pass, 0 fail. `bun test tests/vh-adlc` ran 1668 tests in 136 files: 1658 pass, 10 fail. Eight are 5 s timeouts under load and pass alone: `bun test tests/vh-adlc/maintenance/security-cli.test.ts -t "a checkout draft chains a later reconciliation|actual packets positively reobserve disappeared alerts"` 2 pass, `bun test tests/vh-adlc/audit/batch.test.ts -t "a generated index frozen with source|a later batch completes after explicit old-policy cleanup"` 2 pass, `bun test tests/vh-adlc/audit/live-recovery.test.ts -t "a method cleanup boundary"` 1 pass, `bun test tests/vh-adlc/audit/cli.test.ts -t "native live plan registers key and row|native observation-only merge reconciliation|native owner-handoff reconciliation retires"` 3 pass. The other two, `loop/cli.test.ts` "claims a planned document from a detached worktree…" and `loop/claim.test.ts` "a detached worktree at the tip claims, pushes…", fail on the session's `safe.bareRepository=explicit` and pass with `env -u GIT_CONFIG_COUNT bun test tests/vh-adlc/loop/cli.test.ts tests/vh-adlc/loop/claim.test.ts -t ...` (2 pass).
-- [ ] T19 `docs/specs/worktree-cleanup.md` - run the AC-09 manual procedure on the Stackweaver checkout with a private plan file and record the result as evidence, without applying the plan; every worktree that meets items 1 to 4 has a `remove-worktree` and every other one a `worktree` kept record (AC-09)
+- [x] T19 `docs/specs/worktree-cleanup.md` - run the AC-09 manual procedure on the Stackweaver checkout with a private plan file and record the result as evidence, without applying the plan; every worktree that meets items 1 to 4 has a `remove-worktree` and every other one a `worktree` kept record (AC-09)
       Evidence: `bun plugins/vh-adlc/scripts/branches/cli.ts plan --repo ~/code/stackweaver --output <private file>` exit 0, not applied: 41 linked worktrees, 14 `remove-worktree` and 27 `worktree` kept records, none unmatched or both; an independent read-only check of each (both status commands, ancestry to origin/main 6c0d9f3, merged PR heads via `gh`, reflog entries and ages, locks, rebase/bisect/modules, refs/worktree, `ls-files -v`, nested paths, inaccessible directories) found every proposed worktree clean, on main and at least 7 days old (youngest detached reflog 7.68 days), and every kept reason true (a record can name several: changed or untracked files in 11, unmerged commits with no merged PR in 6, unmerged reflog commits in 2, a lock in 4, younger than 7 days in 10)
 
 ## Open Questions
