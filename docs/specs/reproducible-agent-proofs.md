@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Drafted; three Open Questions wait for the owner before the first spec review."
+status_description: "Drafted with the owner's answers to Q1 to Q3 folded in; waiting for the first spec review."
 issue: null
 goal: "A criterion whose proof depends on what an agent session does can be met in an independent implementation review, because the reviewer can repeat the proof itself."
 covers:
@@ -48,13 +48,14 @@ This feature makes that the rule for every adopter:
 - A review dispatch never tells the reviewer to skip a check. It says how to run the harnesses and where
   kept transcripts are.
 - The reviewer repeats agent-session proofs with the runner rather than trusting a stored summary.
+- A proof that needs a person, such as a GUI pass, can be met from its raw transcripts when their sha256
+  values match the recorded ones.
+- Transcripts are committed as redacted copies, with raw and redacted sha256 values in a manifest; the raw
+  files stay on the machine that ran them.
 
-The Test Plan rule goes into the shared feature-document convention in `vhco-pro/docs`, with the rules
-block unchanged. The plugin text and the two guides follow.
-
-Three choices are yours (Open Questions). Should a reviewer accept hash-matched transcripts instead of a
-rerun when a proof needs a person, as host-cleanup's R-22 did? Do transcripts get committed? Does the rule
-belong in the shared convention?
+The Test Plan rule and the transcript sentence for `met` go into the shared feature-document convention
+in `vhco-pro/docs`, with the rules block unchanged. The plugin text, the workflows guide and the
+compatibility page follow. You chose all three of these on 2026-11-14.
 
 The cost: implementation reviews take longer and spend more model usage, because the reviewer reruns paid
 sessions. R-22 took about 30 minutes.
@@ -132,7 +133,22 @@ reviewer's records, an author's commits, a report. Its Test Plan row names:
 - the pass condition, judged from the run's output, records or commits.
 
 A dispatched subagent with no kept transcript is not a runner. A proof that needs a person at the
-keyboard, such as a GUI pass, names a written procedure instead and keeps its transcripts as Q1 decides.
+keyboard, such as a GUI pass, names a written procedure instead, and the person running it keeps the raw
+transcripts and records their sha256 values in the evidence.
+
+### Transcripts and `met`
+
+The convention's definition of `met` gains one case: for a proof that needs a person, reading raw
+transcripts whose sha256 values match the recorded ones counts as observing it. A proof that runs
+unattended is always rerun by the reviewer.
+
+### Keeping transcripts
+
+Transcripts are committed as redacted copies beside the feature's evidence. Redaction replaces account
+details a copied login adds, such as connector names and the home directory, and changes nothing else. A
+manifest records each transcript's raw and redacted sha256, the checkout the run used, and whether files
+the session reads had uncommitted changes. The raw files stay on the machine that ran them, at a path the
+manifest names.
 
 ### A run counts for the text it ran on
 
@@ -144,7 +160,7 @@ needs a new run before the criterion is ticked again.
 ### Implement
 
 The implement skill proves an agent-session criterion only through its runner, at the commit under test,
-and keeps the transcripts as Q2 decides. It never ticks from a dispatched subagent run that left no
+and keeps the transcripts as described above. It never ticks from a dispatched subagent run that left no
 transcript. After a change to text the session reads, it reruns before the next review.
 
 ### Review dispatch and the reviewer
@@ -154,7 +170,8 @@ where kept transcripts are, and that harness output the reviewer writes into the
 dispatch never limits which checks the reviewer may run.
 
 The reviewer agent repeats an agent-session proof with its runner at the target commit. A stored summary
-or record alone is not observation. When a proof needs a person, the reviewer follows Q1.
+or record alone is not observation. When a proof needs a person, the reviewer reads the raw transcripts and
+checks their sha256 values against the recorded ones.
 
 ### Spec author mode
 
@@ -179,15 +196,17 @@ merge, it is merged in and the version moved again.
 
 - [ ] AC-01: The published convention's Test plan section defines an agent-session proof, requires its row
       to name a committed runner, its fixtures and its pass condition, and says a run counts only for the
-      text it ran on; its rules block is byte-identical to the previous pin's.
+      text it ran on; its definition of `met` lets hash-matched raw transcripts stand in for a proof that
+      needs a person; its rules block is byte-identical to the previous pin's.
 - [ ] AC-02: The review protocol gives both routes the harness commands and the kept-transcript location,
       says a dispatch never limits which checks the reviewer runs, and says harness output must be
-      restored; the reviewer agent says it repeats agent-session proofs with their runner and that a stored
-      summary alone is not observation.
+      restored; the reviewer agent says it repeats agent-session proofs with their runner, that a stored
+      summary alone is not observation, and that a proof needing a person is checked against its raw
+      transcripts' sha256 values.
 - [ ] AC-03: The implement skill proves agent-session criteria only through their runner at a commit with
       no uncommitted change to the text the session reads, never ticks from a run without a kept
-      transcript, and reruns after that text changes; the spec skill's author mode names the runner in the
-      Test Plan row.
+      transcript, reruns after that text changes, and commits redacted transcripts with a manifest of raw
+      and redacted sha256 values; the spec skill's author mode names the runner in the Test Plan row.
 - [ ] AC-04: A reviewer following the updated agent, reviewing a fixture whose committed run summary says
       a criterion passed while its runner fails at the target commit, does not return that criterion
       `met`; with a runner that passes, it returns `met` and its `EVIDENCE` names the runner command.
@@ -219,43 +238,9 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q1: When a proof needs a person and cannot run unattended, can hash-matched transcripts make it `met`?
-
-**Recommendation:** A. A proof that runs unattended must be rerun by the reviewer, and a proof that needs a
-person can be met by reading its raw transcripts when their sha256 values match the recorded ones, as
-host-cleanup's R-22 did.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Rerun when unattended, transcripts when a person is needed** | Headless proofs are always repeated; GUI and interactive proofs can still be met | Reading a transcript is weaker than running, and the convention's `met` wording needs a sentence for it |
-| **B. Always rerun** | One strict rule that matches today's `met` wording | Interactive and GUI proofs can never be `met` in review; they stay `not verified` or need a residual |
-
-**Why this is yours:** It decides how strict independent review is for proofs only a person can run.
-
-### Q2: Where are agent-session transcripts kept?
-
-**Recommendation:** A. Commit redacted copies beside the evidence, with raw and redacted sha256 values in
-a manifest, and keep the raw files outside the repository on the machine that ran them.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Redacted copies committed, raw kept locally** | Any reviewer can read what happened; private account details stay out of Git | A few MB per feature, and a redaction step each repository must get right |
-| **B. Raw transcripts outside the repository only** | No repository growth and no redaction | Only someone on that machine can read them, and they are lost with it |
-| **C. Raw transcripts committed** | The exact files, nothing changed | Account details such as connector names and home paths land in Git |
-
-**Why this is yours:** It trades repository size and redaction work against who can audit a run.
-
-### Q3: Does the Test plan rule go into the shared convention or only into the plugin?
-
-**Recommendation:** A. Put it in the convention, so every project's spec reviews check it, and keep the
-operation behavior in the plugin.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Shared convention plus plugin** | Every adopter's Test Plans carry the rule, and reviewers check it from the pinned page | A companion `vhco-pro/docs` change and a pin move |
-| **B. Plugin only** | One repository to change | The rule binds only operations, not documents, and older documents never show the gap in review |
-
-**Why this is yours:** It changes the shared convention every vhco-pro project follows.
+None. The owner answered Q1 to Q3 on 2026-11-14: hash-matched transcripts can stand in for a proof that
+needs a person, transcripts are committed as redacted copies with raw and redacted hashes, and the Test
+Plan rule goes into the shared convention as well as the plugin.
 
 ## Review Log
 
