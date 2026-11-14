@@ -4,7 +4,7 @@
 // references/loop-settings.md.
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { readYAML, settingsFile } from "../settings-file";
 import { resolveInside } from "../triage/settings";
 import type { Rung } from "./rungs";
@@ -71,8 +71,11 @@ function directories(root: string, value: unknown, field: string): string[] {
   if (!Array.isArray(value)) fail(field);
   const out = value.map((item, index) => {
     const path = text(item, `${field}[${index}]`).replace(/\/+$/, "");
-    try { resolveInside(root, path); } catch { fail(`${field}[${index}]`); }
     if (path === "." || path === "") fail(`${field}[${index}] may not be the whole checkout`);
+    // A scratch directory is left out of the preservation check, never read, so it is checked by its
+    // path alone: in a worktree it may be a symlink into another checkout (shared node_modules).
+    if (isAbsolute(path) || path.includes("\\") || path.includes("\0") || path.split("/").some(part => part === ".." || part === "") ||
+        path.split("/")[0] === ".git") fail(`${field}[${index}]`);
     return path;
   });
   if (new Set(out).size !== out.length) fail(`${field} duplicates`);
