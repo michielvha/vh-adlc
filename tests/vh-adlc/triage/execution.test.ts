@@ -698,3 +698,35 @@ test("only deterministic unrequested indexes can remain unassessed beside proven
   else expect(plan).toThrow();
  }
 });
+
+// Standard state labels from references/issues.md stay triage verdicts that need the controller.
+test("every standard state label applied outside the controller is denied",()=>{
+ const f=setup();
+ const states=(JSON.parse(readFileSync(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/labels/vocabulary.json"),"utf8")).labels as {name:string;kind:string}[]).filter(label=>label.kind==="state").map(label=>label.name);
+ expect(states).toEqual(["ready","blocked","partial","needs-decision"]);
+ withVerificationBoundary(()=>{
+  const report=buildReport(f.config,f.inventory,[{number:1,state:"open",remaining:"Still needs transport",evidence:[{kind:"source",path:"src/app.ts",line:1,detail:"Export source",verified:true}]}]);
+  f.inventory.labels=states.map((name,index)=>({id:index+1,name,description:name,color:"00aa11"}));
+  for(const name of states)expect(()=>planBatch(f.config,f.inventory,report,[{id:"tag",kind:"labels",issue:1,labels:[name]}])).toThrow();
+ });
+});
+
+test("a triage create-request reaches GitHub with an empty labels array",async()=>{
+ const f=setup(),bin=join(f.root,".fake-bin"),log=join(f.root,".fake-gh.log");
+ mkdirSync(bin,{recursive:true});
+ writeFileSync(join(bin,"gh"),`#!/usr/bin/env bash
+input=""; for a in "$@"; do [ "$a" = "--input" ] && input=$(cat); done
+printf '%s\\t%s\\n' "$*" "$input" >> '${log}'
+case "$*" in
+ *" user"*) printf 'HTTP/2.0 200 OK\\r\\n\\r\\n{"login":"operator"}' ;;
+ *"POST"*"repos/example/project/issues"*) printf 'HTTP/2.0 201 Created\\r\\n\\r\\n{"number":10,"html_url":"https://github.com/example/project/issues/10"}' ;;
+ *) exit 1 ;;
+esac
+`);chmodSync(join(bin,"gh"),0o755);
+ const {githubExecutor}=await import("../../../plugins/vh-adlc/scripts/triage/github");
+ const path=process.env.PATH;process.env.PATH=`${bin}:${path}`;
+ try{await githubExecutor(f.config).mutate({id:"request",kind:"create-request",request:{title:"Investigate transport",data:"Owner request"},title:"Owner request: Investigate transport",body:"Unverified owner task data."} as any,"key");}
+ finally{process.env.PATH=path;}
+ const post=readFileSync(log,"utf8").split("\n").find(line=>line.includes("POST"))!;
+ expect(JSON.parse(post.split("\t")[1]).labels).toEqual([]);
+});

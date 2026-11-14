@@ -63,3 +63,12 @@ describe("standard label set", () => {
     expect(text).toContain("label_map");
   });
 });
+
+describe("triage reference", () => {
+  test("names the vocabulary's state labels as the labels triage verdicts use", () => {
+    const text = readFileSync(resolve(PKG, "references/triage.md"), "utf8");
+    expect(text).toContain("references/issues.md");
+    for (const label of vocabulary().filter((item) => item.kind === "state")) expect(text).toContain(`\`${label.name}\``);
+    expect(text).toContain("label_map");
+  });
+});
