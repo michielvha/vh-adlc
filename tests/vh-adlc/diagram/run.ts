@@ -4,6 +4,7 @@ import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { aws, incomplete, oci } from "./fixtures";
+import { gradeDiagram } from "./grade";
 import { runOwnedClient } from "../../../plugins/vh-adlc/scripts/triage/owned-process";
 
 const hash = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -126,12 +127,17 @@ This is a synthetic fixture. Do not change sources.md, the installed package, Gi
     const transcript = join(run, "transcript.jsonl");
     const outcome = await runOwnedClient(argv, { cwd: project, env, stdout: transcript, stderr: join(run, "host.stderr") }, { timeout_ms: 720_000, grace_ms: 500, reap_ms: 2000 });
     const raw = readFileSync(transcript, "utf8");
-    const result = { fixture: fixture.name, activated: observedRead(raw, skill), outcome, output: existsSync(destination) ? packageSnapshot(destination) : null };
+    const messages = raw.split("\n").filter(Boolean).map(line => JSON.parse(line));
+    const response = host === "codex"
+      ? messages.findLast(event => event.type === "item.completed" && event.item?.type === "agent_message")?.item.text ?? ""
+      : messages.findLast(event => event.type === "result")?.result ?? "";
+    const failures = gradeDiagram(fixture, destination, response);
+    const result = { fixture: fixture.name, activated: observedRead(raw, skill), outcome, failures, output: existsSync(destination) ? packageSnapshot(destination) : null };
     results.push(result);
     writeFileSync(join(output, "manifest.json"), JSON.stringify({ commit, host, hostVersion, drawioVersion, inputs: expected, skill: hash(skill), results }, null, 2) + "\n");
     console.log(JSON.stringify(result));
   }
-  if (results.some(r => r.outcome.exit_code !== 0 || !r.activated || (r.fixture === incomplete.name ? Boolean(r.output) : !r.output))) process.exitCode = 1;
+  if (results.some(r => r.outcome.exit_code !== 0 || !r.activated || r.failures.length > 0 || (r.fixture === incomplete.name ? Boolean(r.output) : !r.output))) process.exitCode = 1;
 } finally {
   rmSync(profileAuth, { force: true });
 }
