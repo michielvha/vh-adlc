@@ -432,6 +432,7 @@ None.
 | 2026-11-13 | R-3 | spec | `cfc2f2d` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-4 | spec | `da736bc` | unknown | procedural | Drift review after #87 and #88: 3 should-fix, no blocking finding; model identity not attested (Codex session header showed gpt-6.1-sol) |
 | 2026-11-14 | R-5 | spec | `d0bb0f7` | unknown | procedural | No findings; model identity not attested (Codex session header showed gpt-6.1-sol) |
+| 2026-11-14 | R-6 | spec | `cc3096a` | unknown | procedural | Revision review: 1 blocking, 1 should-fix; model identity not attested (Codex session header showed gpt-6.1-sol) |
 
 ### R-1
 
@@ -547,3 +548,20 @@ PROPOSAL: Base T16 on the current merged plugin version. At this review target, 
 ### R-5
 
 NO FINDINGS
+
+### R-6
+
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: covers; Test Plan / AC-07
+EVIDENCE: At cc3096a, tests/vh-adlc/triage/stackweaver-triage.yaml is outside covers. Both tests/vh-adlc/triage/settings.test.ts:197-206 and tests/vh-adlc/settings-file.test.ts:91-95 read it to establish Stackweaver compatibility. Comparing changed paths against covers identifies this fixture as the sole uncovered implementation path. The pinned feature-document standard requires covers to include every path whose change can affect the feature.
+PROPOSAL: Add tests/vh-adlc/triage/stackweaver-triage.yaml to covers so changes to this compatibility evidence invalidate reviews and participate in the feature-tree check.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Operations; Test Plan / AC-04 and AC-05; Tasks / T12, T20 and T21
+EVIDENCE: docs/specs/shared-issue-labels.md:284-290 requires cli.ts file to preview without writing and create only after approval of an unchanged preview. However, the T11 scenarios call filingPreview and fileIssue directly (tests/vh-adlc/lifecycle/issue-labels.test.ts:12-20), and their refusal cases cover initially missing labels and invalid inputs, without changing the digest, account, repository or labels between preview and creation. T20 checks skill phrases. These checks can pass while the CLI rejects file or filing ignores changes after approval.
+PROPOSAL: Add a failing test task before T12 that executes the actual file CLI against the fake tracker, covering preview-only behavior and approved creation. Include changed-preview, wrong-digest and changed-observation cases that must refuse with no issue created and an empty write log.
