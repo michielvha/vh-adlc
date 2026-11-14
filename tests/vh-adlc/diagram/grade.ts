@@ -72,7 +72,14 @@ export function gradeDiagram(fixture: Fixture, output: string, response: string)
       if (!found) failures.push("Missing expected icon for " + shape.label);
     }
   }
-  if (xpath("count(//mxCell[@edge='1'])") !== String(links.length)) failures.push("Unmapped connector in the drawing");
+  // Legend samples can use their own vertices and edges. The reverse-map
+  // inspection covers unlisted cells. Any edge touching a depicted shape
+  // must still have a corresponding connector row.
+  const endpointIds = shapes.map(row => "'" + row[0] + "'");
+  const touchesDepicted = endpointIds.flatMap(id => ["@source=" + id, "@target=" + id]).join(" or ");
+  if (xpath("count(//mxCell[@edge='1' and (" + touchesDepicted + ")])") !== String(links.length)) {
+    failures.push("Unmapped connector in the drawing");
+  }
   for (const link of fixture.links) {
     const from = role(link.from)?.[0];
     const to = role(link.to)?.[0];
@@ -83,7 +90,7 @@ export function gradeDiagram(fixture: Fixture, output: string, response: string)
     }
     const edge = cell(row[0]);
     const label = xpath("string(" + edge + "/@value)");
-    if (xpath("string(" + edge + "/@source)") !== from || xpath("string(" + edge + "/@target)") !== to) failures.push("Connector endpoints differ from the brief");
+    if (xpath("string(" + edge + "/@edge)") !== "1" || xpath("string(" + edge + "/@source)") !== from || xpath("string(" + edge + "/@target)") !== to) failures.push("Connector endpoints differ from the brief");
     const visiblePorts = label.match(/\b\d{2,5}\b/g) ?? [];
     if (link.port ? !visiblePorts.includes(link.port) || visiblePorts.some(port => port !== link.port) : visiblePorts.length > 0) failures.push("Wrong or unsupported port on " + row[0]);
     if (link.proposed) {
