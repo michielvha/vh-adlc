@@ -1,7 +1,7 @@
 // The external command route for reviews: which replies may be stored, and how the
 // owning worktree is protected from a reviewer that can run commands.
 import { afterAll, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { runReviewRoute, type ReviewOutcome } from "../../../plugins/vh-adlc/scripts/loop/review-route";
@@ -239,6 +239,17 @@ describe("preservation hardening", () => {
     writeFileSync(join(root, "cache/data.bin"), "AAAA\n");
     // Since the private review clone (T49) the reviewer works in a fresh clone, so it reaches the owning worktree by path.
     const body = `cd "${root}" && cp -p cache/data.bin /tmp/vh-mtime-ref-$$ && printf 'BBBB\\n' > cache/data.bin && touch -r /tmp/vh-mtime-ref-$$ cache/data.bin; rm -f /tmp/vh-mtime-ref-$$`;
+    pending(await review(root, commit, stub(body, ok(commit))), "changed");
+  });
+
+  test("a same-size rewrite of a clean tracked file that restores its modification time leaves the review pending", async () => {
+    const { root, commit } = repository();
+    // With ctime ignored, Git's stat cache sees an unchanged size and mtime and reports the file clean.
+    git(root, "config", "core.trustctime", "false");
+    // Backdate the file and refresh the index so its entry is not racily clean, which would make Git re-read it.
+    utimesSync(join(root, "src/app.txt"), new Date("2020-01-01T00:00:00Z"), new Date("2020-01-01T00:00:00Z"));
+    git(root, "update-index", "--refresh");
+    const body = `cd "${root}" && cp -p src/app.txt /tmp/vh-mtime-ref-$$ && printf 'bad\\n' > src/app.txt && touch -r /tmp/vh-mtime-ref-$$ src/app.txt; rm -f /tmp/vh-mtime-ref-$$`;
     pending(await review(root, commit, stub(body, ok(commit))), "changed");
   });
 
