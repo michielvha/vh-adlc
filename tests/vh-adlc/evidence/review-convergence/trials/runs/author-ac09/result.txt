@@ -1,0 +1,40 @@
+=== turn 1
+Conventions: vhco-pro/docs@1ccf8f3 (repository pin, AGENTS.md). Prose edited with guides/humanize-prose.md at that revision.
+
+I applied both R-1 findings in one commit. Both were factual, so I raised no Open Questions and there is nothing for you to answer before the next pass. The last `next` call asks for a new spec review, which I did not start (trial rules).
+
+## Commit
+
+- `62ec873` — spec: apply R-1, 10 second timeout and no --legacy flag. It touches only `docs/specs/feature.md` and is local only: no remote, nothing pushed.
+
+## What changed
+
+- **F-01 (factual, blocking):** the timeout is now 10 seconds instead of 5. I changed it in every place that stated it: the Design's `--max-time 10`, the AC-01 text, and the Owner summary. The Design gives the reason: the endpoint can take up to 8 seconds to warm up (cited to R-1 F-01).
+- **F-02 (factual, should-fix):** the `--legacy` flag is gone from the Design. The skill says to remove a mechanism rather than keep one that behaves the same, so I removed it instead of explaining why it stays. Removing it breaks nothing: probe.sh takes no flags today (probe.sh:2).
+- **Owner summary:** rewritten to cover the outcome, why the limit is 10 seconds, the dropped flag, the checks planned but not yet run, and the fact that a new review is needed before acceptance.
+- **Nits:** R-1 had none, so none are left unapplied. The resolved `conventions/feature-documents.md` does state the nit rule.
+
+## Behaviors and checks I walked
+
+- **Behaviors:**
+  - the curl timeout value
+  - exit 2 when the check times out
+  - the `--legacy` flag
+  - a healthy start that warms up within 8 seconds
+  - retries, which stay out of scope
+- **`tests/check-timeout.sh`:** I re-read it before the change. It compares the first `--max-time N` in the document with the number in AC-01, so the Design and AC-01 had to change together. The stored R-1 records contain no `--max-time` that could match first. It printed `PASS` before and after the change.
+- **The Test Plan's 12-second stub:** it still runs past the new 10-second limit, so the row stays valid without edits.
+
+## vh-adlc results I acted on
+
+- `knowledge`: `answered`, revision 1ccf8f3…, source `repository`
+- `find --slug feature`: `answered`, one document, `docs/specs/feature.md`, so I extended it
+- `lint`: `pass` before and after the edit
+- `fresh` before: R-1 not stale. After: R-1 stale for `baseline-changed`
+- `next`: `answered`, action `spec review`
+
+## Still open
+
+- **R-1 is still blocking.** Only a new independent spec review at `62ec873` can clear it.
+- **F-01's 8-second figure is unverified.** The finding cites probe.sh:2, but that line only shows the call and not how long warm-up takes. I took the number from the reviewer's record and could not measure it myself.
+- **Nothing tests a healthy start.** No criterion or check confirms that a start taking up to 8 seconds succeeds; AC-01 only checks that a slow check fails. I did not add one, because that would be new scope for you to decide on.

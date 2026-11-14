@@ -1,0 +1,77 @@
+=== turn 1
+I've stopped at the owner question, as the trial rules ask. R-1's one judgement finding (F-03, the timeout exit status) is now Open Question Q1 in the document. The two factual findings are not applied yet: step 4 says they go in one commit together with your answer.
+
+## Commit
+
+- **`f424014`** docs(spec): ask the owner how a probe timeout should exit
+
+The only change is in Open Questions, which isn't part of the reviewed baseline, so R-1 still counts as current. `vh-adlc fresh` after the commit gives `"spec_review":{"review":"R-1","commit":"a977b9b","stale":false}`. Nothing was pushed.
+
+## Q1: what exit status should probe.sh return on a timeout?
+
+- **A. Exit 2**, as the draft says.
+- **B. Exit 3**, a code of its own.
+- **C. Pass curl's own status through.** My recommendation.
+
+I recommend C because it needs no code to turn curl's status into another number. The skill says that when options behave differently, the question should recommend the one that removes a mechanism.
+
+The question also corrects something F-03 assumed. Other failures don't exit 2 today. probe.sh ends with the curl call (`probe.sh:2`), so it already exits with curl's status: 22 for an HTTP error and 28 for a timeout (checked in `man curl` for curl 8.15.0).
+
+## Waiting for your answer, then applied in one commit
+
+- **F-01 (blocking):** change the timeout from 5 to 10 seconds in four places: Design's `--max-time`, AC-01, the owner summary and the Test Plan wording. The Design value and AC-01 must change together, because `tests/check-timeout.sh` fails if they differ.
+- **F-02 (should-fix):** remove the `--legacy` flag. It behaves exactly like running with no flag, and probe.sh doesn't read arguments at all, so removing it changes no behavior. That makes it a removal to apply, not a question for you.
+- **Your Q1 answer:** written into Design, AC-01 and the Test Plan, plus the owner summary. Then Q1 is removed and Open Questions goes back to "None.".
+
+## Behaviors and checks I walked
+
+**Behaviors:**
+- the timeout length (5 now, 10 per F-01), including the endpoint's warm-up of up to 8 seconds
+- the exit status on a timeout (Q1)
+- the `--legacy` flag (F-02)
+- how probe.sh exits today: always curl's status
+- a healthy, fast check, which no finding affects
+- retries, which stay out of scope
+
+**Checks:**
+- **`tests/check-timeout.sh`:** I re-read it. It takes the first `--max-time N` in the document and compares it with AC-01's seconds. Design comes before Open Questions, so Q1 can't confuse it. It still prints PASS at `f424014`.
+- **The Test Plan scenario** (a stub endpoint that sleeps 12 seconds should make probe.sh exit 2): 12 seconds is still past a 10-second limit, so it holds after F-01. Its expected exit status will follow your Q1 answer.
+- **AC-01:** both its timeout and its exit status depend on F-01 and Q1.
+
+## Tool results and pages
+
+- `vh-adlc knowledge`: `"result":"answered"`, revision `1ccf8f3…`, source `repository`, feature root `docs/specs/`. I read the pages from the cache.
+- `vh-adlc lint`: `"result":"pass"`, no findings.
+- `vh-adlc find` wasn't run. It rejected the slug I gave it (`"result":"usage"`), and I didn't retry with a working argument. Only one feature document exists here, and I extended it.
+- `review check` wasn't run either. It needs the returned review file, which only exists while storing a review, and that is step 3, not this step.
+- **Nits:** the pinned `conventions/feature-documents.md` states the nit rule, but R-1 has no nits, so none are unapplied.
+- **Prose:** edited with `guides/humanize-prose.md` at `1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff`.
+
+R-1 blocks until a new independent review runs on the commit that applies these findings. Per the trial rules, I haven't started one.
+
+=== turn 2
+R-1's findings and your answer are applied in one commit on main: **`4d484a5`** docs(spec): apply R-1 with a 10 second timeout and exit 2. `tests/check-timeout.sh` still passes: it prints PASS, with both Design and AC-01 now saying 10 seconds.
+
+## What changed
+
+- **F-01 (timeout):** the timeout goes from 5 to 10 seconds, enough for the endpoint's warm-up of up to 8 seconds. I changed Design's `--max-time`, AC-01 and the owner summary together. The Test Plan's 12-second stub endpoint is still past the limit, so that row needed no change. Background now records the warm-up and that probe.sh exits with curl's status (`probe.sh:2`).
+- **F-02 (`--legacy` flag):** removed from Design. It behaved exactly like running with no flag.
+- **F-03 (your answer):** a timeout exits 2. Design now says how: curl exits 28 when its time limit runs out (per `man curl`), and probe.sh turns that into 2. Every other curl status passes through as it does today. I added that sentence because otherwise two implementers could handle other failures differently.
+- **Q1:** removed, and Open Questions is back to "None.".
+- **Nits:** R-1 had none, so nothing is left unapplied.
+
+## Behaviors and checks I walked
+
+- **Behaviors:** the timeout length and the warm-up, the timeout's exit status, the removed `--legacy` flag, how other failures exit (unchanged), and retries (still out of scope).
+- **`tests/check-timeout.sh`:** it reads the first `--max-time N` in the document, which is still Design's, and compares it with AC-01. It passes.
+- **Stub scenario:** a stub endpoint that sleeps 12 seconds should make probe.sh exit 2. That holds after both changes.
+- **`vh-adlc lint`:** `"result":"pass"`, no findings.
+- **`vh-adlc fresh`:** `"spec_review":{"review":"R-1","commit":"a977b9b","stale":true,"reasons":["baseline-changed"]}`. That's expected, because the baseline changed.
+
+## Where the spec stands
+
+probe.sh stops waiting after 10 seconds and exits 2 when that happens. Other failures keep curl's own exit status, and retries are out of scope. The proof is planned but hasn't been run against any implementation yet: `tests/check-timeout.sh` plus the 12-second stub. The document is still `draft` with no acceptance.
+
+R-1 still blocks until a new independent spec review runs on `4d484a5`. Per the trial rules I haven't started one, and nothing was pushed.
+
+I edited the prose with `guides/humanize-prose.md` at `1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff`.

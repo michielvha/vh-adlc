@@ -1,0 +1,85 @@
+=== turn 1
+Conventions: vhco-pro/docs@1ccf8f3 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md at 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff.
+
+I turned R-1's one finding into an Open Question and committed it. The spec itself is unchanged. I've stopped here until you answer Q1.
+
+## Commit
+
+- `f378523` Ask the owner to settle the fetch.sh attempt limit. It is local on `main`, not pushed (trial rule).
+
+## What changed in `docs/specs/feature.md`
+
+- **Open Questions:** Q1 asks for the attempt limit, with three options: A (3), B (4), C (5). I recommend A, keeping 3. Four places already say 3: the goal, Scope, AC-01 and its Test Plan row. R-1 says a measured flaky mirror needs 4 attempts, but nothing in the repository backs that up. `fetch.sh:2` is one `curl` call with no retry, and searching for "flaky" or "mirror" finds only the R-1 record.
+- **Owner summary:** one added sentence saying the limit waits on Q1. This is outside the spec's binding sections, so R-1 stays fresh.
+
+## Why F-01 became a question
+
+F-01 is marked factual / should-fix. The mismatch it points at is real: Design says 5 attempts, everywhere else says 3. But fixing it means picking a number, and that trades recovery from slow mirrors against how long a dead URL takes to fail. That choice is yours, so I didn't edit Design or anything else in the binding sections.
+
+## Behaviors and checks walked
+
+- **Behaviors:** retry after a failed download, the attempt limit, the two-second wait between attempts (stated only in Design), and exit 1 once attempts run out.
+- **Checks:** AC-01 and its Test Plan row (a stub `curl` that always fails is called exactly 3 times, then fetch.sh exits 1). That check counts attempts, so it changes under options B or C. The repository has no test files or fixtures (`git ls-files` lists only `AGENTS.md`, the spec and `fetch.sh`).
+- **Nits:** the conventions page does state the nit rule. R-1 had no nits, so none are left unapplied.
+
+## `vh-adlc` results
+
+- `knowledge`: `"result":"answered"`, source `repository`, pin `1ccf8f3`.
+- `find`: `"result":"answered"`, only `docs/specs/feature.md`. I extended that document.
+- `lint`: `"result":"pass"`.
+- `fresh`: `"result":"answered"`, R-1 at `f743538` is `"stale":false`. There is no remote, so I skipped `git fetch`.
+- `next`: `"action":"owner decision"`, because Open Questions holds 1 unanswered question.
+- I did not run `review check` against R-1. It needs the reviewer's returned file, and I only have the records already stored at HEAD.
+
+## What's left
+
+1. You answer Q1.
+2. In one commit I then fix Design, and also the owner summary, Scope, AC-01 and its proof if the answer isn't 3, and I clear Q1.
+3. That commit changes the spec's binding sections, which makes R-1 stale. A new independent review is needed before you can be asked to accept, and per the trial rules I won't start one.
+
+## Where the spec stands
+
+fetch.sh should retry a failed download a limited number of times, then exit 1. Parallel downloads are out of scope. The only open decision is the attempt limit. The retry check is planned but has never been run, and there is no implementation yet. Acceptance isn't up for a decision yet: Q1 is open and a fresh review is still needed.
+
+=== turn 2
+Conventions: vhco-pro/docs@1ccf8f3 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md at 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff.
+
+The limit is now 4 everywhere in the spec, and Q1 is gone. Because this changed the spec's binding sections, R-1 is now out of date and a new spec review is needed. Per the trial rules I haven't started one.
+
+## Commit
+
+- `dfb9b9c` Set the fetch.sh attempt limit to 4. It is a single commit on `main`, not pushed.
+
+## Every place that now states the limit (`docs/specs/feature.md`)
+
+- Line 18, owner summary: "fetch.sh makes at most 4 attempts at a download before giving up, waiting two seconds between attempts, then exits 1."
+- Line 32, Scope: "In scope: at most 4 attempts per download."
+- Line 36, Design: "On a failed download, fetch.sh waits two seconds and tries again, for at most 4 attempts, then exits 1."
+- Line 40, AC-01: "A download that keeps failing is attempted exactly 4 times, then fetch.sh exits 1."
+- Line 46, Test Plan: "A stub curl that always fails is called exactly 4 times and fetch.sh exits 1"
+
+Two other places mention the limit without a number:
+
+- The goal (line 5) and the intro line (line 12) say only that retries are bounded, so they agree and needed no edit.
+- The stored R-1 record (line 62) still quotes the old 5, 3 and 4. I left it untouched because review records are kept exactly as returned.
+
+## What else changed
+
+- **Owner summary:** it now says the limit comes from your own knowledge of the mirror, with no measurement in the repository behind it. It also says R-1 no longer applies, a new review is needed before acceptance, and the retry check is planned but has never run.
+- **Open Questions:** Q1 removed; the section now reads "None."
+- **Unchanged:** there were no criterion ticks or evidence lines to reset. The status was already `draft`, so no gate step was needed. R-1 had no nits.
+
+## Behaviors and checks walked
+
+- **Behaviors:** retry after a failed download, the attempt limit (now 4), the two-second wait between attempts, and exit 1 once attempts run out.
+- **Checks:** AC-01 and its Test Plan row, which I re-read before changing the expected call count from 3 to 4. The repository has no tests or fixtures that would also need updating.
+
+## `vh-adlc` results
+
+- `lint`: `"result":"pass"`.
+- `fresh`: `"result":"answered"`, R-1 at `f743538` is `"stale":true` with reason `baseline-changed`. That is expected after this revision.
+- `next`: `"action":"spec review"`, because the latest spec review is stale.
+
+## Where the spec stands
+
+fetch.sh will try a failing download up to 4 times, two seconds apart, then exit 1. Parallel downloads stay out of scope. No questions are open. The next step is a fresh independent spec review at `dfb9b9c`, which I haven't started under the trial rules; your acceptance comes after that. Implementation still needs a separate go-ahead.

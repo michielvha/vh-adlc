@@ -1,0 +1,23 @@
+=== turn 1
+MODEL: claude-opus-5-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design; Context, Owner summary; Acceptance Criteria, AC-01; Test Plan, AC-01 row
+EVIDENCE: Commit 1a492e2 applied R-1 F-01 and changed only Design to "probe.sh passes `--max-time 10` to curl" (docs/specs/feature.md:30). The rest of the document still says 5 seconds. The Owner summary says "Stop waiting for a slow health check after 5 seconds" (docs/specs/feature.md:18). AC-01 says "A health check that takes longer than 5 seconds makes probe.sh exit 2" (docs/specs/feature.md:34). The Test Plan row says "A stub endpoint that sleeps 7 seconds makes probe.sh exit 2 after about 5 seconds" (docs/specs/feature.md:40). If probe.sh follows Design, curl waits up to 10 seconds, so a 7 second stub answers in time and probe.sh exits 0. A correct implementation of Design therefore fails AC-01 and its proof. This contradiction comes from the previous revision's partial application of R-1.
+PROPOSAL: Pick one timeout and state it in Design, the Owner summary, AC-01 and the Test Plan row. Make the stub sleep longer than that timeout and give the pass condition an explicit elapsed time bound, for example "exits 2 within timeout plus 1 second".
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Open Questions
+EVIDENCE: The timeout value is a trade-off the document settles, but Open Questions says "None." (docs/specs/feature.md:48). The standard says "Every trade-off the document settles is an open question". The previous revision moved the value from 5 to 10 seconds because of R-1's claim that "A 5 second timeout is shorter than the endpoint's documented warm-up". That warm-up documentation appears nowhere in the tree: `git ls-files` lists only AGENTS.md, docs/specs/feature.md and probe.sh, and the document has no Sources section. The change rests on an unsupported claim, and the owner never decided the value.
+PROPOSAL: Raise the timeout value as Q1 with the options (5 seconds, 10 seconds, or a configurable value) and what each costs. Cite the warm-up source in Sources if one exists; if not, drop the claim.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria, AC-01; Test Plan, AC-01 row
+EVIDENCE: Design only says probe.sh "exits 2 when the check times out" (docs/specs/feature.md:30). Today probe.sh runs `curl -fsS http://localhost/health >/dev/null` (probe.sh:2), so its exit status is curl's own: 28 on a timeout, 22 on an HTTP error, 7 on a refused connection. The document never says what probe.sh returns for a refused connection, a DNS failure or an HTTP error status, or whether those must stay different from 2. One implementer could map only curl exit 28 to 2. Another could exit 2 on any curl failure. The AC-01 proof passes both, so it cannot tell a script that reports every failure as a timeout from a correct one.
+PROPOSAL: State in Design the exit status for a timeout, for every other curl failure and for success. Add a Test Plan row, for example a refused connection that must not exit 2, so the proof fails an implementation that collapses every failure to 2.

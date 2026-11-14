@@ -1,0 +1,44 @@
+=== turn 1
+MODEL: claude-opus-5-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design
+EVIDENCE: Design says "count.sh already parses a `--json` flag (count.sh:3)". At commit a46d95a, count.sh has three lines, and line 3 is `wc -l < "$1"`. No flag is parsed anywhere. Run as `count.sh --json FILE`, it would try to read a file named `--json`.
+PROPOSAL: Change Design to say that argument parsing for `--json` is new work, and describe how it works: flag position, plain `count.sh FILE` still accepted, what happens with no FILE. Add a task for it once tasks are written.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-02); Test Plan (AC-02 row)
+EVIDENCE: AC-02 reads "The output is formatted nicely." and its proof is "Read the output". The proof has no pass condition, so any output passes it. "Nicely" could also mean pretty-printed JSON over several lines, which would clash with the exact `{"lines": N}` that AC-01 requires.
+PROPOSAL: Replace AC-02 with an observable end state, for example that the JSON output is exactly one line ending in a newline with no leading spaces. Give it a proof with a concrete pass condition, or drop AC-02 if AC-01 already covers the format.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary); Scope; Acceptance Criteria; Test Plan
+EVIDENCE: The Owner summary says "Text stays the default." and Scope says the "default output stays text". No criterion or Test Plan row checks that `count.sh FILE` without `--json` still prints the plain count, so an implementation that changes or breaks the default output would pass every proof.
+PROPOSAL: Add a criterion that `count.sh FILE` prints the same plain line count as before, with a Test Plan row that runs it on the three-line fixture and compares the output.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria (AC-01)
+EVIDENCE: AC-01 says "a file of N lines" but does not define N. `wc -l` (count.sh:3) counts newline characters, so a last line with no trailing newline is not counted. Some `wc` implementations also pad the number with leading spaces. Behaviour for a missing or unreadable FILE under `--json` is not stated either. Two implementers could pick different N, output text or error output.
+PROPOSAL: State that N is the `wc -l` newline count (or whatever is chosen), that whitespace is stripped before the number goes into the JSON, and what `--json` does when FILE is missing or unreadable, with a Test Plan check for each.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope
+EVIDENCE: Spelling lens. Scope reads "Teh default output stays text."; "Teh" is misspelled.
+PROPOSAL: Change "Teh" to "The".
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: Background says "its usage line is at count.sh:9". count.sh has only three lines, and the usage comment `# usage: count.sh FILE` is at count.sh:2.
+PROPOSAL: Change the citation to count.sh:2, and say whether the usage line will be updated to show `--json`.

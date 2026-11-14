@@ -1,0 +1,176 @@
+commit 62ec8730431894a98e952cddfe5d42cd378db077
+Author: Trial Author
+
+    spec: apply R-1, 10 second timeout and no --legacy flag
+
+
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+index 716fbef..4a1b6b0 100644
+--- a/docs/specs/feature.md
++++ b/docs/specs/feature.md
+@@ -15,7 +15,11 @@ probe.sh gives up on a slow health check after a fixed timeout.
+ 
+ ### Owner summary
+ 
+-Stop waiting for a slow health check after 5 seconds.
++probe.sh waits on the health endpoint for as long as it takes. After this change it gives up after 10 seconds and exits with status 2, so a hung endpoint no longer hangs the probe. Retries stay out of scope.
++
++The limit is 10 seconds because the endpoint can take up to 8 seconds to warm up right after start (review R-1, finding F-01). The earlier 5 second draft would have failed healthy starts. The draft also had a `--legacy` flag that behaved exactly like no flag; it is gone, and probe.sh has no flags today (probe.sh:2), so removing it breaks no caller.
++
++Planned checks, none run yet: `tests/check-timeout.sh` confirms the Design and AC-01 name the same limit, and a stub endpoint that sleeps 12 seconds must make probe.sh exit 2. Review R-1 blocked the previous draft; this revision needs a new spec review before the owner can accept it.
+ 
+ ### Background
+ 
+@@ -27,11 +31,11 @@ In scope: a timeout on the health check. Out of scope: retries.
+ 
+ ## Design
+ 
+-probe.sh passes `--max-time 5` to curl and exits 2 when the check times out. A `--legacy` flag also exists; it selects the same 5 second timeout and the same exit status as running without it.
++probe.sh passes `--max-time 10` to curl and exits 2 when the check times out. The endpoint can take up to 8 seconds to warm up right after start (R-1 F-01), so 10 seconds leaves room for a healthy start. probe.sh takes no flags (probe.sh:2).
+ 
+ ## Acceptance Criteria
+ 
+-- [ ] AC-01: A health check that takes longer than 5 seconds makes probe.sh exit 2.
++- [ ] AC-01: A health check that takes longer than 10 seconds makes probe.sh exit 2.
+ 
+ ## Test Plan
+ 
+commit 1c1631d872e7862cfeeca028e0cb52b78d654774
+Author: Fixture
+
+    fixture: record R-1
+
+
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+index 55f5720..716fbef 100644
+--- a/docs/specs/feature.md
++++ b/docs/specs/feature.md
+@@ -51,3 +51,20 @@ None.
+ 
+ | Date | Review | Kind | Commit | Model | Isolation | Outcome |
+ | --- | --- | --- | --- | --- | --- | --- |
++| 2026-11-14 | R-1 | spec | `a977b9b` | fixture | procedural | Blocking findings. |
++
++### R-1
++
++FINDING: F-01
++KIND: factual
++SEVERITY: blocking
++WHERE: Design
++EVIDENCE: The endpoint's warm-up takes up to 8 seconds (probe.sh:2 calls it right after start), so a 5 second timeout fails healthy starts.
++PROPOSAL: Use a 10 second timeout in Design.
++
++FINDING: F-02
++KIND: factual
++SEVERITY: should-fix
++WHERE: Design
++EVIDENCE: The `--legacy` flag has exactly the behavior of no flag, so two implementers could keep or drop it.
++PROPOSAL: Remove the `--legacy` flag from Design, or document why it is kept.
+commit 40a0f7df55ec98542c286483377d808e5b97f8c3
+Author: Fixture
+
+    fixture: make the check executable
+
+
+diff --git a/tests/check-timeout.sh b/tests/check-timeout.sh
+old mode 100644
+new mode 100755
+commit a977b9bab7b186e8117a14997e2a1facbebbfb5f
+Author: Fixture
+
+    fixture: AC-09 draft
+
+
+diff --git a/AGENTS.md b/AGENTS.md
+new file mode 100644
+index 0000000..a080bfb
+--- /dev/null
++++ b/AGENTS.md
+@@ -0,0 +1,7 @@
++# Repository instructions
++
++Read the personal conventions at
++https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/AGENTS.md
++and follow the task routes there before implementation.
++
++Feature documents: docs/specs/
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+new file mode 100644
+index 0000000..55f5720
+--- /dev/null
++++ b/docs/specs/feature.md
+@@ -0,0 +1,53 @@
++---
++status: draft
++status_description: "Fixture for a vh-adlc reviewer trial; nothing is accepted or implemented."
++issue: null
++goal: "probe.sh gives up on a slow health check after a fixed timeout."
++covers:
++  - probe.sh
++---
++
++# Plan: Fixture feature
++
++probe.sh gives up on a slow health check after a fixed timeout.
++
++## Context
++
++### Owner summary
++
++Stop waiting for a slow health check after 5 seconds.
++
++### Background
++
++probe.sh waits for the health endpoint with no timeout (probe.sh:2).
++
++## Scope
++
++In scope: a timeout on the health check. Out of scope: retries.
++
++## Design
++
++probe.sh passes `--max-time 5` to curl and exits 2 when the check times out. A `--legacy` flag also exists; it selects the same 5 second timeout and the same exit status as running without it.
++
++## Acceptance Criteria
++
++- [ ] AC-01: A health check that takes longer than 5 seconds makes probe.sh exit 2.
++
++## Test Plan
++
++| Criterion | Proof |
++| --- | --- |
++| AC-01 | `tests/check-timeout.sh` passes, then a stub endpoint that sleeps 12 seconds makes probe.sh exit 2 |
++
++## Tasks
++
++None yet; written once the document is planned.
++
++## Open Questions
++
++None.
++
++## Review Log
++
++| Date | Review | Kind | Commit | Model | Isolation | Outcome |
++| --- | --- | --- | --- | --- | --- | --- |
+diff --git a/probe.sh b/probe.sh
+new file mode 100644
+index 0000000..c544d5c
+--- /dev/null
++++ b/probe.sh
+@@ -0,0 +1,2 @@
++#!/bin/sh
++curl -fsS http://localhost/health >/dev/null
+diff --git a/tests/check-timeout.sh b/tests/check-timeout.sh
+new file mode 100644
+index 0000000..9411e27
+--- /dev/null
++++ b/tests/check-timeout.sh
+@@ -0,0 +1,7 @@
++#!/bin/sh
++# Fails unless the timeout in the Design's curl call equals the one in AC-01.
++doc=docs/specs/feature.md
++design=$(sed -n 's/.*--max-time \([0-9][0-9]*\).*/\1/p' "$doc" | head -1)
++criterion=$(sed -n 's/.*AC-01: A health check that takes longer than \([0-9][0-9]*\) seconds.*/\1/p' "$doc" | head -1)
++[ -n "$design" ] && [ "$design" = "$criterion" ] && echo PASS && exit 0
++echo "FAIL: Design says $design, AC-01 says $criterion"; exit 1

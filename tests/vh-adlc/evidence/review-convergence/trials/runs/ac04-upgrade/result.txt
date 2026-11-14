@@ -1,0 +1,66 @@
+=== turn 1
+Checked the spec, the conventions, cache.sh and the binary's lint/next output; writing the records now.
+
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan (AC-01 row); Background; Design
+EVIDENCE: cache.sh:2 is `compute "$1"`. `git ls-files` at 5bdbbe9 lists only AGENTS.md, cache.sh and docs/specs/feature.md, so nothing in the tree defines `compute`, and on the review host `which compute` printed "compute not found". The document never says what `compute` is, where it comes from, or how a tester provides it.
+PROPOSAL: Say where `compute` comes from (a dependency, a function to add, or a test stub on PATH), and have the AC-01 proof name the stub and how it records each call, so the proof can actually be run.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-01); Test Plan (AC-01 row)
+EVIDENCE: AC-01 reads "A second run with the same input reads its result from state.json". The proof is "see the second run skip the computation". Nothing requires the second run's output to equal the first run's output. Nothing checks that a different input still computes. "Reads its result from state.json" can only be seen by reading the code. An implementation that prints nothing, or a wrong value, on the second run would pass.
+PROPOSAL: Restate AC-01 as an observable end state: the second run with the same input prints the same output as the first and does not call `compute`, and a run with a different input does call `compute`. Prove it with a stub `compute` that counts its calls.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (flock sentence); Acceptance Criteria; Test Plan
+EVIDENCE: Design says "Only one cache.sh runs at a time, guarded by flock" but leaves out four things. It does not name the lock file. It does not say whether a second run blocks, waits with a timeout, or fails. It does not say whether the lock covers the whole read, compute, merge and write cycle. It does not say what happens when a lock holder hangs. If the lock is taken on state.json itself, the rename swaps in a new inode, so two runs can hold locks on different files and both write, and one run's new key is lost. No criterion or Test Plan row covers concurrent runs.
+PROPOSAL: Name a lock file that is never renamed (for example state.json.lock). State that the lock is held from reading state.json until after the rename, and give the behaviour of a second run. Add a criterion with a proof in which two runs with different inputs start together and both keys end up in state.json.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (write, rename and retry sentences); Acceptance Criteria; Test Plan
+EVIDENCE: Design says "A failed rename is retried once" but never says what happens when the retry also fails. The exit status, whether the computed result is still printed, and whether state.json.tmp is removed or left are all undefined. It also never covers a state.json.tmp left by an earlier crash. The crash claim "a crash leaves the last complete file" has no criterion and no Test Plan row, so an implementation that writes state.json in place passes AC-01.
+PROPOSAL: Define the outcome when both rename attempts fail: exit status, output, and temp file cleanup. Define how a leftover state.json.tmp is handled. Add a criterion and proof for crash safety, for example killing the run between the temp write and the rename and checking that state.json still parses and still holds the earlier keys.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (first sentence)
+EVIDENCE: "writes results to state.json as a new JSON object keyed by input hash" leaves several things open. The hash algorithm is not given, and neither is the hashed input (only `$1`, or the input file contents when `$1` is a path). The stored value is not given either: stdout, the exit status, or both. Nor is it said whether a failed `compute` (non-zero exit) gets cached. Where state.json lives (current directory, next to the script, or a configured path) is not stated. Two implementers would build caches that differ in hits, location and stored content.
+PROPOSAL: Specify the key (algorithm and exact hashed input), the stored value, the rule for failed computes, and the state.json path.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Scope
+EVIDENCE: The Design defines no behaviour for a missing state.json, which is the first run after upgrading from today's cache.sh (cache.sh:1-2 keeps no state). It also defines none for a state.json that is empty, cannot be parsed, or is not a JSON object, for example after a hand edit or a future format change. The only parser in the environment would be jq (`which jq` found /usr/bin/jq), and the document names no JSON tool or dependency.
+PROPOSAL: State that a missing file is treated as an empty cache. Say what happens with a file that cannot be read (treat it as empty and overwrite, or fail with a message). Name the JSON tool cache.sh depends on.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Design; Scope
+EVIDENCE: Open Questions is "None." yet the document settles trade-offs without asking the owner. It serialises runs with flock instead of failing fast. It retries a rename exactly once. It leaves cache expiry out of scope, which means state.json grows without bound. The standard says "Every trade-off the document settles is an open question, including one the author would answer the same way the owner would."
+PROPOSAL: Raise these choices as Open Questions with options, at least lock behaviour and unbounded growth without expiry, and fold the answers back into Design.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: The summary is one sentence, "Keep computed results across runs in state.json." It leaves out the flock serialisation, the atomic rename and retry, the decision to exclude expiry and its growth cost, and the validation state (no proof has been observed and none exists yet). The standard asks the summary to cover approach, defaults, trade-offs and validation state, and to separate planned checks from observed proof.
+PROPOSAL: Expand the summary to cover the approach, the no-expiry trade-off, concurrency behaviour and the fact that the AC-01 proof is planned, not observed.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: Background cites "(cache.sh:1)" for the recompute claim, but cache.sh:1 is `#!/bin/sh`. The call that recomputes is cache.sh:2, `compute "$1"`.
+PROPOSAL: Change the citation to cache.sh:2.

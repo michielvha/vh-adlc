@@ -1,0 +1,305 @@
+commit fed758f5615502b6fded71c5374ba44a15527704
+Author: Trial Author
+
+    docs(spec): draft chat notification after each deploy [skip ci]
+
+
+diff --git a/docs/specs/deploy-chat-notification.md b/docs/specs/deploy-chat-notification.md
+new file mode 100644
+index 0000000..fbe584b
+--- /dev/null
++++ b/docs/specs/deploy-chat-notification.md
+@@ -0,0 +1,266 @@
++---
++status: draft
++status_description: "Draft with seven open questions for the owner; no review requested yet."
++issue: null
++goal: "After each run of deploy.sh, the team's chat channel shows a short message saying which deploy ran and how it ended."
++covers:
++  - deploy.sh
++  - tests/deploy-notify/
++---
++
++# Plan: Chat notification after each deploy
++
++`deploy.sh` posts a short message to the team's chat webhook, a remote HTTPS service, once the deploy
++step has finished. A failed or missing notification never changes what the deploy did.
++
++## Context
++
++### Owner summary
++
++Today nobody hears about a deploy unless they ran it. `deploy.sh` runs one command, `./ship-release`, and
++exits with that command's status. This feature adds one step after it: a short message to the team's chat
++webhook naming the revision, the host, the result and the time.
++
++The webhook is a remote HTTPS service, so the design treats every call as one that can fail, hang or
++succeed without telling us. The draft proposes these defaults, each still an open question: the webhook
++URL comes from the `DEPLOY_CHAT_WEBHOOK_URL` environment variable and never sits in the repository; the
++script posts after both successful and failed deploys; `curl` gets a 10 second limit; there is no
++automatic retry; and `deploy.sh` keeps the exit status of `./ship-release` whatever happens to the
++message. When the variable is unset, the script prints a warning and skips the post.
++
++Two deploys that run at the same time each send their own message, and the messages can arrive in either
++order. A timed-out post may still have reached the channel, so the team can see a message the script
++reported as failed. Re-running a deploy sends a second message. Rolling back to the previous `deploy.sh`
++removes the notification and leaves nothing behind to clean up, because the feature keeps no state.
++
++Out of scope: changing `./ship-release`, any other channel such as email, threading or editing earlier
++messages, and storing or rotating the webhook secret.
++
++Planned checks, none run yet: a shell test that runs `deploy.sh` against stub `ship-release` and `curl`
++commands and covers success, failure, a missing URL, a hanging webhook and an error response; and one
++manual post to a real test channel. No review has happened. Seven open questions need the owner, the
++largest being whether a failed post should ever fail the deploy and which chat service's payload format
++to send. Accepting this document would authorize implementation of this scope on a feature branch; it
++would not authorize creating the webhook, storing its secret or changing any deploy host.
++
++### Background
++
++- `deploy.sh` has two lines, `#!/bin/sh` and `./ship-release` (`deploy.sh:1-2`, read with `cat -A deploy.sh`).
++  It sets no shell options, so its exit status is the exit status of `./ship-release`.
++- `ship-release` is not in this repository: `git ls-files` lists only `AGENTS.md` and `deploy.sh`, and
++  `ls ship-release` reports `No such file or directory`. The deploy host supplies it.
++- Nothing in the repository posts to chat today, holds a webhook URL or locks against concurrent deploys
++  (`git ls-files` output above; `deploy.sh:1-2`).
++- On the machine this draft was written on, `command -v curl` printed `/usr/bin/curl` and `/bin/sh` links
++  to `bash`. Neither fact says anything about the deploy host; Q7 covers that.
++- The repository declares its feature root as `docs/specs/` (`AGENTS.md:7`).
++
++## Scope
++
++In scope:
++
++- After `./ship-release` returns, `deploy.sh` sends one HTTPS POST to the URL in `DEPLOY_CHAT_WEBHOOK_URL`.
++- The message names the result (succeeded or failed with its exit code), the revision, the host name and
++  the UTC finish time.
++- Defined behaviour for a missing URL, a timeout, a connection error and a non-2xx response.
++- A shell test under `tests/deploy-notify/` that needs no network.
++
++Out of scope:
++
++- Any change to `ship-release` or to what a deploy does.
++- A start-of-deploy message, threads, message edits, mentions or rich formatting.
++- Other channels such as email or paging.
++- Provisioning the webhook, storing the secret on deploy hosts or rotating it.
++- Locking to prevent concurrent deploys. The feature describes how concurrent runs notify; it does not
++  serialize them.
++
++## Design
++
++### Flow
++
++`deploy.sh` runs `./ship-release` as it does now and keeps its exit code in a variable. It then calls a
++notify function defined in the same file, and finally exits with the saved code (`deploy.sh:2` is the
++line it wraps). The function never calls `exit` and its own failures never reach the script's exit
++status, subject to Q2.
++
++The notify function:
++
++1. Reads `DEPLOY_CHAT_WEBHOOK_URL`. When it is unset or empty, it writes
++   `deploy.sh: DEPLOY_CHAT_WEBHOOK_URL not set; skipping chat notification` to stderr and returns.
++2. Builds the message text from the saved exit code, `git rev-parse --short HEAD` (or `unknown` when that
++   fails), `hostname` and `date -u +%Y-%m-%dT%H:%M:%SZ`. Example:
++   `Deploy succeeded: abc1234 on web-1 at 2026-11-14T10:00:00Z` or
++   `Deploy FAILED (exit 3): abc1234 on web-1 at 2026-11-14T10:00:00Z`.
++3. Wraps the text in the JSON body the chat service expects (Q5) and escapes `"` and `\` in it.
++4. Posts with `curl --silent --show-error --fail --max-time 10 --header 'Content-Type: application/json'
++   --data @-`, giving the body on stdin. The URL reaches `curl` through a config file read from a second
++   descriptor, so the secret path in the URL never appears in the process list or in output.
++5. On any `curl` failure, writes `deploy.sh: chat notification failed (curl exit N)` to stderr and
++   returns. It never prints the URL.
++
++Whether the function runs after a failed `./ship-release` is Q1; the draft posts in both cases.
++
++### Concurrent requests
++
++`deploy.sh` has no lock today (`deploy.sh:1-2`) and this feature adds none. When two deploys run at the
++same time, on one host or several, each run posts its own message once its own `./ship-release` returns.
++The chat service orders them by arrival, which can differ from the order the deploys finished. Each
++message carries the revision, host and UTC finish time, so a reader can tell the two apart and see which
++finished last. The notify step shares no file or state between runs, so concurrent runs cannot corrupt
++each other's message.
++
++### Partial failure
++
++The deploy and the notification are separate steps with no transaction between them, and the deploy
++always comes first. The cases are:
++
++- Deploy succeeded, post failed (DNS, TLS, refused connection, non-2xx, timeout): the deploy stands, the
++  script exits 0, and stderr carries the failure line. The channel shows nothing for that deploy.
++- Deploy succeeded, post timed out after the service accepted it: the channel shows the message while
++  stderr reports a failure. The script cannot tell this case from a lost request.
++- Deploy failed: the script still posts the failure message (Q1) and exits with the deploy's code.
++- `deploy.sh` is killed during the post: the deploy has already finished; the message may or may not
++  arrive. The 10 second limit (Q3) bounds how long a hung webhook can hold the script.
++
++### Retry and replay
++
++The draft makes one attempt and does not retry (Q4). A retry after a timeout could post the same message
++twice, because the generic webhook takes no idempotency key and the case above shows a timed-out request
++may already have landed. Re-running `deploy.sh` by hand, for the same or another revision, is a new
++deploy and sends a new message; the team may see two messages for one revision, each with its own time.
++There is no stored "already notified" state to replay from or to deduplicate against.
++
++### Upgrade and rollback
++
++The feature adds no stored state, schema or file outside `deploy.sh`, so neither direction needs a
++migration.
++
++- Upgrade on a host without `DEPLOY_CHAT_WEBHOOK_URL`: deploys behave as before plus one warning line on
++  stderr and no post. Setting the variable turns the post on with no code change.
++- Rolling back `deploy.sh` to the previous version: deploys stop posting. A variable left set is ignored.
++  Nothing needs cleaning up.
++- Deploying an older application revision with the new `deploy.sh`: the message names whatever revision
++  `git rev-parse` reports in the working tree, so a rollback deploy shows up in chat like any other.
++- Removing the webhook on the chat side: posts fail with a non-2xx response, which the partial failure
++  rules above already cover; deploys keep working.
++
++### Secret handling
++
++The webhook URL holds the secret. It lives only in the deploy environment, never in the repository, in
++command-line arguments or in output. The test asserts the URL never appears on stdout or stderr.
++
++## Acceptance Criteria
++
++- [ ] AC-01: When `./ship-release` exits 0 and `DEPLOY_CHAT_WEBHOOK_URL` is set, `deploy.sh` sends exactly
++      one POST to that URL whose message names success, the short revision, the host name and a UTC time,
++      and `deploy.sh` exits 0.
++- [ ] AC-02: When `./ship-release` exits non-zero, `deploy.sh` sends exactly one POST whose message names
++      failure and that exit code, and `deploy.sh` exits with the same code.
++- [ ] AC-03: When the post fails by timeout, connection error or non-2xx response, `deploy.sh` exits with
++      the exit code of `./ship-release`, prints one failure line to stderr, and makes no second attempt.
++- [ ] AC-04: When the webhook does not answer, `deploy.sh` finishes within 15 seconds of `./ship-release`
++      returning.
++- [ ] AC-05: When `DEPLOY_CHAT_WEBHOOK_URL` is unset or empty, `deploy.sh` makes no network call, prints
++      the skip warning to stderr, and exits with the exit code of `./ship-release`.
++- [ ] AC-06: The webhook URL never appears in `deploy.sh` stdout or stderr, nor in the arguments `curl`
++      is started with, in any of the cases above.
++- [ ] AC-07: A deploy run against a real test channel shows one readable message in that channel.
++
++## Test Plan
++
++| Criterion | Proof |
++| --- | --- |
++| AC-01, AC-02 | `tests/deploy-notify/run.sh`: copies `deploy.sh` into a temp directory with a stub `ship-release` that exits with a chosen code, and puts a stub `curl` first on `PATH` that records its arguments, config input and stdin body, then exits 0. Cases exit 0 and exit 3. Pass: one recorded call per case, URL equals the test value, body parses with `jq` and its text contains `succeeded` or `FAILED (exit 3)`, the stub revision, the stub host and a time matching `^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z`; `deploy.sh` exit equals the stub code. |
++| AC-03 | Same harness, stub `curl` exiting 28 (timeout), 7 (connection) and 22 (HTTP error under `--fail`), each with `ship-release` exiting 0 and then 3. Pass: `deploy.sh` exit equals the `ship-release` code, stderr has exactly one line containing `chat notification failed`, and the stub recorded exactly one call. |
++| AC-04 | Same harness with a stub `curl` that honours `--max-time` by sleeping that many seconds and exiting 28, plus a guard that fails the case if `--max-time` is missing or above 10. Pass: wall time from stub `ship-release` exit to `deploy.sh` exit is under 15 seconds. |
++| AC-05 | Same harness, run once with the variable unset and once set to empty. Pass: stub `curl` records no call, stderr contains `DEPLOY_CHAT_WEBHOOK_URL not set`, exit equals the `ship-release` code. |
++| AC-06 | Every case above uses the URL `https://hooks.example.invalid/secret-token-123`. Pass: `secret-token-123` appears in neither captured stdout, captured stderr nor the recorded `curl` argument list. |
++| AC-07 | Manual procedure: on a host with a test-channel webhook in `DEPLOY_CHAT_WEBHOOK_URL`, run `deploy.sh` with a no-op `ship-release`. Pass: the test channel shows one message with the revision, host and time, and the run printed no failure line. Record the date, commit and channel in Evidence. |
++
++## Tasks
++
++None yet; written once the document is planned.
++
++## Open Questions
++
++### Q1: Should deploy.sh post after a failed deploy as well as a successful one?
++
++**Recommendation:** A. Post after both; a failed deploy is the message the team most needs.
++
++| Option | You get | It costs |
++| --- | --- | --- |
++| **A. Both outcomes** | The channel shows every deploy, failures included | Failure noise during repeated attempts |
++| **B. Success only** | A quieter channel | Failed deploys stay invisible to everyone but the person running them |
++
++**Why this is yours:** It decides what the team sees in its channel and how much noise it accepts.
++
++### Q2: Should a failed notification ever change deploy.sh's exit status?
++
++**Recommendation:** A. Never; a deploy that worked should not be reported as failed because chat was down.
++
++| Option | You get | It costs |
++| --- | --- | --- |
++| **A. Never** | Deploy pipelines see only the deploy's result | A broken webhook can go unnoticed except for a stderr line |
++| **B. Fail on notify error** | Broken notifications get noticed at once | A chat outage makes successful deploys look failed and may trigger rollbacks or retries |
++
++**Why this is yours:** It trades notification reliability against deploy pipeline behaviour.
++
++### Q3: How long should deploy.sh wait for the webhook?
++
++**Recommendation:** A. 10 seconds, which covers a slow TLS handshake without stalling a pipeline for long.
++
++| Option | You get | It costs |
++| --- | --- | --- |
++| **A. 10 seconds** | A bounded wait; AC-04 tests it | A very slow but working service may be cut off |
++| **B. 30 seconds** | Fewer false timeouts | A hung webhook holds every deploy up to half a minute |
++
++**Why this is yours:** The right bound depends on how the team runs deploys and how much delay it accepts.
++
++### Q4: Should deploy.sh retry a failed post?
++
++**Recommendation:** A. No retry; a timed-out post may already have landed, and a retry would then duplicate it.
++
++| Option | You get | It costs |
++| --- | --- | --- |
++| **A. One attempt** | At most one message per deploy | Brief outages drop the message |
++| **B. One retry after 2 seconds, only on connection errors and 5xx** | Survives brief blips | Up to 22 seconds of waiting; a 5xx after delivery can still duplicate |
++
++**Why this is yours:** It chooses between missed and duplicated messages.
++
++### Q5: Which chat service's payload format should the post use?
++
++**Recommendation:** A. `{"text": "..."}`, which Slack-compatible incoming webhooks and Mattermost accept.
++
++| Option | You get | It costs |
++| --- | --- | --- |
++| **A. `{"text": ...}`** | Works with Slack-style webhooks | Fails on services that expect another field, such as Discord's `content` |
++| **B. A format named by the owner** | Matches the team's actual service | Needs the owner to name the service |
++
++**Why this is yours:** The repository does not say which chat service the team uses, and only the owner knows.
++
++### Q6: Should a missing webhook URL be a silent skip, a warning, or an error?
++
++**Recommendation:** A. Warn on stderr and skip, so hosts without the variable keep deploying.
++
++| Option | You get | It costs |
++| --- | --- | --- |
++| **A. Warn and skip** | Safe rollout host by host | A host missing the variable stays quiet in chat until someone reads the log |
++| **B. Fail the deploy** | No host can deploy unannounced | Every host must have the secret before the next deploy |
++
++**Why this is yours:** It decides rollout order and whether notification is mandatory.
++
++### Q7: May deploy.sh depend on curl being installed on deploy hosts?
++
++**Recommendation:** A. Depend on `curl`, and treat a missing `curl` like any other failed post.
++
++| Option | You get | It costs |
++| --- | --- | --- |
++| **A. Require curl** | Simple, testable script | Hosts without `curl` never notify, with a stderr line each time |
++| **B. Fall back to wget** | Works on more minimal hosts | Two code paths to test and keep the URL out of process arguments for |
++
++**Why this is yours:** Only the owner knows what the deploy hosts have installed.
++
++## Review Log
++
++| Date | Review | Kind | Commit | Model | Isolation | Outcome |
++| --- | --- | --- | --- | --- | --- | --- |
+commit a6838cf7a812a6a6e4ca56e85ef331b1169c2678
+Author: Fixture
+
+    fixture: empty repository for AC-07
+
+
+diff --git a/AGENTS.md b/AGENTS.md
+new file mode 100644
+index 0000000..a080bfb
+--- /dev/null
++++ b/AGENTS.md
+@@ -0,0 +1,7 @@
++# Repository instructions
++
++Read the personal conventions at
++https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/AGENTS.md
++and follow the task routes there before implementation.
++
++Feature documents: docs/specs/
+diff --git a/deploy.sh b/deploy.sh
+new file mode 100644
+index 0000000..ebd3cf1
+--- /dev/null
++++ b/deploy.sh
+@@ -0,0 +1,2 @@
++#!/bin/sh
++./ship-release

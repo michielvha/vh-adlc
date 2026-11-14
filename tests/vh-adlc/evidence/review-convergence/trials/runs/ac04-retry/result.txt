@@ -1,0 +1,51 @@
+=== turn 1
+MODEL: claude-opus-5-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design; Context > Owner summary; Scope; Acceptance Criteria; Test Plan
+EVIDENCE: Design says "If the POST fails, notify.sh exits 1 and the build is marked unreported." The document does not cover retry or replay. A POST that times out after the server has recorded it is a partial failure, and it is treated the same as a POST that never arrived. The request carries no idempotency key or dedupe rule, so any rerun of notify.sh (by a person, CI job retry or wrapper) sends a duplicate. A transient network error leaves the result unreported for good. The Owner summary says "Report each build result to the status service", and Scope says "one POST per build". Neither holds under transient failure or replay, so with every box ticked the original problem can still occur. Nothing in the document, Scope or covers says what does "marked unreported" or who does it.
+PROPOSAL: Define the failure path. Either add bounded retries with a timeout and an idempotency key derived from the build ID so the server dedupes replays, or state explicitly that results may be lost or duplicated and why. Name the component that records "unreported". Raise the retry versus no-retry trade-off as an Open Question.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: Design says "Builds never overlap, a lock file in /run serializes notify.sh runs, so concurrent requests cannot happen." At a74104a, notify.sh is `#!/bin/sh` (notify.sh:1) and `true` (notify.sh:2). There is no lock file and the claim cites nothing. The sentence also contradicts itself: if builds never overlap, no lock is needed, and if a lock is needed, overlap can happen. The document does not say what happens when the lock is held (wait, skip or fail), when a crashed run leaves a stale lock, or which lock path is used.
+PROPOSAL: Decide whether the lock is new work or an existing guarantee. If it is new work, specify its path, its contention behaviour and its stale-lock recovery, and add a criterion and Test Plan row for it. If it is not, cite where non-overlap is guaranteed and drop the lock claim.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design; Context > Background
+EVIDENCE: Design says "The request body keeps the previous version's fields, so upgrade and rollback need no migration." The previous version of notify.sh is `true` (notify.sh:2). It sends no request and has no body fields, so the upgrade and rollback claim rests on nothing. The body's fields are not defined anywhere beyond "the build ID". Background cites notify.sh:1 for "the status API is a remote HTTPS service", but notify.sh:1 is only `#!/bin/sh`. The endpoint URL, HTTP method details, auth and payload schema are never given.
+PROPOSAL: Remove the false prior-version claim. Define the endpoint, its configuration, the authentication and the exact request body. Replace the notify.sh:1 citation with a real source for the API or list the API page under Sources.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria; Test Plan; Design; Scope; Context > Owner summary
+EVIDENCE: AC-01 says "A successful build produces one POST with its build ID." The Owner summary says "Report each build result", Scope says "one POST per build", and the goal says "posts a build result". No criterion covers failed builds, and none says the result (pass or fail) is in the POST. Design's failure behaviour ("exits 1 and the build is marked unreported") has no criterion and no Test Plan row. An implementation that posts only for successful builds, or that sends only the build ID with no result, would pass AC-01.
+PROPOSAL: Add criteria for a failed build producing one POST with its build ID and result, and for a failed POST producing exit 1 and the unreported mark. Add Test Plan rows for each.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan
+EVIDENCE: The AC-01 proof is "A stub server records exactly one POST with the build ID". The Design gives no way to point notify.sh at a stub instead of the remote HTTPS service: no endpoint variable, no configuration and no TLS handling for a local stub. The proof also does not say how the build ID is passed in or what makes the stub's check pass. As written, the row cannot be run against a correct implementation without inventing an interface.
+PROPOSAL: Specify the endpoint configuration in Design, for example an environment variable, and how the build ID and result are supplied. Rewrite the proof as a runnable scenario with an exact pass condition.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Design
+EVIDENCE: Open Questions says "None." The Design still settles several trade-offs the standard says belong there: failing without retry, serializing with a lock instead of tolerating concurrency, and treating a lost result as "unreported". The standard says "Every trade-off the document settles is an open question" and that "None." means every question has been answered, but no answers are folded in.
+PROPOSAL: Add Open Questions for the retry policy and the concurrency approach, each with options and a recommendation, and remove "None.".
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Context > Owner summary
+EVIDENCE: The Owner summary is a single sentence: "Report each build result to the status service." It leaves out the approach, the failure behaviour (exit 1, unreported), the lock, the lack of retry, the upgrade claim and the validation state. The standard asks it to cover scope, defaults, trade-offs, validation state and owner decisions, and to agree with the detailed sections.
+PROPOSAL: Expand the summary to state the failure and retry behaviour, the concurrency approach and that no proof has been observed yet, once F-01 to F-06 are settled.
