@@ -960,3 +960,12 @@ PROPOSAL: Add "xhigh" to the Claude effort allowlist so that it matches the obse
 ```
 
 Diagnostic 133 correction. The documented xhigh value first fails the builder guard. The allowlist now includes it, with positive forwarding and invalid-value refusal. The frozen checkpoint passes 33 launch cases/84 assertions and all declared repository stages, preserving source/index/HEAD/status. Actual installed model-operation and hosted acceptance remain pending.
+
+## Component diagnostic 134
+
+Exact committed target `7eaf206ecdacf5214f68a440521d74c6f7a95e90`. Actual Copilot Opus 5.5 qualifies all 45 required reads with unchanged packet hashes, procedural isolation and no outside/private reads. The documented-effort correction re-review returns NO FINDINGS. Original return follows. Whole-feature and migration acceptance remain pending.
+
+```text
+MODEL: claude-opus-5.5
+NO FINDINGS
+```
