@@ -1,0 +1,25 @@
+{
+  "comment": "Shared cases for covers patterns with **: internal/doc and the docs-impact matcher must agree on every row.",
+  "cases": [
+    { "pattern": "deploy/helm/**", "path": "deploy/helm/values.yaml", "match": true },
+    { "pattern": "deploy/helm/**", "path": "deploy/helm/templates/a/b.yaml", "match": true },
+    { "pattern": "deploy/helm/**", "path": "deploy/helmet/x", "match": false },
+    { "pattern": "deploy/helm/**", "path": "deploy/x", "match": false },
+    { "pattern": "**/*.md", "path": "README.md", "match": true },
+    { "pattern": "**/*.md", "path": "docs/a/b.md", "match": true },
+    { "pattern": "**/*.md", "path": "docs/a/b.mdx", "match": false },
+    { "pattern": "src/**/test_*.go", "path": "src/test_a.go", "match": true },
+    { "pattern": "src/**/test_*.go", "path": "src/x/y/test_a.go", "match": true },
+    { "pattern": "src/**/test_*.go", "path": "src/x/y/a_test.go", "match": false },
+    { "pattern": "src/**/test_*.go", "path": "other/src/test_a.go", "match": false },
+    { "pattern": "a**b", "path": "a/x/b", "match": true },
+    { "pattern": "a**b", "path": "ab", "match": true },
+    { "pattern": "core/**/[a-c]?.go", "path": "core/x/b1.go", "match": true },
+    { "pattern": "core/**/[a-c]?.go", "path": "core/x/d1.go", "match": false },
+    { "pattern": "./scripts/**", "path": "scripts/build.sh", "match": true },
+    { "pattern": "src/**", "path": "src/\nfile.go", "match": true },
+    { "pattern": "**/*.go", "path": "a/\nb.go", "match": true },
+    { "pattern": "src/**/x.go", "path": "src/\nd/x.go", "match": true },
+    { "pattern": "src/*", "path": "src/\nfile.go", "match": true }
+  ]
+}

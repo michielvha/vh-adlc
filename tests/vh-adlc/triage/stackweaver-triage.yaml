@@ -1,0 +1,73 @@
+# Settings for the shared vh-adlc triage operation (plugin 0.7.0 or later).
+# The plugin's references/triage-settings.md documents every field.
+schema_version: 1
+repository: michielvha/stackweaver
+hostname: github.com
+
+# The whole checkout is source, except the generated satellite mirror.
+source_roots:
+  - .
+generated_mirrors:
+  - distribution
+
+# Plan frontmatter under docs/internal is the roadmap.
+plan_roots:
+  - docs/internal
+plan_fields:
+  issue: issue
+  status: status
+  status_description: status_description
+  priority: priority
+
+report_dir: docs/internal/status
+
+# Never proposed for action.
+protected_ids:
+  - 332
+  - 334
+
+# Umbrella issues that close only on a current owner request.
+index_ids:
+  - 13
+  - 395
+index_rules:
+  labels: []
+  title_prefixes:
+    - "Milestone:"
+
+bot_authors:
+  - renovate
+  - renovate[bot]
+  - dependabot
+  - dependabot[bot]
+  - stackweaver-release-bot
+  - stackweaver-release-bot[bot]
+owned_labels: []
+label_map:
+  bug: bug
+  enhancement: enhancement
+  documentation: documentation
+  refactor: refactor
+  security: security
+  major-upgrade: major-upgrade
+
+# Ranking: milestone first, then priority.
+priority_order:
+  - high
+  - medium
+  - low
+milestone_order:
+  - Public Go Live
+stale_days: 90
+
+# Issues these sources reference belong to another workflow and stay out of triage actions.
+workstreams:
+  - owner: codebase-audit
+    reference_files:
+      - docs/internal/codebase-audit-2026-06-analysis.md
+  - owner: tfe-compat
+    plan_roots:
+      - docs/internal/tfe-compatibility
+  - owner: rbac
+    reference_files:
+      - docs/internal/plans/features/RBAC_MASTER_PLAN.md

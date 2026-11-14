@@ -56,6 +56,15 @@ Without settings, source scope is the checkout, plan metadata and project mappin
 are absent, stale age is 90 days, and reports/history use `.vh-adlc/reports/triage/`.
 An explicitly requested missing file is an error.
 
+`label_map` maps a standard label from `references/issues.md` to the name this
+repository uses for it, for example `bug: defect`. Triage, investigate, spec and
+the labels helper then use the mapped name, and the helper manages that label's
+color and description, even when a bot created it. An entry keyed by a name outside
+the standard set has no effect. The reader refuses a map in which two standard
+labels end up with the same name, compared case-insensitively and counting unmapped
+standard labels under their own names: `ready: blocked` and `bug: Enhancement` both
+fail.
+
 Protected IDs, bot authors and owned labels exclude work from action proposals.
 Index IDs and label/title rules identify umbrella work that needs the current
 owner-request exception. The agent must also inspect issue purpose: a newly opened

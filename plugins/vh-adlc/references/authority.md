@@ -23,6 +23,7 @@ additional execution or publication permission.
 | Apply/commit reverify/full ledger updates | Current explicit ledger-update/ledger-commit request or freshly adopted audit-mode effects; use the owned audit-ledger role at the exact clean assessed default base, never a shared or unrelated checkout |
 | Repair selected audit findings and deliver a selected batch | Eligible selected local repair follows `audit.md` and `audit-record.md`; live/remote effects additionally need exact current permission or adopted `Standing audit workflow authorization`, current selection/restrictions and all retained gates |
 | Create a tracking issue | Included in acceptance, or requested; a triage-created issue must be in its exact approved batch |
+| Apply a label plan with the labels helper | The owner's approval of that exact plan digest for that repository (`references/issues.md`) |
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
 | Merge | Separate approval for that exact action, or the explicitly selected audit batch's current/adopted `conditional-merge` permission and all retained gates in [audit.md](audit.md). Either one also covers that PR's `after-merge` branch cleanup in [branches.md](branches.md) |
 | Rebuild/restart an owned audit verification runtime | Current explicit permission or adopted `live-verify` naming that exact owned development target and method, with all local ownership/restriction gates |
@@ -76,6 +77,12 @@ check out over or overwrite changes the loop did not make, and stage explicit pa
 already hold someone else's staged work, and a plain `git commit` would take it too, so always name what
 you commit: `git commit -m <message> -- <path>...`. That commits only those paths and leaves the rest
 staged as it was. A conflicting concurrent edit to the same file stops the run with a question.
+
+A claim may also be made from a host worktree at the default-branch tip that is detached or on a branch
+this session created or was handed, through `scripts/loop/cli.ts claim`; it never advances an unrelated
+branch. With loop setting `implement_worktree: isolated`, implement asks the host's own worktree tool for
+a worktree when it starts in the primary checkout. That worktree is the host's: the plugin itself still
+creates none, and on a host without such a tool the operation stops before writing.
 
 Work on a feature only in its owning worktree, found with `git worktree list --porcelain`; run branch
 checks, `fresh` and `gate` there. Outside the maintenance and audit roles below, never create, remove, prune, reset or force-move a worktree,

@@ -164,6 +164,29 @@ and branches in use by a worktree are kept, each with its reason. Clean worktree
 are removed only when you ask for worktree cleanup. See the
 [branch hygiene guide](../../plugins/vh-adlc/references/branches.md).
 
+## Issue labels
+
+Every repository that uses vh-adlc carries the same standard label set: the type labels `bug`,
+`enhancement`, `documentation`, `refactor` and `security`, and the state labels `ready`, `blocked`,
+`partial` and `needs-decision`. Investigate gives an issue it files on request one type label and the
+state its verdict names. Spec gives the issues it files a type label only. After filing, a state
+change is a triage verdict. The
+[issue labels reference](../../plugins/vh-adlc/references/issues.md) (`references/issues.md`) lists
+each label's color and description.
+
+Bring a repository to the set with the labels helper:
+
+```bash
+bun plugins/vh-adlc/scripts/labels/cli.ts plan --repo . --output labels-plan.json
+```
+
+The label plan shows each standard label as present, missing or different, every write with its
+before and after values, and a digest. Nothing changes until you approve that exact digest and the
+agent runs `apply` with it. Apply refuses if the account, repository, label set, mapping or labels
+changed since the plan. It never deletes or renames a label, and labels outside the set stay as they
+are. A repository that keeps its own name for a standard label maps it with `label_map` in
+`.vh-adlc/triage.yaml`.
+
 ## Repository security settings
 
 GitHub's free security settings, such as Dependabot alerts and secret scanning, are
@@ -261,6 +284,34 @@ model does not satisfy that request.
 
 Review isolation is procedural: the reviewer has a shell that can still write.
 See the [compatibility details](../reference/compatibility.md).
+
+A reviewer role can also run through an external command, such as the Codex CLI on
+a model from another vendor. A spec review then reads a read-only export of the
+commit; an implementation review runs in a private clone, where it may run checks.
+The review is stored only when the reply names the requested model and commit and
+the checkout is unchanged afterwards. Otherwise it stays pending.
+
+The command runs in its own PID namespace, created with `unshare --user --pid`, so no
+reviewer process outlives the review. On a host where that fails, command-route reviews
+stay pending. Ubuntu 23.10 and later restrict unprivileged user namespaces through
+AppArmor; allow them, for example with
+`sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`, to use these routes.
+
+## Loop settings
+
+A repository may commit `.vh-adlc/loop.yaml` to tune the feature loop. It can:
+
+- route each role (author, implementer, spec reviewer, implementation reviewer) to the
+  host, optionally with a model, or route a reviewer role to an external command;
+- name a project procedure, instruction files and review lenses every operation reads;
+- declare verification rungs that must pass before push, completion and delivery;
+- set manual CI, a post-merge watch and extra skip-CI paths for delivery;
+- have implement continue in an isolated worktree, and have investigate always write
+  a findings document.
+
+Without the file, the loop runs as described above. A per-user file may replace only
+an external command's executable path. See the
+[loop settings reference](../../plugins/vh-adlc/references/loop-settings.md).
 
 ## Authority and publication
 

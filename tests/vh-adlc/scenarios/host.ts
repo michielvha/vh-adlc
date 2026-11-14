@@ -10,7 +10,7 @@
 // stale. The copy is deleted when the run ends. Nothing of the owner's own
 // profile (plugins, settings, memory) is read or changed.
 
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, sep } from "node:path";
 
@@ -38,9 +38,27 @@ export function profile(home: string, settings: Record<string, unknown> = {}): P
   };
 }
 
+const SESSION_PATH = [join(homedir(), ".bun", "bin"), "/usr/local/bin", "/usr/bin", "/bin"];
+
+// sessionPath keeps every session PATH directory but never shows a host vh-adlc. The installer rejects a
+// PATH binary that reports the locked version with another digest, so a system vh-adlc of the same
+// version as a fixture copy's lock would stop every scenario at "deterministic checks unavailable". A
+// directory that holds vh-adlc is replaced by a profile directory linking all of its other entries.
+function sessionPath(p: Profile): string {
+  return SESSION_PATH.map((dir, i) => {
+    if (!existsSync(join(dir, "vh-adlc"))) return dir;
+    const mirror = join(p.config, "path", String(i));
+    if (!existsSync(mirror)) {
+      mkdirSync(mirror, { recursive: true });
+      for (const name of readdirSync(dir)) if (name !== "vh-adlc") symlinkSync(join(dir, name), join(mirror, name));
+    }
+    return mirror;
+  }).join(":");
+}
+
 function env(p: Profile): Record<string, string> {
   return {
-    PATH: [join(homedir(), ".bun", "bin"), "/usr/local/bin", "/usr/bin", "/bin"].join(":"),
+    PATH: sessionPath(p),
     HOME: p.home,
     XDG_CACHE_HOME: join(p.home, ".cache"),
     CLAUDE_CONFIG_DIR: p.config,

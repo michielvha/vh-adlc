@@ -15,6 +15,13 @@ with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
 Input: a feature document, its issue, or its slug. Follow `references/loop.md` for every step it describes
 and `references/authority.md` for what you may do without asking.
 
+## Loop routes
+
+This operation's loop role and route come from `.vh-adlc/loop.yaml` through
+`bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
+host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
+files and its project procedure, whose local rules apply alongside this procedure. A `host` route that names a model runs with it as a requested model.
+
 ## Start
 
 1. Get the binary and run `vh-adlc knowledge` with `conventions/feature-documents.md`,

@@ -26,7 +26,7 @@ required browser verification fails, report the blocker without a localhost fall
 
 Installation makes the plugin discoverable. Activation establishes remote context for future chats. Native-agent scenarios and a browser on the other device establish actual behavior; package discovery alone does not.
 
-Version 0.2.0 adds human and agent browser phases. Update the installed marketplace plugin through your agent's plugin manager, then start a new chat to load its instructions. Existing sessions retain their running supervisor's code. End an older session before using the updated phase workflow.
+Version 0.3.0 adds the viewer's clipboard panel and reusable profiles. Update the installed marketplace plugin through your agent's plugin manager, then start a new chat to load its instructions. Existing sessions retain their running supervisor's code. End an older session before using the new features.
 
 ## Human sign-in and agent hand-back
 
@@ -34,7 +34,7 @@ Version 0.2.0 adds human and agent browser phases. Update the installed marketpl
 flowchart LR
     H[Human browser\nAutomation and debugging off] -->|Owner confirms sign-in| A[Agent browser\nLocal CDP enabled]
     A -->|Another sign-in needed| H
-    H --> E[Stop or expiry\nDelete temporary profile]
+    H --> E[Stop or expiry\nDelete a disposable profile\nKeep a reusable profile]
     A --> E
 ```
 
@@ -45,6 +45,67 @@ Ordinary inspection and non-login forms can start in agent mode. A later credent
 A failed handoff preserves the viewer and profile until stop or expiry. Its diagnostic may require the owner to finish closing a browser window or resolve a profile lock before retrying. Require `ready` and the intended `browser_mode` before continuing. The reported mode on a failed transition is the last completed phase. Never delete locks or force a second browser into the profile.
 
 Provider acceptance remains a separate check. If a provider rejects a genuine human browser, use its supported authentication route or keep that task human-only. Initial side-effect-free `ERR_NETWORK_CHANGED` navigation allows two retries in the same session. Credential submissions and provider rejections require a separate recovery decision.
+
+## Reusable profiles
+
+By default every browser session gets a **disposable profile**, a fresh profile that is deleted on stop or expiry. A **reusable profile** is a named profile that survives stop and expiry, so a provider sign-in kept in a persistent cookie is still there in the next session. It is opt-in for each session:
+
+```sh
+remote-gui start --profile work --ttl 2h
+remote-gui profile list
+remote-gui profile delete work
+```
+
+| Term | Meaning |
+| --- | --- |
+| Reusable profile | A named remote-gui browser profile that survives session stop and expiry. |
+| Disposable profile | The default per-session profile, deleted on stop or expiry. |
+| Profile owner | The Tailscale owner login, or the `loopback` transport kind, recorded when the profile was created. |
+| In use | Held by a live session's single-writer lock. |
+| Approved agent start | A session with `--profile` started in agent mode with `--agent-start-approved` on the owner's explicit instruction. |
+| Session sweep | The session guard's stop of every remaining process in its private session, identified by session ID across process groups. |
+
+A profile name has 1 to 40 lowercase letters, digits or hyphens and starts with a letter or digit; any other name fails with `invalid-profile-name`. Without `--profile`, sessions behave exactly as before.
+
+### Where profiles live
+
+Profiles are stored in `$XDG_STATE_HOME/remote-gui/profiles/<name>/`, or `~/.local/state/remote-gui/profiles/<name>/`. `REMOTE_GUI_PROFILE_HOME` or `--profile-home` selects another private directory. When `REMOTE_GUI_HOME` or `--home` overrides the sessions root, `start --profile` and the `profile` commands fail with `profile-home-required` until a profile root is given too.
+
+### Owner binding
+
+A new profile belongs to the session's pinned Tailscale owner, or to the `loopback` transport kind. It opens only for that profile owner and transport kind; anything else fails with `profile-owner-mismatch` before a session starts. Profiles are never shared between owners, transports or concurrent sessions.
+
+### Locking
+
+A profile has one writer. A second start on a profile that is in use fails at once with `profile-in-use` and names `holder: <session-id>`, or `holder: starting` while the other session is still starting. `profile list` shows each profile's owner, transport kind, created and last-used times, `in_use` and `holder_session`, and never takes the lock.
+
+### Human sign-in
+
+A session with `--profile` starts in human mode. `--browser-mode agent` additionally needs `--agent-start-approved`, which the owner gives for that one session; without it the start fails with `profile-requires-human-start`. The approval is recorded on the session, never on the profile. Credential entry stays human: a sign-in or MFA challenge in agent mode needs `handoff <id> --browser-mode human` first.
+
+### What carries over
+
+Persistent cookies and site storage carry over. The previous session's tabs and session-only cookies do not, even after a crash. Only sign-ins kept in persistent cookies survive, so choose the provider's "stay signed in" option. Providers still expire their own sessions, and a reused profile never proves that a sign-in is still valid. There is no retention timer: delete a profile when you no longer want it.
+
+### Stop sends no keys
+
+On stop or expiry remote-gui sends no key to the browser. It sends SIGTERM to Chromium, SIGKILL after two seconds if Chromium is still running, and then stops the display. A cookie written up to about half a minute before the stop may be lost, so wait about half a minute after signing in before you stop the session. On a heavily loaded host, with a load average of 4 or more, even a cookie written 30 seconds before the stop can be lost, so persistence there is best effort. The session's downloads, X authority and viewer access are still deleted, and its stopped record remains. A handoff still closes Chromium through its own Exit menu.
+
+### Lock recovery
+
+After a crash, remote-gui removes Chromium's leftover lock files itself once no browser on this host still uses the profile. A start or delete refused with `profile-browser-still-running` names the remote-gui session that owns that browser when there is one: run `cleanup` until that session is no longer `cleanup-pending` and reports `stopped` or `failed`, then retry. Otherwise close the browser you started on that profile. Never delete the lock files by hand. A profile last opened by a newer Chromium fails with `profile-chromium-newer`; upgrade Chromium or delete the profile.
+
+### Deletion
+
+`profile delete <name>` removes an idle profile completely. It refuses a profile that is in use (`profile-in-use`) or that a running browser still uses (`profile-browser-still-running`). Repeated deletes return `missing` and exit 0.
+
+### Protection at rest
+
+A reusable profile is protected only by file permissions and the host account boundary: the store uses 0700 directories and 0600 files, and Chromium keeps its basic password store without a keyring. Anyone with this OS account or root can read its cookies. Agents never list, read or copy files in the profile store; they reach a profile only through a remote-gui session.
+
+### auth-refresh first
+
+auth-refresh keeps configured identities current and drives their sign-in, so it stays the first route for sign-in. Use a reusable profile for sign-ins auth-refresh cannot drive and for pages you need to see yourself, and not for an identity auth-refresh owns. The default profile store lies outside auth-refresh's directories, and remote-gui never reads auth-refresh files.
 
 ## Clipboard panel
 
@@ -105,6 +166,9 @@ remote-gui status <session-id>
 remote-gui access <session-id> --reveal
 remote-gui stop <session-id>
 remote-gui cleanup
+remote-gui start --profile <name> --browser-mode human
+remote-gui profile list
+remote-gui profile delete <name>
 ```
 
 Tailscale sessions pin one exact owner login at creation. The default is the active host profile's user. Use `--owner-login human@example.com` on `doctor`, `start` or `share` when trusted task context selects another account, or the host profile is tagged. A tagged or unavailable default identity requires this explicit value. Status/access cannot change the owner afterward. No wildcard or whole-tailnet fallback is accepted.
@@ -117,7 +181,7 @@ Identity headers are trusted only on the session's private Unix socket from the 
 
 Service shares pin one unambiguous listener and its process birth identity. Each new upstream connection must also have an accepted socket owned by that process before request bytes are sent. A missing, changed or unverifiable connection blocks sharing. Servers that transfer accepted sockets to another process are unsupported by this identity check.
 
-State defaults to `$XDG_STATE_HOME/remote-gui/sessions` or `~/.local/state/remote-gui/sessions`. `REMOTE_GUI_HOME` or `--home` selects a short absolute private directory. Directories use 0700 and files/sockets use 0600. `REMOTE_GUI_BUILD_CACHE` selects a private build cache. Stopping a browser deletes its temporary profile and downloads; stopping a service share preserves its app process, files and settings.
+State defaults to `$XDG_STATE_HOME/remote-gui/sessions` or `~/.local/state/remote-gui/sessions`. `REMOTE_GUI_HOME` or `--home` selects a short absolute private directory. Directories use 0700 and files/sockets use 0600. `REMOTE_GUI_BUILD_CACHE` selects a private build cache. Stopping a browser deletes its disposable profile and downloads and keeps a reusable profile; stopping a service share preserves its app process, files and settings.
 
 Syntax errors exit 2; operation failures exit 1. Missing status/access fails. Repeated stops exit 0; an unknown ID returns `state: missing`. States are starting, ready, handoff, handoff-failed, stopping, stopped, failed and cleanup-pending. `diagnostic` preserves the primary failure; `cleanup_diagnostic` reports unresolved cleanup separately. Cleanup retains its record and denial listener when scoped removal fails. Changed mappings or socket paths remain untouched. Resolve the blocker and rerun cleanup.
 
