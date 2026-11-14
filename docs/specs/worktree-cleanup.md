@@ -1,6 +1,6 @@
 ---
 status: planned
-status_description: "Accepted by the owner on 2026-11-13 after clean spec review R-21 at 5f2f2d1; tasks are next."
+status_description: "Accepted by the owner on 2026-11-13 after clean spec review R-21 at 5f2f2d1. Covered drift made that review stale; the R-22 fixes are applied and a new independent spec review is next."
 issue: null
 goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept; only commits that a branch worktree's HEAD reflog or a deleted branch's own reflog alone still names, such as copies from before a rebase or amend, go with them."
 covers:
@@ -168,9 +168,11 @@ the guard now also reads the commit each entry moved from. Git prints that only 
 in a reftable repository a detached worktree with HEAD reflog entries is kept. Spec review R-19
 corrected how long that lasts, said what a missing `logs/HEAD` means, and tightened two tests. Spec
 review R-20 found that an entry whose directory is gone still keeps its staged changes in its own
-index, and a real Stackweaver entry has some; design item 4 now keeps such an entry. A new
-independent review must pass before acceptance. Acceptance would authorize implementation on a feature branch; pushing, a PR, merging and
-releasing each still need their own approval.
+index, and a real Stackweaver entry has some; design item 4 now keeps such an entry. Spec review
+R-21 found nothing, and the owner accepted the document on 2026-11-13. Work that landed on the
+default branch afterwards moved three cited lines, and spec review R-22 also found one test case that
+no task covered; both are fixed without changing the design. Implementation on the feature branch is
+next; pushing it, a PR, merging and releasing each still need their own approval.
 
 ### Background
 
@@ -199,8 +201,8 @@ These reasons come from the helper:
 - `branches.ts:183-198` only walks local branches, so a detached worktree is never considered.
 - `branches.ts:193` keeps a worktree whose directory is missing.
 - Worktree removal happens only with `--worktrees true` (`branches.ts:193`, `references/branches.md:49`,
-  `references/branches.md:88-90`). `references/authority.md:34` and `references/authority.md:84`,
-  `references/maintenance.md:156-157` and `skills/vh-adlc-ship/SKILL.md:108-109` all require the owner
+  `references/branches.md:88-90`). `references/authority.md:35` and `references/authority.md:90-91`,
+  `references/maintenance.md:156-157` and `skills/vh-adlc-ship/SKILL.md:122-123` all require the owner
   to ask for worktree cleanup.
 
 Git's own rule is looser. In a scratch repository with Git 2.55.0, `git worktree remove ../w1`
@@ -528,8 +530,8 @@ Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives wer
 - [ ] T8 `plugins/vh-adlc/scripts/branches/branches.ts` - Design item 2: a branch at or behind the default tip on its first-parent history counts as proven merged at seven days, aged by its oldest reflog entry or its tip's committer date; T7 passes (AC-03)
 - [ ] T9 `tests/vh-adlc/branches/branches.test.ts` - the AC-04 fixtures: detached worktrees by age, unmerged commits, rebase and bisect state, reflog-only commits named as new or old values, files and reftable storage, `core.logAllRefUpdates=false`, an unreadable `logs/HEAD`, a failing reflog command, shared folder names and a stale tracking ref; they fail first (AC-04)
 - [ ] T10 `plugins/vh-adlc/scripts/branches/branches.ts` - Design item 3: detached worktree removal with the HEAD reflog read through `--git-dir=<admin dir>`, the old and new value check against `logs/HEAD` under files storage, the reftable keep rule, the `rev-list` guard over local branches and live tracking refs, and the rebase and bisect state read for `prunable` entries too; T9 passes (AC-04)
-- [ ] T11 `tests/vh-adlc/branches/branches.test.ts` - the AC-05 fixtures: deleted directories on a merged branch and detached at a default-branch commit (removed), and kept ones that are unmerged, emptied without `.git`, mid-rebase, with an admin `modules/` or with staged changes; they fail first (AC-05)
-- [ ] T12 `plugins/vh-adlc/scripts/branches/branches.ts` - Design item 4: `prunable` entry removal with no minimum age for detached ones, and the keep rules for a remaining directory, `modules/` and `diff-index --cached` exiting non-zero or failing; T11 passes (AC-05)
+- [ ] T11 `tests/vh-adlc/branches/branches.test.ts` - the AC-05 fixtures: deleted directories on a merged branch and detached at a default-branch commit (removed), and kept ones that are unmerged, emptied without `.git`, mid-rebase, with an admin `modules/` or with staged changes; also the AC-02 case of a branch on the default branch's first-parent history with an 8-day reflog, paused by `git rebase -i` with a `break` in its worktree, whose directory the test moves by hand, so that `plan` keeps the entry and the branch with reasons naming the rebase and the branch remains after `apply`; they fail first (AC-02, AC-05)
+- [ ] T12 `plugins/vh-adlc/scripts/branches/branches.ts` - Design item 4: `prunable` entry removal with no minimum age for detached ones, and the keep rules for a remaining directory, `modules/` and `diff-index --cached` exiting non-zero or failing; T11 passes (AC-02, AC-05)
 - [ ] T13 `tests/vh-adlc/branches/branches.test.ts` - the AC-07 `after-merge` cases and the AC-10 lock cases for `plan`: a clean PR worktree removed with its branch while an unrelated old detached worktree stays, and kept ones that hold ignored files, changes, locks, the main checkout, the `--repo` worktree or the working directory, with lock reasons in the kept records; they fail first (AC-07, AC-10)
 - [ ] T14 `plugins/vh-adlc/scripts/branches/branches.ts` - Design item 5: `after-merge` considers only the PR's branch and its worktree, keeps one holding ignored files with `holds ignored files; remove it through an approved plan`, keeps the `--repo` and working-directory worktrees, and every locked worktree's kept reason names its lock reason; T13 passes (AC-07, AC-10)
 - [ ] T15 `tests/vh-adlc/audit/ledger.test.ts`, `tests/vh-adlc/maintenance/publication.test.ts` - the ledger and report-candidate worktrees, fresh and resumed, show `locked vh-adlc <run-id>` in `git worktree list --porcelain`, and the ledger's cleanup unlocks and removes its worktree; they fail first (AC-10)
