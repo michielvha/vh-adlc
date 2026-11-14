@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Refreshing coverage and visual verification after review R-6."
+status: planned
+status_description: "Owner accepted the revised verification plan at review R-7."
 issue: null
 branch: feat/architecture-diagram-agent
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
@@ -121,6 +121,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | 2026-11-14 | R-5 | implementation | `6693aea802f641cf7833073141ec0d5f8824900a` | unknown | procedural | Five criteria met and two should-fix findings |
 | 2026-11-14 | R-6 | spec | `48db37936eab67d416ccdbf53172b0d02a2765f7` | unknown | procedural | Three should-fix findings and one nit |
 | 2026-11-14 | R-7 | spec | `5d3af84c9f93809faf5ad3668477fab1e7bfd1d1` | unknown | procedural | No findings |
+| 2026-11-14 | R-7 | spec | `5d3af84c9f93809faf5ad3668477fab1e7bfd1d1` | n/a | n/a | accepted by owner |
 
 ### R-1
 
