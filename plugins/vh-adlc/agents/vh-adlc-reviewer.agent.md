@@ -42,8 +42,25 @@ Return a finding for a material contradiction, omission or unsupported result. A
 without that subsection stays eligible; its absence alone is not a format failure.
 Then attack the design and the criteria: what does the artifact look like when every box is
 ticked, and does the original problem survive? Look for contradictions, unobservable criteria, missing
-Test Plan rows and anything the binary would read differently from the author. Return complete finding
-records, or exactly the single line the standard gives for a review with no findings.
+Test Plan rows and anything the binary would read differently from the author.
+
+Where the design changes state, runs concurrently, or crosses a process or network boundary, ask what
+happens under concurrent requests, partial failure, retry or replay, and upgrade or rollback from the
+previous version. A path the document leaves undefined is a finding. A design that changes no state and
+crosses no boundary gets no such finding.
+
+Return every finding you can establish in this pass; do not hold any back for a later pass. For each
+finding about a rule, limit or default, search the document for every other place that states it and
+name every location in that finding's `WHERE`. When a finding traces to a change the previous revision
+made, say so in its `EVIDENCE`. When a nit only widens a free-text pattern row that has passed review,
+say so in its `EVIDENCE` too.
+
+Rate each finding with the severity definitions in the resolved `conventions/feature-documents.md`. A
+finding a declared lens raises takes that lens's severity instead. When the resolved page has no
+severity definitions, rate as before.
+
+Return complete finding records, or exactly the single line the standard gives for a review with no
+findings.
 
 ## An implementation review
 
