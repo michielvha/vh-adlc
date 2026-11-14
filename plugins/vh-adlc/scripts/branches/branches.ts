@@ -34,8 +34,8 @@ export const digest = (text: string) => createHash("sha256").update(text).digest
 const same = (a: Operation, b: Operation) => JSON.stringify(a) === JSON.stringify(b);
 
 type Pull = { number: number; head: string; sha: string; repository: string; base: string; merged: boolean };
-/** `admin` is set only when exactly one admin directory names `<path>/.git`; `pointed` is where a present entry's `.git` leads; `state` names a rebase or bisect in progress. */
-type Worktree = { path: string; head?: string; branch?: string; locked: boolean; prunable: boolean; state: string[]; pointed?: string; admin?: string; problems: string[] };
+/** `lock` is the reason given to `git worktree lock`; `admin` is set only when exactly one admin directory names `<path>/.git`; `pointed` is where a present entry's `.git` leads; `state` names a rebase or bisect in progress. */
+type Worktree = { path: string; head?: string; branch?: string; locked: boolean; lock?: string; prunable: boolean; state: string[]; pointed?: string; admin?: string; problems: string[] };
 
 function object(value: unknown, what: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`unexpected ${what} shape`);
@@ -105,7 +105,8 @@ export class Checkout {
   ancestor(oid: string, of: string): boolean { return oid === of || this.ok(["merge-base", "--is-ancestor", oid, of]); }
 }
 
-interface Context { checkout: Checkout; main?: string; invoking: string; worktrees: boolean }
+/** `repo` is the --repo worktree and `cwd` the one holding the process's working directory; both are kept. */
+interface Context { checkout: Checkout; main?: string; repo: string; cwd?: string; worktrees: boolean }
 interface Observation {
   checkout: Checkout; plan: Plan; remote: Map<string, string>; tracking: Map<string, string>;
   local: Map<string, string>; worktrees: Worktree[]; context: Context;
@@ -157,7 +158,8 @@ function worktrees(checkout: Checkout): Worktree[] {
         if (!state.length) state.push("rebase or bisect in progress");
       }
     }
-    entries.push({ path, head, branch, locked: flag("locked"), prunable, state, pointed, admin, problems });
+    const lock = lines.find(l => l.startsWith("locked "))?.slice(7).trim();
+    entries.push({ path, head, branch, locked: flag("locked"), ...(lock ? { lock } : {}), prunable, state, pointed, admin, problems });
   }
   // Removing an entry deletes its admin directory, so one that another checkout uses keeps both.
   for (const tree of entries.slice(1)) {
@@ -259,8 +261,9 @@ function inspect(checkout: Checkout, tree: Worktree, trees: Worktree[]): { reaso
 function assess(c: Context, tree: Worktree, trees: Worktree[], extra: string[] = []): { reasons: string[]; ignored: Ignored[] } {
   const reasons = [...extra, ...tree.state];
   if (tree.path === c.main) reasons.push("the main worktree");
-  if (real(tree.path) === c.invoking) reasons.push("the invoking worktree");
-  if (tree.locked) reasons.push("locked");
+  if (real(tree.path) === c.repo) reasons.push("the --repo worktree");
+  if (real(tree.path) === c.cwd) reasons.push("holds the process's working directory");
+  if (tree.locked) reasons.push(tree.lock ? `locked: ${tree.lock}` : "locked");
   if (!c.worktrees) return { reasons: [...reasons, "worktree removal is off (--worktrees false)"], ignored: [] };
   if (tree.path === c.main) return { reasons, ignored: [] };
   const found = inspect(c.checkout, tree, trees);
@@ -271,6 +274,12 @@ function refs(checkout: Checkout, prefix: string): Map<string, string> {
   return new Map(rows.filter(([, , symref]) => !symref).map(([name, oid]) => [name!.slice(prefix.length), oid!]));
 }
 const real = (path: string) => { try { return realpathSync(path); } catch { return path; } };
+/** The worktree top-level holding the process's working directory: the deepest worktree path that contains it. */
+function holding(trees: Worktree[]): string | undefined {
+  let here: string;
+  try { here = real(process.cwd()); } catch { return undefined; }
+  return trees.map(t => real(t.path)).filter(p => here === p || here.startsWith(p.endsWith(sep) ? p : p + sep)).sort((a, b) => b.length - a.length)[0];
+}
 
 /** Observe remote and local state and classify every branch. It fetches but never deletes. */
 /** With `merged`, only containment in that PR's merged head proves a branch; otherwise any proof below applies. */
@@ -386,7 +395,7 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
   };
 
   const local = refs(checkout, "refs/heads/"), trees = worktrees(checkout);
-  const context: Context = { checkout, main: trees[0]?.path, invoking: real(checkout.root), worktrees: plan.worktrees };
+  const context: Context = { checkout, main: trees[0]?.path, repo: real(checkout.root), cwd: holding(trees), worktrees: plan.worktrees };
   for (const [branch, oid] of [...local].sort()) {
     const upstream = checkout.git(["for-each-ref", "--format=%(upstream)", `refs/heads/${branch}`]).trim();
     const name = upstream.startsWith("refs/remotes/origin/") ? upstream.slice("refs/remotes/origin/".length) : branch;
@@ -402,6 +411,8 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
     const held: string[] = [];
     for (const tree of on) {
       const { reasons, ignored } = assess(context, tree, trees);
+      // after-merge never deletes ignored files the owner has not seen in a plan.
+      if (merged && ignored.length) reasons.push("holds ignored files; remove it through an approved plan");
       if (reasons.length) { keepTree(tree, reasons); held.push(`merged but checked out in a kept worktree (${tree.path}): ${reasons.join("; ")}`); }
       else plan.operations.push({ kind: "remove-worktree", path: tree.path, branch, oid, proof: r.proof, ignored });
     }
