@@ -155,13 +155,21 @@ settings from a template repository, so check new repositories too.
 A merged PR branch is removed as part of the merge. When you approve a merge, the
 agent runs `after-merge` for that PR. It removes the remote branch, its tracking ref
 and the local branch, as long as their tips are inside the merged PR head. That also
-covers squash merges, which plain `git branch -d` refuses.
+covers squash merges, which plain `git branch -d` refuses. It also removes the
+branch's clean worktree, unless that worktree holds ignored files or the agent runs
+from it; the next sweep removes those.
 
 Every maintenance sweep also lists stale branches left by earlier merges and shows
 a plan with a digest. Ask `Use vh-adlc-maintenance to sweep and remove stale branches`
 to apply that plan in the same run. Open PR branches, protected branches, unmerged work
-and branches in use by a worktree are kept, each with its reason. Clean worktrees
-are removed only when you ask for worktree cleanup. See the
+and branches whose worktree stays are kept, each with its reason. A clean
+worktree, one with no changed tracked files and no untracked files, is removed with its
+merged branch; ignored files such as `node_modules/` go with it. The plan lists those
+ignored paths with their file counts and sizes, and gives each worktree it keeps a
+`worktree` kept record with its path, its branch and the reason. Approving the plan, or
+the merge, is all the asking needed. When the plan lists ignored paths, the agent waits
+for you to approve its digest even if you asked for removal up front. A locked worktree
+stays, and so does the one the agent runs from. See the
 [branch hygiene guide](../../plugins/vh-adlc/references/branches.md).
 
 ## Issue labels
@@ -292,6 +300,10 @@ should-fix findings change the document, the same commit fixes that pass's nits,
 the rest are listed in the conversation. The agent applies each pass's findings as one
 revision, after asking you about any judgement finding, so one pass's fixes do not
 seed the next pass's findings.
+
+An implementation review never skips a check it is able to run. When a criterion depends on what an
+agent does in a session, the implementer proves it with a committed script that reruns that session and
+keeps its transcript, so the reviewer can rerun it; a subagent's own report does not count as evidence.
 
 A reviewer role can also run through an external command, such as the Codex CLI on
 a model from another vendor. A spec review then reads a read-only export of the
