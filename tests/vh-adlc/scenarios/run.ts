@@ -1171,6 +1171,45 @@ const CONVERGENCE_SCENARIOS: Scenario[] = [
       };
     },
   },
+  {
+    // AC-11: with the new convention, a pass's nits ride along with its blocking fix in one commit, no nit
+    // becomes an Open Question, and a later pass's lone nit is listed in the conversation, not applied.
+    id: "S16.nits",
+    title: "Nits ride along with a blocking fix and are otherwise listed, not applied",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      const plugin = scriptedPlugin(f, "nits");
+      const turns = session(f, [plugin], [
+        `/vh-adlc-spec review ${FEATURE_PATH}`,
+        "The owner here: run the next spec review pass on the revised document.",
+      ], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const body = doc.split(/^## Review Log$/m)[0];
+          const openQuestions = section(doc, "Open Questions");
+          const fixed = agentLog(f, f.project).find((x) => (show(f, x.hash, FEATURE_PATH) ?? "").includes('greet.sh ""'));
+          const atFix = fixed ? (show(f, fixed.hash, FEATURE_PATH) ?? "") : "";
+          const reports = turns.map((t) => t.result).join("\n");
+          return [
+            { name: "two review passes were stored", ok: /### R-1\b/.test(doc) && /### R-2\b/.test(doc) },
+            { name: "the blocking fix landed", ok: body.includes('greet.sh ""') },
+            {
+              name: "the commit with the blocking fix also fixes all three pass-1 nits",
+              ok: !!fixed && atFix.includes("./greet.sh <name>") && atFix.includes("exactly one name argument") && atFix.includes("test.sh checks the output"),
+              detail: fixed?.subject,
+            },
+            { name: "no nit became an Open Question", ok: !/^### Q\d+/m.test(openQuestions) },
+            { name: "the pass-2 nit is not applied outside the review records", ok: !body.includes("or any flag") },
+            { name: "the report lists the pass-2 nit", ok: /R-2/.test(reports) && /F-01/.test(reports) && /flag/i.test(reports) },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
 ];
 SCENARIOS.push(...CONVERGENCE_SCENARIOS);
 
