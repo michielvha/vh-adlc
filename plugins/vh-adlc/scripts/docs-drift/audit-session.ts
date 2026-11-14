@@ -11,7 +11,7 @@ import { collectWorkerInputs } from "./publication-worker";
 import { PublicationScopeChanged } from "./publish";
 import { canonicalDigest, canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
-import { buildCopilotRoleInvocation } from "./role-launch";
+import { buildNativeRoleInvocation } from "./role-launch";
 import { captureNativeRoleProcess } from "./role-process";
 import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { OUTPUT_LIMIT } from "./owned-process";
@@ -103,7 +103,7 @@ export async function runAuditSession(input: Options) {
       policy: role === "worker" ? workerPolicy : reviewerPolicy, require_invocation: true, expected_cwd: cwd,
       expected: { role, source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, role), target_sha256: target } });
     result.worker = await captureNativeRoleProcess({ ...common,
-      ...buildCopilotRoleInvocation({ runtime, role: "worker", cwd, artifact_root: scope.directory, prompt: workerPrompt, environment }),
+      ...buildNativeRoleInvocation({ runtime, role: "worker", cwd, artifact_root: scope.directory, prompt: workerPrompt, environment }),
       role: "worker", runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: current.worker_input_sha256, policy: workerPolicy });
     result.scope_changed ||= result.worker.scope_changed;
     if (!result.worker.complete || !result.worker.capture) { result.diagnostics.push(...result.worker.diagnostics); throw Error("Original audit worker execution incomplete"); }
@@ -127,7 +127,7 @@ export async function runAuditSession(input: Options) {
       "DOCS_DRIFT_REQUEST: " + JSON.stringify(reviewerRequest),
     ].join("\n");
     result.reviewer = await captureNativeRoleProcess({ ...common,
-      ...buildCopilotRoleInvocation({ runtime, role: "reviewer", cwd, artifact_root: scope.directory, prompt: reviewerPrompt, environment }),
+      ...buildNativeRoleInvocation({ runtime, role: "reviewer", cwd, artifact_root: scope.directory, prompt: reviewerPrompt, environment }),
       role: "reviewer", runtime_sha256: roleRuntimeDigest(runtime, "reviewer"), target_sha256: target.target_sha256, policy: reviewerPolicy });
     result.scope_changed ||= result.reviewer.scope_changed;
     if (!result.reviewer.complete || !result.reviewer.capture) { result.diagnostics.push(...result.reviewer.diagnostics); throw Error("Original audit reviewer execution incomplete"); }

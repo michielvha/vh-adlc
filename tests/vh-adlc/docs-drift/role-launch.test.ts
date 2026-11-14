@@ -51,3 +51,47 @@ test.each(["backend", "loader-path", "loader-extra", "credential-override", "rel
   expect(() => buildCopilotRoleInvocation({ runtime: selected, role: "worker", cwd: "/owned/source", artifact_root: "/owned/artifacts",
     prompt: fault === "empty-prompt" ? "" : fault === "oversize-prompt" ? "x".repeat(65537) : "Bounded prompt", environment: {} })).toThrow("setup required");
 });
+
+test("the generic native launcher preserves Claude scanning and an independent Copilot reviewer", async () => {
+  const { buildNativeRoleInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-launch");
+  const selected = { ...runtime(), loader: { ...runtime().loader, provider: "claude" as const } };
+  selected.loader.credential_references = ["CLAUDE_CODE_OAUTH_TOKEN", "COPILOT_GITHUB_TOKEN"];
+  selected.worker = { ...selected.worker, executable: "/owned/client/claude", client: { provider: "claude" }, argv: ["--effort", "high"] };
+  const input = { runtime: selected, role: "worker" as const, cwd: "/owned/source", artifact_root: "/owned/artifacts",
+    prompt: "Read the exact selected source.", environment: { PATH: "/usr/bin:/bin", HOME: "/ambient",
+      CLAUDE_CODE_OAUTH_TOKEN: "synthetic-oauth", COPILOT_GITHUB_TOKEN: "synthetic-copilot", ANTHROPIC_API_KEY: "synthetic-unselected-key",
+      CLAUDE_CONFIG_DIR: "/ambient/claude", CLAUDE_CODE_SESSION_ID: "ambient", NODE_OPTIONS: "--require=/ambient/injection" } };
+  const worker = buildNativeRoleInvocation(input), reviewer = buildNativeRoleInvocation({ ...input, role: "reviewer" });
+  expect(worker.provider).toBe("claude"); expect(worker.argv[0]).toBe("/owned/client/claude");
+  expect(worker.argv).toContain("--no-session-persistence"); expect(worker.argv).toContain("--strict-mcp-config");
+  expect(worker.argv).not.toContain("--bare"); expect(worker.argv).not.toContain("--dangerously-skip-permissions");
+  expect(worker.argv[worker.argv.indexOf("--session-id") + 1]).toBe(worker.context_id);
+  expect(worker.argv[worker.argv.indexOf("--output-format") + 1]).toBe("stream-json");
+  expect(worker.env.CLAUDE_CODE_OAUTH_TOKEN).toBe("synthetic-oauth"); expect(worker.env.ANTHROPIC_API_KEY).toBeUndefined();
+  expect(worker.env.COPILOT_GITHUB_TOKEN).toBeUndefined(); expect(worker.env.NODE_OPTIONS).toBeUndefined();
+  expect(worker.env.CLAUDE_CODE_SESSION_ID).toBeUndefined(); expect(worker.env.CLAUDE_CONFIG_DIR).toBe(selected.worker.profile_directory);
+  expect(worker.env.DISABLE_AUTOUPDATER).toBe("1"); expect(worker.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe("1");
+  expect(reviewer.provider).toBe("copilot"); expect(reviewer.context_id).not.toBe(worker.context_id);
+  expect(reviewer.env.COPILOT_GITHUB_TOKEN).toBe("synthetic-copilot"); expect(reviewer.env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+});
+
+test.each(["--resume", "--bare", "--fallback-model", "--session-id", "--dangerously-skip-permissions", "--tools", "--setting-sources"])("Claude launch refuses protected argv override %s", async option => {
+  const { buildClaudeRoleInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-launch");
+  const selected = runtime(), worker = { ...selected.worker, client: { provider: "claude" }, argv: [option] };
+  expect(() => buildClaudeRoleInvocation({ runtime: { ...selected, loader: { ...selected.loader, provider: "claude", credential_references: ["CLAUDE_CODE_OAUTH_TOKEN"] }, worker },
+    role: "worker", cwd: "/owned/source", artifact_root: "/owned/artifacts", prompt: "Bounded source review", environment: {} })).toThrow("unsupported protected Claude role argv");
+});
+
+test("a Claude reviewer receives only read tools and the explicitly selected API credential", async () => {
+  const { buildClaudeRoleInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-launch");
+  const selected = runtime(), worker = { ...selected.worker, client: { provider: "claude" }, argv: ["--effort", "high"] };
+  const result = buildClaudeRoleInvocation({ runtime: { ...selected, loader: { ...selected.loader, provider: "claude", credential_references: ["ANTHROPIC_API_KEY"] }, worker, reviewer: worker },
+    role: "reviewer", cwd: "/owned/source", artifact_root: "/owned/artifacts", prompt: "Bounded source review",
+    environment: { ANTHROPIC_API_KEY: "synthetic-api", CLAUDE_CODE_OAUTH_TOKEN: "synthetic-unselected-oauth" } });
+  expect(result.argv[result.argv.indexOf("--tools") + 1]).toBe("Read,Glob,Grep");
+  expect(result.argv[result.argv.indexOf("--allowedTools") + 1]).toBe("Read,Glob,Grep");
+  expect(result.env.ANTHROPIC_API_KEY).toBe("synthetic-api"); expect(result.env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+  expect(JSON.stringify(result.argv)).not.toContain("synthetic-api");
+  expect(result.argv[result.argv.indexOf("--setting-sources") + 1]).toBe("");
+  expect(JSON.parse(result.argv[result.argv.indexOf("--settings") + 1])).toEqual({ disableAllHooks: true });
+});

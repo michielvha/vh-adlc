@@ -12,7 +12,7 @@ function object(value: unknown): Record<string, unknown> {
 export function decodeNativeRoleOutput(options: {
   provider: string; native: Uint8Array; expected_context: string; expected_cwd: string;
 }) {
-  if (options.provider !== "copilot") throw Error("Native role output provider unavailable");
+  if (!["copilot", "claude"].includes(options.provider)) throw Error("Native role output provider unavailable");
   if (!options.expected_context || !isAbsolute(options.expected_cwd) || options.native.byteLength > OUTPUT_LIMIT)
     throw Error("Bounded native role context required");
   let context: string | null = null, returned: Buffer | null = null;
@@ -22,6 +22,26 @@ export function decodeNativeRoleOutput(options: {
     try { parsed = JSON.parse(line); } catch { throw Error("Native role event JSON required"); }
     const event = object(parsed);
     if (typeof event.type !== "string" || !event.type) throw Error("Native role event type required");
+    if (options.provider === "claude") {
+      if (event.session_id !== undefined && event.session_id !== options.expected_context)
+        throw Error("Native role fresh context changed");
+      if (event.type === "error") throw Error("Native role execution failed");
+      if (event.type === "system" && event.subtype === "init") {
+        if (context !== null || event.session_id !== options.expected_context || event.cwd !== options.expected_cwd)
+          throw Error("Native role fresh context changed");
+        context = options.expected_context;
+      }
+      if (event.type === "assistant" && (context === null || returned !== null))
+        throw Error("Native role reply is outside its original execution");
+      if (event.type === "result") {
+        if (context === null || returned !== null || event.session_id !== context)
+          throw Error("Native role final result context changed");
+        if (event.subtype !== "success" || event.is_error !== false || typeof event.result !== "string")
+          throw Error("Native role execution failed");
+        returned = Buffer.from(event.result);
+      }
+      continue;
+    }
     if (event.type === "session.error") {
       const data = object(event.data), type = data.errorType ?? data.code;
       // Keep free-form messages in the private native artifact; expose only a bounded machine type.

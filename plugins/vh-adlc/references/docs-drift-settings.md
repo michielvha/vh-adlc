@@ -66,6 +66,14 @@ and publisher vectors. Worker/reviewer roles bind client, full model and native
 identity-source event/field. Missing usable native identity leaves review pending.
 No setting grants provider execution or publication.
 
+The read-only audit runner has native Copilot and Claude launch paths. Each role
+uses its selected client, isolated profile and fresh context. Claude keeps the
+ordinary OAuth/API-key authentication path, with only the explicitly named
+credential inherited. The independent reviewer receives read tools. Native stream
+capture requires the original matching context and final successful canonical
+reply. Source tests with toy clients establish these controls. Actual installed
+client/model and hosted observations remain required for adoption.
+
 Use a private retained cache outside caller repositories/Git directories.
 The approved runtime verifies the retained complete component payload and client
 before creating isolated entry profiles. Inspect the exact invoked launcher

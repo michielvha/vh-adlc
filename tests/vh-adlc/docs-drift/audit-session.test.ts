@@ -19,9 +19,11 @@ import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 const args = process.argv.slice(2), arg = key => args[args.indexOf(key) + 1];
-if (args.includes("--version")) { console.log("GitHub Copilot CLI fixture-1.0.0."); process.exit(0); }
-const line = arg("--prompt").split("\\n").find(line => line.startsWith("DOCS_DRIFT_REQUEST: "));
-if (!line || process.env.COPILOT_GITHUB_TOKEN !== "synthetic-selected-provider") process.exit(91);
+const isClaude = ${JSON.stringify(fault === "claude-normal-cli")};
+const fixtureVersion = "fixture-1.0.0";
+if (args.includes("--version")) { console.log(isClaude ? fixtureVersion + " (Claude Code)" : "GitHub Copilot CLI " + fixtureVersion + "."); process.exit(0); }
+const line = (isClaude ? args.at(-1) : arg("--prompt")).split("\\n").find(line => line.startsWith("DOCS_DRIFT_REQUEST: "));
+if (!line || (isClaude ? process.env.CLAUDE_CODE_OAUTH_TOKEN : process.env.COPILOT_GITHUB_TOKEN) !== "synthetic-selected-provider") process.exit(91);
 const ref = JSON.parse(line.slice("DOCS_DRIFT_REQUEST: ".length));
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
 const bytes = readFileSync(ref.path); if (digest(bytes) !== ref.sha256) process.exit(92);
@@ -54,15 +56,23 @@ if (request.kind === "docs-drift-audit-worker-request") {
 } else {
   records = ${JSON.stringify(fault)} === "review-findings" ? "FINDING: F-01\\nKIND: factual\\nSEVERITY: should-fix\\nWHERE: synthetic assessment\\nEVIDENCE: Needs another source check\\nPROPOSAL: Correct it\\n" : "NO FINDINGS\\n";
 }
-console.log(JSON.stringify({ type: "session.start", data: { sessionId: arg("--session-id"), alreadyInUse: false, context: { cwd: process.cwd() } } }));
-console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-opus-5.5", content: "MODEL: claude-opus-5.5\\n" + records } }));
+if (isClaude) {
+  console.log(JSON.stringify({ type: "system", subtype: "init", session_id: arg("--session-id"), cwd: process.cwd(), model: "claude-opus-5.5" }));
+  console.log(JSON.stringify({ type: "assistant", session_id: arg("--session-id"), message: { model: "claude-opus-5.5", content: [{ type: "text", text: "MODEL: claude-opus-5.5\\n" + records }] } }));
+  console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, session_id: arg("--session-id"), result: "MODEL: claude-opus-5.5\\n" + records }));
+} else {
+  console.log(JSON.stringify({ type: "session.start", data: { sessionId: arg("--session-id"), alreadyInUse: false, context: { cwd: process.cwd() } } }));
+  console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-opus-5.5", content: "MODEL: claude-opus-5.5\\n" + records } }));
+}
 `; }
 
-test.each(["matching", "proposal", "proposal-supported-cli", "normal-cli", "normal-cli-partial-output", "unretained", "invalid-worker", "request-change", "review-findings"])("retained normal audit session starts before roles and publishes no effects: %s", async fault => {
+test.each(["matching", "proposal", "proposal-supported-cli", "normal-cli", "claude-normal-cli", "normal-cli-partial-output", "unretained", "invalid-worker", "request-change", "review-findings"])("retained normal audit session starts before roles and publishes no effects: %s", async fault => {
   try {
     await import("../../../plugins/vh-adlc/scripts/docs-drift/audit-session");
     const f = await bindingFixture(roots, false, { fullComponent: true, mutableInventory: fault.startsWith("proposal"), role: { model: role.requested_model, native_model: role.adopted_model,
-      identity_source: role.identity_source, argv: ["--no-auto-update"], client_program: client(fault) },
+      provider: fault === "claude-normal-cli" ? "claude" : "copilot",
+      identity_source: fault === "claude-normal-cli" ? { provider: "claude", event_type: "assistant", field_path: ["message", "model"] } : role.identity_source,
+      argv: fault === "claude-normal-cli" ? ["--effort", "high"] : ["--no-auto-update"], client_program: client(fault) },
       beforeCandidate: input => {
         if (!fault.startsWith("proposal")) return;
         const root = dirname(input.artifacts), candidate = join(root, "existing-audit-proposal"), origin = join(root, "binding-origin");
@@ -77,7 +87,7 @@ test.each(["matching", "proposal", "proposal-supported-cli", "normal-cli", "norm
       } });
     const decisionBytes = canonicalJSON({ ...f.decisions, decisions: [] }); writeFileSync(join(f.artifacts, "report-decisions.json"), decisionBytes, { mode: 0o600 });
     const options = { ...f.options, decisions: { path: "report-decisions.json", sha256: sha256(decisionBytes) },
-      environment: { PATH: f.native.environment.PATH, COPILOT_GITHUB_TOKEN: "synthetic-selected-provider", GH_TOKEN: "synthetic-excluded-provider-credential" }, role_timeout_ms: 10000 };
+      environment: { PATH: f.native.environment.PATH, CLAUDE_CODE_OAUTH_TOKEN: "synthetic-selected-provider", COPILOT_GITHUB_TOKEN: "synthetic-selected-provider", GH_TOKEN: "synthetic-excluded-provider-credential" }, role_timeout_ms: 10000 };
     const input = join(f.artifacts, "audit-session-input.json"), output = join(f.artifacts, "audit-session-output.json");
     writeFileSync(input, JSON.stringify(options), { mode: 0o600 });
     const bridge = join(f.artifacts, "audit-session-bridge.ts");
@@ -114,11 +124,11 @@ spyOn(fs, "linkSync").mockImplementation((from, to) => {
 const { main } = await import(${JSON.stringify(join(f.retained.directory, "scripts/docs-drift/cli.ts"))});
 process.exitCode = await main(${JSON.stringify(cliArgs)});
 `, { mode: 0o600 });
-    const cliCase = ["proposal-supported-cli", "normal-cli", "normal-cli-partial-output"].includes(fault);
-    const argv = ["normal-cli", "proposal-supported-cli"].includes(fault) ? [globalThis.process.execPath, join(f.retained.directory, "scripts/docs-drift/cli.ts"), ...cliArgs]
+    const cliCase = ["proposal-supported-cli", "normal-cli", "claude-normal-cli", "normal-cli-partial-output"].includes(fault);
+    const argv = ["normal-cli", "claude-normal-cli", "proposal-supported-cli"].includes(fault) ? [globalThis.process.execPath, join(f.retained.directory, "scripts/docs-drift/cli.ts"), ...cliArgs]
       : [globalThis.process.execPath, bridge];
     const before = captureRepositoryState(f.repo), process = Bun.spawnSync(argv, { env: { ...globalThis.process.env, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
-      PATH: f.native.environment.PATH, GH_TOKEN: "synthetic-read-token", COPILOT_GITHUB_TOKEN: "synthetic-selected-provider" }, timeout: 210000 });
+      PATH: f.native.environment.PATH, GH_TOKEN: "synthetic-read-token", CLAUDE_CODE_OAUTH_TOKEN: "synthetic-selected-provider", COPILOT_GITHUB_TOKEN: "synthetic-selected-provider" }, timeout: 210000 });
     writeFileSync(join(f.artifacts, "audit-session-process.stdout"), process.stdout, { mode: 0o600 });
     writeFileSync(join(f.artifacts, "audit-session-process.stderr"), process.stderr, { mode: 0o600 });
     const expectedExit = fault === "normal-cli-partial-output" ? 2 : fault === "proposal-supported-cli" ? 1 : 0;
@@ -144,7 +154,7 @@ process.exitCode = await main(${JSON.stringify(cliArgs)});
         expect(cli.diagnostics).toContainEqual({ code: "audit-output", message: "Synthetic retained command markdown failure" });
       } else expect(readFileSync(join(f.artifacts, saved.files.markdown.path), "utf8")).toBe(result.report.markdown);
     }
-    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(["matching", "proposal", "proposal-supported-cli", "normal-cli", "normal-cli-partial-output"].includes(fault)); expect(result.authority).toBe("none");
+    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(["matching", "proposal", "proposal-supported-cli", "normal-cli", "claude-normal-cli", "normal-cli-partial-output"].includes(fault)); expect(result.authority).toBe("none");
     expect(result.start.complete).toBe(true);
     if (fault === "matching") {
       const probes = JSON.parse(readFileSync(join(f.artifacts, "wrapped-output-scope.json"), "utf8")), { denied } = probes;
@@ -173,7 +183,7 @@ process.exitCode = await main(${JSON.stringify(cliArgs)});
       expect(result.scope_changed).toBe(true); expect(result.report).toBeNull(); expect(result.reviewer).toBeNull();
       expect(result.diagnostics.join("\n")).toContain("request artifact changed");
     }
-    if (["matching", "proposal", "proposal-supported-cli", "normal-cli", "normal-cli-partial-output"].includes(fault)) {
+    if (["matching", "proposal", "proposal-supported-cli", "normal-cli", "claude-normal-cli", "normal-cli-partial-output"].includes(fault)) {
       expect(result.report.complete).toBe(true); expect(result.report.report.collection_complete).toBe(true);
       expect(result.report.publication_receipts?.complete, JSON.stringify(result.report.diagnostics)).toBe(true);
       expect(result.report.publication_receipts.required_proposals).toBe(fault.startsWith("proposal") ? 1 : 0);

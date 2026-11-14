@@ -911,3 +911,36 @@ PROPOSAL: Use string rows such as ["populated", "empty"], or use object rows wit
 ```
 
 Diagnostic 131 correction checkpoint. Corpus retirement first fails at the existing document-only guard. It now requires complete corresponding all-inventory execution, preserving document-bound retirement and refusing missing/partial/mismatched collection. Self-consistent untracked and dirty-byte quote regressions refuse corpus assessment. Populated/empty inventory rows now have distinct names. The frozen checkpoint passes 99 cases/443 assertions and all declared repository gates, preserving source/index/HEAD/status. These source corrections await committed scoped re-review.
+
+## Component diagnostic 132
+
+Exact committed target `922ddd541bd4ce4a38993b4659b40263df33df86`. Actual Copilot Opus 5.5 qualifies all 118 required reads with unchanged packet hashes, procedural isolation and no outside/private reads. The corpus collection, assessment and feedback correction re-review returns NO FINDINGS. Original return follows. Whole-feature and actual migration acceptance remain pending.
+
+```text
+MODEL: claude-opus-5.5
+NO FINDINGS
+```
+
+## T109 native provider source checkpoint
+
+The Claude launch and original-capture first-red logs reproduce missing support.
+Native CLI help/version 2.1.325 supplies command-flag evidence. Toy clients exercise
+original stream handling and actual retained helper wiring. They establish no live
+provider/model trial. The source builder preserves selected OAuth/API-key paths,
+per-role credentials and contexts, with an independent mixed-provider reviewer.
+
+The first broader checkpoint retains a toy version-upgrade failure. The new toy
+program initially had two version literals, while the existing upgrade fixture
+replaced the first one. One shared version constant corrects that fixture. The
+approved-build check stays strict. Early type failures also remain in their logs.
+
+The corrected broad checkpoint passes 113 native cases and fails one outer capture
+deadline, retaining its failed result. Its strict types and declared repository
+stages all pass, including 64 package and 34 registration cases. The exact failed
+proposal CLI case passes 42 assertions in 181.11 seconds when retried alone at
+identical source/test bytes. The 210-second capture bound remains unchanged.
+`t109-native-composed-verification.json` checks byte equality and that unique case
+correspondence. All 114 native cases are observed passing across these two runs.
+The full run remains recorded as failed. The final full-feature suite remains T31.
+Fresh committed Copilot source review and actual native/hosted migration acceptance
+remain pending.

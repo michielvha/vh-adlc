@@ -35,7 +35,7 @@ export async function captureNativeRoleProcess(input: Options) {
       throw new ArtifactChanged("Caller changed during native role execution");
   }
   try {
-    if (options.provider !== "copilot") throw Error("Native role output provider unavailable");
+    if (options.provider !== "copilot" && options.provider !== "claude") throw Error("Native role output provider unavailable");
     if (!["worker", "reviewer"].includes(options.role) || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(options.source_commit)
       || ![options.runtime_sha256, options.target_sha256].every(value => /^[a-f0-9]{64}$/u.test(value))
       || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(options.context_id)

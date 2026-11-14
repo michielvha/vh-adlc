@@ -26,7 +26,11 @@ export function source(roots: string[], options: { pin?: ReturnType<typeof pin>;
     component_pin: ".vh-adlc/docs-drift-components/shared.yaml", publication: { ...settingsFixture().publication, mode: "adopted" },
     reports: { ...settingsFixture().reports, workflow_id: 19 },
     legacy_proposals: { ...settingsFixture().legacy_proposals, ids: options.legacy_ids ?? [] } };
-  if (options.client) settings.clients["copilot-linux"] = options.client;
+  if (options.client) {
+    settings.clients["copilot-linux"] = options.client;
+    settings.runtime_loader.provider = options.client.provider;
+    if (options.client.provider === "claude") settings.runtime_loader.credential_references = ["CLAUDE_CODE_OAUTH_TOKEN"];
+  }
   if (options.hostname) settings.hostname = options.hostname;
   const selectedRole = options.role ?? { model: "fixture-model-1", identity_source: {
     provider: "copilot", event_type: "assistant.message", field_path: ["data", "model"] } };
