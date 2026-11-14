@@ -15,6 +15,7 @@ export function gradeDiagram(fixture: Fixture, output: string, response: string)
   const brief = readFileSync(join(output, "brief.md"), "utf8");
   const diagram = join(output, "architecture.drawio");
   const failures: string[] = [];
+  const xml = readFileSync(diagram, "utf8");
   const rows = brief.split("\n").filter(line => /^\s*\|/.test(line)).map(line =>
     line.trim().replace(/^\||\|$/g, "").split("|").map(value => value.trim().replaceAll("`", "")));
   const depicted = rows.filter(row => [5, 6].includes(row.length) && /^(documented|proposed)$/i.test(row.at(-2) ?? ""));
@@ -51,7 +52,25 @@ export function gradeDiagram(fixture: Fixture, output: string, response: string)
     }
     const parent = shape.parent ? role(shape.parent)?.[0] : "1";
     if (xpath("string(" + cell(row[0]) + "/@parent)") !== parent) failures.push("Wrong parent for " + shape.label);
-    if (shape.icon && !new RegExp(shape.icon === "stencil(" ? "stencil\\(" : shape.icon, "i").test(readFileSync(diagram, "utf8"))) failures.push("Missing expected icon for " + shape.label);
+    if ((shape.parent && row[2].split(/\s+/)[0] !== parent) || (!shape.parent && ids.has(row[2]))) failures.push("Brief parent differs for " + shape.label);
+    if (shape.icon) {
+      const pending = [row[0]];
+      const seen = new Set<string>();
+      let found = false;
+      while (pending.length && !found) {
+        const id = pending.pop();
+        if (!id || seen.has(id) || !/^[A-Za-z0-9_.:-]+$/.test(id)) continue;
+        seen.add(id);
+        const style = xpath("string(" + cell(id) + "/@style)");
+        found = style.includes(shape.icon);
+        if (!found) {
+          const children = "/mxfile/diagram/mxGraphModel/root/*[@parent='" + id + "' or mxCell/@parent='" + id + "']/@id";
+          const attributes = xpath("count(" + children + ")") === "0" ? "" : xpath(children);
+          pending.push(...[...attributes.matchAll(/id="([^"]+)"/g)].map(match => match[1]));
+        }
+      }
+      if (!found) failures.push("Missing expected icon for " + shape.label);
+    }
   }
   if (xpath("count(//mxCell[@edge='1'])") !== String(links.length)) failures.push("Unmapped connector in the drawing");
   for (const link of fixture.links) {
@@ -68,7 +87,7 @@ export function gradeDiagram(fixture: Fixture, output: string, response: string)
     const visiblePorts = label.match(/\b\d{2,5}\b/g) ?? [];
     if (link.port ? !visiblePorts.includes(link.port) || visiblePorts.some(port => port !== link.port) : visiblePorts.length > 0) failures.push("Wrong or unsupported port on " + row[0]);
     if (link.proposed) {
-      if (row[4].toLowerCase() !== "proposed" || !/proposed/i.test(readFileSync(diagram, "utf8"))) failures.push("Missing proposed flow marking");
+      if (row[4].toLowerCase() !== "proposed" || !/proposed/i.test(xml)) failures.push("Missing proposed flow marking");
     } else if (row[4].toLowerCase() !== "documented") failures.push("Documented flow has the wrong status");
   }
   if (fixture.gap && !brief.toLowerCase().includes(fixture.gap)) failures.push("Missing unresolved detail in the brief");
