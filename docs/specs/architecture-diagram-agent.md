@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Verifying the hardened diagram workflow on both native hosts."
+status: complete
+status_description: "All five criteria met in independent review R-9."
 issue: null
 branch: feat/architecture-diagram-agent
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
