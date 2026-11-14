@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Complete at R-28: eleven criteria met; AC-02, AC-03, AC-07, AC-08, AC-12, AC-14, AC-17 and AC-18 carry owner residuals tracked in issue 85. The release and Stackweaver adoption Order steps follow."
+status_description: "Delivered 2026-11-13. Complete at R-28 (eleven criteria met; AC-02, AC-03, AC-07, AC-08, AC-12, AC-14, AC-17 and AC-18 carry owner residuals in issue 85). Order: 1) #87 merged as 2c9d3af and tagged v0.26.0, published signed; 2) lock PR #88 merged as f4e5793 after the gpg check of checksums.txt and all four archives (lock 0.26.0, plugin 0.18.0); 3) plugin 0.18.0 installed from the published marketplace in an isolated profile matched main file for file (142 files, docs pin c70769e, lock 0.26.0), and one Codex gpt-6.1-sol spec review through it was stored and passed review check; 4) Stackweaver PR #1084 merged as 4e4fcd4d, its release chain published (tag 5.117.3, frontend 0.82.9)."
 issue: https://github.com/michielvha/vh-adlc/issues/78
 branch: feat/shared-development-loop
 goal: "Stackweaver runs its spec, review, tasks, implement, ship and investigate work through installed vh-adlc operations, with every native capability kept and models chosen per role by repository settings."
