@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Independent spec review R-3 returned no findings. Awaiting owner acceptance."
+status: planned
+status_description: "Accepted at spec review R-3 and ready for task planning."
 issue: null
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
 covers:
@@ -104,6 +104,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | 2026-11-14 | R-1 | spec | `ed00017463b84fed13b97546271f7bda6dd299e1` | unknown | procedural | Six should-fix findings |
 | 2026-11-14 | R-2 | spec | `7a0263ea494dd46d0145a2392e691df045558111` | unknown | procedural | Two should-fix findings and one nit |
 | 2026-11-14 | R-3 | spec | `6593ed37147bd2bd6813e6e4d3e53066af7f8896` | unknown | procedural | No findings |
+| 2026-11-14 | R-3 | spec | `6593ed37147bd2bd6813e6e4d3e53066af7f8896` | n/a | n/a | accepted by owner |
 
 ### R-1
 
