@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing T45 to T49 on feat/paseo-hosts: the Windows bootstrap fix and client call deadlines."
+status: complete
+status_description: "Implemented and reviewed (R-45); AC-12 waits for the merge, tracked in issue #77."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 branch: feat/paseo-hosts
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
