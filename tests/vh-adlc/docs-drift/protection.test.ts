@@ -83,6 +83,30 @@ test("active coverage needs exact coordinated selection while historical coverag
   }
 });
 
+test.each(["in-progress", "complete"])("nested double-star coverage classifies ownership for a %s feature", status => {
+  const root = fixture();
+  const text = feature(root, status, "feat/nested-guide").replace("  - docs/guide.md", "  - docs/**");
+  put(root, "plans/feature.md", text);
+  const path = "docs/nested/guide.md";
+  put(root, path, "# Nested guide\n");
+  const snapshot = captureSnapshot(root, commitAll(root));
+  const before = captureRepositoryState(root);
+  const edit = replacement(path, readFileSync(join(root, path)), "Nested guide", "Updated nested guide");
+
+  const result = evaluateProtection(root, snapshot, [edit]);
+  expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+  expect(result.edits[0].allowed).toBe(status === "complete");
+  expect(result.edits[0].affected_features).toEqual([
+    { path: "plans/feature.md", historical: status === "complete", claimed: true },
+  ]);
+  const coordinated = evaluateProtection(root, snapshot, [edit], {
+    coordinated: [{ feature: "plans/feature.md", document: path, source_commit: snapshot.source_commit, selection_sha256: "a".repeat(64) }],
+  });
+  expect(coordinated.complete).toBe(true);
+  expect(coordinated.edits[0].allowed).toBe(true);
+  expect(captureRepositoryState(root)).toEqual(before);
+});
+
 test("local plans allow only explicitly classified ranges from the retained procedure", () => {
   const root = fixture(true);
   const text = "---\nstatus: planned\n---\n# Local plan\n\n## Current behavior\nOld path.\n\n## Recorded proof\nold/proof.ts:7\n";

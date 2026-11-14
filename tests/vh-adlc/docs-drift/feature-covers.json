@@ -273,28 +273,25 @@
     "matched": true
   },
   {
-    "name": "unsupported doublestar",
+    "name": "supported doublestar",
     "pattern": "src/**",
     "path": "src/a.ts",
-    "valid": false,
-    "matched": false,
-    "gate_matched": true
+    "valid": true,
+    "matched": true
   },
   {
-    "name": "unsupported directory doublestar",
+    "name": "supported directory doublestar",
     "pattern": "src/**/",
     "path": "src/**/a.ts",
-    "valid": false,
-    "matched": false,
-    "gate_matched": true
+    "valid": true,
+    "matched": true
   },
   {
-    "name": "unsupported middle doublestar",
+    "name": "supported middle doublestar",
     "pattern": "src/p**x.ts",
     "path": "src/px.ts",
-    "valid": false,
-    "matched": false,
-    "gate_matched": true
+    "valid": true,
+    "matched": true
   },
   {
     "name": "unclosed class",
@@ -335,6 +332,118 @@
     "name": "trailing escape in pattern",
     "pattern": "src/*\\",
     "path": "src/a",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "double-star class excludes slash",
+    "pattern": "a[/]**",
+    "path": "a/b",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "double-star negated class excludes slash",
+    "pattern": "a[^x]**",
+    "path": "a/b",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "double-star negated class permits a rune",
+    "pattern": "a[^x]**",
+    "path": "aéb",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "double-star rune count differs from byte-star behavior",
+    "pattern": "**/*??",
+    "path": "🚀",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "double-star question matches one astral rune",
+    "pattern": "**/?.md",
+    "path": "🚀.md",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "double-star question matches one two-byte rune",
+    "pattern": "**/?.md",
+    "path": "é.md",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "double-star escaped first star",
+    "pattern": "src/\\**",
+    "path": "src/*file.md",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "double-star escaped star is required",
+    "pattern": "src/\\**",
+    "path": "src/file.md",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "double-star directory expansion precedes literal suffix",
+    "pattern": "src/**/",
+    "path": "src/deep/guide.md",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "double-star directory allows its root prefix",
+    "pattern": "src/**/",
+    "path": "src",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "double-star repeated leading dot prefixes",
+    "pattern": "././src/**",
+    "path": "src/deep/guide.md",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "double-star Unicode prefix and filename",
+    "pattern": "café/**/?.md",
+    "path": "café/deep/é.md",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "double-star malformed class",
+    "pattern": "src/**/[a",
+    "path": "src/a",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "double-star malformed separators",
+    "pattern": "src/**//a",
+    "path": "src/a",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "double-star parent traversal",
+    "pattern": "../**",
+    "path": "src/a",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "double-star malformed trailing escape",
+    "pattern": "**/file\\",
+    "path": "file",
     "valid": false,
     "matched": false
   }

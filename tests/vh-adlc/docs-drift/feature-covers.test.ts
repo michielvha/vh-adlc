@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import cases from "./feature-covers.json";
+import gateCases from "../loop/covers-cases.json";
 import { compileCoverage } from "../../../plugins/vh-adlc/scripts/docs-impact/matching";
 
 for (const fixture of cases) {
@@ -9,6 +10,12 @@ for (const fixture of cases) {
       return;
     }
     expect(compileCoverage(fixture.pattern, "feature")(fixture.path)).toBe(fixture.matched);
+  });
+}
+
+for (const fixture of gateCases.cases) {
+  test(`feature coverage follows the gate for ${JSON.stringify(fixture.pattern)} on ${JSON.stringify(fixture.path)}`, () => {
+    expect(compileCoverage(fixture.pattern, "feature")(fixture.path)).toBe(fixture.match);
   });
 }
 

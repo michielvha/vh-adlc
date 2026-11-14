@@ -11,10 +11,11 @@ function malformed(): never { throw new Error("invalid coverage pattern"); }
 /** Compile once per declaration; matching uses bounded dynamic programming, not backtracking. */
 export function compileCoverage(pattern: string, dialect: "documentation" | "feature" = "documentation"): (source: string) => boolean {
   const feature = dialect === "feature";
+  // The gate uses documentation glob semantics for every raw double-star declaration.
+  if (feature && pattern.includes("**")) return compileCoverage(pattern, "documentation");
   const normalized = feature ? pattern : pattern.replace(/^(?:\.\/)+/u, "");
   if (!normalized || normalized.startsWith("/") || normalized.includes("\0") || normalized.includes("//") || normalized.split("/").includes("..")) malformed();
   if (feature) {
-    if (normalized.includes("**")) malformed();
     // MatchCovers checks directory prefixes and ordinary literals before path.Match.
     if (normalized.endsWith("/")) return source => source.startsWith(normalized);
     if (!/[*?\[]/u.test(normalized)) return source => source === normalized;
