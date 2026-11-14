@@ -26,7 +26,7 @@ const (
 )
 
 // Bootstrap is the fixed remote command for Windows hosts.
-const Bootstrap = `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "iex ([Console]::In.ReadToEnd())"`
+const Bootstrap = `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQAgAD0AIAAnAFMAaQBsAGUAbgB0AGwAeQBDAG8AbgB0AGkAbgB1AGUAJwA7ACAAJABXAGEAcgBuAGkAbgBnAFAAcgBlAGYAZQByAGUAbgBjAGUAIAA9ACAAJwBTAGkAbABlAG4AdABsAHkAQwBvAG4AdABpAG4AdQBlACcAOwAgAHQAcgB5ACAAewAgAGkAZQB4ACAAKABAACgAJABpAG4AcAB1AHQAKQAgAC0AagBvAGkAbgAgAFsAYwBoAGEAcgBdADEAMAApACAAfQAgAGMAYQB0AGMAaAAgAHsAIABbAEMAbwBuAHMAbwBsAGUAXQA6ADoARQByAHIAbwByAC4AVwByAGkAdABlAEwAaQBuAGUAKAAkAF8AKQA7ACAAZQB4AGkAdAAgADEAIAB9AA==`
 
 // Kinds of host.
 const (

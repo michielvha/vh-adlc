@@ -5,6 +5,8 @@ package remote
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
@@ -15,13 +17,29 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/michielvha/logger"
 )
 
+// bootstrapScript reads the script through $input, which Windows
+// PowerShell 5.1 still reads when standard input arrives late.
+const bootstrapScript = `$ProgressPreference = 'SilentlyContinue'; $WarningPreference = 'SilentlyContinue'; try { iex (@($input) -join [char]10) } catch { [Console]::Error.WriteLine($_); exit 1 }`
+
 // Bootstrap is the fixed remote command for Windows clients. It holds no
-// data and works whether the OpenSSH default shell is cmd.exe or PowerShell.
-const Bootstrap = `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "iex ([Console]::In.ReadToEnd())"`
+// data, and Base64 has no character cmd.exe or PowerShell treats
+// specially, so it works whichever is the OpenSSH default shell.
+var Bootstrap = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + encode(bootstrapScript)
+
+// encode gives the Base64 of the UTF-16LE text -EncodedCommand takes.
+func encode(s string) string {
+	units := utf16.Encode([]rune(s))
+	b := make([]byte, 0, 2*len(units))
+	for _, u := range units {
+		b = binary.LittleEndian.AppendUint16(b, u)
+	}
+	return base64.StdEncoding.EncodeToString(b)
+}
 
 // ErrUnreachable marks an ssh connection failure (exit 255).
 var ErrUnreachable = errors.New("unreachable over SSH")

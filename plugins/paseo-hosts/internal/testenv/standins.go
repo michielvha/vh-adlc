@@ -432,7 +432,7 @@ func runPwsh(dir string) int {
 	if err != nil {
 		return fail(255, "testenv: %v", err)
 	}
-	cmd := exec.Command(pwsh, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", "iex ([Console]::In.ReadToEnd())")
+	cmd := exec.Command(pwsh, strings.Fields(Bootstrap)[1:]...)
 	cmd.Dir = filepath.Join(dir, "home")
 	cmd.Env = hostEnv(dir)
 	cmd.Stdin = strings.NewReader(pwshShims + string(script))
