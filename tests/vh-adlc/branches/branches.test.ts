@@ -477,3 +477,77 @@ test("apply runs the item 1 checks again just before it removes a worktree", () 
   expect(readFileSync(join(late, "late.md"), "utf8")).toBe("late\n");
   expect(locals(f.work)).toContain("feat/late");
 }, 120000);
+
+const status = (result: ReturnType<typeof apply>, kind: string, branch: string) => result.outcomes.find(o => o.operation.kind === kind && "branch" in o.operation && o.operation.branch === branch);
+
+test("an untracked file added after the plan leaves the worktree, the file and the branch", () => {
+  const f = repo();
+  const tree = f.merged("late");
+  const plan = f.plan();
+  expect(summary(plan.operations)).toEqual(expect.arrayContaining(["remove-worktree:feat/late", "delete-local:feat/late"]));
+  put(tree, { "notes.md": "draft\n" });
+  const result = approve(f.options, plan);
+  expect([status(result, "remove-worktree", "feat/late")?.status, status(result, "delete-local", "feat/late")?.status]).toEqual(["changed", "changed"]);
+  expect(readFileSync(join(tree, "notes.md"), "utf8")).toBe("draft\n");
+  expect(listed(f)).toContain(`worktree ${tree}`);
+  expect(locals(f.work)).toContain("feat/late");
+}, 120000);
+
+test("an ignored file added after the plan leaves the worktree and its branch", () => {
+  const f = repo();
+  const tree = f.merged("late");
+  const plan = f.plan();
+  put(tree, { "node_modules/a/index.js": "x\n" });
+  const result = approve(f.options, plan);
+  expect(status(result, "remove-worktree", "feat/late")?.status).toBe("changed");
+  expect(status(result, "delete-local", "feat/late")).toMatchObject({ status: "failed", detail: "its worktree was not removed" });
+  expect(existsSync(join(tree, "node_modules/a/index.js"))).toBe(true);
+  expect(listed(f)).toContain(`worktree ${tree}`);
+  expect(locals(f.work)).toContain("feat/late");
+}, 120000);
+
+test("a worktree added on a planned branch after the plan keeps the branch", () => {
+  const f = repo();
+  const tip = branch(f.work, "feat/bare");
+  f.write({ pulls: [pr(1, "feat/bare", tip)] });
+  const plan = f.plan();
+  plan.operations = plan.operations.filter(o => o.kind === "delete-local");
+  expect(summary(plan.operations)).toEqual(["delete-local:feat/bare"]);
+  const tree = join(f.dir, "bare");
+  git(f.work, "worktree", "add", "-q", tree, "feat/bare");
+  const result = approve(f.options, plan);
+  expect(status(result, "delete-local", "feat/bare")).toMatchObject({ status: "failed", detail: "its worktree was not removed" });
+  expect(locals(f.work)).toContain("feat/bare");
+  expect(listed(f)).toContain(`worktree ${tree}\nHEAD ${tip}\nbranch refs/heads/feat/bare`);
+}, 120000);
+
+test("a worktree moved after the plan is reported absent and its branch stays", () => {
+  const f = repo();
+  const tree = f.merged("moving"), moved = join(f.dir, "moved");
+  const plan = f.plan();
+  git(f.work, "worktree", "move", tree, moved);
+  const result = approve(f.options, plan);
+  expect(status(result, "remove-worktree", "feat/moving")?.status).toBe("already-absent");
+  expect(status(result, "delete-local", "feat/moving")).toMatchObject({ status: "failed", detail: "its worktree was not removed" });
+  expect(listed(f)).toContain(`worktree ${moved}`);
+  expect(locals(f.work)).toContain("feat/moving");
+}, 120000);
+
+test("a branch checked out in two worktrees stays until both are removed", () => {
+  const f = repo();
+  const first = f.merged("twice"), second = join(f.dir, "twice-again");
+  const early = f.plan();
+  git(f.work, "worktree", "add", "-q", "--force", second, "feat/twice");
+  put(second, { "notes.md": "draft\n" });
+  const plan = f.plan();
+  expect(summary(plan.operations)).not.toContain("delete-local:feat/twice");
+  expect(localWhy(plan, "feat/twice")).toContain(second);
+  expect(why(plan, second)).toContain("changed or untracked files");
+  const result = approve(f.options, early);
+  expect(status(result, "remove-worktree", "feat/twice")?.status).toBe("done");
+  expect(status(result, "delete-local", "feat/twice")?.status).not.toBe("done");
+  expect(existsSync(first)).toBe(false);
+  expect(readFileSync(join(second, "notes.md"), "utf8")).toBe("draft\n");
+  expect(listed(f)).toContain(`worktree ${second}`);
+  expect(locals(f.work)).toContain("feat/twice");
+}, 120000);
