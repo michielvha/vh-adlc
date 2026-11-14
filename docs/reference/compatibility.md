@@ -166,10 +166,12 @@ Hosts may register the reviewer agent directly or dispatch a generic independent
 the same reviewer file. If neither capability is available, the review stays pending with a handoff.
 The primary session never substitutes self-review for independence.
 
-Review severities, the nit rule and one revision per pass need plugin 0.20.0 and a resolved docs
-revision of `1ccf8f3` or later. When a repository pins an earlier revision, the
-reviewer and the spec operation keep their previous behavior: findings are rated without the shared
-definitions, a factual nit is applied and a judgement nit becomes an Open Question.
+Plugin 0.20.0 brings the review convergence rules. The severity definitions, the nit rule and the
+free-text rule come from the docs revision a repository resolves, and need `1ccf8f3` or later. On an
+earlier pin the reviewer rates findings without the shared definitions, and the spec operation applies
+a factual nit and turns a judgement nit into an Open Question, as before. The failure-mode check, one
+pass for every finding, one revision per pass and the ban on rewriting a reviewed commit apply on any
+pin.
 
 ## Article operation
 
