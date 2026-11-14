@@ -591,6 +591,7 @@ None.
 | 2026-11-12 | R-21 | spec | `5f2f2d1f71c1fd673596a34a87cac7f80089f7f5` | unknown | procedural | No findings; the reviewer did not report its model. |
 | 2026-11-13 | R-21 | spec | `5f2f2d1f71c1fd673596a34a87cac7f80089f7f5` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-22 | spec | `9c44bf7bfe8289fab3d262548f58fe4a79f1249c` | unknown | procedural | One should-fix and two nit findings after covered drift; the reviewer did not report its model. |
+| 2026-11-14 | R-23 | spec | `9bd1d26d2e3f8d80529cf092bd51dc4fa427de6c` | unknown | procedural | Three nit findings after covered drift; the reviewer did not report its model. |
 
 ### R-1
 
@@ -1249,3 +1250,26 @@ SEVERITY: nit
 WHERE: Context, Owner summary (last paragraph)
 EVIDENCE: The summary still ends with "A new independent review must pass before acceptance. Acceptance would authorize implementation on a feature branch". Its review history stops at R-20. The frontmatter says `status: planned` with "Accepted by the owner on 2026-11-13 after clean spec review R-21 at 5f2f2d1; tasks are next.". The Review Log has the R-21 `NO FINDINGS` row and the 2026-11-13 `accepted by owner` row, and the Tasks section is now filled in. feature-documents.md at d8f07c9 says to refresh the summary "when scope, proof or decisions change".
 PROPOSAL: Replace the closing sentences with a statement that R-21 found nothing and that the owner accepted the document on 2026-11-13. Say that implementation on the feature branch is next and that pushing, a PR, merging and releasing still each need their own approval.
+
+### R-23
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (last bullet of "These reasons come from the helper")
+EVIDENCE: The bullet cites `references/authority.md:90-91` for "removes completely clean worktrees only when the owner asked for worktree cleanup". At origin/main 8d3fdf9, which 9bd1d26 merges as its second parent, `git show 8d3fdf9:plugins/vh-adlc/references/authority.md | cat -n` puts that sentence at lines 95-96. Lines 90-91 now hold the end of the host worktree claim paragraph ("a worktree when it starts in the primary checkout ... the operation stops before writing."). The line moved because main added a new Preservation paragraph at lines 81-84 ("No operation rebases, amends, squashes or otherwise rewrites a commit that a Review Log row names ..."), followed by a blank line at 85. The R-22 fix did not cause this; main's drift did. The other citations still match the files on main: `authority.md:35` (the "Cleaning stale merged branches" row, with the history-rewrite row now at line 31), branches.ts 117, 159, 161-162, 183-198, 192-193 and 193, `references/branches.md:49` and `88-90`, `references/maintenance.md:156-157` and `skills/vh-adlc-ship/SKILL.md:122-123`.
+PROPOSAL: Change `references/authority.md:90-91` to `references/authority.md:95-96`, or name the commit the Background line numbers were taken from.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (last paragraph, "The pinned delivery convention (`conventions/delivery.md:26-27` at `vhco-pro/docs@d8f07c9`)")
+EVIDENCE: The merge brought in main commit 8a21a1e ("pin the docs revision that defines review severities"). At 9bd1d26, `AGENTS.md:4` pins `vhco-pro/docs` at 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff. `vh-adlc lint` and `vh-adlc gate` against the tree report `"revision":"1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff"`. So d8f07c9 is no longer the pinned revision. The quoted lines are the same at 1ccf8f3: `conventions/delivery.md:26-27` there still reads "Remove a worktree only when the owner asks, only when it is clean, and only with `git worktree remove` without `--force`", so the claim itself still holds.
+PROPOSAL: Cite `conventions/delivery.md:26-27` at `vhco-pro/docs@1ccf8f3`, or drop the word "pinned" and keep d8f07c9 as the revision the citation was taken from.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (last paragraph: "Nothing is implemented. The checks below are planned, not run." and "Implementation on the feature branch is next"), frontmatter `status_description`
+EVIDENCE: At 9bd1d26, `git show 9bd1d26:docs/specs/worktree-cleanup.md | grep -c '^- \[x\] T'` prints 18. T1 to T18 are ticked with evidence lines that record test runs, and T19 has an evidence line for the AC-09 Stackweaver plan check ("41 linked worktrees, 14 `remove-worktree` and 27 `worktree` kept records"). The plugin manifests are at 0.21.0. The summary still says at line 127 that nothing is implemented and that the checks are planned, not run, and at line 175 that implementation is next. `status_description` still reads "implementing the tasks test-first". It does not say that the branch has merged origin/main or that every criterion is still unticked while it waits for an implementation review. feature-documents.md says the summary must "distinguish planned checks from observed proof" and be refreshed "when scope, proof or decisions change".
+PROPOSAL: Rewrite the summary's state sentences to say that T1 to T18 are done with recorded task evidence, that T19's Stackweaver check has been run without applying the plan, that no criterion is ticked yet, and that an implementation review is next. Update `status_description` to match.
