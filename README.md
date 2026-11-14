@@ -26,6 +26,7 @@ The agent runs the workflow; you accept the feature scope and decide when to shi
 ## Why use it?
 
 - Find docs affected by selected code changes with [shared documentation impact](plugins/vh-adlc/examples/docs-impact/README.md).
+- Audit accumulated documentation drift and resolve selected stale audit PRs with the candidate `vh-adlc-docs-drift` operation. Start with its [greenfield example](plugins/vh-adlc/examples/docs-drift/README.md) and check [migration acceptance](docs/reference/compatibility.md#shared-documentation-drift-candidate).
 - Keep a feature's requirements, tasks, and evidence together in Git.
 - Check review freshness and completion with deterministic commands.
 - Get independent spec and implementation reviews before completing a feature.
