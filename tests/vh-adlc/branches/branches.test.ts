@@ -32,9 +32,11 @@ function branch(work: string, name: string): string {
 }
 const pr = (number: number, ref: string, sha: string, merged = true) => ({ number, state: merged ? "closed" : "open", merged_at: merged ? "2026-11-01T00:00:00Z" : null, head: { ref, sha, repo: { full_name: "acme/demo" } }, base: { ref: "main" } });
 
-function fixture(pulls: (f: { work: string; origin: string }) => unknown[] = () => []) {
+function fixture(pulls: (f: { work: string; origin: string }) => unknown[] = () => [], reftable = false) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vh-branches-"))), origin = join(dir, "origin.git"), work = join(dir, "work"), state = join(dir, "state.json");
-  git(dir, "init", "-q", "--bare", origin); git(dir, "clone", "-q", origin, work);
+  git(dir, "init", "-q", "--bare", origin);
+  if (reftable) { git(dir, "init", "-q", "--ref-format=reftable", work); git(work, "remote", "add", "origin", origin); }
+  else git(dir, "clone", "-q", origin, work);
   commit(work, "base"); git(work, "push", "-q", "origin", "HEAD:main");
   const write = (value: Record<string, unknown>) => writeFileSync(state, JSON.stringify({ repository: "acme/demo", repo: { default_branch: "main", delete_branch_on_merge: false }, protected: [], pulls: [], ...value }));
   write({});
@@ -202,7 +204,7 @@ test("a branch in a worktree mid-rebase is kept even though the worktree shows a
   f.write({ pulls: [pr(1, "feat/rebasing", tip)] });
   const { plan } = observe({ ...f.options, worktrees: true });
   expect(summary(plan.operations)).not.toContain("delete-local:feat/rebasing");
-  expect(plan.kept.find(k => k.scope === "local" && k.branch === "feat/rebasing")!.reason).toContain("rebase or bisect in progress");
+  expect(plan.kept.find(k => k.scope === "local" && k.branch === "feat/rebasing")!.reason).toContain("rebase in progress");
 });
 
 test("default-branch reachability proves a merge only for a branch with its own merged commits", () => {
@@ -599,4 +601,118 @@ test("a seven-day-old branch at the default tip stays, with a reason, while its 
     expect(why(plan, path)).toContain(rule);
     expect(localWhy(plan, name)).toContain(`merged but checked out in a kept worktree (${path})`);
   }
+}, 120000);
+
+/** A detached worktree at `at`, created `days` days ago so its HEAD reflog starts then. */
+const detach = (f: { work: string; dir: string }, name: string, days: number, at = "main", path = join(f.dir, name)) => { aged(days, f.work, "worktree", "add", "-q", "--detach", path, at); return path; };
+/** Commits X in a detached worktree, then checks out main again, so only its HEAD reflog names X. */
+const leave = (path: string) => { const x = commit(path, `x in ${path}`); git(path, "checkout", "-q", "--detach", "main"); return x; };
+const onlyKept = (plan: Plan, path: string) => { expect(keptTrees(plan, path)).toHaveLength(1); expect(removal(plan, path)).toBeUndefined(); return why(plan, path); };
+const removals = (plan: Plan) => plan.operations.filter(o => o.kind === "remove-worktree").map(o => (o as { path: string }).path).sort();
+const reflogOnly = "HEAD reflog names commits on no branch";
+
+test("a clean detached worktree on the default branch goes once its HEAD reflog or, without one, its commit is seven days old", () => {
+  const f = repo();
+  put(f.work, { "eight.txt": "8\n" }); git(f.work, "add", "-A"); aged(8, f.work, "commit", "-q", "-m", "eight days ago");
+  const eight = git(f.work, "rev-parse", "HEAD");
+  put(f.work, { "one.txt": "1\n" }); git(f.work, "add", "-A"); aged(1, f.work, "commit", "-q", "-m", "one day ago");
+  const one = git(f.work, "rev-parse", "HEAD");
+  commit(f.work, "today"); git(f.work, "push", "-q", "origin", "main");
+  const old = detach(f, "old", 8), young = detach(f, "young", 1), unmerged = detach(f, "unmerged", 8), untracked = detach(f, "untracked", 8), modified = detach(f, "modified", 8);
+  commit(unmerged, "unmerged work");
+  put(untracked, { "notes.md": "draft\n" }); put(modified, { "base.txt": "edited\n" });
+  const emptiedOld = detach(f, "emptied-old", 0, eight), emptiedYoung = detach(f, "emptied-young", 0, one);
+  for (const name of ["emptied-old", "emptied-young"]) writeFileSync(join(f.work, ".git", "worktrees", name, "logs", "HEAD"), "");
+  const plan = f.plan();
+  expect(removals(plan)).toEqual([emptiedOld, old].sort());
+  expect(removal(plan, old)).toMatchObject({ oid: git(f.work, "rev-parse", "main"), ignored: [] });
+  expect(removal(plan, old)?.branch).toBeUndefined();
+  expect(onlyKept(plan, young)).toContain("within 7 days");
+  expect(onlyKept(plan, emptiedYoung)).toContain("within 7 days");
+  expect(onlyKept(plan, unmerged)).toContain("is not on main");
+  expect(why(plan, unmerged)).toContain(reflogOnly);
+  for (const path of [untracked, modified]) expect(onlyKept(plan, path)).toContain("changed or untracked files");
+  const result = approve(f.options, plan);
+  expect(result.complete, JSON.stringify(result.outcomes)).toBe(true);
+  for (const path of [old, emptiedOld]) { expect(existsSync(path)).toBe(false); expect(listed(f)).not.toContain(path); }
+  for (const path of [young, unmerged, untracked, modified, emptiedYoung]) expect(listed(f)).toContain(`worktree ${path}`);
+}, 120000);
+
+test("a detached worktree paused in a rebase or a bisect on the default branch is kept, naming that and its reflog-only commit", () => {
+  const f = repo();
+  commit(f.work, "third"); git(f.work, "push", "-q", "origin", "main");
+  const rebasing = detach(f, "rebasing", 8), bisecting = detach(f, "bisecting", 8);
+  const x = commit(rebasing, "rebased away");
+  gitWith({ GIT_SEQUENCE_EDITOR: "sed -i '1i break'" }, rebasing, "rebase", "-q", "-i", "main");
+  expect(git(rebasing, "rev-parse", "HEAD")).toBe(git(f.work, "rev-parse", "main"));
+  const y = commit(bisecting, "bisected");
+  git(bisecting, "bisect", "start", y, "main~2");
+  git(f.work, "merge-base", "--is-ancestor", git(bisecting, "rev-parse", "HEAD"), "main");
+  const plan = f.plan();
+  expect(onlyKept(plan, rebasing)).toContain("rebase in progress");
+  expect(why(plan, rebasing)).toContain(`${reflogOnly}: ${x.slice(0, 12)}`);
+  expect(onlyKept(plan, bisecting)).toContain("bisect in progress");
+  expect(why(plan, bisecting)).toContain(`${reflogOnly}: ${y.slice(0, 12)}`);
+}, 120000);
+
+test("a detached worktree whose HEAD reflog alone names a commit, as the value an entry moved to or from, is kept present or missing", () => {
+  const f = repo();
+  const trees = ["new-here", "new-gone", "old-here", "old-gone"].map(name => detach(f, name, 8)), named = trees.map(leave);
+  for (const i of [2, 3]) {
+    git(trees[i]!, "reflog", "delete", "HEAD@{1}");
+    expect(git(trees[i]!, "reflog", "show", "--format=%H", "HEAD")).not.toContain(named[i]!);
+    expect(readFileSync(join(f.work, ".git", "worktrees", `old-${i === 2 ? "here" : "gone"}`, "logs", "HEAD"), "utf8")).toContain(named[i]!);
+  }
+  for (const i of [1, 3]) rmSync(trees[i]!, { recursive: true, force: true });
+  const plan = f.plan();
+  trees.forEach((path, i) => expect(onlyKept(plan, path)).toContain(`${reflogOnly}: ${named[i]!.slice(0, 12)}`));
+}, 120000);
+
+test("under reftable storage a detached worktree with HEAD reflog entries is kept, and one whose reflog was emptied follows its commit date", () => {
+  const f = fixture(() => [], true);
+  put(f.work, { "eight.txt": "8\n" }); git(f.work, "add", "-A"); aged(8, f.work, "commit", "-q", "-m", "eight days ago"); git(f.work, "push", "-q", "origin", "main");
+  expect(git(f.work, "rev-parse", "--show-ref-format")).toBe("reftable");
+  const here = detach(f, "here", 8), gone = detach(f, "gone", 8), emptied = detach(f, "emptied", 0);
+  rmSync(gone, { recursive: true, force: true });
+  while (git(emptied, "reflog", "show", "HEAD")) git(emptied, "reflog", "delete", "HEAD@{0}");
+  const plan = observe(f.options).plan;
+  for (const path of [here, gone]) expect(onlyKept(plan, path)).toContain("reftable");
+  expect(removals(plan)).toEqual([emptied]);
+}, 120000);
+
+test("files storage: no logs/HEAD with core.logAllRefUpdates=false passes, an unreadable logs/HEAD or a failing reflog command keeps", () => {
+  const f = repo();
+  put(f.work, { "eight.txt": "8\n" }); git(f.work, "add", "-A"); aged(8, f.work, "commit", "-q", "-m", "eight days ago"); git(f.work, "push", "-q", "origin", "main");
+  const sealed = detach(f, "sealed", 8), failing = detach(f, "failing", 8), log = join(f.work, ".git", "worktrees", "sealed", "logs", "HEAD");
+  git(f.work, "config", "core.logAllRefUpdates", "false");
+  const unlogged = detach(f, "unlogged", 8);
+  expect(existsSync(join(f.work, ".git", "worktrees", "unlogged", "logs", "HEAD"))).toBe(false);
+  const run: Run = argv => argv.includes("reflog") && argv.some(a => a.startsWith("--git-dir=") && a.endsWith(`${resolve("/", "worktrees", "failing")}`)) ? { code: 128, stdout: "", stderr: "fatal: reflog broken\n" } : f.run(argv);
+  try {
+    chmodSync(log, 0o000);
+    expect(git(sealed, "reflog", "show", "HEAD")).toBe("");
+    const plan = f.plan(run);
+    expect(removals(plan)).toEqual([unlogged]);
+    expect(onlyKept(plan, sealed)).toContain("logs/HEAD");
+    expect(onlyKept(plan, failing)).toContain("HEAD reflog");
+    expect(why(plan, failing)).toContain("failed (exit 128)");
+  } finally {
+    chmodSync(log, 0o644);
+  }
+}, 120000);
+
+test("detached worktrees sharing a folder name each read their own reflog, and a stale tracking ref does not count", () => {
+  const f = repo(), p1 = detach(f, "w", 8, "main", join(f.dir, "p1", "w")), p2 = detach(f, "w", 8, "main", join(f.dir, "p2", "w")), stale = detach(f, "stale", 8);
+  expect(readFileSync(join(f.work, ".git", "worktrees", "w1", "gitdir"), "utf8").trim()).toBe(join(p2, ".git"));
+  const x = leave(p2);
+  const y = commit(stale, "pushed then deleted");
+  git(stale, "push", "-q", "origin", "HEAD:refs/heads/scratch");
+  git(stale, "checkout", "-q", "--detach", "main");
+  bare(f.origin, "branch", "-q", "-D", "scratch");
+  expect(git(f.work, "rev-parse", "refs/remotes/origin/scratch")).toBe(y);
+  for (const path of [p2, stale]) rmSync(path, { recursive: true, force: true });
+  const plan = f.plan();
+  expect(onlyKept(plan, p2)).toContain(`${reflogOnly}: ${x.slice(0, 12)}`);
+  expect(onlyKept(plan, stale)).toContain(`${reflogOnly}: ${y.slice(0, 12)}`);
+  expect(removals(plan)).toEqual([p1]);
 }, 120000);
