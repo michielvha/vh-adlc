@@ -7,7 +7,7 @@ const baseline = "b313327b134bc5ecfa7167856d4b567f8701ba06";
 // The owner requested a conversational summary before accepting a completed spec, and later accepted
 // docs/specs/spec-review-convergence.md, which changes author mode and review step 4 (last at R-20). Keep that
 // intentional text as the spec baseline; other operation bodies retain theirs.
-const specSummaryBaseline = "259a36bed3456c5ea27a3bbc5e7d9d87f4437ca4";
+const specSummaryBaseline = "a4916e58001c896be6416cfaefb14a23723dd254";
 test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resume"])("direct %s keeps its approved operation body", (name) => {
   const path = `plugins/vh-adlc/skills/vh-adlc-${name}/SKILL.md`;
   const revision = name === "spec" ? specSummaryBaseline : baseline;
