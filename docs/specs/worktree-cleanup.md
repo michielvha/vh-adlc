@@ -568,6 +568,7 @@ None.
 | 2026-11-12 | R-20 | spec | `7fc0022511b727c3828d94875357fbd4b66141a4` | claude-opus-4.8 | procedural | One should-fix finding; model self-reported, no model was requested. |
 | 2026-11-12 | R-21 | spec | `5f2f2d1f71c1fd673596a34a87cac7f80089f7f5` | unknown | procedural | No findings; the reviewer did not report its model. |
 | 2026-11-13 | R-21 | spec | `5f2f2d1f71c1fd673596a34a87cac7f80089f7f5` | n/a | n/a | accepted by owner |
+| 2026-11-14 | R-22 | spec | `9c44bf7bfe8289fab3d262548f58fe4a79f1249c` | unknown | procedural | One should-fix and two nit findings after covered drift; the reviewer did not report its model. |
 
 ### R-1
 
@@ -1203,3 +1204,26 @@ PROPOSAL: Keep a `prunable` entry, with a reason, when `git --git-dir=<admin dir
 ### R-21
 
 NO FINDINGS
+
+### R-22
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (last bullet of "These reasons come from the helper")
+EVIDENCE: The bullet cites `references/authority.md:34` and `references/authority.md:84`, and `skills/vh-adlc-ship/SKILL.md:108-109`, as the places that require the owner to ask for worktree cleanup. At 9c44bf7, `git show 9c44bf7:plugins/vh-adlc/references/authority.md | cat -n` puts the "Cleaning stale merged branches" row ("worktree removal needs the owner to ask for it") at line 35. The "removes completely clean worktrees only when the owner asked for worktree cleanup" sentence is now at lines 90-91, because the label-plan row (line 26) and the claim paragraph (lines 81-85) were added after 5f2f2d1. In the ship skill, the "Loop routes" section (lines 42-54) was added, so "stays until the owner asks for worktree cleanup" moved to lines 122-123. Lines 108-109 now hold the article and promotion handoff text. The other line references still match at 9c44bf7: branches.ts 117, 159, 161-162, 183-198, 192-193; branches.md 49 and 88-90; maintenance.md 156-157; and delivery.md 26-27 at d8f07c9.
+PROPOSAL: Change the citations to `references/authority.md:35`, `references/authority.md:90-91` and `skills/vh-adlc-ship/SKILL.md:122-123`, or name the commit the line numbers were taken from.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks (T3, T5, T9, T11), Test Plan AC-02 row
+EVIDENCE: The AC-02 Test Plan row includes this case: "Another has a branch on the default branch's first-parent history with an 8-day reflog, paused by `git rebase -i` with a `break` in its worktree, whose directory the test then moves by hand; `plan` keeps the entry and the branch with reasons naming the rebase, and the branch remains after `apply`." No task assigns this case. T3 covers only "the AC-01 and AC-02 fixtures from the Test Plan for Design item 1". T5 lists four apply-order fixtures, and none of them is this one. T9 covers detached worktrees. T11's "mid-rebase" case is the AC-05 row's "detached one paused mid-rebase whose directory the test deletes". The case also cannot go into T3. It needs Design item 2 (T8), so that an 8-day first-parent branch counts as proven merged. It also needs item 3's reading of `rebase-merge/head-name` for `prunable` entries (T10). Today branches.ts:117 reads that file only for entries that are not prunable. Placed in T3, it would block T4's done condition "T3 passes".
+PROPOSAL: Assign this AC-02 case to a test task that comes after T8, such as T9, or to a new test and implementation pair after T10, and name AC-02 among the criteria that task advances.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (last paragraph)
+EVIDENCE: The summary still ends with "A new independent review must pass before acceptance. Acceptance would authorize implementation on a feature branch". Its review history stops at R-20. The frontmatter says `status: planned` with "Accepted by the owner on 2026-11-13 after clean spec review R-21 at 5f2f2d1; tasks are next.". The Review Log has the R-21 `NO FINDINGS` row and the 2026-11-13 `accepted by owner` row, and the Tasks section is now filled in. feature-documents.md at d8f07c9 says to refresh the summary "when scope, proof or decisions change".
+PROPOSAL: Replace the closing sentences with a statement that R-21 found nothing and that the owner accepted the document on 2026-11-13. Say that implementation on the feature branch is next and that pushing, a PR, merging and releasing still each need their own approval.
