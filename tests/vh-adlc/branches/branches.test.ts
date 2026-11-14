@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { afterMerge, apply, digest, observe, parseOrigin, spawn, type Run } from "../../../plugins/vh-adlc/scripts/branches/branches";
@@ -43,6 +43,16 @@ function fixture(pulls: (f: { work: string; origin: string }) => unknown[] = () 
 const heads = (origin: string) => bare(origin, "for-each-ref", "--format=%(refname:short)", "refs/heads").split("\n").filter(Boolean).sort();
 const locals = (work: string) => git(work, "for-each-ref", "--format=%(refname:short)", "refs/heads").split("\n").filter(Boolean).sort();
 const summary = (ops: { kind: string; branch?: string; ref?: string }[]) => ops.map(op => op.branch ?? op.ref ? `${op.kind}:${op.branch ?? op.ref}` : op.kind);
+/** Runs cli.ts with the fake gh first on PATH. */
+function cliFor(f: { dir: string; state: string }) {
+  const shim = join(f.dir, "bin");
+  if (!existsSync(shim)) { mkdirSync(shim); writeFileSync(join(shim, "gh"), `#!/bin/sh\nexec bun ${JSON.stringify(fakeGh)} "$@"\n`, { mode: 0o755 }); }
+  const env = { ...process.env, PATH: shim + delimiter + process.env.PATH, BRANCHES_FIXTURE: f.state };
+  return (...args: string[]) => {
+    const r = Bun.spawnSync(["bun", cli, ...args], { stdout: "pipe", stderr: "pipe", env });
+    return { code: r.exitCode, out: r.stdout.toString(), err: r.stderr.toString() };
+  };
+}
 
 test("a sweep plan removes only proven-merged branches and applies only the exact approved bytes", () => {
   const f = fixture();
@@ -212,3 +222,46 @@ test("auto-delete reports the setting, enables it only on request and confirms i
   expect([again.code, again.out.changed, patched()]).toEqual([0, false, before]);
   expect(cmd().code).toBe(2);
 });
+
+test("plan proposes worktree removal unless --worktrees false, and after-merge --worktrees false leaves the worktree and branch", () => {
+  const f = fixture();
+  const tip = branch(f.work, "feat/done"), tree = join(f.dir, "done");
+  git(f.work, "worktree", "add", "-q", tree, "feat/done");
+  f.write({ pulls: [pr(1, "feat/done", tip)] });
+  const cmd = cliFor(f), planPath = join(f.dir, "plan.json");
+
+  const byDefault = cmd("plan", "--repo", f.work, "--repository", "acme/demo", "--output", planPath);
+  expect(byDefault.code, byDefault.err).toBe(0);
+  const shown = JSON.parse(byDefault.out);
+  expect(shown.schema_version).toBe(2);
+  expect(summary(shown.operations)).toEqual(["enable-auto-delete", "delete-remote:feat/done", "remove-worktree:feat/done", "delete-local:feat/done"]);
+
+  const off = cmd("plan", "--repo", f.work, "--repository", "acme/demo", "--worktrees", "false", "--output", planPath);
+  expect(off.code, off.err).toBe(0);
+  const without = JSON.parse(off.out);
+  expect(summary(without.operations)).toEqual(["enable-auto-delete", "delete-remote:feat/done"]);
+  expect(without.kept).toContainEqual(expect.objectContaining({ scope: "local", branch: "feat/done" }));
+  expect(without.kept).toContainEqual(expect.objectContaining({ scope: "worktree", path: realpathSync(tree), branch: "feat/done" }));
+
+  const merged = cmd("after-merge", "--repo", f.work, "--repository", "acme/demo", "--pull", "1", "--worktrees", "false");
+  expect(merged.code, merged.out + merged.err).toBe(0);
+  expect(summary(JSON.parse(merged.out).outcomes.map((o: { operation: { kind: string; branch?: string } }) => o.operation))).toEqual(["delete-remote:feat/done"]);
+  expect(existsSync(join(tree, ".git"))).toBe(true);
+  expect(git(f.work, "worktree", "list", "--porcelain")).toContain(`worktree ${realpathSync(tree)}`);
+  expect(locals(f.work)).toContain("feat/done");
+}, 60000);
+
+test("apply refuses a plan written in the previous format", () => {
+  const f = fixture();
+  const tip = branch(f.work, "feat/old");
+  f.write({ pulls: [pr(1, "feat/old", tip)] });
+  const planPath = join(f.dir, "plan.json"), cmd = cliFor(f);
+  const old = { schema_version: 1, repository: "acme/demo", default_branch: "main", default_oid: git(f.work, "rev-parse", "main"), delete_branch_on_merge: false, worktrees: true,
+    operations: [{ kind: "delete-local", branch: "feat/old", oid: tip, proof: `contained in merged PR #1 head ${tip.slice(0, 12)}` }], kept: [] };
+  const text = JSON.stringify(old, null, 2) + "\n";
+  writeFileSync(planPath, text);
+  const applied = cmd("apply", "--repo", f.work, "--plan", planPath, "--approved-digest", digest(text));
+  expect(applied.code).not.toBe(0);
+  expect(applied.err).toContain("unsupported branch plan");
+  expect(locals(f.work)).toContain("feat/old");
+}, 60000);
