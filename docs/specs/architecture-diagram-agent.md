@@ -129,6 +129,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | 2026-11-14 | R-7 | spec | `5d3af84c9f93809faf5ad3668477fab1e7bfd1d1` | unknown | procedural | No findings |
 | 2026-11-14 | R-7 | spec | `5d3af84c9f93809faf5ad3668477fab1e7bfd1d1` | n/a | n/a | accepted by owner |
 | 2026-11-14 | R-8 | implementation | `7cd15314eb48ac223a6126006fd55ad049d0dc3c` | unknown | procedural | Four criteria met, one unmet and three findings |
+| 2026-11-14 | R-9 | implementation | `b5149c1249d66b6c6c773d8c8b79d48ebb4225e2` | unknown | procedural | Five criteria met and no findings |
 
 ### R-1
 
@@ -322,6 +323,28 @@ SEVERITY: nit
 WHERE: Test Plan AC-05, `tests/vh-adlc/diagram/grade.ts:5`
 EVIDENCE: The free-text heuristic gave a clean grade to a response that said the restore facts were unknown and `No clarification is needed`. The manual transcript check required by the accepted proof showed that both observed hosts did ask for the missing facts.
 PROPOSAL: Keep manual verification of an actual request for information in the review evidence. Consider a disclosure-only negative control if the grader becomes the sole check.
+
+### R-9
+
+CRITERION: AC-01 An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
+VERDICT: met
+EVIDENCE: For `b5149c1249d66b6c6c773d8c8b79d48ebb4225e2`, I matched both native catalogs and all 154 installed plugin files to the target and independently verified completed reads of the installed skill in both AWS transcripts. The package checker and maintenance and triage discovery tests passed. The normal native runs preceded the final grading changes and used the same installed plugin.
+
+CRITERION: AC-02 The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
+VERDICT: met
+EVIDENCE: The final grader accepted all four current bundles, including the Codex AWS footer that mentions the excluded Log Bucket and the earlier Claude OCI drawing with legend arrows. The regression controls still reject a Log Bucket component and an extra traffic edge. I checked both directions of the mapping for the four selected bundles. AWS shows its three evidenced hops and ports. OCI shows the proposed backup path, identifies the unselected handoff protocol, places the bucket outside the VCN and records the unresolved restore without drawing it. The unlisted cells are labels, annotations, icon parts or legend samples.
+
+CRITERION: AC-03 A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
+VERDICT: met
+EVIDENCE: I checked the four selected bundle manifests and artifact hashes and inspected the SVGs at documentation and phone widths in Chromium and Firefox. The pinned XSD and reference checks pass. I reproduced offline re-exports and editor drags directly for both AWS drawings and the selected Claude OCI drawing, and independently checked the matching Codex OCI artifact digest and captured re-export and drag records. All four re-exports were identical or differed only in the generated SVG ID and its references. Moving each tested boundary moved the named child.
+
+CRITERION: AC-04 An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+VERDICT: met
+EVIDENCE: The exact-target focused suite passed 82 tests. In the independently exercised race, one complete bundle won, the other writer reported a collision, and a retry succeeded at another destination. Both native forced-failure runs used the target's byte-identical plugin and runner. I observed the exporter errors, verified the final paths remained absent and checked that the agents reported the errors and kept the drafts in their working areas. A separate Codex trial also left the final path absent after two renderer errors.
+
+CRITERION: AC-05 A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+VERDICT: met
+EVIDENCE: I regraded all six latest native intake cases using `b5149c1` and matched the delivered file hashes to both manifests. On each host, AWS and OCI rendered within their original requests, and the OCI brief recorded the missing restore relationship. I read both clarification replies and verified that both asked for the missing connection and initiator, addressed the traffic direction and left the final directory absent. This transcript check establishes the behavior beyond the wording heuristic recorded in R-8.
 
 ## Sources
 
