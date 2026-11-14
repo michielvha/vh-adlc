@@ -547,3 +547,35 @@ Exact local target `2c953c3a0f9afc437bc662f05444d74476577652`. Actual Copilot Op
 MODEL: claude-opus-5.5
 NO FINDINGS
 ```
+
+## Component diagnostic 117
+
+Exact local target `3837ba7d696eb03131444ce919c5f065d0543d1b`. Actual Copilot Opus 5.5 with procedural isolation. All 79 required chunks were read with unchanged packet hashes, no outside paths and no private files sent. The scoped hosted-output diagnostic returns two should-fix items and one nit. The original return follows before corrections. Broader acceptance remains open.
+
+```text
+MODEL: claude-opus-5.5
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/docs-drift/history-output.ts, persistHostedAuditOutput, lines 32 to 48, and tests/vh-adlc/docs-drift/history-output.test.ts, the refusal test.
+EVIDENCE: Line 32 publishes provenance.json. Line 33 then sets result.files.provenance_json to that file's reference. Three checks run only after this: the reopen loop on lines 34 to 36, the second createOriginalAuditReportEnvelope comparison on lines 37 to 38, and the final matchesRepositoryState check on lines 45 to 48. If any of them fails, the catch block and the final branch set complete false and history_provenance "absent". Neither clears files.provenance_json. The returned record therefore says "absent" while it still points to a provenance.json written from the first envelope, and that file stays next to report.json in the audit-output directory. history-workflow.ts allows the diagnostic upload step to run under always(), and context.md says the later workflow uploads exactly report.json and provenance.json. A refused run can therefore still ship a well-formed pair. The only partial-delivery regression mocks linkSync so that provenance.json is never published, and then asserts provenance_json is null. No test makes a check fail after publication, such as a native actor or run change between the two envelope calls or a reopen digest mismatch.
+PROPOSAL: Make every failure path after publication withdraw the provenance claim. For example, set files.provenance_json to null or record it under a separate refused-diagnostic field, and either publish the file under a non-upload name until all checks pass or remove the upload-named file. Add a regression that changes native state between the first and second envelope calls and asserts that no upload-named provenance.json is presented with history_provenance "absent".
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/docs-drift/history-output.ts line 29 together with report-history.ts reportRecord and createActionsEnvelope, and audit-report.ts assembleAuditReport.
+EVIDENCE: In assembleAuditReport, "collectionComplete &&= review.manifest.assessment.collection_complete" can leave collection_complete false while result.complete still becomes true. The completed report then reaches persistHostedAuditOutput. There, createActionsEnvelope calls reportRecord, which throws "ineligible docs-drift history technical report state" for a report with collection_complete false, a nonempty failures list or nonempty pending_corrections. The catch block then marks the whole hosted retention incomplete. That is the same result as a real retention or scope failure, and the CLI outcome becomes "incomplete" because of report_artifacts.complete. The contract says such reports simply cannot establish a history match. It does not say saving them fails. No regression covers hosted output for an original completed report that is valid but not eligible as history, so this classification is neither stated nor tested.
+PROPOSAL: Decide explicitly how hosted output handles a completed report that is not eligible as history. One option is to keep report.json and report.md retained as complete, with history_provenance "absent" and a specific diagnostic. Another is to keep the current refusal and document it as intended. Add a retained-CLI or bridge regression for that case either way.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/docs-drift/history-output.test.ts.
+EVIDENCE: history-output.ts has three refusals that no test reaches:
+- Line 28 throws ArtifactChanged "Original hosted report bytes changed" when the retained report.json differs from the original report object.
+- Line 31 refuses provenance larger than the configured max_entry_bytes.
+- Lines 37 to 38 throw "Original hosted provenance changed during retention".
+The "copied" and "wrapped" cases fail early inside the base persistAuditOutput, which returns saved before any hosted-specific code runs. They show the base refusal, not the hosted report-identity check. The required checkpoint log (t96-hosted-output-checkpoint-hosted-output.log) shows only the two existing cases.
+PROPOSAL: Add focused cases inside the existing bridge. Replace the retained report.json after the base save and before the envelope step, configure a provenance bound smaller than the envelope, and change native state between the two envelope calls. Each should assert complete false, the specific diagnostic and the scope_changed value.
+```
