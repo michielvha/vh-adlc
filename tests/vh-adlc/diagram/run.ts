@@ -65,16 +65,26 @@ function installedPackage(dir: string): string | undefined {
   }
 }
 function observedRead(raw: string, skill: string) {
-  return raw.split("\n").filter(Boolean).some(line => {
-    const e = JSON.parse(line);
-    if (host === "codex") return e.type === "item.completed" && e.item?.type === "command_execution"
-      && e.item.exit_code === 0 && e.item.command?.includes(skill)
-      && e.item.aggregated_output?.includes("name: vh-adlc-diagram");
-    return e.type === "assistant" && e.message?.content?.some((item: { name?: string; input?: { file_path?: string; skill?: string } }) =>
-      (item.name === "Read" && item.input?.file_path === skill) ||
-      (item.name === "Skill" && item.input?.skill === "vh-adlc:vh-adlc-diagram"));
-  });
+  const requested = new Set<string>();
+  for (const line of raw.split("\n").filter(Boolean)) {
+    const event = JSON.parse(line);
+    if (host === "codex" && event.type === "item.completed" && event.item?.type === "command_execution"
+      && event.item.exit_code === 0 && event.item.command?.includes(skill)
+      && event.item.aggregated_output?.includes("name: vh-adlc-diagram")) return true;
+    if (host !== "claude") continue;
+    for (const item of event.message?.content ?? []) {
+      if (item.type === "tool_use" && (
+        (item.name === "Read" && item.input?.file_path === skill) ||
+        (item.name === "Bash" && item.input?.command?.includes(skill)) ||
+        (item.name === "Skill" && item.input?.skill === "vh-adlc:vh-adlc-diagram")
+      )) requested.add(item.id);
+      if (item.type === "tool_result" && !item.is_error && requested.has(item.tool_use_id)
+        && JSON.stringify(item.content).includes("name: vh-adlc-diagram")) return true;
+    }
+  }
+  return false;
 }
+
 try {
   const candidate = join(repo, "plugins/vh-adlc");
   if (!existsSync(join(candidate, "skills/vh-adlc-diagram/SKILL.md"))) throw Error("candidate has no installed diagram skill source");
