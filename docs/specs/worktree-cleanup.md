@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-13 after clean spec review R-21 at 5f2f2d1; tasks are next."
+status: in-progress
+status_description: "Claimed on feat/worktree-cleanup after the R-22 fixes; implementing the tasks test-first."
+branch: feat/worktree-cleanup
 issue: null
 goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept; only commits that a branch worktree's HEAD reflog or a deleted branch's own reflog alone still names, such as copies from before a rebase or amend, go with them."
 covers:
@@ -168,9 +169,11 @@ the guard now also reads the commit each entry moved from. Git prints that only 
 in a reftable repository a detached worktree with HEAD reflog entries is kept. Spec review R-19
 corrected how long that lasts, said what a missing `logs/HEAD` means, and tightened two tests. Spec
 review R-20 found that an entry whose directory is gone still keeps its staged changes in its own
-index, and a real Stackweaver entry has some; design item 4 now keeps such an entry. A new
-independent review must pass before acceptance. Acceptance would authorize implementation on a feature branch; pushing, a PR, merging and
-releasing each still need their own approval.
+index, and a real Stackweaver entry has some; design item 4 now keeps such an entry. Spec review
+R-21 found nothing, and the owner accepted the document on 2026-11-13. Work that landed on the
+default branch afterwards moved three cited lines, and spec review R-22 also found one test case that
+no task covered; both are fixed without changing the design. Implementation on the feature branch is
+next; pushing it, a PR, merging and releasing each still need their own approval.
 
 ### Background
 
@@ -199,8 +202,8 @@ These reasons come from the helper:
 - `branches.ts:183-198` only walks local branches, so a detached worktree is never considered.
 - `branches.ts:193` keeps a worktree whose directory is missing.
 - Worktree removal happens only with `--worktrees true` (`branches.ts:193`, `references/branches.md:49`,
-  `references/branches.md:88-90`). `references/authority.md:34` and `references/authority.md:84`,
-  `references/maintenance.md:156-157` and `skills/vh-adlc-ship/SKILL.md:108-109` all require the owner
+  `references/branches.md:88-90`). `references/authority.md:35` and `references/authority.md:90-91`,
+  `references/maintenance.md:156-157` and `skills/vh-adlc-ship/SKILL.md:122-123` all require the owner
   to ask for worktree cleanup.
 
 Git's own rule is looser. In a scratch repository with Git 2.55.0, `git worktree remove ../w1`
@@ -528,8 +531,8 @@ Items 1 to 5 follow the owner's answers of 2026-11-12. Rejected alternatives wer
 - [ ] T8 `plugins/vh-adlc/scripts/branches/branches.ts` - Design item 2: a branch at or behind the default tip on its first-parent history counts as proven merged at seven days, aged by its oldest reflog entry or its tip's committer date; T7 passes (AC-03)
 - [ ] T9 `tests/vh-adlc/branches/branches.test.ts` - the AC-04 fixtures: detached worktrees by age, unmerged commits, rebase and bisect state, reflog-only commits named as new or old values, files and reftable storage, `core.logAllRefUpdates=false`, an unreadable `logs/HEAD`, a failing reflog command, shared folder names and a stale tracking ref; they fail first (AC-04)
 - [ ] T10 `plugins/vh-adlc/scripts/branches/branches.ts` - Design item 3: detached worktree removal with the HEAD reflog read through `--git-dir=<admin dir>`, the old and new value check against `logs/HEAD` under files storage, the reftable keep rule, the `rev-list` guard over local branches and live tracking refs, and the rebase and bisect state read for `prunable` entries too; T9 passes (AC-04)
-- [ ] T11 `tests/vh-adlc/branches/branches.test.ts` - the AC-05 fixtures: deleted directories on a merged branch and detached at a default-branch commit (removed), and kept ones that are unmerged, emptied without `.git`, mid-rebase, with an admin `modules/` or with staged changes; they fail first (AC-05)
-- [ ] T12 `plugins/vh-adlc/scripts/branches/branches.ts` - Design item 4: `prunable` entry removal with no minimum age for detached ones, and the keep rules for a remaining directory, `modules/` and `diff-index --cached` exiting non-zero or failing; T11 passes (AC-05)
+- [ ] T11 `tests/vh-adlc/branches/branches.test.ts` - the AC-05 fixtures: deleted directories on a merged branch and detached at a default-branch commit (removed), and kept ones that are unmerged, emptied without `.git`, mid-rebase, with an admin `modules/` or with staged changes; also the AC-02 case of a branch on the default branch's first-parent history with an 8-day reflog, paused by `git rebase -i` with a `break` in its worktree, whose directory the test moves by hand, so that `plan` keeps the entry and the branch with reasons naming the rebase and the branch remains after `apply`; they fail first (AC-02, AC-05)
+- [ ] T12 `plugins/vh-adlc/scripts/branches/branches.ts` - Design item 4: `prunable` entry removal with no minimum age for detached ones, and the keep rules for a remaining directory, `modules/` and `diff-index --cached` exiting non-zero or failing; T11 passes (AC-02, AC-05)
 - [ ] T13 `tests/vh-adlc/branches/branches.test.ts` - the AC-07 `after-merge` cases and the AC-10 lock cases for `plan`: a clean PR worktree removed with its branch while an unrelated old detached worktree stays, and kept ones that hold ignored files, changes, locks, the main checkout, the `--repo` worktree or the working directory, with lock reasons in the kept records; they fail first (AC-07, AC-10)
 - [ ] T14 `plugins/vh-adlc/scripts/branches/branches.ts` - Design item 5: `after-merge` considers only the PR's branch and its worktree, keeps one holding ignored files with `holds ignored files; remove it through an approved plan`, keeps the `--repo` and working-directory worktrees, and every locked worktree's kept reason names its lock reason; T13 passes (AC-07, AC-10)
 - [ ] T15 `tests/vh-adlc/audit/ledger.test.ts`, `tests/vh-adlc/maintenance/publication.test.ts` - the ledger and report-candidate worktrees, fresh and resumed, show `locked vh-adlc <run-id>` in `git worktree list --porcelain`, and the ledger's cleanup unlocks and removes its worktree; they fail first (AC-10)
@@ -568,6 +571,7 @@ None.
 | 2026-11-12 | R-20 | spec | `7fc0022511b727c3828d94875357fbd4b66141a4` | claude-opus-4.8 | procedural | One should-fix finding; model self-reported, no model was requested. |
 | 2026-11-12 | R-21 | spec | `5f2f2d1f71c1fd673596a34a87cac7f80089f7f5` | unknown | procedural | No findings; the reviewer did not report its model. |
 | 2026-11-13 | R-21 | spec | `5f2f2d1f71c1fd673596a34a87cac7f80089f7f5` | n/a | n/a | accepted by owner |
+| 2026-11-14 | R-22 | spec | `9c44bf7bfe8289fab3d262548f58fe4a79f1249c` | unknown | procedural | One should-fix and two nit findings after covered drift; the reviewer did not report its model. |
 
 ### R-1
 
@@ -1203,3 +1207,26 @@ PROPOSAL: Keep a `prunable` entry, with a reason, when `git --git-dir=<admin dir
 ### R-21
 
 NO FINDINGS
+
+### R-22
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (last bullet of "These reasons come from the helper")
+EVIDENCE: The bullet cites `references/authority.md:34` and `references/authority.md:84`, and `skills/vh-adlc-ship/SKILL.md:108-109`, as the places that require the owner to ask for worktree cleanup. At 9c44bf7, `git show 9c44bf7:plugins/vh-adlc/references/authority.md | cat -n` puts the "Cleaning stale merged branches" row ("worktree removal needs the owner to ask for it") at line 35. The "removes completely clean worktrees only when the owner asked for worktree cleanup" sentence is now at lines 90-91, because the label-plan row (line 26) and the claim paragraph (lines 81-85) were added after 5f2f2d1. In the ship skill, the "Loop routes" section (lines 42-54) was added, so "stays until the owner asks for worktree cleanup" moved to lines 122-123. Lines 108-109 now hold the article and promotion handoff text. The other line references still match at 9c44bf7: branches.ts 117, 159, 161-162, 183-198, 192-193; branches.md 49 and 88-90; maintenance.md 156-157; and delivery.md 26-27 at d8f07c9.
+PROPOSAL: Change the citations to `references/authority.md:35`, `references/authority.md:90-91` and `skills/vh-adlc-ship/SKILL.md:122-123`, or name the commit the line numbers were taken from.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks (T3, T5, T9, T11), Test Plan AC-02 row
+EVIDENCE: The AC-02 Test Plan row includes this case: "Another has a branch on the default branch's first-parent history with an 8-day reflog, paused by `git rebase -i` with a `break` in its worktree, whose directory the test then moves by hand; `plan` keeps the entry and the branch with reasons naming the rebase, and the branch remains after `apply`." No task assigns this case. T3 covers only "the AC-01 and AC-02 fixtures from the Test Plan for Design item 1". T5 lists four apply-order fixtures, and none of them is this one. T9 covers detached worktrees. T11's "mid-rebase" case is the AC-05 row's "detached one paused mid-rebase whose directory the test deletes". The case also cannot go into T3. It needs Design item 2 (T8), so that an 8-day first-parent branch counts as proven merged. It also needs item 3's reading of `rebase-merge/head-name` for `prunable` entries (T10). Today branches.ts:117 reads that file only for entries that are not prunable. Placed in T3, it would block T4's done condition "T3 passes".
+PROPOSAL: Assign this AC-02 case to a test task that comes after T8, such as T9, or to a new test and implementation pair after T10, and name AC-02 among the criteria that task advances.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (last paragraph)
+EVIDENCE: The summary still ends with "A new independent review must pass before acceptance. Acceptance would authorize implementation on a feature branch". Its review history stops at R-20. The frontmatter says `status: planned` with "Accepted by the owner on 2026-11-13 after clean spec review R-21 at 5f2f2d1; tasks are next.". The Review Log has the R-21 `NO FINDINGS` row and the 2026-11-13 `accepted by owner` row, and the Tasks section is now filled in. feature-documents.md at d8f07c9 says to refresh the summary "when scope, proof or decisions change".
+PROPOSAL: Replace the closing sentences with a statement that R-21 found nothing and that the owner accepted the document on 2026-11-13. Say that implementation on the feature branch is next and that pushing, a PR, merging and releasing still each need their own approval.

@@ -1,0 +1,51 @@
+=== turn 1
+MODEL: claude-opus-5-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design
+EVIDENCE: The Design says "count.sh already parses a `--json` flag (count.sh:3), so the change only formats the existing count". At commit 86bbd04, count.sh:3 is `wc -l < "$1"` and the 3-line script parses no flags at all. Running `sh count.sh --json /tmp/fx.txt` on a three-line file printed `count.sh: line 3: --json: No such file or directory` and exited 1. An implementer who follows the Design and only adds formatting will not make AC-01 pass.
+PROPOSAL: Rewrite the Design to say that count.sh takes only a positional FILE today. State that the change adds parsing for `--json` (its position relative to FILE, and how unknown flags are handled) as well as the JSON formatting, and cite count.sh:2 and count.sh:3 for what exists now.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-02); Test Plan (AC-02 row)
+EVIDENCE: AC-02 reads "The output is formatted nicely." That end state cannot be observed or decided. Two careful implementers could reasonably build pretty-printed JSON, compact JSON or styled text, and any of them meets it. AC-01 already fixes the shape as `{"lines": N}`, so AC-02 adds no checkable requirement and may conflict with AC-01 if "nicely" means pretty-printing.
+PROPOSAL: Replace AC-02 with a concrete, observable end state, for example that the `--json` output is exactly one line holding a JSON object that parses, with no ANSI bytes and no surrounding whitespace other than a trailing newline. Alternatively, drop AC-02 and record why in the Review Log history.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan (AC-02 row)
+EVIDENCE: The AC-02 proof is "Read the output". It names no command, no input and no pass condition, so any output passes, including a wrong implementation. feature-documents.md "Test plan" says that "Proof names a real check: a test, a scenario with a pass condition, or a written manual procedure."
+PROPOSAL: Give AC-02 a proof with a command and an objective pass condition, for example `./count.sh --json fixture.txt | jq -e '.lines == 3'` together with a check that the output has no escape bytes. Keep it aligned with the reworded AC-02 from F-02.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary); Scope; Acceptance Criteria; Test Plan
+EVIDENCE: The Owner summary says "Text stays the default." and Scope says "Teh default output stays text." No criterion or Test Plan row checks that `count.sh FILE` without `--json` still prints the plain count. Adding flag parsing (see F-01) changes how arguments are read, so a broken default would still pass AC-01 and AC-02.
+PROPOSAL: Add a criterion that `count.sh FILE` without `--json` still prints the same plain line count as before. Add a Test Plan row that runs it on the three-line fixture and expects the current output of `wc -l`.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria
+EVIDENCE: The document does not say what `count.sh --json` does when FILE is missing, unreadable or not given. Implementers could print JSON errors on stdout, print text on stderr, or exit with different codes. The pinned conventions/terminal-output.md says to "Keep progress and diagnostics on the program's documented diagnostic stream so stdout remains usable as data" and that machine-readable formats keep stable contracts and exit codes. Today a missing file makes the shell print to stderr and exit 1.
+PROPOSAL: State the error behaviour in the Design, for example a diagnostic on stderr, nothing on stdout and a nonzero exit status. Add a criterion and a Test Plan row for a missing file under `--json`.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: Background says "its usage line is at count.sh:9". count.sh has 3 lines, and the usage comment `# usage: count.sh FILE` is at count.sh:2.
+PROPOSAL: Change the citation to count.sh:2.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Scope
+EVIDENCE: Scope says "Teh default output stays text."
+PROPOSAL: Correct "Teh" to "The".

@@ -1,0 +1,93 @@
+=== turn 1
+Conventions: vhco-pro/docs@1ccf8f3 (repository pin, AGENTS.md); prose edited with `guides/humanize-prose.md` at 1ccf8f3.
+
+I've stopped and am waiting for your answer to Q1. R-1 had one judgement finding, so I wrote it into the document as an Open Question and committed that. The two factual findings are not applied yet. Step 4 has them go in one commit together with your answer.
+
+## Commits
+
+- `0c97750` **Ask the owner how a timeout should exit (R-1 F-03).** It is local on `main` and not pushed, per the trial rules.
+
+## What changed
+
+All changes are in `docs/specs/feature.md`.
+- **Open Questions:** added Q1, which asks whether a timeout should exit 2 or 3. I recommend 2. Today probe.sh has one failure path (`curl -fsS`, `probe.sh:2`), so callers that treat any nonzero exit as unhealthy need no change. Option 3 would change Design, AC-01 and the Test Plan, and every caller would have to handle a second status.
+- **Owner summary:** added one line saying a decision is pending and that the other findings will be applied after it. This is in Context, outside the normative baseline.
+- **Not changed:** Scope, Design, Acceptance Criteria, Test Plan and `covers`. Because the baseline is unchanged, R-1 is still not stale.
+
+## Plan once you answer (one commit)
+
+- **F-01 (blocking, factual):** change the timeout from 5 to 10 seconds. The value must change in Design, AC-01 and the Owner summary together, because `tests/check-timeout.sh` fails unless the `--max-time` value in Design equals the value in AC-01. The stub's 12-second sleep is still longer than 10 seconds, so that Test Plan row stays valid.
+  - **Caveat:** the finding's evidence says the endpoint takes up to 8 seconds to warm up. The line it cites, `probe.sh:2`, only shows the curl call; it doesn't show that number. I'll apply F-01 as a factual finding unless you tell me otherwise, but nothing in the repository backs the 8-second figure.
+- **F-02 (should-fix, factual):** remove `--legacy` from Design. It behaves exactly like running with no flag. When removing a mechanism and keeping one with the same behavior both meet a finding, the skill says to remove it, so this needs no question.
+- **Your Q1 answer:** if you choose 3, I'll change the exit status in Design, AC-01, the Test Plan and the summary. Then I'll remove Q1.
+
+## Behaviors and checks walked
+
+**Behaviors:**
+- the health-check timeout value
+- the exit status when a check times out
+- the `--legacy` flag
+- the exit status for other failures
+
+**Checks:**
+- **`tests/check-timeout.sh`:** I re-read it. It compares the `--max-time` value in Design with the value in AC-01, and it passes at `0c97750`.
+- **Test Plan scenario for AC-01:** a stub endpoint that sleeps 12 seconds should make probe.sh exit 2. It still holds under F-01, and it changes only if you choose 3.
+
+## Nit rule
+
+The resolved `conventions/feature-documents.md` states the nit rule. R-1 had no nits, so there are none to list.
+
+## vh-adlc results acted on
+
+- **`knowledge`:** `result: "answered"`, source repository, revision 1ccf8f3, feature root `docs/specs/`.
+- **`lint`:** `result: "pass"` with no findings, run before the commit.
+- **`fresh`:**
+  - `result: "answered"`; spec review R-1 at `f51f718` is not stale.
+  - The implementation review shows `no-review`, which is expected for a draft.
+- **`next`:** `result: "answered"`, `action: "owner decision"`, because Open Questions holds 1 unanswered question.
+
+## What's left
+
+- Your answer to Q1.
+- After that, the single revision commit for F-01, F-02 and your answer.
+- R-1 is a blocking pass. Only a new independent review at the new commit clears it, and I'm not dispatching one under the trial rules.
+
+=== turn 2
+Conventions: vhco-pro/docs@1ccf8f3 (repository pin, AGENTS.md); prose edited with `guides/humanize-prose.md` at 1ccf8f3.
+
+R-1's findings and your answer are now applied in one commit on `main`, and `tests/check-timeout.sh` still passes. The document now needs a new spec review, which the trial rules leave to you.
+
+## Commit
+
+- `dc3613b` **Apply R-1: 10 second timeout, drop --legacy, timeout exits 2.** It is local on `main` and not pushed.
+
+## What changed
+
+All changes are in `docs/specs/feature.md`.
+- **F-01:** the timeout is now 10 seconds instead of 5. I changed it in Design (`--max-time 10`), AC-01 and the Owner summary together, so no place still says 5.
+- **F-02:** removed the `--legacy` flag from Design. It behaved exactly like running with no flag, so removing it changes no behavior.
+- **F-03 (your answer):** a timeout exits 2. Design already said that, so the wording stays and Q1 is removed. Open Questions now says "None."
+- **Owner summary:** rewritten to describe the 10-second limit, what this revision changed, and what is still unproven.
+
+## Checks
+
+- **`tests/check-timeout.sh`:** prints `PASS`. Design and AC-01 both say 10.
+- **Test Plan scenario for AC-01:** unchanged. The stub sleeps 12 seconds, which is still longer than 10, and it expects exit 2, which matches your answer.
+- **`vh-adlc lint`:** `result: "pass"`.
+- **`vh-adlc fresh`:** reports R-1 stale with `baseline-changed`. That is expected after a normative revision.
+- **`vh-adlc next`:** returns `action: "spec review"`.
+
+## Still open
+
+- **New spec review:** R-1 was a blocking pass. Only a new independent review at `dc3613b` can clear it, and the trial rules have me not start one.
+- **The 8-second warm-up figure:** Design and the summary now attribute it to R-1 F-01. The line that finding cites, `probe.sh:2`, doesn't show the number.
+- **Nits:** R-1 had none, so there are none to list.
+
+## Owner-facing summary
+
+- **Problem and behavior:** probe.sh waits on the health endpoint with no time limit (`probe.sh:2`). After this change, it gives up after 10 seconds and exits 2, which leaves room for the endpoint's warm-up.
+- **Scope:** only the timeout is in scope; retries are out. The `--legacy` flag is gone.
+- **Validation:**
+  - **Planned:** a stub endpoint that sleeps 12 seconds should make probe.sh exit 2. That scenario hasn't run, because nothing is implemented yet.
+  - **Observed:** only the document-consistency check, which passes.
+- **What's next:** a fresh spec review. Then I ask you to accept, which would allow moving the document to `planned`. Building and pushing each need separate approval.

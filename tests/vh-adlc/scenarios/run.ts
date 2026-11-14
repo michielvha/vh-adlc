@@ -9,7 +9,7 @@
 
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { accept, addCI, AGENT_NAME, agentHome, build, claim, gh, SHIP_REPO, shipIssue, toGitHub, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, OTHER_FEATURE_BRANCH, OTHER_FEATURE_PATH, plan, prepareOtherFeature, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
 import { CLAUDE_TOKEN, claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
@@ -1106,6 +1106,199 @@ const PHASE5: Scenario[] = [
   },
 ];
 SCENARIOS.push(...PHASE5);
+
+// ---- Review convergence (docs/specs/spec-review-convergence.md) ----
+
+const CONVERGENCE = join(ROOT, "tests", "vh-adlc", "evidence", "review-convergence");
+
+// scriptedPlugin copies plugin A and replaces its reviewer with the scripted stand-in, which returns the
+// canned record for the next pass from evidence/review-convergence/canned/<name>/pass-N.txt.
+function scriptedPlugin(f: Fixtures, name: string): string {
+  const copy = join(f.dir, `plugin-scripted-${name}`);
+  cpSync(f.pluginA, copy, { recursive: true });
+  const template = readFileSync(join(CONVERGENCE, "scripted-reviewer.agent.md"), "utf8");
+  writeFileSync(join(copy, "agents", "vh-adlc-reviewer.agent.md"), template.replaceAll("{{CANNED}}", join(CONVERGENCE, "canned", name)));
+  return copy;
+}
+
+// The session PATH leaves out /usr/local/bin: a system vh-adlc there with the locked version but another
+// digest makes the installer refuse the fixture copy's own lock (see S16.drift's first run).
+const SCENARIO_PATH = [join(homedir(), ".bun", "bin"), "/usr/bin", "/bin"].join(":");
+
+// reviewLogCommits lists the commits of the spec and implementation review rows, without acceptance rows.
+function reviewLogCommits(doc: string): string[] {
+  return doc
+    .split("\n")
+    .filter((l) => /^\| \d{4}-\d{2}-\d{2} \| R-\d+ \|/.test(l) && !l.includes("accepted by owner"))
+    .map((l) => l.split("|")[4]?.trim().replaceAll("`", "").replace(/\+dirty$/, ""))
+    .filter((x): x is string => !!x && /^[0-9a-f]{7,40}$/.test(x));
+}
+
+const CONVERGENCE_SCENARIOS: Scenario[] = [
+  {
+    // AC-10: default-branch drift during a review loop on a feature branch comes in by merge, so every
+    // commit the Review Log names stays reachable. A guard: today's review mode already merges here.
+    id: "S16.drift",
+    title: "Drift during a feature-branch review loop comes in by merge",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      plan(f);
+      const owning = claim(f);
+      pushFromElsewhere(f, "greet.sh", '#!/bin/sh\necho "Hello, world."\n# drift from another session\n', "chore: touch greet.sh from elsewhere");
+      const plugin = scriptedPlugin(f, "drift");
+      const turns = session(f, [plugin], [
+        `/vh-adlc-spec review ${FEATURE_PATH}. ${HANDOFF} The default branch moved under this feature; bring it in as the procedure says and run a fresh spec review.`,
+      ], { cwd: owning, env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
+          const tip = rev(f, FEATURE_BRANCH);
+          const main = rev(f, "origin/main");
+          const reviewed = reviewLogCommits(doc);
+          const freshCalls = c.log().filter((x) => words(x.args)[0] === "fresh");
+          const unreachable = freshCalls.some((x) => JSON.stringify(x.json ?? {}).includes("commit-unreachable"));
+          return [
+            { name: "the feature branch holds the moved default branch", ok: !!tip && !!main && ancestor(f, main, tip) },
+            { name: "no rewrite: the claim commit is still on the feature branch", ok: !!tip && reviewed.length > 0 && ancestor(f, reviewed[0], tip) },
+            { name: "a second spec review row was stored", ok: reviewed.length >= 2, detail: reviewed.join(", ") },
+            { name: "every commit the Review Log names is an ancestor of the branch tip", ok: !!tip && reviewed.length > 0 && reviewed.every((x) => ancestor(f, x, tip)) },
+            { name: "fresh never reported commit-unreachable", ok: freshCalls.length > 0 && !unreachable },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    // AC-11: with the new convention, a pass's nits ride along with its blocking fix in one commit, no nit
+    // becomes an Open Question, and a later pass's lone nit is listed in the conversation, not applied.
+    id: "S16.nits",
+    title: "Nits ride along with a blocking fix and are otherwise listed, not applied",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      const plugin = scriptedPlugin(f, "nits");
+      // One prompt: the blocking pass makes the session run pass 2 itself, and the canned records stop there.
+      const turns = session(f, [plugin], [`/vh-adlc-spec review ${FEATURE_PATH}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const body = doc.split(/^## Review Log$/m)[0];
+          const openQuestions = section(doc, "Open Questions");
+          // Oldest first: the agent commits that change the normative baseline, and what each adds.
+          // The review records quote the nit texts, so only the body before the Review Log counts, and code
+          // formatting is ignored (an author may write `test.sh`).
+          const at = (ref: string) => show(f, ref, FEATURE_PATH) ?? "";
+          const prose = (doc: string) => doc.split(/^## Review Log$/m)[0].replaceAll("`", "");
+          const nitTexts = ["./greet.sh <name>", "exactly one name argument", "test.sh checks the output"];
+          const changing = agentLog(f, f.project, "--reverse", "--all").filter((x) => normative(at(x.hash)) !== normative(at(`${x.hash}^`)));
+          const fix = changing[0];
+          const before = fix ? prose(at(`${fix.hash}^`)) : "";
+          const atFix = fix ? prose(at(fix.hash)) : "";
+          const reports = turns.map((t) => t.result).join("\n");
+          return [
+            { name: "exactly two review passes were stored", ok: /### R-1\b/.test(doc) && /### R-2\b/.test(doc) && !/### R-3\b/.test(doc) },
+            { name: "the blocking fix landed", ok: body.includes('greet.sh ""') },
+            {
+              name: "one agent commit changes the normative baseline, adding the blocking fix and all three pass-1 nits together",
+              ok: changing.length === 1 && !before.includes('greet.sh ""') && atFix.includes('greet.sh ""') && nitTexts.every((t) => !before.includes(t) && atFix.includes(t)),
+              detail: changing.map((x) => x.subject).join(" | "),
+            },
+            { name: "no nit became an Open Question", ok: !/^### Q\d+/m.test(openQuestions) },
+            { name: "the pass-2 nit is not applied outside the review records", ok: !body.includes("or any flag") },
+            { name: "the report lists the pass-2 nit by its IDs", ok: /R-2[^\n]{0,160}F-01|F-01[^\n]{0,160}R-2/.test(reports) && /flag/i.test(reports) },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    // AC-06 procedure case: on a repository pinned to the docs revision before the severity definitions,
+    // a clean pass's lone factual nit is still applied as today, and the report names the needed pin.
+    id: "S16.oldpin",
+    title: "An older docs pin keeps today's nit handling and names the needed pin",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      writePin(f, f.revisionPrevious);
+      const plugin = scriptedPlugin(f, "oldpin");
+      const turns = session(f, [plugin], [`/vh-adlc-spec review ${FEATURE_PATH}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const body = doc.split(/^## Review Log$/m)[0];
+          const reports = turns.map((t) => t.result).join("\n");
+          const resolved = c.log().filter((x) => words(x.args)[0] === "knowledge").map((x) => x.json?.knowledge?.revision);
+          return [
+            { name: "knowledge resolved the previous pin", ok: resolved.length > 0 && resolved.every((r) => r === f.revisionPrevious) },
+            { name: "a review pass was stored", ok: /### R-1\b/.test(doc) },
+            { name: "the lone factual nit was applied as today", ok: body.includes("./greet.sh <name>") },
+            { name: "the report names the plugin's own pin", ok: reports.includes(f.revisionA.slice(0, 7)) },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    // AC-06, beyond the Test Plan row: on the previous pin a clean pass's lone judgement nit becomes an Open
+    // Question for the owner, as today, instead of being applied under a nit rule the page does not define.
+    id: "S16.oldpin-judgement",
+    title: "An older docs pin still turns a judgement nit into an Open Question",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      writePin(f, f.revisionPrevious);
+      const plugin = scriptedPlugin(f, "oldpin-judgement");
+      const turns = session(f, [plugin], [`/vh-adlc-spec review ${FEATURE_PATH}. ${HANDOFF}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const resolved = c.log().filter((x) => words(x.args)[0] === "knowledge").map((x) => x.json?.knowledge?.revision);
+          return [
+            { name: "knowledge resolved the previous pin", ok: resolved.length > 0 && resolved.every((r) => r === f.revisionPrevious) },
+            { name: "a review pass was stored", ok: /### R-1\b/.test(doc) },
+            { name: "the judgement nit is an Open Question", ok: /^### Q\d+/m.test(section(doc, "Open Questions")) },
+            { name: "the judgement nit was not applied", ok: !section(doc, "Scope").includes("exactly one name argument") },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    // AC-06 reviewer case: the failure-mode check relies on no convention text, so the real reviewer still
+    // asks it on a repository pinned to the previous docs revision.
+    id: "S16.oldpin-reviewer",
+    title: "On an older docs pin the reviewer still raises a failure-mode gap",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      editFeature(f, "keeps printing \`Hello, world.\`", "keeps printing \`Hello, world.\` Every run also appends the name to the shared file names.log, which parallel CI runs on one host write at the same time.", "fixture: seed a failure-mode gap");
+      writePin(f, f.revisionPrevious);
+      const turns = session(f, [f.pluginA], [`/vh-adlc-spec review ${FEATURE_PATH}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const records = doc.split(/^### R-1$/m)[1] ?? "";
+          return [
+            { name: "a review pass was stored", ok: records.trim() !== "" },
+            { name: "the records raise the concurrency gap on names.log", ok: /names\.log/.test(records) && /(concurren|parallel|lock|interleav|simultaneous)/i.test(records) },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+];
+SCENARIOS.push(...CONVERGENCE_SCENARIOS);
 
 // ---- Phase 6: review ----
 
