@@ -312,18 +312,21 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
     const upstream = checkout.git(["for-each-ref", "--format=%(upstream)", `refs/heads/${branch}`]).trim();
     const name = upstream.startsWith("refs/remotes/origin/") ? upstream.slice("refs/remotes/origin/".length) : branch;
     if (branch === defaultBranch || (only && !only(branch) && !only(name))) continue;
-    const r = proof(oid, name), tree = trees.find(t => t.branch === branch);
-    if (tree) seen.add(tree);
+    // `git worktree add --force` can check one branch out in several worktrees.
+    const r = proof(oid, name), on = trees.filter(t => t.branch === branch);
+    for (const tree of on) seen.add(tree);
     if (!r.proof) {
       keep("local", branch, r.reason!);
-      if (tree) keepTree(tree, assess(context, tree, trees, [`its branch is kept: ${r.reason}`]).reasons);
+      for (const tree of on) keepTree(tree, assess(context, tree, trees, [`its branch is kept: ${r.reason}`]).reasons);
       continue;
     }
-    if (tree) {
+    const held: string[] = [];
+    for (const tree of on) {
       const { reasons, ignored } = assess(context, tree, trees);
-      if (reasons.length) { keepTree(tree, reasons); keep("local", branch, `merged but checked out in a kept worktree (${tree.path}): ${reasons.join("; ")}`); continue; }
-      plan.operations.push({ kind: "remove-worktree", path: tree.path, branch, oid, proof: r.proof, ignored });
+      if (reasons.length) { keepTree(tree, reasons); held.push(`merged but checked out in a kept worktree (${tree.path}): ${reasons.join("; ")}`); }
+      else plan.operations.push({ kind: "remove-worktree", path: tree.path, branch, oid, proof: r.proof, ignored });
     }
+    if (held.length) { keep("local", branch, held.join("; ")); continue; }
     plan.operations.push({ kind: "delete-local", branch, oid, proof: r.proof });
   }
   // Linked worktrees that no branch above covers: detached, on the default branch or on an unborn branch.
@@ -383,13 +386,14 @@ function perform(checkout: Checkout, op: Operation, run: Run): Outcome {
 
 /** Re-observe, then perform each approved operation only if a fresh plan still proposes it unchanged. */
 function execute(options: Options, approved: Operation[], only?: (branch: string) => boolean, merged?: Pull): Outcome[] {
-  const fresh = observe(options, only, merged), run = options.run ?? spawn, outcomes: Outcome[] = [], blocked = new Set<string>();
+  const fresh = observe(options, only, merged), run = options.run ?? spawn, outcomes: Outcome[] = [], removed = new Set<string>();
   for (const op of approved) {
-    if (op.kind === "delete-local" && blocked.has(op.branch)) { outcomes.push({ operation: op, status: "failed", detail: "its worktree was not removed" }); continue; }
     if (!fresh.plan.operations.some(candidate => same(candidate, op))) { outcomes.push({ operation: op, status: absent(fresh, op) ? "already-absent" : "changed" }); continue; }
-    if (op.kind === "remove-worktree" && !unchanged(fresh, op)) { outcomes.push({ operation: op, status: "changed" }); if (op.branch) blocked.add(op.branch); continue; }
+    // `git update-ref -d` deletes a branch even while a worktree has it checked out.
+    if (op.kind === "delete-local" && !fresh.worktrees.filter(t => t.branch === op.branch).every(t => removed.has(t.path))) { outcomes.push({ operation: op, status: "failed", detail: "its worktree was not removed" }); continue; }
+    if (op.kind === "remove-worktree" && !unchanged(fresh, op)) { outcomes.push({ operation: op, status: "changed" }); continue; }
     const outcome = perform(fresh.checkout, op, run);
-    if (outcome.status === "failed" && op.kind === "remove-worktree" && op.branch) blocked.add(op.branch);
+    if (outcome.status === "done" && op.kind === "remove-worktree") removed.add(op.path);
     outcomes.push(outcome);
   }
   return outcomes;
