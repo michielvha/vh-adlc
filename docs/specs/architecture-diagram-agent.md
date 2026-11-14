@@ -101,6 +101,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | --- | --- | --- | --- | --- | --- | --- |
 
 | 2026-11-14 | R-1 | spec | `ed00017463b84fed13b97546271f7bda6dd299e1` | unknown | procedural | Six should-fix findings |
+| 2026-11-14 | R-2 | spec | `7a0263ea494dd46d0145a2392e691df045558111` | unknown | procedural | Two should-fix findings and one nit |
 
 ### R-1
 
@@ -145,6 +146,29 @@ SEVERITY: should-fix
 WHERE: Frontmatter covers, Design > Delivery, Acceptance Criteria AC-01, Test Plan AC-01
 EVIDENCE: Both catalogs at the reviewed commit resolve the same package path. The draft makes both native catalog installs part of the feature and its proof, but `covers` omits `.agents/plugins/marketplace.json` and `.claude-plugin/marketplace.json`. Changing either source can invalidate the claimed discovery behavior without changing a listed path. The pinned standard requires `covers` to include every path whose change can affect the feature.
 PROPOSAL: Include the two marketplace catalogs in `covers` and account for any separate runtime or asset paths introduced by the decision in F-03.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context > Owner summary, Design > Editable diagram and export, Acceptance Criteria AC-03, Test Plan AC-03
+EVIDENCE: AC-03 requires the SVG delivered to the user to match the editable file. The proof compares two offline re-exports of the original and inspects an SVG for visual defects. It never requires comparing the delivered SVG to either re-export. A skill can return a valid but stale SVG while both reference exports match each other and all three images pass visual inspection.
+PROPOSAL: Compare the SVG delivered by each native session with a reference export of that session's delivered draw.io file using the recorded settings. Keep the second export if it serves a separate repeatability check.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Editable diagram and export, Test Plan AC-03 and AC-04, Sources
+EVIDENCE: The revised setup requires expected hashes before use. The fixture setup specifies the Desktop version and a commit-pinned AWS index but identifies the OCI input only through a mutable Oracle toolkit landing page. The proof preserves observed hashes after rendering and never checks an incorrect hash. Two runs can use different OCI inputs while satisfying that description, and a hash check that accepts any present file can pass the missing-prerequisite scenario.
+PROPOSAL: Require the committed fixture setup to declare the expected SHA-256 of the OCI archive or chosen library before either native run, and compare the installed input against it. Exercise a supplied asset with the wrong hash and require the same preservation behavior as for a missing asset.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Owner summary, Sources
+EVIDENCE: The summary states that both prototypes exported with networking disabled. Sources links the Desktop release, which establishes the tool identity but cannot establish that execution. The resolved feature-document standard calls for a source or command and observed result for Context claims.
+PROPOSAL: Cite the prototype export command and observed result in Background or link to the recorded evidence. Keep the claim limited to the prototypes.
 
 ## Sources
 
