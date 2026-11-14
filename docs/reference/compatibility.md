@@ -169,7 +169,7 @@ The primary session never substitutes self-review for independence.
 Review severities, the nit rule and one revision per pass need plugin 0.19.0 and a resolved docs
 revision of `1ccf8f3` or later. When a repository pins an earlier revision, the
 reviewer and the spec operation keep their previous behavior: findings are rated without the shared
-definitions and every nit is applied.
+definitions, a factual nit is applied and a judgement nit becomes an Open Question.
 
 ## Article operation
 

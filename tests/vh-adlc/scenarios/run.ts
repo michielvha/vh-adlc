@@ -1180,30 +1180,33 @@ const CONVERGENCE_SCENARIOS: Scenario[] = [
     run: async (f) => {
       editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
       const plugin = scriptedPlugin(f, "nits");
-      const turns = session(f, [plugin], [
-        `/vh-adlc-spec review ${FEATURE_PATH}`,
-        "The owner here: run the next spec review pass on the revised document.",
-      ], { env: { PATH: SCENARIO_PATH } });
+      // One prompt: the blocking pass makes the session run pass 2 itself, and the canned records stop there.
+      const turns = session(f, [plugin], [`/vh-adlc-spec review ${FEATURE_PATH}`], { env: { PATH: SCENARIO_PATH } });
       return {
         turns,
         checks: (c) => {
           const doc = c.file(FEATURE_PATH) ?? "";
           const body = doc.split(/^## Review Log$/m)[0];
           const openQuestions = section(doc, "Open Questions");
-          const fixed = agentLog(f, f.project).find((x) => (show(f, x.hash, FEATURE_PATH) ?? "").includes('greet.sh ""'));
-          const atFix = fixed ? (show(f, fixed.hash, FEATURE_PATH) ?? "") : "";
+          // Oldest first: the agent commits that change the normative baseline, and what each adds.
+          const at = (ref: string) => show(f, ref, FEATURE_PATH) ?? "";
+          const nitTexts = ["./greet.sh <name>", "exactly one name argument", "test.sh checks the output"];
+          const changing = agentLog(f, f.project, "--reverse", "--all").filter((x) => normative(at(x.hash)) !== normative(at(`${x.hash}^`)));
+          const fix = changing[0];
+          const before = fix ? at(`${fix.hash}^`) : "";
+          const atFix = fix ? at(fix.hash) : "";
           const reports = turns.map((t) => t.result).join("\n");
           return [
-            { name: "two review passes were stored", ok: /### R-1\b/.test(doc) && /### R-2\b/.test(doc) },
+            { name: "exactly two review passes were stored", ok: /### R-1\b/.test(doc) && /### R-2\b/.test(doc) && !/### R-3\b/.test(doc) },
             { name: "the blocking fix landed", ok: body.includes('greet.sh ""') },
             {
-              name: "the commit with the blocking fix also fixes all three pass-1 nits",
-              ok: !!fixed && atFix.includes("./greet.sh <name>") && atFix.includes("exactly one name argument") && atFix.includes("test.sh checks the output"),
-              detail: fixed?.subject,
+              name: "one agent commit changes the normative baseline, adding the blocking fix and all three pass-1 nits together",
+              ok: changing.length === 1 && !before.includes('greet.sh ""') && atFix.includes('greet.sh ""') && nitTexts.every((t) => !before.includes(t) && atFix.includes(t)),
+              detail: changing.map((x) => x.subject).join(" | "),
             },
             { name: "no nit became an Open Question", ok: !/^### Q\d+/m.test(openQuestions) },
             { name: "the pass-2 nit is not applied outside the review records", ok: !body.includes("or any flag") },
-            { name: "the report lists the pass-2 nit", ok: /R-2/.test(reports) && /F-01/.test(reports) && /flag/i.test(reports) },
+            { name: "the report lists the pass-2 nit by its IDs", ok: /R-2[^\n]{0,160}F-01|F-01[^\n]{0,160}R-2/.test(reports) && /flag/i.test(reports) },
             unrelatedIntact(c),
           ];
         },
@@ -1233,6 +1236,33 @@ const CONVERGENCE_SCENARIOS: Scenario[] = [
             { name: "a review pass was stored", ok: /### R-1\b/.test(doc) },
             { name: "the lone factual nit was applied as today", ok: body.includes("./greet.sh <name>") },
             { name: "the report names the plugin's own pin", ok: reports.includes(f.revisionA.slice(0, 7)) },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    // AC-06, beyond the Test Plan row: on the previous pin a clean pass's lone judgement nit becomes an Open
+    // Question for the owner, as today, instead of being applied under a nit rule the page does not define.
+    id: "S16.oldpin-judgement",
+    title: "An older docs pin still turns a judgement nit into an Open Question",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      writePin(f, f.revisionPrevious);
+      const plugin = scriptedPlugin(f, "oldpin-judgement");
+      const turns = session(f, [plugin], [`/vh-adlc-spec review ${FEATURE_PATH}. ${HANDOFF}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const resolved = c.log().filter((x) => words(x.args)[0] === "knowledge").map((x) => x.json?.knowledge?.revision);
+          return [
+            { name: "knowledge resolved the previous pin", ok: resolved.length > 0 && resolved.every((r) => r === f.revisionPrevious) },
+            { name: "a review pass was stored", ok: /### R-1\b/.test(doc) },
+            { name: "the judgement nit is an Open Question", ok: /^### Q\d+/m.test(section(doc, "Open Questions")) },
+            { name: "the judgement nit was not applied", ok: !section(doc, "Scope").includes("exactly one name argument") },
             unrelatedIntact(c),
           ];
         },
