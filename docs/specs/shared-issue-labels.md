@@ -364,9 +364,10 @@ once would make each other's reviews stale. So:
       the standard color and description, and no issue in either lost a label.
 - [ ] AC-10: The workflows user guide describes the standard label set and the helper, and the
       authority reference has the row for applying a label plan.
-- [ ] AC-11: A plugin installed from the branch's marketplace package, in an isolated profile,
+- [x] AC-11: A plugin installed from the branch's marketplace package, in an isolated profile,
       contains the labels helper and vocabulary file, both manifests carry the bumped version, and the
       installed `plan` produces the same label plan as the source helper for the same fixture.
+      Evidence: `tests/vh-adlc/labels/evidence/candidate-install.md`, source 661f5d0: Claude Code 2.1.325 installed vh-adlc@labels-candidate from a local catalog into a fresh credential-free profile; the cache holds `scripts/labels/` and `vocabulary.json`, both manifests read 0.19.0, and installed and source `plan` outputs are byte-identical on the same fake GitHub. Local catalog only; no published marketplace checked.
 
 ## Test Plan
 
@@ -426,7 +427,8 @@ shared-development-loop).
       Evidence: `vh-adlc settings read --stdin < .vh-adlc/triage.yaml`: answered with the declared values. `bun plugins/vh-adlc/scripts/triage/cli.ts settings --repo .`: configured true from `.vh-adlc/triage.yaml`. A read-only `collect --mode sweep` against michielvha/vh-adlc collected 10 issues and 11 labels with every collection complete, and `report --report-output /tmp/sil-t15/report.md` saved outside the checkout; `git status` showed only the new settings file.
 - [x] T16 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - minor version bump from the current merged version (0.18.0 at `da736bc`, so 0.19.0 unless main moves again); `bun test tests/vh-adlc --timeout 60000`, `go test ./...`, `go vet ./...`, `golangci-lint run` and `go mod tidy -diff` pass (AC-11)
       Evidence: Manifests 0.18.1 to 0.19.0. `bun test tests/vh-adlc --timeout 60000`: 1615 pass, 0 fail across 136 files. `go test ./...` ok; `go vet ./...` exit 0; golangci-lint v2.15.0 (installed to a temporary GOBIN) `config verify` exit 0 and `run` 0 issues; `go mod tidy -diff` exit 0.
-- [ ] T17 `tests/vh-adlc/labels/evidence/candidate-install.md` - the AC-11 procedure run on the branch head: installed files listed, both manifest versions compared, installed and source `plan` outputs byte-identical (AC-11)
+- [x] T17 `tests/vh-adlc/labels/evidence/candidate-install.md` - the AC-11 procedure run on the branch head: installed files listed, both manifest versions compared, installed and source `plan` outputs byte-identical (AC-11)
+      Evidence: Procedure run on 661f5d0 and recorded in `tests/vh-adlc/labels/evidence/candidate-install.md`: isolated credential-free install of vh-adlc@labels-candidate succeeded; the installed cache holds the labels helper, vocabulary and reference; both manifests read 0.19.0; installed and source `plan` outputs are byte-identical (SHA-256 fb2418a7...) with only GET calls.
 - [ ] T18 `tests/vh-adlc/labels/evidence/rollout-vh-adlc.md` - owner-approved `plan` and `apply` on `michielvha/vh-adlc` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
 - [ ] T19 `tests/vh-adlc/labels/evidence/rollout-stackweaver.md` - owner-approved `plan` and `apply` on `michielvha/stackweaver` with complete before and after issue snapshots, receipt and `gh label list` recorded (AC-09)
 
