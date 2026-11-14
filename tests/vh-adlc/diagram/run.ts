@@ -112,7 +112,7 @@ This is a synthetic fixture. Do not change sources.md, the installed package, Gi
     writeFileSync(join(run, "prompt.txt"), prompt);
     const argv = host === "codex"
       ? ["codex", "exec", "--json", "--ephemeral", "--skip-git-repo-check", "--sandbox", "workspace-write", "-c", "sandbox_workspace_write.network_access=false", "-C", project, prompt]
-      : ["claude", "-p", "--output-format", "stream-json", "--verbose", "--strict-mcp-config", "--permission-mode", "acceptEdits", "--allowedTools", "Read,Write,Edit,Glob,Grep,Skill,Bash", prompt];
+      : ["claude", "-p", "--output-format", "stream-json", "--verbose", "--strict-mcp-config", "--permission-mode", "acceptEdits", "--allowedTools", "Read,Write,Edit,Glob,Grep,Skill,Bash", "--", prompt];
     const transcript = join(run, "transcript.jsonl");
     const outcome = await runOwnedClient(argv, { cwd: project, env, stdout: transcript, stderr: join(run, "host.stderr") }, { timeout_ms: 720_000, grace_ms: 500, reap_ms: 2000 });
     const raw = readFileSync(transcript, "utf8");
