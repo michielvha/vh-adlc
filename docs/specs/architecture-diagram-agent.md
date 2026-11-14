@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing the shared diagram skill and native-host fixtures."
+status: draft
+status_description: "Revising coverage for the shared plugin checker."
 issue: null
 branch: feat/architecture-diagram-agent
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
