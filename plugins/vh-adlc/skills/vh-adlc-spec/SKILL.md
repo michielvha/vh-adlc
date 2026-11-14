@@ -97,7 +97,7 @@ outcome is stored like a host reviewer's records, and a `pending` outcome leaves
    cleared only by a new independent pass at the new commit.
 
    The nit rule applies when the resolved `conventions/feature-documents.md` states it: its Review log
-   section says a nit on the normative baseline never causes a revision on its own. A page that only
+   section says that a baseline nit alone never triggers a revision. A page that only
    lists `nit` as a record value does not state it. When it applies, follow it in that same commit: fix
    every nit of the pass, factual or judgement and in any section, only when the pass's blocking or
    should-fix findings change the normative baseline, and never a free-text widening nit. Raise no nit as an Open Question. List every nit you did not apply, from every pass this run
