@@ -341,6 +341,7 @@ reviewer removes (F-10).
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-14 | R-1 | spec | `409d32d` | claude-opus-5-5 | procedural | Blocking: the command review route cannot carry the new dispatch or rerun agent sessions; eleven should-fix findings |
 | 2026-11-14 | R-2 | spec | `0442f4d` | claude-opus-5-5 | procedural | Clean: no blocking finding; ten should-fix findings and two nits |
+| 2026-11-14 | R-3 | spec | `6a90dae` | claude-opus-5-5 | procedural | Clean: no blocking finding; seven should-fix findings |
 
 ### R-1
 
@@ -520,3 +521,54 @@ SEVERITY: nit
 WHERE: Design, Keeping transcripts
 EVIDENCE: Redaction replaces "the home directory" in committed transcripts, yet the committed manifest names the raw files "at a path the manifest names", which on the running machine is usually under that home directory. The working example's manifest records hashes but no raw path (tests/vh-adlc/evidence/review-convergence/trials/runs/manifest.json), and collect.py redacts the home directory as `~` (collect.py:21-25).
 PROPOSAL: Say the manifest's raw path is redacted the same way, with the home directory as `~`.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, The reviewer (second sentence); Design, Keeping transcripts (last sentence); Context, Owner summary (fourth bullet); AC-02
+EVIDENCE: The design says "A run killed by the route's timeout leaves its run directory behind, and the review report names it." On the command route, a timeout kills every reviewer process in the PID namespace (plugins/vh-adlc/references/loop-settings.md:117-119). runReviewRoute then returns `{ status: "pending", reason: "the reviewer command timed out", reply }` (plugins/vh-adlc/scripts/loop/review-route.ts:242) and stores nothing. The reviewer is dead, so it cannot write a report, and the route's JSON does not know the run directory, so no report can name it. That directory holds the copied Claude Code login, because "A runner keeps copied logins and session profiles inside its run directory", and nothing removes it or names it to the owner. The Owner summary says only that the reviewer "removes its run directory afterwards", which leaves out that a credential can stay behind in the system temp directory. This sentence was added in this revision in answer to R-2 F-10.
+PROPOSAL: Make the leftover observable by something that survives the kill. For example, the runner creates its run directory under a fixed, recognizable prefix, and the review operation or the next run removes stale ones and reports them, or the route reports the prefix on a timeout. Then state the leftover credential in the Owner summary.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-04 row ("writes outside the checkout, and keeps redacted transcripts with a transcript manifest under tests/vh-adlc/evidence/agent-proofs/trials/runs/"); Design, Glossary (Runner); Design, Keeping transcripts; Design, Implement; Design, The reviewer
+EVIDENCE: The glossary defines a runner as "writing only outside it", and the reviewer runs each runner and must leave the tree unchanged. The AC-04 row has the same runner both write outside the checkout and keep redacted transcripts and the manifest in a tracked directory. No design section names the step that copies redacted transcripts into the tree. The working example splits this: run.ts writes only to its output directory, and a separate collect.py copies redacted transcripts and writes manifest.json into the evidence directory (tests/vh-adlc/evidence/review-convergence/trials/collect.py:4-11). If a runner writes into runs/ itself, a command-route reviewer's rerun changes the private clone, and the route returns pending (review-route.ts:240-241). A host-route rerun overwrites the implementer's evidence. Also, runs/ sits under trials/ next to run.ts and build.py. A runner that declares trials/ as one tree input voids its own run when the transcripts are committed there.
+PROPOSAL: Name a separate collect step that only the implement operation runs to write redacted copies and the manifest into the tree, and say the reviewer never runs it. Alternatively, put the committed evidence outside any directory a runner may declare as an input.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Transcripts and `met`; Design, A run counts for its inputs; Design, The reviewer (last sentence); Design, Glossary (Transcript manifest; Proof that needs a person); AC-01; AC-02 (last clause); Context, Owner summary (fifth bullet)
+EVIDENCE: The rule that "a run counts only while every input still has the recorded id" is stated for runners. A proof that needs a person has a written procedure and no runner, so its manifest records no runner input. The reviewer only checks "their sha256 against the manifest". A redacted copy and its hash committed together always match. So a GUI transcript recorded against an earlier plugin or binary still counts at a later commit that changed the behaviour it shows. That is the stale-trial problem R-19 F-08 found (docs/specs/spec-review-convergence.md:1607). The precedent the document cites went further. host-cleanup R-23 also hashed /usr/local/bin/vh-adlc and checked its `vcs.revision` to tie the transcripts to the build under review (docs/specs/host-cleanup.md:1778).
+PROPOSAL: Require the manifest of a proof that needs a person to record the ids of the inputs its procedure exercised, such as the plugin tree or binary revision. Have the reviewer accept the transcripts only while those still match at the target commit, and say so in the convention text AC-01 adds and in AC-02.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The reviewer (third and fourth sentences); Design, Agent-session proofs; Context, Owner summary (fourth bullet); AC-02; AC-04; Test Plan, AC-04 row
+EVIDENCE: The reviewer returns `not met` on "a failed pass condition" and `not verified` when "a run ... cannot start or finish". The design defines no result contract that tells them apart once sessions have started. The example runner catches a trial's error, records `runner_error` in its manifest and moves on (tests/vh-adlc/evidence/review-convergence/trials/run.ts:224-226). One reviewer would read a session that hit a rate limit or crashed mid-trial as unfinished (`not verified`, rerun), and another as a failed pass condition (`not met`, fix the code). Verification rungs settle this with exit codes: 0 passes, 126 or 127 could not run, anything else fails (plugins/vh-adlc/references/loop-settings.md, Verification rungs table). The AC-04 stale-summary trial assumes that "exits 1" means a failed pass condition, but nothing in the design says so.
+PROPOSAL: Define how a runner reports each proof, for example per-proof pass, fail or error lines, or rung-style exit codes. Map error or could-not-run to `not verified` and fail to `not met`, and have the AC-04 fixture runner follow that contract.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Review dispatch (first sentence); Design, Command route (first sentence); Context, Owner summary (third bullet); AC-02; AC-09; Test Plan, AC-09 row
+EVIDENCE: Every dispatch and `reviewPrompt` carry "the repository's `AGENTS.md` "Local commands" section" verbatim. The design does not say what happens when that section is absent. The adopter the Background names, Stackweaver, has no such section: its AGENTS.md headings are Repository instructions, Personal conventions, Shared workflows and Harness compatibility (/home/m/code/stackweaver/AGENTS.md). It declares `verification_rungs` in .vh-adlc/loop.yaml instead. loop-settings.md says operations read verification commands from AGENTS.md only "Without rungs". One implementer would have `reviewPrompt` throw on the missing section, which breaks every command-route review there. Another would omit it, and a third would fall back to the rungs. The AC-09 fixture always has the section, so all three pass.
+PROPOSAL: State the behaviour when the section is missing (omit it, or say "none"). State whether a repository with `verification_rungs` passes its rung commands instead, and add a no-section case to the AC-09 test.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Command route (last sentence); AC-02 ("the review skill offers an owner-requested host-route implementation review that counts as the latest"); Test Plan, AC-02, AC-03 row; Context, Owner summary (fourth bullet)
+EVIDENCE: The owner can ask for "one implementation review on the host route instead". The design does not say which model that review requests or how it is checked. The configured `implementation_reviewer` names a command-route model, for example `gpt-6.1-sol` in Stackweaver's .vh-adlc/loop.yaml. Under the protocol, "A model the route names counts as a requested model" (plugins/vh-adlc/references/review-protocol.md:9). A host that cannot serve that model then leaves the review pending, while a host route with no model inherits the host default. One implementer would carry the configured model over and get a pending review on Claude Code, and another would drop it and record an unrequested default. The two give different eligibility results for the review that is supposed to count as the latest.
+PROPOSAL: Say whether the host-route request carries a model (the configured one, one the owner names, or none), and which eligibility rule from review-protocol.md applies to it.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-02, AC-03 row; Test Plan, AC-07 row
+EVIDENCE: The rows leave some clauses of composite criteria unchecked, so each could pass on text that omits them. AC-02 requires the reviewer agent to remove its run directory and to check transcripts "only when the resolved convention has that case". The row requires neither a removal phrase nor a convention-condition phrase. AC-03 requires author mode to name "its fixtures", but the row requires only "path and command" with "pass condition" and "transcript". AC-07 requires the page to place "the missing-runner finding" under the docs pin and the "host-route request" and "reviewer-run" changes under any pin. The row checks only "Test plan rule" and "transcript" with "docs pin", and "dispatch", "command route", "implement" and "author" with "any pin". Its own must-pass example names neither the missing-runner finding nor the host-route request, so text that fails AC-07 passes the row. These rows were changed in this revision in answer to R-2 F-07, which named them, so they have not passed review.
+PROPOSAL: Add a required phrase for each unchecked clause: "remove" and a convention-condition phrase for the agent, "fixtures" for author mode, and "missing-runner" under the docs pin and "host route" and "reviewer" under any pin for the page. Make the AC-07 must-pass example contain them.
