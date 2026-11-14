@@ -25,7 +25,7 @@ function success(root: string, ...args: string[]) {
 function worktrees(root: string) {
   return gitBytes(root, "worktree", "list", "--porcelain", "-z").toString().split("\0\0").filter(Boolean).map(block => {
     const fields = block.split("\0"), path = fields.find(field => field.startsWith("worktree "))?.slice(9), branch = fields.find(field => field.startsWith("branch "))?.slice(7);
-    if (!path) fail("unreadable worktree identity"); return { path, branch };
+    if (!path) fail("unreadable worktree identity"); return { path, branch, locked: fields.some(field => field === "locked" || field.startsWith("locked ")) };
   });
 }
 function file(path: string) {
@@ -139,13 +139,16 @@ export function beginCandidate(config: Settings, id: string, authority: ReportPe
 }
 function resumeCandidate(config: Settings, run: Run, value: Candidate): Candidate {
   if (file(value.archive_path).digest !== value.archive_digest) fail("candidate archive changed or missing; reconcile intent");
+  // Branch cleanup keeps a locked worktree, so a sweep during this run leaves it alone.
+  const lock = `vh-adlc ${value.run_id}`;
   if (!existsSync(value.worktree)) {
     if (success(config.root, "show-ref", "--verify", `refs/heads/${value.ref}`)) {
       if (command(config.root, "rev-parse", value.ref) !== value.base) fail("interrupted owned ref changed");
-      command(config.root, "worktree", "add", value.worktree, value.ref);
-    } else command(config.root, "worktree", "add", "-b", value.ref, value.worktree, value.base);
+      command(config.root, "worktree", "add", "--lock", "--reason", lock, value.worktree, value.ref);
+    } else command(config.root, "worktree", "add", "--lock", "--reason", lock, "-b", value.ref, value.worktree, value.base);
   }
   identity(config, run, value);
+  if (!worktrees(config.root).find(row => row.path === value.worktree)?.locked) command(config.root, "worktree", "lock", "--reason", lock, value.worktree);
   if (command(value.worktree, "rev-parse", "HEAD") !== value.base) fail("unexpected commit during candidate preparation; reconcile");
   for (const path of value.allowed_paths) safeOutput(value.worktree, path);
   const target = safeOutput(value.worktree, value.report_path), bytes = readFileSync(value.archive_path);
