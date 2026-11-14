@@ -303,6 +303,7 @@ and how a runner works inside is left to each repository.
 | 2026-11-14 | R-2 | spec | `0442f4d` | claude-opus-5-5 | procedural | Clean: no blocking finding; ten should-fix findings and two nits |
 | 2026-11-14 | R-3 | spec | `6a90dae` | claude-opus-5-5 | procedural | Clean: no blocking finding; seven should-fix findings |
 | 2026-11-14 | R-4 | spec | `0661a35` | claude-opus-5-5 | procedural | Blocking: two static-check rows reject the criteria's own hyphenated wording; five should-fix findings and two nits |
+| 2026-11-14 | R-5 | spec | `c378677` | claude-opus-5-5 | procedural | Clean: no blocking finding; five should-fix findings and two nits, all from text the cut dropped |
 
 ### R-1
 
@@ -591,3 +592,54 @@ SEVERITY: nit
 WHERE: Test Plan, AC-05 row and AC-06 row
 EVIDENCE: The rule this feature adds says an agent-session row names "the runner's path and the command that runs it" and where transcripts and the manifest go. The AC-05 and AC-06 rows say only "by the same runner". They give no command line with the trial id, unlike the AC-04 row's `bun tests/vh-adlc/evidence/agent-proofs/trials/run.ts <output dir> stale-summary runner-pass`. A reviewer given these Proof cells verbatim has to infer the command.
 PROPOSAL: Give each row its full command, for example `bun tests/vh-adlc/evidence/agent-proofs/trials/run.ts <output dir> missing-runner`, and say its transcripts go to the same runs directory.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Glossary (Transcript manifest; Proof that needs a person); Design, Transcripts (second paragraph); Design, The rule (last sentence of the first paragraph); Design, Implement; Design, The reviewer (last sentence); AC-01; AC-03; Context, Owner summary (fifth bullet)
+EVIDENCE: The transcript case accepts a person's transcripts when "the inputs the procedure exercised, such as the plugin tree or the binary's revision, still have the recorded ids". Nothing defines where those ids are recorded, who records them or when. The glossary's Transcript manifest records only "the checkout, the runner inputs' ids and whether any had uncommitted changes, all taken when the run started". A proof that needs a person has no runner, so it has no runner inputs. This revision also cut the glossary's Proof that needs a person entry from "proved by a written procedure, kept transcripts and the ids of the inputs the procedure exercised" to "proved by a written procedure and kept transcripts" (git diff 0661a35 c378677). The rule says only that such a row "names a written procedure instead", and no text requires the procedure to declare the inputs it exercises. Implement and AC-03 cover runner proofs only and say nothing about writing a manifest for a person's proof. One implementer would leave the ids out of the manifest, so the reviewer's check can never pass. Another would let the reviewer accept any hash-matched transcript, which brings back the stale-trial problem R-3 F-03 raised.
+PROPOSAL: Restore the exercised-input ids to the Proof that needs a person entry and to the Transcript manifest entry. Say that the procedure names the inputs it exercises and that the implement operation records their ids when the procedure runs, and add that clause to AC-01 and AC-03.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-01 (transcript clause); AC-07; Test Plan, AC-01 row (written procedure); Test Plan, AC-02, AC-03, AC-07, AC-10 row; Design, Transcripts (second paragraph); Design, Pins and older consumers
+EVIDENCE: This revision shortened two criteria so that their content now lives only in Design. AC-01 used to require that "hash-matched kept transcripts, raw or redacted, stand in for a proof that needs a person while the inputs that proof exercised keep their recorded ids". It now says only that the `met` definition "adds the transcript case for a proof that needs a person". AC-07 used to list which changes depend on the docs pin and which apply on any pin. It now says only that the page "says which parts depend on the docs pin and which apply on any pin". AC-02 and AC-09 point back with "by the rule above", but AC-01 and AC-07 do not. Both rows are written procedures that pass when the reviewer can quote "for each clause ... the sentence that states it". So convention text that accepts transcripts with no sha256 or input-id condition passes the AC-01 procedure, and a compatibility page that puts the missing-runner finding under "any pin" passes the AC-07 procedure. The Pins and older consumers subsection says the opposite.
+PROPOSAL: Have AC-01 and AC-07 name their content or say "as Design, Transcripts" and "as Design, Pins and older consumers" state it. Have the written procedures check each quoted sentence against that Design text.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-01 row; AC-01 (last clause); Design, Delivery; AC-08
+EVIDENCE: The row says the test "resolves the convention page at the new pin through `vh-adlc knowledge` and compares the rules block at the companion docs commit with the one at `1ccf8f3`". `vh-adlc knowledge` resolves at the repository's pin (plugins/vh-adlc/knowledge.md:8; tests/vh-adlc/review-convergence.test.ts:24 passes `--repo` and `--plugin-pin`). Delivery and AC-08 allow the new pin to be "the published docs commit or a later one". When the pin is later, the page at the new pin is not the page at the companion commit. If a later docs commit changed the rules block for another feature, a test that compares the new-pin page fails although AC-01 holds. The words "at the new pin" are new in this revision (git diff 0661a35 c378677). Before, the row named only the companion commit, which was the answer to R-2 F-09.
+PROPOSAL: Drop "at the new pin" and have the test resolve the page at the companion commit itself, for example through `knowledge --plugin-pin <companion sha>` in a scratch repository that has no pin of its own.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-09 row; AC-09; Design, Review dispatch; Design, Command route
+EVIDENCE: The design says the verification commands are "the `verification_rungs` commands when the loop settings declare them, otherwise the `AGENTS.md` "Local commands" section, otherwise "none"". The AC-09 fixtures are one commit with an AGENTS.md section, one "whose loop settings declare `verification_rungs`", and one with neither. The rungs fixture is not said to also have the AGENTS.md section, and the row does not require the section to be absent from the prompt when rungs exist. A `reviewPrompt` that always includes the AGENTS.md section when it is present, and the rungs as well when they are declared, passes all three cases while breaking the precedence. That precedence matters for an adopter such as Stackweaver, which declares rungs (/home/m/code/stackweaver/.vh-adlc/loop.yaml).
+PROPOSAL: Give the rungs fixture an AGENTS.md "Local commands" section too, and have the row require the rung commands in the prompt and the section text absent.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The reviewer (first sentence); Design, Transcripts (first paragraph, "the raw files stay on the machine that ran them"); Context, Background (Copied logins); Open Questions; Context, Owner summary (paragraph after the bullets)
+EVIDENCE: At 0661a35 the reviewer gave the runner "an output directory under the system temporary directory, and removes that directory after reading the result". This revision changed that to "with its output outside the repository" and dropped the removal (git diff 0661a35 c378677). The Open Questions and the Owner summary list what the owner cut: token-only authentication, the exit-code protocol, the collect step and the phrase-matching tests. Reviewer cleanup is not on that list. Token-only authentication is gone, and the Background still says the example host copies the owner's login into each profile (tests/vh-adlc/scenarios/host.ts:25-30). So every reviewer rerun can now leave raw transcripts that list account connectors, and possibly a copied login, in a temp directory, and the design does not say whether that is intended. One implementer would carry over the removal into the reviewer agent, and another would leave the existing scratch rule unchanged.
+PROPOSAL: Either restore "removes its output directory after reading the result" in The reviewer and AC-02, or record in Open Questions and the Owner summary that the reviewer's run output, and whatever the runner left in it, stays behind.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (fifth bullet and the paragraph on cost)
+EVIDENCE: This revision removed three things from the Owner summary that Design still states. First, the command route's implementation-review timeout grows from 15 minutes to two hours (Design, Command route), which is an important default under feature-documents.md:80-83. Second, the owner-requested host-route review names no model and runs on the host default. Third, the Test plan rule and the transcript case apply only on a docs pin that has them (Design, Pins and older consumers). The 0661a35 summary stated the first two.
+PROPOSAL: Add one sentence each on the two-hour default, the host default model for the host-route review, and the pin dependency.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Scope (third bullet, "its reference text in `loop-settings.md`"); Design, Command route; Test Plan, AC-02, AC-03, AC-07, AC-10 row
+EVIDENCE: Scope puts the command route's reference text in plugins/vh-adlc/references/loop-settings.md in scope, and covers lists that file. This revision removed the Design sentence "`loop-settings.md` says both" (git diff 0661a35 c378677). No criterion names loop-settings.md, and the written-procedure row's file list leaves it out. Today that file says nothing about the review timeout or the prompt contents (grep for "timeout" and "prompt" in it finds only the argv placeholder row at line 37).
+PROPOSAL: Restore the sentence saying what loop-settings.md gains, and add the file to the list in the AC-02 row, or remove it from Scope.
