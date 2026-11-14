@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "T1 to T19 done on feat/worktree-cleanup with origin/main merged in; no criterion ticked yet; implementation review next."
+status: complete
+status_description: "Implemented on feat/worktree-cleanup; implementation review R-25 found every criterion met. Not yet shipped."
 branch: feat/worktree-cleanup
 issue: null
 goal: "Branch cleanup removes every linked worktree whose work is already on the default branch or in a merged PR, including ones that hold only ignored build output, so worktrees stop piling up after merges, while a worktree with changed or untracked files or unmerged commits is always kept; only commits that a branch worktree's HEAD reflog or a deleted branch's own reflog alone still names, such as copies from before a rebase or amend, go with them."
@@ -124,9 +124,9 @@ from before a rebase, and they go with their worktree. Deleting a branch deletes
 On the same day 3 Stackweaver branches without a worktree, each older than seven days, had reflogs
 that alone named 5 commits, copies from before an amend or rebase, and those go with the branch.
 
-T1 to T18 are implemented test-first on the feature branch, each with recorded task evidence, and
-T19 ran the Stackweaver plan check without applying the plan. No criterion is ticked yet; that waits
-for an implementation review. Spec review R-1 found two blocking
+T1 to T18 and T20 are implemented test-first on the feature branch, each with recorded task
+evidence, and T19 ran the Stackweaver plan check without applying the plan. Implementation review
+R-25 found every criterion met. Spec review R-1 found two blocking
 issues: missing-directory entries could drop unmerged detached commits, and `after-merge` would delete
 ignored files the owner never saw. Design items 4 and 5 close both. Spec review R-2 found two more:
 with `status.showUntrackedFiles=no` the ignored list came back empty, and a worktree nested inside an
@@ -175,8 +175,10 @@ index, and a real Stackweaver entry has some; design item 4 now keeps such an en
 R-21 found nothing, and the owner accepted the document on 2026-11-13. Work that landed on the
 default branch afterwards moved three cited lines, and spec review R-22 also found one test case that
 no task covered; both are fixed without changing the design. After the branch merged the default
-branch in, spec review R-23 found three citation and status nits, now fixed. An implementation review
-is next; pushing the branch, a PR, merging and releasing each still need their own approval.
+branch in, spec review R-23 found three citation and status nits, now fixed. Implementation review
+R-24 found that `references/audit.md` did not yet describe the `after-merge` worktree removal; T20
+added it, and R-25 found nothing left. Pushing the branch, a PR, merging and releasing each still need
+their own approval.
 
 ### Background
 
