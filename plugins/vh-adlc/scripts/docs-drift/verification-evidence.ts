@@ -25,10 +25,11 @@ export function readCandidateVerificationArtifacts(options: Parameters<typeof in
   }
   const parsed = json(read(options.reference));
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) fail("record required");
+  if ((parsed as Record<string, unknown>).schema_version === 1) fail("version-one physical snapshot proof requires its original implementation");
   const value = parsed as Verification;
   const fields = ["schema_version", "kind", "authority", "source_commit", "candidate_commit", "complete", "diagnostics", "inspection", "scan", "scan_artifacts", "checkout_state_sha256", "commands", "record_path"];
   if (Object.keys(value).length !== fields.length || fields.some(field => !Object.hasOwn(value, field))
-    || value.schema_version !== 1 || value.kind !== "docs-drift-candidate-verification" || value.authority !== "none"
+    || value.schema_version !== 2 || value.kind !== "docs-drift-candidate-verification" || value.authority !== "none"
     || value.complete !== true || !same(value.diagnostics, []) || value.source_commit !== options.source || value.candidate_commit !== options.candidate)
     fail("complete exact-source record required");
   if (typeof value.record_path !== "string" || relative(scope.directory, value.record_path) !== (options.reference as { path: string }).path)
@@ -45,7 +46,7 @@ export function readCandidateVerificationArtifacts(options: Parameters<typeof in
   if (join(scope.directory, checkoutPath) !== scan.checkout) fail("canonical owned verification source required");
   scope.assertExternal(scan.checkout);
   artifactDirectoryScope(scope.directory, options.repo).assertExternal(scan.checkout);
-  if (!matchesRepositoryState(scan.checkout, value.checkout_state_sha256)) fail("owned verification source changed or unavailable");
+  if (!matchesRepositoryState(scan.checkout, value.checkout_state_sha256, "full")) fail("owned verification source changed or unavailable");
   const snapshot = captureSnapshot(options.candidate_repo, options.candidate);
   readOriginalScan(snapshot, scan, originals, scope.directory, read);
   const configured = [...snapshot.settings.generation_commands, ...snapshot.settings.verification_commands];

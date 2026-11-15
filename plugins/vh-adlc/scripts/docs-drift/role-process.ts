@@ -31,7 +31,7 @@ export async function captureNativeRoleProcess(input: Options) {
   let before: string | null = null, repo: string | null = null, candidateBefore: string | null = null, candidate: string | null = null;
   function unchanged() {
     if (repo === null || before === null || !matchesRepositoryState(repo, before)
-      || candidate !== null && candidateBefore !== null && !matchesRepositoryState(candidate, candidateBefore))
+      || candidate !== null && candidateBefore !== null && !matchesRepositoryState(candidate, candidateBefore, "full"))
       throw new ArtifactChanged("Caller changed during native role execution");
   }
   try {
@@ -46,7 +46,7 @@ export async function captureNativeRoleProcess(input: Options) {
     if (readGit(repo, "rev-parse", "--verify", "--end-of-options", options.source_commit + "^{commit}").toString().trim() !== options.source_commit)
       throw Error("Original native role source required");
     if (options.candidate_repo) {
-      candidate = realpathSync(options.candidate_repo); candidateBefore = canonicalDigest(captureRepositoryState(candidate));
+      candidate = realpathSync(options.candidate_repo); candidateBefore = canonicalDigest(captureRepositoryState(candidate, "full"));
     }
     const scope = artifactDirectoryScope(options.artifact_root, repo);
     if (candidate) artifactDirectoryScope(scope.directory, candidate);

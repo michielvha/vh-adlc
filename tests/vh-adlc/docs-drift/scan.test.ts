@@ -57,12 +57,19 @@ test.each([
   expect(result.diagnostics.length).toBeGreaterThan(0);
 });
 
-test.each(["mutate-document", "mutate-feedback", "mutate-index", "mutate-ref", "mutate-fetch-head", "mutate-config"])("scanner repository writes remain incomplete and preserve the caller (%s)", async fault => {
+test.each(["mutate-document", "mutate-feedback", "mutate-index", "mutate-ref", "mutate-config"])("scanner repository writes remain incomplete and preserve the caller (%s)", async fault => {
   const f = fixture(fault);
   const before = captureRepositoryState(f.repo);
   const result = await scan(f);
   expect(result.complete).toBe(false);
   expect(result.diagnostics.some(item => item.code === "scanner-mutation")).toBe(true);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+});
+
+test("owned FETCH_HEAD diagnostics can change while the selected source and refs stay fixed", async () => {
+  const f = fixture("mutate-fetch-head"), before = captureRepositoryState(f.repo);
+  const result = await scan(f);
+  expect(result.complete).toBe(true);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 

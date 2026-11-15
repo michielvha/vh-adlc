@@ -1,6 +1,7 @@
+import { snapshot as logicalSnapshot, repositoryConfigurationDigest } from "../loop/review-route";
 import { readFeatureClassification } from "../docs-impact/collection";
 import { randomUUID } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { readGit } from "./git";
 import { loadCommittedSettings } from "./settings";
@@ -201,81 +202,21 @@ export function checkFreshness(snapshot: Snapshot, currentCommit: string, option
   return result;
 }
 
-function fileDigest(path: string): string | null {
-  try { return sha256(readFileSync(path)); }
-  catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return null;
-    throw error;
-  }
-}
-
-function directoryInventory(root: string, skipRootNames: string[]): unknown[] {
-  const rows: unknown[] = [];
-  function visit(directory: Buffer, prefix: Buffer): void {
-    for (const name of readdirSync(directory, { encoding: "buffer" }).sort(Buffer.compare)) {
-      if (prefix.length === 0 && skipRootNames.some(skip => name.equals(Buffer.from(skip)))) continue;
-      const full = Buffer.concat([directory, Buffer.from("/"), name]);
-      const path = prefix.length === 0 ? name : Buffer.concat([prefix, Buffer.from("/"), name]);
-      const identity = path.toString("hex");
-      const stat = lstatSync(full);
-      if (stat.isDirectory()) {
-        rows.push([identity, "directory", stat.mode]);
-        visit(full, path);
-      } else if (stat.isSymbolicLink()) {
-        rows.push([identity, "link", readlinkSync(full, { encoding: "buffer" }).toString("hex")]);
-      } else if (stat.isFile()) {
-        rows.push([identity, "file", stat.mode, sha256(readFileSync(full))]);
-      } else incomplete("unsupported repository file type");
-    }
-  }
-  visit(Buffer.from(root), Buffer.alloc(0));
-  return rows;
-}
-
-function objectInventory(root: string): unknown[] {
-  const rows: unknown[] = [];
-  function visit(directory: string, prefix: string): void {
-    for (const name of readdirSync(directory).sort(compareUTF8)) {
-      const path = join(directory, name);
-      const relative = prefix ? prefix + "/" + name : name;
-      const stat = lstatSync(path);
-      if (stat.isDirectory()) {
-        rows.push([relative, "directory", stat.mode]);
-        visit(path, relative);
-      }
-      else if (stat.isSymbolicLink()) rows.push([relative, "link", readlinkSync(path)]);
-      else rows.push([relative, stat.mode, stat.size, stat.mtimeMs, stat.ctimeMs]);
-    }
-  }
-  visit(root, "");
-  return rows;
-}
-
-/** A mutation guard for the owned scanner checkout, also usable in preservation regressions. */
-export function captureRepositoryState(directory: string) {
+/** Protect logical caller inputs while excluding ignored output and unrelated shared Git activity. */
+export function captureRepositoryState(directory: string, scope: "owning" | "full" = "owning") {
   const repo = repositoryRoot(directory);
-  const gitDirectory = gitPath(repo, "--git-dir");
-  const objects = gitPath(repo, "--git-path", "objects");
-  const commonDirectory = gitPath(repo, "--git-common-dir");
-  const worktree = directoryInventory(repo, [".git"]);
-  const gitMetadata = canonicalDigest(directoryInventory(gitDirectory, ["objects"]));
-  const commonMetadata = commonDirectory === gitDirectory ? gitMetadata : canonicalDigest(directoryInventory(commonDirectory, ["objects"]));
-  return {
-    head_sha256: fileDigest(join(gitDirectory, "HEAD")),
-    index_sha256: fileDigest(gitPath(repo, "--git-path", "index")),
-    fetch_head_sha256: fileDigest(join(gitDirectory, "FETCH_HEAD")),
-    refs_sha256: sha256(readGit(repo, "for-each-ref", "--format=%(refname)%00%(objectname)%00")),
-    worktree_sha256: canonicalDigest(worktree),
-    git_metadata_sha256: gitMetadata,
-    common_metadata_sha256: commonMetadata,
-    objects_inventory_sha256: canonicalDigest(objectInventory(objects)),
-  };
+  const boundary = ["shallow", "info/grafts"].map(name => {
+    const path = gitPath(repo, "--git-path", name);
+    return [name, existsSync(path) ? sha256(readFileSync(path)) : null];
+  });
+  return { schema_version: 2, ...logicalSnapshot(repo, [], scope, { ignored: "exclude" }),
+    local_config_sha256: repositoryConfigurationDigest(repo), history_boundary_sha256: canonicalDigest(boundary) };
 }
 
 /** Preserve an incomplete handoff when the original canonical caller changes or becomes unavailable. */
-export function matchesRepositoryState(directory: string, expected: string): boolean {
+export function matchesRepositoryState(directory: string, expected: string, scope: "owning" | "full" = "owning"): boolean {
   try {
-    return realpathSync(directory) === directory && canonicalDigest(captureRepositoryState(directory)) === expected;
+    return realpathSync(directory) === directory && canonicalDigest(captureRepositoryState(directory, scope)) === expected;
   } catch { return false; }
 }
 

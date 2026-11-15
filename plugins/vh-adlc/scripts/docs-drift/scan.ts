@@ -248,7 +248,7 @@ export async function runScan(snapshot: Snapshot, options: ScanOptions): Promise
       isAbsolute(runtime) ? runtime : join(checkout, runtime), ...snapshot.settings.scanner.argv.slice(1),
       "--protocol-bindings", bindingsPath, "--protocol-json", output,
     ];
-    before = captureRepositoryState(checkout);
+    before = captureRepositoryState(checkout, "full");
     result.process = await executeOwnedProcess({ argv: args, cwd: checkout, env, watched_outputs: [output], stdout, stderr, timeout_ms: timeout, started: pid => {
       writeFileSync(join(root, "process-start.json"), canonicalJSON({ pid, argv: args, source_commit: snapshot.source_commit }), { flag: "wx", mode: 0o600 });
     } });
@@ -269,7 +269,7 @@ export async function runScan(snapshot: Snapshot, options: ScanOptions): Promise
     gap("scanner-incomplete", "Scanner setup, execution, output or retained bindings could not be verified.");
   } finally {
     try {
-      if (before && !same(captureRepositoryState(result.checkout), before)) gap("scanner-mutation", "The scanner changed its committed source, files or Git state.");
+      if (before && !same(captureRepositoryState(result.checkout, "full"), before)) gap("scanner-mutation", "The scanner changed its committed source, files or Git state.");
       if (original && !same(captureRepositoryState(snapshot.repo), original)) gap("caller-changed", "The original caller state changed during collection.");
     } catch { gap("scanner-state-unavailable", "The final source mutation check is unavailable."); }
     result.complete = result.diagnostics.length === 0;

@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureBareSnapshot, captureRepositoryState, captureSnapshot, checkFreshness, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -37,6 +37,63 @@ test("committed snapshots preserve staged, unstaged, ignored, untracked and Git 
   expect(captureRepositoryState(repo)).toEqual(before);
   expect(() => captureSnapshot(repo, "HEAD")).toThrow();
   expect(captureRepositoryState(repo)).toEqual(before);
+});
+
+test.each(["ignored-cache", "remote-ref", "prefetch-ref", "sibling-worktree", "index-refresh", "repack"] as const)("caller preservation ignores benign %s activity", activity => {
+  const { repo, commit } = fixture();
+  put(repo, ".gitignore", "build/\n"); commitAll(repo);
+  const before = captureRepositoryState(repo);
+  if (activity === "ignored-cache") put(repo, "build/cache.bin", "Generated ignored cache\n");
+  if (activity === "remote-ref") git(repo, "update-ref", "refs/remotes/origin/other", commit);
+  if (activity === "prefetch-ref") git(repo, "update-ref", "refs/prefetch/remotes/origin/other", commit);
+  if (activity === "sibling-worktree") git(repo, "worktree", "add", "--detach", temporary(), commit);
+  if (activity === "index-refresh") { const time = new Date(Date.now() + 60000); utimesSync(join(repo, "src/app.ts"), time, time); git(repo, "update-index", "--refresh"); }
+  if (activity === "repack") git(repo, "gc", "--prune=never");
+  expect(captureRepositoryState(repo)).toEqual(before);
+});
+
+test("local configuration values stay in memory and actual changes invalidate caller preservation", () => {
+  const { repo } = fixture(), before = captureRepositoryState(repo);
+  git(repo, "config", "--local", "fixture.private", "synthetic-private-config-value");
+  const after = captureRepositoryState(repo);
+  expect(after).not.toEqual(before);
+  expect(JSON.stringify(after)).not.toContain("synthetic-private-config-value");
+});
+
+test("non-UTF8 untracked file contents remain protected", () => {
+  const { repo } = fixture(), path = Buffer.concat([Buffer.from(repo + "/"), Buffer.from([0xff]), Buffer.from("-untracked")]);
+  writeFileSync(path, "one");
+  const before = captureRepositoryState(repo);
+  writeFileSync(path, "two");
+  expect(captureRepositoryState(repo)).not.toEqual(before);
+});
+
+test("ignored directories retain tracked and explicitly unignored source files", () => {
+  const { repo } = fixture();
+  put(repo, "build/tracked.txt", "original tracked source\n"); commitAll(repo);
+  put(repo, ".gitignore", "build/*\n!build/kept/\n!build/kept/**\n"); commitAll(repo);
+  put(repo, "build/kept/untracked.txt", "original unignored input\n");
+  const before = captureRepositoryState(repo);
+  put(repo, "build/cache/output.txt", "ignored cache\n");
+  expect(captureRepositoryState(repo)).toEqual(before);
+  put(repo, "build/tracked.txt", "changed tracked source\n");
+  expect(captureRepositoryState(repo)).not.toEqual(before);
+  put(repo, "build/tracked.txt", "original tracked source\n");
+  expect(captureRepositoryState(repo)).toEqual(before);
+  put(repo, "build/kept/untracked.txt", "changed unignored input\n");
+  expect(captureRepositoryState(repo)).not.toEqual(before);
+});
+
+test("logical preservation detects nested submodule source while ignoring its cache", () => {
+  const { repo } = fixture(), nested = temporary();
+  populateRepository(nested);
+  git(repo, "-c", "protocol.file.allow=always", "submodule", "add", nested, "vendor/child"); commitAll(repo);
+  put(repo, "vendor/child/.gitignore", "cache/\n"); commitAll(join(repo, "vendor/child")); commitAll(repo);
+  const before = captureRepositoryState(repo);
+  put(repo, "vendor/child/cache/generated", "ignored nested cache\n");
+  expect(captureRepositoryState(repo)).toEqual(before);
+  put(repo, "vendor/child/src/app.ts", "changed nested input\n");
+  expect(captureRepositoryState(repo)).not.toEqual(before);
 });
 
 test("scope omission and unresolved command dependencies use the whole tracked repository", () => {

@@ -4,7 +4,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { runReviewRoute, type ReviewOutcome } from "../../../plugins/vh-adlc/scripts/loop/review-route";
+import { runReviewRoute, snapshot, type ReviewOutcome } from "../../../plugins/vh-adlc/scripts/loop/review-route";
 import { pagesStub } from "./pages-stub";
 
 const made: string[] = [];
@@ -48,6 +48,15 @@ function stub(body: string, reply: string) {
 }
 
 const ok = (commit: string, model = "gpt-6.1-sol") => `MODEL: ${model}\nTARGET: ${commit}\n\nNO FINDINGS`;
+
+test("ignored-content exclusion is opt-in and preserves the lifecycle snapshot default", () => {
+  const { root } = repository();
+  const ordinary = snapshot(root, [], "owning"), excluded = snapshot(root, [], "owning", { ignored: "exclude" });
+  writeFileSync(join(root, ".env"), "SECRET=2\n");
+  writeFileSync(join(root, "build/cache.txt"), "Generated cache\n");
+  expect(snapshot(root, [], "owning")).not.toEqual(ordinary);
+  expect(snapshot(root, [], "owning", { ignored: "exclude" })).toEqual(excluded);
+});
 
 async function review(root: string, commit: string, script: string, options: { kind?: "spec" | "implementation"; scratch?: string[]; timeoutMs?: number; model?: string } = {}): Promise<ReviewOutcome> {
   return runReviewRoute({ repo: root, commit, kind: options.kind ?? "implementation", document: "docs/specs/feature.md",

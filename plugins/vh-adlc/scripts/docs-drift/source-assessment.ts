@@ -44,7 +44,7 @@ export async function assessSource(input: Options): Promise<SourceAssessment> {
   return freezeJSON(result);
 }
 
-/** Legacy passing baseline proofs remain readable. New assessments require the scan alone. */
+/** Read source assessments and passing baseline records with explicit snapshot-format validation. */
 export function readSourceAssessmentArtifacts(options: Options & { candidate_repo: string; reference: unknown }): SourceAssessment {
   const secondary = artifactDirectoryScope(options.artifact_root, options.candidate_repo), primary = artifactDirectoryScope(secondary.directory, options.repo);
   function read(reference: unknown): Buffer {
@@ -55,11 +55,11 @@ export function readSourceAssessmentArtifacts(options: Options & { candidate_rep
   const bytes = read(options.reference), parsed: unknown = JSON.parse(decodeUTF8(bytes));
   if (!canonicalJSON(parsed).equals(bytes) || parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw Error("Canonical source assessment required");
   if ((parsed as Record<string, unknown>).kind === "docs-drift-candidate-verification") {
-    const legacy = readCandidateVerificationArtifacts({ ...options, candidate: options.source,
+    const verified = readCandidateVerificationArtifacts({ ...options, candidate: options.source,
       selection: { schema_version: 1, source_commit: options.source, edits: [] } });
     return { schema_version: 1, kind: "docs-drift-source-assessment", authority: "none", source_commit: options.source,
-      complete: true, diagnostics: [], scan: legacy.scan, scan_artifacts: legacy.scan_artifacts, object_store: legacy.inspection?.object_store ?? null,
-      record_path: legacy.record_path, evidence: legacy.evidence };
+      complete: true, diagnostics: [], scan: verified.scan, scan_artifacts: verified.scan_artifacts, object_store: verified.inspection?.object_store ?? null,
+      record_path: verified.record_path, evidence: verified.evidence };
   }
   const fields = ["schema_version", "kind", "authority", "source_commit", "complete", "diagnostics", "scan", "scan_artifacts", "object_store", "record_path"];
   const value = parsed as SourceAssessment;

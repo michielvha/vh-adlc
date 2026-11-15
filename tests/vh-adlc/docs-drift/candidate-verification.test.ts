@@ -131,6 +131,27 @@ test.each(["matching", "scan-report", "scan-process", "scan-start", "scan-bindin
   } else expect(() => readCandidateVerificationArtifacts({ ...options, reference: proof })).toThrow();
 });
 
+test("logical verification survives index refresh and garbage collection, with old proof handed off intact", async () => {
+  const { verifyCandidate } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification");
+  const { readCandidateVerificationArtifacts } = await import("../../../plugins/vh-adlc/scripts/docs-drift/verification-evidence");
+  const f = fixture("passed"), options = { repo: f.repo, source: f.source, candidate_repo: f.candidate, candidate: f.head,
+    selection: JSON.parse(f.selection.toString()), artifact_root: f.artifacts, owner: "fixture-owner", run: "fixture-run" };
+  const result = await verifyCandidate(options);
+  expect(result.complete).toBe(true);
+  expect(result.schema_version).toBe(2);
+  const proof = result.evidence!, bytes = readFileSync(join(f.artifacts, proof.path));
+  git(result.scan!.checkout, "update-index", "--refresh");
+  git(result.scan!.checkout, "gc", "--prune=never");
+  expect(readCandidateVerificationArtifacts({ ...options, reference: proof }).complete).toBe(true);
+  const old = canonicalJSON({ ...JSON.parse(bytes.toString()), schema_version: 1 });
+  const path = "original-version-one-verification.json";
+  writeFileSync(join(f.artifacts, path), old, { mode: 0o600 });
+  expect(() => readCandidateVerificationArtifacts({ ...options, reference: { path, sha256: sha256(old) } }))
+    .toThrow("version-one physical snapshot proof requires its original implementation");
+  expect(readFileSync(join(f.artifacts, path)).equals(old)).toBe(true);
+  expect(readFileSync(join(f.artifacts, proof.path)).equals(bytes)).toBe(true);
+});
+
 test.each(["matching", "changed-output"])("normal original verification check %s", async scenario => {
   const { verifyCandidate } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification");
   const f = fixture("passed"), verified = await verifyCandidate({ repo: f.repo, source: f.source, candidate_repo: f.candidate, candidate: f.head,
