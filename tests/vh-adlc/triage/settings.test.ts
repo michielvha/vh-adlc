@@ -127,9 +127,23 @@ test("configured repository conflicts never switch target or account", () => {
 test("SSH GitHub origins are normalized; non-GitHub-style and authenticated URLs are rejected", () => {
   const f = project(); git(f.root, "remote", "set-url", "origin", "git@github.com:example/project.git");
   expect(loadSettings(f.root).repository).toBe("example/project");
-  for (const remote of ["/tmp/origin.git", "https://secret@github.com/example/project.git", "https://github.com/example/project.git?token=secret"]) {
+  // Token-shaped userinfo, a password, a query or a non-GitHub path are refused; a login-shaped username is not (next test).
+  for (const remote of ["/tmp/origin.git", "https://ghp_0123456789abcdef0123456789abcdef0123@github.com/example/project.git",
+    "https://example:secret@github.com/example/project.git", "https://github.com/example/project.git?token=secret"]) {
     git(f.root, "remote", "set-url", "origin", remote);
     expect(() => loadSettings(f.root)).toThrow();
+  }
+});
+
+// Changed after the shared loop adoption: a login-shaped HTTPS username selects a credential-helper account
+// and is not a secret (GitHub tokens contain underscores or exceed 39 characters), so it is read past, never stored.
+test("an HTTPS origin with a GitHub login as username identifies the repository and never keeps the login", () => {
+  const f = project();
+  for (const login of ["example", "other-login"]) {
+    git(f.root, "remote", "set-url", "origin", `https://${login}@github.com/example/project.git`);
+    const settings = loadSettings(f.root);
+    expect([settings.repository, settings.hostname]).toEqual(["example/project", "github.com"]);
+    if (login !== "example") expect(JSON.stringify(settings)).not.toContain(login);
   }
 });
 

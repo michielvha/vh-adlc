@@ -36,7 +36,7 @@ Resume takes the route of the operation it continues.
 | `roles.<role>.model` | Optional for `host`, passed to the host as a requested model under `review-protocol.md`. Required for `command`. |
 | `roles.<role>.argv` | `command` only: the executable, then its arguments. It must contain `{prompt}` or `{prompt_file}`, and may use `{model}` and `{export_dir}`. No other placeholder is accepted. |
 | `roles.<role>.model_attestation` | Optional, `command` only: `codex-session` reads the served model from Codex's session log for the run's thread id instead of the reviewer's self-report; the `argv` must include `--json`. A missing log, no or several recorded models, or a mismatch leaves the review pending. |
-| `review_scratch` | Optional list of directories inside the checkout left out of the before-and-after check: build output a shell-enabled implementation reviewer may write to, and ignored directories other sessions or tools write while a review runs, such as other worktrees, temp roots and `node_modules`. Changes there do not leave the review pending. Never `.`. |
+| `review_scratch` | Optional list of directories inside the checkout left out of the before-and-after check: build output a shell-enabled implementation reviewer may write to, and ignored directories other sessions or tools write while a review runs, such as other worktrees, temp roots and `node_modules`. Changes there do not leave the review pending. An entry is checked by its path alone, so it may be a symlink, such as a worktree's shared `node_modules`. Never `.`, an absolute path, `..` or `.git`. |
 | `project_procedure` | Optional contained file of local rules. Every SDD operation reads it before acting. |
 | `instruction_files` | Optional contained files, such as `AGENTS.md` and `CLAUDE.md`. Every SDD operation reads them, and every spec review checks the document against them. |
 | `lenses` | Optional list of `{name, check, severity}`: a named check every spec review applies, with severity `blocking`, `should-fix` or `nit`. |
@@ -49,6 +49,7 @@ Resume takes the route of the operation it continues.
 | `verification_rungs[].when` | `always`, or `{paths: [glob, ...]}` matched against the whole feature delta. |
 | `verification_rungs[].command` | A shell command run from the worktree. Exit 0 passes; exit 126 or 127 means it could not run; any other exit fails. |
 | `verification_rungs[].procedure` | Instead of a command: a written procedure the operation performs and records. |
+| `verification_rungs[].timeout_minutes` | Optional whole number of minutes a command may run, default 60. A command that runs longer is stopped with every process it started and reported as not run, with a reason that says it timed out. |
 | `verification_rungs[].skipped_pattern` | Optional regular expression for an output line that reports a skipped mandatory subcheck; its first group names the subcheck. |
 
 Before merge the feature delta is the branch against its merge base with the default branch, plus every
@@ -109,7 +110,11 @@ rejected push keeps the local claim commit, creates no feature branch and report
 host's own worktree tool for a worktree, or to stop before writing.
 
 `bun scripts/loop/cli.ts context --repo <dir>` prints the reading list (instruction files, then the
-project procedure) and the lenses.
+project procedure), the lenses, and `plugin`: the running plugin version and, where the host keeps an
+install record, the installed one. A host keeps the plugin a session started with, so after an update
+`plugin.stale` is true until the session restarts, and operations stop before writing. When a `vh-adlc`
+on PATH reports another version than the plugin's lock, `plugin.binary_warning` says so, and operations
+run only the binary `scripts/ensure-vh-adlc.sh` prints.
 
 Only `spec_reviewer` and `implementation_reviewer` accept a `command` route; settings that give one to
 `author` or `implementer` are refused, naming the role. Agent and skill files never name a model.

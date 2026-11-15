@@ -81,7 +81,8 @@ export function classifyAuthor(config: Settings, login: string, type: string): "
 export function loadSettings(root: string, options: { settingsPath?: string } = {}): Settings {
   root = realpathSync(root);
   let identity: { repository: string; hostname: string };
-  try { identity = origin(root); } catch { fail("origin identity"); }
+  // The helper's reasons name the field, never the URL, so they are safe to pass on.
+  try { identity = origin(root); } catch (error) { fail(`origin identity (${String((error as Error).message).replace(/^invalid triage settings: /, "")})`); }
   identity = { repository: repository(identity.repository, "origin repository"), hostname: hostname(identity.hostname) };
   const inside = (path: string) => { try { return resolveInside(root, path); } catch { fail("settings path"); } };
   const file = settingsFile({ root, name: "maintenance", settingsPath: options.settingsPath, inside, fail });

@@ -21,6 +21,8 @@ import { join } from "node:path";
 import { loadLoopSettings, loadLoopSettingsAt, routeFor, type LoopOperation } from "./settings";
 import { runReviewRoute } from "./review-route";
 import { loopContext, type LoopContext } from "./procedure";
+import { cacheReviewPages } from "./pages";
+import { pluginStatus } from "./plugin-version";
 import { applicableRungs, featureDelta, mayAdvance, runRungs } from "./rungs";
 import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, repositoryVisibility, skipMarker } from "./delivery";
 import { claim, isolation } from "./claim";
@@ -80,7 +82,7 @@ export async function main(argv: string[]): Promise<number> {
     console.log(JSON.stringify(routeFor(settings, operation, options.continues ? { continues: options.continues as Exclude<LoopOperation, "resume"> } : {})));
     return 0;
   }
-  if (command === "context") { console.log(JSON.stringify(loopContext(settings))); return 0; }
+  if (command === "context") { console.log(JSON.stringify({ ...loopContext(settings), plugin: pluginStatus() })); return 0; }
   if (command === "isolation") { console.log(JSON.stringify(isolation(settings, repo, { hostWorktreeTool: options["host-worktree-tool"] === "true" }))); return 0; }
   if (command === "claim") {
     const document = need(options, "document"), featureBranch = need(options, "feature-branch"), description = need(options, "status-description");
@@ -149,6 +151,12 @@ export async function main(argv: string[]): Promise<number> {
     const route = routeFor(policy, kind === "spec" ? "spec review" : "review");
     if (route.route !== "command" || !route.argv) { console.log(JSON.stringify({ status: "host", ...route })); return 0; }
     const document = need(options, "document"), commit = need(options, "commit");
+    // The reviewer reads every routed page from the cache and may not be able to fetch one itself.
+    const pages = cacheReviewPages({ repo, commit, revision: need(options, "docs-revision"), binary: need(options, "binary"), pluginPin: need(options, "plugin-pin") });
+    if (pages.missing.length) {
+      console.log(JSON.stringify({ role: route.role, status: "pending", reason: `convention pages the reviewer reads could not be cached: ${pages.missing.join(", ")} (${pages.reason})` }));
+      return 3;
+    }
     const prompt = reviewPrompt({ repository: kind === "spec" ? "the current directory, a read-only export of the commit" : "the current directory, a private clone of the reviewed commit",
       document, commit, kind, docsRevision: need(options, "docs-revision"), binary: need(options, "binary"), pluginPin: need(options, "plugin-pin") }, loopContext(policy));
     const outcome = await runReviewRoute({ repo, commit, kind, document, route: { model: route.model!, argv: route.argv, ...(route.model_attestation ? { model_attestation: route.model_attestation } : {}) }, prompt,

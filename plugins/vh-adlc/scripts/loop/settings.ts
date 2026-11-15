@@ -4,7 +4,7 @@
 // references/loop-settings.md.
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { readYAML, settingsFile } from "../settings-file";
 import { resolveInside } from "../triage/settings";
 import type { Rung } from "./rungs";
@@ -71,8 +71,11 @@ function directories(root: string, value: unknown, field: string): string[] {
   if (!Array.isArray(value)) fail(field);
   const out = value.map((item, index) => {
     const path = text(item, `${field}[${index}]`).replace(/\/+$/, "");
-    try { resolveInside(root, path); } catch { fail(`${field}[${index}]`); }
     if (path === "." || path === "") fail(`${field}[${index}] may not be the whole checkout`);
+    // A scratch directory is left out of the preservation check, never read, so it is checked by its
+    // path alone: in a worktree it may be a symlink into another checkout (shared node_modules).
+    if (isAbsolute(path) || path.includes("\\") || path.includes("\0") || path.split("/").some(part => part === ".." || part === "") ||
+        path.split("/")[0] === ".git") fail(`${field}[${index}]`);
     return path;
   });
   if (new Set(out).size !== out.length) fail(`${field} duplicates`);
@@ -107,7 +110,7 @@ function rungs(value: unknown): Rung[] {
   if (!Array.isArray(value)) fail("verification_rungs");
   const out = value.map((item, index): Rung => {
     const field = `verification_rungs[${index}]`, rung = object(item, field);
-    keys(rung, ["name", "when", "command", "procedure", "skipped_pattern"], field);
+    keys(rung, ["name", "when", "command", "procedure", "skipped_pattern", "timeout_minutes"], field);
     const name = text(rung.name, `${field}.name`);
     if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) fail(`${field}.name`);
     let when: Rung["when"];
@@ -123,9 +126,14 @@ function rungs(value: unknown): Rung[] {
       if (rung.command === undefined) fail(`${field}.skipped_pattern needs a command`);
       try { new RegExp(text(rung.skipped_pattern, `${field}.skipped_pattern`)); } catch { fail(`${field}.skipped_pattern`); }
     }
+    if (rung.timeout_minutes !== undefined) {
+      if (rung.command === undefined) fail(`${field}.timeout_minutes needs a command`);
+      if (!Number.isInteger(rung.timeout_minutes) || (rung.timeout_minutes as number) <= 0) fail(`${field}.timeout_minutes must be a positive whole number of minutes`);
+    }
     return { name, when,
       ...(rung.command === undefined ? { procedure: text(rung.procedure, `${field}.procedure`) } : { command: text(rung.command, `${field}.command`) }),
-      ...(rung.skipped_pattern === undefined ? {} : { skipped_pattern: rung.skipped_pattern as string }) };
+      ...(rung.skipped_pattern === undefined ? {} : { skipped_pattern: rung.skipped_pattern as string }),
+      ...(rung.timeout_minutes === undefined ? {} : { timeout_minutes: rung.timeout_minutes as number }) };
   });
   if (new Set(out.map(rung => rung.name)).size !== out.length) fail("verification_rungs duplicates");
   return out;
