@@ -55,23 +55,25 @@ export function computeComponentIdentity(repo: string, sourceCommit: string): Co
 }
 
 function inspectRetainedFiles(directory: string, expected: { files: PayloadFile[]; component_sha256: string },
-  inspectBlob?: (path: string, bytes: Buffer) => void) {
+  inspectBlob?: (path: string, bytes: Buffer) => void, policy: "retained" | "installed" = "retained") {
   canonicalJSON(expected);
   if (!Array.isArray(expected.files) || expected.files.length === 0
     || componentDigest(expected.files) !== expected.component_sha256) fail("expected component identity");
-  const root = realpathSync(directory), rootStat = lstatSync(directory), owner = process.getuid?.();
-  if (owner === undefined || root !== directory || rootStat.isSymbolicLink() || !rootStat.isDirectory()
-    || rootStat.uid !== owner || (rootStat.mode & 0o077) !== 0) fail("private owned runtime root required");
+  const root = realpathSync(directory), owner = process.getuid?.();
+  const rootStat = lstatSync(policy === "installed" ? root : directory);
+  if (!rootStat.isDirectory()) fail("runtime directory required");
+  if (policy === "retained" && (owner === undefined || root !== directory || rootStat.isSymbolicLink()
+    || rootStat.uid !== owner || (rootStat.mode & 0o077) !== 0)) fail("private owned runtime root required");
   const selected = new Map(expected.files.map(file => [file.path, file]));
   if (selected.size !== expected.files.length) fail("duplicate component identity");
   const files: PayloadFile[] = [];
   function walk(parent: string): void {
     for (const name of readdirSync(parent)) {
       const path = join(parent, name), stat = lstatSync(path);
-      if (stat.uid !== owner || stat.isSymbolicLink()) fail("foreign or linked runtime input");
+      if (stat.isSymbolicLink() || policy === "retained" && stat.uid !== owner) fail("foreign or linked runtime input");
       if (stat.isDirectory()) { walk(path); continue; }
       const relative = protocolPath(path.slice(root.length + 1)), required = selected.get(relative);
-      if (!stat.isFile() || stat.nlink !== 1 || !required || !Number.isSafeInteger(required.size)
+      if (!stat.isFile() || policy === "retained" && stat.nlink !== 1 || !required || !Number.isSafeInteger(required.size)
         || required.size < 0 || stat.size !== required.size) fail("unexpected or changed runtime input");
       const mode = (stat.mode & 0o100) === 0 ? "100644" : "100755";
       if (mode !== required.mode) fail("runtime executable mode changed");
@@ -79,7 +81,8 @@ function inspectRetainedFiles(directory: string, expected: { files: PayloadFile[
       try {
         const opened = fstatSync(fd);
         if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino || opened.size !== required.size
-          || opened.uid !== owner || opened.nlink !== 1 || opened.mode !== stat.mode) fail("runtime input changed during inspection");
+          || policy === "retained" && (opened.uid !== owner || opened.nlink !== 1)
+          || opened.mode !== stat.mode) fail("runtime input changed during inspection");
         const bytes = readFileSync(fd), digest = sha256(bytes);
         if (bytes.length !== required.size || digest !== required.sha256) fail("runtime input bytes changed");
         inspectBlob?.(relative, bytes);
@@ -94,15 +97,24 @@ function inspectRetainedFiles(directory: string, expected: { files: PayloadFile[
   return freezeJSON({ directory: root, component_sha256: componentDigest(files), files });
 }
 
-/** Recheck the exported shipped directory. Setup metadata and native session files belong outside it. */
-export function inspectRetainedPayload(options: { directory: string; expected: ComponentIdentity }) {
+function inspectComponentPayload(options: { directory: string; expected: ComponentIdentity }, policy: "retained" | "installed") {
   if (options.expected.schema_version !== 1) fail("expected component identity");
   let version: string | undefined;
   const inspected = inspectRetainedFiles(options.directory, options.expected, (path, bytes) => {
     if (path === ".claude-plugin/plugin.json") version = pluginVersion(bytes);
-  });
+  }, policy);
   if (version !== options.expected.plugin_version) fail("retained component identity changed");
   return freezeJSON({ ...inspected, plugin_version: version });
+}
+
+/** Recheck the exported shipped directory. Setup metadata and native session files belong outside it. */
+export function inspectRetainedPayload(options: { directory: string; expected: ComponentIdentity }) {
+  return inspectComponentPayload(options, "retained");
+}
+
+/** Validate ordinary installed bytes and inventory without changing installer permissions or copying files. */
+export function inspectInstalledPayload(options: { directory: string; expected: ComponentIdentity }) {
+  return inspectComponentPayload(options, "installed");
 }
 
 type ClientBinding = ReturnType<typeof parseClientBinding>;

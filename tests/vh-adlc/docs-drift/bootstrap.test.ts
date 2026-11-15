@@ -608,3 +608,19 @@ test("ordinary installed payloads keep their existing modes and support a canoni
   expect(inspected.plugin_version).toBe(f.identity.plugin_version);
   expect({ mode: lstatSync(f.payload).mode, links: lstatSync(guide).nlink, source: captureRepositoryState(f.repo) }).toEqual(before);
 });
+
+test.each(["changed", "missing", "extra", "hidden-extra", "executable", "symlink", "directory"] as const)(
+  "ordinary installed inventory rejects %s under an unchanged version", scenario => {
+    const f = component(), guide = join(f.payload, "guide.md");
+    chmodSync(f.payload, 0o755);
+    if (scenario === "changed") writeFileSync(guide, "changed installed bytes\n");
+    if (scenario === "missing") rmSync(guide);
+    if (scenario === "extra") writeFileSync(join(f.payload, "extra.agent.md"), "unexpected agent\n");
+    if (scenario === "hidden-extra") writeFileSync(join(f.payload, ".installer-metadata"), "unlisted bytes\n");
+    if (scenario === "executable") chmodSync(guide, 0o755);
+    if (scenario === "symlink") { rmSync(guide); symlinkSync(join(f.plugin, "guide.md"), guide); }
+    if (scenario === "directory") { rmSync(guide); mkdirSync(guide); }
+    expect(() => bootstrap.inspectInstalledPayload({ directory: f.payload, expected: f.identity })).toThrow();
+    expect(lstatSync(f.payload).mode & 0o777).toBe(0o755);
+  },
+);
