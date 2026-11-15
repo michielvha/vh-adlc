@@ -7,6 +7,31 @@ function runtime() {
     credential_references: ["COPILOT_GITHUB_TOKEN"] }, worker, reviewer: { ...worker, profile_directory: "/owned/profiles/reviewer" } };
 }
 
+test.each(["copilot", "claude"] as const)("ordinary %s launch preserves the existing native authentication locations", async provider => {
+  const { buildNativeRoleInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-launch");
+  const selected = runtime();
+  const worker = { ...selected.worker, client: { provider }, argv: [] };
+  const environment = { HOME: "/owner", XDG_CONFIG_HOME: "/owner/config", XDG_CACHE_HOME: "/owner/cache", XDG_STATE_HOME: "/owner/state",
+    COPILOT_HOME: "/owner/copilot", COPILOT_CACHE_HOME: "/owner/copilot-cache", CLAUDE_CONFIG_DIR: "/owner/claude",
+    NODE_OPTIONS: "--require=/ambient/injection", CLAUDE_CODE_SESSION_ID: "ambient", COPILOT_AGENT_SESSION_ID: "ambient" };
+  const invocation = buildNativeRoleInvocation({ runtime: { ...selected, authentication: "native", worker,
+    loader: { ...selected.loader, provider, credential_references: [] } }, role: "worker", cwd: "/owned/source",
+    artifact_root: "/owned/artifacts", prompt: "Bounded source review", environment });
+  expect(invocation.env.HOME).toBe(environment.HOME);
+  expect(invocation.env.XDG_CONFIG_HOME).toBe(environment.XDG_CONFIG_HOME);
+  expect(invocation.env.XDG_CACHE_HOME).toBe(environment.XDG_CACHE_HOME);
+  expect(invocation.env.XDG_STATE_HOME).toBe(environment.XDG_STATE_HOME);
+  if (provider === "claude") expect(invocation.env.CLAUDE_CONFIG_DIR).toBe(environment.CLAUDE_CONFIG_DIR);
+  else {
+    expect(invocation.env.COPILOT_HOME).toBe(environment.COPILOT_HOME);
+    expect(invocation.env.COPILOT_CACHE_HOME).toBe(environment.COPILOT_CACHE_HOME);
+  }
+  expect(invocation.env.NODE_OPTIONS).toBeUndefined();
+  expect(invocation.env.CLAUDE_CODE_SESSION_ID).toBeUndefined();
+  expect(invocation.env.COPILOT_AGENT_SESSION_ID).toBeUndefined();
+  expect(environment.HOME).toBe("/owner");
+});
+
 test("native role launch uses the selected executable/component/profile/model with a fresh independent context", async () => {
   const { buildCopilotRoleInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-launch");
   const selected = runtime(), environment = { PATH: "/owned/tools:/usr/bin:/bin", HOME: "/ambient", COPILOT_HOME: "/ambient/copilot",

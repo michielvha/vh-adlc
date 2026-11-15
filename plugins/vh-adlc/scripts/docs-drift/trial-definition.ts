@@ -1,6 +1,6 @@
 import { collectionReaders, readAdoptionInput, readGit } from "./git";
 import { canonicalJSON, freezeJSON, protocolPath, withinPrefix } from "./protocol";
-import { parseSettings, type Settings } from "./settings";
+import { legacySettings, parseSettings, type Settings } from "./settings";
 import { verifyConfiguredWorkerCaller, verifyWorkerCallers } from "./worker-callers";
 import { PUBLISHER_ENTRIES, sameLogin } from "./identity";
 
@@ -64,7 +64,7 @@ function trialRoot(value: unknown) {
 
 /** Read and compare committed policy. This performs no trial, publication or authorization. */
 export function readTrialDefinition(options: { repo: string; source: string; settings: Settings }) {
-  const { repo, source, settings } = options, selected = settings.trial;
+  const { repo, source } = options, settings = legacySettings(options.settings), selected = settings.trial;
   if (selected === null) fail("selector missing");
   const blob = (value: unknown, mode: string | null = "100644") => {
     const binding = object(value, ["path", "sha256"]), path = protocolPath(binding.path);
@@ -80,7 +80,7 @@ export function readTrialDefinition(options: { repo: string; source: string; set
   const nativeIdentity = { repository: settings.repository, repository_id: positive(identity.repository_id), actor: identity.actor,
     actor_id: positive(identity.actor_id), default_branch: settings.default_branch };
   const candidateSettings = blob(root.candidate_settings), candidateComponent = blob(root.candidate_component);
-  const candidate = parseSettings(collectionReaders().yaml(candidateSettings.bytes));
+  const candidate = legacySettings(parseSettings(collectionReaders().yaml(candidateSettings.bytes)));
   if (candidate.repository !== settings.repository || candidate.hostname !== settings.hostname
     || candidate.default_branch !== settings.default_branch || !sameLogin(candidate.publication.actor, settings.publication.actor)
     || candidate.publication.mode !== "adopted" || candidate.component_pin !== candidateComponent.path) fail("candidate consumer selection");

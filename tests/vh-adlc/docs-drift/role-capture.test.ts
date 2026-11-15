@@ -10,6 +10,26 @@ import { publicationFixture } from "./publication-fixture";
 import { git } from "./repository-fixture";
 
 const roots: string[] = [];
+
+test("installed role bindings ignore diagnostic versions and installation paths without probing a provider", async () => {
+  const { roleRuntimeDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-capture");
+  const selected = { client: { provider: "claude" as const, executable: "claude" }, client_id: "native-claude", executable: "/missing/claude",
+    version: "2.1.325", model: "claude-opus-5-5", argv: [], identity_source: null };
+  const runtime = { kind: "docs-drift-installed-runtime" as const, authority: "none" as const, authentication: "native" as const,
+    source_commit: "a".repeat(40), settings_sha256: "b".repeat(64), entry: "interactive", worker: selected, reviewer: selected,
+    component: { plugin_version: "0.25.0", source_commit: "c".repeat(40), component_sha256: "d".repeat(64), directory: "/missing/plugin" },
+    loader: { provider: "claude" as const, argv: ["--plugin-dir", "/missing/plugin"], credential_references: [] } };
+  const digest = roleRuntimeDigest(runtime, "worker"), patched = structuredClone(runtime);
+  patched.worker.version = "2.1.326"; patched.worker.executable = "/other/missing/claude";
+  patched.component.directory = "/other/missing/plugin"; patched.loader.argv[1] = patched.component.directory;
+  expect(roleRuntimeDigest(patched, "worker")).toBe(digest);
+  patched.worker.model = "claude-sonnet-5-5";
+  expect(roleRuntimeDigest(patched, "worker")).not.toBe(digest);
+  patched.worker.model = runtime.worker.model; patched.component.component_sha256 = "e".repeat(64);
+  expect(roleRuntimeDigest(patched, "worker")).not.toBe(digest);
+  patched.component.component_sha256 = runtime.component.component_sha256; patched.settings_sha256 = "f".repeat(64);
+  expect(roleRuntimeDigest(patched, "worker")).not.toBe(digest);
+});
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 function fixture() {
   const f = publicationFixture(roots), source = git(f.repo, "rev-parse", "HEAD"), target = hash("original pre-candidate input");

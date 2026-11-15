@@ -5,12 +5,12 @@ file links and checks their targets against the committed Git inventory.
 Its findings are candidates for source-based assessment.
 
 The example starts staged and has no standing publication effects. Its client
-distribution and model fields are placeholders. Local collection requires no
-provider credentials. Configure and verify the consumer's actual client,
-launcher, role identity, worker and adoption evidence before provider execution.
-Replace every role's null native identity source and the separate Claude client
-placeholder with the selected client's actual verified bindings. Each entry
-retains its own worker/reviewer identity and full model.
+model is a placeholder and its component binding is unset. Local collection
+requires no provider credentials. Install and authenticate the selected client
+normally. Configure and verify the consumer's released component, role identities,
+worker and preflight checklist before provider execution. Replace each null
+native identity source with the selected client's observed binding. Each
+execution profile retains its own worker/reviewer identity and full model.
 
 No generated files or feedback stores are configured here. Add actual project
 checks and separate suppression/correction-history procedures during authorized

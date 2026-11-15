@@ -25,10 +25,12 @@ export function samePublicationIdentity(left: PublicationIdentity, right: Public
     && sameAccount(left, right);
 }
 
-export function publisherActor(settings: Settings, entry?: PublisherEntry): string {
+export function publisherActor(settings: Settings, entry?: string): string {
+  if (settings.schema_version === 2 && (entry === undefined || !Object.hasOwn(settings.execution.entries, entry)))
+    throw Error("docs-drift publisher entry required");
   const actors = settings.publication.entry_actors;
   if (actors === undefined) return settings.publication.actor;
-  if (entry === undefined || !PUBLISHER_ENTRIES.includes(entry)) throw Error("docs-drift publisher entry required");
+  if (entry === undefined || !Object.hasOwn(actors, entry)) throw Error("docs-drift publisher entry required");
   return actors[entry];
 }
 

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { inspectClientArchive } from "../../../plugins/vh-adlc/scripts/docs-drift/client-archive";
-import { settingsFixture } from "./settings-fixture";
+import { installedSettingsFixture, settingsFixture } from "./settings-fixture";
 import { dirname, join } from "node:path";
 import { computeComponentIdentity, inspectRetainedPayload } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
@@ -609,6 +609,17 @@ test("ordinary installed payloads keep their existing modes and support a canoni
   expect({ mode: lstatSync(f.payload).mode, links: lstatSync(guide).nlink, source: captureRepositoryState(f.repo) }).toEqual(before);
 });
 
+test.each(["unchanged", "changed", "extra", "missing"] as const)("ordinary payload binding validates the complete file set without a separate manifest %s", scenario => {
+  const f = component();
+  const { plugin_version, source_commit, component_sha256 } = f.identity;
+  if (scenario === "changed") writeFileSync(join(f.payload, "guide.md"), "changed\n");
+  if (scenario === "extra") writeFileSync(join(f.payload, ".hidden-extra"), "extra\n");
+  if (scenario === "missing") rmSync(join(f.payload, "guide.md"));
+  const inspect = () => bootstrap.inspectInstalledPayload({ directory: f.payload, expected: { plugin_version, source_commit, component_sha256 } });
+  if (scenario === "unchanged") expect(inspect().files).toEqual(f.identity.files);
+  else expect(inspect).toThrow();
+});
+
 test.each(["changed", "missing", "extra", "hidden-extra", "executable", "symlink", "directory"] as const)(
   "ordinary installed inventory rejects %s under an unchanged version", scenario => {
     const f = component(), guide = join(f.payload, "guide.md");
@@ -624,3 +635,52 @@ test.each(["changed", "missing", "extra", "hidden-extra", "executable", "symlink
     expect(lstatSync(f.payload).mode & 0o777).toBe(0o755);
   },
 );
+
+test("ordinary client inspection uses the installed command without creating a private distribution", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-installed-client-")));
+  roots.push(root);
+  const executable = join(root, "claude");
+  const program = "#!/bin/sh\nprintf '%s\\n' '2.1.325 (Claude Code)'\n";
+  writeFileSync(executable, program, { mode: 0o755 });
+  const selected = await bootstrap.inspectInstalledClient({ client: { provider: "claude", executable: "claude" }, cwd: root, path: root });
+  expect(selected.complete).toBe(true);
+  expect(selected.version).toBe("2.1.325");
+  expect(selected.executable).toBe(executable);
+  expect(readdirSync(root)).toEqual(["claude"]);
+  expect(readFileSync(executable, "utf8")).toBe(program);
+});
+
+test("ordinary client inspection reports a missing command as setup", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-installed-missing-")));
+  roots.push(root);
+  const selected = await bootstrap.inspectInstalledClient({ client: { provider: "claude", executable: "unprovisioned-client" }, cwd: root, path: root });
+  expect(selected.complete).toBe(false);
+  expect(selected.process).toBeNull();
+  expect(selected.diagnostics.join(" ")).toContain("command");
+  expect(readdirSync(root)).toEqual([]);
+});
+
+test.each(["supported", "missing", "unsupported", "missing-capability"] as const)("ordinary runtime selects configured native roles in place %s", async scenario => {
+  const f = component(), settings = installedSettingsFixture(), executable = join(f.root, "copilot");
+  settings.component = { plugin_version: f.identity.plugin_version, source_commit: f.identity.source_commit, component_sha256: f.identity.component_sha256 };
+  settings.clients.copilot.executable = scenario === "missing" ? "unprovisioned-client" : executable;
+  if (scenario === "unsupported") Reflect.set(settings.clients.copilot, "provider", "codex");
+  const flags = scenario === "missing-capability" ? "--model" : "--plugin-dir --model --session-id --output-format --available-tools --no-custom-instructions --disable-builtin-mcps";
+  writeFileSync(executable, "#!/bin/sh\nif [ \"$1\" = '--no-auto-update' ]; then shift; fi\nif [ \"$1\" = '--version' ]; then printf '%s\\n' 'GitHub Copilot CLI 1.0.112.'; else printf '%s\\n' '" + flags + "'; fi\n", { mode: 0o755 });
+  mkdirSync(join(f.repo, ".vh-adlc"), { recursive: true });
+  writeFileSync(join(f.repo, ".vh-adlc/docs-drift.yaml"), JSON.stringify(settings));
+  const source = commit(f.repo);
+  const selected = await bootstrap.selectInstalledRuntime({ repo: f.repo, source_commit: source, directory: f.payload, entry: "interactive" });
+  expect(selected.complete).toBe(scenario === "supported");
+  if (scenario === "supported") {
+    expect(selected.runtime?.authority).toBe("none");
+    expect(selected.runtime?.worker.executable).toBe(executable);
+    expect(selected.runtime?.worker.model).toBe(settings.execution.entries.interactive.worker.model);
+    expect(selected.runtime?.authentication).toBe("native");
+    expect(selected.runtime?.component.directory).toBe(f.payload);
+    expect(readdirSync(f.root).filter(name => name.includes("client") || name.includes("profile"))).toEqual([]);
+  } else {
+    expect(selected.runtime).toBeNull();
+    expect(selected.diagnostics.length).toBeGreaterThan(0);
+  }
+});

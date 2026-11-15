@@ -1,5 +1,5 @@
 import { readRecordedRoleModel, verifyRuntimeAdoption } from "./adoption";
-import type { selectApprovedRuntime } from "./bootstrap";
+import type { selectApprovedRuntime, InstalledRuntime } from "./bootstrap";
 import type { PublicationIdentity } from "./transport";
 import { isAbsolute, join } from "node:path";
 import { ArtifactChanged, readBoundArtifact, readNativeRoleArtifacts } from "./evidence-input";
@@ -85,7 +85,13 @@ export function readNativeRoleCapture(options: {
 type Runtime = Awaited<ReturnType<typeof selectApprovedRuntime>>;
 
 /** Ordinary disjoint default advances preserve this retained execution contract. */
-export function roleRuntimeDigest(runtime: Runtime, role: Role): string {
+export function roleRuntimeDigest(runtime: Runtime | InstalledRuntime, role: Role): string {
+  if (runtime.kind === "docs-drift-installed-runtime") {
+    const selected = runtime[role], { directory: _directory, ...component } = runtime.component;
+    return canonicalDigest({ kind: runtime.kind, settings_sha256: runtime.settings_sha256, component, entry: runtime.entry,
+      role, selected: { client: selected.client, client_id: selected.client_id, model: selected.model, argv: selected.argv,
+        identity_source: selected.identity_source }, credential_references: runtime.loader.credential_references });
+  }
   return canonicalDigest({ adoption_sha256: runtime.adoption_sha256, component: runtime.component, entry: runtime.entry,
     role, selected: runtime[role], loader: runtime.loader });
 }

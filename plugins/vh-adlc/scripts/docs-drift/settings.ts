@@ -13,6 +13,9 @@ const fields = [
   "verification_commands", "generation_commands", "read_set", "component_pin", "pr_discovery", "publication",
   "reports", "runtime_loader", "clients", "execution", "legacy_proposals", "knowledge_pages", "trial",
 ] as const;
+const installedFields = [...fields.filter(field => field !== "component_pin" && field !== "runtime_loader"),
+  "component", "credential_references"] as const;
+type SettingsField = typeof fields[number] | typeof installedFields[number];
 
 export const DOCS_DRIFT_KNOWLEDGE_PAGES = [
   "conventions/feature-documents.md", "conventions/documentation.md", "conventions/documentation-impact.md",
@@ -167,10 +170,16 @@ export function parseClientBinding(value: unknown) {
   };
 }
 
-function clientSettings(value: unknown) {
+export function parseInstalledClient(value: unknown) {
+  const client = object(value, ["provider", "executable"], "clients entry");
+  return { provider: choice(client.provider, ["copilot", "claude", "codex"], "clients provider"),
+    executable: text(client.executable, "clients executable") };
+}
+
+function clientSettings<Client>(value: unknown, parse: (value: unknown) => Client) {
   const input = object(value, null, "clients");
   identifiers(Object.keys(input), "clients", true);
-  return Object.fromEntries(Object.entries(input).map(([id, value]) => [id, parseClientBinding(value)] as const));
+  return Object.fromEntries(Object.entries(input).map(([id, value]) => [id, parse(value)] as const));
 }
 
 export type IdentitySource = { provider: "copilot" | "claude" | "codex"; event_type: string; field_path: string[] };
@@ -185,7 +194,7 @@ export function parseIdentitySource(value: unknown, provider: string): IdentityS
   return { provider: selected, event_type: text(input.event_type, "identity_source event_type"), field_path: fieldPath };
 }
 
-function executionSettings(value: unknown, clients: ReturnType<typeof clientSettings>) {
+function executionSettings(value: unknown, clients: Record<string, { provider: IdentitySource["provider"] }>, installed = false) {
   const input = object(value, ["worker_workflow", "scheduled_workflow", "claude_command", "runner", "permissions", "secret_mappings", "entries"], "execution");
   const permissions = object(input.permissions, [
     "actions", "contents", "pull-requests", "issues", "checks", "statuses", "security-events",
@@ -199,17 +208,19 @@ function executionSettings(value: unknown, clients: ReturnType<typeof clientSett
     if (!/^[A-Z_][A-Z0-9_]*$/u.test(key) || typeof value !== "string" || !/^[A-Z_][A-Z0-9_]*$/u.test(value)) invalid("execution secret_mappings");
     return [key, value] as const;
   }));
-  const entries = object(input.entries, ["hosted", "copilot", "claude"], "execution entries");
+  const entries = object(input.entries, installed ? null : ["hosted", "copilot", "claude"], "execution entries");
+  const names = installed ? identifiers(Object.keys(entries), "execution entries", true) : ["hosted", "copilot", "claude"];
   const role = (value: unknown) => {
     const input = object(value, ["client", "model", "argv", "identity_source"], "execution role");
     const client = text(input.client, "execution role client");
     if (!Object.hasOwn(clients, client)) invalid("execution role client");
     return {
-      client, model: text(input.model, "execution role model"), argv: argv(input.argv, "execution role argv"),
+      client, model: text(input.model, "execution role model"), argv: installed
+        ? strings(input.argv ?? [], "execution role argv") : argv(input.argv, "execution role argv"),
       identity_source: parseIdentitySource(input.identity_source, clients[client].provider),
     };
   };
-  const parsedEntries = Object.fromEntries(["hosted", "copilot", "claude"].map(name => {
+  const parsedEntries = Object.fromEntries(names.map(name => {
     const entry = object(entries[name], ["worker", "reviewer", "publisher"], "execution entry");
     const publisher = object(entry.publisher, ["argv"], "execution publisher");
     return [name, {
@@ -219,15 +230,17 @@ function executionSettings(value: unknown, clients: ReturnType<typeof clientSett
     }] as const;
   }));
   return {
-    worker_workflow: path(input.worker_workflow, "execution worker_workflow"), scheduled_workflow: path(input.scheduled_workflow, "execution scheduled_workflow"),
-    claude_command: path(input.claude_command, "execution claude_command"), runner: text(input.runner, "execution runner"),
+    worker_workflow: installed && input.worker_workflow === undefined ? null : path(input.worker_workflow, "execution worker_workflow"),
+    scheduled_workflow: installed && input.scheduled_workflow === undefined ? null : path(input.scheduled_workflow, "execution scheduled_workflow"),
+    claude_command: installed && input.claude_command === undefined ? null : path(input.claude_command, "execution claude_command"),
+    runner: installed && input.runner === undefined ? null : text(input.runner, "execution runner"),
     permissions: parsedPermissions, secret_mappings: secretMappings, entries: parsedEntries,
   };
 }
 
-function publicationSettings(value: unknown, selectedRepository: string, base: string) {
+function publicationSettings(value: unknown, selectedRepository: string, base: string, profiles?: string[]) {
   const input = object(value, [
-    "repository", "base", "actor", "branch_prefix", "mode", "adoption_record", "pr_state", "lease_ref", "receipt_ref_prefix",
+    "repository", "base", "actor", "branch_prefix", "mode", profiles ? "checklist_path" : "adoption_record", "pr_state", "lease_ref", "receipt_ref_prefix",
     "resolution_root", "closure", "merge_methods", "entry_actors",
   ], "publication");
   if (repository(input.repository, "publication repository") !== selectedRepository || ref(input.base, "publication base") !== base) invalid("publication destination");
@@ -246,21 +259,22 @@ function publicationSettings(value: unknown, selectedRepository: string, base: s
   const methods = unique(strings(input.merge_methods, "publication merge_methods", true), "publication merge_methods");
   for (const method of methods) choice(method, ["merge", "squash", "rebase"], "publication merge_methods");
   const actor = text(input.actor, "publication actor");
-  const entries: { entry_actors?: Record<PublisherEntry, string> } = {};
+  const entries: { entry_actors?: Record<string, string> } = {};
   if (Object.hasOwn(input, "entry_actors")) {
-    const selected = object(input.entry_actors, PUBLISHER_ENTRIES, "publication entry_actors");
-    const login = (entry: PublisherEntry) => {
+    const names = profiles ?? [...PUBLISHER_ENTRIES];
+    const selected = object(input.entry_actors, names, "publication entry_actors");
+    entries.entry_actors = Object.fromEntries(names.map(entry => {
       const value = text(selected[entry], "publication entry_actors " + entry);
       if (!/^[A-Za-z0-9_][A-Za-z0-9_-]*(?:\[bot\])?$/iu.test(value)) invalid("publication entry_actors " + entry);
-      return value;
-    };
-    entries.entry_actors = { hosted: login("hosted"), copilot: login("copilot"), claude: login("claude") };
-    if (!sameLogin(entries.entry_actors.hosted, actor)) invalid("publication entry_actors hosted");
+      return [entry, value];
+    }));
+    if (Object.hasOwn(entries.entry_actors, "hosted") && !sameLogin(entries.entry_actors.hosted, actor)) invalid("publication entry_actors hosted");
   }
   return {
     repository: selectedRepository, base, actor, branch_prefix: branchPrefix, ...entries,
     mode: choice(input.mode, ["staged", "adopted"], "publication mode"),
-    adoption_record: yamlPath(input.adoption_record, "publication adoption_record"),
+    policy_path: profiles && input.checklist_path === null ? null
+      : yamlPath(profiles ? input.checklist_path : input.adoption_record, profiles ? "publication checklist_path" : "publication adoption_record"),
     pr_state: { advisory: choice(states.advisory, ["draft", "ready"], "publication pr_state advisory"),
       resolve: choice(states.resolve, ["draft", "ready"], "publication pr_state resolve") },
     lease_ref: lease, receipt_ref_prefix: receipts,
@@ -317,21 +331,56 @@ function loaderSettings(value: unknown) {
   };
 }
 
+function legacySetup(input: Record<string, unknown>, selectedRepository: string, base: string) {
+  const clients = clientSettings(input.clients, parseClientBinding);
+  const parsedExecution = executionSettings(input.execution, clients);
+  const execution = { ...parsedExecution,
+    worker_workflow: path(parsedExecution.worker_workflow, "execution worker_workflow"),
+    scheduled_workflow: path(parsedExecution.scheduled_workflow, "execution scheduled_workflow"),
+    claude_command: path(parsedExecution.claude_command, "execution claude_command"), runner: text(parsedExecution.runner, "execution runner") };
+  const { policy_path, ...policy } = publicationSettings(input.publication, selectedRepository, base);
+  const publication = { ...policy, adoption_record: yamlPath(policy_path, "publication adoption_record") };
+  const componentPin = input.component_pin === null ? null : yamlPath(input.component_pin, "component_pin");
+  if (publication.mode === "adopted" && componentPin === null) invalid("adopted component_pin");
+  return { schema_version: 1 as const, clients, execution, publication, reports: reportSettings(input.reports),
+    runtime_loader: loaderSettings(input.runtime_loader), component_pin: componentPin };
+}
+
+function installedSetup(input: Record<string, unknown>, selectedRepository: string, base: string) {
+  const clients = clientSettings(input.clients, parseInstalledClient);
+  const execution = executionSettings(input.execution, clients, true);
+  const { policy_path, ...policy } = publicationSettings(input.publication, selectedRepository, base, Object.keys(execution.entries));
+  const publication = { ...policy, checklist_path: policy_path };
+  let component: { plugin_version: string; source_commit: string; component_sha256: string } | null = null;
+  if (input.component !== null) {
+    const selected = object(input.component, ["plugin_version", "source_commit", "component_sha256"], "component");
+    const pluginVersion = text(selected.plugin_version, "component plugin_version"), source = text(selected.source_commit, "component source_commit");
+    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(pluginVersion)
+      || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(source)) invalid("component binding");
+    component = { plugin_version: pluginVersion, source_commit: source, component_sha256: digest(selected.component_sha256, "component component_sha256") };
+  }
+  if (publication.mode === "adopted" && (component === null || publication.checklist_path === null)) invalid("adopted component/checklist");
+  const credentials = identifiers(input.credential_references, "credential_references");
+  if (credentials.some(name => !/^[A-Z_][A-Z0-9_]*$/u.test(name))) invalid("credential_references");
+  return { schema_version: 2 as const, clients, execution, publication, component,
+    credential_references: credentials, reports: reportSettings(input.reports) };
+}
+
+/** Validate immutable project policy while retaining the historical settings representation. */
 /** Validate the same closed schema for selected source blobs and current-default policy. */
-export function parseSettings(value: unknown) {
-  const input = object(value, fields, "settings");
-  if (input.schema_version !== 1 || input.protocol_version !== 1) invalid("versions");
+function parseSettingsValue(value: unknown) {
+  const version = object(value, null, "settings").schema_version;
+  if (version !== 1 && version !== 2) invalid("versions");
+  const input = object(value, version === 1 ? fields : installedFields, "settings");
+  if (input.protocol_version !== 1) invalid("versions");
   const selectedRepository = repository(input.repository, "repository");
   const hostname = text(input.hostname, "hostname").toLowerCase();
   if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/u.test(hostname)) invalid("hostname");
   const base = ref(input.default_branch, "default_branch");
   const required = identifiers(input.required_detectors, "required_detectors", true);
   const options = object(input.detector_options, required, "detector_options");
-  const clients = clientSettings(input.clients);
-  const execution = executionSettings(input.execution, clients);
-  const publication = publicationSettings(input.publication, selectedRepository, base);
-  const componentPin = input.component_pin === null ? null : yamlPath(input.component_pin, "component_pin");
-  if (publication.mode === "adopted" && componentPin === null) invalid("adopted component_pin");
+  const setup = version === 1 ? legacySetup(input, selectedRepository, base) : installedSetup(input, selectedRepository, base);
+  const { publication, reports, execution } = setup;
   const discovery = object(input.pr_discovery, ["repository", "base", "authors", "branch_prefixes"], "pr_discovery");
   if (repository(discovery.repository, "pr_discovery repository") !== selectedRepository || ref(discovery.base, "pr_discovery base") !== base) invalid("pr_discovery destination");
   const authors = unique(strings(discovery.authors, "pr_discovery authors", true), "pr_discovery authors");
@@ -348,9 +397,8 @@ export function parseSettings(value: unknown) {
   if (!Array.isArray(legacy.ids)) invalid("legacy_proposals ids");
   const legacyIDs = legacy.ids.map(id => positive(id, "legacy_proposals ids"));
   if (new Set(legacyIDs).size !== legacyIDs.length) invalid("legacy_proposals ids");
-  const reports = reportSettings(input.reports);
-  if (reports.workflow_path !== execution.scheduled_workflow) invalid("reports scheduled workflow");
-  if (publication.mode === "adopted" && reports.workflow_id === null) invalid("adopted reports workflow_id");
+  if (execution.scheduled_workflow !== null && reports.workflow_path !== execution.scheduled_workflow) invalid("reports scheduled workflow");
+  if (publication.mode === "adopted" && Object.hasOwn(execution.entries, "hosted") && reports.workflow_id === null) invalid("adopted reports workflow_id");
   let trial: { definition_path: string; definition_sha256: string } | null = null;
   if (input.trial !== undefined) {
     const block = object(input.trial, ["definition_path", "definition_sha256"], "trial");
@@ -359,7 +407,7 @@ export function parseSettings(value: unknown) {
   const pages = unique([...DOCS_DRIFT_KNOWLEDGE_PAGES, ...strings(input.knowledge_pages, "knowledge_pages")], "knowledge_pages");
   for (const page of pages) if (!path(page, "knowledge_pages").endsWith(".md")) invalid("knowledge_pages");
   return {
-    schema_version: 1 as const, protocol_version: 1 as const, repository: selectedRepository, hostname, default_branch: base,
+    ...setup, protocol_version: 1 as const, repository: selectedRepository, hostname, default_branch: base,
     roots: paths(input.roots, "roots", true), exclusions: paths(input.exclusions, "exclusions"), suffixes: suffixes(input.suffixes, "suffixes", true),
     required_detectors: required, detector_inputs: detectorSelectors(input.detector_inputs, required),
     detector_options: Object.fromEntries(required.map(id =>
@@ -368,13 +416,12 @@ export function parseSettings(value: unknown) {
     scanner: scannerSettings(input.scanner), project_procedure: path(input.project_procedure, "project_procedure"),
     verification_commands: commands(input.verification_commands, "verification_commands"),
     generation_commands: commands(input.generation_commands, "generation_commands"),
-    read_set: readSet(input.read_set), component_pin: componentPin,
+    read_set: readSet(input.read_set),
     pr_discovery: {
       repository: selectedRepository,
       base,
       authors, branch_prefixes: branchPrefixes,
     },
-    publication, reports, runtime_loader: loaderSettings(input.runtime_loader), clients, execution,
     legacy_proposals: {
       authors: unique(strings(legacy.authors, "legacy_proposals authors"), "legacy_proposals authors"),
       branch_prefixes: unique(strings(legacy.branch_prefixes, "legacy_proposals branch_prefixes")
@@ -393,7 +440,20 @@ function scannerSettings(value: unknown) {
   };
 }
 
-export type Settings = ReturnType<typeof parseSettings>;
+export type Settings = ReturnType<typeof parseSettingsValue>;
+export type LegacySettings = Extract<Settings, { schema_version: 1 }>;
+export type InstalledSettings = Extract<Settings, { schema_version: 2 }>;
+
+export function parseSettings(value: { schema_version: 1 }): LegacySettings;
+export function parseSettings(value: { schema_version: 2 }): InstalledSettings;
+export function parseSettings(value: unknown): Settings;
+export function parseSettings(value: unknown): Settings { return parseSettingsValue(value); }
+
+/** The original setup reader remains available for historical inspection and its implementation handoff. */
+export function legacySettings(settings: Settings): LegacySettings {
+  if (settings.schema_version !== 1) invalid("use the ordinary installed runtime for settings version 2");
+  return settings;
+}
 
 const classifications = {
   schema_version: "protected",
@@ -414,6 +474,8 @@ const classifications = {
   generation_commands: "protected",
   read_set: "protected",
   component_pin: "protected",
+  component: "protected",
+  credential_references: "protected",
   pr_discovery: "protected",
   publication: "protected",
   reports: "protected",
@@ -423,7 +485,7 @@ const classifications = {
   legacy_proposals: "protected",
   knowledge_pages: "protected",
   trial: "trial-setup",
-} satisfies Record<keyof Settings, SettingClassification>;
+} satisfies Record<SettingsField, SettingClassification>;
 
 export type ClassifiedLeaf = { path: Array<string | number>; classification: SettingClassification; value: unknown };
 
@@ -438,14 +500,17 @@ export function classifySettingsLeaves(settings: Settings): ClassifiedLeaf[] {
     }
     for (const [key, item] of entries) visit(item, [...path, Array.isArray(value) ? Number(key) : key], classification);
   }
-  for (const key of fields) visit(settings[key], [key], classifications[key]);
+  const values: Record<string, unknown> = settings;
+  for (const key of settings.schema_version === 1 ? fields : installedFields) visit(values[key], [key], classifications[key]);
   return leaves;
 }
 
 export function settingsProjections(settings: Settings): { ordinary: Record<string, unknown>; protected: Record<string, unknown>; trial_setup: Record<string, unknown> } {
-  const select = (classification: SettingClassification) => Object.fromEntries(fields
+  const values: Record<string, unknown> = settings;
+  const selectedFields = settings.schema_version === 1 ? fields : installedFields;
+  const select = (classification: SettingClassification) => Object.fromEntries(selectedFields
     .filter(key => classifications[key] === classification)
-    .map(key => [key, settings[key]] as const));
+    .map(key => [key, values[key]] as const));
   return { ordinary: select("ordinary"), protected: select("protected"), trial_setup: select("trial-setup") };
 }
 
@@ -464,4 +529,10 @@ export function loadCommittedSettings(repo: string, sourceCommit: string): { set
   const bytes = readGit(repo, "cat-file", "blob", match[2]);
   const value = readYAML(bytes, reason => { throw new Error(reason); }, { offline: true, environment: verifiedHelperEnvironment() });
   return { settings: parseSettings(value), settings_sha256: sha256(bytes), source_commit: sourceCommit };
+}
+
+
+export function loadLegacyCommittedSettings(repo: string, sourceCommit: string) {
+  const loaded = loadCommittedSettings(repo, sourceCommit);
+  return { ...loaded, settings: legacySettings(loaded.settings) };
 }

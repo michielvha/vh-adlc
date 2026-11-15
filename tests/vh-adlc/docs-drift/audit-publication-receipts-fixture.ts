@@ -1,3 +1,4 @@
+import { legacySettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 /** Real owned Git receipt objects behind a GET-only native fixture. No publication or provider trial. */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -50,7 +51,7 @@ export async function auditReceiptFixture(roots: string[], options: { single?: b
   const selected = { ...bindings, ...deriveSourceWorkerInputs(snapshot), candidate_commit: head, candidate_tree: tree,
     diff_sha256: sha256(readOwnedPatch(store, settings.repository, f.source, head)), delivery_sha256: deliveryDigest([correction], []) };
   const input = fixture(selected, effects), plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
-    adoption_sha256: sha256(readGit(store.root, "show", f.source + ":" + settings.publication.adoption_record)),
+    adoption_sha256: sha256(readGit(store.root, "show", f.source + ":" + legacySettings(settings).publication.adoption_record)),
     publication_kind: "advisory", context: "production", transport: "native", corrections: [correction], attention: [] });
   const objects = writePlanObject(store, plan), bytes = canonicalJSON(plan), prefix = "repos/fixture/docs";
   const refEndpoint = prefix + "/git/ref/" + ref.slice(5), blobEndpoint = prefix + "/git/blobs/" + objects.blob;

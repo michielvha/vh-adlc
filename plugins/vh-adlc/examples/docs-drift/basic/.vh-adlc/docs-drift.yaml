@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2
 protocol_version: 1
 repository: example/docs
 hostname: github.com
@@ -29,7 +29,8 @@ generation_commands: []
 read_set:
   source_roots: null
   reference_roots: null
-component_pin: null
+component: null
+credential_references: []
 pr_discovery:
   repository: example/docs
   base: main
@@ -43,7 +44,7 @@ publication:
   actor: example-bot
   branch_prefix: docs-drift/
   mode: staged
-  adoption_record: .vh-adlc/docs-drift-adoptions/initial.yaml
+  checklist_path: .vh-adlc/docs-drift-preflight.yaml
   pr_state:
     advisory: ready
     resolve: ready
@@ -72,30 +73,10 @@ reports:
   - bun
   - scripts/docs-drift-entry.ts
   - collect-report-history
-runtime_loader:
-  launcher: scripts/docs-drift-entry.ts
-  provider: copilot
-  argv:
-  - --plugin-dir
-  - '{plugin_dir}'
-  plugin_directory_template: '{plugin_dir}'
-  profile_root_template: '{profile_root}'
-  automatic_updates: false
-  ambient_discovery: false
-  credential_references: []
 clients:
-  copilot-linux:
+  copilot:
     provider: copilot
-    version: 0.0.0-example
-    platform: linux-x64
-    distribution_url: https://example.invalid/replace-with-verified-client.tgz
-    distribution_sha256: '0000000000000000000000000000000000000000000000000000000000000000'
-  claude-linux:
-    provider: claude
-    version: 0.0.0-example
-    platform: linux-x64
-    distribution_url: https://example.invalid/replace-with-verified-claude-client.tgz
-    distribution_sha256: '0000000000000000000000000000000000000000000000000000000000000000'
+    executable: copilot
 execution:
   worker_workflow: .github/workflows/docs-drift-worker.yml
   scheduled_workflow: .github/workflows/docs-drift.yml
@@ -108,52 +89,30 @@ execution:
   entries:
     hosted:
       worker:
-        client: copilot-linux
+        client: copilot
         model: example-model-1
-        argv:
-        - --replace-with-native-role-arguments
+        argv: []
         identity_source: null
       reviewer:
-        client: copilot-linux
+        client: copilot
         model: example-model-1
-        argv:
-        - --replace-with-native-role-arguments
+        argv: []
         identity_source: null
       publisher:
         argv:
         - bun
         - scripts/docs-drift-entry.ts
         - publish
-    copilot:
+    interactive:
       worker:
-        client: copilot-linux
+        client: copilot
         model: example-model-1
-        argv:
-        - --replace-with-native-role-arguments
+        argv: []
         identity_source: null
       reviewer:
-        client: copilot-linux
+        client: copilot
         model: example-model-1
-        argv:
-        - --replace-with-native-role-arguments
-        identity_source: null
-      publisher:
-        argv:
-        - bun
-        - scripts/docs-drift-entry.ts
-        - publish
-    claude:
-      worker:
-        client: claude-linux
-        model: example-model-1
-        argv:
-        - --replace-with-native-role-arguments
-        identity_source: null
-      reviewer:
-        client: claude-linux
-        model: example-model-1
-        argv:
-        - --replace-with-native-role-arguments
+        argv: []
         identity_source: null
       publisher:
         argv:

@@ -3,7 +3,7 @@ export function settingsFixture() {
   const role = { client: "copilot-linux", model: "fixture-model", argv: ["--fixture-role"] };
   const entry = { worker: role, reviewer: role, publisher: { argv: ["bun", "publisher.ts"] } };
   return structuredClone({
-    schema_version: 1,
+    schema_version: 1 as const,
     protocol_version: 1,
     repository: "fixture/docs",
     hostname: "github.com",
@@ -55,4 +55,25 @@ export function settingsFixture() {
     legacy_proposals: { authors: ["legacy-bot"], branch_prefixes: ["docs-audit/"], ids: [] as number[] },
     knowledge_pages: [],
   });
+}
+
+/** Ordinary client commands and project policy, independent of the invoking harness. */
+export function installedSettingsFixture() {
+  const legacy = settingsFixture();
+  const { component_pin: _pin, runtime_loader: _loader, clients: _clients, execution, publication, ...common } = legacy;
+  const { adoption_record: _adoption, ...policy } = publication;
+  const previous = execution.entries.copilot;
+  const entry = { worker: { ...previous.worker, client: "copilot", argv: [] as string[] },
+    reviewer: { ...previous.reviewer, client: "copilot", argv: [] as string[] }, publisher: previous.publisher };
+  return {
+    ...common, schema_version: 2 as const,
+    component: { plugin_version: "0.25.0", source_commit: "a".repeat(40), component_sha256: "b".repeat(64) },
+    credential_references: ["COPILOT_GITHUB_TOKEN"],
+    clients: { copilot: { provider: "copilot", executable: "copilot" } },
+    execution: { permissions: execution.permissions, secret_mappings: execution.secret_mappings,
+      entries: { interactive: entry, hosted: entry } },
+    publication: { ...policy, checklist_path: ".vh-adlc/docs-drift-preflight.yaml",
+      entry_actors: { interactive: "fixture-owner", hosted: "fixture-bot" } },
+    pr_discovery: { ...common.pr_discovery, authors: ["fixture-bot", "fixture-owner"] },
+  };
 }

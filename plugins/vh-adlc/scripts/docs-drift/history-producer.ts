@@ -7,7 +7,7 @@ import { readHistoryWorkflowContract } from "./history-workflow";
 import { requireOwnedStore } from "./proposals";
 import { canonicalDigest, freezeJSON, sha256 } from "./protocol";
 import type { ProducerSource, VerifiedProducer } from "./report-history";
-import { loadCommittedSettings } from "./settings";
+import { loadLegacyCommittedSettings } from "./settings";
 import type { OwnedObjectStore } from "./snapshot";
 import { requireCompleteHistory } from "./snapshot";
 import type { PublicationIdentity } from "./transport";
@@ -32,7 +32,7 @@ export function createAdoptedProducerVerifier(input: { store: OwnedObjectStore; 
       if (!isGitAncestor(repo, run.head_sha, current)) return null;
       // A pre-adoption run is ineligible, not a fabricated approved producer.
       if (readAdoptionInput(repo, run.head_sha, ".vh-adlc/docs-drift.yaml") === null) return null;
-      const { settings } = loadCommittedSettings(repo, run.head_sha);
+      const { settings } = loadLegacyCommittedSettings(repo, run.head_sha);
       if (settings.publication.mode !== "adopted" || readAdoptionInput(repo, run.head_sha, settings.publication.adoption_record) === null) return null;
       const adopted = readRecordedAdoption({ repo, current_default: run.head_sha });
       if (adopted.identity.repository_id !== identity.repository_id || adopted.identity.default_branch !== identity.default_branch

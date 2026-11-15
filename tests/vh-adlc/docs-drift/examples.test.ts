@@ -21,20 +21,23 @@ afterAll(() => {
 
 test("the complete example settings pass the production strict reader and stay staged", () => {
   const settings = parseSettings(readYAML(readFileSync(join(example, ".vh-adlc/docs-drift.yaml")), reason => { throw Error(reason); }, { offline: true }));
+  expect(settings.schema_version).toBe(2);
+  if (settings.schema_version !== 2) throw Error("Example uses ordinary installed settings");
   expect(settings.publication.mode).toBe("staged");
-  expect(settings.component_pin).toBeNull();
+  expect(settings.component).toBeNull();
   expect(settings.required_detectors).toEqual(["local-links"]);
-  expect(settings.runtime_loader.automatic_updates).toBe(false);
-  expect(settings.runtime_loader.ambient_discovery).toBe(false);
+  expect(settings.credential_references).toEqual([]);
+  expect(Object.keys(settings.execution.entries)).toEqual(["hosted", "interactive"]);
+  expect(settings.clients.copilot).toEqual({ provider: "copilot", executable: "copilot" });
   expect(settings.execution.secret_mappings).toEqual({});
   for (const entry of Object.values(settings.execution.entries)) {
     expect(entry.worker.identity_source).toBeNull();
     expect(entry.reviewer.identity_source).toBeNull();
   }
-  expect(settings.clients[settings.execution.entries.claude.worker.client].provider).toBe("claude");
-  for (const path of [settings.project_procedure, settings.scanner.script, settings.runtime_loader.launcher,
-    settings.execution.worker_workflow, settings.execution.scheduled_workflow, settings.execution.claude_command])
-    expect(readFileSync(join(example, path)).length).toBeGreaterThan(0);
+  for (const path of [settings.project_procedure, settings.scanner.script,
+    settings.execution.worker_workflow, settings.execution.scheduled_workflow, settings.execution.claude_command]) {
+    if (path !== null) expect(readFileSync(join(example, path)).length).toBeGreaterThan(0);
+  }
 });
 
 test.each([
@@ -100,13 +103,15 @@ test("the collection example binds the original committed component and rejects 
 test("the staged collection workflow keeps explicit read-only caller permissions and credential-free collection", () => {
   const fail = (reason: string): never => { throw Error(reason); };
   const settings = parseSettings(readYAML(readFileSync(join(example, ".vh-adlc/docs-drift.yaml")), fail, { offline: true }));
+  if (!settings.execution.scheduled_workflow || !settings.execution.worker_workflow) throw Error("Example requires both workflow paths");
+  const workerPath = settings.execution.worker_workflow;
   const callerBytes = readFileSync(join(example, settings.execution.scheduled_workflow));
   const worker = readYAML(readFileSync(join(example, settings.execution.worker_workflow)), fail, { offline: true }) as any;
   const caller = readYAML(callerBytes, fail, { offline: true }) as any;
   expect(Object.keys(caller.on)).toEqual(["workflow_dispatch"]);
   expect(Object.keys(worker.on)).toEqual(["workflow_call"]);
   expect(worker.permissions).toEqual({ contents: "read", actions: "read" });
-  expect(() => verifyConfiguredWorkerCaller({ bytes: callerBytes, worker_path: settings.execution.worker_workflow,
+  expect(() => verifyConfiguredWorkerCaller({ bytes: callerBytes, worker_path: workerPath,
     permissions: settings.execution.permissions, secret_mappings: settings.execution.secret_mappings })).not.toThrow();
   expect(JSON.stringify(worker)).not.toContain("secrets.");
   const checkouts = worker.jobs.collect.steps.filter((step: any) => step.uses?.startsWith("actions/checkout@"));

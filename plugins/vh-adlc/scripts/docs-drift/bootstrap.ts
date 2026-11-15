@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { clientArchivePath, inspectClientArchive } from "./client-archive";
 import { executeOwnedProcess, ownedClientCompleted, recordedProcessCompleted, type OwnedProcess } from "./owned-process";
-import { parseClientBinding } from "./settings";
+import { loadCommittedSettings, parseClientBinding, parseInstalledClient } from "./settings";
 import { collectAdoptionBindings, collectTrialBindings, parseComponentPin, verifyRuntimeAdoption } from "./adoption";
 import type { PublicationIdentity } from "./transport";
 import { publishArtifact, syncDirectory } from "./journal";
@@ -54,37 +54,39 @@ export function computeComponentIdentity(repo: string, sourceCommit: string): Co
     component_sha256: componentDigest(files), files });
 }
 
-function inspectRetainedFiles(directory: string, expected: { files: PayloadFile[]; component_sha256: string },
+function inspectRetainedFiles(directory: string, expected: { files?: PayloadFile[]; component_sha256: string },
   inspectBlob?: (path: string, bytes: Buffer) => void, policy: "retained" | "installed" = "retained") {
   canonicalJSON(expected);
-  if (!Array.isArray(expected.files) || expected.files.length === 0
-    || componentDigest(expected.files) !== expected.component_sha256) fail("expected component identity");
+  if (!/^[a-f0-9]{64}$/u.test(expected.component_sha256)
+    || (expected.files === undefined ? policy !== "installed" : !Array.isArray(expected.files) || expected.files.length === 0
+      || componentDigest(expected.files) !== expected.component_sha256)) fail("expected component identity");
   const root = realpathSync(directory), owner = process.getuid?.();
   const rootStat = lstatSync(policy === "installed" ? root : directory);
   if (!rootStat.isDirectory()) fail("runtime directory required");
   if (policy === "retained" && (owner === undefined || root !== directory || rootStat.isSymbolicLink()
     || rootStat.uid !== owner || (rootStat.mode & 0o077) !== 0)) fail("private owned runtime root required");
-  const selected = new Map(expected.files.map(file => [file.path, file]));
-  if (selected.size !== expected.files.length) fail("duplicate component identity");
+  const selected = expected.files ? new Map(expected.files.map(file => [file.path, file])) : null;
+  if (selected && selected.size !== expected.files?.length) fail("duplicate component identity");
   const files: PayloadFile[] = [];
   function walk(parent: string): void {
     for (const name of readdirSync(parent)) {
       const path = join(parent, name), stat = lstatSync(path);
       if (stat.isSymbolicLink() || policy === "retained" && stat.uid !== owner) fail("foreign or linked runtime input");
       if (stat.isDirectory()) { walk(path); continue; }
-      const relative = protocolPath(path.slice(root.length + 1)), required = selected.get(relative);
-      if (!stat.isFile() || policy === "retained" && stat.nlink !== 1 || !required || !Number.isSafeInteger(required.size)
-        || required.size < 0 || stat.size !== required.size) fail("unexpected or changed runtime input");
+      const relative = protocolPath(path.slice(root.length + 1)), required = selected?.get(relative);
+      if (!stat.isFile() || policy === "retained" && stat.nlink !== 1 || selected && !required
+        || !Number.isSafeInteger(stat.size) || stat.size < 0
+        || required && (!Number.isSafeInteger(required.size) || required.size < 0 || stat.size !== required.size)) fail("unexpected or changed runtime input");
       const mode = (stat.mode & 0o100) === 0 ? "100644" : "100755";
-      if (mode !== required.mode) fail("runtime executable mode changed");
+      if (required && mode !== required.mode) fail("runtime executable mode changed");
       const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
       try {
         const opened = fstatSync(fd);
-        if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino || opened.size !== required.size
+        if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino || opened.size !== stat.size
           || policy === "retained" && (opened.uid !== owner || opened.nlink !== 1)
           || opened.mode !== stat.mode) fail("runtime input changed during inspection");
         const bytes = readFileSync(fd), digest = sha256(bytes);
-        if (bytes.length !== required.size || digest !== required.sha256) fail("runtime input bytes changed");
+        if (bytes.length !== stat.size || required && digest !== required.sha256) fail("runtime input bytes changed");
         inspectBlob?.(relative, bytes);
         files.push({ path: relative, mode, sha256: digest, size: bytes.length });
       } finally { closeSync(fd); }
@@ -92,13 +94,15 @@ function inspectRetainedFiles(directory: string, expected: { files: PayloadFile[
   }
   walk(root);
   files.sort((left, right) => compareUTF8(left.path, right.path));
-  if (files.length !== expected.files.length
-    || !canonicalJSON(files).equals(canonicalJSON(expected.files)) || componentDigest(files) !== expected.component_sha256) fail("retained component identity changed");
+  if (expected.files && (files.length !== expected.files.length || !canonicalJSON(files).equals(canonicalJSON(expected.files)))
+    || componentDigest(files) !== expected.component_sha256) fail("retained component identity changed");
   return freezeJSON({ directory: root, component_sha256: componentDigest(files), files });
 }
 
-function inspectComponentPayload(options: { directory: string; expected: ComponentIdentity }, policy: "retained" | "installed") {
-  if (options.expected.schema_version !== 1) fail("expected component identity");
+export type InstalledComponentBinding = Pick<ComponentIdentity, "plugin_version" | "source_commit" | "component_sha256">;
+function inspectComponentPayload(options: { directory: string; expected: InstalledComponentBinding & Partial<Pick<ComponentIdentity, "files" | "schema_version">> }, policy: "retained" | "installed") {
+  if ((options.expected.schema_version !== undefined || policy === "retained") && options.expected.schema_version !== 1
+    || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(options.expected.source_commit)) fail("expected component identity");
   let version: string | undefined;
   const inspected = inspectRetainedFiles(options.directory, options.expected, (path, bytes) => {
     if (path === ".claude-plugin/plugin.json") version = pluginVersion(bytes);
@@ -113,7 +117,7 @@ export function inspectRetainedPayload(options: { directory: string; expected: C
 }
 
 /** Validate ordinary installed bytes and inventory without changing installer permissions or copying files. */
-export function inspectInstalledPayload(options: { directory: string; expected: ComponentIdentity }) {
+export function inspectInstalledPayload(options: { directory: string; expected: InstalledComponentBinding & Partial<Pick<ComponentIdentity, "files" | "schema_version">> }) {
   return inspectComponentPayload(options, "installed");
 }
 
@@ -238,15 +242,93 @@ async function clientFiles(distribution: Uint8Array, client: ClientBinding, form
   if (!files.has(executable)) fail("client distribution executable or inventory");
   return files;
 }
-function nativeClientVersion(stdout: Uint8Array, client: ClientBinding): string {
+function nativeClientVersion(stdout: Uint8Array, client: { provider: ClientBinding["provider"]; version?: string }): string {
   const lines = decodeUTF8(stdout).trim().split(/\r?\n/u);
   const pattern = client.provider === "copilot" ? /^GitHub Copilot CLI (.+?)\.?$/u
     : client.provider === "claude" ? /^(.+) \(Claude Code\)$/u : /^codex-cli (.+)$/u;
   const version = pattern.exec(lines[0])?.[1];
   const extras = client.provider === "copilot" && lines.length === 2 && lines[1] === "Run 'copilot update' to check for updates.";
-  if ((lines.length !== 1 && !extras) || version !== client.version) fail("native client version differs from approved build");
+  if ((lines.length !== 1 && !extras) || !version
+    || (client.version === undefined ? !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(version)
+      : version !== client.version)) fail("native client version differs from approved build");
   return version;
 }
+
+/** Observe the ordinary command in place. Its version is diagnostic and carries no effect authority. */
+export async function inspectInstalledClient(input: {
+  client: ReturnType<typeof parseInstalledClient>; cwd: string; path?: string; required_flags?: readonly string[];
+}) {
+  const options = { ...input, required_flags: input.required_flags ? [...input.required_flags] : [] };
+  const client = parseInstalledClient(options.client);
+  const command = Bun.which(client.executable, { cwd: options.cwd, PATH: options.path ?? process.env.PATH });
+  if (!command) return { complete: false, client, executable: null, version: null, process: null,
+    diagnostics: ["Install the configured native client command or correct its executable setting."] };
+  const executable = realpathSync(command);
+  const probe = (argument: "--version" | "--help") => executeOwnedProcess({
+      argv: [executable, ...(client.provider === "copilot" ? ["--no-auto-update"] : []), argument],
+      cwd: options.cwd, env: { PATH: options.path ?? process.env.PATH ?? "", LANG: "C.UTF-8", DISABLE_AUTOUPDATER: "1", COPILOT_AUTO_UPDATE: "false" },
+      capture: "memory", watched_outputs: [], stdout: "/dev/null", stderr: "/dev/null",
+      timeout_ms: 15000, max_output_bytes: 65536, started: () => {},
+    });
+  const result = await probe("--version");
+  const { captured, ...completion } = result;
+  let version: string | null = null;
+  if (ownedClientCompleted(result) && captured) {
+    try { version = nativeClientVersion(captured.stdout, client); }
+    catch { /* Unrecognized output remains private in memory. Return only the setup diagnosis. */ }
+  }
+  const diagnostics = version === null ? ["The configured native client did not complete a recognized version probe."] : [];
+  if (version !== null && options.required_flags?.length) {
+    const help = await probe("--help");
+    const flags = new Set(help.captured ? decodeUTF8(help.captured.stdout).match(/--[a-z][a-z0-9-]*/gu) : []);
+    if (!ownedClientCompleted(help) || options.required_flags.some(flag => !flags.has(flag)))
+      diagnostics.push("The configured native client lacks the required plugin, isolation or output capabilities.");
+  }
+  return { complete: diagnostics.length === 0, client, executable, version, process: completion, diagnostics };
+}
+
+/** Select immutable project policy and ordinary installed commands. Publication is gated separately. */
+export async function selectInstalledRuntime(input: {
+  repo: string; source_commit: string; directory: string; entry: string; path?: string;
+}) {
+  const options = { ...input };
+  const loaded = loadCommittedSettings(options.repo, options.source_commit), settings = loaded.settings;
+  if (settings.schema_version !== 2) fail("settings version 2 required for ordinary installation");
+  if (!settings.component) fail("declare the selected released component");
+  if (!Object.hasOwn(settings.execution.entries, options.entry)) fail("configured execution profile required");
+  const inspected = inspectInstalledPayload({ directory: options.directory, expected: settings.component });
+  const entry = settings.execution.entries[options.entry];
+  const clients = new Map<string, Awaited<ReturnType<typeof inspectInstalledClient>>>();
+  const diagnostics: string[] = [];
+  for (const selected of [entry.worker, entry.reviewer]) {
+    if (clients.has(selected.client)) continue;
+    const client = settings.clients[selected.client];
+    if (client.provider !== "copilot" && client.provider !== "claude") {
+      diagnostics.push("The configured native role backend is unsupported.");
+      continue;
+    }
+    const required_flags = client.provider === "copilot"
+      ? ["--plugin-dir", "--model", "--session-id", "--output-format", "--available-tools", "--no-custom-instructions", "--disable-builtin-mcps"]
+      : ["--plugin-dir", "--model", "--session-id", "--output-format", "--tools", "--setting-sources", "--strict-mcp-config", "--no-session-persistence"];
+    const inspected = await inspectInstalledClient({ client, cwd: options.repo, path: options.path, required_flags });
+    clients.set(selected.client, inspected);
+    diagnostics.push(...inspected.diagnostics);
+  }
+  function role(selected: typeof entry.worker) {
+    const client = clients.get(selected.client);
+    if (!client?.complete || !client.executable || !client.version) return null;
+    return { ...selected, client: client.client, client_id: selected.client, executable: client.executable, version: client.version };
+  }
+  const worker = role(entry.worker), reviewer = role(entry.reviewer);
+  if (!worker || !reviewer) return { complete: false as const, runtime: null, diagnostics };
+  return { complete: true as const, diagnostics, runtime: freezeJSON({ kind: "docs-drift-installed-runtime" as const,
+    authority: "none" as const, authentication: "native" as const, source_commit: options.source_commit,
+    settings_sha256: loaded.settings_sha256, entry: options.entry, worker, reviewer,
+    component: { ...settings.component, directory: inspected.directory },
+    loader: { provider: worker.client.provider, argv: ["--plugin-dir", inspected.directory], credential_references: settings.credential_references } }) };
+}
+
+export type InstalledRuntime = NonNullable<Awaited<ReturnType<typeof selectInstalledRuntime>>["runtime"]>;
 
 /** Read the checksum-bound cache entry selected by the protected client binding. */
 export async function inspectRetainedClient(input: { cache_directory: string; consumer_repo: string; client_id: string; client: ClientBinding; profile_scope: ClientProfileScope }) {
@@ -489,7 +571,7 @@ export async function selectApprovedRuntime(input: {
   if (settingsSHA !== bindings.settings_sha256) fail("invoked settings changed");
   const runtime = await retainedRuntimeEntry({ ...options, settings, pin: adopted.component_pin, identity: adopted.identity,
     launcher_sha256: launcherSHA, settings_sha256: settingsSHA });
-  return freezeJSON({ kind: "docs-drift-approved-runtime", evidence: adopted.evidence, current_default: options.current_default,
+  return freezeJSON({ kind: "docs-drift-approved-runtime" as const, evidence: adopted.evidence, current_default: options.current_default,
     adoption_sha256: adopted.adoption_sha256, protected_sha256: adopted.protected_sha256, entry: options.entry, ...runtime });
 }
 

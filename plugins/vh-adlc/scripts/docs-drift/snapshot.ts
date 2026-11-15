@@ -88,13 +88,20 @@ function readSetFor(settings: Settings, featureRoot: string): ReadSet {
   // until their complete dependency sets can be established by the selected verification.
   const commandInputsUnknown = settings.verification_commands.length > 0 || settings.generation_commands.length > 0;
   const bounded = !omitted && !commandInputsUnknown;
+  const workflowPaths = [settings.execution.worker_workflow, settings.execution.scheduled_workflow, settings.execution.claude_command]
+    .filter((value): value is string => value !== null);
   const alwaysPaths = [
     "AGENTS.md", ".vh-adlc/docs-drift.yaml", settings.scanner.script, settings.project_procedure,
-    settings.execution.worker_workflow, settings.execution.scheduled_workflow, settings.execution.claude_command,
-    settings.runtime_loader.launcher, settings.publication.adoption_record, ...settings.feedback_files,
+    ...workflowPaths, ...settings.feedback_files,
   ];
   if (settings.scanner.adapter !== null) alwaysPaths.push(settings.scanner.adapter);
-  if (settings.component_pin !== null) alwaysPaths.push(settings.component_pin);
+  if (settings.schema_version === 1) {
+    alwaysPaths.push(settings.runtime_loader.launcher, settings.publication.adoption_record);
+    if (settings.component_pin !== null) alwaysPaths.push(settings.component_pin);
+  } else {
+    alwaysPaths.push(settings.reports.workflow_path);
+    if (settings.publication.checklist_path !== null) alwaysPaths.push(settings.publication.checklist_path);
+  }
   return {
     mode: bounded ? "bounded" : "whole-repository",
     reason: omitted ? "omitted-read-bound" : commandInputsUnknown ? "command-inputs-unbounded" : null,

@@ -3,7 +3,7 @@ import { verifyCompatibleWorkerCaller } from "./worker-callers";
 import type { PublicationIdentity } from "./transport";
 import { readGit, collectionReaders, readAdoptionInput as committedInput } from "./git";
 import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
-import { classifySettingsLeaves, loadCommittedSettings, parseSettings, settingsProjections } from "./settings";
+import { classifySettingsLeaves, loadLegacyCommittedSettings, parseSettings, settingsProjections } from "./settings";
 import { readTrialDefinition, readTrialHistoryBindings } from "./trial-definition";
 import { PUBLISHER_ENTRIES, publisherActor, sameLogin, samePublicationIdentity,
   type EntryIdentities, type PublisherEntry } from "./identity";
@@ -41,10 +41,10 @@ export function parseComponentPin(value: unknown): ComponentPin {
 
 /** Collect bindings only. Trial evidence, operator acceptance and effect authority are separate gates. */
 export function collectAdoptionBindings(repo: string, sourceCommit: string) {
-  return collectSelectedBindings(repo, sourceCommit, loadCommittedSettings(repo, sourceCommit));
+  return collectSelectedBindings(repo, sourceCommit, loadLegacyCommittedSettings(repo, sourceCommit));
 }
 
-function collectSelectedBindings(repo: string, sourceCommit: string, committed: ReturnType<typeof loadCommittedSettings>,
+function collectSelectedBindings(repo: string, sourceCommit: string, committed: ReturnType<typeof loadLegacyCommittedSettings>,
   scheduled?: { path: string; mode: string; sha256: string }) {
   const { settings } = committed;
   if (settings.component_pin === null) fail("selected component pin missing");
@@ -67,7 +67,7 @@ function collectSelectedBindings(repo: string, sourceCommit: string, committed: 
 
 /** Committed setup is non-granting. Actual fixture ownership and trial permission are separate. */
 export function collectTrialBindings(options: AdoptionOptions) {
-  const source = immutable(options.current_default), current = loadCommittedSettings(options.repo, source).settings;
+  const source = immutable(options.current_default), current = loadLegacyCommittedSettings(options.repo, source).settings;
   const policy = readTrialDefinition({ repo: options.repo, source, settings: current });
   const candidate = collectSelectedBindings(options.repo, source, { settings: policy.candidate_settings.value,
     settings_sha256: policy.candidate_settings.sha256, source_commit: source }, policy.scheduled_contract);
@@ -287,7 +287,7 @@ function recordHistory(repo: string, ancestor: string, descendant: string, path:
 function readAdoptionFrame(options: AdoptionOptions, boundary: AdoptionBoundary) {
   const { repo, current_default: current } = options;
   immutable(current);
-  if (loadCommittedSettings(repo, current).settings.publication.mode !== "adopted") fail("consumer is not adopted");
+  if (loadLegacyCommittedSettings(repo, current).settings.publication.mode !== "adopted") fail("consumer is not adopted");
   const bindings = collectAdoptionBindings(repo, current), path = bindings.settings.publication.adoption_record;
   const input = committedInput(repo, current, path);
   if (!input || input.mode !== "100644") fail("committed adoption record missing");
@@ -430,7 +430,7 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
   next: ReturnType<typeof readAdoptionFrame>, boundary: AdoptionBoundary): string[] {
   const changes = compareUpgradeBindings({ repo, approved_default: previous.current_default,
     source_candidate: next.result.source_candidate, identity: next.result.identity }, previous);
-  const previousSettings = loadCommittedSettings(repo, previous.current_default).settings, policy = previousSettings.trial;
+  const previousSettings = loadLegacyCommittedSettings(repo, previous.current_default).settings, policy = previousSettings.trial;
   if (policy === null) fail("upgrade trial definition missing");
   const definitionInput = committedInput(repo, previous.current_default, policy.definition_path);
   if (!definitionInput || definitionInput.mode !== "100644" || definitionInput.sha256 !== policy.definition_sha256) fail("upgrade trial definition binding");
@@ -524,7 +524,7 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
 
 /** Rollback can select an earlier record while later delivered records still need retention. */
 function verifyHistoricalAdoptionInputs(repo: string, current: string, boundary: AdoptionBoundary): void {
-  const settingsByBlob = new Map<string, ReturnType<typeof loadCommittedSettings>["settings"]>(), checked = new Set<string>();
+  const settingsByBlob = new Map<string, ReturnType<typeof loadLegacyCommittedSettings>["settings"]>(), checked = new Set<string>();
   const revisions = readGit(repo, "log", "--full-history", "--format=%H", current, "--", ".vh-adlc/docs-drift.yaml")
     .toString().trim().split("\n").filter(Boolean);
   for (const revision of revisions) {
@@ -532,7 +532,7 @@ function verifyHistoricalAdoptionInputs(repo: string, current: string, boundary:
     if (!settingsInput) continue;
     let settings = settingsByBlob.get(settingsInput.blob);
     if (!settings) {
-      settings = loadCommittedSettings(repo, revision).settings;
+      settings = loadLegacyCommittedSettings(repo, revision).settings;
       settingsByBlob.set(settingsInput.blob, settings);
     }
     if (settings.publication.mode !== "adopted") continue;
@@ -605,7 +605,7 @@ export function verifyRuntimeAdoption(options: AdoptionOptions) {
 
 /** Reopen original owner-attested history. This supplies no current caller or execution authority. */
 export function readRecordedAdoption(options: { repo: string; current_default: string }) {
-  const current = immutable(options.current_default), { settings } = loadCommittedSettings(options.repo, current);
+  const current = immutable(options.current_default), { settings } = loadLegacyCommittedSettings(options.repo, current);
   const input = committedInput(options.repo, current, settings.publication.adoption_record);
   if (!input || input.mode !== "100644") fail("original recorded adoption required");
   const record = parseAdoptionRecord(input.bytes, { kind: "observed" });
@@ -622,7 +622,7 @@ export async function createTrialAdoptionGate(options: { root: string; context_c
     const current = immutable(input.current_default);
     try { readGit(context.source, "merge-base", "--is-ancestor", context.source_commit, current); }
     catch { fail("synthetic adoption default outside owned source"); }
-    const { settings } = loadCommittedSettings(context.source, current);
+    const { settings } = loadLegacyCommittedSettings(context.source, current);
     if (settings.hostname !== "docs-drift.invalid" || settings.repository !== TRIAL_IDENTITY.repository
       || settings.default_branch !== TRIAL_IDENTITY.default_branch || !sameLogin(publisherActor(settings, "hosted"), TRIAL_IDENTITY.actor)) fail("synthetic adoption namespace");
     const result = verifyAdoptionRecord({ repo: context.source, current_default: current, identity: TRIAL_IDENTITY, entry: input.entry },
@@ -637,7 +637,7 @@ const clientPackages = { copilot: "@github/copilot", claude: "@anthropic-ai/clau
 
 /** Signals are non-executing intake. Their mismatch never selects or replaces a runtime. */
 export function checkUpgradeSignals(options: { repo: string; source: string; identity?: PublicationIdentity; entry?: PublisherEntry }) {
-  const source = immutable(options.source), { settings } = loadCommittedSettings(options.repo, source);
+  const source = immutable(options.source), { settings } = loadLegacyCommittedSettings(options.repo, source);
   let selectedPin: ComponentPin, selectedSettings = settings, target: "candidate-trial" | "adopted";
   if (settings.publication.mode === "staged") {
     if (settings.trial === null) return freezeJSON({ status: "staged-no-target", source_commit: source, matches: null });
@@ -692,14 +692,14 @@ export function collectUpgradeChanges(options: {
 
 /** A new C selects its absent successor record. Earlier delivered selections remain authoritative. */
 function verifyPriorSelection(repo: string, base: string, candidate: string): void {
-  const settingsByBlob = new Map<string, ReturnType<typeof loadCommittedSettings>["settings"]>();
+  const settingsByBlob = new Map<string, ReturnType<typeof loadLegacyCommittedSettings>["settings"]>();
   const commits = readGit(repo, "rev-list", `${base}..${candidate}`).toString().trim().split("\n").filter(Boolean);
   for (const commit of commits) {
     const input = committedInput(repo, commit, ".vh-adlc/docs-drift.yaml");
     if (!input) continue;
     let settings = settingsByBlob.get(input.blob);
     if (!settings) {
-      settings = loadCommittedSettings(repo, commit).settings;
+      settings = loadLegacyCommittedSettings(repo, commit).settings;
       settingsByBlob.set(input.blob, settings);
     }
     if (settings.publication.mode !== "adopted") continue;

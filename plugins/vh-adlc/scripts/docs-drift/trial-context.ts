@@ -4,7 +4,7 @@ import { computeComponentIdentity, inspectRetainedPayload } from "./bootstrap";
 import { readGit } from "./git";
 import { canonicalJSON, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { requireOwnedStore } from "./proposals";
-import { loadCommittedSettings } from "./settings";
+import { loadLegacyCommittedSettings } from "./settings";
 import type { OwnedObjectStore } from "./snapshot";
 import { publisherActor, sameLogin } from "./identity";
 
@@ -81,7 +81,7 @@ export function loadTrialContext(options: { root: string; context_commit: string
   const sourceCommit = commit(manifest.source_commit);
   if (readGit(source, "rev-list", "--parents", "-n", "1", contextCommit).toString().trim() !== contextCommit + " " + sourceCommit
     || readGit(source, "diff", "--name-only", sourceCommit, contextCommit).toString().trim() !== TRIAL_CONTEXT_PATH) fail("record-only immutable context child required");
-  const settings = loadCommittedSettings(source, sourceCommit).settings;
+  const settings = loadLegacyCommittedSettings(source, sourceCommit).settings;
   if (settings.repository !== TRIAL_IDENTITY.repository || settings.hostname !== "docs-drift.invalid"
     || settings.default_branch !== TRIAL_IDENTITY.default_branch || !sameLogin(publisherActor(settings, "hosted"), TRIAL_IDENTITY.actor)
     || settings.publication.repository !== TRIAL_IDENTITY.repository || settings.pr_discovery.repository !== TRIAL_IDENTITY.repository

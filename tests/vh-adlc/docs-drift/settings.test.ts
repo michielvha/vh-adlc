@@ -1,10 +1,11 @@
+import { publisherActor } from "../../../plugins/vh-adlc/scripts/docs-drift/identity";
 import { afterAll, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { classifySettingsLeaves, loadCommittedSettings, parseSettings, settingsProjections } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
-import { settingsFixture } from "./settings-fixture";
+import { installedSettingsFixture, settingsFixture } from "./settings-fixture";
 
 const repositories: string[] = [];
 afterAll(() => {
@@ -157,4 +158,50 @@ test("the accepted publication block is the only adoption and per-operation PR-s
     { ...input, publication: { ...input.publication, pr_state: { advisory: "ready", resolve: "unknown" } } },
     { ...input, publication: { ...input.publication, pr_state: { advisory: "ready", resolve: "draft", fallback: "draft" } } },
   ]) expect(() => parseSettings(changed)).toThrow();
+});
+
+
+test("ordinary settings use configured client commands and harness-neutral entry profiles", () => {
+  const settings = parseSettings(installedSettingsFixture());
+  expect(settings.schema_version).toBe(2);
+  expect(settings.clients.copilot).toEqual({ provider: "copilot", executable: "copilot" });
+  expect(Object.keys(settings.execution.entries)).toEqual(["interactive", "hosted"]);
+  expect(settings.publication.checklist_path).toBe(".vh-adlc/docs-drift-preflight.yaml");
+  expect(settings.component?.plugin_version).toBe("0.25.0");
+  expect(settings.credential_references).toEqual(["COPILOT_GITHUB_TOKEN"]);
+  expect(Object.hasOwn(settings, "runtime_loader")).toBe(false);
+  expect(Object.hasOwn(settings, "component_pin")).toBe(false);
+  expect(settingsProjections(settings).protected.clients).toEqual(settings.clients);
+});
+
+
+test("publisher selection binds a configured profile independently of the invoking harness", () => {
+  const settings = parseSettings(installedSettingsFixture());
+  expect(publisherActor(settings, "interactive")).toBe("fixture-owner");
+  expect(publisherActor(settings, "hosted")).toBe("fixture-bot");
+  expect(() => publisherActor(settings, "unknown-profile")).toThrow("publisher entry required");
+});
+
+test("ordinary settings reject obsolete setup and incomplete review-bound policy", () => {
+  const input = installedSettingsFixture();
+  for (const changed of [
+    { ...input, schema_version: 3 },
+    { ...input, protocol_version: 2 },
+    { ...input, runtime_loader: settingsFixture().runtime_loader },
+    { ...input, component_pin: "old-pin.yaml" },
+    { ...input, clients: { copilot: settingsFixture().clients["copilot-linux"] } },
+    { ...input, publication: { ...input.publication, adoption_record: "old-adoption.yaml" } },
+    { ...input, publication: { ...input.publication, mode: "adopted", checklist_path: null } },
+    { ...input, component: { ...input.component, component_sha256: "unknown" } },
+    { ...input, publication: { ...input.publication, entry_actors: { hosted: "fixture-bot" } } },
+    { ...input, pr_discovery: { ...input.pr_discovery, authors: ["fixture-owner"] } },
+    { ...input, pr_discovery: { ...input.pr_discovery, branch_prefixes: ["other/"] } },
+  ]) expect(() => parseSettings(changed)).toThrow();
+  expect(parseSettings(settingsFixture()).schema_version).toBe(1);
+  const baseline = settingsProjections(parseSettings(input)).protected;
+  for (const changed of [
+    { ...input, component: { ...input.component, plugin_version: "0.26.0" } },
+    { ...input, credential_references: ["GH_TOKEN"] },
+    { ...input, clients: { copilot: { ...input.clients.copilot, executable: "/different/copilot" } } },
+  ]) expect(settingsProjections(parseSettings(changed)).protected).not.toEqual(baseline);
 });
