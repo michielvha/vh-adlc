@@ -12,7 +12,7 @@ import { publishArtifact, readJournal, syncDirectory, type Outcome, type SealedP
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { createGitHubReader, createRepositoryReader, GitHubReadError } from "../github-read";
+import { createGitHubReader, createRepositoryReader, GitHubReadError, type TypedPage, type WorkflowRunInput } from "../github-read";
 import { gitEnvironment } from "../git-read";
 import { canonicalJSON, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { effectMarker } from "./manifests";
@@ -204,7 +204,7 @@ export function readNativeContext(options: NativeContextOptions & { observation?
 }
 
 /** One read-only validation phase shares observations and replays its complete read set before returning. */
-export async function withNativeObservation<T>(options: NativeContextOptions & { comparison_identity?: PublicationIdentity }, run: (observation: NativeObservation) => Promise<T>): Promise<T> {
+export async function withNativeObservation<T>(options: NativeContextOptions & { comparison_identity?: PublicationIdentity; collection?: "closure" | "audit" }, run: (observation: NativeObservation) => Promise<T>): Promise<T> {
   const scope = { hostname: options.hostname, repository: options.repository, credential: options.credential,
     path: options.path ?? process.env.PATH ?? "/usr/bin:/bin", timeout_ms: options.timeout_ms ?? 30000 };
   const initial = nativeContext({ ...scope, comparison_identity: options.comparison_identity }), observation = Object.freeze({ [observationBrand]: true as const });
@@ -221,6 +221,19 @@ export async function withNativeObservation<T>(options: NativeContextOptions & {
     const accounts = new Map(original.items.map(item => [item.id, accountProjection(item)] as const));
     return (current: ReturnType<Reader["comments"]>) => ({ ...current,
       items: current.items.map(item => accounts.get(item.id)?.(item) ?? item) });
+  }
+  function pullPageProjection(original: ReturnType<Reader["pulls"]>) {
+    const accounts = new Map(original.items.map(item => [item.number, accountProjection(item)] as const));
+    return (current: ReturnType<Reader["pulls"]>) => ({ ...current,
+      items: current.items.map(item => accounts.get(item.number)?.(item) ?? item) });
+  }
+  function runProjection(original: WorkflowRunInput) {
+    return (current: WorkflowRunInput): WorkflowRunInput => ({ ...current, updated_at: original.updated_at });
+  }
+  function runPageProjection(original: TypedPage<WorkflowRunInput>) {
+    const runs = new Map(original.items.map(item => [item.id + ":" + item.run_attempt, runProjection(item)] as const));
+    return (current: TypedPage<WorkflowRunInput>) => ({ ...current,
+      items: current.items.map(item => runs.get(item.id + ":" + item.run_attempt)?.(item) ?? item) });
   }
   function cached<Args extends (number | string)[], Value>(read: (reader: Reader, ...args: Args) => Value,
     project?: (original: Value) => (current: Value) => Value) {
@@ -247,6 +260,30 @@ export async function withNativeObservation<T>(options: NativeContextOptions & {
     };
   }
   function unavailable(): never { throw new NativeObservationUnavailable("Native reader method unavailable during shared validation"); }
+  const readLatestRun = cached((reader, id: number) => reader.run(id), runProjection);
+  const readRunAttempt = cached((reader, id: number, attempt: number) => reader.run(id, attempt), runProjection);
+  const readTree = cached((reader, sha: string, maxEntries: number) => reader.tree(sha, maxEntries));
+  const readBlob = cached((reader, sha: string, maxBytes: number) => reader.blob(sha, maxBytes).toString("base64"));
+  const readRuns = cached((reader, workflow: number, branch: string, event: "schedule" | "workflow_dispatch") => reader.runs(workflow, branch, event), runPageProjection);
+  const readRecentRuns = cached((reader, workflow: number, branch: string, maxRuns: number, event: "schedule" | "workflow_dispatch") => reader.recentRuns(workflow, branch, maxRuns, event), runPageProjection);
+  const additional = options.collection === "audit" ? {
+    publicationPull: cached((reader, number: number) => reader.publicationPull(number), accountProjection),
+    pulls: cached((reader, base: string) => reader.pulls(base), pullPageProjection),
+    workflow: cached((reader, id: number) => reader.workflow(id)),
+    run: (id: number, attempt?: number) => attempt === undefined ? readLatestRun(id) : readRunAttempt(id, attempt),
+    runs: (workflow: number, branch: string, event: "schedule" | "workflow_dispatch" = "schedule") => readRuns(workflow, branch, event),
+    recentRuns: (workflow: number, branch: string, maxRuns: number, event: "schedule" | "workflow_dispatch" = "schedule") => readRecentRuns(workflow, branch, maxRuns, event),
+    jobs: cached((reader, id: number, attempt: number) => reader.jobs(id, attempt)),
+    artifacts: cached((reader, id: number) => reader.artifacts(id)),
+    artifact: cached((reader, id: number) => reader.artifact(id)),
+    commit: cached((reader, sha: string) => reader.commit(sha)),
+    tree: (sha: string, maxEntries = 10000) => readTree(sha, maxEntries),
+    blob: (sha: string, maxBytes = 16 * 1024 * 1024) => Buffer.from(readBlob(sha, maxBytes), "base64"),
+    trace() { if (!active) throw new NativeObservationUnavailable("Native observation has finished"); return initial.repository.trace(); },
+  } : {
+    publicationPull: unavailable, pulls: unavailable, workflow: unavailable, run: unavailable, runs: unavailable, recentRuns: unavailable,
+    jobs: unavailable, artifacts: unavailable, artifact: unavailable, commit: unavailable, tree: unavailable, blob: unavailable, trace: unavailable,
+  };
   const repository = Object.freeze({
     repository: cached(reader => reader.repository()),
     ref: cached((reader, ref: string) => reader.ref(ref)),
@@ -257,19 +294,7 @@ export async function withNativeObservation<T>(options: NativeContextOptions & {
       if (!page.complete) throw Error("Incomplete native comments collection");
       return page;
     }, commentProjection),
-    publicationPull: unavailable,
-    pulls: unavailable,
-    workflow: unavailable,
-    run: unavailable,
-    runs: unavailable,
-    recentRuns: unavailable,
-    jobs: unavailable,
-    artifacts: unavailable,
-    artifact: unavailable,
-    commit: unavailable,
-    tree: unavailable,
-    blob: unavailable,
-    trace: unavailable,
+    ...additional,
   });
   function recheck() {
     if (changed !== null) throw new NativeObservationChanged(changed);

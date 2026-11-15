@@ -12,6 +12,8 @@ import type { HistorySnapshot } from "./report";
 import { loadCommittedSettings } from "./settings";
 import { captureRepositoryState, matchesRepositoryState } from "./snapshot";
 import { readNativeContext } from "./transport";
+import { readAdoptionInput } from "./git";
+import { readHistoryWorkflowEvents } from "./history-workflow";
 
 type Options = WorkerCollectionOptions & {
   hosted_run_attempt?: number;
@@ -59,8 +61,9 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
   try {
     const { settings } = loadCommittedSettings(repo, options.source);
     limit = Math.min(limit, settings.reports.max_entry_bytes);
-    result.mode = options.entry === "hosted" ? settings.reports.hosted : settings.reports.interactive;
-    if (options.entry === "hosted" && (!/^[1-9][0-9]*$/u.test(options.run) || !Number.isSafeInteger(Number(options.run))
+    const hosted = settings.schema_version === 1 ? options.entry === "hosted" : options.hosted_run_attempt !== undefined;
+    result.mode = hosted ? settings.reports.hosted : settings.reports.interactive;
+    if (hosted && (!/^[1-9][0-9]*$/u.test(options.run) || !Number.isSafeInteger(Number(options.run))
       || !Number.isSafeInteger(options.hosted_run_attempt) || typeof options.hosted_run_attempt !== "number" || options.hosted_run_attempt < 1))
       throw Error("Current native scheduled run identity required");
     const current = await collectWorkerInputs(options);
@@ -73,17 +76,21 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
     result.worker_input_sha256 = current.worker_input_sha256; result.current_default = currentDefault;
     const context: HistoryContext = { repository: settings.repository, scope_sha256: current.inputs.scope_sha256, run_id: options.run, started_at: captured_at };
     result.context = context;
-    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const freshNative = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, observation: options.observation });
     const initial = native();
     if (initial.default_commit !== currentDefault || canonicalDigest(initial.identity) !== canonicalDigest(identity))
       throw new PublicationScopeChanged("Native history source or actor changed before collection");
-    const run = options.entry === "hosted" ? readNativeRun(initial.repository, Number(options.run)) : null;
+    const run = hosted ? readNativeRun(initial.repository, Number(options.run)) : null;
+    const caller = run && settings.schema_version === 2 ? readAdoptionInput(repo, options.source, settings.reports.workflow_path) : null;
+    const events = caller ? readHistoryWorkflowEvents(caller.bytes) : ["schedule"];
+    if (run && settings.schema_version === 2 && !caller) throw Error("Committed hosted workflow required");
     const runBinding = (selected: NonNullable<typeof run>) => {
       const { updated_at: _updated, ...binding } = selected;
       return canonicalDigest(binding);
     };
     if (run && (run.repository.id !== identity.repository_id || run.head_repository?.id !== identity.repository_id
-      || run.run_attempt !== options.hosted_run_attempt || run.head_sha !== options.source || run.head_branch !== settings.default_branch || run.event !== "schedule" || run.status !== "in_progress"
+      || run.run_attempt !== options.hosted_run_attempt || run.head_sha !== options.source || run.head_branch !== settings.default_branch || !events.includes(run.event) || run.status !== "in_progress"
       || run.workflow_id !== settings.reports.workflow_id || ![settings.reports.workflow_path, settings.reports.workflow_path + "@" + settings.default_branch,
         settings.reports.workflow_path + "@refs/heads/" + settings.default_branch, settings.reports.workflow_path + "@" + options.source].includes(run.path)))
       throw new PublicationScopeChanged("Current native scheduled run identity changed");
@@ -100,7 +107,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
       localContext = { repo, cache_directory: options.cache_directory, settings, identity, store, current_default: currentDefault, entry: options.entry,
         source: options.source, component_sha256: facts.runtime.component.component_sha256, run_id: options.run,
         scope_sha256: context.scope_sha256, started_at: captured_at, recheck() {
-          const observed = native();
+          const observed = freshNative();
           if (observed.default_commit !== currentDefault || canonicalDigest(observed.identity) !== canonicalDigest(identity))
             throw new PublicationScopeChanged("Native local history source or actor changed");
         } };
@@ -114,7 +121,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
       || (run && runBinding(readNativeRun(final.repository, run.id, run.run_attempt)) !== runBinding(run)))
       throw new PublicationScopeChanged("Native history source, actor or invocation changed during collection");
     if (run) envelope = bytes => {
-      const beforeOutput = canonicalDigest(captureRepositoryState(repo)), observed = native();
+      const beforeOutput = canonicalDigest(captureRepositoryState(repo)), observed = freshNative();
       if (observed.default_commit !== currentDefault || canonicalDigest(observed.identity) !== canonicalDigest(identity))
         throw new PublicationScopeChanged("Native history source or actor changed before output");
       const currentRun = readNativeRun(observed.repository, run.id, run.run_attempt);
@@ -126,7 +133,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
       if (report.scope_sha256 !== context.scope_sha256 || report.started_at !== context.started_at)
         throw new PublicationScopeChanged("Original hosted report context changed");
       const output = createActionsEnvelope(bytes, { settings, run: currentRun, producer });
-      const after = native();
+      const after = freshNative();
       if (after.default_commit !== currentDefault || canonicalDigest(after.identity) !== canonicalDigest(identity)
         || runBinding(readNativeRun(after.repository, run.id, run.run_attempt)) !== runBinding(run))
         throw new PublicationScopeChanged("Native history source, actor or invocation changed during output");

@@ -54,7 +54,7 @@ export async function collectAuditProposalInputs(input: WorkerCollectionOptions)
     const { store, identity, current_default: currentDefault } = current.facts;
     if (!store || !identity || !currentDefault) throw Error("Current native audit source required");
     const snapshot = captureSnapshot(repo, options.source), settings = snapshot.settings;
-    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, observation: options.observation });
     const initial = native();
     if (initial.default_commit !== currentDefault || canonicalDigest(initial.identity) !== canonicalDigest(identity))
       throw new PublicationScopeChanged("Native audit proposal source or actor changed before collection");

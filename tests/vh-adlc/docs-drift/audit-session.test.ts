@@ -2,6 +2,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { lstatSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { auditClient } from "./native-audit-client-fixture";
 import { bindingFixture } from "./binding-fixture";
 import { role } from "./manifest-fixture";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -14,57 +15,6 @@ afterAll(() => {
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-function client(fault: string) { return `#!${process.execPath}
-import { readFileSync, writeFileSync, appendFileSync } from "node:fs";
-import { join } from "node:path";
-import { createHash } from "node:crypto";
-const args = process.argv.slice(2), arg = key => args[args.indexOf(key) + 1];
-const isClaude = ${JSON.stringify(fault === "claude-normal-cli")};
-const fixtureVersion = "fixture-1.0.0";
-if (args.includes("--version")) { console.log(isClaude ? fixtureVersion + " (Claude Code)" : "GitHub Copilot CLI " + fixtureVersion + "."); process.exit(0); }
-const line = (isClaude ? args.at(-1) : arg("--prompt")).split("\\n").find(line => line.startsWith("DOCS_DRIFT_REQUEST: "));
-if (!line || (isClaude ? process.env.CLAUDE_CODE_OAUTH_TOKEN : process.env.COPILOT_GITHUB_TOKEN) !== "synthetic-selected-provider") process.exit(91);
-const ref = JSON.parse(line.slice("DOCS_DRIFT_REQUEST: ".length));
-const digest = bytes => createHash("sha256").update(bytes).digest("hex");
-const bytes = readFileSync(ref.path); if (digest(bytes) !== ref.sha256) process.exit(92);
-const request = JSON.parse(bytes), { canonicalJSON } = await import(request.canonicalizer);
-appendFileSync(join(request.artifact_root, "synthetic-role-order.jsonl"), JSON.stringify({ kind: request.kind, context: arg("--session-id"), cwd: process.cwd() }) + "\\n", { mode: 0o600 });
-let records;
-if (request.kind === "docs-drift-audit-worker-request") {
-  const baseline = JSON.parse(readFileSync(join(request.artifact_root, request.source_verification.path)));
-  const payload = canonicalJSON({ schema_version: 1, kind: "docs-drift-assessment", source_commit: request.source_commit,
-    source_verification_sha256: request.source_verification.sha256, findings: baseline.scan.findings.map(finding => ({ id: finding.id,
-      verdict: "unknown", reason: "Synthetic source needs human judgment", recommendation: "Inspect the exact current source", evidence: [] })) });
-  const path = request.outputs.assessment; writeFileSync(join(request.artifact_root, path), payload, { mode: 0o600 });
-  let proposal_assessment;
-  if (request.proposals.length) {
-    const proposed = canonicalJSON({ schema_version: 1, kind: "docs-drift-proposal-assessment", source_commit: request.source_commit,
-      inputs_sha256: request.proposal_inputs_sha256, proposals: request.proposals.map(row => {
-        const original = JSON.parse(readFileSync(join(request.artifact_root, row.inputs_reference.path)));
-        const supported = ${JSON.stringify(fault)} === "proposal-supported-cli", source = readFileSync(join(request.source_checkout, "docs/guide.md"));
-        const quote = { path: "docs/guide.md", sha256: digest(source), start: 0, end: source.length, quote_sha256: digest(source) };
-        return { number: row.number, binding_sha256: row.binding_sha256, hunks: original.hunks.map(hunk => ({ id: hunk.id, verdict: supported ? "supported" : "unknown",
-          reason: "Synthetic semantic assessment remains unknown", recommendation: "Inspect this full original hunk", evidence: supported ? [quote] : [] })) };
-      }) });
-    writeFileSync(join(request.artifact_root, request.outputs.proposal_assessment), proposed, { mode: 0o600 });
-    proposal_assessment = { path: request.outputs.proposal_assessment, sha256: digest(proposed) };
-  }
-  records = JSON.stringify({ input_sha256: request.worker_input_sha256, edits: [], publication: null, assessment: { path, sha256: digest(payload) },
-    ...(proposal_assessment ? { proposal_assessment } : {}) }) + "\\n";
-  if (${JSON.stringify(fault)} === "invalid-worker") records = "Not a worker handoff\\n";
-  if (${JSON.stringify(fault)} === "request-change") writeFileSync(ref.path, "Preserve this changed synthetic request\\n", { mode: 0o600 });
-} else {
-  records = ${JSON.stringify(fault)} === "review-findings" ? "FINDING: F-01\\nKIND: factual\\nSEVERITY: should-fix\\nWHERE: synthetic assessment\\nEVIDENCE: Needs another source check\\nPROPOSAL: Correct it\\n" : "NO FINDINGS\\n";
-}
-if (isClaude) {
-  console.log(JSON.stringify({ type: "system", subtype: "init", session_id: arg("--session-id"), cwd: process.cwd(), model: "claude-opus-5.5" }));
-  console.log(JSON.stringify({ type: "assistant", session_id: arg("--session-id"), message: { model: "claude-opus-5.5", content: [{ type: "text", text: "MODEL: claude-opus-5.5\\n" + records }] } }));
-  console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, session_id: arg("--session-id"), result: "MODEL: claude-opus-5.5\\n" + records }));
-} else {
-  console.log(JSON.stringify({ type: "session.start", data: { sessionId: arg("--session-id"), alreadyInUse: false, context: { cwd: process.cwd() } } }));
-  console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-opus-5.5", content: "MODEL: claude-opus-5.5\\n" + records } }));
-}
-`; }
 
 test.each(["matching", "proposal", "proposal-supported-cli", "normal-cli", "claude-normal-cli", "normal-cli-partial-output", "unretained", "invalid-worker", "request-change", "review-findings"])("retained normal audit session starts before roles and publishes no effects: %s", async fault => {
   try {
@@ -72,7 +22,7 @@ test.each(["matching", "proposal", "proposal-supported-cli", "normal-cli", "clau
     const f = await bindingFixture(roots, false, { fullComponent: true, mutableInventory: fault.startsWith("proposal"), role: { model: role.requested_model, native_model: role.adopted_model,
       provider: fault === "claude-normal-cli" ? "claude" : "copilot",
       identity_source: fault === "claude-normal-cli" ? { provider: "claude", event_type: "assistant", field_path: ["message", "model"] } : role.identity_source,
-      argv: fault === "claude-normal-cli" ? ["--effort", "high"] : ["--no-auto-update"], client_program: client(fault) },
+      argv: fault === "claude-normal-cli" ? ["--effort", "high"] : ["--no-auto-update"], client_program: auditClient(fault) },
       beforeCandidate: input => {
         if (!fault.startsWith("proposal")) return;
         const root = dirname(input.artifacts), candidate = join(root, "existing-audit-proposal"), origin = join(root, "binding-origin");

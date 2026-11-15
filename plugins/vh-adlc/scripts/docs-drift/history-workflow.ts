@@ -15,6 +15,17 @@ function name(value: unknown): string {
     fail("literal native display name required");
   return value;
 }
+
+/** Only triggers declared by the original committed caller can produce eligible hosted history. */
+export function readHistoryWorkflowEvents(bytes: Uint8Array): Array<"schedule" | "workflow_dispatch"> {
+  const triggers = object(object(collectionReaders().yaml(bytes)).on);
+  const events: Array<"schedule" | "workflow_dispatch"> = [];
+  if (Array.isArray(triggers.schedule) && triggers.schedule.length) events.push("schedule");
+  if (Object.hasOwn(triggers, "workflow_dispatch") && (triggers.workflow_dispatch === null
+    || typeof triggers.workflow_dispatch === "object" && !Array.isArray(triggers.workflow_dispatch))) events.push("workflow_dispatch");
+  if (!events.length) fail("scheduled or manual caller trigger required");
+  return events;
+}
 function requiredExecution(value: Record<string, unknown>): void {
   const condition = value.if;
   // Diagnostics must still upload after a technical failure. Arbitrary conditional omissions are unsupported.

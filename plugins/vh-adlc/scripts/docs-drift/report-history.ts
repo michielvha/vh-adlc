@@ -113,6 +113,9 @@ function workflowMatches(settings: Settings, run: WorkflowRunInput): boolean {
   const path = settings.reports.workflow_path;
   return [path, `${path}@${settings.default_branch}`, `${path}@refs/heads/${settings.default_branch}`, `${path}@${run.head_sha}`].includes(run.path);
 }
+function supportedEvent(settings: Settings, event: string): boolean {
+  return event === "schedule" || settings.schema_version === 2 && event === "workflow_dispatch";
+}
 function artifactName(settings: Settings, run: WorkflowRunInput): string {
   return settings.reports.artifact_name_template.replaceAll("{run_id}", String(run.id)).replaceAll("{run_attempt}", String(run.run_attempt));
 }
@@ -124,7 +127,7 @@ export function createActionsEnvelope(bytes: Uint8Array, input: { settings: Sett
   producerIdentity(producer);
   if (report.repository !== settings.repository || report.run_id !== String(run.id) || report.source_commit !== run.head_sha
     || producer.source_commit !== run.head_sha || run.workflow_id !== settings.reports.workflow_id
-    || !workflowMatches(settings, run) || run.head_branch !== settings.default_branch || run.event !== "schedule") invalid("producer/report binding");
+    || !workflowMatches(settings, run) || run.head_branch !== settings.default_branch || !supportedEvent(settings, run.event)) invalid("producer/report binding");
   return canonicalJSON({ schema: "docs-drift-provenance/v1", origin: "actions", context: "production", repository: settings.repository,
     scope_sha256: report.scope_sha256, run_id: run.id, run_attempt: run.run_attempt, head_sha: run.head_sha,
     branch: run.head_branch, event: run.event, workflow_id: run.workflow_id, workflow_path: settings.reports.workflow_path,
@@ -181,7 +184,7 @@ export async function verifyActionsReport(input: {
   const started = reportTime(context.started_at);
   if (context.repository !== settings.repository || run.repository.full_name.toLowerCase() !== context.repository.toLowerCase()
     || run.head_repository?.id !== run.repository.id || run.head_repository.full_name.toLowerCase() !== context.repository.toLowerCase()
-    || run.status !== "completed" || String(run.id) === context.run_id || run.event !== "schedule"
+    || run.status !== "completed" || String(run.id) === context.run_id || !supportedEvent(settings, run.event)
     || run.workflow_id !== settings.reports.workflow_id || !workflowMatches(settings, run)
     || run.head_branch !== settings.default_branch || reportTime(run.updated_at) >= started) invalid("native producer");
   const created = reportTime(artifact.created_at);
@@ -358,13 +361,15 @@ export async function collectActionsHistory(options: {
   const snapshot: HistorySnapshot & { complete: boolean; receipts: unknown[] } = { captured_at: context.started_at, records: [], diagnostics: [], complete: true, receipts: [] };
   try {
     if (settings.reports.workflow_id === null || context.repository !== settings.repository) invalid("adopted workflow identity missing");
-    const repository = reader.repository(), workflow = reader.workflow(settings.reports.workflow_id);
+    const workflowID = settings.reports.workflow_id;
+    const repository = reader.repository(), workflow = reader.workflow(workflowID);
     if (repository.full_name.toLowerCase() !== settings.repository.toLowerCase() || repository.default_branch !== settings.default_branch
       || workflow.path !== settings.reports.workflow_path) invalid("current native repository or workflow changed");
-    const runs = reader.recentRuns(settings.reports.workflow_id, settings.default_branch, settings.reports.max_runs);
-    if (!runs.complete) invalid("workflow run collection incomplete");
+    const events = settings.schema_version === 2 ? ["schedule", "workflow_dispatch"] as const : ["schedule"] as const;
+    const pages = events.map(event => reader.recentRuns(workflowID, settings.default_branch, settings.reports.max_runs, event));
+    if (pages.some(page => !page.complete)) invalid("workflow run collection incomplete");
     const start = reportTime(context.started_at);
-    const eligible = runs.items.filter(run => run.status === "completed" && String(run.id) !== context.run_id && reportTime(run.updated_at) < start)
+    const eligible = pages.flatMap(page => page.items).filter(run => run.status === "completed" && String(run.id) !== context.run_id && reportTime(run.updated_at) < start)
       .sort((left, right) => reportTime(right.created_at) - reportTime(left.created_at)).slice(0, settings.reports.max_runs);
     for (const candidate of eligible) {
       try {

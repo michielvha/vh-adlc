@@ -2,6 +2,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import { source } from "./adoption-fixture";
 import { nativeReader } from "./runtime-fixture";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -83,6 +84,65 @@ test("only checked reader methods are available inside a native observation", as
       expect(() => reader.pulls("main")).toThrow(NativeObservationUnavailable);
       expect(() => reader.commit(f.candidate)).toThrow(NativeObservationUnavailable);
     });
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+test("audit observations preserve binary blobs and expire their cached readers", async () => {
+  try {
+    const f = fixture(), blob = Buffer.from([0, 255, 128, 10, 13]);
+    const sha = createHash("sha1").update("blob " + blob.length + "\0").update(blob).digest("hex");
+    writeFileSync(f.program, readFileSync(f.program, "utf8").replace("const value = endpoint ===",
+      'const value = endpoint === "repos/fixture/docs/git/blobs/' + sha + '" ? '
+      + JSON.stringify({ sha, size: blob.length, encoding: "base64", content: blob.toString("base64") }) + ' : endpoint ==='));
+    const reader = await withNativeObservation({ ...f.scope, collection: "audit" }, async observation => {
+      const current = readNativeContext({ ...f.scope, observation }).repository;
+      expect(Buffer.isBuffer(current.blob(sha))).toBe(true);
+      const first = current.blob(sha); first[0] = 42;
+      expect(current.blob(sha)).toEqual(blob);
+      expect(current.commit(f.candidate).sha).toBe(f.candidate);
+      return current;
+    });
+    expect(f.calls().filter(call => call.args.includes("repos/fixture/docs/git/blobs/" + sha))).toHaveLength(2);
+    expect(() => reader.blob(sha)).toThrow(NativeObservationUnavailable);
+    expect(() => reader.trace()).toThrow(NativeObservationUnavailable);
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+test("audit observations refuse corrupted binary blob data during replay", async () => {
+  try {
+    const f = fixture(), sha = createHash("sha1").update("blob 1\0").update(Buffer.from([255])).digest("hex");
+    const program = readFileSync(f.program, "utf8").replace("const value = endpoint ===",
+      'const value = endpoint === "repos/fixture/docs/git/blobs/' + sha + '" ? '
+      + JSON.stringify({ sha, size: 1, encoding: "base64", content: "/w==" }) + ' : endpoint ===');
+    writeFileSync(f.program, program);
+    await expect(withNativeObservation({ ...f.scope, collection: "audit" }, async observation => {
+      expect(readNativeContext({ ...f.scope, observation }).repository.blob(sha)).toEqual(Buffer.from([255]));
+      writeFileSync(f.program, program.replace('/w==', '/g=='));
+    })).rejects.toThrow("github-git-blob-digest-mismatch");
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+test.each(["timestamp", "event", "attempt"])("audit observation replays hosted run identity: %s", async change => {
+  try {
+    const f = fixture(), path = join(f.root, "run.json"), repository = { id: 10, full_name: "fixture/docs" };
+    const run = { id: 101, run_attempt: 1, workflow_id: 55, path: ".github/workflows/docs-drift.yml", event: "schedule",
+      status: "in_progress", conclusion: null, head_sha: f.candidate, head_branch: "main", repository, head_repository: repository,
+      created_at: "2000-01-01T00:00:00Z", updated_at: "2000-01-01T00:01:00Z" };
+    writeFileSync(path, JSON.stringify(run));
+    writeFileSync(f.program, readFileSync(f.program, "utf8").replace("const value = endpoint ===",
+      'const value = endpoint === "repos/fixture/docs/actions/runs/101" ? '
+      + 'JSON.parse(require("node:fs").readFileSync(' + JSON.stringify(path) + ', "utf8")) : endpoint ==='));
+    const result = withNativeObservation({ ...f.scope, collection: "audit" }, async observation => {
+      const reader = readNativeContext({ ...f.scope, observation }).repository;
+      expect(reader.run(101).run_attempt).toBe(1);
+      expect(() => reader.run(101, 0)).toThrow();
+      if (change === "event") run.event = "workflow_dispatch";
+      if (change === "attempt") run.run_attempt = 2;
+      run.updated_at = "2000-01-01T00:02:00Z";
+      writeFileSync(path, JSON.stringify(run));
+    });
+    if (change === "timestamp") await result;
+    else await expect(result).rejects.toBeInstanceOf(NativeObservationChanged);
   } catch (error) { failed = true; throw error; }
 }, 90000);
 

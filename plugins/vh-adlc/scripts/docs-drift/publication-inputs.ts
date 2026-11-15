@@ -8,7 +8,7 @@ import { fetchCurrentDefault } from "./proposals";
 import { canonicalDigest } from "./protocol";
 import { captureBareSnapshot, captureRepositoryState, checkFreshness, externalArtifactDirectory, matchesRepositoryState, type OwnedObjectStore } from "./snapshot";
 import { loadCommittedSettings } from "./settings";
-import { readNativeContext, type PublicationIdentity } from "./transport";
+import { readNativeContext, type NativeObservation, type PublicationIdentity } from "./transport";
 
 type PublicationInputs = {
   schema_version: 1; kind: "docs-drift-publication-inputs"; authority: "none"; complete: boolean; scope_changed: boolean; diagnostics: string[];
@@ -20,7 +20,7 @@ type PublicationInputs = {
 /** Collect current native policy, retained runtime and committed candidate facts. Effect grants follow separately. */
 export async function collectPublicationInputs(input: {
   repo: string; source: string; candidate_repo: string; candidate: string; selection: unknown; resolution_record?: { path: string; sha256: string };
-  artifact_root: string; owner: string; run: string; credential: string; path?: string; comparison_identity?: PublicationIdentity;
+  artifact_root: string; owner: string; run: string; credential: string; path?: string; comparison_identity?: PublicationIdentity; observation?: NativeObservation;
   protection_context?: Parameters<typeof inspectCandidate>[0]["protection_context"];
   object_store?: OwnedObjectStore; cache_directory: string; entry: string; launcher_path: string; settings_path: string;
 }): Promise<PublicationInputs> {
@@ -38,7 +38,7 @@ export async function collectPublicationInputs(input: {
       resolution_record: options.resolution_record, protection_context: options.protection_context, object_store: options.object_store, artifact_root: root, owner: options.owner, run: options.run });
     if (!result.candidate.complete) { result.diagnostics.push(...result.candidate.diagnostics); throw Error("Committed publication candidate incomplete"); }
     const { settings } = loadCommittedSettings(repo, options.source);
-    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, comparison_identity: options.comparison_identity });
+    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, comparison_identity: options.comparison_identity, observation: options.observation });
     const context = native();
     result.current_default = context.default_commit; result.identity = context.identity;
     if (!sameLogin(context.identity.actor, publisherActor(settings, options.entry)) || context.identity.default_branch !== settings.default_branch)

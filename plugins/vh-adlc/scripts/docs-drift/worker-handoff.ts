@@ -13,8 +13,9 @@ export function parseWorkerHandoff(options: Options) {
     throw Error("Original worker source and input target required");
   const parsed: unknown = JSON.parse(options.records);
   const has = (key: string) => parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) && Object.hasOwn(parsed, key);
-  const packet = exactRecord(parsed, ["input_sha256", "edits", "publication", ...["assessment", "proposal_assessment"].filter(has)], "Original worker handoff fields changed");
+  const packet = exactRecord(parsed, ["input_sha256", "edits", "publication", ...["assessment", "proposal_assessment", "resolution_verifications"].filter(has)], "Original worker handoff fields changed");
   if (packet.input_sha256 !== options.input_sha256 || !Array.isArray(packet.edits)) throw Error("Original worker input target changed");
+  if (has("resolution_verifications") && !Array.isArray(packet.resolution_verifications)) throw Error("Original resolution verification rows required");
   const edits = packet.edits.map(parseEdit), publication = parseWorkerPublication(packet.publication);
   if (!canonicalJSON(packet.edits).equals(canonicalJSON(edits))) throw Error("Original worker edit representation changed");
   function reference(key: "assessment" | "proposal_assessment"): { path: string; sha256: string } | null {
@@ -25,5 +26,6 @@ export function parseWorkerHandoff(options: Options) {
     return { path, sha256: value.sha256 };
   }
   return freezeJSON({ selection: { schema_version: 1 as const, source_commit: options.source, edits }, publication,
-    assessment_reference: reference("assessment"), proposal_assessment_reference: reference("proposal_assessment") });
+    assessment_reference: reference("assessment"), proposal_assessment_reference: reference("proposal_assessment"),
+    resolution_verifications: has("resolution_verifications") ? packet.resolution_verifications as unknown[] : null });
 }

@@ -22,8 +22,9 @@ export const DOCS_DRIFT_KNOWLEDGE_PAGES = [
   "conventions/delivery.md", "guides/humanize-prose.md",
 ] as const;
 
+export class SetupRequired extends Error {}
 function invalid(field: string): never {
-  throw new Error(`invalid docs-drift settings field ${field}`);
+  throw new SetupRequired(`invalid docs-drift settings field ${field}`);
 }
 
 function object(value: unknown, allowed: readonly string[] | null, field: string): Record<string, unknown> {
@@ -533,7 +534,7 @@ export function loadCommittedSettings(repo: string, sourceCommit: string): { set
   const match = /^(100644|100755) blob ([a-f0-9]{40}(?:[a-f0-9]{24})?)\t\.vh-adlc\/docs-drift\.yaml\0$/u.exec(entry);
   if (!match) invalid("committed settings file");
   const bytes = readGit(repo, "cat-file", "blob", match[2]);
-  const value = readYAML(bytes, reason => { throw new Error(reason); }, { offline: true, environment: verifiedHelperEnvironment() });
+  const value = readYAML(bytes, reason => { throw new SetupRequired(reason); }, { offline: true, environment: verifiedHelperEnvironment() });
   return { settings: parseSettings(value), settings_sha256: sha256(bytes), source_commit: sourceCommit };
 }
 

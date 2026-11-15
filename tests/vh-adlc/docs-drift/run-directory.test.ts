@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { createRunDirectory, readRunDirectory, appendRunStage } from "../../../plugins/vh-adlc/scripts/docs-drift/run-directory";
+import { assertRunStageOrder, createRunArtifactWriter, createRunDirectory, readRunDirectory, appendRunStage } from "../../../plugins/vh-adlc/scripts/docs-drift/run-directory";
 import { installedSettingsFixture } from "./settings-fixture";
 import { publicationFixture } from "./publication-fixture";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
@@ -24,6 +24,27 @@ function fixture() {
   const source = readGit(f.repo, "rev-parse", "HEAD").toString().trim();
   return { ...f, input: { repo: f.repo, source, directory, origins, entry: "interactive" } };
 }
+
+test.each(["prepare-after-verify", "verify-after-publish", "resolve-after-prepare", "prepare-after-scan"])("normal stage ordering preserves one coherent preparation attempt: %s", fault => {
+  const f = fixture();
+  const prior = fault === "prepare-after-verify" ? "verify" : fault === "verify-after-publish" ? "publish" : fault === "resolve-after-prepare" ? "prepare" : "scan";
+  const selected = fault === "verify-after-publish" ? "verify" : fault === "resolve-after-prepare" ? "resolve" : "prepare";
+  const run = createRunDirectory(f.input);
+  appendRunStage(run, { command: prior, state: "complete", artifacts: {} });
+  const current = readRunDirectory(f.input);
+  if (fault === "prepare-after-scan") expect(() => assertRunStageOrder(current, selected)).not.toThrow();
+  else expect(() => assertRunStageOrder(current, selected)).toThrow("fresh run");
+});
+
+test("shared stage artifact writing enforces its size and opened-run scope", () => {
+  const f = fixture(), run = createRunDirectory(f.input), retain = createRunArtifactWriter(run, 8);
+  const reference = retain("small-record", Buffer.from("bounded"));
+  expect(readFileSync(join(run.directory, reference.path), "utf8")).toBe("bounded");
+  expect(reference.sha256).toBe(sha256(Buffer.from("bounded")));
+  expect(() => retain("large-record", Buffer.alloc(9))).toThrow("configured bound");
+  expect(() => retain("../outside", Buffer.alloc(1))).toThrow();
+  expect(() => createRunArtifactWriter(JSON.parse(JSON.stringify(run)), 8)).toThrow("original opened run");
+});
 
 test("a run retains immutable policy and bounded stage artifacts without granting effects", () => {
   const f = fixture(), run = createRunDirectory(f.input);

@@ -21,6 +21,7 @@ type Preparation = {
   selection: { schema_version: 1; source_commit: string; edits: Edit[] } | null;
   assessment: ReturnType<typeof readAssessmentReport> | null;
   proposal_assessment_reference: ReturnType<typeof parseWorkerHandoff>["proposal_assessment_reference"];
+  resolution_verifications: ReturnType<typeof parseWorkerHandoff>["resolution_verifications"];
   publication: ReturnType<typeof parseWorkerHandoff>["publication"]; inspection: ReturnType<typeof inspectPreparation> | null;
 };
 
@@ -29,7 +30,7 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
   const options = { ...input, source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), worker_capture: structuredClone(input.worker_capture) };
   const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
   const result: Preparation = { schema_version: 1, kind: "docs-drift-worker-preparation", authority: "none", complete: false, scope_changed: false, diagnostics: [],
-    worker_inputs: null, worker: null, selection: null, assessment: null, proposal_assessment_reference: null, publication: null, inspection: null };
+    worker_inputs: null, worker: null, selection: null, assessment: null, proposal_assessment_reference: null, resolution_verifications: null, publication: null, inspection: null };
   try {
     result.worker_inputs = await collectWorkerInputs(options);
     if (!result.worker_inputs.complete) { result.diagnostics.push(...result.worker_inputs.diagnostics); throw Error("Current worker inputs incomplete"); }
@@ -49,6 +50,7 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
     result.publication = handoff.publication;
     // This is original worker data; only the separate assessment reviewer validates its full proposal judgments.
     result.proposal_assessment_reference = handoff.proposal_assessment_reference;
+    result.resolution_verifications = handoff.resolution_verifications;
     if (handoff.proposal_assessment_reference) {
       const secondary = artifactDirectoryScope(options.artifact_root, options.candidate_repo ?? repo), reference = handoff.proposal_assessment_reference;
       secondary.assertExternal(join(secondary.directory, protocolPath(reference.path)));

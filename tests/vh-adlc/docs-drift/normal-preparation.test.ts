@@ -1,0 +1,81 @@
+/** Exercise normal preparation through owned native processes. No actual provider or remote writes. */
+import { afterAll, expect, test } from "bun:test";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { ordinaryComponentFixture, preflightFixture } from "./preflight-fixture";
+import { auditClient } from "./native-audit-client-fixture";
+import { installOwnedNativeService } from "./original-publication-fixture";
+import { git } from "./repository-fixture";
+import { executeOwnedProcess } from "../../../plugins/vh-adlc/scripts/docs-drift/owned-process";
+import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { readRunDirectory } from "../../../plugins/vh-adlc/scripts/docs-drift/run-directory";
+import { readBoundArtifact } from "../../../plugins/vh-adlc/scripts/docs-drift/evidence-input";
+
+const roots: string[] = [];
+let passed = false;
+afterAll(() => {
+  if (!passed) console.error("Preserved failed normal preparation fixtures", JSON.stringify(roots));
+  else for (const root of roots) rmSync(root, { recursive: true, force: true });
+});
+
+test("normal prepare retains the original worker selection and edits only its owned candidate", async () => {
+  const component = ordinaryComponentFixture(roots, true), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable });
+  writeFileSync(component.executable, auditClient("prepare", true), { mode: 0o755 });
+  const source = f.head(), origin = join(f.root, "origin.git"), directory = join(f.root, "run"), state = join(f.root, "state");
+  git(f.root, "clone", "--bare", "--no-local", f.repo, origin);
+  const service = installOwnedNativeService({ root: f.root, origin, source, head: source, publisher_identity: { actor: "fixture-owner", actor_id: 30 } });
+  const before = captureRepositoryState(f.repo), nativeBefore = readFileSync(service.statePath), refs = git(origin, "for-each-ref");
+  async function invoke(command: string) {
+    const result = await executeOwnedProcess({ argv: [process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), command,
+      "--repo", f.repo, "--run-dir", directory, ...(command === "scan" ? ["--source", source] : [])], cwd: f.repo,
+      env: { PATH: join(f.root, "native-bin") + ":" + process.env.PATH, HOME: process.env.HOME!, GH_TOKEN: "synthetic-native-token",
+        COPILOT_GITHUB_TOKEN: "synthetic-selected-provider", XDG_STATE_HOME: state, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
+      capture: "memory", watched_outputs: [], timeout_ms: 900000, stdout: join(f.root, command + ".stdout"),
+      stderr: join(f.root, command + ".stderr"), started: () => {} });
+    expect(result.reaped).toBe(true); expect(result.timed_out).toBe(false);
+    return { result, report: JSON.parse(Buffer.from(result.captured?.stdout ?? []).toString()) as unknown };
+  }
+  expect((await invoke("scan")).result.exit_code).toBe(0);
+  writeFileSync(join(directory, "prepare.yaml"), "decisions:\n  - id: guide-fix\n    reason: Correct the selected guide\nattention: []\n", { mode: 0o600 });
+  const prepared = await invoke("prepare");
+  expect(prepared.report).toMatchObject({ command: "prepare", outcome: "collected" });
+  expect(prepared.result.exit_code).toBe(0);
+  const run = readRunDirectory({ repo: f.repo, directory, origins: join(state, "vh-adlc/docs-drift/origins") });
+  const stage = run.stages.at(-1);
+  expect(stage?.command).toBe("prepare"); expect(stage?.state).toBe("complete");
+  const reference = stage?.artifacts.preparation;
+  if (!reference) throw Error("Original preparation reference required");
+  const preparation = JSON.parse(readBoundArtifact({ source_repo: f.repo, artifact_root: directory, reference }).toString());
+  expect(preparation.prepared.state).toBe("prepared-uncommitted");
+  expect(readFileSync(join(preparation.prepared.checkout, "docs/guide.md"), "utf8")).toBe("# Corrected guide\n");
+  expect(stage?.artifacts.worker_capture).toBeDefined(); expect(stage?.artifacts.selection).toBeDefined();
+  git(preparation.prepared.checkout, "add", "docs/guide.md");
+  git(preparation.prepared.checkout, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Selected guide correction");
+  const verified = await invoke("verify");
+  expect(verified.report).toMatchObject({ command: "verify", outcome: "collected" }); expect(verified.result.exit_code).toBe(0);
+  const final = readRunDirectory({ repo: f.repo, directory, origins: join(state, "vh-adlc/docs-drift/origins") }).stages.at(-1);
+  expect(final?.command).toBe("verify"); expect(final?.state).toBe("complete");
+  expect(final?.artifacts.candidate_verification).toBeDefined(); expect(final?.artifacts.reviewer_capture).toBeDefined();
+  expect(final?.artifacts.reviewed_plan).toBeDefined();
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+  expect(readFileSync(service.statePath)).toEqual(nativeBefore); expect(git(origin, "for-each-ref")).toBe(refs);
+  const manifest = final?.artifacts.reviewed_plan;
+  if (!manifest) throw Error("Exact reviewed manifest required");
+  writeFileSync(join(directory, "approval.yaml"), "manifest_sha256: " + manifest.sha256 + "\nrequest: Approve this exact synthetic publication batch\n", { mode: 0o600 });
+  const head = git(preparation.prepared.checkout, "rev-parse", "HEAD");
+  git(origin, "fetch", "--no-write-fetch-head", preparation.prepared.checkout, head);
+  const native = JSON.parse(readFileSync(service.statePath, "utf8")); native.publication_commit = head;
+  writeFileSync(service.statePath, JSON.stringify(native), { mode: 0o600 });
+  const published = await invoke("publish");
+  expect(published.report).toMatchObject({ command: "publish", outcome: "collected", publication_effects: { state: "complete" } });
+  expect(published.result.exit_code).toBe(0);
+  const completed = JSON.parse(readFileSync(service.statePath, "utf8"));
+  expect(completed.prs).toHaveLength(1); expect(completed.prs[0].title).toBe("Repair the guide");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+  const resumed = await invoke("resume");
+  expect(resumed.report).toMatchObject({ command: "resume", outcome: "collected", publication_effects: { state: "complete" } });
+  expect(resumed.result.exit_code).toBe(0);
+  expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(1);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+  passed = true;
+}, 1200000);

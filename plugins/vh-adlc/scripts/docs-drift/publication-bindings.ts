@@ -72,12 +72,14 @@ export async function collectPublicationBindings(input: Options): Promise<Result
     if (verified.source_only && result.mode !== "advisory") throw Error("Source-only publication requires an advisory issue assessment");
     result.facts = await collectPublicationInputs({ ...common, candidate_repo: candidateRepo, candidate: options.candidate, selection: options.selection,
       resolution_record: options.resolution_record, object_store: verified.inspection?.object_store ?? undefined, credential: options.credential, path: options.path,
-      cache_directory: options.cache_directory, entry: options.entry, launcher_path: options.launcher_path, settings_path: options.settings_path, comparison_identity: options.comparison_identity });
+      cache_directory: options.cache_directory, entry: options.entry, launcher_path: options.launcher_path, settings_path: options.settings_path,
+      comparison_identity: options.comparison_identity, observation: options.observation });
     if (!result.facts.complete) { result.diagnostics.push(...result.facts.diagnostics); throw Error("Current publication facts incomplete"); }
     const { identity, current_default: currentDefault, store, candidate } = result.facts;
     if (!identity || !currentDefault || !store || !candidate?.candidate_tree || !candidate.diff_sha256 || !baseline.scan_artifacts || !verified.scan)
       throw Error("Complete native candidate and original verification required");
-    const native = () => readNativeContext({ hostname: snapshot.settings.hostname, repository: snapshot.settings.repository, credential: options.credential, path: options.path, comparison_identity: options.comparison_identity });
+    const native = () => readNativeContext({ hostname: snapshot.settings.hostname, repository: snapshot.settings.repository, credential: options.credential, path: options.path,
+      comparison_identity: options.comparison_identity, observation: options.observation });
     const context = native();
     if (context.default_commit !== currentDefault || canonicalDigest(context.identity) !== canonicalDigest(identity)) throw new PublicationScopeChanged("Native source or actor changed before proposal collection");
     result.proposals = collectProposals(context.repository, snapshot.settings);

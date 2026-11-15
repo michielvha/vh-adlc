@@ -3,7 +3,7 @@ import type { WorkflowRunInput } from "../github-read";
 import { collectAdoptionBindings, readRecordedAdoption } from "./adoption";
 import { readCompatibleAdoptionLineage } from "./adoption-lineage";
 import { isGitAncestor, readAdoptionInput, readGit } from "./git";
-import { readHistoryWorkflowContract } from "./history-workflow";
+import { readHistoryWorkflowContract, readHistoryWorkflowEvents } from "./history-workflow";
 import { requireOwnedStore } from "./proposals";
 import { canonicalDigest, compareUTF8, freezeJSON, sha256 } from "./protocol";
 import type { ProducerSource, VerifiedProducer } from "./report-history";
@@ -25,7 +25,7 @@ function flatProducer(input: { store: OwnedObjectStore; current_default: string;
       if (source.commit_sha !== run.head_sha || run.repository.id !== identity.repository_id
         || run.repository.full_name.toLowerCase() !== identity.repository.toLowerCase()
         || run.head_repository?.id !== identity.repository_id || run.head_repository.full_name.toLowerCase() !== identity.repository.toLowerCase()
-        || run.event !== "schedule" || run.head_branch !== identity.default_branch) fail("native source or repository changed");
+        || !["schedule", "workflow_dispatch"].includes(run.event) || run.head_branch !== identity.default_branch) fail("native source or repository changed");
       requireCompleteHistory(repo, run.head_sha); requireCompleteHistory(repo, input.current_default);
       if (!isGitAncestor(repo, run.head_sha, input.current_default)) return null;
       if (readAdoptionInput(repo, run.head_sha, ".vh-adlc/docs-drift.yaml") === null) return null;
@@ -53,6 +53,7 @@ function flatProducer(input: { store: OwnedObjectStore; current_default: string;
       });
       const scheduled = native.get(settings.reports.workflow_path), worker = native.get(settings.execution.worker_workflow);
       if (!scheduled || !worker) fail("protected workflow source required");
+      if (!readHistoryWorkflowEvents(scheduled).some(event => event === run.event)) fail("original caller trigger changed");
       const contract = readHistoryWorkflowContract({ scheduled, worker, worker_path: settings.execution.worker_workflow });
       return freezeJSON({ source_commit: run.head_sha,
         manifest_sha256: canonicalDigest({ settings: settingsProjections(settings).protected, component: settings.component, blobs }),

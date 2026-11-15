@@ -7,7 +7,7 @@ import type { HistoryContext, ProducerSource, VerifiedProducer } from "../../../
 import { attentionProjection, buildReport } from "../../../plugins/vh-adlc/scripts/docs-drift/report";
 import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
-import { settingsFixture } from "./settings-fixture";
+import { settingsFixture, installedSettingsFixture } from "./settings-fixture";
 import { createGitHubReader, createRepositoryReader } from "../../../plugins/vh-adlc/scripts/github-read";
 import { git, populateRepository } from "./repository-fixture";
 import type { ArtifactInput, WorkflowRunInput } from "../../../plugins/vh-adlc/scripts/github-read";
@@ -26,9 +26,10 @@ function zip(report: Uint8Array, provenance: Uint8Array): Buffer {
   if (result.exitCode !== 0) throw new Error(result.stderr.toString());
   return result.stdout;
 }
-function fixture() {
-  const selected = settings();
-  const run: WorkflowRunInput = { id: 101, run_attempt: 2, workflow_id: 55, path: selected.reports.workflow_path, event: "schedule", status: "completed", conclusion: "failure", head_sha: producer.source_commit, head_branch: "main", repository: { id: 11, full_name: context.repository }, head_repository: { id: 11, full_name: context.repository }, created_at: "2026-11-05T10:00:00Z", updated_at: "2026-11-05T10:02:00Z" };
+function fixture(manual = false) {
+  const modern = installedSettingsFixture();
+  const selected = manual ? parseSettings({ ...modern, reports: { ...modern.reports, workflow_id: 55 } }) : settings();
+  const run: WorkflowRunInput = { id: 101, run_attempt: 2, workflow_id: 55, path: selected.reports.workflow_path, event: manual ? "workflow_dispatch" : "schedule", status: "completed", conclusion: "failure", head_sha: producer.source_commit, head_branch: "main", repository: { id: 11, full_name: context.repository }, head_repository: { id: 11, full_name: context.repository }, created_at: "2026-11-05T10:00:00Z", updated_at: "2026-11-05T10:02:00Z" };
   const bytes = canonicalJSON(report());
   const envelope = createActionsEnvelope(bytes, { settings: selected, run, producer });
   const archive = zip(bytes, envelope);
@@ -203,10 +204,10 @@ test("the native binary backend accepts only a numeric same-repository API endpo
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-function nativeFixture(root: string) {
+function nativeFixture(root: string, manual = false) {
   const source = join(root, "source"), artifacts = join(root, "artifacts"), bin = join(root, "bin");
   for (const directory of [source, artifacts, bin]) mkdirSync(directory, { mode: 0o700 });
-  const populated = populateRepository(source), input = fixture();
+  const populated = populateRepository(source), input = fixture(manual);
   const workflow = readFileSync(join(source, input.settings.reports.workflow_path));
   const observedProducer = { ...producer, source_commit: populated.commit,
     source_inputs_sha256: canonicalDigest([[input.settings.reports.workflow_path, sha256(workflow)]]) };
@@ -223,7 +224,8 @@ function nativeFixture(root: string) {
   const responses: Record<string, unknown> = {
     [prefix]: { id: 11, full_name: "fixture/docs", default_branch: "main" },
     [prefix + "/actions/workflows/55"]: { id: 55, path: input.settings.reports.workflow_path, state: "active" },
-    [prefix + "/actions/workflows/55/runs?event=schedule&branch=main&status=completed&per_page=30&page=1"]: { total_count: 1, workflow_runs: [input.run] },
+    [prefix + "/actions/workflows/55/runs?event=schedule&branch=main&status=completed&per_page=30&page=1"]: { total_count: manual ? 0 : 1, workflow_runs: manual ? [] : [input.run] },
+    [prefix + "/actions/workflows/55/runs?event=workflow_dispatch&branch=main&status=completed&per_page=30&page=1"]: { total_count: manual ? 1 : 0, workflow_runs: manual ? [input.run] : [] },
     [prefix + "/actions/runs/101/attempts/2"]: input.run,
     [prefix + "/actions/runs/101/artifacts?per_page=100&page=1"]: { total_count: 1, artifacts: [input.artifact] },
     [prefix + "/actions/artifacts/201"]: { ...input.artifact, archive_download_url: "https://foreign.invalid/ignored" },
@@ -261,6 +263,25 @@ function nativeFixture(root: string) {
     } };
   return { input, options, responses, responsePath, log };
 }
+
+test("ordinary manual-dispatch reports retain their native artifacts and remembered attention", async () => {
+  const root = mkdtempSync(join(tmpdir(), "docs-drift-history-manual-"));
+  try {
+    const f = nativeFixture(root, true);
+    const result = await collectActionsHistory(f.options);
+    expect(result.diagnostics).toEqual([]); expect(result.complete).toBe(true);
+    expect(result.records).toHaveLength(1); expect(result.receipts).toHaveLength(1);
+    expect(JSON.parse(f.input.provenance_bytes.toString()).event).toBe("workflow_dispatch");
+    const requests: string[][] = readFileSync(f.log, "utf8").trim().split("\n").map(line => JSON.parse(line));
+    expect(requests.filter(args => args.at(-1)?.includes("event=workflow_dispatch"))).toHaveLength(1);
+    expect(requests.filter(args => args.at(-1)?.includes("event=schedule"))).toHaveLength(1);
+    const current = report();
+    const carried = buildReport({ ...context, completed_at: "2026-11-06T10:01:00Z", source_commit: f.input.run.head_sha,
+      collection_complete: true, failures: [], attention: current.attention.map(row => row.item), corrections: [], proposals: [], published: [],
+      history: { captured_at: context.started_at, records: result.records, diagnostics: [] } });
+    expect(carried.outcome).toBe("carried-attention");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 
 test("native history uses hash-checked producer source, typed job reads and the packaged binary path", async () => {
   const root = mkdtempSync(join(tmpdir(), "docs-drift-history-native-"));

@@ -65,7 +65,7 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
     owner: input.owner, run: input.run, credential: input.credential, path: input.path ?? process.env.PATH,
     cache_directory: input.cache_directory, entry: input.entry, launcher_path: input.launcher_path, settings_path: input.settings_path,
     source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), inventory_context: input.inventory_context,
-    comparison_identity: input.comparison_identity ? { ...input.comparison_identity } : undefined };
+    comparison_identity: input.comparison_identity ? { ...input.comparison_identity } : undefined, observation: input.observation };
   const result: WorkerCollection = { schema_version: 1, kind: "docs-drift-worker-inputs", authority: "none", complete: false, scope_changed: false, diagnostics: [],
     inputs: null, worker_input_sha256: null, worker_runtime_sha256: null, attention: [], proposal_snapshot: null, proposal_snapshot_path: null,
     source_verification: null, facts: null, proposals: null, resolution: null };
@@ -88,7 +88,7 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
     const { identity, current_default: currentDefault } = result.facts;
     if (!identity || !currentDefault || !result.facts.runtime) throw Error("Complete native source identity and runtime required");
     result.worker_runtime_sha256 = roleRuntimeDigest(result.facts.runtime, "worker");
-    const native = () => readNativeContext({ hostname: snapshot.settings.hostname, repository: snapshot.settings.repository, credential: options.credential, path: options.path, comparison_identity: options.comparison_identity });
+    const native = () => readNativeContext({ hostname: snapshot.settings.hostname, repository: snapshot.settings.repository, credential: options.credential, path: options.path, comparison_identity: options.comparison_identity, observation: options.observation });
     const context = native();
     if (context.default_commit !== currentDefault || canonicalDigest(context.identity) !== canonicalDigest(identity)) throw new PublicationScopeChanged("Native source or actor changed before proposal collection");
     result.proposals = collectProposals(context.repository, snapshot.settings);

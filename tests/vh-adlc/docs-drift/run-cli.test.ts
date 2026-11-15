@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
@@ -26,6 +26,26 @@ function invoke(f: ReturnType<typeof fixture>, command: string, extra: string[] 
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw Error("CLI report object required");
   return { status: result.exitCode, report: parsed as Record<string, unknown> };
 }
+
+test.each(["several-consolidations", "missing-consolidation", "missing-originals", "ambiguous-resume-operation"])("normal option refusals precede run creation: %s", fault => {
+  const f = fixture(), command = fault === "missing-originals" ? "resolve" : fault === "ambiguous-resume-operation" ? "resume" : "close";
+  const extra = fault === "ambiguous-resume-operation" ? ["--operation-id", "known-operation"] : ["--source", f.source,
+    ...(fault === "several-consolidations" ? ["--proposal", "1", "--proposal", "2"] : [])];
+  const result = invoke(f, command, extra);
+  expect(result.status).toBe(2); expect(result.report.diagnostics).not.toEqual([]);
+  expect(existsSync(f.directory)).toBe(false);
+});
+
+test.each(["unknown-field", "malformed"])("committed policy errors have a setup outcome before any run is created: %s", fault => {
+  const f = fixture(), path = join(f.repo, ".vh-adlc/docs-drift.yaml");
+  writeFileSync(path, fault === "malformed" ? "schema_version: [\n" : readFileSync(path, "utf8") + "\nunexpected_setup_field: true\n");
+  readGit(f.repo, "add", "--all");
+  readGit(f.repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Invalid synthetic setup");
+  f.source = readGit(f.repo, "rev-parse", "HEAD").toString().trim();
+  const result = invoke(f, "scan", ["--source", f.source]);
+  expect(result.status).toBe(2); expect(result.report).toMatchObject({ outcome: "setup-required" });
+  expect(existsSync(f.directory)).toBe(false);
+});
 
 test("normal scan and report retain their inputs in one external directory", () => {
   const f = fixture(), before = captureRepositoryState(f.repo);

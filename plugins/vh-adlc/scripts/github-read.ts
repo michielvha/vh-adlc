@@ -322,19 +322,21 @@ export function createRepositoryReader(reader: GitHubReader, repository: string)
       if (result.id !== id || (attempt !== undefined && result.run_attempt !== attempt)) throw Error("github-read-run-changed");
       return result;
     },
-    runs(workflow: number, branch: string): TypedPage<WorkflowRunInput> {
+    runs(workflow: number, branch: string, event: "schedule" | "workflow_dispatch" = "schedule"): TypedPage<WorkflowRunInput> {
       readText(branch);
-      return list(`${prefix}/actions/workflows/${readID(workflow)}/runs?event=schedule&branch=${encodeURIComponent(branch)}&per_page=100`, value => {
+      if (!["schedule", "workflow_dispatch"].includes(event)) throw Error("invalid-github-workflow-event");
+      return list(`${prefix}/actions/workflows/${readID(workflow)}/runs?event=${event}&branch=${encodeURIComponent(branch)}&per_page=100`, value => {
         const result = run(value);
-        if (result.workflow_id !== workflow || result.event !== "schedule" || result.head_branch !== branch) throw Error("github-read-run-filter-changed");
+        if (result.workflow_id !== workflow || result.event !== event || result.head_branch !== branch) throw Error("github-read-run-filter-changed");
         return result;
       }, "workflow_runs");
     },
-    recentRuns(workflow: number, branch: string, maxRuns: number): TypedPage<WorkflowRunInput> {
+    recentRuns(workflow: number, branch: string, maxRuns: number, event: "schedule" | "workflow_dispatch" = "schedule"): TypedPage<WorkflowRunInput> {
       readID(workflow); readText(branch); readID(maxRuns);
-      return list(`${prefix}/actions/workflows/${workflow}/runs?event=schedule&branch=${encodeURIComponent(branch)}&status=completed&per_page=${Math.min(maxRuns, 100)}`, value => {
+      if (!["schedule", "workflow_dispatch"].includes(event)) throw Error("invalid-github-workflow-event");
+      return list(`${prefix}/actions/workflows/${workflow}/runs?event=${event}&branch=${encodeURIComponent(branch)}&status=completed&per_page=${Math.min(maxRuns, 100)}`, value => {
         const result = run(value);
-        if (result.workflow_id !== workflow || result.event !== "schedule" || result.head_branch !== branch || result.status !== "completed") throw Error("github-read-run-filter-changed");
+        if (result.workflow_id !== workflow || result.event !== event || result.head_branch !== branch || result.status !== "completed") throw Error("github-read-run-filter-changed");
         return result;
       }, "workflow_runs", maxRuns);
     },

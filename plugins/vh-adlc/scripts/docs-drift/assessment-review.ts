@@ -65,7 +65,7 @@ function bounded(result: Result, command: Command, limit: number): Result {
 function copiedOptions(input: Options): Options {
   return { repo: input.repo, source: input.source, artifact_root: input.artifact_root, owner: input.owner, run: input.run, candidate_repo: input.candidate_repo,
     credential: input.credential, path: input.path ?? process.env.PATH, inventory_context: input.inventory_context, cache_directory: input.cache_directory,
-    entry: input.entry, launcher_path: input.launcher_path, settings_path: input.settings_path,
+    entry: input.entry, launcher_path: input.launcher_path, settings_path: input.settings_path, observation: input.observation,
     source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), worker_capture: structuredClone(input.worker_capture) };
 }
 

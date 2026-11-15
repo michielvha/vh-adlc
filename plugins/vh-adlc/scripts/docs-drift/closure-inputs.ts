@@ -7,6 +7,8 @@ import { readResolutionRecord, resolutionSource, type ResolutionRecord } from ".
 import { readResolutionProposal } from "./resolve-inputs";
 import { captureBareSnapshot, captureRepositoryState, readCommittedTree, type OwnedObjectStore, type RequiredInput, type Snapshot } from "./snapshot";
 import { loadCommittedSettings, type Settings } from "./settings";
+import { sameAccount } from "./identity";
+import { verifyProductionPreflight } from "./preflight";
 
 type Reader = Pick<RepositoryReader, "repository" | "mergedPull" | "pull" | "ref" | "trace" | "comments">;
 export type ClosureCollection = {
@@ -29,10 +31,18 @@ function selectedRepository(proposal: PullRequestInput, settings: Settings, id: 
   if (proposal.base_repository.id !== id || proposal.base_repository.full_name.toLowerCase() !== settings.repository
     || proposal.base_ref !== settings.default_branch) fail("proposal repository scope");
 }
-function nativeShape(proposal: ReturnType<Reader["mergedPull"]>, settings: Settings, id: number): void {
+function nativeShape(proposal: ReturnType<Reader["mergedPull"]>, settings: Settings, id: number, store: OwnedObjectStore): void {
   selectedRepository(proposal, settings, id);
+  let publisher = proposal.actor === settings.publication.actor;
+  if (settings.schema_version === 2) {
+    const original = loadCommittedSettings(store.root, proposal.head_sha).settings;
+    if (original.schema_version !== 2 || !original.component || original.repository !== settings.repository || original.hostname !== settings.hostname)
+      fail("actual merged consolidation identity");
+    const checked = verifyProductionPreflight({ repo: store.root, current_default: proposal.head_sha, component: original.component });
+    publisher = Object.values(checked.checklist.native_entries).some(entry => entry.repository_id === id && sameAccount(entry.publisher, proposal));
+  }
   if (proposal.merged !== true || proposal.state !== "closed" || proposal.merged_at === null || proposal.merge_commit_sha === null || proposal.draft
-    || proposal.actor !== settings.publication.actor || proposal.head_repository?.id !== id
+    || !publisher || proposal.head_repository?.id !== id
     || proposal.head_repository.full_name.toLowerCase() !== settings.repository
     || !proposal.head_ref.startsWith(settings.publication.branch_prefix)) fail("actual merged consolidation identity");
 }
@@ -101,7 +111,7 @@ export function collectClosureInputs(options: ClosureCollection): ClosureInputs 
     result.repository_id = repository.id;
     const consolidation = options.reader.mergedPull(options.consolidation_id);
     if (consolidation.number !== options.consolidation_id) fail("native consolidation changed");
-    nativeShape(consolidation, options.settings, repository.id);
+    nativeShape(consolidation, options.settings, repository.id, options.store);
     result.consolidation = consolidation;
     const mergeCommit = consolidation.merge_commit_sha;
     if (mergeCommit === null) fail("missing actual merge commit");

@@ -11,7 +11,7 @@ import { HistoryEligibilityError, PublicationEvidenceChanged, readReviewedPropos
 import { createAdoptedPublicationVerifier, RetainedPublicationIneligible } from "./reviewed-publication";
 import { loadCommittedSettings } from "./settings";
 import { artifactDirectoryScope, captureRepositoryState, matchesRepositoryState } from "./snapshot";
-import { readNativeContext } from "./transport";
+import { readNativeContext, type NativeObservation } from "./transport";
 
 type NativeReceipt = Awaited<ReturnType<typeof readReviewedProposal>>;
 type Entry = { number: number; binding_sha256: string; eligibility: "reviewed" | "unreviewed" | "unavailable";
@@ -23,7 +23,7 @@ const originalReceipts = new WeakMap<object, Entry[]>();
 
 /** Recollect historical publication eligibility. This is not a current candidate check or carried-delivery verdict. */
 export async function collectAuditPublicationReceipts(input: { repo: string; source: string; artifact_root: string;
-  credential: string; path?: string; proposals: Awaited<ReturnType<typeof collectAuditProposalInputs>> }): Promise<Result> {
+  credential: string; path?: string; observation?: NativeObservation; proposals: Awaited<ReturnType<typeof collectAuditProposalInputs>> }): Promise<Result> {
   const options = { ...input }, result: Result = { schema_version: 1, kind: "docs-drift-audit-publication-receipts", authority: "none",
     source_commit: input.source, complete: false, scope_changed: false, details_omitted: false, diagnostics: [],
     inputs_sha256: null, required_proposals: null, reviewed_proposals: 0, proposals: [] };
@@ -41,7 +41,7 @@ export async function collectAuditPublicationReceipts(input: { repo: string; sou
     };
     recheckReferences();
     result.inputs_sha256 = context.inputs_sha256; result.required_proposals = context.proposals.length;
-    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, observation: options.observation });
     const requireContext = (current: ReturnType<typeof native>) => {
       if (current.default_commit !== context.current_default || canonicalDigest(current.identity) !== canonicalDigest(context.identity))
         throw new PublicationScopeChanged("Original audit publication source or actor changed");

@@ -53,7 +53,8 @@ export function proposalAttentionDisposition(assessment: ProposalAssessment["pro
 
 /** The execution controller calls this before its model roles. JSON metadata cannot recreate the run. */
 export async function beginAuditReport(input: Options): Promise<Start> {
-  const options = structuredClone(input), repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const { observation, ...serializable } = input, options = { ...structuredClone(serializable), observation };
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
   const result: Start = { schema_version: 1, kind: "docs-drift-audit-report-run", authority: "none", source_commit: options.source,
     run_id: options.run, started_at: null, complete: false, scope_changed: false, diagnostics: [], worker_input_sha256: null, proposal_inputs_sha256: null };
   let context: Context | null = null;
@@ -122,7 +123,7 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
     }
     collectionComplete = current.complete && original.history.complete;
     result.publication_receipts = await collectAuditPublicationReceipts({ repo, source: options.source, artifact_root: options.artifact_root,
-      credential: options.credential, path: options.path, proposals: current });
+      credential: options.credential, path: options.path, proposals: current, observation: options.observation });
     result.scope_changed ||= result.publication_receipts.scope_changed;
     if (!result.publication_receipts.complete) {
       collectionComplete = false;
@@ -191,7 +192,7 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
         throw new PublicationScopeChanged("Original audit proposal inputs changed during current verification");
       }
       const finalReceipts = await collectAuditPublicationReceipts({ repo, source: options.source, artifact_root: options.artifact_root,
-        credential: options.credential, path: options.path, proposals: finalInputs });
+        credential: options.credential, path: options.path, proposals: finalInputs, observation: options.observation });
       result.scope_changed ||= finalReceipts.scope_changed;
       if (!finalReceipts.complete) {
         collectionComplete = false;

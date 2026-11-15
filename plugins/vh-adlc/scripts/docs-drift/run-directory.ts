@@ -27,6 +27,24 @@ export type RunDirectory = {
   manifest: Manifest; stages: Stage[]; digest: string;
 };
 const contexts = new WeakMap<RunDirectory, RunOptions>();
+export function latestRunArtifact(run: RunDirectory, name: string) {
+  return run.stages.findLast(stage => Object.hasOwn(stage.artifacts, name))?.artifacts[name];
+}
+export function createRunArtifactWriter(run: RunDirectory, limit: number, nonce = randomUUID()): (name: string, bytes: Uint8Array) => Reference {
+  if (!contexts.has(run) || run.origin !== "original" || !Number.isSafeInteger(limit) || limit < 1 || limit > 16 * 1024 * 1024)
+    fail("original opened run and bounded artifact size required");
+  return (name, bytes) => {
+    if (bytes.length > limit) fail("complete stage artifact exceeds the configured bound");
+    const path = protocolPath(name) + "-" + nonce + ".json";
+    publishArtifact(join(run.directory, path), bytes);
+    return { path, sha256: sha256(bytes) };
+  };
+}
+export function assertRunStageOrder(run: RunDirectory, command: Command): void {
+  const later: Partial<Record<Command, Command[]>> = { resolve: ["prepare", "verify", "publish"], prepare: ["verify", "publish"], verify: ["publish"] };
+  if (run.stages.some(stage => later[command]?.includes(stage.command)))
+    fail("a later stage already belongs to this attempt. Select a fresh run");
+}
 function fail(reason: string): never { throw Error("docs-drift run " + reason); }
 function text(value: unknown): string {
   if (typeof value !== "string" || !value || value.includes("\0")) fail("invalid string");
@@ -154,7 +172,7 @@ export function createRunDirectory(input: RunOptions & { source: string; entry: 
   return readRunDirectory({ repo: snapshot.repo, directory, origins });
 }
 
-function originalContext(run: RunDirectory) {
+export function originalRunContext(run: RunDirectory) {
   const options = contexts.get(run);
   if (!options) fail("original opened run required");
   const current = readRunDirectory(options);
@@ -165,7 +183,7 @@ function originalContext(run: RunDirectory) {
 
 /** Bind the immutable journal header before this original run's first native dispatch. */
 export function bindRunJournal(run: RunDirectory, selected: Journal): RunDirectory {
-  const { options, current } = originalContext(run), journal = readJournal(selected.directory, options.repo);
+  const { options, current } = originalRunContext(run), journal = readJournal(selected.directory, options.repo);
   const plan = journal.plan;
   if (dirname(journal.directory) !== current.directory || journal.header.recovery_mode !== "original" || plan.schema_version !== 2
     || plan.manifest.bindings.source_commit !== current.manifest.source_commit
@@ -183,7 +201,7 @@ export function bindRunJournal(run: RunDirectory, selected: Journal): RunDirecto
 
 /** Append by revision CAS. Existing role/effect journals retain their own dispatch and approval gates. */
 export function appendRunStage(run: RunDirectory, input: Pick<Stage, "command" | "state" | "artifacts">): Stage {
-  const { options } = originalContext(run);
+  const { options } = originalRunContext(run);
   const stage = stageRecord({ schema_version: 1, kind: "docs-drift-run-stage", run_id: run.manifest.id,
     revision: run.stages.length + 1, previous_sha256: run.digest, ...input }, run.manifest, run.stages.length + 1, run.digest);
   for (const reference of Object.values(stage.artifacts)) readBoundArtifact({ source_repo: options.repo, artifact_root: run.directory, reference });

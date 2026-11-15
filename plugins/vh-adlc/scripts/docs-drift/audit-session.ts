@@ -34,7 +34,9 @@ export function readOriginalAuditSessionOutputScope(session: object): OutputScop
 
 /** Retained read-only audit orchestration. Provider execution still needs its caller's actual authorization. */
 export async function runAuditSession(input: Options) {
-  const { environment, role_timeout_ms: timeout = 900000, ...options } = structuredClone(input);
+  const { observation, ...serializable } = input;
+  const { environment, role_timeout_ms: timeout = 900000, ...copied } = structuredClone(serializable);
+  const options = { ...copied, observation };
   const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
   let outputScope: OutputScope | null = null;
   const result: { schema_version: 1; kind: "docs-drift-audit-session"; authority: "none"; source_commit: string;

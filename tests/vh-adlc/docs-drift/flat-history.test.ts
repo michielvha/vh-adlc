@@ -17,11 +17,11 @@ afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force
 const workflow = ".github/workflows/docs-drift.yml", worker = ".github/workflows/docs-drift-worker.yml";
 const reader = { repository: "fixture/docs", repository_id: 10, actor: "fixture-owner", actor_id: 30, default_branch: "main" };
 
-function fixture() {
+function fixture(manual = false) {
   const f = preflightFixture(roots, "none", undefined, (repo, settings) => {
     Object.assign(settings.execution, { scheduled_workflow: workflow, worker_workflow: worker, claude_command: ".claude/commands/docs-drift.md" });
     settings.reports.interactive = "local-attestation"; settings.reports.local_history_roots = ["history"];
-    put(repo, workflow, canonicalJSON({ on: { schedule: [{ cron: "0 9 * * 1" }] }, jobs: { drift: { uses: "./" + worker } } }).toString());
+    put(repo, workflow, canonicalJSON({ on: { schedule: [{ cron: "0 9 * * 1" }], ...(manual ? { workflow_dispatch: null } : {}) }, jobs: { drift: { uses: "./" + worker } } }).toString());
     put(repo, worker, canonicalJSON({ on: { workflow_call: null }, jobs: { report: { "runs-on": "ubuntu-latest",
       steps: ["collect", "review", "report", "upload", "attention"].map(id => ({ id: "docs-drift-" + id, name: "Drift " + id, run: "synthetic-only" })) } } }).toString());
     put(repo, ".claude/commands/docs-drift.md", "Synthetic command\n");
@@ -40,17 +40,17 @@ function source(repo: string, head: string, changed = false): ProducerSource {
       .map(([path, bytes]) => [path, bytes === null ? null : sha256(bytes)] as const); } };
 }
 
-test.each(["matching", "changed-native-blob", "foreign-repository", "wrong-workflow", "wrong-event", "staged-source"])("flat scheduled history verifies its original source and native workflow: %s", fault => {
-  const f = fixture(), head = fault === "staged-source" ? f.candidate : f.current;
+test.each(["matching", "manual-dispatch", "changed-native-blob", "foreign-repository", "wrong-workflow", "wrong-event", "staged-source"])("flat scheduled history verifies its original source and native workflow: %s", fault => {
+  const f = fixture(fault === "manual-dispatch"), head = fault === "staged-source" ? f.candidate : f.current;
   const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
   const run: WorkflowRunInput = { id: 101, run_attempt: 1, workflow_id: 100, path: workflow, event: "schedule",
     head_branch: "main", head_sha: head, repository, head_repository: repository,
     status: "completed", conclusion: "success", created_at: "2000-01-01T00:00:00Z", updated_at: "2000-01-01T00:01:00Z" };
   if (fault === "foreign-repository") run.repository = { ...repository, id: 11 };
   if (fault === "wrong-workflow") run.workflow_id++;
-  if (fault === "wrong-event") run.event = "workflow_dispatch";
+  if (fault === "wrong-event" || fault === "manual-dispatch") run.event = "workflow_dispatch";
   const verify = createAdoptedProducerVerifier({ store: f.store, current_default: f.current, identity: reader, entry: "interactive" });
-  if (fault === "matching") {
+  if (fault === "matching" || fault === "manual-dispatch") {
     const result = verify(source(f.repo, head), run);
     expect(result?.source_commit).toBe(head); expect(result?.component_sha256).toBe(f.component.component_sha256);
     expect(result?.job_name).toBe("drift / report");

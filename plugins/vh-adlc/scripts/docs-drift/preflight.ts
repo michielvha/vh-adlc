@@ -3,7 +3,7 @@ import { publisherActor, sameAccount, sameLogin } from "./identity";
 import { fullModel, modelMatches, ref } from "./manifests";
 import { canonicalDigest, canonicalJSON, freezeJSON, protocolPath } from "./protocol";
 import { exactRecord } from "./publication-decisions";
-import { loadCommittedSettings, parseComponentBinding, type InstalledSettings } from "./settings";
+import { loadCommittedSettings, parseComponentBinding, SetupRequired, type InstalledSettings } from "./settings";
 import { readYAML } from "../settings-file";
 import { OUTPUT_LIMIT } from "./owned-process";
 import type { PublicationIdentity } from "./transport";
@@ -31,7 +31,7 @@ type Evidence = { component: Component; consumer_commit: string; evidence_sha256
 type Check = Evidence & { name: CheckName; status: "passed"; target_sha256: string; note: string };
 type NativeEntry = Evidence & { repository_id: number; entry_sha256: string; worker_model: string; reviewer_model: string; publisher: { actor: string; actor_id: number } };
 
-function fail(reason: string): never { throw Error("docs-drift preflight " + reason); }
+function fail(reason: string): never { throw new SetupRequired("docs-drift preflight " + reason); }
 function text(value: unknown): string {
   if (typeof value !== "string" || !value.trim() || value.includes("\0")) fail("nonempty text required");
   return value;
