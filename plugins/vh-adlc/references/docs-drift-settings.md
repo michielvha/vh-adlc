@@ -77,6 +77,12 @@ each publisher in `pr_discovery.authors`, and cover the publication branch with
 an equal or parent discovery prefix. Copilot and Claude can share an account.
 Their original entry, role receipt and invocation remain independently bound.
 
+Select the intended entry with `--entry hosted`, `--entry copilot` or
+`--entry claude` when collecting `trial-bindings` and preparing a mapped
+`prepare-trial-fixture`. Interactive binding collection observes the selected
+account through the existing read credential. The scalar `trial-bindings`
+call without an entry keeps its offline metadata-inspection behavior.
+
 The runtime resolves the authenticated viewer's numeric ID through GitHub's
 native account endpoint and records the returned login. Configured logins and
 later native observations compare case-insensitively with exact numeric IDs.

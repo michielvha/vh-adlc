@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { PUBLISHER_ENTRIES, type PublisherEntry } from "./identity";
 import { auditSessionOutput, runAuditSession } from "./audit-session";
 import { persistAuditOutput, type AuditOutputArtifacts } from "./report-output";
 import { persistHostedAuditOutput } from "./history-output";
@@ -97,8 +98,10 @@ bun <plugin>/scripts/docs-drift/cli.ts report-findings --repo <repo> --source <f
 bun <plugin>/scripts/docs-drift/cli.ts check-upgrade-signals --repo <repo>
   --source <full-commit>
 bun <plugin>/scripts/docs-drift/cli.ts trial-bindings --repo <repo>
+  [--entry <hosted|copilot|claude>]
   --source <full-commit>
 bun <plugin>/scripts/docs-drift/cli.ts prepare-trial-fixture --repo <repo>
+  [--entry <hosted|copilot|claude>]
   --source <full-current-default-commit> --artifact-root <private-external-directory>
 bun <plugin>/scripts/docs-drift/cli.ts inspect-runtime --repo <repo>
   --source <full-current-default-commit> --cache-root <retained-cache>
@@ -335,6 +338,7 @@ export function argumentsForCommand(argv: string[]) {
   const needsArtifacts = ["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", ...originalInputCommands, ...auditSessionCommands, ...assessmentReviewCommands, ...selectionCommands, ...recoveryCommands, ...retainedCommands].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
+  if (["trial-bindings", "prepare-trial-fixture"].includes(command)) flags.push("--entry");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
   if (retainedCommands.includes(command)) flags.push("--operation-id");
   if (recoveryCommands.includes(command)) flags.push("--cache-root", "--entry", "--journal-directory");
@@ -389,6 +393,9 @@ export function argumentsForCommand(argv: string[]) {
   if (values.has("--coordination") !== values.has("--coordination-sha256")) throw Error("Coordinated selection path and digest are required together");
   const missing = (requiredReferences[command] ?? []).filter(flag => !values.has(flag));
   if (missing.length) throw Error(command + " requires " + missing.join(", "));
+  const entry = values.get("--entry");
+  if (["trial-bindings", "prepare-trial-fixture"].includes(command) && entry !== undefined
+    && !PUBLISHER_ENTRIES.includes(entry as PublisherEntry)) throw Error("Unknown trial publisher entry");
   return { command, repo, source, artifacts, operation: values.get("--operation-id"), cache: values.get("--cache-root"), entry: values.get("--entry"),
     launcher: values.get("--launcher"), settings: values.get("--settings"), definition: values.get("--trial-definition"),
     selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256"), candidate_repo: values.get("--candidate-repo"), candidate: values.get("--candidate"), resolution_record: values.get("--resolution-record"), resolution_sha256: values.get("--resolution-sha256"), verification: values.get("--verification"), verification_sha256: values.get("--verification-sha256"),
@@ -677,7 +684,10 @@ export async function main(argv: string[]): Promise<number> {
       report = { schema_version: 1, command: options.command, outcome: source_assessment.complete ? "collected" : "incomplete",
         source_commit: options.source, source_assessment, diagnostics: source_assessment.diagnostics.map(message => ({ code: "source-assessment", message })) };
     } else if (options.command === "trial-bindings") {
-      const trial = collectTrialBindings({ repo, current_default: options.source });
+      const entry = options.entry as PublisherEntry | undefined;
+      const context = entry && entry !== "hosted" ? nativeContext(repo, options.source) : null;
+      if (context && context.default_commit !== options.source) throw Error("trial binding source must match the observed current default");
+      const trial = collectTrialBindings({ repo, current_default: options.source, entry, ...(context ? { identity: context.identity } : {}) });
       report = { schema_version: 1, command: options.command, outcome: "collected", source_commit: options.source, diagnostics: [], trial };
     } else if (options.command === "check-upgrade-signals") {
       const signals = checkUpgradeSignals({ repo, source: options.source });
@@ -704,7 +714,7 @@ export async function main(argv: string[]): Promise<number> {
     } else if (options.command === "prepare-trial-fixture") {
       const artifacts = privateArtifacts(options.artifacts, repo), context = nativeContext(repo, options.source);
       if (context.default_commit !== options.source) throw Error("trial preparation source must match the observed current default");
-      const preparation = prepareTrialFixture({ repo, current_default: options.source, identity: context.identity, directory: artifacts.root });
+      const preparation = prepareTrialFixture({ repo, current_default: options.source, identity: context.identity, entry: options.entry as PublisherEntry | undefined, directory: artifacts.root });
       report = { schema_version: 1, command: options.command, outcome: "collected", source_commit: options.source, diagnostics: [], preparation };
     } else {
       const artifacts = privateArtifacts(options.artifacts, repo);

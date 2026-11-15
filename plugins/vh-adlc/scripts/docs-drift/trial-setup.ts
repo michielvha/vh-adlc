@@ -1,3 +1,4 @@
+import type { PublisherEntry } from "./identity";
 import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { collectTrialBindings } from "./adoption";
@@ -11,10 +12,10 @@ function fail(reason: string): never { throw Error("docs-drift trial setup " + r
 
 /** Import only the committed synthetic bundle into a new owned directory. This grants no execution. */
 export function prepareTrialFixture(options: {
-  repo: string; current_default: string; identity: PublicationIdentity; directory: string;
+  repo: string; current_default: string; identity: PublicationIdentity; entry?: PublisherEntry; directory: string;
 }) {
   if (!options?.identity) fail("current native trial identity required");
-  const policy = collectTrialBindings({ repo: options.repo, current_default: options.current_default, identity: options.identity });
+  const policy = collectTrialBindings({ repo: options.repo, current_default: options.current_default, identity: options.identity, entry: options.entry });
   const parent = externalArtifactDirectory(options.directory, options.repo);
   const bundle = readAdoptionInput(options.repo, options.current_default, policy.fixture.bundle.path);
   if (!bundle || bundle.sha256 !== policy.fixture.bundle.sha256) fail("committed bundle changed");

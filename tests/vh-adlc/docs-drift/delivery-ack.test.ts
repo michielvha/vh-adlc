@@ -1041,7 +1041,11 @@ for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-create
     if (change === "case") {
       const lookup = await lookupAppliedDelivery(scope);
       expect(lookup.differences).toContain("body_sha256");
-      expect(lookup.current.user_login_sha256).toBe(sha256(Buffer.from("Fixture-Owner")));
+      expect(lookup.current.user_login_sha256).toBe(sha256(Buffer.from("FIXTURE-OWNER")));
+      const retained = JSON.parse(readFileSync(lookup.evidence.path, "utf8")).lookup;
+      expect(retained.current.user_login_sha256).toBe(sha256(Buffer.from("FIXTURE-OWNER")));
+      expect(retained.creator_projection).toEqual({ observed_login_sha256: sha256(Buffer.from("FIXTURE-OWNER")),
+        recorded_login_sha256: sha256(Buffer.from("Fixture-Owner")) });
       expect((f.resources.get(key)!.user as { login: string }).login).toBe("FIXTURE-OWNER");
     } else await expect(lookupAppliedDelivery(scope)).rejects.toThrow("delivery-current-target-changed");
     expect(canonicalJSON(f.resources.get(key)).equals(bytes)).toBe(true);

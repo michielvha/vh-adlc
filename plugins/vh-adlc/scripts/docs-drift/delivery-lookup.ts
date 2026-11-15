@@ -19,6 +19,7 @@ export type DeliveryLookup = {
   effect_id: string; resource_id: number; application_sha256: string;
   transport: "native" | "collector"; context: "trial" | "production";
   current: Facts; parent: ReturnType<typeof projectBeforeSource> | null;
+  creator_projection?: { observed_login_sha256: string; recorded_login_sha256: string };
   differences: string[]; current_sha256: string; evidence: SuccessEvidence;
 };
 
@@ -69,12 +70,14 @@ export async function lookupAppliedDelivery(options: {
   const before = readBefore({ ...scope, evidence: application.before });
   if (current.id !== application.resource_id || current.number !== application.number
     || current.user_id !== original.user_id) throw Error("delivery-current-target-changed");
+  let creator_projection: DeliveryLookup["creator_projection"];
   if (current.user_login_sha256 !== original.user_login_sha256) {
     const nativeCreator = record(record(resources.resource).user);
     // The verified applied response binds the original own creator's ID and exact spelling hash.
     if (original.user_id !== creator.actor_id || original.user_login_sha256 !== sha256(Buffer.from(creator.actor))
       || typeof nativeCreator.login !== "string" || !sameLogin(nativeCreator.login, creator.actor)) throw Error("delivery-current-target-changed");
-    current.user_login_sha256 = original.user_login_sha256;
+    creator_projection = { observed_login_sha256: sha256(Buffer.from(nativeCreator.login)),
+      recorded_login_sha256: sha256(Buffer.from(creator.actor)) };
   }
   const marker = publicationMarker(options.settings, plan.manifest.operation_id);
   if (effect.kind !== "pr-close" && effect.kind !== "pr-update") {
@@ -121,6 +124,7 @@ export async function lookupAppliedDelivery(options: {
   if (!/^[a-f0-9]{64}$/u.test(resources.requests_sha256)) throw Error("incomplete delivery request trace");
   const projection = { effect_id: effect.id, resource_id: application.resource_id, application_sha256: application.proof_sha256,
     transport: plan.transport, context: plan.context, current, parent, differences,
+    ...(creator_projection ? { creator_projection } : {}),
     requests_sha256: resources.requests_sha256 };
   const evidence = retainLookup({ ...scope, transport: plan.transport, state: "conflict", lookup: projection });
   return { ...projection, current_sha256: sha256(canonicalJSON(projection)), evidence };

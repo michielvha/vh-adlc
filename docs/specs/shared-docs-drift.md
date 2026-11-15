@@ -309,7 +309,7 @@ Actual Claude Code Opus 5.5 reads all 236 required fragments at `453ffc09d75c73a
 
 The exact `453ffc0` source completes 24 focused checks with 130 assertions and 210 recovery/application neighbors with 872 assertions. Each command records zero exit and confirmed owned-process cleanup, and its final Git checkout is clean. The additional exact compiler file-list command includes all 255 repository inputs and `mapped-runtime.test.ts`. `verify-recovery-453ffc0/typescript-inputs.json` and `type-coverage-results.json` retain this proof. The existing compiler glob already includes the new file.
 
-The review's completed-journal nit is addressed by interrupting native-fixture writes before outcome persistence, recasing the account before the first pending resume, and counting actual create/comment/close dispatches. The Copilot pending publication and closure controls pass two cases and 36 assertions. The corresponding Claude entry controls are running. Native other-entry resume refusal is established by the invocation digest. The separate publisher-operations unit controls establish policy-level entry refusal.
+The review's completed-journal nit is addressed by interrupting native-fixture writes before outcome persistence, recasing the account before the first pending resume, and counting actual create/comment/close dispatches. The Copilot pending publication and closure controls pass two cases and 36 assertions. The corresponding Claude pending publication and closure controls also pass two cases with 36 assertions in `t112-pending-native-claude-case-green.log`. These are working-tree results. Native other-entry resume refusal is established by the invocation digest. The separate publisher-operations unit controls establish policy-level entry refusal.
 
 Historical PR reads also reproduce a case-only first/final author refusal. Scoped row projection now passes 62 history/producer cases with 319 assertions. Applied PR, issue and comment lookup controls preserve original evidence and raw resource rows while deriving the original own-creator comparison hash; thirty-six selected lookup controls pass 158 assertions. Closure explanation account comparisons retain numeric-ID and material-name refusals. T112 still requires its complete legacy-author/carried-delivery and configured/native matrix. New working changes require committed-source checks and fresh scoped review before their tasks are ticked.
 
@@ -1480,6 +1480,14 @@ Code tasks add and run the regression before the behavior change. Each task is o
 ## Open Questions
 
 None. The owner approved recommendation A on 2026-11-15.
+
+### Current lookup and trial setup corrections
+
+Claude Code Opus 5.5 R6 reads all 156 required fragments at `df2d49c6f6bd15e067d5cb3a030ba5c9a7346116`. Native model, exact target, packet integrity and owned-process cleanup validate. The first validator incorrectly required adjacent metadata lines. Its corrected parser accepts blank separators while preserving every model, target, read-coverage and integrity check. The original return and first validation remain unchanged. R6 finds one should-fix and two nits. The lookup correction retains the observed creator hash and records the verified original spelling separately. Six controls first reproduce the lost observation. Forty-two lookup/explanation neighbor cases then pass 188 assertions, including reads of the retained artifact.
+
+The exact clean `df2d49c` checkout passes strict TypeScript and its resolved compiler file list. Its first normal closure-role CLI attempt hits the unchanged sixty-second child deadline while other checks run. The isolated retry at the same commit and unchanged deadlines passes one case with 28 assertions and confirmed cleanup. Both runs remain under `verify-boundaries-df2d49c`, including the initial failure. The boundary-regression command after that first failure remains unexecuted and is still required. The isolated success establishes that scoped CLI result.
+
+The normal trial setup helper and CLI omitted the selected mapped publisher entry. Five tests first fail for the missing entry and rejected option. The fix forwards the explicit entry through both commands and observes the native interactive account for `trial-bindings`. Scalar offline binding inspection preserves its existing behavior. All 39 trial-setup and publisher-identity cases pass 92 assertions. These lookup and setup results are working-tree observations pending committed-source verification and fresh scoped review. The complete T111/T112 matrix and migration acceptance remain open.
 
 ## Review Log
 

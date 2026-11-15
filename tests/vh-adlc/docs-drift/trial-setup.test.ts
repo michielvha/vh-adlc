@@ -146,3 +146,40 @@ test("repeated setup keeps independently owned exact fixture imports", () => {
   expect(first.fixture).toEqual(second.fixture);
   expect(readGit(first.source, "status", "--porcelain").length).toBe(0);
 });
+
+test.each(["hosted", "copilot", "claude"] as const)("mapped trial preparation forwards the explicit %s account selection", entry => {
+  const actors = { hosted: "fixture-bot", copilot: "fixture-owner", claude: "fixture-owner" };
+  const f = trialDefinitionFixture(roots, { entry_actors: actors }), directory = join(f.root, "mapped-output");
+  mkdirSync(directory, { mode: 0o700 });
+  const before = captureRepositoryState(f.repo), identity = { ...runtimeIdentity, actor: actors[entry], actor_id: entry === "hosted" ? 20 : 30 };
+  const result = setup.prepareTrialFixture({ repo: f.repo, current_default: f.staged, identity, entry, directory });
+  expect(result.authority).toBe("none");
+  expect(result.fixture.tree).toBe(f.definition.fixture.tree);
+  expect(readGit(result.source, "status", "--porcelain").length).toBe(0);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+});
+
+test.each(["trial-bindings", "prepare-trial-fixture"] as const)("normal %s CLI forwards the selected interactive native account", async command => {
+  const { nativeReader } = await import("./runtime-fixture");
+  const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
+  const f = trialDefinitionFixture(roots, { entry_actors: { hosted: "fixture-bot", copilot: "fixture-owner", claude: "fixture-owner" } });
+  const directory = join(f.root, "mapped-cli-output"); mkdirSync(directory, { mode: 0o700 });
+  const native = nativeReader({ root: f.root, candidate: f.staged }, "fixture-owner", false, false, 30);
+  const before = captureRepositoryState(f.repo), argv = [process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"),
+    command, "--repo", f.repo, "--source", f.staged, "--entry", "copilot"];
+  if (command === "prepare-trial-fixture") argv.push("--artifact-root", directory);
+  const result = await executeOwnedProcess({ argv, cwd: f.repo,
+    env: { PATH: native.environment.PATH!, HOME: process.env.HOME ?? f.root, TMPDIR: process.env.TMPDIR ?? f.root,
+      GH_TOKEN: "synthetic-read-token", BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" }, capture: "memory", watched_outputs: [], timeout_ms: 30000,
+    stdout: join(f.root, command + ".stdout"), stderr: join(f.root, command + ".stderr"), started: () => {} });
+  expect(result.reaped).toBe(true); expect(result.timed_out).toBe(false);
+  const output = Buffer.from(result.captured?.stdout ?? []).toString();
+  expect(result.exit_code, output).toBe(0);
+  const report = JSON.parse(output);
+  expect(report.outcome).toBe("collected");
+  if (command === "trial-bindings") {
+    expect(report.trial.publisher_entry).toBe("copilot");
+    expect(report.trial.identity).toMatchObject({ actor: "fixture-owner", actor_id: 30 });
+  } else expect(report.preparation.authority).toBe("none");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+}, 60000);
