@@ -343,6 +343,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-15 | R-1 | spec | `ef7f01b8b85a78c3c26aebb77aab526eed13d54a` | claude-opus-5-5 | procedural | One blocking, eight should-fix and four nit findings |
 | 2026-11-15 | R-2 | spec | `b34ba95382ee1ceb78d0c6c2ac5d751dc65b0ff3` | claude-opus-5-5 | procedural | Two blocking, five should-fix and two nit findings |
+| 2026-11-15 | R-3 | spec | `09de0c3e2a106f48ae3f72e8859362a9193cc308` | claude-opus-5-5 | procedural | One blocking, three should-fix and six nit findings |
 
 ### R-1
 
@@ -501,6 +502,78 @@ SEVERITY: nit
 WHERE: Design (Trial, Arms, the lifecycle command); Test Plan row AC-05
 EVIDENCE: The command given, `--candidate base-<n> --source-ref <base>` or `--candidate rewrite-<n> --package <dir>` with `--repeat 1`, names no case. Without `--cases` the plan runs L01, L02, L04 and L05 (tests/vh-adlc/lifecycle/scenario-plan.ts:21), and an execution failure stops the remaining cases of that invocation (run.ts:134). The Design's own case list, for example `L11-ship`, needs `--cases`.
 PROPOSAL: Add `--cases <case>` to the lifecycle command in Design and in the Test Plan row, one case per invocation.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Trial, Sign-off); Scope (baseline constant bullet); Acceptance Criteria AC-04 and AC-06; Test Plan rows AC-04 and AC-06; Context, Background (direct-operation-compatibility bullet, "the baseline constant moved to the commit holding the approved text"); Context, Owner summary paragraph 4 ("before its pinned baseline moves")
+EVIDENCE: The test does not compare the two texts the same way. tests/vh-adlc/direct-operation-compatibility.test.ts:61-81 removes ship's "## Article and promotion handoff" and "## After an authorized merge" sections only from the current file. Lines 86-94 remove only Loop routes and Documentation impact from the baseline text. That works today only because the ship baseline b313327b has neither section (`git show b313327b:plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md | grep '^## '` gives Start, Make the feature shippable, Deliver, Report). Ship and review also share one constant, `baseline`, with investigate, tasks and resume (:6, :14, :16). The precedent at :7-13 added new per-skill constants (`specSummaryBaseline`, `implementBaseline`) and a selector branch; it did not move a constant. I copied the test to /tmp, set `baseline` and `implementBaseline` to 09de0c3e (so the bodies are identical to the current ones) and ran it: 5 pass, 2 fail. Investigate fails because the new baseline has "## Issue labels". Ship fails because the new baseline has "## Article and promotion handoff". So if ship's baseline moves "to the commit holding the approved body", as Design and Scope require, the test fails even for an unchanged body, and AC-06's proof (`bun test tests/vh-adlc/direct-operation-compatibility.test.ts` passes) and AC-04 cannot be met. If the shared constant moves for ship or review, it also breaks investigate and contradicts AC-06's "every other skill's baseline is unchanged". This traces to the previous revision, which added the sign-off baseline move to answer R-2 F-01.
+PROPOSAL: Say in Scope and Design that each signed-off skill gets its own baseline constant and selector branch, and that the test strips the promotion and cleanup sections (and Issue labels where present) from the baseline text as it does from the current text. Then word AC-06 and its row to accept that test change. Correct the Background sentence about how earlier approvals moved the baseline.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, Decision; Measures; Execution failure); Acceptance Criteria AC-05; Test Plan row AC-05; Context, Owner summary paragraph 3 ("You asked for proof that the rewrite is better")
+EVIDENCE: Passed runs and violations are compared as raw totals over five runs, with no margin. "No worse" must hold on every case on both hosts, and one improvement on any case and host is enough. Only turns and tool calls get a margin (the base spread). Implement is reached by about ten scenario invocations (`grep -c 'vh-adlc-implement\|FINISH' tests/vh-adlc/scenarios/run.ts` gives 10), plus the "Binary unavailable" case for each operation (run.ts:603) and the Codex cases. That is roughly twenty case and host pairs. A single extra grader-reported violation, or one failed run, in any one base or rewrite arm decides the verdict. A failed run includes a hosted-service error turn after the session started, which the Execution failure rule counts rather than reruns. A rewrite with no real effect therefore passes when chance gives it one fewer violation on one case, and fails when chance goes the other way on any of the twenty pairs. The verdict can come out green or red while the question the owner asked, whether the rewrite is better, stays unanswered.
+PROPOSAL: Raise an Open Question on noise handling. Options: require a margin for passed runs and violations in both the no-worse and the improves clauses (for example a difference larger than the base arm's spread, or at least two), limit the cases to those that load the skill's changed steps, or keep the rule and drop the claim that the trial proves the rewrite is better. Also decide whether a hosted-service error after start is rerun.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, Combination; Grader); Acceptance Criteria AC-05; Test Plan row AC-05; Context, Owner summary paragraph 3 ("passing rewrites are then tried together")
+EVIDENCE: The combined trial runs "on every case that reaches more than one of them, under the same rules". The same rules include "improves on at least one case on at least one host". The document does not say what happens when no listed case reaches more than one of the passing skills, for example if only ship and implement pass and the ship cases (L11-ship, the SHIP() S13 scenarios at run.ts:1590) do not run implement. One implementer would score an empty combined trial as a pass with nothing to check. Another would score it as a fail, because the improvement clause cannot hold, and then "the trial stops and returns to the owner". It is also unclear whether the combined arm has to improve again or only be no worse. The Grader paragraph gives the grader "the skill's rule inventory", which does not say which inventory, or which union of inventories, grades a combined transcript that loads two rewritten skills.
+PROPOSAL: Define the combined pass rule (for example no worse only), what happens when no case reaches more than one passing skill, and which inventories the grader scores combined transcripts against.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-05 ("`git diff origin/<default branch> -- <file>` after the last merge is empty"); Acceptance Criteria AC-05
+EVIDENCE: AC-05 asks that a failed skill be identical to "its text on the default branch the feature branch last merged". The row compares the file with the current origin/<default branch>, not with the commit that was merged. The three files change often: 19, 12 and 13 commits since 2026-10-15 (`git log --since=2026-10-15 --oneline ef7f01b -- <file> | wc -l`, verified). If main changes a failed skill after the last merge and before the implementation review, the row's diff is non-empty although AC-05 holds. The words "after the last merge" can be read as a point in time or as the comparison commit, so two reviewers would run different commands.
+PROPOSAL: Compare against the default-branch commit the feature branch last merged, for example `git diff <that merge's second parent> HEAD -- <file>`, and name it in the row.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (scenario harness bullet `:1820`; lifecycle harness bullet `:88`, `:117`)
+EVIDENCE: At 09de0c3e, tests/vh-adlc/scenarios/run.ts:1820 is `const kept = SCRATCH.splice(0);`. The `writeFileSync(join(EVIDENCE, ...))` is at :1818. In tests/vh-adlc/lifecycle/run.ts, :88 is the `Bun.spawn` call and the 720-second timer is at :89. :117 is `const unchangedPackage = ...` and the `execution-failed` status is set at :124.
+PROPOSAL: Cite scenarios/run.ts:1818 and lifecycle/run.ts:89 and :124.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (direct-operation-compatibility bullet and "Other tests pin phrases" bullet); Design (Rewrite pass step 4)
+EVIDENCE: The pinned-text list leaves out two pins that step 4's search would have to find. tests/vh-adlc/direct-operation-compatibility.test.ts:83-84 requires the Generic intake section to be exactly "For generic vh-adlc requests without an operation name, follow `references/lifecycle.md`; then continue here." and to be followed directly by "The plugin directory is two levels". That sentence also anchors the compared body (:19). tests/vh-adlc/blog/run.ts:70-71 sends agents to the ship skill's "Article and promotion handoff section" by name.
+PROPOSAL: Add these two pins to the Background list so the inventory marks them.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: frontmatter goal ("with every rule kept"); Context, Owner summary paragraph 2 ("Every rule keeps its meaning"); Design (Rewrite pass steps 2 and 3)
+EVIDENCE: Design step 2 deletes "sentences that change nothing" and step 3 records rules as `removed` with a reason. AC-03 accepts a recorded removal. The goal says every rule is kept, and the Owner summary says every rule keeps its meaning before it mentions removals.
+PROPOSAL: Word the goal and the summary sentence as "every rule kept or its removal recorded and accepted".
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary paragraph 3; Design (Trial, Combination)
+EVIDENCE: Design says "If that combined trial fails, the trial stops and returns to the owner before anything ships." The summary says only that passing rewrites "are then tried together" and leaves out this stop, which the owner is accepting.
+PROPOSAL: Add one sentence on the combined-trial stop to the summary.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Routing); Scope (AGENTS.md bullet); Acceptance Criteria AC-01
+EVIDENCE: The companion route in /home/m/code/vhco-pro-docs-write-for-agents/AGENTS.md (uncommitted diff) reads "Write skills, agent entry points, reviewer prompts and references an agent loads". Guide line 10 applies to agent entry points (`AGENTS.md`, `CLAUDE.md`). The planned route for this repository's AGENTS.md leaves out entry points, although AGENTS.md is itself one.
+PROPOSAL: Include agent entry points in the route sentence and AC-01, or say why this repository leaves them out.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Trial, Arms; Glossary "Arm commit")
+EVIDENCE: The lifecycle harness takes its driver, case list and grader from the checkout it runs in (tests/vh-adlc/lifecycle/run.ts:14, :26, :32 copies `import.meta.dir`). It takes only `plugins/vh-adlc` from `--source-ref` (`git archive sourceRef plugins/vh-adlc`, :44-47). A lifecycle case added on the arm commits is therefore used only when the invocation runs from a checkout that already has it. Design names the arm commit only through `--source-ref`, and says a worktree at the arm commit only for Claude Code.
+PROPOSAL: Say that the Codex invocations for both arms run from a checkout at the base arm commit, so both arms use the same driver and any added case.
 
 ## Sources
 
