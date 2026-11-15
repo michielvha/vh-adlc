@@ -233,6 +233,15 @@ F-01 found case-insensitive record-to-record comparison could allow a changed id
 
 Four controls reproduce these findings in `publisher-component-r1-red-final.log`, including compatible and unaffected-entry trial successors with fresh target-bound receipts and byte-preserved carried entry receipts. All four pass with seven assertions in `publisher-component-r1-focused-green.log`. The expanded adoption, upgrade and trial neighbor run remains in progress. A fresh scoped Claude Code review is required before T115 is ticked. These controls use synthetic metadata and establish no hosted or migration acceptance.
 
+
+### Publisher follow-up verification
+
+The expanded adoption/upgrade/trial run passes 269 cases and 406 assertions across five files in `publisher-component-r1-green-neighbors.log`. The four original review regressions are included. Actual Claude Code Opus 5.5 then reads all 90 required fragments at `b2dc4f83be93b169b3d51cd1a9b65da0fe1c9276`, with original packet/model/target and process cleanup verified. It returns one should-fix finding in two native-observation tests, retained in `publisher-component-claude-r2/returned-records.txt`, SHA256 `babc4ecc7e3ed4aeab2058dd346fe29d214e25f6f51adafc4c540d70ef7be24b`. Those tests changed the first GraphQL login literal, while the typed actor now comes from REST. Both failures are reproduced in `publisher-component-r2-red.log`.
+
+The tests now change the actual REST observation, and a separate control preserves a same-ID REST observation when only the GraphQL slug changes. The full native-observation suite passes twelve cases and 335 assertions in `publisher-component-r2-native-observation-green.log`. This fixes the reported test fault. Broader native regressions remain in progress. No whole-feature criterion, installed operation or migration result is inferred from these component checks.
+
+While the feature CI was running, main advanced to `c676010` through PR #99 and used plugin version 0.23.0. The pushed feature's macOS job then passed 1,226 cases but failed its package-version comparison, with two platform skips. Its exact original log is `ci-27b9466-macos.log`. The installed Codex marketplace plugin was refreshed to that published 0.23.0 version, while the verified CLI remains 0.26.0. Upstream integration and the feature candidate's next version are tracked before the next push.
+
 ## Scope
 
 Recovery includes a separately approved delivery acknowledgement that preserves a changed remote resource and permits exact-owned lease cleanup after proof of original ownership and settled execution.

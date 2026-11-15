@@ -94,7 +94,7 @@ test.each(["actor", "source", "pull"])("native observation rejects changed input
       if (changed === "pull") { f.pulls[0].body = "Changed explanation"; f.save(); }
       else {
         const program = readFileSync(f.program, "utf8");
-        writeFileSync(f.program, changed === "actor" ? program.replace('"fixture-bot"', '"changed-actor"')
+        writeFileSync(f.program, changed === "actor" ? program.replaceAll('"fixture-bot"', '"changed-actor"')
           : program.replace(JSON.stringify(f.candidate), JSON.stringify("f".repeat(40))));
       }
     })).rejects.toBeInstanceOf(NativeObservationChanged);
@@ -115,7 +115,7 @@ test.each(["unchanged", "actor-changed"])("callback failure preserves material-c
     const f = fixture(), transient = Error("Synthetic read failure");
     const result = withNativeObservation(f.scope, async observation => {
       readNativeContext({ ...f.scope, observation }).repository.pull(1);
-      if (state === "actor-changed") writeFileSync(f.program, readFileSync(f.program, "utf8").replace('"fixture-bot"', '"changed-actor"'));
+      if (state === "actor-changed") writeFileSync(f.program, readFileSync(f.program, "utf8").replaceAll('"fixture-bot"', '"changed-actor"'));
       throw transient;
     });
     if (state === "actor-changed") await expect(result).rejects.toBeInstanceOf(NativeObservationChanged);
@@ -159,5 +159,19 @@ test("an incomplete comments replay stays retryable without asserting a material
     await withNativeObservation(f.scope, async observation => {
       expect(readNativeContext({ ...f.scope, observation }).repository.comments(1).complete).toBe(true);
     });
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+
+test("a changed GraphQL slug at the same ID preserves the native REST account observation", async () => {
+  try {
+    const f = fixture();
+    await withNativeObservation(f.scope, async observation => {
+      const original = readNativeContext({ ...f.scope, observation }).identity;
+      expect(original.actor).toBe("fixture-bot");
+      // The first occurrence belongs to GraphQL. The REST account response deliberately stays unchanged.
+      writeFileSync(f.program, readFileSync(f.program, "utf8").replace('"fixture-bot"', '"alternate-graphql-slug"'));
+    });
+    expect(readNativeContext(f.scope).identity.actor).toBe("fixture-bot");
   } catch (error) { failed = true; throw error; }
 }, 90000);
