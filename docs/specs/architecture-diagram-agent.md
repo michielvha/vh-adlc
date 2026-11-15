@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing the shared diagram skill and native-host fixtures."
+status: complete
+status_description: "All five criteria met in independent review R-11."
 issue: null
 branch: feat/architecture-diagram-agent
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
@@ -14,6 +14,9 @@ covers:
   - docs/reference/marketplace.md
   - docs/user-guides/workflows.md
   - tests/vh-adlc/diagram/
+  - tests/vh-adlc/check.test.ts
+  - tests/vh-adlc/maintenance/discovery.test.ts
+  - tests/vh-adlc/triage/discovery.test.ts
 ---
 
 # Plan: Architecture diagram agent
@@ -28,7 +31,7 @@ VitePress has a Claude-specific agent for AWS architecture. It already uses a sh
 
 The agent decides which relationships to show and how to explain them. Each depicted relationship has a source or a visible label that identifies it as proposed. When the sources leave a link uncertain, the brief records the gap. Drawing and export use local tools. The project chooses the destination and controls any publication. Stackgraph stays a standalone deterministic tool. FlowStory playback and VitePress adoption can use the results of this first feature.
 
-The first release covers an AWS request path grounded in repository sources and an OCI-to-local design from a written brief. The agent renders in the same request when the sources support a useful view. The host supplies draw.io Desktop and the selected local provider assets. In the prototype check, both drawings exported twice with networking disabled and produced identical files on the second export. Independent review found gaps in the proof and the local setup contract. The revised proof requires actual invocation from both marketplace installs, a comparison between the brief and the drawing, and a local export and editor check. Independent spec review R-3 returned no findings. The native implementation checks are pending. Acceptance authorizes implementing and testing this scope under the feature lifecycle.
+The first release covers an AWS request path grounded in repository sources and an OCI-to-local design from a written brief. The agent renders in the same request when the sources support a useful view. The host supplies draw.io Desktop and the selected local provider assets. In the prototype check, both drawings exported twice with networking disabled and produced identical files on the second export. The native fixture and intake runs recorded under T6 produced editable AWS and OCI diagrams and requested clarification for the incomplete restore brief. Review R-5 recorded matching offline exports and successful editor boundary drags. Review R-6 found two discovery checks missing from coverage, an incomplete reverse mapping check in the fixture proof, and an outdated marketplace version. The revised proof adds the discovery checks, an explicit inspection of visual cells that have no brief row, and regression tests for an empty SVG and a changed staged drawing.
 
 ### Background
 
@@ -70,32 +73,42 @@ Work in a separate staging directory for each request. Create the final files un
 
 ### Delivery
 
-The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`. Update the two manifest versions together and document the operation in the user workflow. Before feature merge, exercise the actual catalog install from the candidate checkout in isolated Codex and Claude profiles, then run the native-host proofs against those installs. Before claiming marketplace availability or adopting the skill in VitePress, verify discovery from the published marketplace source. The packaged change is a plugin skill and supporting files. It requires no Go binary changes. [Codex marketplace](../../.agents/plugins/marketplace.json) · [Claude marketplace](../../.claude-plugin/marketplace.json) · [Marketplace migration precedent](../reference/marketplace.md#L34)
+The existing vhco-tools Codex and Claude catalogs both source `plugins/vh-adlc`. Update the two manifest versions together, register the skill as a content operation in the shared plugin checker, and document the operation in the user workflow. Before feature merge, exercise the actual catalog install from the candidate checkout in isolated Codex and Claude profiles, then run the native-host proofs against those installs. Before claiming marketplace availability or adopting the skill in VitePress, verify discovery from the published marketplace source. The packaged change is a plugin skill and supporting files. It requires no Go binary changes. [Codex marketplace](../../.agents/plugins/marketplace.json) · [Claude marketplace](../../.claude-plugin/marketplace.json) · [Marketplace migration precedent](../reference/marketplace.md#L34)
 
 ## Acceptance Criteria
 
-- [ ] AC-01: An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
-- [ ] AC-02: The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
-- [ ] AC-03: A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
-- [ ] AC-04: An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
-- [ ] AC-05: A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+- [x] AC-01: An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
+      Evidence: Both native hosts installed the candidate from their own local catalog and read the shared skill. The package and both discovery tests passed.
+- [x] AC-02: The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
+      Evidence: Regraded all native outputs with the final fixture checker and inspected the drawings and briefs in both directions. Unlisted cells were headings, labels, icon parts or legends. Both OCI briefs identify the unresolved restore path.
+- [x] AC-03: A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
+      Evidence: All four diagrams passed the pinned schema and reference checks and matched a fresh offline export. Drawing boundaries moved their children in the Desktop editor. The SVGs rendered at 390 px in Chromium and Firefox and were inspected at 900 px.
+- [x] AC-04: An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+      Evidence: The focused Bun tests passed the failed-export, invalid-SVG, changed-input, collision and retry cases. Both native `--case export-failure` runs attempted an export, reported the renderer error and left the final directory absent.
+- [x] AC-05: A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+      Evidence: The `--case intake` outputs rendered the AWS and proposed OCI views. The Codex and Claude missing-link transcripts asked how the restore would work and produced no final files.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Run `bun tests/vh-adlc/diagram/run.ts --host <codex-or-claude> --case fixtures` once per host. Install from the candidate catalog in an isolated profile, verify installed content against the candidate, then give the fresh native session an explicit request naming the installed skill and the fixture sources. Retain a native skill activation event or the observed tool read of the installed skill file, plus the package identity, prompt and output manifest. Discovery or a self-reported invocation alone fails. Use those same sessions for AC-02. |
-| AC-02 | Run the AC-01 runner against an AWS route fixture with a dependency-only decoy and a written OCI-to-local fixture with a proposed route and an unresolved restore link. Match semantic roles to the fixture expectations and verify the brief-to-cell ID mapping in both directions. Agent-chosen ID spelling may vary across runs. Check parents, endpoints, status, source locations and port labels. Fail on a depicted decoy traffic arrow, invented port, unrelated resource or unresolved arrow. Retain briefs, draw.io files, SVGs and redacted transcripts with the run manifest. |
+| AC-01 | Run `bun tests/vh-adlc/diagram/run.ts --host <codex-or-claude> --case fixtures` once per host. Install from the candidate catalog in an isolated profile, verify installed content against the candidate, then give the fresh native session an explicit request naming the installed skill and the fixture sources. Retain a native skill activation event or the observed tool read of the installed skill file, plus the package identity, prompt and output manifest. Discovery or a self-reported invocation alone fails. Use those same sessions for AC-02. Run `bun test tests/vh-adlc/check.test.ts` to verify the operation is registered and both manifests are versioned together. Run the maintenance and triage discovery tests with the package suite to verify the installed skill lists. |
+| AC-02 | Run the AC-01 runner against an AWS route fixture with a dependency-only decoy and a written OCI-to-local fixture with a proposed route and an unresolved restore link. Match semantic roles to the fixture expectations and verify the brief-to-cell ID mapping in both directions. Agent-chosen ID spelling may vary across runs. Compare all visible components, boundaries and connectors in the draw.io file and SVG against the depicted brief rows. Record which unlisted cells serve as labels, styling, icons or legend samples. Fail on any visible resource, boundary or flow without a matching brief row. Check parents, endpoints, status, source locations and port labels. Fail on a depicted decoy traffic arrow, invented port, unrelated resource or unresolved arrow. Retain briefs, draw.io files, SVGs and redacted transcripts with the run manifest. |
 | AC-03 | Use both hosts' AC-01 fixture outputs. Check against the pinned XSD and resolve every parent and connector reference. Open each draw.io file, move a boundary and confirm its children move with it. Verify the configured input hashes against the committed expectations before the run. Re-export each session’s delivered draw.io file with networking disabled and the recorded Desktop version and settings. Compare the delivered SVG with that reference export for equivalent rendered content and geometry. Inspect the delivered SVG at documentation width and open or zoom it on a phone viewport. Fail on missing fixture icons, overlapping or clipped labels, or misleading routes. Preserve captures, tool versions, asset hashes and results. |
-| AC-04 | `bun test tests/vh-adlc/diagram` exercises a missing local prerequisite, a mismatched provider asset hash, a failed export, an occupied destination, a concurrent publish and a retry to an unused path. Synchronize two processes after successful staging, before publication to the same initially free destination. Require one complete winner and one collision. Compare the winner's files against its staged output and verify byte-for-byte preservation of the occupied destination. Failed requests expose no partial final directory. A hash mismatch identifies the affected asset and does not invoke the exporter. |
+| AC-04 | `bun test tests/vh-adlc/diagram` exercises a missing local prerequisite, a mismatched provider asset hash, a failed export, an empty SVG returned with success, a renderer that mutates the staged drawing, an occupied destination, a concurrent publish and a retry to an unused path. Synchronize two processes after successful staging, before publication to the same initially free destination. Require one complete winner and one collision. Compare the winner's files against its staged output and verify byte-for-byte preservation of the occupied destination. Failed requests expose no partial final directory. A hash mismatch identifies the affected asset and does not invoke the exporter. |
 | AC-05 | Run `bun tests/vh-adlc/diagram/run.ts --host <codex-or-claude> --case intake` on both hosts. The complete AWS fixture renders immediately. The OCI-to-local fixture with the missing restore link renders without that arrow and includes the gap in the brief. A separate fixture without evidence for its main link requests the missing input and leaves no final directory. Keep the redacted transcripts and output inventory with the run manifest. |
 
 ## Tasks
 
-- [ ] T1 `tests/vh-adlc/diagram/output.test.ts` - the staging and export contract fails before the shared helper exists (AC-03, AC-04)
-- [ ] T2 `plugins/vh-adlc/skills/vh-adlc-diagram/scripts/export.ts` - local export, checked inputs, failure recovery and exclusive publication pass the output tests (AC-03, AC-04)
-- [ ] T3 `tests/vh-adlc/diagram/` - fixture runner and committed scenarios enforce installation, invocation, diagram semantics and intake behavior, with discovery failing before the skill exists (AC-01, AC-02, AC-03, AC-05)
-- [ ] T4 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `docs/reference/marketplace.md`, `docs/user-guides/workflows.md` - both native hosts load the installed skill and the fixture and intake checks and rendered-output review pass (AC-01, AC-02, AC-03, AC-05)
+- [x] T1 `tests/vh-adlc/diagram/output.test.ts` - the staging and export contract fails before the shared helper exists (AC-03, AC-04)
+      Evidence: bun test tests/vh-adlc/diagram/output.test.ts returned four expected failures before the export helper existed.
+- [x] T5 `tests/vh-adlc/diagram/` - fixture runner and committed scenarios reject the package when the skill is absent (AC-01, AC-02, AC-03, AC-05)
+      Evidence: bun test tests/vh-adlc/diagram/discovery.test.ts rejected the candidate because the declared skill had no SKILL.md.
+- [x] T6 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `tests/vh-adlc/check.test.ts`, `docs/reference/marketplace.md`, `docs/user-guides/workflows.md` - the package checker and export tests pass, followed by native fixture and intake runs on both hosts and rendered inspection (AC-01, AC-02, AC-03, AC-04, AC-05)
+      Evidence: bun test tests/vh-adlc --timeout 20000 passed 1634 tests. Both native hosts produced the AWS and OCI outputs and requested clarification for the missing restore link. All four delivered SVGs matched offline re-exports, and all four editor boundary drags moved the child. Review R-5 recorded two follow-ups.
+
+- [x] T7 `plugins/vh-adlc/skills/vh-adlc-diagram/`, `plugins/vh-adlc/references/diagram.md`, `docs/reference/marketplace.md`, `tests/vh-adlc/diagram/` - verify export failure handling, the reviewed fixture mapping and dense diagram readability (AC-01, AC-02, AC-03, AC-04)
+      Evidence: 82 focused tests passed. Both native renderer-failure tests passed. The final fixture checker accepted all six native intake results after correcting false positives for a legend and a scope note. The dense AWS preview still benefits from zoom for some recovery labels.
 
 ## Open Questions
 
@@ -109,6 +122,16 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | 2026-11-14 | R-2 | spec | `7a0263ea494dd46d0145a2392e691df045558111` | unknown | procedural | Two should-fix findings and one nit |
 | 2026-11-14 | R-3 | spec | `6593ed37147bd2bd6813e6e4d3e53066af7f8896` | unknown | procedural | No findings |
 | 2026-11-14 | R-3 | spec | `6593ed37147bd2bd6813e6e4d3e53066af7f8896` | n/a | n/a | accepted by owner |
+| 2026-11-14 | R-4 | spec | `211db5a7ceb0510e7107b160efe8ce30babda981` | unknown | procedural | One should-fix finding in the task order |
+| 2026-11-14 | R-4 | spec | `211db5a7ceb0510e7107b160efe8ce30babda981` | n/a | n/a | accepted by owner |
+| 2026-11-14 | R-5 | implementation | `6693aea802f641cf7833073141ec0d5f8824900a` | unknown | procedural | Five criteria met and two should-fix findings |
+| 2026-11-14 | R-6 | spec | `48db37936eab67d416ccdbf53172b0d02a2765f7` | unknown | procedural | Three should-fix findings and one nit |
+| 2026-11-14 | R-7 | spec | `5d3af84c9f93809faf5ad3668477fab1e7bfd1d1` | unknown | procedural | No findings |
+| 2026-11-14 | R-7 | spec | `5d3af84c9f93809faf5ad3668477fab1e7bfd1d1` | n/a | n/a | accepted by owner |
+| 2026-11-14 | R-8 | implementation | `7cd15314eb48ac223a6126006fd55ad049d0dc3c` | unknown | procedural | Four criteria met, one unmet and three findings |
+| 2026-11-14 | R-9 | implementation | `b5149c1249d66b6c6c773d8c8b79d48ebb4225e2` | unknown | procedural | Five criteria met and no findings |
+| 2026-11-15 | R-10 | spec | `53943500fa750071f20c2937e779e8a4ae64ad3a` | unknown | procedural | No findings |
+| 2026-11-15 | R-11 | implementation | `53943500fa750071f20c2937e779e8a4ae64ad3a` | unknown | procedural | Five criteria met and no findings |
 
 ### R-1
 
@@ -180,6 +203,176 @@ PROPOSAL: Cite the prototype export command and observed result in Background or
 ### R-3
 
 NO FINDINGS
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks T2 through T4
+EVIDENCE: T2 first adds files under the new skill directory. The task verification command in AGENTS.md runs tests/vh-adlc/check.test.ts. Lines 224-232 require a version change whenever the plugin subtree changes, and lines 235-245 reject an undeclared skill directory and require its SKILL.md once declared. The current sequence defers both manifest changes and the skill definition to T4, and no task names the checker. T2 cannot pass the required package verification in that order.
+PROPOSAL: Replan the unchecked tail after T1. Commit the failing fixture proof before introducing the skill, then land the helper, skill entry, checker declaration and both manifest changes together with the focused checker in the done condition.
+
+### R-5
+
+CRITERION: AC-01 An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
+VERDICT: met
+EVIDENCE: At `6693aea802f641cf7833073141ec0d5f8824900a`, `bun test tests/vh-adlc/check.test.ts` passed all 64 tests. I compared both installed packages with the catalog copies and reviewed candidate, matching all 154 files on each host. I matched completed installed-skill tool reads in all six native transcripts. Native sessions ran at `4d64cd2` and used byte-identical plugin, catalog and fixture inputs.
+
+CRITERION: AC-02 The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
+VERDICT: met
+EVIDENCE: At `6693aea802f641cf7833073141ec0d5f8824900a`, I applied committed `gradeDiagram` to both hosts' four rendered fixtures and got no failures. I separately compared the delivered drawings and briefs with the source lines and visually inspected all four renderings. Both AWS drawings show the three documented hops without the deployment-only Log Bucket. Both OCI drawings show the proposed backup path and omit the unresolved restore arrow, with the gap recorded in each brief. Manual comparison was necessary for the reverse mapping limitation in F-01.
+
+CRITERION: AC-03 A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
+VERDICT: met
+EVIDENCE: At `6693aea802f641cf7833073141ec0d5f8824900a`, I checked all four drawings with the pinned XSD, repeated the network-disabled Desktop 32.6.10 export and used `cmp` to match all four delivered SVGs byte for byte. In the Desktop editor I dragged each AWS Public Tier and each OCI-local Proxmox Host and observed the expected child move horizontally and vertically. The four standalone SVGs rendered at 390 by 844 in Chromium and Firefox, and I inspected the full-size screenshots for the fixture icons and connector legibility. The browser check exercised these fixture SVGs on a standalone page.
+
+CRITERION: AC-04 An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+VERDICT: met
+EVIDENCE: At `6693aea802f641cf7833073141ec0d5f8824900a`, `bun test tests/vh-adlc/diagram` passed all six tests. The output tests exercised a missing executable, a changed asset with no renderer invocation, a deliberately failed export, an occupied destination preserved byte for byte, two staged subprocesses yielding one complete publication and one collision, and a successful retry at an unused path. The controlled renderer was used for fault and collision cases.
+
+CRITERION: AC-05 A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+VERDICT: met
+EVIDENCE: At `6693aea802f641cf7833073141ec0d5f8824900a`, I checked the six completed native session transcripts and their output inventories, matched transcript and artifact digests to the sanitized manifests, and applied committed `gradeDiagram` to all six outputs. Both hosts rendered AWS and the partial OCI-local view in their initial requests. Each asked how the restore connects, which component initiates it and which way traffic travels in the clarification case. Neither clarification directory contained final output.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-02 and tests/vh-adlc/diagram/grade.ts
+EVIDENCE: The accepted proof requires bidirectional mapping and rejection of unrelated components. `grade.ts` lines 31-40 look up brief entries in the diagram, and line 56 counts connectors. In an isolated copy of the AWS fixture output, I added an unlisted visible Log Bucket vertex to the drawing without changing the brief. `gradeDiagram` still returned an empty failure list.
+PROPOSAL: Check for unmapped semantic vertices or record an explicit manual reverse-mapping check in the proof. Add the unlisted Log Bucket as a negative control.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter covers and Test Plan AC-01
+EVIDENCE: The feature changes `tests/vh-adlc/maintenance/discovery.test.ts` and `tests/vh-adlc/triage/discovery.test.ts` to account for the installed skill in shared plugin discovery. Neither path is in accepted `covers`. Both are exercised by the repository's `bun test tests/vh-adlc` verification command.
+PROPOSAL: Include the two feature-dependent discovery tests in the reviewed coverage, or handle the test change with independently scoped maintenance before relying on it for this feature.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter covers, Design > Delivery, Test Plan AC-01
+EVIDENCE: At `48db37936eab67d416ccdbf53172b0d02a2765f7`, the diff against the merged main parent still changes `tests/vh-adlc/maintenance/discovery.test.ts` and `tests/vh-adlc/triage/discovery.test.ts` to accommodate the diagram skill. Neither path is in `covers`. These checks depend on the installed skill set and are part of the required package test suite. R-5 F-02 remains open.
+PROPOSAL: Include both discovery checks in the reviewed coverage and name their verification in AC-01, or deliver the changes through independently scoped maintenance.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Request and evidence, Test Plan AC-02
+EVIDENCE: The revised grader at `tests/vh-adlc/diagram/grade.ts:93-97` rejects an unlisted Log Bucket but leaves the general reverse mapping to visual inspection. I added an unlisted visible Redis Cluster to a scratch copy of an otherwise valid AWS fixture drawing. `gradeDiagram` returned `[]`. AC-02 says to verify the mapping in both directions and fail on an unrelated resource. Its proof names the runner without an explicit manual reverse-mapping step.
+PROPOSAL: Add a recorded manual check of unlisted visual cells against the fixture and brief, or implement and test the general reverse mapping in the runner.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Delivery, `docs/reference/marketplace.md:116`
+EVIDENCE: The marketplace reference claims that the diagram skill is included from plugin version `0.21.0`. The merged main parent has version `0.21.1` and no diagram skill. Both feature manifests at the reviewed commit give the candidate version as `0.22.0`. Users relying on the stated minimum could install a package that lacks the skill.
+PROPOSAL: Document the version that contains the feature and distinguish the candidate from confirmed availability in the published marketplace.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Owner summary, Tasks T6, Review Log R-5
+EVIDENCE: The summary calls the R-4 task-order fix future work and says the native implementation checks are pending. T6 and the R-5 record describe completed checks, including native runs, matched exports and editor drags. This is stale summary text outside the normative baseline.
+PROPOSAL: Refresh the summary to record the completed checks at their tested revision and the outstanding follow-ups on the refreshed target.
+
+### R-7
+
+NO FINDINGS
+
+### R-8
+
+CRITERION: AC-01 An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
+VERDICT: met
+EVIDENCE: At `7cd15314eb48ac223a6126006fd55ad049d0dc3c`, both isolated native profiles installed the candidate from their respective catalogs. I matched all 154 installed files on each host to the candidate and verified completed reads of the installed skill in both AWS transcripts. The package checker and maintenance and triage discovery tests passed.
+
+CRITERION: AC-02 The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
+VERDICT: met
+EVIDENCE: I compared the four delivered briefs, drawings and SVGs to the fixture sources. The AWS routes show 443, 8080 and 5432 in order and omit the dependency-only Log Bucket. Both OCI views show the three proposed backup hops, label the unset handoff protocol, place the bucket outside the VCN and record the unresolved restore without drawing it. I checked the mapping in both directions and classified the remaining cells as headings, labels, icon parts or legend samples. The isolated Claude OCI result has two legend arrows that the automated grader misclassified as traffic.
+
+CRITERION: AC-03 A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
+VERDICT: met
+EVIDENCE: All four delivered drawings passed the pinned XSD and reference checks. I dragged the Public Tier on each AWS drawing and the Proxmox Host on each OCI drawing. The named child moved with its parent each time. Offline Desktop 32.6.10 re-exports matched the delivered SVGs byte for byte or after normalizing only the generated SVG ID and its references. I inspected the four SVGs at 900 px and 390 px. The final Claude OCI result came from an isolated run of the same candidate.
+
+CRITERION: AC-04 An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+VERDICT: not met
+EVIDENCE: The helper tests passed. My synchronized race with distinct staged artifacts produced one complete winner, one collision and a successful retry to another path. In the exact Codex intake retry, the exporter reported two timeouts. The native agent then created the requested final directory and copied in the draw.io file and brief without an SVG. The runner recorded `Incomplete diagram directory`. The accepted proof requires failed requests to expose no partial final directory.
+
+CRITERION: AC-05 A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+VERDICT: met
+EVIDENCE: Each host rendered AWS and the useful OCI backup view in its original request in a completed native case. Both OCI briefs record the missing restore link. I read both clarification responses and checked that neither created a final directory. Both asked what carries the restore, which component initiates it and which way data travels. The Claude OCI and clarification evidence came from isolated runs of the same candidate after the shared renderer broker was interrupted.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan AC-02, `tests/vh-adlc/diagram/grade.ts:75`
+EVIDENCE: The isolated Claude OCI output contains three source-backed traffic edges and two legend samples between decorative endpoints. The committed grader reports `Unmapped connector in the drawing` because it counts all five edges. The accepted proof explicitly allows unmapped legend samples.
+PROPOSAL: Confirm unmatched edges through the manual reverse-mapping check or distinguish legend samples without waiving any edge connected to a semantic node. Exercise a valid legend and an unsupported traffic edge.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-04, `plugins/vh-adlc/skills/vh-adlc-diagram/SKILL.md:10`, `plugins/vh-adlc/references/diagram.md:35`
+EVIDENCE: In `codex-retry/oci-local/transcript.jsonl`, both helper attempts returned an export timeout. Codex then created `diagram/` directly and copied `architecture.drawio` and `brief.md`. The exact-target manifest confirms those two files and the missing SVG.
+PROPOSAL: Require final publication through the helper and explicitly keep working files outside the requested destination on failure. Verify this through a native case with a renderer that returns an error.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-05, `tests/vh-adlc/diagram/grade.ts:5`
+EVIDENCE: The free-text heuristic gave a clean grade to a response that said the restore facts were unknown and `No clarification is needed`. The manual transcript check required by the accepted proof showed that both observed hosts did ask for the missing facts.
+PROPOSAL: Keep manual verification of an actual request for information in the review evidence. Consider a disclosure-only negative control if the grader becomes the sole check.
+
+### R-9
+
+CRITERION: AC-01 An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
+VERDICT: met
+EVIDENCE: For `b5149c1249d66b6c6c773d8c8b79d48ebb4225e2`, I matched both native catalogs and all 154 installed plugin files to the target and independently verified completed reads of the installed skill in both AWS transcripts. The package checker and maintenance and triage discovery tests passed. The normal native runs preceded the final grading changes and used the same installed plugin.
+
+CRITERION: AC-02 The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
+VERDICT: met
+EVIDENCE: The final grader accepted all four current bundles, including the Codex AWS footer that mentions the excluded Log Bucket and the earlier Claude OCI drawing with legend arrows. The regression controls still reject a Log Bucket component and an extra traffic edge. I checked both directions of the mapping for the four selected bundles. AWS shows its three evidenced hops and ports. OCI shows the proposed backup path, identifies the unselected handoff protocol, places the bucket outside the VCN and records the unresolved restore without drawing it. The unlisted cells are labels, annotations, icon parts or legend samples.
+
+CRITERION: AC-03 A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
+VERDICT: met
+EVIDENCE: I checked the four selected bundle manifests and artifact hashes and inspected the SVGs at documentation and phone widths in Chromium and Firefox. The pinned XSD and reference checks pass. I reproduced offline re-exports and editor drags directly for both AWS drawings and the selected Claude OCI drawing, and independently checked the matching Codex OCI artifact digest and captured re-export and drag records. All four re-exports were identical or differed only in the generated SVG ID and its references. Moving each tested boundary moved the named child.
+
+CRITERION: AC-04 An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+VERDICT: met
+EVIDENCE: The exact-target focused suite passed 82 tests. In the independently exercised race, one complete bundle won, the other writer reported a collision, and a retry succeeded at another destination. Both native forced-failure runs used the target's byte-identical plugin and runner. I observed the exporter errors, verified the final paths remained absent and checked that the agents reported the errors and kept the drafts in their working areas. A separate Codex trial also left the final path absent after two renderer errors.
+
+CRITERION: AC-05 A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+VERDICT: met
+EVIDENCE: I regraded all six latest native intake cases using `b5149c1` and matched the delivered file hashes to both manifests. On each host, AWS and OCI rendered within their original requests, and the OCI brief recorded the missing restore relationship. I read both clarification replies and verified that both asked for the missing connection and initiator, addressed the traffic direction and left the final directory absent. This transcript check establishes the behavior beyond the wording heuristic recorded in R-8.
+
+### R-10
+
+NO FINDINGS
+
+### R-11
+
+CRITERION: AC-01 An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
+VERDICT: met
+EVIDENCE: At `53943500fa750071f20c2937e779e8a4ae64ad3a`, I installed 0.23.0 from each native catalog into a fresh profile. All 154 files in each install matched the candidate. The package checker and discovery tests passed. The installed diagram skill, reference and export helper match the files from the R-9 native sessions, where both hosts read the installed skill on request.
+
+CRITERION: AC-02 The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
+VERDICT: met
+EVIDENCE: The diagram source and fixtures match R-9 byte for byte. I regraded all four delivered bundles with the merged target and matched their hashes to the manifests from the source and drawing inspection. The AWS diagrams preserve the three documented hops and omit the dependency-only bucket. The OCI diagrams preserve the proposed backup path and record the unresolved restore without drawing it.
+
+CRITERION: AC-03 A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
+VERDICT: met
+EVIDENCE: The export helper, schema inputs and fixture code match R-9. I matched all four bundles to the artifacts checked in the Desktop editor and inspected at documentation and phone widths. All four passed the XSD and reference checks. The offline SVG exports matched byte for byte or differed only in the generated SVG ID and its references. The editor drags moved the named children with their boundaries.
+
+CRITERION: AC-04 An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+VERDICT: met
+EVIDENCE: The 82 focused tests passed at the merged target, including the failure, collision and retry checks. I confirmed that the runtime and failure case match the prior native trials, checked the renderer invocation markers and verified that both failed trials left the final directory absent.
+
+CRITERION: AC-05 A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+VERDICT: met
+EVIDENCE: I reapplied the merged target's grader to all six retained native intake cases and observed no failures. Both hosts rendered the AWS and partial OCI cases within their original requests. The OCI briefs record the missing restore relationship. Both clarification transcripts request the missing input, and both final directories remain absent.
 
 ## Sources
 
