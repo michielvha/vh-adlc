@@ -397,6 +397,7 @@ None.
 | 2026-11-15 | R-1 | spec | `ef7f01b8b85a78c3c26aebb77aab526eed13d54a` | claude-opus-5-5 | procedural | One blocking, twelve should-fix and two nit findings |
 | 2026-11-15 | R-2 | spec | `b34ba95382ee1ceb78d0c6c2ac5d751dc65b0ff3` | claude-opus-5-5 | procedural | One blocking, sixteen should-fix and three nit findings |
 | 2026-11-15 | R-3 | spec | `09de0c3e2a106f48ae3f72e8859362a9193cc308` | claude-opus-5-5 | procedural | One blocking, ten should-fix and three nit findings |
+| 2026-11-15 | R-4 | spec | `fc1b66539fc6b13d92d6473230911e8fbaf31691` | claude-opus-5-5 | procedural | Eleven should-fix and three nit findings |
 
 ### R-1
 
@@ -746,6 +747,106 @@ SEVERITY: nit
 WHERE: Design, History ("The key is `<category>:<home class>:<kebab-case slug>`"; fields "category, home, home class")
 EVIDENCE: The persisted `format: 1` block does not list the allowed tokens for category or home class. The category names in the Analysis table contain spaces and capitals ("Instruction size and no-ops"), and the home classes are prose ("Consumer repository", "User-level files"). The same report contract is read across versions and on rollback.
 PROPOSAL: List the exact category and home-class tokens in the format definition in `references/retro.md`.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Background ("`git rev-parse --path-format=absolute --git-common-dir` returns the main checkout's `.git` directory from every worktree of a repository, so the folder that holds it names the repository the same way from all of them"); Design, Session and report folder ("where `<name>` is the name of the folder holding the directory `git rev-parse --path-format=absolute --git-common-dir` prints: the main checkout's folder, the same from every worktree"); Owner summary ("named after the repository's main folder so all its worktrees share it"); Design, History (block field "repository folder name"); AC-11; Test Plan row AC-11
+EVIDENCE: The Background claim has no command output and is false outside the plain layout. In a scratch directory, a worktree of a bare clone printed `/tmp/rv-8xcm/bare.git`, so the folder holding it is `rv-8xcm` (the parent directory); a submodule printed `/tmp/rv-8xcm/super/.git/modules/sub`, so the name is `modules` for every submodule of every repository; `git init --separate-git-dir` printed the separate directory, whose parent is again an unrelated folder. Distinct repositories also share a basename on this host: `/home/m/code/homebrew-tap` (origin michielvha/homebrew-tap) and `/home/m/code/vhco-pro/homebrew-tap` (origin vhco-pro/homebrew-tap), and likewise `builders`. Each pair would share one report folder, so a problem from one repository becomes `recurring` or `fix-not-held` (high) in the other. The Owner summary does not mention this cost. This rule came in with this revision: the previous one used the absolute common-dir path when there was no origin (`git diff 09de0c3 fc1b665`). The AC-11 test uses a plain repository, so it passes on this behaviour.
+PROPOSAL: Key the folder on a name that cannot collide without reading remotes or adding a setting, for example the main folder name plus a short hash of the absolute common directory, and define the bare and submodule cases. Or keep the bare name, state the collision in the Owner summary and raise it as an Open Question. Either way, add AC-11 cases for a bare-clone worktree and two same-named repositories.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Session and report folder ("on Claude Code from `CLAUDE_CODE_SESSION_ID`, on Codex CLI from `CODEX_SESSION_ID` or `CODEX_THREAD_ID`"; "The variable it found also tells it the running host, which it passes to the script as `--host claude` or `--host codex`"); Background (session variables bullet, "Both hosts set these themselves"); AC-09; AC-10; Test Plan rows AC-09 and AC-10
+EVIDENCE: I started `codex exec -s read-only` from this Claude Code session in an empty temporary directory. Its shell had `CLAUDE_CODE_SESSION_ID`, `CLAUDECODE=1`, `CODEX_SESSION_ID` and `CODEX_THREAD_ID` all set. A nested session sees both hosts' variables, and loop settings explicitly support it through `command` routes that run an external CLI (`plugins/vh-adlc/references/loop-settings.md:13`). The Design sets no precedence. An implementation that checks the Claude variable first reviews the parent Claude session and passes `--host claude` while running on Codex, and the other-host check then rejects or misreads the transcript. The recorded-run harness passes only PATH, HOME, LANG, TERM and XDG_CACHE_HOME to the host (`plugins/vh-adlc/scripts/triage/controller-clients.ts:11`), so the AC-09 runs never see both variables and pass with either precedence.
+PROPOSAL: Define how the running host is decided when both hosts' variables are present, for example from the plugin root the host loaded the skill from, and use only that host's variable. Add a `bun test` case for session selection with both sets present.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Extraction and redaction ("Boundaries" paragraph: "a Skill tool call naming `vh-adlc-retro` or a user message invoking `/vh-adlc-retro` on Claude Code, and at a command that reads `vh-adlc-retro/SKILL.md` on Codex CLI. It ends at its `save` command, or ... at the next user message"); Terminology (Session); Design, Knowledge and invocation (intake routing); AC-01; AC-12; Test Plan row AC-12
+EVIDENCE: This revision added the markers in answer to R-3 F-04, and they still miss and over-match real records. (1) Intake rows tell the agent to "Use `skills/<op>/SKILL.md`" (`plugins/vh-adlc/references/lifecycle.md:55`). Claude Code transcripts on this host hold three Read tool calls of `skills/vh-adlc-*/SKILL.md` beside Skill calls named `vh-adlc:vh-adlc-*`. An intake-routed run on Claude Code, which AC-01 requires, therefore has no start marker, and its own turns enter the digest. (2) On Codex, any command that reads the file counts. A rollout from 2026-11-15 reads `.../vh-adlc-review/SKILL.md` with `sed -n '1,100p'` inside a batch of unrelated commands. In this repository, implementing or reviewing retro reads `plugins/vh-adlc/skills/vh-adlc-retro/SKILL.md` many times, and each read would open a run that ends at the next user message, so real work is dropped. (3) "User message" is undefined. Claude Code writes tool results and the loaded skill body (`isMeta: true`) as `type: "user"` entries, as seen right after the Skill call in transcript 1b459f39-4887-498b-86cb-227e4f1529a1. The owner's answer to the skill's own question (repository mismatch, AC-11) is a real user message inside the current run. Under the end rule it closes the current run as interrupted, so no current run is found. The AC-12 fixture is built from the stated markers and passes either way.
+PROPOSAL: Define per host the records that start a run for every entry path, including intake and a read of the installed skill file under the plugin root rather than any copy. Define "user message" as a human-typed entry, excluding tool results and meta entries, and say that owner replies within a run do not end it. Add AC-12 cases for an intake-started run and a run containing an owner answer.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Session and report folder ("When the transcript's recorded working directory is not inside it, or no longer exists, the skill asks"; "`locate` ... prints that folder, or the ask outcome when the working directory is outside the repository or gone"); Owner summary ("If the session was in a different repository than the one retro runs in, retro asks"); AC-11; Test Plan row AC-11
+EVIDENCE: A Claude Code transcript records `cwd` on every line, and the value changes during a session. `~/.claude/projects/-home-m-code-stackweaver/29303468-81f7-55d8-b068-a4fcab5d3893.jsonl` holds 50 distinct values: 5,477 lines in `/home/m/code/stackweaver`, 579 in `.claude/worktrees/one-launcher-p1`, 528 in `.claude/worktrees/runner-architecture`, and 4 values outside the repository (`/tmp` and scratchpad directories). The document does not say which value is "the" recorded working directory: the first, the last or any. "Inside it" is also undefined. A path check makes a live sibling worktree "outside" when retro runs from another worktree, although it is the same repository. Two implementers will ask in different cases, and a single-cwd AC-11 fixture cannot tell them apart.
+PROPOSAL: Name the value used, for example the cwd of the last included turn. Define "inside the repository" as resolving to the same Git common directory when the path exists. Build the AC-11 fixture with several cwd values, including a sibling worktree and `/tmp`.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Session and report folder (reports under `${XDG_STATE_HOME:-$HOME/.local/state}/vh-adlc/retro/<name>/`); Design, Extraction and redaction (`extract ... --output <dir>`); Design, Report and save; Design, Effects and failure ("Each run works in `.work/<run id>/` inside the report folder"); Owner summary ("Its working files sit in a hidden folder beside the reports"); Scope (retro row in `docs/reference/compatibility.md`); AC-06; AC-08; Test Plan rows AC-02 to AC-09 (recorded runs per host)
+EVIDENCE: `codex sandbox -c sandbox_mode=workspace-write -- sh -c "mkdir $HOME/.local/state/vh-adlc-review-probe-<pid>"` failed with "Read-only file system", while `mkdir` inside the workspace succeeded under the same mode. Codex's default sandbox therefore blocks `extract` and `save` on Linux. The plugin's other Codex trials ran in that default sandbox (`docs/reference/compatibility.md:119`, `:125`). The previous revision kept the digest in the system temporary directory, which the sandbox allows. This revision moved all working files into the report folder (`git diff 09de0c3 fc1b665`). The document says nothing about how a Codex run gets write access, or what happens when it is refused.
+PROPOSAL: State how a Codex run gets write access to the report folder, either an approval prompt or a writable root, and what happens on refusal. Record it in the compatibility row, and run the Codex recorded runs in the default `workspace-write` mode.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Report and save ("The skill passes the report to `save --dir <dir> --report <file>`, which ... writes it to `.work/<run id>/report.tmp`"); Design, Effects and failure ("the folder is removed when the run ends"; "there is no other file write"); Design, Extraction and redaction (`--output <dir>`); Owner summary ("Those files are read directly, so the report is redacted again before it is shown"; "removed at the end"); AC-06; AC-10; Test Plan rows AC-06 and AC-10
+EVIDENCE: The model's draft has to exist as a file before `save` reads it, and the document never says where. The draft is unredacted and can hold a secret from the user-level files the model reads directly; AC-06 plants one there. `save` takes no run id, yet it writes to `.work/<run id>/`. No command is named that creates the run id or work folder, or that removes the folder. The no-report endings (an unparseable or other-host transcript, AC-10, or the owner declining at the ask) do not say whether the work folder is removed. AC-06 compares only the fixture repository and the report folder, so a draft left in `/tmp` or in another directory passes. The previous revision had the same unplaced draft.
+PROPOSAL: Place the draft in `.work/<run id>/` and name the command that creates the run id and work folder. Pass the run id to `save`, and name the step that removes the whole work folder on every ending. Extend the AC-06 and AC-10 checks to the draft and to the no-report endings.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan rows AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08 and AC-09; Fixture table paragraphs ("Each recorded run uses an isolated host profile"; "The seeded reports are"); AC-07 ("with no earlier report the run states it is a first run")
+EVIDENCE: The Test Plan never says where a recorded run's report folder is, or that it starts empty. The existing harness sets HOME to the real home and passes no XDG_STATE_HOME (`plugins/vh-adlc/scripts/triage/controller-clients.ts:11`). Reports and seeded reports would therefore land in the owner's real `~/.local/state/vh-adlc/retro/<fixture folder>/`. Suppose the Claude Code and Codex first runs use fixture repositories with the same main folder name, or a folder left by an earlier attempt. The second host's "first run" then finds a report from another session id that raises every planted problem. P1 to P9 turn `recurring` or `fix-not-held`, and AC-02's order and severities fail a correct implementation. AC-07's first-run statement depends on the same state.
+PROPOSAL: Give each recorded run a fresh XDG_STATE_HOME, seeded only with the stated reports for the second run, and say so in the Test Plan and the fixture paragraph.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Extraction and redaction ("each at most 20,000 characters, which the skill reads in full and in order"; "the digest never exceeds that size"); Design, Analysis (input list: instruction files, build files, CI workflows, lessons file, user-level instruction and memory files); Owner summary ("reduces it to a bounded digest"); AC-08; Test Plan row AC-08
+EVIDENCE: Only the digest is bounded. For one consumer on this host, the other required reads measured: `docs/internal/tasks/lessons.md` 236,727 bytes, 71 Claude Code memory notes 167,937 bytes, `CLAUDE.md` 46,569, `.github/workflows` 106,513 and `agents/loop-project.md` 25,905. With a 500,000-character digest that is about 1.08 million characters for one run, which a session cannot hold without compaction or partial reads. The document gives no total budget and no order or limit for the file reads. AC-08 puts P4 only in the last chunk, the part most likely to survive compaction. An implementation that loses the early chunks or the large files still passes.
+PROPOSAL: Set a total reading budget for the digest plus files, or an order and size limit for the file reads, and say what is dropped first. Plant a second problem in the large fixture's first chunk, and give that fixture lessons and memory files of realistic size.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Fixture table row P9 (Home class "User-level files"); AC-03; AC-05; Design, Analysis ("A mechanical violation is always proposed as a deterministic check, never as a prose or review rule: in the pre-commit hook when the mistake reached a commit, otherwise in the earliest guardrail that already exists, adding a pre-commit hook where none does"); Terminology (Mechanical violation; Home); Test Plan row AC-02, AC-03, AC-04, AC-05 (checklist home class item)
+EVIDENCE: P9 is a commit message containing a forbidden character. That is a fixed shape a tool can detect, so it is a mechanical violation under the Terminology. The Design then requires a deterministic check in the earliest existing guardrail, adding a pre-commit hook where none exists. The fixture repository has none, so the expected home class would be repository, but the fixture table expects user-level files. A pre-commit hook also runs before the commit message exists, so it cannot check one; that takes a commit-msg hook. P2 (editing a generated file, a file-location rule) is mechanical too, and the table states no expected change for it. Two careful implementers will give P9 different homes, and AC-03 passes only one of them.
+PROPOSAL: State whether a covered mechanical violation still gets a check, and where the check for a user-level rule lives. Make P9's expected home and change follow from that, and say "commit-msg hook" for message checks.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Extraction and redaction ("the value assigned to any key whose name contains ..."; "`Authorization` ... header values; `Bearer` tokens"; "Each match becomes `<REDACTED>`"); AC-06 ("no string matching a pattern in `references/retro.md`"); Test Plan row AC-06 ("search the digest and the saved report with the patterns from `references/retro.md` ... (must find none)")
+EVIDENCE: The key rule replaces only the value, so a correct digest contains `DB_PASSWORD=<REDACTED>` and `Authorization: <REDACTED>`. `<REDACTED>` is itself a value assigned to such a key, so the patterns as described match correct output. The "must find none" search then fails a correct implementation unless the patterns exclude the marker, and the document does not say they do. The same question decides whether `save` is idempotent, since it re-redacts a report that already quotes redacted digest lines. This row has not passed review (R-3 F-09 named it), so this is not the free-text widening nit case.
+PROPOSAL: State that no pattern treats the `<REDACTED>` marker as a secret value, and add `DB_PASSWORD=<REDACTED>` and `Bearer <REDACTED>` to the row's must-survive examples.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Report and save (`save` "redacts it with the same rules, writes it ... links it"); Design, History ("A report whose `format` is newer than the version understands, or whose block does not parse, is skipped and listed by name"); AC-07; Test Plan row AC-07
+EVIDENCE: The `retro-report` block is YAML the model writes, and `save` only redacts and links it. A summary with an unquoted ": ", a category or home-class token outside the listed set, or a missing field still gets saved. The next run then skips that report, and its recurrence history is lost. No proof checks that a report `save` writes can be read by `history`. The tests cover only skipping seeded malformed blocks.
+PROPOSAL: Have `save` parse the block after redaction and refuse with a reason unless it is a valid `format: 1` block with the listed tokens, so the skill corrects its draft. Add a `bun test` that `save` refuses a block `history` would skip.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Effects and failure ("each report lists any leftover work folders so the owner can delete them"; "Concurrent runs use different run ids"); Owner summary ("a killed run leaves them there, and the next report lists them for you to delete")
+EVIDENCE: When a report is saved, the run's own `.work/<run id>/` still exists, because `save` writes `report.tmp` there, and a concurrent run's folder is live. Both fit "leftover work folders", so the report invites the owner to delete a running run's digest.
+PROPOSAL: List only other runs' folders, and note that they may belong to a run still in progress.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: nit
+WHERE: Scope ("the skill count in `docs/get-started/installation.md` (seventeen, ...)"; "entries in ... `docs/user-guides/workflows.md`"); Background ("Both discovery tests assert sixteen skills")
+EVIDENCE: `docs/user-guides/workflows.md:15` also states "The package has fifteen skills: this entry, eleven engineering operations, two content operations and one host-cleanup operation". `tests/vh-adlc/triage/discovery.test.ts:50` and `:52` assert the text "fifteen skills" and "eleven engineering operations" in workflows.md and installation.md. The Scope names neither the workflows.md count nor these text assertions.
+PROPOSAL: Add the workflows.md count line and the two text assertions to the Scope.
+
+FINDING: F-14
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Extraction and redaction ("it includes a file from `subagents/` or `tool-results/` only when an included turn references it"); Terminology (Session)
+EVIDENCE: The main transcript `0443e578-6437-5521-b63e-27f043a5ac80.jsonl` refers to its subagents only as `agentId: a6d6fbd72502c1fd7`, never by the file name `subagents/agent-a6d6fbd72502c1fd7.jsonl`. Tool-results files are named by path. "References" is not defined for subagents.
+PROPOSAL: Say that an `agentId` in an included turn references `subagents/agent-<id>.jsonl`.
 
 ## Sources
 
