@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "The smaller design retains audit, resolver and recovery capabilities. The owner confirmed ordinary installation and capability-preserving checklist migration. Fresh review of the selected design precedes T121 to T130."
+status: planned
+status_description: "The owner-confirmed ordinary-installation and capability-preserving design has a fresh R-95 review with no blocking or should-fix findings. T121 to T130 are ready for implementation."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -1248,6 +1248,8 @@ None. The owner confirmed ordinary plugin/client installation and the recommende
 | 2026-11-15 | R-92 | spec | `e23243e4639a11a81730e67bc83fc9ec9e9b6663` | claude-opus-5-5 | procedural | Two should-fix findings and one nit. All 60 required fragments read, inputs unchanged and cleanup confirmed. |
 | 2026-11-15 | R-93 | spec | `bfd1e9f8b854f8474cc555422b731039f1a48cc2` | claude-opus-5-5 | procedural | One should-fix finding and three nits. All 62 required fragments read, inputs unchanged and cleanup confirmed. |
 | 2026-11-15 | R-94 | spec | `7e4f477ffe54e3fee636fc3ac3a7184ec4dcb316` | claude-opus-5-5 | procedural | Two should-fix findings and one nit. All 62 required fragments read, inputs unchanged and cleanup confirmed. |
+| 2026-11-15 | R-95 | spec | `9bc6670d3e036c4400dcfea544fa6cbfda044010` | claude-opus-5-5 | procedural | No blocking or should-fix findings. Two nits remain under the pinned nit rule. All 64 required fragments read, inputs unchanged and cleanup confirmed. |
+| 2026-11-15 | R-95 | spec | `9bc6670d3e036c4400dcfea544fa6cbfda044010` | n/a | n/a | accepted by owner |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -2252,6 +2254,22 @@ SEVERITY: nit
 WHERE: Context "Owner summary", second paragraph (line 77: "Configured role/provider/model, source, payload, authority and publisher changes require fresh review") and third paragraph (line 79: "Execution needs an installed release matching the consumer binding, using an existing matching install or isolated profile").
 EVIDENCE: Design "Installation and role execution" says "Hosted execution checks out the exact published `component.source_commit` through ordinary Git/checkout tooling", and that only "Interactive execution uses an ordinary installed directory". The summary says all execution needs an installed release. The Design's fresh-review list also includes "plugin revision", "configuration" and "candidate", which the summary leaves out. The detailed sections are explicit, so nothing an implementer builds changes.
 PROPOSAL: Say that interactive execution uses a matching install and hosted execution uses the exact released checkout. Add plugin revision, configuration and candidate changes to the summary's fresh-review sentence.
+
+### R-95
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Context "Owner summary", fourth paragraph ("Retain durable operation records, guarded observation-only restoration and evidence-backed owner acknowledgement"); Context "Simplification basis on 2026-11-15", paragraph declining the suggestion to drop delivery acknowledgement; Context "Terms used here", row "Delivery acknowledgement"; Design "Publication, concurrency and recovery", paragraph beginning "Owner-approved acknowledgement remains available through resume" and paragraph beginning "For a bot-owned hosted operation"; Acceptance Criteria AC-05 ("supports evidence-backed owner acknowledgement").
+EVIDENCE: Acknowledgement needs an original-mode journal. `delivery-ack.ts:102` to `:106` returns "acknowledgement-original-owner-required" unless `journal.header.recovery_mode === "original"`. Restoration always creates an observation-only journal (`recovery.ts:271`). The Design says hosted run directories are normally ephemeral, and that "After that runner and origin record are lost, fresh scheduled or dispatched jobs remain observation-only." Acknowledgement also needs "a fresh approval of the current changed resource". `references/authority.md` excludes "standing adopted procedures, unattended controllers" as approval sources for acknowledgement. Taken together, a bot-owned scheduled operation can be acknowledged only while its original unattended job is still running, and the document defines no way for owner approval to reach that job. In practice, acknowledgement covers surviving-origin operations, which are usually interactive ones. Scheduled partial deliveries go to administrative abandonment instead. No existing capability is lost: the current code has the same original-mode requirement. But the summary and the decline paragraph present acknowledgement as a general retained capability, and the owner chose to keep it partly on that basis. The detailed rules agree with each other, so implementers would build the same thing. This follows from the R-94 correction that withdrew the hosted recovery dispatch.
+PROPOSAL: In the Owner summary and the acknowledgement paragraph, say that acknowledgement runs from a surviving-origin controller, normally an interactive owner operation. Also say that a bot-owned scheduled operation whose runner is gone goes to administrative abandonment instead.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design "Migration, compatibility and rollout", paragraph beginning "Upgrade checks use a fixed table" ("The reviewer records the applicable rows and outcomes", "Releases that change those dependencies use the affected rows below"); Test Plan AC-07 ("the fixed upgrade rows for unrelated component releases and routine activation-workflow pins").
+EVIDENCE: The paragraph refers to "a fixed table" and to "the affected rows below". No table follows. The rows are prose sentences in the same paragraph and the next one: "Procedure/report-only changes need ...", "Scanner/scope/feedback changes also need ...", "Effect/recovery changes also need ...", "Routine dependency/digest changes ...", "Provider, role model/command, credential mapping or publisher identity changes need ...", "Unclassified changes remain pending for scoped review". The categories and the checks each one requires are complete, so nothing an implementer builds changes.
+PROPOSAL: Put the upgrade categories in a two-column table (change class, required checks). Alternatively, reword the sentence to "Upgrade checks use the fixed change classes below" so the AC-07 reference to "fixed upgrade rows" still matches.
 
 ## Sources
 
