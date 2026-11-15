@@ -17,6 +17,12 @@ const authenticationPaths = ["HOME", "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_S
 function fail(reason: string): never { throw Error("docs-drift native role setup required: " + reason); }
 function absolute(value: unknown) { return typeof value === "string" && isAbsolute(value) && !value.includes("\0"); }
 
+export function nativeCredentialReferences(provider: string, references: readonly string[]): string[] {
+  const selected = provider === "claude" ? claudeCredentials : provider === "copilot" ? copilotCredentials : null;
+  if (!selected) fail("unsupported selected native backend");
+  return references.filter(name => selected.has(name));
+}
+
 function roleArguments(argv: string[]): string[] {
   const result: string[] = [], seen = new Set<string>();
   for (let index = 0; index < argv.length; index++) {
@@ -48,9 +54,8 @@ function prepareRole(input: LaunchOptions, provider: "copilot" | "claude") {
     || new Set(runtime.loader.credential_references).size !== runtime.loader.credential_references.length) fail("unsupported native credential reference");
   const context = randomUUID(), profile = selected.profile_directory;
   const env: Record<string, string> = {};
-  const selectedCredentials = provider === "claude" ? claudeCredentials : copilotCredentials;
   const nativePaths = native ? [...authenticationPaths, ...(provider === "claude" ? ["CLAUDE_CONFIG_DIR"] : ["COPILOT_HOME", "COPILOT_CACHE_HOME"])] : [];
-  for (const key of [...inherited, ...nativePaths, ...runtime.loader.credential_references.filter(key => selectedCredentials.has(key))]) {
+  for (const key of [...inherited, ...nativePaths, ...nativeCredentialReferences(provider, runtime.loader.credential_references)]) {
     const value = options.environment[key];
     if (value !== undefined) {
       if (typeof value !== "string" || value.includes("\0")) fail("invalid native environment value");

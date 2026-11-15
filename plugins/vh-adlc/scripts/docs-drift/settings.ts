@@ -346,19 +346,21 @@ function legacySetup(input: Record<string, unknown>, selectedRepository: string,
     runtime_loader: loaderSettings(input.runtime_loader), component_pin: componentPin };
 }
 
+export function parseComponentBinding(value: unknown) {
+  const selected = object(value, ["plugin_version", "source_commit", "component_sha256"], "component");
+  const pluginVersion = text(selected.plugin_version, "component plugin_version"), source = text(selected.source_commit, "component source_commit");
+  if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(pluginVersion)
+    || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(source)) invalid("component binding");
+  return { plugin_version: pluginVersion, source_commit: source, component_sha256: digest(selected.component_sha256, "component component_sha256") };
+}
+export type ComponentBinding = ReturnType<typeof parseComponentBinding>;
+
 function installedSetup(input: Record<string, unknown>, selectedRepository: string, base: string) {
   const clients = clientSettings(input.clients, parseInstalledClient);
   const execution = executionSettings(input.execution, clients, true);
   const { policy_path, ...policy } = publicationSettings(input.publication, selectedRepository, base, Object.keys(execution.entries));
   const publication = { ...policy, checklist_path: policy_path };
-  let component: { plugin_version: string; source_commit: string; component_sha256: string } | null = null;
-  if (input.component !== null) {
-    const selected = object(input.component, ["plugin_version", "source_commit", "component_sha256"], "component");
-    const pluginVersion = text(selected.plugin_version, "component plugin_version"), source = text(selected.source_commit, "component source_commit");
-    if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(pluginVersion)
-      || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(source)) invalid("component binding");
-    component = { plugin_version: pluginVersion, source_commit: source, component_sha256: digest(selected.component_sha256, "component component_sha256") };
-  }
+  const component = input.component === null ? null : parseComponentBinding(input.component);
   if (publication.mode === "adopted" && (component === null || publication.checklist_path === null)) invalid("adopted component/checklist");
   const credentials = identifiers(input.credential_references, "credential_references");
   if (credentials.some(name => !/^[A-Z_][A-Z0-9_]*$/u.test(name))) invalid("credential_references");

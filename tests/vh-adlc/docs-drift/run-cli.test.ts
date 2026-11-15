@@ -81,3 +81,16 @@ test("an explicitly changed execution profile cannot silently reuse a run", () =
   expect(result.status).toBe(2);
   expect(result.report.diagnostics).toEqual([expect.stringContaining("profile")]);
 });
+
+test("static collection records a component mismatch while retaining its scan", () => {
+  const f = fixture(), path = join(f.repo, ".vh-adlc/docs-drift.yaml");
+  // The packaged settings are YAML. Change only its unset component binding.
+  writeFileSync(path, readFileSync(path, "utf8").replace("component: null", "component:\n  plugin_version: 0.0.0\n  source_commit: " + "a".repeat(40) + "\n  component_sha256: " + "f".repeat(64)));
+  readGit(f.repo, "add", "--all");
+  readGit(f.repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Owned mismatched component binding");
+  f.source = readGit(f.repo, "rev-parse", "HEAD").toString().trim();
+  const result = invoke(f, "scan", ["--source", f.source]);
+  expect(result.status).toBe(0);
+  expect(result.report.diagnostics).toEqual([expect.stringContaining("component")]);
+  expect(invoke(f, "publish").report.outcome).toBe("setup-required");
+});

@@ -70,3 +70,26 @@ consumer's common worker for scanner, selected worker, independent reviewer and
 publisher, with the trial/production caller comparison and original observations
 required by `references/docs-drift-settings.md`. Preserve those additional
 obligations when adapting this staged example.
+
+## Flat preflight checklist
+
+After the required tests and paired review, create one checklist from the staged
+consumer commit C. `normalizedConfigurationDigest` in `scripts/docs-drift/preflight.ts`
+binds the parsed configuration, omitting `publication.mode` and
+`publication.checklist_path`. `preflightReviewTarget` binds C, that configuration,
+the component and the exact proposed activation files, including their modes and
+before/after hashes. These values are available before activation.
+
+Each passed check records its applicability target and the digest of its evidence.
+Native entry observations separately retain their original component, consumer
+commit, selected entry configuration, observed full models and publisher's REST
+login/numeric ID. Use the actual saved observations. Classify an upgrade with the
+fixed rows returned by `upgradeChecks`, repeat the selected checks and explain
+why carried evidence still applies at its original target. Record unresolved
+operations with their original component and lease identity and preserve their
+records through the switch.
+
+Add the checklist, mode/reference change and reviewed activation diff in D,
+the direct child of C. The gate checks that shape and the current policy and
+activation-file hashes. Save the actual routing-switch result after D in the
+delivery report. The example stays staged while these observations are pending.
