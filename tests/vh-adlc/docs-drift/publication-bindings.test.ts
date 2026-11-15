@@ -664,3 +664,21 @@ test("a changed original comparison account remains material through publication
   expect(result.diagnostics).toContain("Recorded native account or repository changed");
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 120000);
+
+test("the original account comparison reaches worker inputs through candidate review", async () => {
+  const { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+  const { collectCandidateReview } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-review");
+  const { readNativeContext } = await import("../../../plugins/vh-adlc/scripts/docs-drift/transport");
+  const f = await bindingFixture(roots, false), before = captureRepositoryState(f.repo);
+  const identity = readNativeContext({ hostname: "github.com", repository: "fixture/docs", credential: "synthetic-read-token", path: f.native.environment.PATH }).identity;
+  const comparison_identity = { ...identity, actor_id: identity.actor_id + 1 };
+  const worker = await collectWorkerInputs({ ...f.options, comparison_identity });
+  expect(worker.complete).toBe(false);
+  expect(worker.scope_changed).toBe(true);
+  expect(worker.diagnostics).toContain("Recorded native account or repository changed");
+  const candidate = await collectCandidateReview({ ...f.options, worker_capture: null, reviewer_capture: null, comparison_identity });
+  expect(candidate.complete).toBe(false);
+  expect(candidate.scope_changed).toBe(true);
+  expect(candidate.target?.preparation?.worker_inputs?.diagnostics).toContain("Recorded native account or repository changed");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+}, 120000);

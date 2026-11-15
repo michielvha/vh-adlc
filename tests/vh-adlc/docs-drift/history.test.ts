@@ -353,6 +353,24 @@ test("PR attention reads only its retained metadata ref and refuses edited bodie
     const verified = await readReviewedProposal({ reader, settings, proposal: original, verifyPlan: verify });
     expect(verified.reviewed.body_sha256).toBe(hash(body));
     expect(verified.receipt).toMatchObject({ ref, object: receiptCommit, plan_sha256: sha256(planBytes) });
+    for (const account of [{ login: "FIXTURE-BOT", id: 12 }, { login: "FIXTURE-BOT", id: 13 }, { login: "somebody-else", id: 12 }]) {
+      fixture.responses["repos/fixture/docs/pulls/7"] = { ...pull, user: { ...pull.user, ...account } };
+      writeFileSync(fixture.responsePath, JSON.stringify(fixture.responses));
+      if (account.login === "FIXTURE-BOT" && account.id === 12) {
+        expect(await readReviewedProposal({ reader, settings, proposal: original, verifyPlan: verify })).toEqual(verified);
+        expect(reader.pull(7).actor).toBe("FIXTURE-BOT");
+      } else await expect(readReviewedProposal({ reader, settings, proposal: original, verifyPlan: verify })).rejects.toThrow("current owned PR changed during read");
+    }
+    fixture.responses["repos/fixture/docs/pulls/7"] = pull;
+    writeFileSync(fixture.responsePath, JSON.stringify(fixture.responses));
+    const lateCase = await readReviewedProposal({ reader, settings, proposal: original, verifyPlan: bytes => {
+      const result = verify(bytes);
+      fixture.responses["repos/fixture/docs/pulls/7"] = { ...pull, user: { ...pull.user, login: "FIXTURE-BOT" } };
+      writeFileSync(fixture.responsePath, JSON.stringify(fixture.responses));
+      return result;
+    } });
+    expect(lateCase).toEqual(verified);
+    expect(reader.pull(7).actor).toBe("FIXTURE-BOT");
     fixture.responses["repos/fixture/docs/pulls/7"] = { ...pull, body: body + "\nChanged after review" };
     writeFileSync(fixture.responsePath, JSON.stringify(fixture.responses));
     await expect(readReviewedProposal({ reader, settings, proposal: original, verifyPlan: verify })).rejects.toThrow();

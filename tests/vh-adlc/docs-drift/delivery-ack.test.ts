@@ -253,11 +253,11 @@ test("an observation-only journal cannot acknowledge original application", () =
 });
 
 type CollectorKind = "pr-create" | "issue-create" | "comment-create" | "pr-update" | "pr-close";
-async function collectorDeliveryFixture(kind: CollectorKind) {
-  const f = publicationFixture(roots, { owned_resources: true }), execute = f.transport.execute;
+async function collectorDeliveryFixture(kind: CollectorKind, publisher?: NonNullable<Parameters<typeof publicationFixture>[1]>["publisher"]) {
+  const f = publicationFixture(roots, { owned_resources: true, publisher }), execute = f.transport.execute;
   const original = { title: "Original title", body: "Original body", labels: ["old"], draft: false };
   if (kind !== "issue-create" && kind !== "pr-create") f.resources.set("pulls/77", { ...original, id: 901, number: 77, state: "open", merged_at: null,
-    labels: [{ id: 102, name: "old" }], user: { id: kind === "pr-close" ? 90 : 20, login: kind === "pr-close" ? "legacy-bot" : "fixture-bot" },
+    labels: [{ id: 102, name: "old" }], user: { id: kind === "pr-close" ? 90 : publisher?.actor_id ?? 20, login: kind === "pr-close" ? "legacy-bot" : publisher?.actor ?? "fixture-bot" },
     head: { sha: f.input.manifest.bindings.candidate_commit, ref: kind === "pr-close" ? "docs-audit/legacy" : "docs-drift/one", repo: { id: 10 } },
     base: { ref: "main", repo: { id: 10 } } });
   const { publicationMarker } = await import("../../../plugins/vh-adlc/scripts/docs-drift/report-history");
@@ -274,7 +274,8 @@ async function collectorDeliveryFixture(kind: CollectorKind) {
   const explanation: Effect = { id: "explain", kind: "comment-create", payload: { number: 77, prior_ids: [],
     body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain") } };
   const effects = [...f.plan.manifest.effects.slice(0, 2), ...(kind === "pr-create" ? [f.plan.manifest.effects.find(item => item.kind === "push")!] : []), ...(kind === "pr-close" ? [explanation] : []), effect, f.plan.manifest.effects.at(-1)!];
-  f.input = fixture(f.input.manifest.bindings, effects);
+  f.input = fixture(f.input.manifest.bindings, effects, f.input.manifest.operation_id, { actor: f.input.manifest.actor, actor_id: f.input.manifest.actor_id,
+    ...(f.input.manifest.publisher_entry ? { publisher_entry: f.input.manifest.publisher_entry } : {}) });
   f.plan = sealPlan({ reviewed: validateReviewedManifest(f.input), grants: f.input.grants, ...f.policy, corrections: [], attention: [] });
   f.gate = async () => ({ review: f.input, policy: f.policy });
   f.transport.execute = async (...args) => {
@@ -1017,4 +1018,55 @@ for (const mode of ["scalar", "mapped"] as const) test.each(["case", "account-id
   expect(readAppliedDelivery({ source_repo: f.repo, journal_directory: published.journal.directory,
     effect_id: "pr", settings: f.settings, transport: "collector" }).resource_id).toBeGreaterThan(0);
   expect(canonicalJSON(published.journal.plan).equals(original)).toBe(true);
+});
+
+
+for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-create", "issue-create", "comment-create"] as const) {
+  test.each(["case", "account-id", "material-login"] as const)(`${mode} ${kind} applied delivery compares its original creator without changing raw observations: %s`, async change => {
+    const { lookupAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-lookup");
+    const { f, effect } = await collectorDeliveryFixture(kind, { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER",
+      ...(mode === "mapped" ? { entry: "copilot" as const } : {}) });
+    const published = await publish(publicationOptions(f));
+    const scope = { source_repo: f.repo, journal_directory: published.journal.directory, effect_id: effect.id, settings: f.settings, transport: f.transport };
+    const application = readAppliedDelivery({ ...scope, transport: "collector" }), original = canonicalJSON(published.journal.plan);
+    const key = kind === "issue-create" ? "issues/" + application.number : kind === "comment-create" ? "comments/" + application.resource_id : "pulls/" + application.number;
+    const resource = f.resources.get(key)!;
+    resource.body = String(resource.body) + "Preserve a later owner edit";
+    const user = resource.user as { login: string; id: number };
+    user.login = change === "material-login" ? "somebody-else" : "FIXTURE-OWNER";
+    if (change === "account-id") user.id++;
+    const native = await f.transport.identity();
+    f.transport.identity = async () => ({ ...native, actor: "FIXTURE-OWNER" });
+    const bytes = canonicalJSON(resource), executed = [...f.executed];
+    if (change === "case") {
+      const lookup = await lookupAppliedDelivery(scope);
+      expect(lookup.differences).toContain("body_sha256");
+      expect(lookup.current.user_login_sha256).toBe(sha256(Buffer.from("Fixture-Owner")));
+      expect((f.resources.get(key)!.user as { login: string }).login).toBe("FIXTURE-OWNER");
+    } else await expect(lookupAppliedDelivery(scope)).rejects.toThrow("delivery-current-target-changed");
+    expect(canonicalJSON(f.resources.get(key)).equals(bytes)).toBe(true);
+    expect(canonicalJSON(published.journal.plan).equals(original)).toBe(true);
+    expect(readAppliedDelivery({ ...scope, transport: "collector" }).proof_sha256).toBe(application.proof_sha256);
+    expect(f.executed).toEqual(executed);
+  });
+}
+
+for (const mode of ["scalar", "mapped"] as const) test.each(["case", "account-id", "material-login"] as const)(`${mode} closure delivery rechecks its original explanation account: %s`, async change => {
+  const { lookupAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-lookup");
+  const { f, effect } = await collectorDeliveryFixture("pr-close", { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER",
+    ...(mode === "mapped" ? { entry: "copilot" as const } : {}) });
+  const published = await publish(publicationOptions(f));
+  const scope = { source_repo: f.repo, journal_directory: published.journal.directory, effect_id: effect.id, settings: f.settings, transport: f.transport };
+  f.resources.get("pulls/77")!.state = "open";
+  const explanation = [...f.resources.entries()].find(([key]) => key.startsWith("comments/"))![1];
+  const author = explanation.user as { login: string; id: number };
+  if (change === "account-id") author.id++;
+  if (change === "material-login") author.login += "-someone-else";
+  const native = await f.transport.identity();
+  f.transport.identity = async () => ({ ...native, actor: "FIXTURE-OWNER" });
+  const before = canonicalJSON([...f.resources]), calls = [...f.executed];
+  if (change === "case") expect((await lookupAppliedDelivery(scope)).differences).toContain("state");
+  else await expect(lookupAppliedDelivery(scope)).rejects.toThrow("delivery-current-explanation-changed");
+  expect(canonicalJSON([...f.resources]).equals(before)).toBe(true);
+  expect(f.executed).toEqual(calls);
 });

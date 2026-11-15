@@ -1084,3 +1084,33 @@ test.each(["case", "account-id", "material-login"] as const)("reconciliation bin
   expect(f.executed.includes("pr")).toBe(false);
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(change !== "case");
 });
+
+for (const mode of ["scalar", "mapped"] as const) test.each(["matching", "account-id", "material-login", "other-publisher"] as const)(`${mode} reconciliation refuses a foreign original-operation account before authority or retirement: %s`, async changed => {
+  const f = publicationFixture(roots, { publisher: { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER",
+    ...(mode === "mapped" ? { entry: "copilot" as const } : {}) } });
+  const pending = await legacyReceiptInterruption(f);
+  f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", pending.objects.receipt_object ?? pending.objects.object);
+  f.done.add("receipt");
+  const before = readJournal(pending.journal.directory, f.repo), refs = [...f.refs], executed = [...f.executed], native = await f.transport.identity();
+  f.transport.identity = async () => ({ ...native, actor: changed === "material-login" ? "someone-else" : changed === "other-publisher" ? "fixture-bot" : native.actor,
+    actor_id: changed === "account-id" ? 31 : changed === "other-publisher" ? 20 : native.actor_id });
+  let approvals = 0;
+  const result = await reconcileAbsent({ source_repo: f.repo, journal_directory: before.directory, object_store: f.store,
+    settings: f.settings, transport: f.transport, retire_effect_ids: ["push", "pr"], authorize: async scope => {
+      approvals++; return { scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("Synthetic exact cleanup request") };
+    } });
+  if (changed === "matching") {
+    expect(result.state, result.reason ?? undefined).toBe("retired");
+    expect(approvals).toBeGreaterThan(0);
+    expect(result.journal.events.filter(event => event.kind === "retired-absence")).toHaveLength(2);
+    expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+    return;
+  }
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("reconciliation-actor-changed");
+  expect(approvals).toBe(0);
+  expect(result.journal.events.some(event => event.kind === "retired-absence")).toBe(false);
+  expect(readJournal(before.directory, f.repo).digest).toBe(before.digest);
+  expect([...f.refs]).toEqual(refs);
+  expect(f.executed).toEqual(executed);
+});

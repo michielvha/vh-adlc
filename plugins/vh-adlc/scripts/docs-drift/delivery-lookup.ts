@@ -1,3 +1,4 @@
+import { sameAccount, sameLogin } from "./identity";
 import { dirname } from "node:path";
 import { readAppliedDelivery, readBefore, projectBeforeSource, type AppliedDelivery } from "./delivery-proof";
 import { readArtifact, readJournal, type SealedPlan } from "./journal";
@@ -6,7 +7,7 @@ import { projectSuccess, type Facts, type SuccessEvidence } from "./success";
 import { retainLookup } from "./observations";
 import { publicationMarker } from "./report-history";
 import { effectMarker, type Effect } from "./manifests";
-import type { PublicationTransport } from "./transport";
+import type { PublicationTransport, PublicationIdentity } from "./transport";
 import type { Settings } from "./settings";
 
 /** These responses stay in memory. Only the validated bounded projection is retained. */
@@ -58,15 +59,23 @@ export async function lookupAppliedDelivery(options: {
   if (!options.transport.readDelivery || options.transport.artifact_root !== dirname(journal.directory)) throw Error("delivery-lookup-unavailable");
   const identity = await options.transport.identity();
   if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
-    || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id) throw Error("delivery-current-actor-changed");
+    || !sameAccount(identity, plan.manifest)) throw Error("delivery-current-actor-changed");
   const resources = structuredClone(await options.transport.readDelivery(plan, effect, application));
   const current = facts(resources.resource), originalBytes = readArtifact(application.successes[0].path);
   if (sha256(originalBytes) !== application.successes[0].sha256) throw Error("delivery-application-changed");
-  const original = record(JSON.parse(originalBytes.toString())).facts as Facts;
+  const applied = record(JSON.parse(originalBytes.toString())), original = applied.facts as Facts;
+  const creator = applied.identity as PublicationIdentity;
   const scope = { artifact_root: options.transport.artifact_root, source_repo: options.source_repo, plan, effect, attempt_id: application.attempt_id };
   const before = readBefore({ ...scope, evidence: application.before });
   if (current.id !== application.resource_id || current.number !== application.number
-    || current.user_id !== original.user_id || current.user_login_sha256 !== original.user_login_sha256) throw Error("delivery-current-target-changed");
+    || current.user_id !== original.user_id) throw Error("delivery-current-target-changed");
+  if (current.user_login_sha256 !== original.user_login_sha256) {
+    const nativeCreator = record(record(resources.resource).user);
+    // The verified applied response binds the original own creator's ID and exact spelling hash.
+    if (original.user_id !== creator.actor_id || original.user_login_sha256 !== sha256(Buffer.from(creator.actor))
+      || typeof nativeCreator.login !== "string" || !sameLogin(nativeCreator.login, creator.actor)) throw Error("delivery-current-target-changed");
+    current.user_login_sha256 = original.user_login_sha256;
+  }
   const marker = publicationMarker(options.settings, plan.manifest.operation_id);
   if (effect.kind !== "pr-close" && effect.kind !== "pr-update") {
     if (!markers(record(resources.resource).body, marker, effectMarker(effect.id))) throw Error("delivery-current-marker-changed");
@@ -98,7 +107,7 @@ export async function lookupAppliedDelivery(options: {
     const matches = inventory(resources.explanation, marker, effectMarker(explanation.id));
     const found = resources.explanation.map(record).find(item => item.id === proof.resource_id);
     if (matches.length !== 1 || matches[0] !== proof.resource_id || !found || found.body !== explanation.payload.body
-      || facts(found).user_id !== identity.actor_id || facts(found).user_login_sha256 !== sha256(Buffer.from(identity.actor))) throw Error("delivery-current-explanation-changed");
+      || facts(found).user_id !== plan.manifest.actor_id || !sameLogin(String(record(found.user).login), plan.manifest.actor)) throw Error("delivery-current-explanation-changed");
   }
   const p = effect.payload;
   const desired: Partial<Facts> = effect.kind === "pr-close" ? { state: "closed" }

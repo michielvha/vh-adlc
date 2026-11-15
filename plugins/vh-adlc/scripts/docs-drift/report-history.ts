@@ -1,4 +1,4 @@
-import { isPublisherLogin, sameLogin } from "./identity";
+import { isPublisherLogin, sameLogin, projectRecordedAccount } from "./identity";
 import { randomUUID } from "node:crypto";
 import { constants, closeSync, mkdirSync, writeFileSync, fstatSync, lstatSync, openSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { join, relative, isAbsolute } from "node:path";
@@ -431,7 +431,7 @@ export async function readReviewedProposal(options: {
 }) {
   const { reader, settings, proposal } = options;
   const current = reader.pull(proposal.number);
-  if (canonicalDigest(current) !== canonicalDigest(proposal)) throw new PublicationEvidenceChanged("current owned PR changed during read");
+  if (canonicalDigest(projectRecordedAccount(current, proposal)) !== canonicalDigest(proposal)) throw new PublicationEvidenceChanged("current owned PR changed during read");
   if (current.state !== "open" || current.merged_at !== null
     || current.base_repository.full_name.toLowerCase() !== settings.repository.toLowerCase()
     || current.base_ref !== settings.default_branch || current.head_repository?.id !== current.base_repository.id
@@ -466,7 +466,7 @@ export async function readReviewedProposal(options: {
     if (error instanceof GitHubReadError && error.status === 404) throw new PublicationEvidenceChanged("native publication disappeared during read");
     throw error;
   }
-  if (recheckedRef.sha !== nativeRef.sha || canonicalDigest(reader.pull(current.number)) !== canonicalDigest(current))
+  if (recheckedRef.sha !== nativeRef.sha || canonicalDigest(projectRecordedAccount(reader.pull(current.number), current)) !== canonicalDigest(current))
     throw new PublicationEvidenceChanged("native publication changed during read");
   return { reviewed: { actor: reviewed.actor, head: reviewed.head, body_sha256: reviewed.body_sha256,
     corrections: reviewed.corrections, attention: reviewed.attention },

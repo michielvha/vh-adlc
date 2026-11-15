@@ -318,6 +318,7 @@ export async function reconcileAbsent(options: {
   try {
     const identity = await options.transport.identity();
     if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id) return blocked("reconciliation-repository-changed");
+    if (!sameAccount(identity, plan.manifest)) return blocked("reconciliation-actor-changed");
     const lease = await options.transport.ref(String(release.payload.ref));
     if (journal.header.recovery_mode === "observation-only" && lease.state === "present") return blocked("inferred-publication-lease");
     if (plan.manifest.effects.slice(0, -1).every(effect => terminal(journal, effect.id) || isRetired(effect.id))) {

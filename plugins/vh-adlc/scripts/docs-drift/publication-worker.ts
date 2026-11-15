@@ -64,7 +64,8 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
   const options: WorkerCollectionOptions = { repo: input.repo, source: input.source, artifact_root: input.artifact_root,
     owner: input.owner, run: input.run, credential: input.credential, path: input.path ?? process.env.PATH,
     cache_directory: input.cache_directory, entry: input.entry, launcher_path: input.launcher_path, settings_path: input.settings_path,
-    source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), inventory_context: input.inventory_context };
+    source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), inventory_context: input.inventory_context,
+    comparison_identity: input.comparison_identity ? { ...input.comparison_identity } : undefined };
   const result: WorkerCollection = { schema_version: 1, kind: "docs-drift-worker-inputs", authority: "none", complete: false, scope_changed: false, diagnostics: [],
     inputs: null, worker_input_sha256: null, worker_runtime_sha256: null, attention: [], proposal_snapshot: null, proposal_snapshot_path: null,
     source_verification: null, facts: null, proposals: null, resolution: null };
