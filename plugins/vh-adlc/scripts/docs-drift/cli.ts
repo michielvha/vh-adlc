@@ -25,7 +25,7 @@ import { artifactDirectoryScope, captureSnapshot, externalArtifactDirectory } fr
 import { runScan, type ScanRun } from "./scan";
 import { checkUpgradeSignals, collectTrialBindings } from "./adoption";
 import { loadCommittedSettings } from "./settings";
-import { readNativeContext } from "./transport";
+import { readNativeContext, withNativeObservation } from "./transport";
 import { prepareTrialFixture } from "./trial-setup";
 import { selectApprovedRuntime, selectCandidateRuntime } from "./bootstrap";
 import { collectProposals } from "./proposals";
@@ -566,6 +566,7 @@ export async function main(argv: string[]): Promise<number> {
           credential: nativeCredential(settings.hostname), cache_directory: resolve(options.cache), entry: options.entry as "hosted" | "copilot" | "claude",
           launcher_path: resolve(options.launcher), settings_path: resolve(options.settings) };
         const base = { schema_version: 1 as const, command: options.command, source_commit: options.source };
+        const observationScope = { hostname: settings.hostname, repository: settings.repository, credential: common.credential };
         if (closureEffectCommands.includes(options.command)) {
           const reviewed = { ...common, worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 },
             reviewer_capture: { path: options.reviewer_capture, sha256: options.reviewer_capture_sha256 },
@@ -581,16 +582,18 @@ export async function main(argv: string[]): Promise<number> {
               result: value, limit: Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes) });
           }
         } else if (options.command === "collect-closure-worker-inputs") {
-          const value = await collectClosureWorkerInputs(common);
+          const value = await withNativeObservation(observationScope, observation => collectClosureWorkerInputs({ ...common, observation }));
           report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_worker_inputs: value,
             diagnostics: value.diagnostics.map(message => ({ code: "closure-worker-inputs", message })) };
         } else if (options.command === "collect-closure-review-target") {
-          const value = await collectClosureReviewTarget({ ...common, worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 } });
+          const value = await withNativeObservation(observationScope, observation => collectClosureReviewTarget({ ...common, observation,
+            worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 } }));
           report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_review_target: closureReviewTargetProjection(value),
             diagnostics: value.diagnostics.map(message => ({ code: "closure-review-target", message })) };
         } else {
-          const value = await collectClosureReview({ ...common, worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 },
-            reviewer_capture: { path: options.reviewer_capture, sha256: options.reviewer_capture_sha256 } });
+          const value = await withNativeObservation(observationScope, observation => collectClosureReview({ ...common, observation,
+            worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 },
+            reviewer_capture: { path: options.reviewer_capture, sha256: options.reviewer_capture_sha256 } }));
           report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_review: closureReviewProjection(value),
             diagnostics: value.diagnostics.map(message => ({ code: "closure-review", message })) };
         }

@@ -19,7 +19,11 @@ import { evidence, role } from "./manifest-fixture";
 import { captureSyntheticRole, retainSyntheticArtifact } from "./original-publication-fixture";
 
 const roots: string[] = [];
-afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+let failedProcess = false;
+afterAll(() => {
+  if (failedProcess) console.error("Preserved failed closure CLI fixture roots", JSON.stringify(roots));
+  else for (const root of roots) rmSync(root, { recursive: true, force: true });
+});
 async function fixture(method: "merge" | "squash" | "rebase" = "merge", binary = false, nativeFault = "none") {
   return closureRuntimeFixture(roots, method, nativeFault, binary ? original => {
     const bytes = Buffer.from([0, 255, 1]);
@@ -53,12 +57,17 @@ async function invoke(f: Awaited<ReturnType<typeof fixture>>, command: string, w
     env: Object.fromEntries(Object.entries(f.environment).filter((pair): pair is [string, string] => typeof pair[1] === "string")),
     capture: "memory", watched_outputs: [], timeout_ms: 60000, stdout: join(f.artifacts, name + ".stdout"),
     stderr: join(f.artifacts, name + ".stderr"), started: () => {} });
+  const { captured, ...metadata } = completion;
+  writeFileSync(join(f.artifacts, name + ".stdout"), captured?.stdout ?? new Uint8Array(), { mode: 0o600 });
+  writeFileSync(join(f.artifacts, name + ".stderr"), captured?.stderr ?? new Uint8Array(), { mode: 0o600 });
+  writeFileSync(join(f.artifacts, name + "-process.json"), canonicalJSON(metadata), { mode: 0o600 });
+  failedProcess ||= !completion.reaped || completion.timed_out;
   expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
-  const report = JSON.parse(Buffer.from(completion.captured?.stdout ?? []).toString());
+  const report = JSON.parse(Buffer.from(captured?.stdout ?? []).toString());
   const calls = existsSync(f.calls) ? readFileSync(f.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] }) : [];
   expect(calls.every(call => call.program === "git" ? !call.args.includes("push")
     : call.args.includes("GET") || call.args.includes("graphql") && !call.args.some(arg => /mutation\b/u.test(arg)))).toBe(true);
-  return { completion, report };
+  return { completion, report, calls };
 }
 
 test.each(["merge", "squash", "rebase"] as const)("original %s closure roles bind current semantics and exact effects without permission", async method => {
@@ -94,14 +103,18 @@ test("normal closure role commands preserve original native evidence and remain 
   const f = await fixture(), before = captureRepositoryState(f.repo);
   const initial = await invoke(f, "collect-closure-worker-inputs"), current = initial.report.closure_worker_inputs as Awaited<ReturnType<typeof collectClosureWorkerInputs>>;
   expect(initial.completion.exit_code, JSON.stringify(initial.report.diagnostics)).toBe(0);
+  expect(initial.calls.filter(call => call.args.includes("graphql"))).toHaveLength(3);
   const worker = captureSyntheticRole(f.artifacts, f.source, "worker", current.worker_runtime_sha256!,
     evidence("closure-cli-worker", current.worker_input_sha256!, canonicalJSON(packet(f, current)).toString()));
   const targetResult = await invoke(f, "collect-closure-review-target", worker), target = targetResult.report.closure_review_target as Awaited<ReturnType<typeof collectClosureReviewTarget>>;
   expect(targetResult.completion.exit_code, JSON.stringify(targetResult.report.diagnostics)).toBe(0);
+  expect(targetResult.calls.filter(call => call.args.includes("graphql"))).toHaveLength(6);
   const reviewer = captureSyntheticRole(f.artifacts, f.source, "reviewer", target.reviewer_runtime_sha256!,
     evidence("closure-cli-reviewer", target.manifest_sha256!, "NO FINDINGS\n"));
   const review = await invoke(f, "read-closure-review", worker, reviewer);
   expect(review.completion.exit_code, JSON.stringify(review.report.diagnostics)).toBe(0);
+  expect(review.calls.filter(call => call.args.includes("graphql"))).toHaveLength(9);
+  expect(review.calls.filter(call => call.args.at(-1) === "user/20")).toHaveLength(9);
   expect(review.report.closure_review).toMatchObject({ complete: true, authority: "none", review: { manifest_sha256: target.manifest_sha256 },
     worker_input_sha256: current.worker_input_sha256, target_sha256: current.target!.target_sha256 });
   expect(targetResult.report.closure_review_target.worker_inputs).toBeUndefined();
@@ -109,6 +122,14 @@ test("normal closure role commands preserve original native evidence and remain 
   const initialSize = Buffer.byteLength(JSON.stringify(initial.report) + "\n");
   expect(Buffer.byteLength(JSON.stringify(targetResult.report) + "\n")).toBeLessThan(initialSize);
   expect(Buffer.byteLength(JSON.stringify(review.report) + "\n")).toBeLessThan(initialSize);
+  const responses = JSON.parse(readFileSync(f.responses_file, "utf8"));
+  const endpoint = "repos/fixture/docs/pulls/1";
+  responses.__mutation_after = { at: 11, endpoint, value: { ...responses[endpoint], body: responses[endpoint].body + " Changed during final replay" } };
+  writeFileSync(f.responses_file, JSON.stringify(responses));
+  const changed = await invoke(f, "read-closure-review", worker, reviewer);
+  expect(changed.completion.exit_code).toBe(2);
+  expect(changed.report.outcome).toBe("incomplete");
+  expect(JSON.stringify(changed.report.diagnostics)).toContain("Native repository inputs changed");
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 240000);
 
