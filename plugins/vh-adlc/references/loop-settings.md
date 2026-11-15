@@ -49,6 +49,7 @@ Resume takes the route of the operation it continues.
 | `verification_rungs[].when` | `always`, or `{paths: [glob, ...]}` matched against the whole feature delta. |
 | `verification_rungs[].command` | A shell command run from the worktree. Exit 0 passes; exit 126 or 127 means it could not run; any other exit fails. |
 | `verification_rungs[].procedure` | Instead of a command: a written procedure the operation performs and records. |
+| `verification_rungs[].timeout_minutes` | Optional whole number of minutes a command may run, default 60. A command that runs longer is stopped with every process it started and reported as not run, with a reason that says it timed out. |
 | `verification_rungs[].skipped_pattern` | Optional regular expression for an output line that reports a skipped mandatory subcheck; its first group names the subcheck. |
 
 Before merge the feature delta is the branch against its merge base with the default branch, plus every

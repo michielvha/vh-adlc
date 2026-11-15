@@ -210,3 +210,29 @@ describe("the rung report", () => {
     expect([run.exitCode, out.advance, out.blocking]).toEqual([0, true, []]);
   });
 });
+
+describe("rung time limits", () => {
+  test("a rung that outlives its declared limit is reported as not run because it timed out, never as failed, and blocks unless the owner allows that rung", async () => {
+    const { root, head } = feature("schema_version: 1\n");
+    // Settings take whole minutes; the run itself honors any limit, so a fraction keeps this test short.
+    const started = Date.now();
+    const results = await runRungs(root, [{ name: "slow", when: "always", command: "sleep 30", timeout_minutes: 0.02 }]);
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(results[0]).toMatchObject({ name: "slow", state: "not run", timed_out: true });
+    expect(results[0].reason).toMatch(/^timed out/);
+    expect(results[0].reason).toContain("1.2 s");
+    expect(mayAdvance(results, { head, declared: true })).toMatchObject({ advance: false, blocking: ["slow"] });
+    expect(mayAdvance(results, { head, declared: true, allowances: ["slow"] }).advance).toBe(true);
+  });
+
+  test("a declared limit longer than the default is used in place of the default", () => {
+    const { root } = feature("schema_version: 1\nverification_rungs:\n  - name: integration\n    when: always\n    command: \"true\"\n    timeout_minutes: 150\n");
+    expect(loadLoopSettings(root, { overridePath: null }).verification_rungs[0].timeout_minutes).toBe(150);
+  });
+
+  for (const bad of ["0", "-5", "\"soon\""])
+    test(`a timeout_minutes of ${bad} is refused`, () => {
+      const { root } = feature(`schema_version: 1\nverification_rungs:\n  - name: x\n    when: always\n    command: "true"\n    timeout_minutes: ${bad}\n`);
+      expect(() => loadLoopSettings(root, { overridePath: null })).toThrow("timeout_minutes");
+    });
+});

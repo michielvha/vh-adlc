@@ -110,7 +110,7 @@ function rungs(value: unknown): Rung[] {
   if (!Array.isArray(value)) fail("verification_rungs");
   const out = value.map((item, index): Rung => {
     const field = `verification_rungs[${index}]`, rung = object(item, field);
-    keys(rung, ["name", "when", "command", "procedure", "skipped_pattern"], field);
+    keys(rung, ["name", "when", "command", "procedure", "skipped_pattern", "timeout_minutes"], field);
     const name = text(rung.name, `${field}.name`);
     if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) fail(`${field}.name`);
     let when: Rung["when"];
@@ -126,9 +126,14 @@ function rungs(value: unknown): Rung[] {
       if (rung.command === undefined) fail(`${field}.skipped_pattern needs a command`);
       try { new RegExp(text(rung.skipped_pattern, `${field}.skipped_pattern`)); } catch { fail(`${field}.skipped_pattern`); }
     }
+    if (rung.timeout_minutes !== undefined) {
+      if (rung.command === undefined) fail(`${field}.timeout_minutes needs a command`);
+      if (!Number.isInteger(rung.timeout_minutes) || (rung.timeout_minutes as number) <= 0) fail(`${field}.timeout_minutes must be a positive whole number of minutes`);
+    }
     return { name, when,
       ...(rung.command === undefined ? { procedure: text(rung.procedure, `${field}.procedure`) } : { command: text(rung.command, `${field}.command`) }),
-      ...(rung.skipped_pattern === undefined ? {} : { skipped_pattern: rung.skipped_pattern as string }) };
+      ...(rung.skipped_pattern === undefined ? {} : { skipped_pattern: rung.skipped_pattern as string }),
+      ...(rung.timeout_minutes === undefined ? {} : { timeout_minutes: rung.timeout_minutes as number }) };
   });
   if (new Set(out.map(rung => rung.name)).size !== out.length) fail("verification_rungs duplicates");
   return out;
