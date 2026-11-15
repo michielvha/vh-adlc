@@ -1,3 +1,4 @@
+import { PUBLISHER_ENTRIES, type PublisherEntry } from "./identity";
 import { canonicalJSON, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { parseIdentitySource, type IdentitySource } from "./settings";
 import type { OwnedProcess } from "./owned-process";
@@ -21,7 +22,7 @@ export type Bindings = {
 export type Effect = { id: string; kind: keyof typeof effectFields; payload: Record<string, unknown> };
 export type ActionManifest = {
   schema_version: 1; operation_id: string; repository: string; repository_id: number; actor: string; actor_id: number;
-  bindings: Bindings; effects: Effect[]; worker: RoleReceipt;
+  bindings: Bindings; effects: Effect[]; worker: RoleReceipt; publisher_entry?: PublisherEntry;
 };
 /** Created by the owner-request/adopted-procedure controller, never read from worker output. */
 export type EffectGrant = { manifest_sha256: string; effect_id: string; effect_sha256: string };
@@ -188,7 +189,10 @@ export function effectDigest(value: Effect[]): string {
   return sha256(canonicalJSON(effects));
 }
 export function parseActionManifest(value: unknown): ActionManifest {
-  const input = object(value, ["schema_version", "operation_id", "repository", "repository_id", "actor", "actor_id", "bindings", "effects", "worker"], "fields");
+  const mapped = value !== null && typeof value === "object" && Object.hasOwn(value, "publisher_entry");
+  const input = object(value, ["schema_version", "operation_id", "repository", "repository_id", "actor", "actor_id", "bindings", "effects", "worker",
+    ...(mapped ? ["publisher_entry"] : [])], "fields");
+  if (mapped && !PUBLISHER_ENTRIES.includes(input.publisher_entry as PublisherEntry)) invalid("publisher entry");
   if (input.schema_version !== 1) invalid("schema version");
   if (typeof input.operation_id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(input.operation_id)) invalid("operation ID");
   if (typeof input.repository !== "string" || !/^[a-z0-9-]+\/[a-z0-9_.-]+$/u.test(input.repository) || input.repository.split("/").some(part => part === "." || part === "..")) invalid("repository");

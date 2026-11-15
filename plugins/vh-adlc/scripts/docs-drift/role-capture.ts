@@ -92,7 +92,7 @@ export function roleRuntimeDigest(runtime: Runtime, role: Role): string {
 
 /** Read the adopted full model from its validated historical receipt, independently of the requested selector. */
 export function readAdoptedRolePolicy(options: { repo: string; current_default: string; identity: PublicationIdentity; runtime: Runtime; role: Role }): RolePolicy {
-  const adopted = verifyRuntimeAdoption(options);
+  const adopted = verifyRuntimeAdoption({ ...options, entry: options.runtime.entry });
   if (adopted.adoption_sha256 !== options.runtime.adoption_sha256) fail("current adoption changed");
   const name = options.runtime.entry === "hosted" ? "hosted_advisory" : options.runtime.entry === "copilot" ? "copilot_entry" : "claude_entry";
   const native = fullModel(readRecordedRoleModel(adopted.receipts, name, options.role)), selected = options.runtime[options.role];

@@ -30,6 +30,7 @@ export async function collectTrialRetained(selected: TrialContext, input: { oper
     if (worker.identity_source === null || reviewer.identity_source === null) return null;
     return { adoption_sha256: context.context_sha256, context: "trial", transport: "collector", publication_kind: plan.publication_kind,
       pr_draft: true,
+      ...(context.settings.publication.entry_actors ? { publisher_entry: input.entry } : {}),
       worker: { requested_model: worker.model, adopted_model: worker.model, identity_source: worker.identity_source },
       reviewer: { requested_model: reviewer.model, adopted_model: reviewer.model, identity_source: reviewer.identity_source } };
   };

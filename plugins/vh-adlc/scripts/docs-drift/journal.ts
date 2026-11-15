@@ -1,3 +1,4 @@
+import type { PublisherEntry } from "./identity";
 import type { ExecutionEvidence } from "./success";
 import { createHash, randomUUID } from "node:crypto";
 import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
@@ -20,7 +21,7 @@ export type SealedPlan = {
 };
 export type PlanPolicy = {
   adoption_sha256: string; context: SealedPlan["context"]; transport: SealedPlan["transport"]; publication_kind: SealedPlan["publication_kind"]; pr_draft: boolean;
-  worker: RolePolicy; reviewer: RolePolicy;
+  worker: RolePolicy; reviewer: RolePolicy; publisher_entry?: PublisherEntry;
 };
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null; lookup?: { path: string; sha256: string } };
 export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string }; never_dispatched?: true; unapplied?: true };
@@ -144,6 +145,7 @@ export function readVerifiedPlan(bytes: Uint8Array, verifyPolicy: (plan: SealedP
   const plan = readRetainedPlan(bytes);
   const policy = verifyPolicy(structuredClone(plan));
   if (policy === null || policy.adoption_sha256 !== plan.adoption_sha256 || policy.context !== plan.context || policy.transport !== plan.transport || policy.publication_kind !== plan.publication_kind) fail("current policy unavailable or changed");
+  if (policy.publisher_entry !== plan.manifest.publisher_entry) fail("current publisher entry changed");
   if (typeof policy.pr_draft !== "boolean") fail("missing draft policy");
   for (const effect of plan.manifest.effects) {
     if (["pr-create", "pr-update"].includes(effect.kind) && effect.payload.draft !== policy.pr_draft) fail("current draft policy");

@@ -1,3 +1,4 @@
+import { publisherActor, sameLogin, sameAccount } from "./identity";
 import { executeAttempt, hasEffectAttempt } from "./attempts";
 import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRecoveryOnly, createJournal, readJournal, readVerifiedPlan, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { effectMarker, manifestDigest, parseActionManifest, validateReviewedManifest, type Effect } from "./manifests";
@@ -22,7 +23,8 @@ export class PublicationScopeChanged extends Error {}
 export function validatePublicationShape(plan: Pick<SealedPlan, "manifest" | "context" | "publication_kind">, settings: Settings, draft: boolean): void {
   const { manifest } = plan;
   if (plan.context === "production" ? draft !== (settings.publication.pr_state[plan.publication_kind] === "draft") : draft !== true) fail("declared production or trial draft policy");
-  if (manifest.repository !== settings.repository || manifest.actor !== settings.publication.actor) fail("selected repository or actor");
+  if (!settings.publication.entry_actors && manifest.publisher_entry !== undefined) fail("publisher entry outside mapped policy");
+  if (manifest.repository !== settings.repository || !sameLogin(manifest.actor, publisherActor(settings, manifest.publisher_entry))) fail("selected repository or actor");
   if (plan.context === "production" && settings.publication.mode !== "adopted") fail("consumer adoption is not active");
   if (canonicalJSON(plan).length > settings.reports.max_entry_bytes) fail("retained plan size bound");
   const effects = manifest.effects;
@@ -78,7 +80,7 @@ export async function verifyPublicationGate(options: PublishOptions, journal: Jo
   validatePublicationShape(plan, committed.settings, gate.policy.pr_draft);
   const identity = await options.transport.identity();
   if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
-    || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id
+    || !sameAccount(identity, plan.manifest)
     || identity.default_branch !== options.settings.default_branch) throw new PublicationScopeChanged("current-native-repository-or-actor-changed");
 }
 

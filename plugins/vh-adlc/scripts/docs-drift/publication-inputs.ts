@@ -1,3 +1,4 @@
+import { publisherActor, sameLogin } from "./identity";
 import { PublicationScopeChanged } from "./publish";
 import { realpathSync } from "node:fs";
 import { selectApprovedRuntime } from "./bootstrap";
@@ -39,7 +40,7 @@ export async function collectPublicationInputs(input: {
     const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
     const context = native();
     result.current_default = context.default_commit; result.identity = context.identity;
-    if (context.identity.actor.toLowerCase() !== settings.publication.actor.toLowerCase() || context.identity.default_branch !== settings.default_branch)
+    if (!sameLogin(context.identity.actor, publisherActor(settings, options.entry)) || context.identity.default_branch !== settings.default_branch)
       throw new PublicationScopeChanged("Selected native publication actor or default differs from assessed policy");
     const store = result.candidate.object_store;
     if (!store) throw Error("Owned candidate objects unavailable");

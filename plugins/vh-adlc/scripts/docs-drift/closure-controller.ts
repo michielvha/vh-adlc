@@ -73,7 +73,8 @@ async function currentState(options: Options, inventory?: ClosureInventory, expe
   const review: PublicationGate["review"] = { manifest, current: manifest, worker: worker.evidence, reviewer: reviewer.evidence,
     policy: { worker: workerPolicy, reviewer: reviewerPolicy }, grants: authority.grants };
   const policy: PlanPolicy = { adoption_sha256: runtime.adoption_sha256, context: "production", transport: "native", publication_kind: "resolve",
-    pr_draft: settings.publication.pr_state.resolve === "draft", worker: workerPolicy, reviewer: reviewerPolicy };
+    pr_draft: settings.publication.pr_state.resolve === "draft",
+    ...(settings.publication.entry_actors ? { publisher_entry: options.entry } : {}), worker: workerPolicy, reviewer: reviewerPolicy };
   const plan = sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy, corrections: [], attention: [] });
   if (expected && !canonicalJSON(plan).equals(canonicalJSON(expected))) throw new PublicationScopeChanged("Original closure reviewed plan changed");
   return { plan, policy, review, runtime, settings, store: facts.store, original_target: { source_commit: options.source, identity: facts.identity, target: facts.target } };

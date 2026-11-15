@@ -86,7 +86,8 @@ async function currentState(options: Options, inventory?: PublicationInventory, 
   const review: PublicationGate["review"] = { manifest: target.manifest, current: target.manifest, worker: worker.evidence, reviewer: reviewer.evidence,
     policy: { worker: workerPolicy, reviewer: reviewerPolicy }, grants: authority.grants };
   const policy: PlanPolicy = { adoption_sha256: runtime.adoption_sha256, context: "production", transport: "native", publication_kind: bound.mode!,
-    pr_draft: settings.publication.pr_state[bound.mode!] === "draft", worker: workerPolicy, reviewer: reviewerPolicy };
+    pr_draft: settings.publication.pr_state[bound.mode!] === "draft",
+    ...(settings.publication.entry_actors ? { publisher_entry: options.entry } : {}), worker: workerPolicy, reviewer: reviewerPolicy };
   const plan = sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy, corrections: bound.corrections, attention: bound.attention,
     candidate_verification_sha256: bound.candidate_verification_sha256! });
   const store = bound.source_verification.object_store;

@@ -72,9 +72,11 @@ export function readTrialPublication(selected: TrialContext, requestPath: string
   const workerPolicy = rolePolicy("worker"), reviewerPolicy = rolePolicy("reviewer");
   const plan = readVerifiedPlan(retained(context, request.plan), () => ({ adoption_sha256: context.context_sha256,
     context: "trial", transport: "collector", publication_kind: publicationKind, pr_draft: true,
+    ...(context.settings.publication.entry_actors ? { publisher_entry: request.entry as "copilot" | "claude" } : {}),
     worker: workerPolicy, reviewer: reviewerPolicy }));
   const policy: PlanPolicy = { adoption_sha256: context.context_sha256, context: "trial", transport: "collector",
-    publication_kind: publicationKind, pr_draft: true, worker: workerPolicy, reviewer: reviewerPolicy };
+    publication_kind: publicationKind, pr_draft: true,
+    ...(context.settings.publication.entry_actors ? { publisher_entry: request.entry as "copilot" | "claude" } : {}), worker: workerPolicy, reviewer: reviewerPolicy };
   const manifest = plan.manifest, candidate = manifest.bindings.candidate_commit;
   if (manifest.bindings.source_commit !== context.source_commit || manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256
     || readGit(context.store.root, "rev-parse", "--verify", "--end-of-options", candidate + "^{commit}").toString().trim() !== candidate

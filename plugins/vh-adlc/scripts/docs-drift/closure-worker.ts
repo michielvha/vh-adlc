@@ -1,3 +1,4 @@
+import { publisherActor, sameLogin } from "./identity";
 import { projectClosureReader } from "./closure-inventory";
 import { realpathSync } from "node:fs";
 import { selectApprovedRuntime } from "./bootstrap";
@@ -39,7 +40,7 @@ export async function collectClosureWorkerInputs(input: Options): Promise<Inputs
       result.diagnostics.push(...target.diagnostics); throw Error("Complete native closure target required for its worker");
     }
     const snapshot = captureSnapshot(repo, options.source), settings = snapshot.settings;
-    if (target.identity.actor.toLowerCase() !== settings.publication.actor.toLowerCase())
+    if (!sameLogin(target.identity.actor, publisherActor(settings, options.entry)))
       throw new PublicationScopeChanged("Current closure actor differs from committed policy");
     result.runtime = await selectApprovedRuntime({ ...options, repo, policy_repo: target.store.root,
       current_default: options.source, identity: target.identity });
@@ -176,6 +177,7 @@ export async function collectClosureReviewTarget(input: Options & { worker_captu
     const { repository, repository_id, actor, actor_id } = target.identity;
     result.manifest = parseActionManifest({ schema_version: 1, operation_id: (options.selection as { operation_id: string }).operation_id,
       repository, repository_id, actor, actor_id,
+      ...(settings.publication.entry_actors ? { publisher_entry: options.entry } : {}),
       bindings: { ...current.inputs, candidate_commit: options.source,
         candidate_tree: readGit(target.store.root, "rev-parse", options.source + "^{tree}").toString().trim(),
         diff_sha256: canonicalDigest({ record: closure.record?.sha256, interval: closure.interval, originals: closure.originals }),
