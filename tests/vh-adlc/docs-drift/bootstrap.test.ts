@@ -592,3 +592,19 @@ test("retained client inspection preserves the original client ID while awaiting
   expect(selected.client_id).toBe(f.setup.client_id);
   expect(selected.client).toEqual(f.setup.client);
 });
+
+test("ordinary installed payloads keep their existing modes and support a canonical root alias", () => {
+  const f = component();
+  chmodSync(f.payload, 0o755);
+  const guide = join(f.payload, "guide.md");
+  rmSync(guide);
+  linkSync(join(f.plugin, "guide.md"), guide);
+  const alias = join(f.root, "installed-plugin");
+  symlinkSync(f.payload, alias);
+  const before = { mode: lstatSync(f.payload).mode, links: lstatSync(guide).nlink, source: captureRepositoryState(f.repo) };
+  const inspected = bootstrap.inspectInstalledPayload({ directory: alias, expected: f.identity });
+  expect(inspected.directory).toBe(f.payload);
+  expect(inspected.component_sha256).toBe(f.identity.component_sha256);
+  expect(inspected.plugin_version).toBe(f.identity.plugin_version);
+  expect({ mode: lstatSync(f.payload).mode, links: lstatSync(guide).nlink, source: captureRepositoryState(f.repo) }).toEqual(before);
+});
