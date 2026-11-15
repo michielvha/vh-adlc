@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Publisher and recovery fixes have local proof and draft PR #98. Canonical R-85 is fresh. Remaining exact-source gates and migration acceptance stay open."
+status: draft
+status_description: "Revising the implementation approach after the owner requested a proportionate port that retains the useful audit, resolver and recovery capabilities."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
