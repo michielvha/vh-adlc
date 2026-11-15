@@ -70,7 +70,13 @@ function originalResourceCreator(options: { source_repo: string; artifact_root: 
   if (!canonicalJSON(controller).equals(controllerBytes) || controller.schema_version !== 1
     || controller.kind !== (closure ? "docs-drift-closure-controller" : "docs-drift-publication-controller")
     || controller.plan_sha256 !== sha256(canonicalJSON(plan))) throw Error("delivery-original-controller-changed");
-  const bytes = readBoundArtifact({ ...options, reference: controller[field] });
+  let bytes: Buffer;
+  try {
+    bytes = readBoundArtifact({ ...options, reference: controller[field] });
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") throw Error("delivery-original-creator-unavailable");
+    throw error;
+  }
   if (sha256(bytes) !== (closure ? plan.manifest.bindings.assessment_sha256 : plan.manifest.bindings.proposals_sha256)) throw Error("delivery-original-creator-binding-changed");
   const source = record(JSON.parse(bytes.toString()));
   if (!canonicalJSON(source).equals(bytes)) throw Error("delivery-original-creator-binding-changed");

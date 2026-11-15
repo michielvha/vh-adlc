@@ -1167,7 +1167,7 @@ for (const mode of ["scalar", "mapped"] as const) test.each(["body", "creator-lo
 
 for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-update", "pr-close"] as const) {
   const sharedCases = ["case", "account-id", "material-login", "wrong-row", "missing-original", "changed-original", "configured-alias",
-    "foreign-controller", "foreign-row-repository", "corrupt-controller"] as const;
+    "foreign-controller", "foreign-row-repository", "corrupt-controller", "private-controller", "missing-source"] as const;
   const structuralCases = kind === "pr-close" ? ["closure-effects", "closure-inputs-digest", "closure-actor-id"] as const : ["snapshot-kind"] as const;
   test.each([...sharedCases, ...structuralCases])(`${mode} ${kind} delivery verifies its bound original legacy creator: %s`, async change => {
     const { projectProposalBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposals");
@@ -1212,6 +1212,8 @@ for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-update
     if (change === "configured-alias") user.login = f.settings.publication.entry_actors?.hosted ?? f.settings.publication.actor;
     if (change === "account-id") user.id++;
     if (change === "missing-original") rmSync(controllerPath);
+    if (change === "private-controller") chmodSync(controllerPath, 0o644);
+    if (change === "missing-source") rmSync(join(f.artifacts, reference.path));
     if (change === "corrupt-controller") writeFileSync(controllerPath, "{invalid", { mode: 0o600 });
     if (change === "changed-original") writeFileSync(join(f.artifacts, reference.path), Buffer.concat([bytes, Buffer.from("\n")]), { mode: 0o600 });
     if (change === "foreign-controller") {
@@ -1240,6 +1242,7 @@ for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-update
         "wrong-row": "delivery-original-creator-binding-changed", "missing-original": "delivery-original-creator-unavailable",
         "changed-original": "docs-drift original evidence artifact changed", "configured-alias": "delivery-current-target-changed",
         "foreign-controller": "delivery-original-controller-changed", "foreign-row-repository": "delivery-original-creator-binding-changed",
+        "private-controller": "docs-drift journal unsafe private file", "missing-source": "delivery-original-creator-unavailable",
         "corrupt-controller": "delivery-original-controller-changed", "closure-effects": "delivery-original-creator-binding-changed",
         "closure-inputs-digest": "delivery-original-creator-binding-changed", "closure-actor-id": "delivery-original-creator-binding-changed",
         "snapshot-kind": "delivery-original-creator-binding-changed" };

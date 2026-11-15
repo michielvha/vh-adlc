@@ -371,6 +371,12 @@ The controller now returns stable domain errors for missing or corrupt original 
 
 The strengthened real native mapped closure acknowledgement passes fourteen assertions and verifies both the retained raw observed hash and separate original-creator projection. The new retained native publication-controller acknowledgement passes nineteen assertions, preserving the original plan and candidate while issuing one update, creating no replacement PR and releasing its original lease once. Evidence is in `r9-native-closure-projection-green.log` and `r9-native-legacy-refresh-ack-green.log`. The fixture uses an existing ready PR, consistent with the established acknowledgement contract for unchanged draft state. These current working-tree results need committed-source verification and scoped re-review before the follow-up is closed.
 
+### Final diagnostic follow-up after component R10
+
+Actual Claude Code Opus 5.5 component R10 at `9da22f349d5df90d2c0c60822f4bc766d07a860c` qualifies all 127 required fragments, with three nits and no blocking or should-fix findings. Original returns and validation remain in `publisher-component-claude-r10`. The private-controller control confirms unsafe file permissions retain their original refusal. A missing bound source first reproduces four failures alongside four passing private-controller controls in `r10-missing-source-red.log`. Mapping only that source read's ENOENT to the stable unavailable reason then passes all 56 legacy cases with 356 assertions in `r10-legacy-controls-green.log`; strict TypeScript passes in `r10-followup-types.log`.
+
+The clean `9da22f3` checkout passes all 219 delivery acknowledgement neighbors with 1,185 assertions, plus strict types and resolved compiler inclusion. Its native-controller repeats are still running at this checkpoint. R10 F-03 retains the broader unfiltered native-transport, mapped-runtime and native-refresh verification in T31/T112. Existing selected native-case results remain accurately scoped. This feature is pushed as draft PR #98. The user-local runtime is independently updated to signed, checksum-verified 0.32.0. The current published marketplace plugin remains 0.23.0, with the candidate 0.24.0 unreleased.
+
 ## Scope
 
 Recovery includes a separately approved delivery acknowledgement that preserves a changed remote resource and permits exact-owned lease cleanup after proof of original ownership and settled execution.
