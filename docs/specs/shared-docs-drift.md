@@ -75,7 +75,7 @@ Existing scalar settings and the new entry map use exact numeric account IDs and
 
 The owner selected Claude Code Opus 5.5 for this feature's development spec, source, implementation and preliminary migration-parity reviews. The preliminary parity review happens before release. Final adoption evidence comes later from the candidate's protected runtime reviewer at the released, installed and frozen C. This distinction preserves the accepted runtime provider and credential configuration. The owner confirmed this development-only interpretation on 2026-11-15.
 
-Implementation is published through draft PR #98. The installed plugin is 0.23.0 with CLI 0.26.0, and this feature candidate is 0.24.0. Publisher-entry isolation, original producer verification and recovery have local source/fixture evidence. The full remaining case matrix, final review and installed/provider/migration acceptance remain open. GUI and phone checks are deferred.
+Implementation is published through draft PR #98. The installed marketplace plugin is 0.23.0, its locked runtime is 0.26.0, and the standalone CLI is updated to signed release 0.32.0. This feature candidate is 0.24.0. Publisher-entry isolation, original producer verification and recovery have local source/fixture evidence. The full remaining case matrix, final review and installed/provider/migration acceptance remain open. GUI and phone checks are deferred.
 
 ### Current implementation checkpoint
 
@@ -312,6 +312,30 @@ The exact `453ffc0` source completes 24 focused checks with 130 assertions and 2
 The review's completed-journal nit is addressed by interrupting native-fixture writes before outcome persistence, recasing the account before the first pending resume, and counting actual create/comment/close dispatches. The Copilot pending publication and closure controls pass two cases and 36 assertions. The corresponding Claude pending publication and closure controls also pass two cases with 36 assertions in `t112-pending-native-claude-case-green.log`. These are working-tree results. Native other-entry resume refusal is established by the invocation digest. The separate publisher-operations unit controls establish policy-level entry refusal.
 
 Historical PR reads also reproduce a case-only first/final author refusal. Scoped row projection now passes 62 history/producer cases with 319 assertions. Applied PR, issue and comment lookup controls preserve original evidence and raw resource rows while deriving the original own-creator comparison hash; thirty-six selected lookup controls pass 158 assertions. Closure explanation account comparisons retain numeric-ID and material-name refusals. T112 still requires its complete legacy-author/carried-delivery and configured/native matrix. New working changes require committed-source checks and fresh scoped review before their tasks are ticked.
+
+### Current lookup and trial setup corrections
+
+Claude Code Opus 5.5 R6 reads all 156 required fragments at `df2d49c6f6bd15e067d5cb3a030ba5c9a7346116`. Native model, exact target, packet integrity and owned-process cleanup validate. The first validator incorrectly required adjacent metadata lines. Its corrected parser accepts blank separators while preserving every model, target, read-coverage and integrity check. The original return and first validation remain unchanged. R6 finds one should-fix and two nits. The lookup correction retains the observed creator hash and records the verified original spelling separately. Six controls first reproduce the lost observation. Forty-two lookup/explanation neighbor cases then pass 188 assertions, including reads of the retained artifact.
+
+The exact clean `df2d49c` checkout passes strict TypeScript and its resolved compiler file list. Its first normal closure-role CLI attempt hits the unchanged sixty-second child deadline while other checks run. The isolated retry at the same commit and unchanged deadlines passes one case with 28 assertions and confirmed cleanup. Both runs remain under `verify-boundaries-df2d49c`, including the initial failure. The boundary-regression command after that first failure remains unexecuted and is still required. The isolated success establishes that scoped CLI result.
+
+The normal trial setup helper and CLI omitted the selected mapped publisher entry. Five tests first fail for the missing entry and rejected option. The fix forwards the explicit entry through both commands and observes the native interactive account for `trial-bindings`. Scalar offline binding inspection preserves its existing behavior. All 39 trial-setup and publisher-identity cases pass 92 assertions. These lookup and setup results are working-tree observations pending committed-source verification and fresh scoped review. The complete T111/T112 matrix and migration acceptance remain open.
+
+### Reviewed setup and acknowledgement follow-up
+
+The native marketplace refresh still selects published plugin 0.23.0. The newer standalone runtime 0.32.0 is installed after verification of its detached release signature, the pinned primary key fingerprint and archive checksum. The plugin keeps its declared locked runtime for reproducible plugin operations. This feature candidate remains unreleased.
+
+Actual Claude Code Opus 5.5 R7 qualifies at `7dff346d102c961792751e93b78ace4f8082d83d` with all 57 required fragments read and confirmed cleanup. Its five records contain nits and no blocking or should-fix finding. The clean immutable checkout at that target passes strict TypeScript, the resolved compiler input list and all 180 trial-setup, publisher-identity and delivery-acknowledgement cases with 687 assertions. Original outputs and clean final-state records remain in `verify-lookup-7dff346`.
+
+R7's retained preparation metadata nit is reproduced by four failing controls. Mapped preparation now retains its selected entry and observed native identity. CLI usage explains native binding collection and scalar offline inspection, with invalid entry controls. The creator boundary validates its typed native account and requires original publisher ownership for own-creator projection.
+
+The acknowledgement path now uses the original account's numeric ID and case-insensitive login and separately compares verified original-creator projections across fresh reads. The owner-approved scope and retained lookup continue to carry raw observed hashes and explicit projection metadata. Twelve positive controls first fail while twelve changed-account controls already pass. After correction, 43 focused setup, CLI, acknowledgement and existing authority/material-change controls pass 297 assertions. These are working-tree observations pending exact committed-source checks and review. The test-only collector request digest now reflects request scope, matching the native transport contract. Response fields remain covered by their independent lookup projections and material-change controls. The prior fixture incorrectly included response contents in the request digest.
+
+The remaining T112 legacy-author/carried-delivery matrix, final full feature gate, private paired migration, marketplace/model and hosted adoption remain open. No production route is switched by these corrections.
+
+### Upstream freshness refresh
+
+The 0.32.0 standalone binary and the plugin's locked 0.26.0 binary both identify the R-83 spec review as stale solely from covered upstream drift. The integrated diagram release changed seven covered workflow, manifest, marketplace and discovery paths on main `c676010`. The accepted normative baseline is unchanged. A new canonical Claude Code Opus 5.5 spec review is required to refresh that drift before further implementation. Existing owner acceptance remains attached to the unchanged baseline.
 
 ## Scope
 
@@ -1480,26 +1504,6 @@ Code tasks add and run the regression before the behavior change. Each task is o
 ## Open Questions
 
 None. The owner approved recommendation A on 2026-11-15.
-
-### Current lookup and trial setup corrections
-
-Claude Code Opus 5.5 R6 reads all 156 required fragments at `df2d49c6f6bd15e067d5cb3a030ba5c9a7346116`. Native model, exact target, packet integrity and owned-process cleanup validate. The first validator incorrectly required adjacent metadata lines. Its corrected parser accepts blank separators while preserving every model, target, read-coverage and integrity check. The original return and first validation remain unchanged. R6 finds one should-fix and two nits. The lookup correction retains the observed creator hash and records the verified original spelling separately. Six controls first reproduce the lost observation. Forty-two lookup/explanation neighbor cases then pass 188 assertions, including reads of the retained artifact.
-
-The exact clean `df2d49c` checkout passes strict TypeScript and its resolved compiler file list. Its first normal closure-role CLI attempt hits the unchanged sixty-second child deadline while other checks run. The isolated retry at the same commit and unchanged deadlines passes one case with 28 assertions and confirmed cleanup. Both runs remain under `verify-boundaries-df2d49c`, including the initial failure. The boundary-regression command after that first failure remains unexecuted and is still required. The isolated success establishes that scoped CLI result.
-
-The normal trial setup helper and CLI omitted the selected mapped publisher entry. Five tests first fail for the missing entry and rejected option. The fix forwards the explicit entry through both commands and observes the native interactive account for `trial-bindings`. Scalar offline binding inspection preserves its existing behavior. All 39 trial-setup and publisher-identity cases pass 92 assertions. These lookup and setup results are working-tree observations pending committed-source verification and fresh scoped review. The complete T111/T112 matrix and migration acceptance remain open.
-
-### Reviewed setup and acknowledgement follow-up
-
-The native marketplace refresh still selects published plugin 0.23.0. The newer standalone runtime 0.32.0 is installed after verification of its detached release signature, the pinned primary key fingerprint and archive checksum. The plugin keeps its declared locked runtime for reproducible plugin operations. This feature candidate remains unreleased.
-
-Actual Claude Code Opus 5.5 R7 qualifies at `7dff346d102c961792751e93b78ace4f8082d83d` with all 57 required fragments read and confirmed cleanup. Its five records contain nits and no blocking or should-fix finding. The clean immutable checkout at that target passes strict TypeScript, the resolved compiler input list and all 180 trial-setup, publisher-identity and delivery-acknowledgement cases with 687 assertions. Original outputs and clean final-state records remain in `verify-lookup-7dff346`.
-
-R7's retained preparation metadata nit is reproduced by four failing controls. Mapped preparation now retains its selected entry and observed native identity. CLI usage explains native binding collection and scalar offline inspection, with invalid entry controls. The creator boundary validates its typed native account and requires original publisher ownership for own-creator projection.
-
-The acknowledgement path now uses the original account's numeric ID and case-insensitive login and separately compares verified original-creator projections across fresh reads. The owner-approved scope and retained lookup continue to carry raw observed hashes and explicit projection metadata. Twelve positive controls first fail while twelve changed-account controls already pass. After correction, 43 focused setup, CLI, acknowledgement and existing authority/material-change controls pass 297 assertions. These are working-tree observations pending exact committed-source checks and review. The test-only collector request digest now reflects request scope, matching the native transport contract. Response fields remain covered by their independent lookup projections and material-change controls. The prior fixture incorrectly included response contents in the request digest.
-
-The remaining T112 legacy-author/carried-delivery matrix, final full feature gate, private paired migration, marketplace/model and hosted adoption remain open. No production route is switched by these corrections.
 
 ## Review Log
 
