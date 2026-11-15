@@ -2,7 +2,7 @@ import type { PublisherEntry } from "./identity";
 import type { ExecutionEvidence } from "./success";
 import { createHash, randomUUID } from "node:crypto";
 import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { authorizeEffects, effectDigest, manifestDigest, modelMatches, parseActionManifest, requireReviewedManifest, workerInputDigest } from "./manifests";
 import type { ActionManifest, EffectGrant, ReviewedManifest, RolePolicy } from "./manifests";
 import { canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "./protocol";
@@ -399,7 +399,7 @@ export function createJournal(options: { source_repo: string; artifact_root: str
 }
 
 /** Read-only inspection stays possible after policy drift. It confers no replay authority. */
-export function readJournal(directory: string, sourceRepo: string, expected?: { revision: number; digest: string }): Journal {
+function readJournalRecords(directory: string, sourceRepo: string, expected?: { revision: number; digest: string }, observationOnly = false): Journal {
   const source = realpathSync(sourceRepo);
   externalArtifactDirectory(directory, source);
   privateDirectory(dirname(directory));
@@ -409,7 +409,12 @@ export function readJournal(directory: string, sourceRepo: string, expected?: { 
   const header = exact(value, ["schema_version", "kind", "operation_id", "repository", "source_repo", "directory", "plan_sha256", "owner_uid", "run_id", "recovery_mode", "observed_lease_object", ...(hasReceipt ? ["observed_receipt_object"] : [])]) as Header;
   if (hasReceipt && header.observed_receipt_object !== null && (header.recovery_mode !== "observation-only"
     || typeof header.observed_receipt_object !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(header.observed_receipt_object))) fail("changed recovery receipt");
-  if (!["original", "observation-only"].includes(header.recovery_mode) || header.schema_version !== 1 || header.kind !== "docs-drift-journal" || header.directory !== directory || header.source_repo !== source || header.owner_uid !== process.getuid?.() || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(header.run_id)
+  if (!["original", "observation-only"].includes(header.recovery_mode) || header.schema_version !== 1 || header.kind !== "docs-drift-journal"
+    || typeof header.directory !== "string" || !isAbsolute(header.directory) || header.directory.includes("\0")
+    || typeof header.source_repo !== "string" || !isAbsolute(header.source_repo) || header.source_repo.includes("\0")
+    || !Number.isSafeInteger(header.owner_uid) || header.owner_uid < 0
+    || !observationOnly && (header.directory !== directory || header.source_repo !== source || header.owner_uid !== process.getuid?.())
+    || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(header.run_id)
     || (header.observed_lease_object !== null && (header.recovery_mode !== "observation-only"
       || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(header.observed_lease_object)))) fail("changed journal ownership");
   const planBytes = readArtifact(join(directory, "plan.json"));
@@ -432,6 +437,20 @@ export function readJournal(directory: string, sourceRepo: string, expected?: { 
   if (!canonicalJSON(files).equals(canonicalJSON(numberedRecordFiles(eventDirectory)))) fail("journal read conflict");
   if (expected && (expected.revision !== events.length || expected.digest !== previous)) fail("revision conflict");
   return { directory, source_repo: source, header, plan, events, revision: events.length, digest: previous };
+}
+
+/** Execution callers always reopen the original location and ownership record. */
+export function readJournal(directory: string, sourceRepo: string, expected?: { revision: number; digest: string }): Journal {
+  return readJournalRecords(directory, sourceRepo, expected);
+}
+
+/** Inspect copied records without converting their recorded origin into executing ownership. */
+export function inspectJournal(directory: string, sourceRepo: string) {
+  const journal = readJournalRecords(directory, sourceRepo, undefined, true);
+  const terminal = new Set(journal.events.filter(event => ["outcome", "acknowledged-delivery", "retired-absence"].includes(event.kind)).map(event => event.effect_id));
+  return freezeJSON({ authority: "none" as const, replay_authority: false as const, header: journal.header, plan: journal.plan,
+    events: journal.events, revision: journal.revision, digest: journal.digest,
+    pending_effect_ids: journal.plan.manifest.effects.filter(effect => !terminal.has(effect.id)).map(effect => effect.id) });
 }
 function append(journal: Journal, kind: Event["kind"], effectId: string, payload: Event["payload"]): Journal {
   const current = readJournal(journal.directory, journal.source_repo, journal);

@@ -7,7 +7,7 @@ import { evidence, role } from "./manifest-fixture";
 import { nativeServiceProgram } from "./native-service-fixture";
 import { collectWorkerInputs } from "../../../plugins/vh-adlc/scripts/docs-drift/publication-worker";
 import { collectReviewTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/review-target";
-import { effectDigest, verifyRoleIdentity, type NativeRoleEvidence } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
+import { effectDigest, verifyRoleIdentity, type NativeRoleEvidence, type RolePolicy } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { roleRuntimeDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
@@ -16,8 +16,8 @@ type Reference = { path: string; sha256: string };
 function retain(root: string, name: string, bytes: Uint8Array): Reference {
   writeFileSync(join(root, name), bytes, { mode: 0o600 }); return { path: name, sha256: sha256(bytes) };
 }
-function capture(root: string, source: string, selectedRole: "worker" | "reviewer", runtime: string, original: NativeRoleEvidence): Reference {
-  const { records: _records, ...binding } = verifyRoleIdentity(original, role);
+function capture(root: string, source: string, selectedRole: "worker" | "reviewer", runtime: string, original: NativeRoleEvidence, policy: RolePolicy = role): Reference {
+  const { records: _records, ...binding } = verifyRoleIdentity(original, policy);
   const launch = { schema_version: 1, kind: "docs-drift-role-launch", role: selectedRole, source_commit: source, runtime_sha256: runtime,
     target_sha256: original.target_sha256, invocation_id: original.invocation_id, context_id: original.context_id, pid: original.process.pid };
   return retain(root, selectedRole + "-capture.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-role-capture", role: selectedRole,

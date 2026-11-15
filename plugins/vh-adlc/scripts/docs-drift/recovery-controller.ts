@@ -1,6 +1,7 @@
+import { bindRunJournal, type RunDirectory } from "./run-directory";
 import { realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { selectRecoveryRuntime } from "./bootstrap";
+import { dirname, join, resolve } from "node:path";
+import { selectOriginalOperationRuntime } from "./bootstrap";
 import { fetchCurrentDefault } from "./proposals";
 import { readJournal } from "./journal";
 import { acknowledgeDeliveries, reconcileAbsent, type AcknowledgementScope, type ReconciliationScope } from "./recovery";
@@ -17,7 +18,7 @@ import type { AbsenceEvidence } from "./observations";
 type Purpose = "acknowledgement" | "reconciliation";
 export type RecoveryOptions = {
   repo: string; source: string; artifact_root: string; journal_directory: string; cache_directory: string;
-  entry: "hosted" | "copilot" | "claude"; owner: string; run: string; credential: string; path?: string; selection: unknown;
+  entry: string; owner: string; run: string; credential: string; path?: string; selection: unknown;
 };
 function selectedIDs(value: unknown): string[] {
   if (!Array.isArray(value) || value.length > 1000 || value.some(id => typeof id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/u.test(id))
@@ -42,24 +43,31 @@ function readSelection(value: unknown, source: string, operation: string) {
   return { purpose: packet.purpose as Purpose, acknowledge_effect_ids: acknowledge, retire_effect_ids: retire, retirement_lookups: selected };
 }
 
-async function collectContext(input: RecoveryOptions, execution?: Purpose) {
+async function collectContext(input: RecoveryOptions, execution?: Purpose, run?: RunDirectory) {
   const options = structuredClone(input), repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
   const root = artifactDirectoryScope(options.artifact_root, repo).directory;
   if (dirname(realpathSync(options.journal_directory)) !== root) throw Error("Original recovery journal artifact root required");
   const journal = readJournal(options.journal_directory, repo), plan = journal.plan;
-  if (plan.schema_version !== 1) throw Error("Version-two original-context recovery integration is required");
   if (plan.manifest.bindings.source_commit !== options.source || plan.transport !== "native") throw Error("Original native recovery source required");
   const selection = readSelection(options.selection, options.source, plan.manifest.operation_id);
   if (execution && execution !== selection.purpose) throw Error("Recovery command purpose differs from its selected operation");
   const { settings } = loadCommittedSettings(repo, options.source);
-  const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+  const comparison = { repository: plan.manifest.repository, repository_id: plan.manifest.repository_id,
+    actor: plan.manifest.actor, actor_id: plan.manifest.actor_id, default_branch: settings.default_branch };
+  const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential,
+    path: options.path, comparison_identity: comparison });
   const observed = native();
   if (observed.identity.repository_id !== plan.manifest.repository_id || observed.identity.repository !== plan.manifest.repository
     || observed.identity.actor_id !== plan.manifest.actor_id || observed.identity.actor !== plan.manifest.actor) throw Error("Recovery original repository and actor required");
-  const runtime = await selectRecoveryRuntime({ repo, source_commit: options.source, identity: observed.identity,
-    cache_directory: options.cache_directory, entry: options.entry, adoption_sha256: plan.adoption_sha256 });
+  const runtime = await selectOriginalOperationRuntime({ repo, directory: resolve(import.meta.dir, "../.."), plan,
+    identity: observed.identity, cache_directory: options.cache_directory, entry: options.entry });
   if (execution && realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/recovery-controller.ts"))
     throw Error("Original retained recovery controller required");
+  let originalRun: RunDirectory | undefined;
+  if (execution && plan.schema_version === 2) {
+    if (!run) throw Error("Original run required for version-two recovery");
+    originalRun = bindRunJournal(run, journal);
+  }
   // This owned environment carries immutable source and metadata. Original journals and application artifacts supply proof.
   const store = createOwnedObjectStore({ source_repo: repo, source_commit: options.source, parent: root, evidence_directory: root,
     owner: options.owner, run: options.run, repository: settings.repository });
@@ -71,7 +79,7 @@ async function collectContext(input: RecoveryOptions, execution?: Purpose) {
   if (canonicalDigest(fresh.identity) !== canonicalDigest(observed.identity) || fresh.default_commit !== observed.default_commit)
     throw Error("Recovery identity or permission source changed during collection");
   if (!matchesRepositoryState(repo, before)) throw Error("Caller changed during recovery collection");
-  const transport = createNativeTransport({ source_repo: repo, artifact_root: root, object_store: store, settings, credential: options.credential, path: options.path });
+  const transport = createNativeTransport({ source_repo: repo, artifact_root: root, object_store: store, settings, credential: options.credential, path: options.path, run: originalRun });
   const common = { source_repo: repo, journal_directory: journal.directory, object_store: store, settings, transport };
   return { options, repo, before, settings, runtime, native, observed, store, selection, common };
 }
@@ -116,9 +124,9 @@ export async function inspectRecovery(input: RecoveryOptions): Promise<RecoveryI
 }
 
 /** Execute only metadata recovery under fresh exact authority using the original retained code. */
-export async function applyRecovery(input: RecoveryOptions & { authority: unknown; purpose: Purpose }) {
+export async function applyRecovery(input: RecoveryOptions & { authority: unknown; purpose: Purpose }, run?: RunDirectory) {
   if (Bun.version !== "1.4.4") throw Error("Original retained recovery Bun version required");
-  const options = structuredClone(input), context = await collectContext(options, options.purpose), selected = context.selection;
+  const options = structuredClone(input), context = await collectContext(options, options.purpose, run), selected = context.selection;
   recoveryEffectsOutput({ command: selected.purpose === "acknowledgement" ? "acknowledge-delivery" : "reconcile-publication",
     source: options.source, outcome: "incomplete", limit: Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes), capacity_check: true,
     result: { state: "pending", reason: null, journal: readJournal(options.journal_directory, options.repo) } });

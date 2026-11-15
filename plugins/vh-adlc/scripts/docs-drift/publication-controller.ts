@@ -1,3 +1,4 @@
+import { bindRunJournal, type RunDirectory } from "./run-directory";
 import { runtimePolicyBinding } from "./bootstrap";
 import { policyDigest } from "./journal";
 import { loadCommittedSettings } from "./settings";
@@ -135,10 +136,10 @@ function readInvocation(options: Options, plan: SealedPlan) {
   return input;
 }
 
-function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof currentState>>, original: unknown): PublishOptions {
+function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof currentState>>, original: unknown, run?: RunDirectory): PublishOptions {
   requireExecutingRuntime(initial.runtime);
   const transport = createNativeTransport({ source_repo: options.repo, artifact_root: options.artifact_root, object_store: initial.store,
-    settings: initial.settings, credential: options.credential, path: options.path });
+    settings: initial.settings, credential: options.credential, path: options.path, run });
   return { source_repo: options.repo, artifact_root: options.artifact_root, object_store: initial.store, settings: initial.settings, plan: initial.plan, transport,
     gate: async (journal: Journal | null) => {
       if (journal) publicationEffectsOutput({ command: "publish", source: options.source, outcome: "incomplete", capacity_check: true,
@@ -166,20 +167,24 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
     } };
 }
 
-export async function publishPublication(input: Options) {
+export async function publishPublication(input: Options, run?: RunDirectory) {
   const options = structuredClone(input), current = await currentState(options);
   requireExecutingRuntime(current.runtime);
   const path = join(options.artifact_root, current.plan.manifest.operation_id + ".controller.json");
   if (!existsSync(path)) publishArtifact(path, canonicalJSON({ schema_version: 1, kind: "docs-drift-publication-controller", plan_sha256: sha256(canonicalJSON(current.plan)),
     inputs_sha256: invocationDigest(options), proposal_snapshot: current.proposal_snapshot }));
   const invocation = readInvocation(options, current.plan);
-  return publish(publicationOptions(options, current, invocation.proposal_snapshot));
+  return publish(publicationOptions(options, current, invocation.proposal_snapshot, run));
 }
 
-export async function resumePublication(input: Options & { journal_directory: string }) {
+export async function resumePublication(input: Options & { journal_directory: string }, run?: RunDirectory) {
   const options = structuredClone(input);
   if (dirname(realpathSync(options.journal_directory)) !== realpathSync(options.artifact_root)) throw Error("Original publication journal artifact root required");
   const journal = readJournal(options.journal_directory, options.repo), invocation = readInvocation(options, journal.plan);
+  if (journal.plan.schema_version === 2) {
+    if (!run) throw Error("Original run required for version-two resume");
+    run = bindRunJournal(run, journal);
+  }
   try {
     const source = readSourceAssessmentArtifacts({ ...options, candidate_repo: options.candidate_repo, reference: options.source_verification });
     const candidate = readPublicationCandidateProof(options, source);
@@ -194,7 +199,7 @@ export async function resumePublication(input: Options & { journal_directory: st
       result: { state: "pending", reason: null, journal }, limit: Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes) });
     importCandidate(source.object_store, facts.store!, journal.plan);
     const transport = createNativeTransport({ source_repo: options.repo, artifact_root: options.artifact_root, object_store: source.object_store,
-      settings, credential: options.credential, path: options.path });
+      settings, credential: options.credential, path: options.path, run });
     const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
     const proposals = collectProposals(native.repository, settings);
     if (proposals.scope_changed) throw new PublicationScopeChanged("Current recovery proposal metadata changed");
@@ -203,7 +208,7 @@ export async function resumePublication(input: Options & { journal_directory: st
       original: invocation.proposal_snapshot, transport, objects: writePublicationObjects(source.object_store, journal.plan, journal.header), current_proposals: proposals.proposals });
     const current = await currentState(options, inventory, journal.plan);
     if (!canonicalJSON(current.plan).equals(canonicalJSON(journal.plan))) throw new PublicationScopeChanged("Original recovery plan changed");
-    const publication = publicationOptions(options, current, invocation.proposal_snapshot);
+    const publication = publicationOptions(options, current, invocation.proposal_snapshot, run);
     return resumeEffects({ ...publication, journal_directory: options.journal_directory });
   } catch (error) {
     if (error instanceof PublicationScopeChanged || error instanceof ArtifactChanged) {

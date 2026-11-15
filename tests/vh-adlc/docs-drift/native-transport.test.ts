@@ -66,7 +66,7 @@ function setup() {
   const transport = createNativeTransport({ settings, object_store: store, artifact_root: artifacts, source_repo: repo, credential: "synthetic-credential", path: bin + ":" + process.env.PATH });
   const update = (change: (value: typeof state) => void) => { const value = JSON.parse(readFileSync(statePath, "utf8")) as typeof state; change(value); writeFileSync(statePath, JSON.stringify(value)); };
   const inspect = () => JSON.parse(readFileSync(statePath, "utf8")) as typeof state;
-  return { root, settings, store, plan, objects, transport, update, inspect, calls, commit, readme };
+  return { root, repo, bin, settings, store, plan, objects, transport, update, inspect, calls, commit, readme };
 }
 
 test("native transport pins observed identities and uses absence-bound Git ref creation", async () => {
@@ -2230,4 +2230,66 @@ test("unconfirmed native cleanup leaves the mutation attempt unsettled", async (
     expect(pendingAttempt(retained, selected.effect)).toBe("attempt-not-reaped");
     expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(selected.objects.lease_object);
   } finally { probe.mockRestore(); }
+});
+
+test("version-two native dispatch requires the external original run binding", async () => {
+  const f = setup();
+  const { adoption_sha256: _legacyPolicy, schema_version: _legacyVersion, ...retained } = f.plan;
+  const plan = journalArtifacts.readRetainedPlan(canonicalJSON({ ...retained, schema_version: 2,
+    policy_sha256: hash("synthetic native trial policy"), component: { plugin_version: "0.25.0",
+      source_commit: "d".repeat(40), component_sha256: hash("synthetic installed component") } }));
+  const journal = createJournal({ source_repo: join(f.root, "source"), artifact_root: f.transport.artifact_root, plan });
+  const objects = writePublicationObjects(f.store, plan, journal.header), before = f.inspect();
+  await expect(f.transport.execute(plan, plan.manifest.effects[0], objects, "origin-required-attempt")).rejects.toBeInstanceOf(PublicationExecutionError);
+  expect(f.inspect()).toEqual(before);
+  expect(existsSync(f.calls)).toBe(false);
+});
+
+
+test("version-two native writes bind their journal first and stop after original-host proof is lost", async () => {
+  const { dirname } = await import("node:path");
+  const { installedSettingsFixture } = await import("./settings-fixture");
+  const { createRunDirectory, readRunDirectory } = await import("../../../plugins/vh-adlc/scripts/docs-drift/run-directory");
+  const { loadCommittedSettings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/settings");
+  const f = setup(), configured = installedSettingsFixture();
+  writeFileSync(join(f.repo, ".vh-adlc/docs-drift.yaml"), canonicalJSON(configured));
+  for (const path of [configured.scanner.script, configured.project_procedure, ...configured.feedback_files]) {
+    mkdirSync(dirname(join(f.repo, path)), { recursive: true });
+    writeFileSync(join(f.repo, path), "Owned synthetic input\n");
+  }
+  readGit(f.repo, "add", "--all");
+  readGit(f.repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Ordinary native fixture");
+  const source = readGit(f.repo, "rev-parse", "HEAD").toString().trim(), tree = readGit(f.repo, "rev-parse", "HEAD^{tree}").toString().trim();
+  const loaded = loadCommittedSettings(f.repo, source), settings = loaded.settings;
+  if (settings.schema_version !== 2 || !settings.component) throw Error("Ordinary fixture component required");
+  const location = { repo: f.repo, directory: join(f.root, "ordinary-run"), origins: join(f.root, "host-origins") };
+  const run = createRunDirectory({ ...location, source, entry: "hosted" });
+  const store = createOwnedObjectStore({ source_repo: f.repo, source_commit: source, parent: run.directory, evidence_directory: run.directory,
+    repository: settings.repository, owner: "fixture", run: run.manifest.id });
+  const input = fixture({ ...bindings, source_commit: source, settings_sha256: loaded.settings_sha256, candidate_commit: source, candidate_tree: tree },
+    [...f.plan.manifest.effects, { id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } }], "operation-1",
+    { actor: "fixture-bot", actor_id: 20, publisher_entry: "hosted" });
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, schema_version: 2,
+    policy_sha256: hash("synthetic native trial policy"), component: settings.component, context: "trial", transport: "native",
+    publication_kind: "advisory", corrections: [], attention: [] });
+  let journal = createJournal({ source_repo: f.repo, artifact_root: run.directory, plan });
+  const objects = writePublicationObjects(store, plan, journal.header);
+  f.update(state => { state.commit = source; state.tree = tree; state.refs["refs/heads/main"] = source; });
+  const beforeDispatch = "if (process.argv.includes('push') && !require('node:fs').existsSync(" + JSON.stringify(join(run.directory, "stages/0000000001.json")) + ")) process.exit(91);\n";
+  const git = join(f.bin, "git"), program = readFileSync(git, "utf8"), line = program.indexOf("\n") + 1;
+  writeFileSync(git, program.slice(0, line) + beforeDispatch + program.slice(line), { mode: 0o700 });
+  const transport = createNativeTransport({ settings, source_repo: f.repo, artifact_root: run.directory, object_store: store,
+    credential: "synthetic-credential", path: f.bin + ":" + process.env.PATH, run });
+  const lease = plan.manifest.effects[0]; journal = appendIntent(journal, lease.id);
+  journal = await executeAttempt({ journal, effect: lease, objects, transport });
+  expect(pendingAttempt(journal, lease)).toBe("dispatch-outcome-unknown");
+  expect(journal.events.findLast(event => event.kind === "attempt-ended")?.payload).toMatchObject({ sent: true, reaped: true });
+  expect(f.inspect().refs[settings.publication.lease_ref]).toBe(objects.lease_object);
+  const bound = readRunDirectory(location);
+  expect(bound.stages.at(-1)?.artifacts.journal.path).toBe("docs-drift-operation-1/header.json");
+  rmSync(join(location.origins, run.manifest.id + ".json"));
+  const before = f.inspect();
+  await expect(transport.execute(plan, plan.manifest.effects.at(-1)!, objects, "lost-origin-release")).rejects.toBeInstanceOf(PublicationExecutionError);
+  expect(f.inspect()).toEqual(before);
+  expect(await transport.ref(settings.publication.lease_ref)).toEqual({ state: "present", object: objects.lease_object });
 });

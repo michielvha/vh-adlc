@@ -49,6 +49,15 @@ test("a copied directory remains observation-only even with matching run metadat
   expect(readFileSync(join(copy, "run.json"))).toEqual(readFileSync(join(f.input.directory, "run.json")));
 });
 
+test("the same committed source at a new host path permits observation without inheriting the old origin", () => {
+  const f = fixture(), original = createRunDirectory(f.input), relocated = join(f.root, "relocated-source");
+  readGit(f.root, "clone", "--no-local", f.input.repo, relocated);
+  const observed = readRunDirectory({ ...f.input, repo: relocated });
+  expect(observed.origin).toBe("observation-only");
+  expect(observed.manifest).toEqual(original.manifest);
+  expect(() => appendRunStage(observed, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+});
+
 test("changed retained artifacts stop inspection and never replace the original reference", () => {
   const f = fixture(), run = createRunDirectory(f.input), bytes = canonicalJSON({ complete: true });
   writeFileSync(join(f.input.directory, "role.json"), bytes, { mode: 0o600 });
@@ -72,6 +81,13 @@ test("missing host ownership leaves the surviving directory observation-only", (
   expect(() => appendRunStage(run, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
 });
 
+test("an explicitly restored observation directory creates no host execution origin", () => {
+  const f = fixture(), run = createRunDirectory({ ...f.input, ownership: "observation-only" });
+  expect(run.origin).toBe("observation-only");
+  expect(existsSync(f.input.origins)).toBe(false);
+  expect(() => appendRunStage(run, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+});
+
 test.each(["schema", "source", "settings", "read-set", "entry"] as const)("run inspection refuses a changed %s binding", field => {
   const f = fixture();
   const run = createRunDirectory(f.input);
@@ -83,4 +99,31 @@ test.each(["schema", "source", "settings", "read-set", "entry"] as const)("run i
   if (field === "entry") value.entry = "unconfigured";
   writeFileSync(path, canonicalJSON(value));
   expect(() => readRunDirectory(f.input)).toThrow();
+});
+
+test("a run binds one original version-two journal before native dispatch", async () => {
+  const { bindRunJournal } = await import("../../../plugins/vh-adlc/scripts/docs-drift/run-directory");
+  const { createJournal, sealPlan } = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+  const { loadCommittedSettings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/settings");
+  const { validateReviewedManifest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/manifests");
+  const { fixture: manifestFixture, bindings, hash } = await import("./manifest-fixture");
+  const f = fixture(), run = createRunDirectory(f.input), loaded = loadCommittedSettings(f.repo, f.input.source);
+  if (loaded.settings.schema_version !== 2 || !loaded.settings.component) throw Error("Ordinary fixture component required");
+  const input = manifestFixture({ ...bindings, source_commit: f.input.source, settings_sha256: loaded.settings_sha256 }, [], "run-journal",
+    { actor: "fixture-owner", actor_id: 30, publisher_entry: "interactive" });
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, schema_version: 2,
+    policy_sha256: hash("synthetic original policy"), component: loaded.settings.component,
+    context: "production", transport: "native", publication_kind: "advisory", corrections: [], attention: [] });
+  const journal = createJournal({ source_repo: f.repo, artifact_root: run.directory, plan });
+  const bound = bindRunJournal(run, journal);
+  expect(bound.origin).toBe("original");
+  expect(bound.stages.at(-1)?.artifacts.journal.path).toBe("docs-drift-run-journal/header.json");
+  expect(bindRunJournal(bound, journal).digest).toBe(bound.digest);
+  expect(() => bindRunJournal({ ...bound }, journal)).toThrow("opened");
+  expect(() => bindRunJournal(run, journal)).toThrow("changed");
+  const copy = join(f.root, "copied-run"); cpSync(run.directory, copy, { recursive: true });
+  const observer = readRunDirectory({ ...f.input, directory: copy });
+  const stages = readFileSync(join(copy, "stages/0000000001.json"));
+  expect(() => bindRunJournal(observer, journal)).toThrow("original");
+  expect(readFileSync(join(copy, "stages/0000000001.json"))).toEqual(stages);
 });

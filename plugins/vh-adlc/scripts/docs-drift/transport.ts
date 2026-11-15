@@ -1,3 +1,4 @@
+import { bindRunJournal, type RunDirectory } from "./run-directory";
 import { projectRecordedAccount, sameAccount, samePublicationIdentity, type PublisherAccount } from "./identity";
 import { nativePushArguments, retainGitSuccess, type GitUpdate } from "./git-success";
 import type { DeliveryReader } from "./delivery-lookup";
@@ -7,7 +8,7 @@ import { projectRejection, retainRejection, type RejectionEvidence } from "./rej
 import { PublicationExecutionError } from "./attempts";
 import { ArtifactChanged } from "./evidence-input";
 import type { Effect } from "./manifests";
-import { publishArtifact, syncDirectory, type Outcome, type SealedPlan, type writePlanObject } from "./journal";
+import { publishArtifact, readJournal, syncDirectory, type Outcome, type SealedPlan, type writePlanObject } from "./journal";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -111,6 +112,34 @@ function contentsAccess(selected: ReturnType<typeof createRepositoryReader>) {
   const head = selected.ref("refs/heads/" + current.default_branch);
   selected.commit(head.sha);
   return { ...current, head_sha: head.sha };
+}
+
+/** Read normal gh authentication into memory. Credentials never enter the run's retained records. */
+export async function readNativeCredential(options: {
+  hostname: string; cwd: string; path?: string; environment?: Record<string, string | undefined>;
+}): Promise<string> {
+  if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/iu.test(options.hostname)) throw Error("Selected native GitHub authentication host required");
+  const environment = options.environment ?? process.env, host = options.hostname.toLowerCase();
+  const selected = host === "github.com" || host.endsWith(".ghe.com")
+    ? environment.GH_TOKEN || environment.GITHUB_TOKEN : environment.GH_ENTERPRISE_TOKEN || environment.GITHUB_ENTERPRISE_TOKEN;
+  let credential = selected ?? "";
+  if (!credential) {
+    const path = options.path ?? environment.PATH ?? process.env.PATH ?? "";
+    const executable = Bun.which("gh", { PATH: path });
+    if (!executable) throw Error("Selected native GitHub authentication command unavailable");
+    const keys = ["HOME", "XDG_CONFIG_HOME", "GH_CONFIG_DIR", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS"];
+    const env = Object.fromEntries(keys.flatMap(key => {
+      const value = environment[key];
+      return value === undefined ? [] : [[key, value] as const];
+    }));
+    const result = await executeOwnedProcess({ argv: [executable, "auth", "token", "--hostname", host], cwd: options.cwd,
+      env: { ...env, PATH: path, LANG: "C.UTF-8", GH_PROMPT_DISABLED: "1" }, capture: "memory",
+      stdout: "/dev/null", stderr: "/dev/null", watched_outputs: [], timeout_ms: 30000, max_output_bytes: OUTPUT_LIMIT, started: () => {} });
+    if (!ownedClientCompleted(result) || !result.captured) throw Error("Selected native GitHub authentication unavailable");
+    credential = Buffer.from(result.captured.stdout).toString("utf8").replace(/\r?\n$/u, "");
+  }
+  if (!credential || /[\r\n\0]/u.test(credential)) throw Error("Selected native GitHub authentication invalid");
+  return credential;
 }
 
 function nativeEnvironment(options: { hostname: string; credential: string; path?: string }) {
@@ -559,9 +588,10 @@ export function createPublicationReader(options: {
 /** Fixed native destinations, explicit credentials and owned subprocess groups. No collector selector. */
 export function createNativeTransport(options: {
   settings: Settings; object_store: OwnedObjectStore; artifact_root: string; source_repo: string;
-  credential: string; path?: string; timeout_ms?: number;
+  credential: string; path?: string; timeout_ms?: number; run?: RunDirectory;
 }): PublicationTransport {
   const { settings, object_store: store } = options;
+  let originalRun = options.run;
   requireOwnedStore(store, settings.repository);
   const root = externalArtifactDirectory(options.artifact_root, options.source_repo);
   const environment = nativeEnvironment({ ...options, hostname: settings.hostname });
@@ -724,6 +754,12 @@ export function createNativeTransport(options: {
         ...(delivery.before ? { before: delivery.before } : {}),
         ...(delivery.capture_unverified ? { capture_unverified: true } : {}) });
       try {
+        if (plan.schema_version === 2) {
+          if (!originalRun || originalRun.directory !== root) throw Error("Original run required before native dispatch");
+          const journal = readJournal(join(root, "docs-drift-" + plan.manifest.operation_id), options.source_repo);
+          if (!canonicalJSON(journal.plan).equals(canonicalJSON(plan))) throw Error("Original native journal plan changed");
+          originalRun = bindRunJournal(originalRun, journal);
+        }
         if (attempt_id && ["pr-create", "issue-create", "comment-create", "pr-update", "pr-close"].includes(effect.kind)
           && plan.manifest.effects.some(selected => selected.id === effect.id && sha256(canonicalJSON(selected)) === sha256(canonicalJSON(effect)))) {
           const data = await captureBefore(plan, effect);

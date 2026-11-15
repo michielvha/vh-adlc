@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { readBoundArtifact } from "./evidence-input";
-import { numberedRecordFiles, publishArtifact, readArtifact, syncDirectory } from "./journal";
+import { numberedRecordFiles, publishArtifact, readArtifact, readJournal, syncDirectory, type Journal } from "./journal";
 import { exactRecord } from "./publication-decisions";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { artifactDirectoryScope, captureSnapshot, externalResourceScope } from "./snapshot";
@@ -94,13 +94,13 @@ export function readRunDirectory(input: RunOptions): RunDirectory {
   const options = { repo: realpathSync(input.repo), directory: realpathSync(input.directory), origins: input.origins };
   const scope = artifactDirectoryScope(options.directory, options.repo);
   const bytes = readArtifact(join(scope.directory, "run.json")), manifest = manifestRecord(record(bytes));
-  if (manifest.source_repo !== options.repo) fail("source repository changed");
   const snapshot = captureSnapshot(options.repo, manifest.source_commit);
   if (snapshot.settings_sha256 !== manifest.settings_sha256 || snapshot.read_set_sha256 !== manifest.read_set_sha256
-    || snapshot.settings.schema_version !== 2 || !Object.hasOwn(snapshot.settings.execution.entries, manifest.entry)) fail("source/configuration binding changed");
+    || !Object.hasOwn(snapshot.settings.execution.entries, manifest.entry)) fail("source/configuration binding changed");
   let origin: RunDirectory["origin"] = "observation-only";
   const identity = directoryIdentity(scope.directory);
-  if (scope.directory === manifest.directory && identity.device === manifest.device && identity.inode === manifest.inode) {
+  if (snapshot.settings.schema_version === 2 && manifest.source_repo === options.repo
+    && scope.directory === manifest.directory && identity.device === manifest.device && identity.inode === manifest.inode) {
     try {
       artifactDirectoryScope(options.origins, options.repo);
       scope.assertExternal(options.origins);
@@ -126,9 +126,11 @@ export function readRunDirectory(input: RunOptions): RunDirectory {
 }
 
 /** Create one external run. Its host-local origin record is committed before its public manifest. */
-export function createRunDirectory(input: RunOptions & { source: string; entry: string; mode?: Manifest["mode"]; proposals?: number[] }): RunDirectory {
+export function createRunDirectory(input: RunOptions & { source: string; entry: string; mode?: Manifest["mode"]; proposals?: number[];
+  ownership?: "original" | "observation-only" }): RunDirectory {
   const snapshot = captureSnapshot(input.repo, input.source);
-  if (snapshot.settings.schema_version !== 2 || !Object.hasOwn(snapshot.settings.execution.entries, input.entry)) fail("ordinary settings and configured profile required");
+  if (snapshot.settings.schema_version !== 2 && input.ownership !== "observation-only"
+    || !Object.hasOwn(snapshot.settings.execution.entries, input.entry)) fail("ordinary settings and configured profile required");
   const directory = creationPath(input.directory), origins = creationPath(input.origins);
   const external = externalResourceScope(snapshot.repo);
   external.assertExternal(directory);
@@ -137,26 +139,51 @@ export function createRunDirectory(input: RunOptions & { source: string; entry: 
   if (existsSync(directory)) fail("directory already exists; resume it or select a fresh directory");
   mkdirSync(directory, { mode: 0o700, recursive: true });
   const scope = artifactDirectoryScope(directory, snapshot.repo);
-  mkdirSync(origins, { mode: 0o700, recursive: true });
-  artifactDirectoryScope(origins, snapshot.repo);
   const manifest = manifestRecord({ schema_version: 1, kind: "docs-drift-run", id: randomUUID(), nonce: randomUUID(), directory: scope.directory,
     ...directoryIdentity(scope.directory), source_repo: snapshot.repo, source_commit: snapshot.source_commit,
     settings_sha256: snapshot.settings_sha256, read_set_sha256: snapshot.read_set_sha256, entry: input.entry,
     mode: input.mode ?? "audit", proposals: input.proposals ?? [], bun_version: Bun.version });
   mkdirSync(join(directory, "stages"), { mode: 0o700 });
-  publishArtifact(join(origins, manifest.id + ".json"), canonicalJSON(manifest));
+  if (input.ownership !== "observation-only") {
+    mkdirSync(origins, { mode: 0o700, recursive: true });
+    artifactDirectoryScope(origins, snapshot.repo);
+    publishArtifact(join(origins, manifest.id + ".json"), canonicalJSON(manifest));
+  }
   publishArtifact(join(directory, "run.json"), canonicalJSON(manifest));
   syncDirectory(dirname(directory));
   return readRunDirectory({ repo: snapshot.repo, directory, origins });
 }
 
-/** Append by revision CAS. Existing role/effect journals retain their own dispatch and approval gates. */
-export function appendRunStage(run: RunDirectory, input: Pick<Stage, "command" | "state" | "artifacts">): Stage {
+function originalContext(run: RunDirectory) {
   const options = contexts.get(run);
   if (!options) fail("original opened run required");
   const current = readRunDirectory(options);
   if (current.origin !== "original") fail("original host ownership required");
   if (current.digest !== run.digest) fail("stage changed; reopen the run before continuing");
+  return { options, current };
+}
+
+/** Bind the immutable journal header before this original run's first native dispatch. */
+export function bindRunJournal(run: RunDirectory, selected: Journal): RunDirectory {
+  const { options, current } = originalContext(run), journal = readJournal(selected.directory, options.repo);
+  const plan = journal.plan;
+  if (dirname(journal.directory) !== current.directory || journal.header.recovery_mode !== "original" || plan.schema_version !== 2
+    || plan.manifest.bindings.source_commit !== current.manifest.source_commit
+    || plan.manifest.bindings.settings_sha256 !== current.manifest.settings_sha256
+    || plan.manifest.publisher_entry !== current.manifest.entry) fail("original selected journal and run bindings required");
+  const path = join(journal.directory, "header.json"), reference = { path: relative(current.directory, path), sha256: sha256(readArtifact(path)) };
+  const prior = current.stages.findLast(stage => Object.hasOwn(stage.artifacts, "journal"))?.artifacts.journal;
+  if (prior) {
+    if (canonicalDigest(prior) !== canonicalDigest(reference)) fail("run already binds another journal");
+    return current;
+  }
+  appendRunStage(current, { command: current.manifest.mode === "close" ? "close" : "publish", state: "pending", artifacts: { journal: reference } });
+  return readRunDirectory(options);
+}
+
+/** Append by revision CAS. Existing role/effect journals retain their own dispatch and approval gates. */
+export function appendRunStage(run: RunDirectory, input: Pick<Stage, "command" | "state" | "artifacts">): Stage {
+  const { options } = originalContext(run);
   const stage = stageRecord({ schema_version: 1, kind: "docs-drift-run-stage", run_id: run.manifest.id,
     revision: run.stages.length + 1, previous_sha256: run.digest, ...input }, run.manifest, run.stages.length + 1, run.digest);
   for (const reference of Object.values(stage.artifacts)) readBoundArtifact({ source_repo: options.repo, artifact_root: run.directory, reference });

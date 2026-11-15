@@ -41,6 +41,13 @@ test("normal retained recovery inspects and acknowledges a changed delivered PR 
     expect(inspected.complete, inspected.diagnostics.join("\n")).toBe(true); expect(inspected.authority).toBe("none");
     expect(inspected.scopes).toHaveLength(1); expect(inspected.scopes[0].acknowledgements[0]).toMatchObject({ effect_id: "publication", differences: ["title_sha256"] });
     expect(journals.readJournal(pending.journal.directory, f.repo).digest).toBe(journalBefore);
+    const recasedState = JSON.parse(readFileSync(service.statePath, "utf8")) as { viewer_login: string };
+    recasedState.viewer_login = "Fixture-Bot"; writeFileSync(service.statePath, JSON.stringify(recasedState), { mode: 0o600 });
+    const recased = await recovery.inspectRecovery(common);
+    expect(recased.complete, recased.diagnostics.join("\n")).toBe(true);
+    expect(recased.scopes[0]).toMatchObject({ actor: "Fixture-Bot", actor_id: pending.journal.plan.manifest.actor_id });
+    expect(inspected.scopes[0]).toMatchObject({ actor: pending.journal.plan.manifest.actor, actor_id: pending.journal.plan.manifest.actor_id });
+    expect(journals.readJournal(pending.journal.directory, f.repo).digest).toBe(journalBefore);
     const environment = Object.fromEntries(Object.entries(f.native.environment).filter((pair): pair is [string, string] => typeof pair[1] === "string"));
     let invocation = 0;
     const invoke = async (command: string, extra: string[] = []) => {
@@ -54,11 +61,11 @@ test("normal retained recovery inspects and acknowledges a changed delivered PR 
     };
     const cliInspection = await invoke("inspect-recovery");
     expect(cliInspection.completion.exit_code, JSON.stringify(cliInspection.report.diagnostics)).toBe(0);
-    expect(cliInspection.report.recovery_inspection.scope_sha256s).toEqual(inspected.scope_sha256s);
+    expect(cliInspection.report.recovery_inspection.scope_sha256s).toEqual(recased.scope_sha256s);
     expect(journals.readJournal(pending.journal.directory, f.repo).digest).toBe(journalBefore);
     const request = retainSyntheticArtifact(f.artifacts, "current-recovery-owner.txt", Buffer.from("Synthetic current owner approves this displayed exact acknowledgement and owned-lease cleanup, preserving the later title.\n"));
     const authority = retainSyntheticArtifact(f.artifacts, "current-recovery-authority.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-recovery-authority",
-      purpose: "acknowledgement", scope_sha256s: inspected.scope_sha256s, origin: { kind: "owner-current-request", artifact: request } }));
+      purpose: "acknowledgement", scope_sha256s: recased.scope_sha256s, origin: { kind: "owner-current-request", artifact: request } }));
     const applied = await invoke("acknowledge-delivery", ["--authority", authority.path, "--authority-sha256", authority.sha256]);
     expect(applied.completion.exit_code, JSON.stringify(applied.report.diagnostics)).toBe(1);
     expect(applied.report.recovery_effects.state).toBe("acknowledged"); expect(applied.report.outcome).toBe("attention");

@@ -1,5 +1,6 @@
 import { verifyProductionPreflight } from "./preflight";
-import type { PolicyBinding } from "./journal";
+import { sameAccount } from "./identity";
+import { readVerifiedPlan, type CurrentSealedPlan, type PolicyBinding, type SealedPlan } from "./journal";
 import { randomUUID } from "node:crypto";
 import { clientArchivePath, inspectClientArchive } from "./client-archive";
 import { executeOwnedProcess, ownedClientCompleted, recordedProcessCompleted, type OwnedProcess } from "./owned-process";
@@ -346,6 +347,46 @@ export async function selectProductionRuntime(input: {
   const entry = preflight.checklist.native_entries[options.entry];
   return freezeJSON({ ...selected.runtime, current_default: options.current_default, policy_sha256: preflight.policy_sha256,
     observed_models: { worker: entry.worker_model, reviewer: entry.reviewer_model } });
+}
+
+/** Reopen only the operation's original policy. This metadata read invokes no native model client. */
+export function readOriginalRuntime(options: {
+  repo: string; directory: string; plan: CurrentSealedPlan; identity: PublicationIdentity;
+}) {
+  const plan = structuredClone(options.plan), source = plan.manifest.bindings.source_commit;
+  const loaded = loadCommittedSettings(options.repo, source), settings = loaded.settings, entry = plan.manifest.publisher_entry;
+  if (loaded.settings_sha256 !== plan.manifest.bindings.settings_sha256 || plan.manifest.repository !== settings.repository
+    || options.identity.repository.toLowerCase() !== plan.manifest.repository.toLowerCase()
+    || options.identity.repository_id !== plan.manifest.repository_id || !sameAccount(options.identity, plan.manifest))
+    fail("original operation settings or native identity changed");
+  if (settings.schema_version !== 2 || !entry || !Object.hasOwn(settings.execution.entries, entry)
+    || plan.context !== "production" || plan.transport !== "native") fail("original native production policy required");
+  const inspected = inspectInstalledPayload({ directory: options.directory, expected: plan.component });
+  const preflight = verifyProductionPreflight({ repo: options.repo, current_default: source, component: plan.component,
+    publisher: { entry, identity: options.identity } });
+  const selected = settings.execution.entries[entry], models = preflight.checklist.native_entries[entry];
+  const policy = { schema_version: 2 as const, policy_sha256: preflight.policy_sha256, component: plan.component,
+    context: plan.context, transport: plan.transport, publication_kind: plan.publication_kind, publisher_entry: entry,
+    pr_draft: settings.publication.pr_state[plan.publication_kind] === "draft",
+    worker: { requested_model: selected.worker.model, adopted_model: models.worker_model, identity_source: selected.worker.identity_source },
+    reviewer: { requested_model: selected.reviewer.model, adopted_model: models.reviewer_model, identity_source: selected.reviewer.identity_source } };
+  readVerifiedPlan(canonicalJSON(plan), () => policy);
+  return freezeJSON({ kind: "docs-drift-original-runtime" as const, authority: "none" as const, purpose: "metadata-recovery" as const,
+    source_commit: source, component: { ...plan.component, directory: inspected.directory }, policy });
+}
+
+/** Recovery selects the recorded component and original policy, independently of a successor config. */
+export async function selectOriginalOperationRuntime(options: {
+  repo: string; directory: string; plan: SealedPlan; identity: PublicationIdentity; entry: string; cache_directory: string;
+}) {
+  if (options.plan.schema_version === 2) {
+    if (options.entry !== options.plan.manifest.publisher_entry) fail("original operation profile changed");
+    return readOriginalRuntime({ ...options, plan: options.plan });
+  }
+  const entry = options.entry;
+  if (entry !== "hosted" && entry !== "copilot" && entry !== "claude") fail("original legacy profile required");
+  return selectRecoveryRuntime({ repo: options.repo, source_commit: options.plan.manifest.bindings.source_commit,
+    identity: options.identity, entry, cache_directory: options.cache_directory, adoption_sha256: options.plan.adoption_sha256 });
 }
 
 /** Keep historical entry callers separate while selecting the ordinary production contract. */
