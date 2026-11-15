@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The smaller design retains audit, resolver and recovery capabilities. It waits for owner choices Q1 and Q3 and a fresh canonical review of the selected replacement before T121 to T130."
+status_description: "The smaller design retains audit, resolver and recovery capabilities. The owner confirmed ordinary installation and capability-preserving checklist migration. Fresh review of the selected design precedes T121 to T130."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -76,11 +76,11 @@ Move Stackweaver's scheduled documentation audit and stale audit-PR resolver int
 
 The proposed simplification uses the ordinary installed plugin and native clients, shared process/review primitives and one run directory. Callers use eight helper operations. Scanner protocol version 1 and its separate completeness correction remain required. Recovery keeps original account ownership, partial-delivery refusal and evidence-backed owner acknowledgement. Shared execution work must preserve existing loop/triage behavior.
 
-Two operational changes need acceptance. Q1 uses ordinary installed clients. Changes to plugin revision, configured role provider/command/model, source/read set, config, candidate, payload, authority or publisher identity need fresh review. Native client, Bun, Git and gh version strings are diagnostic when their required capabilities and observed model still match. The proposed Q2 removal is withdrawn. Retain the existing durable operation plan/receipt records and guarded inspection/restoration. A restored mirror is observation-only, and lost application/ownership proof can still require owner intervention. These recovery records serve a different purpose from the setup/adoption chains proposed for simplification in Q3. Q3 replaces adoption receipt chains with a committed staged/adopted gate, released component binding and acyclic preflight checklist. Each decision is independent.
+The owner confirmed the installation and migration approach on 2026-11-15. Use ordinary installed clients. Changes to plugin revision, configured role provider/command/model, source/read set, config, candidate, payload, authority or publisher identity need fresh review. Native client, Bun, Git and gh version strings are diagnostic when their required capabilities and observed model still match. The proposed Q2 removal is withdrawn. Retain the existing durable operation plan/receipt records and guarded inspection/restoration. A restored mirror is observation-only, and lost application/ownership proof can still require owner intervention. These recovery records serve a different purpose from the setup/adoption chains proposed for simplification in Q3. Replace historical adoption record chains with a reviewed migration checklist and ordinary committed enablement/payload checks. Each decision is independent.
 
 Stackweaver's legacy routes stay active through staged testing. Migration uses a preflight checklist of exact release/install, scanner parity, final Claude Code Opus 5.5 paired review, actual model/entry tests, a successful unattended installed synthetic trial and rollback rehearsal. The routing switch is reported separately after activation. The trial needs its separately selected provider and exact owned-fixture effect authority. Real-corpus scanner parity remains a separate read-only check. The current code still implements the earlier architecture. Its recorded tests and reviews keep their original commit attribution. This revision has no implementation or migration acceptance yet. GUI and phone checks retain their deferrals.
 
-Acceptance covers the revised implementation plan and the installation and adoption choices the owner selects. Existing publication, provider-execution, private-payload and cutover boundaries still govern those later actions.
+The owner selected the recommended ordinary-installation and checklist migration approach and reiterated that useful Stackweaver capabilities must survive the port. The earlier conditional acceptance applies after a fresh clean Claude Code Opus 5.5 review. Continue implementation after that review without another confirmation of these requirements. Existing publication, provider-execution, private-payload and cutover boundaries govern later actions.
 
 ### Simplification basis on 2026-11-15
 
@@ -91,6 +91,10 @@ Current reuse opportunities and limits are visible in `scripts/triage/owned-proc
 Merge `a9be541` integrates upstream `3e3f655`, including the ordinary 0.32.0 binary lock and loop fixes. `git show origin/main:plugins/vh-adlc/plugin.json` at that upstream declares 0.24.1. The merge resolves both plugin manifests to candidate 0.25.0. The retained working-tree package/discovery output passes 69 cases and 301 assertions in `simplification-upstream-package-check.log`. The log itself has no source/exit/clean-state record, so it supplies no frozen-source attribution. The owner requested retaining useful capabilities and reducing disproportionate machinery on 2026-11-15.
 
 The architecture diagnostic's suggestions to drop delivery acknowledgement, compare numeric account IDs alone and split this port into additional feature documents are declined. The owner selected the useful audit/resolver/recovery capabilities as one migration, including original-account handling and acknowledgement. Retain the installed synthetic trial because it proves the actual installed/model route, and retain the bounded ZIP reader because native extraction would lose its input limits. The proposed removal of durable recovery records is withdrawn after inspecting their role in hosted failures; this is retention of the earlier accepted capability, without inferring an owner answer to Q2.
+
+### Confirmed requirements on 2026-11-15
+
+The owner reiterated that ordinary plugin installation and migration to shared vh-adlc with validation of all useful Stackweaver capabilities are given requirements. The earlier installation/adoption questions are resolved in favor of that approach. Use the existing shared plugin release and installation paths. Reduce machinery where the same useful outcomes and permission boundaries survive. A feature is ready for migration only after source/fixture parity, actual installed-payload checks and the declared native/scheduled/rollback observations establish those outcomes. Keep development and runtime-review provider choices distinct and preserve the selected client/model/credential configuration. The owner's selection of the recommended approach includes the previously offered acceptance conditional on a fresh clean Claude Code Opus 5.5 review. No repeated acceptance request is required for this same selected scope.
 
 ### Review lens
 
@@ -527,7 +531,7 @@ Before consumer cutover, publish the reviewed shared dependency under its config
 
 Validate its original native model/target/context and process outcome. Automatic runtime operation reviews keep their configured provider/model/credential bindings and their own captured native identity. Keep legacy routes active until those observations and the owner's existing cutover boundary are satisfied. Final paired review includes the exact activation diff before the D switch. A disposable rollback rehearsal restores legacy routing and schedule while preserving reports and pending-operation evidence. GUI and phone checks retain their owner-approved deferrals. Other unperformed host/model surfaces remain unclaimed.
 
-The two remaining choices requiring the owner's acceptance are ordinary installed-client/version management in Q1 and checklist-backed staged/adopted gating and upgrade checks in Q3. Q2's proposed recovery-record removal is withdrawn; retain the earlier accepted durable inspection/restoration behavior and its limits. Complete collection, protected documents, independent review, both publisher identities, remembered findings and evidence-backed surviving-journal recovery remain required.
+The owner confirmed ordinary installed clients and the capability-preserving checklist migration on 2026-11-15. Retain the earlier accepted durable operation inspection/restoration behavior and its limits. This direction resolves the former installation/adoption questions; a fresh clean review of this selected design satisfies the previously offered conditional acceptance. Complete collection, protected documents, independent review, both publisher identities, remembered findings and evidence-backed surviving-journal recovery remain required.
 
 ## Acceptance Criteria
 
@@ -1121,27 +1125,7 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 ## Open Questions
 
-### Q1: Use ordinary installed clients and record runtime versions?
-
-**Recommendation:** A. Keep the normal plugin/client installation and record versions. Changes to plugin revision, configured role provider/command/model, source/read set, config, candidate, payload, authority or publisher require fresh review. Native client, Bun, Git and gh version strings are diagnostic when capabilities and the recorded model/config binding still match. A resume without a role process makes no new provider call or model probe.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Ordinary installed clients** | Normal client/authentication flow and a smaller installer/configuration surface. | Private executable copies are retired. A newer unmatched installed plugin pauses docs-drift writes until an approved exact install is selected or its binding/checklist is updated; scheduled jobs select the bound released checkout. |
-| B. Retained private execution copies | The earlier exact-executable recovery environment. | Retained client/component installation and its compatibility machinery stay in scope. |
-
-**Why this is yours:** This changes the accepted exact-runtime retention guarantee.
-
-### Q3: Replace adoption receipt chains with a committed component-binding gate and preflight checklist?
-
-**Recommendation:** A. Check staged/adopted mode, the released component fingerprint/version and a complete preflight checklist before production writes. Bind the staged candidate and activation diff before switch, and record switch results afterwards. Use the Design's fixed changed-surface table to select upgrade checks, including actual native trials for provider/model/credential/publisher changes.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Gated migration checklist** | Recorded migration and affected-upgrade verification with a smaller adoption interface. | The helper validates the component binding, acyclic preflight checklist and activation diff. Matching source/payload updates to bound activation files require their applicable upgrade checks and a successor checklist. |
-| B. Retain the earlier adoption chains | The previous receipt lineage and upgrade-classification mechanism. | That framework and its tests remain part of this feature. |
-
-**Why this is yours:** This changes the accepted adoption and upgrade evidence mechanism. Publication permission remains independently required under either option.
+None. The owner confirmed ordinary plugin/client installation and the recommended capability-preserving migration checklist on 2026-11-15.
 
 ## Review Log
 
