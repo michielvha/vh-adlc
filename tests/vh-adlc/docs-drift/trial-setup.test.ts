@@ -154,6 +154,8 @@ test.each(["hosted", "copilot", "claude"] as const)("mapped trial preparation fo
   const before = captureRepositoryState(f.repo), identity = { ...runtimeIdentity, actor: actors[entry], actor_id: entry === "hosted" ? 20 : 30 };
   const result = setup.prepareTrialFixture({ repo: f.repo, current_default: f.staged, identity, entry, directory });
   expect(result.authority).toBe("none");
+  expect(result).toMatchObject({ publisher_entry: entry, identity });
+  expect(JSON.parse(readFileSync(join(result.root, "preparation.json"), "utf8"))).toMatchObject({ publisher_entry: entry, identity });
   expect(result.fixture.tree).toBe(f.definition.fixture.tree);
   expect(readGit(result.source, "status", "--porcelain").length).toBe(0);
   expect(captureRepositoryState(f.repo)).toEqual(before);
@@ -180,6 +182,7 @@ test.each(["trial-bindings", "prepare-trial-fixture"] as const)("normal %s CLI f
   if (command === "trial-bindings") {
     expect(report.trial.publisher_entry).toBe("copilot");
     expect(report.trial.identity).toMatchObject({ actor: "fixture-owner", actor_id: 30 });
-  } else expect(report.preparation.authority).toBe("none");
+  } else expect(report.preparation).toMatchObject({ authority: "none", publisher_entry: "copilot",
+    identity: { actor: "fixture-owner", actor_id: 30 } });
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 60000);

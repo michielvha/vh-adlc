@@ -74,7 +74,9 @@ export function publicationFixture(roots: string[], options: { owned_resources?:
       const parent = effect.kind === "comment-create" ? resources.get("pulls/" + effect.payload.number) : null;
       const explanation = effect.kind === "pr-close" ? [...resources.entries()].filter(([key, value]) => key.startsWith("comments/")
         && value.parent_number === effect.payload.number).map(([, value]) => value) : [];
-      return { resource, inventory, parent, explanation, requests_sha256: sha256(canonicalJSON({ surface, inventory, parent: parent ?? null, explanation })) };
+      return { resource, inventory, parent, explanation, // Match the native reader's request-scope digest. Response facts have their own projections.
+        requests_sha256: sha256(canonicalJSON({ surface, number: application.number, resource_id: application.resource_id,
+          parent_number: effect.payload.number ?? null })) };
     },
     async observe(plan, effect, objects) {
       observed.push(effect.id);

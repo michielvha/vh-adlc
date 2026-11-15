@@ -80,7 +80,9 @@ Their original entry, role receipt and invocation remain independently bound.
 Select the intended entry with `--entry hosted`, `--entry copilot` or
 `--entry claude` when collecting `trial-bindings` and preparing a mapped
 `prepare-trial-fixture`. Interactive binding collection observes the selected
-account through the existing read credential. The scalar `trial-bindings`
+account through the existing read credential and requires the observed current
+default as `--source`. Scalar policy ignores entry selection. A non-hosted
+`--entry` still performs the native account/default read. The scalar `trial-bindings`
 call without an entry keeps its offline metadata-inspection behavior.
 
 The runtime resolves the authenticated viewer's numeric ID through GitHub's

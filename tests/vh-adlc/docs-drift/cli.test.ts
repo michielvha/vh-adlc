@@ -422,3 +422,10 @@ process.exit(child.exitCode);
     expect(captureRepositoryState(join(f.root, "retained-candidate"))).toEqual(candidateBefore);
   } else expect(captureRepositoryState(candidate)).toEqual(candidateBefore);
 }, 60000);
+
+for (const command of ["trial-bindings", "prepare-trial-fixture"]) test.each(["unknown", "COPILOT"])(`normal ${command} refuses an invalid publisher entry %s`, async entry => {
+  const { argumentsForCommand } = await import("../../../plugins/vh-adlc/scripts/docs-drift/cli");
+  const argv = [command, "--repo", "/fixture", "--source", "a".repeat(40), "--entry", entry];
+  if (command === "prepare-trial-fixture") argv.push("--artifact-root", "/artifacts");
+  expect(() => argumentsForCommand(argv)).toThrow("Unknown trial publisher entry");
+});

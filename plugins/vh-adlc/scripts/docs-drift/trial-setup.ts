@@ -57,6 +57,7 @@ export function prepareTrialFixture(options: {
     phase = "finalize";
     const result = freezeJSON({ schema_version: 1, kind: "docs-drift-trial-fixture", authority: "none", root, source,
       current_default: policy.source_commit, definition_sha256: policy.definition_sha256,
+      ...(policy.publisher_entry ? { publisher_entry: policy.publisher_entry, identity: policy.identity } : {}),
       candidate_protected_sha256: policy.candidate.protected_sha256,
       fixture: { id: policy.fixture.id, source_commit: policy.fixture.source_commit, tree, bundle_sha256: bundle.sha256 } });
     publishArtifact(join(root, "preparation.json"), canonicalJSON(result));

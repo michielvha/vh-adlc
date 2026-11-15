@@ -1074,3 +1074,51 @@ for (const mode of ["scalar", "mapped"] as const) test.each(["case", "account-id
   expect(canonicalJSON([...f.resources]).equals(before)).toBe(true);
   expect(f.executed).toEqual(calls);
 });
+
+for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-create", "issue-create", "comment-create"] as const) {
+  test.each(["before-approval", "during-approval", "account-id", "material-login"] as const)(`${mode} ${kind} acknowledgement validates native recasing without rewriting its evidence: %s`, async change => {
+    const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+    const { f, effect } = await collectorDeliveryFixture(kind, { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER",
+      ...(mode === "mapped" ? { entry: "copilot" as const } : {}) });
+    const interrupted = await publish(publicationOptions(f));
+    const application = readAppliedDelivery({ source_repo: f.repo, journal_directory: interrupted.journal.directory,
+      effect_id: effect.id, settings: f.settings, transport: "collector" });
+    const key = kind === "issue-create" ? "issues/" + application.number : kind === "comment-create" ? "comments/" + application.resource_id : "pulls/" + application.number;
+    const resource = f.resources.get(key)!;
+    resource.body = String(resource.body) + "\nOwner's later edit";
+    const identity = await f.transport.identity(), originalPlan = canonicalJSON(interrupted.journal.plan);
+    const originalSuccess = readFileSync(application.successes[0].path);
+    const recase = () => {
+      f.transport.identity = async () => ({ ...identity, actor: change === "material-login" ? "someone-else" : "FIXTURE-OWNER",
+        actor_id: change === "account-id" ? 31 : 30 });
+      (resource.user as { login: string }).login = "FIXTURE-OWNER";
+    };
+    if (change !== "during-approval") recase();
+    let approvals = 0;
+    const result = await acknowledgeDeliveries({ source_repo: f.repo, journal_directory: interrupted.journal.directory,
+      object_store: f.store, settings: f.settings, transport: f.transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [],
+      authorize: async scope => {
+        approvals++;
+        if (change === "during-approval") recase();
+        return { kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+          scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("owner accepts the exact original delivery") };
+      } });
+    const accepted = change === "before-approval" || change === "during-approval";
+    expect(result.state, result.reason ?? undefined).toBe(accepted ? "acknowledged" : "pending");
+    if (!accepted) expect(approvals).toBe(0);
+    expect(f.refs.has(f.settings.publication.lease_ref)).toBe(!accepted);
+    expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+    expect(f.executed.filter(id => id === "release")).toHaveLength(accepted ? 1 : 0);
+    expect(canonicalJSON(result.journal.plan)).toEqual(originalPlan);
+    expect(readFileSync(application.successes[0].path)).toEqual(originalSuccess);
+    expect(resource.body).toEndWith("Owner's later edit");
+    if (accepted) {
+      expect(approvals).toBeGreaterThan(0);
+      const event = result.journal.events.find(item => item.kind === "acknowledged-delivery" && item.effect_id === effect.id);
+      if (!event || !("lookup" in event.payload) || !event.payload.lookup) throw Error("missing retained acknowledgement lookup");
+      const observed = JSON.parse(readFileSync(event.payload.lookup.path, "utf8")).lookup;
+      expect(observed.current.user_login_sha256).toBe(sha256(Buffer.from("FIXTURE-OWNER")));
+      expect(observed.creator_projection.recorded_login_sha256).toBe(sha256(Buffer.from("Fixture-Owner")));
+    }
+  });
+}

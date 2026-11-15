@@ -1,3 +1,4 @@
+import { sameAccount, samePublicationIdentity } from "./identity";
 import { dirname, join } from "node:path";
 import { executeAttempt, hasInFlightAttempt, pendingAttempt } from "./attempts";
 import { readAppliedDelivery } from "./delivery-proof";
@@ -6,6 +7,7 @@ import { readGitSuccess } from "./git-success";
 import { appendAcknowledgement, appendIntent, appendOutcome, appendRetirement, publishArtifact, readArtifact, readJournal, writePublicationObjects, type Journal, type ReconciliationGrant } from "./journal";
 import { readLookup, lookupFactsDigest } from "./observations";
 import { readRejection } from "./rejections";
+import { exactRecord } from "./publication-decisions";
 import { canonicalJSON, sha256 } from "./protocol";
 import { captureRepositoryState, externalArtifactDirectory } from "./snapshot";
 import type { Settings } from "./settings";
@@ -18,7 +20,8 @@ export type AcknowledgementScope = {
   source_state_sha256: string; settings_sha256: string; settlement_sha256: string;
   lease_ref: string; lease_object: string; receipt_ref: string; receipt_object: string; release_effect_id: string;
   acknowledgements: { effect_id: string; payload_sha256: string; application_sha256: string; current_sha256: string;
-    lookup_sha256: string; resource_id: number; differences: string[]; current: DeliveryLookup["current"]; parent: DeliveryLookup["parent"] }[];
+    lookup_sha256: string; resource_id: number; differences: string[]; current: DeliveryLookup["current"]; parent: DeliveryLookup["parent"];
+    creator_projection?: DeliveryLookup["creator_projection"] }[];
   retirements: { effect_id: string; state: "absent" | "conflict"; lookup_sha256: string }[];
   accounts: { effect_id: string; disposition: string; resource_id?: string | null; object?: string | null }[];
 };
@@ -118,7 +121,7 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
     refresh(); settled(options, journal, objects);
     const identity = await options.transport.identity();
     if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
-      || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id) throw Error("acknowledgement-current-actor-changed");
+      || !sameAccount(identity, plan.manifest)) throw Error("acknowledgement-current-actor-changed");
     if (journal.events.some(event => event.kind === "acknowledged-delivery") && plan.manifest.effects.slice(0, -1).every(effect => terminal(journal, effect.id))) {
       const observed = await options.transport.observe(plan, release, objects);
       refresh();
@@ -133,7 +136,7 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
     const collect = async () => {
       refresh();
       const currentIdentity = await options.transport.identity();
-      if (!canonicalJSON(currentIdentity).equals(canonicalJSON(identity))) throw Error("acknowledgement-current-actor-changed");
+      if (!samePublicationIdentity(currentIdentity, identity)) throw Error("acknowledgement-current-actor-changed");
       const lease = await options.transport.ref(options.settings.publication.lease_ref);
       if (lease.state !== "present" || lease.object !== objects.lease_object) throw Error("acknowledgement-owned-lease-changed");
       const retained = await options.transport.ref(String(receipt.payload.ref));
@@ -146,7 +149,8 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
           const lookup = await lookupAppliedDelivery({ ...options, effect_id: effect.id });
           lookups.set(effect.id, lookup);
           acknowledgements.push({ effect_id: effect.id, payload_sha256: sha256(canonicalJSON(effect.payload)), application_sha256: lookup.application_sha256,
-            current_sha256: lookup.current_sha256, lookup_sha256: lookup.evidence.sha256, resource_id: lookup.resource_id, differences: lookup.differences, current: lookup.current, parent: lookup.parent });
+            current_sha256: lookup.current_sha256, lookup_sha256: lookup.evidence.sha256, resource_id: lookup.resource_id, differences: lookup.differences, current: lookup.current, parent: lookup.parent,
+            ...(lookup.creator_projection ? { creator_projection: lookup.creator_projection } : {}) });
           continue;
         }
         const completed = terminal(journal, effect.id);
@@ -183,7 +187,23 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
         settlement_sha256: sha256(canonicalJSON({ business: settled(options, journal, objects), release: releaseSettlement(options, journal, objects) })),
         lease_ref: String(acquire.payload.ref), lease_object: objects.lease_object!, receipt_ref: String(receipt.payload.ref), receipt_object: objects.receipt_object!,
         release_effect_id: release.id, acknowledgements, retirements, accounts };
-      return { scope, observations, lookups };
+      // Compare complete lookup records using only the already verified creator projection.
+      // The owner scope and every retained lookup keep their original observed bytes.
+      const comparison = structuredClone(scope);
+      for (const acknowledgement of comparison.acknowledgements) {
+        const lookup = lookups.get(acknowledgement.effect_id)!;
+        const retained = exactRecord(JSON.parse(readArtifact(lookup.evidence.path).toString()),
+          ["schema_version", "state", "transport", "repository", "operation_id", "plan_sha256", "effect_id", "effect_sha256", "lookup"],
+          "acknowledgement-lookup-evidence-changed");
+        const { creator_projection, current_sha256: _currentDigest, evidence: _evidence, ...projection } = lookup;
+        projection.current = { ...lookup.current, ...(creator_projection ? { user_login_sha256: creator_projection.recorded_login_sha256 } : {}) };
+        retained.lookup = projection;
+        delete acknowledgement.creator_projection;
+        acknowledgement.current = projection.current;
+        acknowledgement.current_sha256 = sha256(canonicalJSON(projection));
+        acknowledgement.lookup_sha256 = sha256(canonicalJSON(retained));
+      }
+      return { scope, comparison, observations, lookups };
     };
     const initial = await collect(), scopeHash = sha256(canonicalJSON(initial.scope));
     if (options.inspect_only) return { ...result("pending", "inspection-only"), inspection_scope: initial.scope };
@@ -205,7 +225,7 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
       refresh();
       await authorize(grant);
       const fresh = await collect();
-      if (!canonicalJSON(fresh.scope).equals(canonicalJSON(initial.scope))) throw Error("acknowledgement-approved-scope-changed");
+      if (!canonicalJSON(fresh.comparison).equals(canonicalJSON(initial.comparison))) throw Error("acknowledgement-approved-scope-changed");
       return fresh;
     };
     for (const effect of plan.manifest.effects.slice(0, -1)) {

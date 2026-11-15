@@ -7,7 +7,7 @@ import { projectSuccess, type Facts, type SuccessEvidence } from "./success";
 import { retainLookup } from "./observations";
 import { publicationMarker } from "./report-history";
 import { effectMarker, type Effect } from "./manifests";
-import type { PublicationTransport, PublicationIdentity } from "./transport";
+import type { PublicationTransport } from "./transport";
 import type { Settings } from "./settings";
 
 /** These responses stay in memory. Only the validated bounded projection is retained. */
@@ -20,7 +20,7 @@ export type DeliveryLookup = {
   transport: "native" | "collector"; context: "trial" | "production";
   current: Facts; parent: ReturnType<typeof projectBeforeSource> | null;
   creator_projection?: { observed_login_sha256: string; recorded_login_sha256: string };
-  differences: string[]; current_sha256: string; evidence: SuccessEvidence;
+  differences: string[]; requests_sha256: string; current_sha256: string; evidence: SuccessEvidence;
 };
 
 function record(value: unknown): Record<string, unknown> {
@@ -65,7 +65,10 @@ export async function lookupAppliedDelivery(options: {
   const current = facts(resources.resource), originalBytes = readArtifact(application.successes[0].path);
   if (sha256(originalBytes) !== application.successes[0].sha256) throw Error("delivery-application-changed");
   const applied = record(JSON.parse(originalBytes.toString())), original = applied.facts as Facts;
-  const creator = applied.identity as PublicationIdentity;
+  const creatorValue = record(applied.identity);
+  if (typeof creatorValue.actor !== "string" || typeof creatorValue.actor_id !== "number"
+    || !Number.isSafeInteger(creatorValue.actor_id) || creatorValue.actor_id < 1) throw Error("delivery-current-target-changed");
+  const creator = { actor: creatorValue.actor, actor_id: creatorValue.actor_id };
   const scope = { artifact_root: options.transport.artifact_root, source_repo: options.source_repo, plan, effect, attempt_id: application.attempt_id };
   const before = readBefore({ ...scope, evidence: application.before });
   if (current.id !== application.resource_id || current.number !== application.number
@@ -74,7 +77,7 @@ export async function lookupAppliedDelivery(options: {
   if (current.user_login_sha256 !== original.user_login_sha256) {
     const nativeCreator = record(record(resources.resource).user);
     // The verified applied response binds the original own creator's ID and exact spelling hash.
-    if (original.user_id !== creator.actor_id || original.user_login_sha256 !== sha256(Buffer.from(creator.actor))
+    if (!sameAccount(creator, plan.manifest) || original.user_id !== creator.actor_id || original.user_login_sha256 !== sha256(Buffer.from(creator.actor))
       || typeof nativeCreator.login !== "string" || !sameLogin(nativeCreator.login, creator.actor)) throw Error("delivery-current-target-changed");
     creator_projection = { observed_login_sha256: sha256(Buffer.from(nativeCreator.login)),
       recorded_login_sha256: sha256(Buffer.from(creator.actor)) };

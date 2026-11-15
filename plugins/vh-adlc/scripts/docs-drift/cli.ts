@@ -246,6 +246,8 @@ content decisions and publication have their own lifecycle gates.
 Complete collection exits 0. Incomplete input, setup or collection exits 2.
 Upgrade signals compare committed intake metadata. A mismatch exits 1.
 Trial bindings report candidate policy with execution authority none.
+A non-hosted --entry needs the native read credential and observed current default.
+Scalar policy ignores entry selection. Omit --entry for offline scalar inspection.
 Signal consistency reads committed blobs and requires no publication credential.
 Native reads require GH_TOKEN for github.com and *.ghe.com, or GH_ENTERPRISE_TOKEN
 for an enterprise server, to observe the authenticated account and repository.
