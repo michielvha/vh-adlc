@@ -60,8 +60,9 @@ jobs:
           tar -xf coreutils-9.7.tar.xz
           cd coreutils-9.7
           ./configure --disable-nls
-          make -j "$(nproc)" src/mv
-          printf '%s\n' "$PWD/src" >> "$GITHUB_PATH"
+          make -j "$(nproc)"
+          install -D src/mv "$RUNNER_TEMP/diagram-bin/mv"
+          printf '%s\n' "$RUNNER_TEMP/diagram-bin" >> "$GITHUB_PATH"
       - name: Check the vh-adlc package
         run: bun test tests/vh-adlc --timeout 60000
 
