@@ -214,10 +214,14 @@ function executionSettings(value: unknown, clients: Record<string, { provider: I
     const input = object(value, ["client", "model", "argv", "identity_source"], "execution role");
     const client = text(input.client, "execution role client");
     if (!Object.hasOwn(clients, client)) invalid("execution role client");
+    const provider = clients[client].provider;
+    const nativeSource = provider === "copilot"
+      ? { provider, event_type: "assistant.message", field_path: ["data", "model"] }
+      : provider === "claude" ? { provider, event_type: "assistant", field_path: ["message", "model"] } : null;
     return {
       client, model: text(input.model, "execution role model"), argv: installed
         ? strings(input.argv ?? [], "execution role argv") : argv(input.argv, "execution role argv"),
-      identity_source: parseIdentitySource(input.identity_source, clients[client].provider),
+      identity_source: parseIdentitySource(installed && input.identity_source === undefined ? nativeSource : input.identity_source, provider),
     };
   };
   const parsedEntries = Object.fromEntries(names.map(name => {

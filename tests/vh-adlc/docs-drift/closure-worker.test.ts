@@ -1,3 +1,4 @@
+import { runtimePolicyBinding } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 /** Original role-capture controls use synthetic model records and an owned native service. */
 import { randomUUID } from "node:crypto";
 import { executeOwnedProcess } from "../../../plugins/vh-adlc/scripts/docs-drift/owned-process";
@@ -92,7 +93,7 @@ test.each(["merge", "squash", "rebase"] as const)("original %s closure roles bin
   const manifest = reviewedTarget.manifest!, grants = manifest.effects.map(effect => ({ manifest_sha256: reviewedTarget.manifest_sha256!, effect_id: effect.id, effect_sha256: effectDigest([effect]) }));
   const validated = validateReviewedManifest({ manifest, current: manifest, worker: workerEvidence, reviewer: reviewerEvidence,
     policy: { worker: role, reviewer: role }, grants });
-  const plan = sealPlan({ reviewed: validated, grants, adoption_sha256: current.runtime!.adoption_sha256, context: "production", transport: "native",
+  const plan = sealPlan({ reviewed: validated, grants, ...runtimePolicyBinding(current.runtime!), context: "production", transport: "native",
     publication_kind: "resolve", corrections: [], attention: [] });
   expect(plan.manifest_sha256).toBe(reviewedTarget.manifest_sha256!);
   expect(captureRepositoryState(f.repo)).toEqual(before);
@@ -223,7 +224,7 @@ test("original closure roles survive freshly proven own explanation and closure 
   const reviewer = captureSyntheticRole(f.artifacts, f.source, "reviewer", target.reviewer_runtime_sha256!, reviewerEvidence);
   const manifest = target.manifest!, grants = manifest.effects.map(effect => ({ manifest_sha256: target.manifest_sha256!, effect_id: effect.id, effect_sha256: effectDigest([effect]) }));
   const validated = validateReviewedManifest({ manifest, current: manifest, worker: workerEvidence, reviewer: reviewerEvidence, policy: { worker: role, reviewer: role }, grants });
-  const plan = sealPlan({ reviewed: validated, grants, adoption_sha256: current.runtime!.adoption_sha256, context: "production", transport: "native", publication_kind: "resolve", corrections: [], attention: [] });
+  const plan = sealPlan({ reviewed: validated, grants, ...runtimePolicyBinding(current.runtime!), context: "production", transport: "native", publication_kind: "resolve", corrections: [], attention: [] });
   let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan });
   const selected = retainSyntheticArtifact(f.artifacts, "retry-original-target.json", canonicalJSON({ source_commit: f.source,
     identity: current.target!.identity, target: current.target!.target }));

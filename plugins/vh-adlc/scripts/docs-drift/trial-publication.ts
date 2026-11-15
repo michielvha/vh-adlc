@@ -110,7 +110,7 @@ export async function runTrialAcknowledgement(selected: TrialContext, selectionP
     return value;
   }
   const journal = readJournal(selection.journal_directory, context.source), plan = journal.plan;
-  if (plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
+  if (plan.schema_version !== 1 || plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
     || plan.manifest.bindings.source_commit !== context.source_commit
     || plan.manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256) throw Error("synthetic acknowledgement original context changed");
   if (ownerRequestPath) preflight?.(journal);
@@ -146,7 +146,7 @@ export async function runTrialReconciliation(selected: TrialContext, selectionPa
   if (lookups === null || typeof lookups !== "object" || Array.isArray(lookups) || Object.keys(lookups).some(id => !ids.includes(id)))
     throw Error("synthetic reconciliation selected lookups required");
   const journal = readJournal(selection.journal_directory, context.source), plan = journal.plan;
-  if (plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
+  if (plan.schema_version !== 1 || plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
     || plan.manifest.bindings.source_commit !== context.source_commit
     || plan.manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256)
     throw Error("synthetic reconciliation original context changed");

@@ -1,5 +1,5 @@
 import { recordedProcessCompleted } from "./owned-process";
-import { PUBLISHER_ENTRIES, type PublisherEntry } from "./identity";
+import type { PublisherEntry } from "./identity";
 import { canonicalJSON, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { parseIdentitySource, type IdentitySource } from "./settings";
 import type { OwnedProcess } from "./owned-process";
@@ -193,7 +193,7 @@ export function parseActionManifest(value: unknown): ActionManifest {
   const mapped = value !== null && typeof value === "object" && Object.hasOwn(value, "publisher_entry");
   const input = object(value, ["schema_version", "operation_id", "repository", "repository_id", "actor", "actor_id", "bindings", "effects", "worker",
     ...(mapped ? ["publisher_entry"] : [])], "fields");
-  if (mapped && !PUBLISHER_ENTRIES.includes(input.publisher_entry as PublisherEntry)) invalid("publisher entry");
+  if (mapped && (typeof input.publisher_entry !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.-]*$/u.test(input.publisher_entry))) invalid("publisher entry");
   if (input.schema_version !== 1) invalid("schema version");
   if (typeof input.operation_id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(input.operation_id)) invalid("operation ID");
   if (typeof input.repository !== "string" || !/^[a-z0-9-]+\/[a-z0-9_.-]+$/u.test(input.repository) || input.repository.split("/").some(part => part === "." || part === "..")) invalid("repository");

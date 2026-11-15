@@ -80,6 +80,7 @@ async function publicationRequest(kind: "advisory" | "resolve" = "advisory", max
 test("a synthetic request revalidates original role artifacts before every common publisher step", async () => {
   const { f, context, path } = await publicationRequest();
   const options = readTrialPublication(context, path);
+  if (options.plan.schema_version !== 1) throw Error("Original legacy plan required");
   expect(options.plan.adoption_sha256).toBe(context.context_sha256);
   expect(options.transport.kind).toBe("collector");
   const result = await publish(options);

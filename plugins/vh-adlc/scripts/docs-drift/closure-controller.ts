@@ -1,5 +1,5 @@
 import { sameAccount } from "./identity";
-import { selectRecoveryRuntime } from "./bootstrap";
+import { runtimePolicyBinding, selectRecoveryRuntime } from "./bootstrap";
 import { collectNativeClosure } from "./resolution-entry";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -75,9 +75,9 @@ async function currentState(options: Options, inventory?: ClosureInventory, expe
   }
   const review: PublicationGate["review"] = { manifest, current: manifest, worker: worker.evidence, reviewer: reviewer.evidence,
     policy: { worker: workerPolicy, reviewer: reviewerPolicy }, grants: authority.grants };
-  const policy: PlanPolicy = { adoption_sha256: runtime.adoption_sha256, context: "production", transport: "native", publication_kind: "resolve",
+  const policy: PlanPolicy = { ...runtimePolicyBinding(runtime), context: "production", transport: "native", publication_kind: "resolve",
     pr_draft: settings.publication.pr_state.resolve === "draft",
-    ...(settings.publication.entry_actors ? { publisher_entry: options.entry } : {}), worker: workerPolicy, reviewer: reviewerPolicy };
+    ...(settings.schema_version === 2 || settings.publication.entry_actors ? { publisher_entry: options.entry } : {}), worker: workerPolicy, reviewer: reviewerPolicy };
   const plan = sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy, corrections: [], attention: [] });
   if (expected && !canonicalJSON(plan).equals(canonicalJSON(expected))) throw new PublicationScopeChanged("Original closure reviewed plan changed");
   return { plan, policy, review, runtime, settings, store: facts.store, original_target: { source_commit: options.source, identity: facts.identity, target: facts.target } };
@@ -150,11 +150,14 @@ export async function resumeClosure(input: Options & { journal_directory: string
   const options = structuredClone(input);
   if (dirname(realpathSync(options.journal_directory)) !== realpathSync(options.artifact_root)) throw Error("Original closure journal artifact root required");
   const journal = readJournal(options.journal_directory, options.repo), invocation = readInvocation(options, journal.plan);
+  if (journal.plan.schema_version !== 1) throw Error("Version-two original-context recovery integration is required");
+  const entry = options.entry;
+  if (entry !== "hosted" && entry !== "copilot" && entry !== "claude") throw Error("Original legacy execution entry required");
   const { settings } = loadCommittedSettings(options.repo, journal.plan.manifest.bindings.source_commit);
   const manifest = journal.plan.manifest;
   const runtime = await selectRecoveryRuntime({ repo: options.repo, source_commit: manifest.bindings.source_commit,
     identity: { repository: manifest.repository, repository_id: manifest.repository_id, actor: manifest.actor, actor_id: manifest.actor_id, default_branch: settings.default_branch },
-    cache_directory: options.cache_directory, entry: options.entry, adoption_sha256: journal.plan.adoption_sha256 });
+    cache_directory: options.cache_directory, entry, adoption_sha256: journal.plan.adoption_sha256 });
   requireExecutingRuntime(runtime);
   try {
     const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });

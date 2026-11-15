@@ -1,11 +1,12 @@
 import { isGitAncestor, readAdoptionInput, readGit, verifiedHelperEnvironment } from "./git";
-import { publisherActor, sameLogin } from "./identity";
+import { publisherActor, sameAccount, sameLogin } from "./identity";
 import { fullModel, modelMatches, ref } from "./manifests";
 import { canonicalDigest, canonicalJSON, freezeJSON, protocolPath } from "./protocol";
 import { exactRecord } from "./publication-decisions";
 import { loadCommittedSettings, parseComponentBinding, type InstalledSettings } from "./settings";
 import { readYAML } from "../settings-file";
 import { OUTPUT_LIMIT } from "./owned-process";
+import type { PublicationIdentity } from "./transport";
 import { nativeCredentialReferences } from "./role-launch";
 
 export const CORE_PREFLIGHT_CHECKS = ["published_install", "installed_routing", "scanner_parity", "native_trials", "paired_review", "rollback_rehearsal"] as const;
@@ -28,7 +29,7 @@ type Activation = { path: string; before: FileImage; after: FileImage };
 type Target = { repository: string; candidate_commit: string; component: Component; configuration_sha256: string; activation: Activation[] };
 type Evidence = { component: Component; consumer_commit: string; evidence_sha256: string };
 type Check = Evidence & { name: CheckName; status: "passed"; target_sha256: string; note: string };
-type NativeEntry = Evidence & { entry_sha256: string; worker_model: string; reviewer_model: string; publisher: { actor: string; actor_id: number } };
+type NativeEntry = Evidence & { repository_id: number; entry_sha256: string; worker_model: string; reviewer_model: string; publisher: { actor: string; actor_id: number } };
 
 function fail(reason: string): never { throw Error("docs-drift preflight " + reason); }
 function text(value: unknown): string {
@@ -128,10 +129,11 @@ export function parsePreflightChecklist(value: unknown) {
   if (entries === null || typeof entries !== "object" || Array.isArray(entries)) fail("native entry observations required");
   const native_entries = Object.fromEntries(Object.entries(entries).map(([name, value]) => {
     if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*$/u.test(name)) fail("native entry name required");
-    const entry = object(value, ["entry_sha256", "worker_model", "reviewer_model", "publisher", "component", "consumer_commit", "evidence_sha256"]);
+    const entry = object(value, ["repository_id", "entry_sha256", "worker_model", "reviewer_model", "publisher", "component", "consumer_commit", "evidence_sha256"]);
     const publisher = object(entry.publisher, ["actor", "actor_id"]);
     if (typeof publisher.actor_id !== "number" || !Number.isSafeInteger(publisher.actor_id) || publisher.actor_id < 1) fail("native publisher numeric identity required");
-    const parsed: NativeEntry = { ...evidence(entry), entry_sha256: hash(entry.entry_sha256), worker_model: fullModel(entry.worker_model), reviewer_model: fullModel(entry.reviewer_model),
+    if (typeof entry.repository_id !== "number" || !Number.isSafeInteger(entry.repository_id) || entry.repository_id < 1) fail("native repository numeric identity required");
+    const parsed: NativeEntry = { ...evidence(entry), repository_id: entry.repository_id, entry_sha256: hash(entry.entry_sha256), worker_model: fullModel(entry.worker_model), reviewer_model: fullModel(entry.reviewer_model),
       publisher: { actor: text(publisher.actor), actor_id: publisher.actor_id } };
     return [name, parsed];
   }));
@@ -147,7 +149,9 @@ export function parsePreflightChecklist(value: unknown) {
 }
 
 /** Validate the committed C-to-D activation and current policy. Current effect grants remain separate. */
-export function verifyProductionPreflight(options: { repo: string; current_default: string; component: Component }) {
+export function verifyProductionPreflight(options: { repo: string; current_default: string; component: Component;
+  publisher?: { entry: string; identity: PublicationIdentity };
+}) {
   const current = loadCommittedSettings(options.repo, options.current_default).settings;
   if (current.schema_version !== 2 || current.publication.mode !== "adopted" || !current.publication.checklist_path || !current.component)
     fail("new production work requires adopted ordinary settings and a complete checklist");
@@ -191,6 +195,11 @@ export function verifyProductionPreflight(options: { repo: string; current_defau
     if (observed.entry_sha256 !== nativeEntryDigest(current, entry) || !sameLogin(observed.publisher.actor, publisherActor(current, entry))
       || !modelMatches(selected.worker.model, observed.worker_model) || !modelMatches(selected.reviewer.model, observed.reviewer_model)
       || !selected.worker.identity_source || !selected.reviewer.identity_source) fail("native entry configuration or observed model changed");
+  }
+  if (options.publisher) {
+    const { entry, identity } = options.publisher, observed = checklist.native_entries[entry];
+    if (!observed || identity.repository.toLowerCase() !== current.repository || identity.repository_id !== observed.repository_id
+      || identity.default_branch !== current.default_branch || !sameAccount(identity, observed.publisher)) fail("native repository or publisher identity changed");
   }
   return freezeJSON({ authority: "none" as const, policy_sha256: canonicalDigest(checklist), checklist, activation_commit: activation });
 }

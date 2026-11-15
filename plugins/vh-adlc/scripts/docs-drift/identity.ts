@@ -2,7 +2,8 @@ import type { Settings } from "./settings";
 import type { PublicationIdentity } from "./transport";
 
 export const PUBLISHER_ENTRIES = ["hosted", "copilot", "claude"] as const;
-export type PublisherEntry = typeof PUBLISHER_ENTRIES[number];
+export type LegacyPublisherEntry = typeof PUBLISHER_ENTRIES[number];
+export type PublisherEntry = string;
 export type PublisherAccount = Pick<PublicationIdentity, "actor" | "actor_id">;
 export type EntryIdentities = Record<PublisherEntry, PublisherAccount>;
 

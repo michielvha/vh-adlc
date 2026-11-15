@@ -92,12 +92,10 @@ execution:
         client: copilot
         model: example-model-1
         argv: []
-        identity_source: null
       reviewer:
         client: copilot
         model: example-model-1
         argv: []
-        identity_source: null
       publisher:
         argv:
         - bun
@@ -108,12 +106,10 @@ execution:
         client: copilot
         model: example-model-1
         argv: []
-        identity_source: null
       reviewer:
         client: copilot
         model: example-model-1
         argv: []
-        identity_source: null
       publisher:
         argv:
         - bun

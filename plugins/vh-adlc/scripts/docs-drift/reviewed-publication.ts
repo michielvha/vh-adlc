@@ -32,6 +32,7 @@ export function createAdoptedPublicationVerifier(input: {
     try {
       function readPlan() { try { return readRetainedPlan(bytes); } catch { fail("invalid retained plan"); } }
       const original = readPlan(), manifest = original.manifest, bindings = manifest.bindings;
+      if (original.schema_version !== 1) fail("version-two flat publication evidence reader required");
       if (original.context !== "production" || original.transport !== "native") fail("requires production native evidence");
       if (!allowed.has(original.adoption_sha256)) fail("adoption is outside the approved compatible lineage");
       if (proposal.state !== "open" || proposal.merged_at !== null || !sameAccount(proposal, manifest)

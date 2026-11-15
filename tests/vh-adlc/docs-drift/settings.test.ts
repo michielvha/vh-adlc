@@ -205,3 +205,17 @@ test("ordinary settings reject obsolete setup and incomplete review-bound policy
     { ...input, clients: { copilot: { ...input.clients.copilot, executable: "/different/copilot" } } },
   ]) expect(settingsProjections(parseSettings(changed)).protected).not.toEqual(baseline);
 });
+
+test.each(["copilot", "claude"] as const)("ordinary %s roles derive their standard native identity source", provider => {
+  const input = installedSettingsFixture();
+  Reflect.set(input.clients.copilot, "provider", provider);
+  for (const entry of Object.values(input.execution.entries)) for (const selected of [entry.worker, entry.reviewer])
+    Reflect.deleteProperty(selected, "identity_source");
+  const selected = parseSettings(input).execution.entries.interactive.worker;
+  expect(selected.identity_source).toEqual(provider === "copilot"
+    ? { provider, event_type: "assistant.message", field_path: ["data", "model"] }
+    : { provider, event_type: "assistant", field_path: ["message", "model"] });
+  const legacy = settingsFixture();
+  Reflect.deleteProperty(legacy.execution.entries.copilot.worker, "identity_source");
+  expect(parseSettings(legacy).execution.entries.copilot.worker.identity_source).toBeNull();
+});

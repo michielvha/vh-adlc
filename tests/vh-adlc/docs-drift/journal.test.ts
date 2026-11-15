@@ -357,3 +357,21 @@ test("candidate proof binds delivery while retained legacy plans preserve their 
   const { candidate_verification_sha256: _proof, ...missing } = plan;
   expect(() => readVerifiedPlan(canonicalJSON(missing), policy)).toThrow("delivery");
 });
+
+test.each(["production-native", "trial-native", "trial-collector"] as const)("version-two plans separate grants and context policy for %s", context => {
+  const input = fixture(), reviewed = validateReviewedManifest(input);
+  const component = { plugin_version: "0.25.0", source_commit: "d".repeat(40), component_sha256: hash("installed component") };
+  const policy = { schema_version: 2 as const, policy_sha256: hash(context), component,
+    context: context === "production-native" ? "production" as const : "trial" as const,
+    transport: context === "trial-collector" ? "collector" as const : "native" as const,
+    publication_kind: "advisory" as const, pr_draft: true, worker: role, reviewer: role };
+  const plan = sealPlan({ reviewed, grants: input.grants, ...policy, corrections: [], attention: [] });
+  expect(plan.schema_version).toBe(2);
+  expect(plan).toMatchObject({ approval_sha256: sha256(canonicalJSON(input.grants)), policy_sha256: policy.policy_sha256, component });
+  expect(Object.hasOwn(plan, "grants_sha256")).toBe(false);
+  expect(Object.hasOwn(plan, "adoption_sha256")).toBe(false);
+  expect(readVerifiedPlan(canonicalJSON(plan), () => policy)).toEqual(plan);
+  expect(() => readVerifiedPlan(canonicalJSON(plan), () => ({ ...policy, policy_sha256: hash("different context policy") }))).toThrow("policy");
+  expect(() => readVerifiedPlan(canonicalJSON(plan), () => ({ ...policy, component: { ...component, component_sha256: hash("different component") } }))).toThrow("policy");
+  expect(() => readVerifiedPlan(canonicalJSON(plan), () => ({ ...policy, transport: policy.transport === "native" ? "collector" : "native" }))).toThrow("policy");
+});

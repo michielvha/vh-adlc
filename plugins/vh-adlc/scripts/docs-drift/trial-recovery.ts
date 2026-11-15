@@ -17,7 +17,7 @@ export async function collectTrialRetained(selected: TrialContext, input: { oper
     // are opaque comparison evidence for the common recovery engine, never authority or replay proof.
     if (originalObject === null || id === originalObject) {
       const plan = readRetainedPlan(Buffer.from(native.bytes));
-      if (plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
+      if (plan.schema_version !== 1 || plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
         || plan.manifest.bindings.source_commit !== context.source_commit || plan.manifest.bindings.settings_sha256 !== settingsHash
         || plan.manifest.operation_id !== input.operation_id) throw Error("synthetic retained original context changed");
     }

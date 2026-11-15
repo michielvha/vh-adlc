@@ -1,6 +1,6 @@
 import { publisherActor, sameLogin, sameAccount } from "./identity";
 import { executeAttempt, hasEffectAttempt } from "./attempts";
-import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRecoveryOnly, createJournal, readJournal, readVerifiedPlan, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+import { policyBinding, appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRecoveryOnly, createJournal, readJournal, readVerifiedPlan, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { effectMarker, manifestDigest, parseActionManifest, validateReviewedManifest, type Effect } from "./manifests";
 import { canonicalJSON } from "./protocol";
 import { publicationMarker } from "./report-history";
@@ -23,7 +23,7 @@ export class PublicationScopeChanged extends Error {}
 export function validatePublicationShape(plan: Pick<SealedPlan, "manifest" | "context" | "publication_kind">, settings: Settings, draft: boolean): void {
   const { manifest } = plan;
   if (plan.context === "production" ? draft !== (settings.publication.pr_state[plan.publication_kind] === "draft") : draft !== true) fail("declared production or trial draft policy");
-  if (!settings.publication.entry_actors && manifest.publisher_entry !== undefined) fail("publisher entry outside mapped policy");
+  if (settings.schema_version === 1 && !settings.publication.entry_actors && manifest.publisher_entry !== undefined) fail("publisher entry outside mapped policy");
   if (manifest.repository !== settings.repository || !sameLogin(manifest.actor, publisherActor(settings, manifest.publisher_entry))) fail("selected repository or actor");
   if (plan.context === "production" && settings.publication.mode !== "adopted") fail("consumer adoption is not active");
   if (canonicalJSON(plan).length > settings.reports.max_entry_bytes) fail("retained plan size bound");
@@ -72,7 +72,7 @@ export async function verifyPublicationGate(options: PublishOptions, journal: Jo
   const plan = readVerifiedPlan(canonicalJSON(options.plan), () => gate.policy);
   if (manifestDigest(parseActionManifest(gate.review.current)) !== plan.manifest_sha256) throw new PublicationScopeChanged("current-manifest-changed");
   const checked = validateReviewedManifest(gate.review);
-  const current = sealPlan({ reviewed: checked, grants: gate.review.grants, adoption_sha256: gate.policy.adoption_sha256,
+  const current = sealPlan({ reviewed: checked, grants: gate.review.grants, ...policyBinding(gate.policy),
     context: gate.policy.context, transport: gate.policy.transport, publication_kind: gate.policy.publication_kind, corrections: plan.corrections, attention: plan.attention, candidate_verification_sha256: plan.candidate_verification_sha256 });
   if (!canonicalJSON(current).equals(canonicalJSON(plan))) fail("changed current review or authority");
   const committed = loadCommittedSettings(options.source_repo, plan.manifest.bindings.source_commit);

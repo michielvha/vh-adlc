@@ -1,3 +1,4 @@
+import { runtimePolicyBinding } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { executeOwnedProcess } from "../../../plugins/vh-adlc/scripts/docs-drift/owned-process";
 import { bindingFixture } from "./binding-fixture";
 import { afterAll, expect, spyOn, test } from "bun:test";
@@ -594,7 +595,7 @@ test("normal binding rechecks preserve the reviewed input after its exact own PR
     { id: "push", kind: "push", payload: { ref: "refs/heads/" + payload.branch, head: f.head } },
     { id: "pr", kind: "pr-create", payload }, { id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } },
   ], "own-replay");
-  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, adoption_sha256: runtime.adoption_sha256,
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...runtimePolicyBinding(runtime),
     context: "production", transport: "native", publication_kind: "advisory", corrections: bound.corrections, attention: bound.attention,
     candidate_verification_sha256: bound.candidate_verification_sha256! });
   let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan });

@@ -339,7 +339,7 @@ type AdoptionResult = ReturnType<typeof readAdoptionFrame>["result"] & {
 function currentPublisher(recorded: AdoptionResult, options: AdoptionOptions) {
   if (!options.identity) fail("current native adoption identity");
   const entry = options.entry;
-  if (recorded.entry_identities && (entry === undefined || !PUBLISHER_ENTRIES.includes(entry))) fail("publisher entry required");
+  if (recorded.entry_identities && (entry === undefined || !PUBLISHER_ENTRIES.some(known => known === entry))) fail("publisher entry required");
   const identity = recorded.entry_identities && entry
     ? { ...recorded.identity, ...recorded.entry_identities[entry] } : recorded.identity;
   if (!samePublicationIdentity(identity, nativeIdentity(options.identity))) fail("current native adoption identity");

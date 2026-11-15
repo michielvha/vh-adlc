@@ -688,6 +688,7 @@ test.each(["adoption", "model", "unavailable"] as const)("retained inspection su
   expect(completed.reason).toBe("inferred-publication-lease");
   expect(f.executed).toEqual(before);
   expect(f.refs.get(f.settings.publication.lease_ref)).toBe(interrupted.objects.lease_object);
+  if (interrupted.journal.plan.schema_version !== 1) throw Error("Original legacy plan required");
   expect(interrupted.journal.plan.adoption_sha256).toBe(f.plan.adoption_sha256);
 });
 

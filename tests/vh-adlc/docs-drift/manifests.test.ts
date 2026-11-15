@@ -235,3 +235,15 @@ test.each(["clean", "findings", "same-context", "changed-current", "wrong-target
     expect(() => verifyReviewEvidence(withoutPermission)).toThrow(reasons[scenario as keyof typeof reasons]);
   }
 });
+
+test("configured profile names bind manifests independently of the invoking harness", () => {
+  const input = fixture(bindings, undefined, "profile-operation", { actor: "fixture-owner", actor_id: 30, publisher_entry: "interactive" });
+  expect(validateReviewedManifest(input).manifest.publisher_entry).toBe("interactive");
+  const changed = structuredClone(input);
+  changed.current.publisher_entry = "different-profile";
+  expect(() => validateReviewedManifest(changed)).toThrow();
+  for (const name of ["", "../profile", "profile/name", "profile name"]) {
+    expect(() => validateReviewedManifest(fixture(bindings, undefined, "profile-operation",
+      { actor: "fixture-owner", actor_id: 30, publisher_entry: name }))).toThrow("publisher entry");
+  }
+});

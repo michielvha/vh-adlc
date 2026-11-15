@@ -31,8 +31,8 @@ test("the complete example settings pass the production strict reader and stay s
   expect(settings.clients.copilot).toEqual({ provider: "copilot", executable: "copilot" });
   expect(settings.execution.secret_mappings).toEqual({});
   for (const entry of Object.values(settings.execution.entries)) {
-    expect(entry.worker.identity_source).toBeNull();
-    expect(entry.reviewer.identity_source).toBeNull();
+    expect(entry.worker.identity_source).toEqual({ provider: "copilot", event_type: "assistant.message", field_path: ["data", "model"] });
+    expect(entry.reviewer.identity_source).toEqual(entry.worker.identity_source);
   }
   for (const path of [settings.project_procedure, settings.scanner.script,
     settings.execution.worker_workflow, settings.execution.scheduled_workflow, settings.execution.claude_command]) {

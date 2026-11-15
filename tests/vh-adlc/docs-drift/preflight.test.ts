@@ -1,5 +1,8 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { computeComponentIdentity, selectProductionRuntime } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
+import { readAdoptedRolePolicy, roleRuntimeDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
 import { dirname, join } from "node:path";
 import { publicationFixture } from "./publication-fixture";
 import { installedSettingsFixture } from "./settings-fixture";
@@ -16,8 +19,12 @@ function commit(repo: string, message: string) {
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", message);
   return readGit(repo, "rev-parse", "HEAD").toString().trim();
 }
-function fixture(fault = "none") {
+function fixture(fault = "none", runtime?: { component: ReturnType<typeof computeComponentIdentity>; executable: string }) {
   const f = publicationFixture(roots), baseSettings = installedSettingsFixture(), configured = { ...baseSettings, reports: { ...baseSettings.reports, workflow_id: 100 } }, path = configured.publication.checklist_path;
+  if (runtime) {
+    configured.component = { plugin_version: runtime.component.plugin_version, source_commit: runtime.component.source_commit, component_sha256: runtime.component.component_sha256 };
+    configured.clients.copilot.executable = runtime.executable;
+  }
   for (const entry of Object.values(configured.execution.entries)) for (const role of [entry.worker, entry.reviewer]) {
     role.model = "claude-opus-5.5";
     Object.assign(role, { identity_source: { provider: "copilot", event_type: "assistant.message", field_path: ["data", "model"] } });
@@ -37,7 +44,7 @@ function fixture(fault = "none") {
       target_sha256: preflightReviewTarget(base), note: "Synthetic applicability check. Original native observations retain their own targets." })),
     native_entries: Object.fromEntries(Object.entries(settings.execution.entries).map(([entry]) => [entry, {
       entry_sha256: nativeEntryDigest(settings, entry), worker_model: "claude-opus-5.5", reviewer_model: "claude-opus-5.5",
-      publisher: { actor: entry === "hosted" ? "fixture-bot" : "fixture-owner", actor_id: entry === "hosted" ? 20 : 30 },
+      repository_id: 10, publisher: { actor: entry === "hosted" ? "fixture-bot" : "fixture-owner", actor_id: entry === "hosted" ? 20 : 30 },
       component, consumer_commit: candidate, evidence_sha256: proof,
     }])), pending_operations: [] };
   if (fault === "missing-check") checklist.checks.pop();
@@ -125,4 +132,49 @@ test("a flat unrelated-component successor retains original native attribution a
   expect(result.checklist.pending_operations[0].component).toEqual(f.component);
   expect(result.checklist.checks.find(check => check.name === "native_trials")?.target_sha256).toBe(f.checklist.review.target_sha256);
   expect(result.authority).toBe("none");
+});
+
+
+test.each(["matching", "recased", "wrong-id", "wrong-login", "wrong-repository-id", "wrong-repository", "wrong-default"] as const)("flat runtime policy binds the native publisher %s", scenario => {
+  const f = fixture(), identity = { repository: "fixture/docs", repository_id: 10, default_branch: "main", actor: "fixture-owner", actor_id: 30 };
+  if (scenario === "recased") identity.actor = "Fixture-Owner";
+  if (scenario === "wrong-id") identity.actor_id = 31;
+  if (scenario === "wrong-login") identity.actor = "different-owner";
+  if (scenario === "wrong-repository-id") identity.repository_id = 11;
+  if (scenario === "wrong-repository") identity.repository = "fixture/different";
+  if (scenario === "wrong-default") identity.default_branch = "different";
+  const check = () => verifyProductionPreflight({ repo: f.repo, current_default: f.head(), component: f.component,
+    publisher: { entry: "interactive", identity } });
+  if (scenario === "matching" || scenario === "recased") expect(check().policy_sha256).toHaveLength(64);
+  else expect(check).toThrow("native");
+});
+
+
+test.each(["matching", "staged", "wrong-publisher", "changed-payload"] as const)("ordinary production runtime selects flat native policy %s", async scenario => {
+  const root = mkdtempSync(join(tmpdir(), "vh-flat-native-")); roots.push(root);
+  const directory = join(root, "plugins/vh-adlc"), executable = join(root, "client"), calls = join(root, "calls");
+  mkdirSync(join(directory, ".claude-plugin"), { recursive: true });
+  writeFileSync(join(directory, ".claude-plugin/plugin.json"), JSON.stringify({ name: "vh-adlc", version: "0.25.0" }));
+  readGit(root, "init", "--template=", "-b", "main");
+  const identity = computeComponentIdentity(root, commit(root, "Synthetic installed component"));
+  const flags = "--plugin-dir --model --session-id --output-format --available-tools --no-custom-instructions --disable-builtin-mcps";
+  writeFileSync(executable, "#!/bin/sh\nprintf '%s\\n' \"$*\" >> 'CALLS'\nif [ \"$1\" = '--no-auto-update' ]; then shift; fi\nif [ \"$1\" = '--version' ]; then echo 'GitHub Copilot CLI 1.0.112.'; else echo 'FLAGS'; fi\n".replace("CALLS", calls).replace("FLAGS", flags), { mode: 0o755 });
+  const f = fixture("none", { component: identity, executable });
+  const publisher = { repository: "fixture/docs", repository_id: 10, default_branch: "main", actor: "fixture-owner", actor_id: scenario === "wrong-publisher" ? 31 : 30 };
+  if (scenario === "changed-payload") writeFileSync(join(directory, "extra.txt"), "Unreleased extra payload\n");
+  const select = () => selectProductionRuntime({ repo: f.repo, current_default: scenario === "staged" ? f.candidate : f.head(), directory, entry: "interactive", identity: publisher });
+  if (scenario !== "matching") {
+    await expect(select()).rejects.toThrow();
+    expect(() => readFileSync(calls)).toThrow();
+    return;
+  }
+  const selected = await select();
+  expect(selected.authentication).toBe("native");
+  expect(selected.policy_sha256).toBe(verifyProductionPreflight({ repo: f.repo, current_default: f.head(), component: f.component }).policy_sha256);
+  expect(readAdoptedRolePolicy({ repo: f.repo, current_default: f.head(), identity: publisher, runtime: selected, role: "reviewer" }).adopted_model).toBe("claude-opus-5.5");
+  const digest = roleRuntimeDigest(selected, "worker"), observations = readFileSync(calls, "utf8");
+  expect(observations).toContain("--version"); expect(observations).toContain("--help");
+  expect(observations).not.toContain("--prompt");
+  expect(roleRuntimeDigest({ ...selected, worker: { ...selected.worker, version: "1.0.113" } }, "worker")).toBe(digest);
+  expect(readFileSync(calls, "utf8")).toBe(observations);
 });

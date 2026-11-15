@@ -1,4 +1,4 @@
-import type { EntryIdentities, PublisherEntry } from "../../../plugins/vh-adlc/scripts/docs-drift/identity";
+import type { EntryIdentities, LegacyPublisherEntry } from "../../../plugins/vh-adlc/scripts/docs-drift/identity";
 /** Toy retained runtimes for helper and normal CLI controls. No model or hosted execution. */
 import { cpSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -11,7 +11,7 @@ import { publicationFixture } from "./publication-fixture";
 import { commit, pin, runtimeIdentity, write } from "./adoption-fixture";
 import { settingsFixture } from "./settings-fixture";
 
-export async function runtimeFixture(roots: string[], upgrade = false, bounded = false, role?: { model: string; identity_source: IdentitySource | null; native_model?: string; argv?: string[]; client_program?: string; provider?: "copilot" | "claude" }, fullComponent = false, legacyIDs?: number[], publisher?: { entry: PublisherEntry; identities: EntryIdentities }) {
+export async function runtimeFixture(roots: string[], upgrade = false, bounded = false, role?: { model: string; identity_source: IdentitySource | null; native_model?: string; argv?: string[]; client_program?: string; provider?: "copilot" | "claude" }, fullComponent = false, legacyIDs?: number[], publisher?: { entry: LegacyPublisherEntry; identities: EntryIdentities }) {
   const shared = publicationFixture(roots), prefix = "plugins/vh-adlc/";
   if (fullComponent) cpSync(join(import.meta.dir, "../../../plugins/vh-adlc"), join(shared.repo, prefix), { recursive: true });
   if (fullComponent) write(shared.repo, prefix + "plugin.json", '{"name":"vh-adlc","version":"0.13.0"}\n');

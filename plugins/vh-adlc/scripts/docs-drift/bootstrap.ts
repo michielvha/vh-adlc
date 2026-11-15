@@ -1,3 +1,5 @@
+import { verifyProductionPreflight } from "./preflight";
+import type { PolicyBinding } from "./journal";
 import { randomUUID } from "node:crypto";
 import { clientArchivePath, inspectClientArchive } from "./client-archive";
 import { executeOwnedProcess, ownedClientCompleted, recordedProcessCompleted, type OwnedProcess } from "./owned-process";
@@ -329,6 +331,42 @@ export async function selectInstalledRuntime(input: {
 }
 
 export type InstalledRuntime = NonNullable<Awaited<ReturnType<typeof selectInstalledRuntime>>["runtime"]>;
+
+/** Select ordinary native roles only after the committed flat policy matches the observed account. */
+export async function selectProductionRuntime(input: {
+  repo: string; current_default: string; directory: string; entry: string; identity: PublicationIdentity; path?: string;
+}) {
+  const options = structuredClone(input), settings = loadCommittedSettings(options.repo, options.current_default).settings;
+  if (settings.schema_version !== 2 || !settings.component) fail("ordinary settings and released component required");
+  inspectInstalledPayload({ directory: options.directory, expected: settings.component });
+  const preflight = verifyProductionPreflight({ ...options, component: settings.component,
+    publisher: { entry: options.entry, identity: options.identity } });
+  const selected = await selectInstalledRuntime({ ...options, source_commit: options.current_default });
+  if (!selected.complete || !selected.runtime) fail(selected.diagnostics.join(". "));
+  const entry = preflight.checklist.native_entries[options.entry];
+  return freezeJSON({ ...selected.runtime, current_default: options.current_default, policy_sha256: preflight.policy_sha256,
+    observed_models: { worker: entry.worker_model, reviewer: entry.reviewer_model } });
+}
+
+/** Keep historical entry callers separate while selecting the ordinary production contract. */
+export async function selectOperationRuntime(input: Omit<Parameters<typeof selectApprovedRuntime>[0], "entry"> & { entry: string }) {
+  const options = { ...input }, repo = options.policy_repo ?? options.repo;
+  if (loadCommittedSettings(repo, options.current_default).settings.schema_version === 2)
+    return selectProductionRuntime({ repo, current_default: options.current_default, entry: options.entry,
+      identity: options.identity, directory: resolve(import.meta.dir, "../..") });
+  const entry = options.entry;
+  if (entry !== "hosted" && entry !== "copilot" && entry !== "claude") fail("legacy execution entry required");
+  return selectApprovedRuntime({ ...options, entry });
+}
+
+export function runtimePolicyBinding(runtime: Awaited<ReturnType<typeof selectOperationRuntime>>): PolicyBinding {
+  if (runtime.kind === "docs-drift-installed-runtime") {
+    const { plugin_version, source_commit, component_sha256 } = runtime.component;
+    return { schema_version: 2, policy_sha256: runtime.policy_sha256, component: { plugin_version, source_commit, component_sha256 } };
+  }
+  return { adoption_sha256: runtime.adoption_sha256 };
+}
+
 
 /** Read the checksum-bound cache entry selected by the protected client binding. */
 export async function inspectRetainedClient(input: { cache_directory: string; consumer_repo: string; client_id: string; client: ClientBinding; profile_scope: ClientProfileScope }) {

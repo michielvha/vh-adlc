@@ -47,6 +47,7 @@ async function collectContext(input: RecoveryOptions, execution?: Purpose) {
   const root = artifactDirectoryScope(options.artifact_root, repo).directory;
   if (dirname(realpathSync(options.journal_directory)) !== root) throw Error("Original recovery journal artifact root required");
   const journal = readJournal(options.journal_directory, repo), plan = journal.plan;
+  if (plan.schema_version !== 1) throw Error("Version-two original-context recovery integration is required");
   if (plan.manifest.bindings.source_commit !== options.source || plan.transport !== "native") throw Error("Original native recovery source required");
   const selection = readSelection(options.selection, options.source, plan.manifest.operation_id);
   if (execution && execution !== selection.purpose) throw Error("Recovery command purpose differs from its selected operation");

@@ -198,3 +198,30 @@ test("an inventoried PR cannot authorize a non-namespace branch rewrite", () => 
   const settings = { ...f.settings, legacy_proposals: { ...f.settings.legacy_proposals, ids: [17] } };
   expect(() => validatePublicationShape({ ...f.plan, manifest: { ...f.plan.manifest, effects } }, settings, true)).toThrow("candidate branch scope");
 });
+
+test("version-two publication retains its new bindings through every exact gate", async () => {
+  const f = setup(), input = fixture(f.plan.manifest.bindings, f.plan.manifest.effects);
+  const policy = { schema_version: 2 as const, policy_sha256: hash("synthetic manifest"),
+    component: { plugin_version: "0.25.0", source_commit: "d".repeat(40), component_sha256: hash("installed component") },
+    context: "trial" as const, transport: "collector" as const, publication_kind: "advisory" as const,
+    pr_draft: true, ...input.policy };
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policy, corrections: [], attention: [] });
+  const selected = { ...options(f), plan, gate: async () => ({ review: input, policy }) };
+  const result = await publish(selected);
+  expect(result.state).toBe("complete");
+  expect(result.journal.plan).toEqual(plan);
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr", "release"]);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+});
+
+test("ordinary scalar publisher policy still retains its configured execution profile", async () => {
+  const { installedSettingsFixture } = await import("./settings-fixture");
+  const { parseSettings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/settings");
+  const input = installedSettingsFixture();
+  Reflect.deleteProperty(input.publication, "entry_actors");
+  const settings = parseSettings(input), f = setup();
+  const plan = { ...f.plan, manifest: { ...f.plan.manifest, publisher_entry: "interactive" } };
+  expect(() => validatePublicationShape(plan, settings, true)).not.toThrow();
+  expect(() => validatePublicationShape({ ...plan, manifest: { ...plan.manifest, publisher_entry: "unknown-profile" } }, settings, true)).toThrow();
+  expect(() => validatePublicationShape({ ...plan, manifest: { ...plan.manifest, publisher_entry: undefined } }, settings, true)).toThrow();
+});

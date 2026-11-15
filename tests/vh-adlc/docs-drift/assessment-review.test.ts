@@ -1,3 +1,4 @@
+import { runtimePolicyBinding } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -103,7 +104,7 @@ test("a finding assessment preserves the native inventory capability across opti
     // An empty, genuinely sealed synthetic journal needs no remote observation or effect.
     const input = fixture({ ...bindings, source_commit: f.source, candidate_commit: f.source,
       proposals_sha256: current.inputs.proposals_sha256 }, [], "assessment-inventory");
-    const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: [], adoption_sha256: current.facts.runtime.adoption_sha256,
+    const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: [], ...runtimePolicyBinding(current.facts.runtime),
       context: "production", transport: "native", publication_kind: "advisory", corrections: [], attention: [] });
     const journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan });
     let observations = 0;

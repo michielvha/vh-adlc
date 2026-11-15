@@ -58,8 +58,8 @@ compute the compared identity. An operator establishes trust in the release
 before this example runs. A credentialed worker adaptation verifies identity
 with already trusted tooling before executing the selected component.
 
-For native role setup, replace each role's `identity_source: null` with the
-selected client's observed native identity event and field path. Each native
+The helper recognizes standard Claude Code and Copilot CLI model events. Native
+execution verifies the actual full model and original session. Each native
 client is installed and authenticated through its own ordinary installation
 procedure. Configure a Claude command when selecting Claude for a role. Native
 role identities need verification before independent review can finish.

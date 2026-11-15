@@ -73,7 +73,7 @@ export async function collectReviewTarget(input: Options): Promise<ReviewTarget>
     effects.push({ id: "publication", kind: action.kind, payload }, { id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } });
     const { repository, repository_id, actor, actor_id } = facts.identity;
     const manifest = parseActionManifest({ schema_version: 1, operation_id: proposal.operation_id, repository, repository_id, actor, actor_id,
-      ...(settings.publication.entry_actors ? { publisher_entry: options.entry } : {}),
+      ...(settings.schema_version === 2 || settings.publication.entry_actors ? { publisher_entry: options.entry } : {}),
       bindings: bound.bindings, effects, worker: { invocation_id: original.binding.invocation_id, context_id: original.binding.context_id,
         native_sha256: original.binding.native_sha256, returned_sha256: original.binding.returned_sha256 } });
     validatePublicationShape({ manifest, context: "production", publication_kind: bound.mode }, settings,

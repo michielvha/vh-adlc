@@ -7,22 +7,38 @@ import { authorizeEffects, effectDigest, manifestDigest, modelMatches, parseActi
 import type { ActionManifest, EffectGrant, ReviewedManifest, RolePolicy } from "./manifests";
 import { canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "./protocol";
 import { deliveryDigest, correctionProjection, type AttentionProjection, type CorrectionInput } from "./report";
-import { parseIdentitySource } from "./settings";
+import { parseComponentBinding, parseIdentitySource } from "./settings";
+import type { InstalledComponentBinding } from "./bootstrap";
 import { externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
 import { requireOwnedStore } from "./proposals";
 import { writeMetadataObject } from "./git";
 
 type RoleBinding = Omit<ReviewedManifest["worker"], "records">;
-export type SealedPlan = {
-  schema_version: 1; manifest: ActionManifest; manifest_sha256: string; approval_sha256: string;
-  adoption_sha256: string; context: "production" | "trial"; transport: "native" | "collector";
+type LegacyPolicyBinding = { adoption_sha256: string };
+type CurrentPolicyBinding = { schema_version: 2; policy_sha256: string; component: InstalledComponentBinding };
+export type PolicyBinding = LegacyPolicyBinding | CurrentPolicyBinding;
+type PlanContents = {
+  manifest: ActionManifest; manifest_sha256: string; approval_sha256: string; context: "production" | "trial"; transport: "native" | "collector";
   publication_kind: "advisory" | "resolve"; review_verdict: "clean"; roles: { worker: RoleBinding; reviewer: RoleBinding };
   corrections: CorrectionInput[]; attention: AttentionProjection[]; candidate_verification_sha256?: string;
 };
-export type PlanPolicy = {
-  adoption_sha256: string; context: SealedPlan["context"]; transport: SealedPlan["transport"]; publication_kind: SealedPlan["publication_kind"]; pr_draft: boolean;
+export type LegacySealedPlan = PlanContents & LegacyPolicyBinding & { schema_version: 1 };
+export type CurrentSealedPlan = PlanContents & CurrentPolicyBinding;
+export type SealedPlan = LegacySealedPlan | CurrentSealedPlan;
+export type PlanPolicy = PolicyBinding & {
+  context: SealedPlan["context"]; transport: SealedPlan["transport"]; publication_kind: SealedPlan["publication_kind"]; pr_draft: boolean;
   worker: RolePolicy; reviewer: RolePolicy; publisher_entry?: PublisherEntry;
 };
+
+/** Preserve each format's own policy semantics without rewriting original retained bytes. */
+export function policyBinding(value: PolicyBinding): PolicyBinding {
+  return "policy_sha256" in value
+    ? { schema_version: 2, policy_sha256: value.policy_sha256, component: structuredClone(value.component) }
+    : { adoption_sha256: value.adoption_sha256 };
+}
+export function policyDigest(value: PolicyBinding): string {
+  return "policy_sha256" in value ? value.policy_sha256 : value.adoption_sha256;
+}
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null; lookup?: { path: string; sha256: string } };
 export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string }; never_dispatched?: true; unapplied?: true };
 export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256"> & { kind?: "owner-delivery-acknowledgement" };
@@ -79,12 +95,16 @@ function roleBinding(value: unknown): RoleBinding {
 }
 function parsePlan(value: unknown): SealedPlan {
   const hasProof = value !== null && typeof value === "object" && Object.hasOwn(value, "candidate_verification_sha256");
-  const input = exact(value, ["schema_version", "manifest", "manifest_sha256", "approval_sha256", "adoption_sha256", "context", "transport", "publication_kind", "review_verdict", "roles", "corrections", "attention", ...(hasProof ? ["candidate_verification_sha256"] : [])]);
+  const version = value !== null && typeof value === "object" ? Reflect.get(value, "schema_version") : undefined;
+  const input = exact(value, ["schema_version", "manifest", "manifest_sha256", ...(version === 2 ? ["approval_sha256", "policy_sha256", "component"] : ["approval_sha256", "adoption_sha256"]),
+    "context", "transport", "publication_kind", "review_verdict", "roles", "corrections", "attention", ...(hasProof ? ["candidate_verification_sha256"] : [])]);
   const proof = hasProof ? hash(input.candidate_verification_sha256) : undefined;
-  if (input.schema_version !== 1 || input.review_verdict !== "clean" || !["production", "trial"].includes(String(input.context))
+  if ((input.schema_version !== 1 && input.schema_version !== 2) || input.review_verdict !== "clean" || !["production", "trial"].includes(String(input.context))
     || !["native", "collector"].includes(String(input.transport)) || (input.context === "production" && input.transport !== "native")) fail("plan context or verdict");
   if (input.publication_kind !== "advisory" && input.publication_kind !== "resolve") fail("publication kind");
-  hash(input.approval_sha256); hash(input.adoption_sha256);
+  if (input.schema_version === 2) {
+    hash(input.approval_sha256); hash(input.policy_sha256); parseComponentBinding(input.component);
+  } else { hash(input.approval_sha256); hash(input.adoption_sha256); }
   const manifest = parseActionManifest(input.manifest);
   if (manifestDigest(manifest) !== hash(input.manifest_sha256)) fail("plan manifest digest");
   const roles = exact(input.roles, ["worker", "reviewer"]);
@@ -116,19 +136,25 @@ function parsePlan(value: unknown): SealedPlan {
 }
 
 /** Native records stay external. Only their exact reviewed digests and provenance enter the plan. */
-export function sealPlan(options: {
-  reviewed: ReviewedManifest; grants: EffectGrant[]; adoption_sha256: string;
+type SealOptions = {
+  reviewed: ReviewedManifest; grants: EffectGrant[];
   context: SealedPlan["context"]; transport: SealedPlan["transport"]; publication_kind: SealedPlan["publication_kind"];
   corrections: CorrectionInput[]; attention: AttentionProjection[]; candidate_verification_sha256?: string;
-}): SealedPlan {
+};
+export function sealPlan(options: SealOptions & LegacyPolicyBinding): LegacySealedPlan;
+export function sealPlan(options: SealOptions & CurrentPolicyBinding): CurrentSealedPlan;
+export function sealPlan(options: SealOptions & PolicyBinding): SealedPlan;
+export function sealPlan(options: SealOptions & PolicyBinding): SealedPlan {
   requireReviewedManifest(options.reviewed);
   const { manifest, manifest_sha256, worker, reviewer } = options.reviewed;
   authorizeEffects(manifest, options.grants);
   const { records: workerRecords, ...workerBinding } = worker;
   const { records: reviewerRecords, ...reviewerBinding } = reviewer;
   return parsePlan({
-    schema_version: 1, manifest, manifest_sha256, approval_sha256: sha256(canonicalJSON(options.grants)),
-    adoption_sha256: options.adoption_sha256, context: options.context, transport: options.transport,
+    ...("policy_sha256" in options
+      ? { schema_version: 2, approval_sha256: sha256(canonicalJSON(options.grants)), policy_sha256: options.policy_sha256, component: options.component }
+      : { schema_version: 1, approval_sha256: sha256(canonicalJSON(options.grants)), adoption_sha256: options.adoption_sha256 }),
+    manifest, manifest_sha256, context: options.context, transport: options.transport,
     publication_kind: options.publication_kind, review_verdict: "clean", roles: { worker: workerBinding, reviewer: reviewerBinding },
     corrections: options.corrections, attention: options.attention,
     ...(options.candidate_verification_sha256 === undefined ? {} : { candidate_verification_sha256: options.candidate_verification_sha256 }),
@@ -144,7 +170,7 @@ export function readRetainedPlan(bytes: Uint8Array): SealedPlan {
 export function readVerifiedPlan(bytes: Uint8Array, verifyPolicy: (plan: SealedPlan) => PlanPolicy | null): SealedPlan {
   const plan = readRetainedPlan(bytes);
   const policy = verifyPolicy(structuredClone(plan));
-  if (policy === null || policy.adoption_sha256 !== plan.adoption_sha256 || policy.context !== plan.context || policy.transport !== plan.transport || policy.publication_kind !== plan.publication_kind) fail("current policy unavailable or changed");
+  if (policy === null || !canonicalJSON(policyBinding(policy)).equals(canonicalJSON(policyBinding(plan))) || policy.context !== plan.context || policy.transport !== plan.transport || policy.publication_kind !== plan.publication_kind) fail("current policy unavailable or changed");
   if (policy.publisher_entry !== plan.manifest.publisher_entry) fail("current publisher entry changed");
   if (typeof policy.pr_draft !== "boolean") fail("missing draft policy");
   for (const effect of plan.manifest.effects) {

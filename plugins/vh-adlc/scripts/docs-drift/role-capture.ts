@@ -1,5 +1,6 @@
+import { verifyProductionPreflight } from "./preflight";
 import { readRecordedRoleModel, verifyRuntimeAdoption } from "./adoption";
-import type { selectApprovedRuntime, InstalledRuntime } from "./bootstrap";
+import type { selectOperationRuntime, InstalledRuntime } from "./bootstrap";
 import type { PublicationIdentity } from "./transport";
 import { isAbsolute, join } from "node:path";
 import { ArtifactChanged, readBoundArtifact, readNativeRoleArtifacts } from "./evidence-input";
@@ -82,7 +83,7 @@ export function readNativeRoleCapture(options: {
 }
 
 
-type Runtime = Awaited<ReturnType<typeof selectApprovedRuntime>>;
+type Runtime = Awaited<ReturnType<typeof selectOperationRuntime>>;
 
 /** Ordinary disjoint default advances preserve this retained execution contract. */
 export function roleRuntimeDigest(runtime: Runtime | InstalledRuntime, role: Role): string {
@@ -90,7 +91,8 @@ export function roleRuntimeDigest(runtime: Runtime | InstalledRuntime, role: Rol
     const selected = runtime[role], { directory: _directory, ...component } = runtime.component;
     return canonicalDigest({ kind: runtime.kind, settings_sha256: runtime.settings_sha256, component, entry: runtime.entry,
       role, selected: { client: selected.client, client_id: selected.client_id, model: selected.model, argv: selected.argv,
-        identity_source: selected.identity_source }, credential_references: runtime.loader.credential_references });
+        identity_source: selected.identity_source }, credential_references: runtime.loader.credential_references,
+      ...("policy_sha256" in runtime ? { policy_sha256: runtime.policy_sha256, observed_models: runtime.observed_models } : {}) });
   }
   return canonicalDigest({ adoption_sha256: runtime.adoption_sha256, component: runtime.component, entry: runtime.entry,
     role, selected: runtime[role], loader: runtime.loader });
@@ -98,10 +100,22 @@ export function roleRuntimeDigest(runtime: Runtime | InstalledRuntime, role: Rol
 
 /** Read the adopted full model from its validated historical receipt, independently of the requested selector. */
 export function readAdoptedRolePolicy(options: { repo: string; current_default: string; identity: PublicationIdentity; runtime: Runtime; role: Role }): RolePolicy {
-  const adopted = verifyRuntimeAdoption({ ...options, entry: options.runtime.entry });
-  if (adopted.adoption_sha256 !== options.runtime.adoption_sha256) fail("current adoption changed");
-  const name = options.runtime.entry === "hosted" ? "hosted_advisory" : options.runtime.entry === "copilot" ? "copilot_entry" : "claude_entry";
-  const native = fullModel(readRecordedRoleModel(adopted.receipts, name, options.role)), selected = options.runtime[options.role];
+  const runtime = options.runtime;
+  if (runtime.kind === "docs-drift-installed-runtime") {
+    const { plugin_version, source_commit, component_sha256 } = runtime.component;
+    const preflight = verifyProductionPreflight({ ...options, component: { plugin_version, source_commit, component_sha256 },
+      publisher: { entry: runtime.entry, identity: options.identity } });
+    if (preflight.policy_sha256 !== runtime.policy_sha256) fail("current flat policy changed");
+    const selected = runtime[options.role], observed = preflight.checklist.native_entries[runtime.entry];
+    const model = options.role === "worker" ? observed.worker_model : observed.reviewer_model;
+    if (!selected.identity_source || !modelMatches(selected.model, model) || runtime.observed_models[options.role] !== model)
+      fail("observed native role policy changed");
+    return { requested_model: selected.model, adopted_model: model, identity_source: selected.identity_source };
+  }
+  const adopted = verifyRuntimeAdoption({ ...options, entry: runtime.entry });
+  if (adopted.adoption_sha256 !== runtime.adoption_sha256) fail("current adoption changed");
+  const name = runtime.entry === "hosted" ? "hosted_advisory" : runtime.entry === "copilot" ? "copilot_entry" : "claude_entry";
+  const native = fullModel(readRecordedRoleModel(adopted.receipts, name, options.role)), selected = runtime[options.role];
   if (!selected.identity_source || !modelMatches(selected.model, native)) fail("adopted native role capability unavailable");
   return { requested_model: selected.model, adopted_model: native, identity_source: selected.identity_source };
 }

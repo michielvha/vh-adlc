@@ -1,3 +1,5 @@
+import { runtimePolicyBinding } from "./bootstrap";
+import { policyDigest } from "./journal";
 import { loadCommittedSettings } from "./settings";
 import { publicationEffectsOutput } from "./recovery-output";
 import { OUTPUT_LIMIT } from "./owned-process";
@@ -30,7 +32,7 @@ function confirmedFactsChanged(facts: PublicationFacts | null | undefined, plan:
   const identity = facts?.identity, manifest = plan?.manifest;
   return Boolean(facts?.scope_changed || identity && manifest && (identity.repository_id !== manifest.repository_id || identity.actor_id !== manifest.actor_id
     || identity.repository.toLowerCase() !== manifest.repository.toLowerCase() || identity.actor.toLowerCase() !== manifest.actor.toLowerCase())
-    || plan && facts?.runtime && facts.runtime.adoption_sha256 !== plan.adoption_sha256);
+    || plan && facts?.runtime && policyDigest(runtimePolicyBinding(facts.runtime)) !== policyDigest(plan));
 }
 
 function requireExecutingRuntime(runtime: Runtime): void {
@@ -95,9 +97,9 @@ async function currentState(options: Options, inventory?: PublicationInventory, 
   }
   const review: PublicationGate["review"] = { manifest: target.manifest, current: target.manifest, worker: worker.evidence, reviewer: reviewer.evidence,
     policy: { worker: workerPolicy, reviewer: reviewerPolicy }, grants: authority.grants };
-  const policy: PlanPolicy = { adoption_sha256: runtime.adoption_sha256, context: "production", transport: "native", publication_kind: bound.mode!,
+  const policy: PlanPolicy = { ...runtimePolicyBinding(runtime), context: "production", transport: "native", publication_kind: bound.mode!,
     pr_draft: settings.publication.pr_state[bound.mode!] === "draft",
-    ...(settings.publication.entry_actors ? { publisher_entry: options.entry } : {}), worker: workerPolicy, reviewer: reviewerPolicy };
+    ...(settings.schema_version === 2 || settings.publication.entry_actors ? { publisher_entry: options.entry } : {}), worker: workerPolicy, reviewer: reviewerPolicy };
   const plan = sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy, corrections: bound.corrections, attention: bound.attention,
     candidate_verification_sha256: bound.candidate_verification_sha256! });
   const store = bound.source_verification.object_store;

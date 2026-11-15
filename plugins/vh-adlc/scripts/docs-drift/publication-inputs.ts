@@ -2,7 +2,7 @@ import { ArtifactChanged } from "./evidence-input";
 import { publisherActor, sameLogin } from "./identity";
 import { PublicationScopeChanged } from "./publish";
 import { realpathSync } from "node:fs";
-import { selectApprovedRuntime } from "./bootstrap";
+import { selectOperationRuntime } from "./bootstrap";
 import { inspectCandidate } from "./preparation";
 import { fetchCurrentDefault } from "./proposals";
 import { canonicalDigest } from "./protocol";
@@ -14,7 +14,7 @@ type PublicationInputs = {
   schema_version: 1; kind: "docs-drift-publication-inputs"; authority: "none"; complete: boolean; scope_changed: boolean; diagnostics: string[];
   source_commit: string; current_default: string | null; identity: PublicationIdentity | null; store: OwnedObjectStore | null;
   candidate: ReturnType<typeof inspectCandidate> | null; freshness: ReturnType<typeof checkFreshness> | null;
-  runtime: Awaited<ReturnType<typeof selectApprovedRuntime>> | null;
+  runtime: Awaited<ReturnType<typeof selectOperationRuntime>> | null;
 };
 
 /** Collect current native policy, retained runtime and committed candidate facts. Effect grants follow separately. */
@@ -22,7 +22,7 @@ export async function collectPublicationInputs(input: {
   repo: string; source: string; candidate_repo: string; candidate: string; selection: unknown; resolution_record?: { path: string; sha256: string };
   artifact_root: string; owner: string; run: string; credential: string; path?: string; comparison_identity?: PublicationIdentity;
   protection_context?: Parameters<typeof inspectCandidate>[0]["protection_context"];
-  object_store?: OwnedObjectStore; cache_directory: string; entry: "hosted" | "copilot" | "claude"; launcher_path: string; settings_path: string;
+  object_store?: OwnedObjectStore; cache_directory: string; entry: string; launcher_path: string; settings_path: string;
 }): Promise<PublicationInputs> {
   const options = { ...input, object_store: input.object_store ? { ...input.object_store } : undefined, selection: structuredClone(input.selection), resolution_record: structuredClone(input.resolution_record), path: input.path ?? process.env.PATH };
   const result: PublicationInputs = { schema_version: 1, kind: "docs-drift-publication-inputs", authority: "none", complete: false, scope_changed: false, diagnostics: [],
@@ -59,7 +59,7 @@ export async function collectPublicationInputs(input: {
         throw new PublicationScopeChanged("Current publication consumer is not adopted");
       throw new PublicationScopeChanged("Assessed publication source needs fresh collection and review");
     }
-    result.runtime = await selectApprovedRuntime({ repo, policy_repo: store.root, current_default: context.default_commit, identity: context.identity,
+    result.runtime = await selectOperationRuntime({ repo, policy_repo: store.root, current_default: context.default_commit, identity: context.identity,
       cache_directory: options.cache_directory, entry: options.entry, launcher_path: options.launcher_path, settings_path: options.settings_path });
     const current = native();
     if (current.default_commit !== context.default_commit || canonicalDigest(current.identity) !== canonicalDigest(context.identity))

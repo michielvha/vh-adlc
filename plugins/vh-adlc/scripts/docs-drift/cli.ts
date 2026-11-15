@@ -399,7 +399,7 @@ export function argumentsForCommand(argv: string[]) {
   if (missing.length) throw Error(command + " requires " + missing.join(", "));
   const entry = values.get("--entry");
   if (["trial-bindings", "prepare-trial-fixture"].includes(command) && entry !== undefined
-    && !PUBLISHER_ENTRIES.includes(entry as PublisherEntry)) throw Error("Unknown trial publisher entry");
+    && !PUBLISHER_ENTRIES.some(known => known === entry)) throw Error("Unknown trial publisher entry");
   return { command, repo, source, artifacts, operation: values.get("--operation-id"), cache: values.get("--cache-root"), entry: values.get("--entry"),
     launcher: values.get("--launcher"), settings: values.get("--settings"), definition: values.get("--trial-definition"),
     selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256"), candidate_repo: values.get("--candidate-repo"), candidate: values.get("--candidate"), resolution_record: values.get("--resolution-record"), resolution_sha256: values.get("--resolution-sha256"), verification: values.get("--verification"), verification_sha256: values.get("--verification-sha256"),
