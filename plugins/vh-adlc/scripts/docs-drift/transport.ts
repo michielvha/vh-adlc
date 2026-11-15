@@ -1,3 +1,4 @@
+import { projectRecordedAccount, sameAccount, samePublicationIdentity, type PublisherAccount } from "./identity";
 import { nativePushArguments, retainGitSuccess, type GitUpdate } from "./git-success";
 import type { DeliveryReader } from "./delivery-lookup";
 import { nativeMutationArguments, projectSuccess, retainSuccess, type ExecutionResult } from "./success";
@@ -179,20 +180,36 @@ export async function withNativeObservation<T>(options: NativeContextOptions, ru
   const checks: Array<{ digest: string; read(reader: Reader): unknown }> = [];
   let active = true, retained = 0, changed: string | null = null;
   function invalidate(reason: string): never { changed = reason; throw new NativeObservationChanged(reason); }
-  function cached<Args extends (number | string)[], Value>(read: (reader: Reader, ...args: Args) => Value) {
-    const values = new Map<string, { digest: string; retained?: { value: Value } }>();
+  // Keep only original account fields when a response body exceeds the retained-byte budget.
+  function accountProjection<Value extends PublisherAccount>(original: Value) {
+    const account = { actor: original.actor, actor_id: original.actor_id };
+    return (current: Value): Value => projectRecordedAccount(current, account);
+  }
+  function commentProjection(original: ReturnType<Reader["comments"]>) {
+    const accounts = new Map(original.items.map(item => [item.id, accountProjection(item)] as const));
+    return (current: ReturnType<Reader["comments"]>) => ({ ...current,
+      items: current.items.map(item => accounts.get(item.id)?.(item) ?? item) });
+  }
+  function cached<Args extends (number | string)[], Value>(read: (reader: Reader, ...args: Args) => Value,
+    project?: (original: Value) => (current: Value) => Value) {
+    const values = new Map<string, { digest: string; project?: (current: Value) => Value; retained?: { value: Value } }>();
     return (...args: Args): Value => {
       if (!active) throw new NativeObservationUnavailable("Native observation has finished");
       const key = canonicalJSON(args).toString(), prior = values.get(key);
       if (prior?.retained) return structuredClone(prior.retained.value);
-      const value = read(initial.repository, ...args), bytes = canonicalJSON(value), digest = sha256(bytes);
+      const observed = read(initial.repository, ...args), value = prior?.project ? prior.project(observed) : observed;
+      const bytes = canonicalJSON(value), digest = sha256(bytes);
       if (prior) {
         if (prior.digest !== digest) invalidate("Native repository inputs changed during validation");
       } else {
         const saved = retained + bytes.length <= OUTPUT_LIMIT ? { value: freezeJSON(structuredClone(value)) } : undefined;
         if (saved) retained += bytes.length;
-        values.set(key, { digest, ...(saved ? { retained: saved } : {}) });
-        checks.push({ digest, read: reader => read(reader, ...args) });
+        const projection = project?.(value);
+        values.set(key, { digest, project: projection, ...(saved ? { retained: saved } : {}) });
+        checks.push({ digest, read: reader => {
+          const current = read(reader, ...args);
+          return projection ? projection(current) : current;
+        } });
       }
       return value;
     };
@@ -201,13 +218,13 @@ export async function withNativeObservation<T>(options: NativeContextOptions, ru
   const repository = Object.freeze({
     repository: cached(reader => reader.repository()),
     ref: cached((reader, ref: string) => reader.ref(ref)),
-    pull: cached((reader, number: number) => reader.pull(number)),
-    mergedPull: cached((reader, number: number) => reader.mergedPull(number)),
+    pull: cached((reader, number: number) => reader.pull(number), accountProjection),
+    mergedPull: cached((reader, number: number) => reader.mergedPull(number), accountProjection),
     comments: cached((reader, number: number) => {
       const page = reader.comments(number);
       if (!page.complete) throw Error("Incomplete native comments collection");
       return page;
-    }),
+    }, commentProjection),
     publicationPull: unavailable,
     pulls: unavailable,
     workflow: unavailable,
@@ -225,14 +242,14 @@ export async function withNativeObservation<T>(options: NativeContextOptions, ru
   function recheck() {
     if (changed !== null) throw new NativeObservationChanged(changed);
     const fresh = nativeContext(scope);
-    if (!same(fresh.identity, initial.identity) || fresh.default_commit !== initial.default_commit)
+    if (!samePublicationIdentity(fresh.identity, initial.identity) || fresh.default_commit !== initial.default_commit)
       invalidate("Native source or actor changed during validation");
     for (const check of checks) {
       if (sha256(canonicalJSON(check.read(fresh.repository))) !== check.digest)
         invalidate("Native repository inputs changed during validation");
     }
     const final = nativeContext(scope);
-    if (!same(final.identity, initial.identity) || final.default_commit !== initial.default_commit)
+    if (!samePublicationIdentity(final.identity, initial.identity) || final.default_commit !== initial.default_commit)
       invalidate("Native source or actor changed during final validation");
   }
   nativeObservations.set(observation, { scope, context: { ...initial, repository }, invalidate });
@@ -304,7 +321,7 @@ export function createPublicationReader(options: {
   }
   function ownedActor(input: unknown, plan: SealedPlan): boolean {
     const identity = actor(input);
-    return identity.actor === plan.manifest.actor && identity.actor_id === plan.manifest.actor_id;
+    return sameAccount(identity, plan.manifest);
   }
   function refreshTarget(input: Record<string, unknown>, plan: SealedPlan): boolean {
     const head = record(input.head), author = actor(input.user);

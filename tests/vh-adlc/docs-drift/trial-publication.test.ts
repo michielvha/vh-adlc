@@ -55,8 +55,8 @@ test("a report flag cannot authorize synthetic publication", () => {
   expect(git(f.origin, "for-each-ref", "--format=%(refname)")).toBe("refs/heads/main");
 });
 
-async function publicationRequest(kind: "advisory" | "resolve" = "advisory", max_entry_bytes?: number, temporary_parent?: string) {
-  const fixture = persistentTrialPublication(roots, { bound_roles: true, max_entry_bytes, temporary_parent }), { context } = fixture;
+async function publicationRequest(kind: "advisory" | "resolve" = "advisory", max_entry_bytes?: number, temporary_parent?: string, mapped_entry?: "copilot" | "claude") {
+  const fixture = persistentTrialPublication(roots, { bound_roles: true, max_entry_bytes, temporary_parent, mapped_entry }), { context } = fixture;
   const { review, policy: originalPolicy } = await fixture.options.gate();
   const policy = { ...originalPolicy, publication_kind: kind };
   const options = { ...fixture.options,
@@ -71,7 +71,7 @@ async function publicationRequest(kind: "advisory" | "resolve" = "advisory", max
     return { native: retain(name + ".jsonl", selected.native), returned: retain(name + ".txt", selected.returned), process };
   }
   const request = { schema_version: 1, kind: "docs-drift-synthetic-publication", context_sha256: context.context_sha256,
-    entry: "copilot", publication_kind: kind, plan: retain("plan.json", canonicalJSON(options.plan)), worker: role("worker"), reviewer: role("reviewer") };
+    entry: mapped_entry ?? "copilot", publication_kind: kind, plan: retain("plan.json", canonicalJSON(options.plan)), worker: role("worker"), reviewer: role("reviewer") };
   const path = join(context.artifacts, "request.json");
   writeFileSync(path, canonicalJSON(request), { mode: 0o600 });
   return { ...fixture, options, request, path };
@@ -579,4 +579,25 @@ test("installed publish capacity refusal preserves the cause and creates no jour
     expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
     expect(readTrialTracker(context).commit).toBe(tracker);
   } catch (error) { preserveFailedTrialRoots = true; throw error; }
+}, 120000);
+
+
+test.each(["copilot", "claude"] as const)("mapped %s collector publication and retained inspection preserve the original entry", async entry => {
+  const { collectTrialRetained } = await import("../../../plugins/vh-adlc/scripts/docs-drift/trial-recovery");
+  const f = await publicationRequest("advisory", undefined, undefined, entry);
+  const options = readTrialPublication(f.context, f.path);
+  expect(options.plan.manifest.publisher_entry).toBe(entry);
+  const published = await publish(options);
+  expect(published.state).toBe("complete");
+  const before = readTrialTracker(f.context);
+  const inspected = await collectTrialRetained(f.context, { operation_id: options.plan.manifest.operation_id, entry });
+  expect(inspected.policy_state).toBe("current");
+  expect(inspected.authority).toBe("none");
+  const other = entry === "copilot" ? "claude" : "copilot";
+  writeFileSync(f.path, canonicalJSON({ ...f.request, entry: other }));
+  expect(() => readTrialPublication(f.context, f.path)).toThrow();
+  const foreign = await collectTrialRetained(f.context, { operation_id: options.plan.manifest.operation_id, entry: other });
+  expect(foreign.policy_state).not.toBe("current");
+  expect(foreign.authority).toBe("none");
+  expect(readTrialTracker(f.context).commit).toBe(before.commit);
 }, 120000);

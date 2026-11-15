@@ -122,7 +122,7 @@ export function fullDefinitionUpgradeFixture(roots: string[], options: {
 } = {}) {
   const f = trialDefinitionFixture(roots, { approved: options.approved }), repo = f.repo, originalCandidate = f.bindings.source_commit;
   readGit(repo, "switch", "--detach", originalCandidate);
-  const original = portableRecord({ repo, configured: f.configured, candidate: originalCandidate, native_model: f.native_model });
+  const original = portableRecord({ repo, configured: f.configured, candidate: originalCandidate, native_model: f.native_model, entry_identities: f.entry_identities });
   write(repo, f.configured.publication.adoption_record, canonicalJSON(original));
   const originalDelivery = commit(repo, "synthetic full-definition predecessor"), predecessorHash = sha256(canonicalJSON(original));
   const candidateSettings = structuredClone(f.configured);
@@ -177,7 +177,7 @@ export function fullDefinitionUpgradeFixture(roots: string[], options: {
   write(repo, candidateSettings.execution.scheduled_workflow, canonicalJSON(futureCaller));
   write(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...candidateSettings, trial: f.trial }));
   const candidate = commit(repo, "synthetic tested successor selection");
-  const fresh = portableRecord({ repo, configured: candidateSettings, candidate, native_model: f.native_model });
+  const fresh = portableRecord({ repo, configured: candidateSettings, candidate, native_model: f.native_model, entry_identities: f.entry_identities });
   fresh.receipts.quiescence = structuredClone(original.receipts.quiescence!);
   const record = { ...fresh, predecessor: { schema_version: 1, evidence_kind: "observed", route: "trial", default_commit: policySource,
     record_path: f.configured.publication.adoption_record, record_sha256: predecessorHash, carry_receipts: ["quiescence"],

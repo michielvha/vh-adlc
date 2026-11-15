@@ -21,12 +21,16 @@ export function commit(repo: string, message: string) {
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", message);
   return readGit(repo, "rev-parse", "HEAD").toString().trim();
 }
-export function source(roots: string[], options: { pin?: ReturnType<typeof pin>; client?: ReturnType<typeof settingsFixture>["clients"]["copilot-linux"]; hostname?: string; bounded?: boolean; legacy_ids?: number[]; role?: { model: string; identity_source: IdentitySource | null; native_model?: string; argv?: string[] } } = {}) {
+export function source(roots: string[], options: { entry_identities?: EntryIdentities; pin?: ReturnType<typeof pin>; client?: ReturnType<typeof settingsFixture>["clients"]["copilot-linux"]; hostname?: string; bounded?: boolean; legacy_ids?: number[]; role?: { model: string; identity_source: IdentitySource | null; native_model?: string; argv?: string[] } } = {}) {
   const f = publicationFixture(roots), settings = { ...settingsFixture(),
     ...(options.bounded ? { verification_commands: [], generation_commands: [], read_set: { source_roots: ["src"], reference_roots: ["references"] } } : {}),
-    component_pin: ".vh-adlc/docs-drift-components/shared.yaml", publication: { ...settingsFixture().publication, mode: "adopted" },
+    component_pin: ".vh-adlc/docs-drift-components/shared.yaml", publication: { ...settingsFixture().publication, mode: "adopted",
+      ...(options.entry_identities ? { entry_actors: { hosted: options.entry_identities.hosted.actor,
+        copilot: options.entry_identities.copilot.actor, claude: options.entry_identities.claude.actor } } : {}) },
     reports: { ...settingsFixture().reports, workflow_id: 19 },
     legacy_proposals: { ...settingsFixture().legacy_proposals, ids: options.legacy_ids ?? [] } };
+  if (options.entry_identities)
+    settings.pr_discovery.authors = [...new Set([...settings.pr_discovery.authors, ...Object.values(options.entry_identities).map(account => account.actor)])];
   if (options.client) {
     settings.clients["copilot-linux"] = options.client;
     settings.runtime_loader.provider = options.client.provider;
@@ -46,14 +50,15 @@ export function source(roots: string[], options: { pin?: ReturnType<typeof pin>;
     settings.execution.claude_command, settings.runtime_loader.launcher]) write(f.repo, path, "Synthetic protected input " + path + "\n");
   write(f.repo, settings.scanner.script, "Synthetic ordinary detector implementation\n");
   write(f.repo, "docs/guide.md", "Synthetic ordinary document\n");
-  return { ...f, configured: settings, candidate: commit(f.repo, "synthetic adopted source candidate"), native_model: options.role?.native_model };
+  return { ...f, configured: settings, candidate: commit(f.repo, "synthetic adopted source candidate"), native_model: options.role?.native_model,
+    ...(options.entry_identities ? { entry_identities: structuredClone(options.entry_identities) } : {}) };
 }
 
 export const runtimeIdentity = { repository: "fixture/docs", repository_id: 10, actor: "fixture-bot", actor_id: 20, default_branch: "main" };
 
 // Observed-shaped owner-attestation parser fixtures only. They establish no native host execution.
-export type AdoptionSourceFixture = Pick<ReturnType<typeof source>, "repo" | "configured" | "candidate"> & { native_model?: string };
-export function portableRecord(f: AdoptionSourceFixture, identities?: EntryIdentities) {
+export type AdoptionSourceFixture = Pick<ReturnType<typeof source>, "repo" | "configured" | "candidate"> & { native_model?: string; entry_identities?: EntryIdentities };
+export function portableRecord(f: AdoptionSourceFixture, identities: EntryIdentities | undefined = f.entry_identities) {
   const bindings = collectAdoptionBindings(f.repo, f.candidate);
   const trialHistory = readTrialHistoryBindings({ repo: f.repo, source: f.candidate, settings: bindings.settings });
   const target = hash(canonicalJSON({ schema_version: identities ? 2 : 1, repository: f.configured.repository,

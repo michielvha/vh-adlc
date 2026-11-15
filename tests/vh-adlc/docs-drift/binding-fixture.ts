@@ -10,12 +10,13 @@ import { nativeReader, runtimeFixture } from "./runtime-fixture";
 import { commitAll, git, put } from "./repository-fixture";
 
 export async function bindingFixture(roots: string[], incompleteInventory: boolean, options: {
+  publisher?: Parameters<typeof runtimeFixture>[6];
   scannerCase?: "none" | "finding"; sourceGuide?: string; coordinated?: boolean; sourceInsideCandidate?: boolean; sourceCheckNeedsRepair?: boolean; mutableInventory?: boolean; fullComponent?: boolean; legacy_ids?: number[]; role?: Parameters<typeof runtimeFixture>[3];
   prepareSource?: (fixture: Awaited<ReturnType<typeof runtimeFixture>>) => string;
   beforeCandidate?: (input: { repo: string; source: string; artifacts: string; baseline: Awaited<ReturnType<typeof verifyCandidate>>; selection: unknown; decisions: Uint8Array; worker_options: WorkerCollectionOptions }) => void | Promise<void>;
 } = {}) {
   const { sourceInsideCandidate = false, sourceCheckNeedsRepair = false, beforeCandidate } = options;
-  const f = await runtimeFixture(roots, true, false, options.role, options.fullComponent ?? false, options.legacy_ids), repo = f.repo;
+  const f = await runtimeFixture(roots, true, false, options.role, options.fullComponent ?? false, options.legacy_ids, options.publisher), repo = f.repo;
   const scanner = readFileSync(join(import.meta.dir, "fixtures/scanner.js"), "utf8")
     .replace("__FIXTURE_CASE__", JSON.stringify(options.scannerCase ?? "none")).replace("__FIXTURE_ENDPOINT__", JSON.stringify("http://127.0.0.1:1"));
   put(repo, "scripts/scan.js", scanner); put(repo, "docs/suppressions.yaml", "suppressions: []\n");
@@ -67,7 +68,7 @@ export async function bindingFixture(roots: string[], incompleteInventory: boole
   const decisionBytes = canonicalJSON(decisions); writeFileSync(join(artifacts, "decisions.json"), decisionBytes, { mode: 0o600 });
   const inventoryFile = join(f.root, "binding-native-inventory.json");
   if (options.mutableInventory) writeFileSync(inventoryFile, "[]", { mode: 0o600 });
-  const native = nativeReader({ ...f, candidate: source, inventory_path: options.mutableInventory ? inventoryFile : undefined }, "fixture-bot", false, incompleteInventory), executable = Bun.which("git");
+  const native = nativeReader({ ...f, candidate: source, inventory_path: options.mutableInventory ? inventoryFile : undefined }, f.selection.identity.actor, false, incompleteInventory, f.selection.identity.actor_id), executable = Bun.which("git");
   if (!executable) throw Error("fixture requires Git");
   writeFileSync(join(f.root, "native-bin", "git"), `#!${process.execPath}
 const args = process.argv.slice(2), target = args.indexOf("https://github.com/fixture/docs.git");
@@ -78,7 +79,7 @@ const result = Bun.spawnSync([${JSON.stringify(executable)}, ...args], { stdout:
 `, { mode: 0o700 });
   const worker_options: WorkerCollectionOptions = { ...common, repo, source, source_verification: baseline.evidence!,
     decisions: { path: "decisions.json", sha256: sha256(decisionBytes) }, credential: "synthetic-read-token", path: native.environment.PATH,
-    cache_directory: f.selection.cache_directory, entry: "copilot", launcher_path: f.selection.launcher_path, settings_path: join(repo, ".vh-adlc/docs-drift.yaml") };
+    cache_directory: f.selection.cache_directory, entry: f.selection.entry, launcher_path: f.selection.launcher_path, settings_path: join(repo, ".vh-adlc/docs-drift.yaml") };
   await beforeCandidate?.({ repo, source, artifacts, baseline, selection, decisions: decisionBytes, worker_options });
   if (!sourceInsideCandidate) {
     git(f.root, "clone", "--no-local", "--no-checkout", repo, candidate); git(candidate, "checkout", "--detach", source);
@@ -95,5 +96,5 @@ const result = Bun.spawnSync([${JSON.stringify(executable)}, ...args], { stdout:
     options: { ...common, repo, source, candidate_repo: candidate, candidate: head, selection,
       source_verification: assessment?.evidence ?? baseline.evidence!, candidate_verification: verified.evidence!, decisions: { path: "decisions.json", sha256: sha256(decisionBytes) },
       credential: "synthetic-read-token", path: native.environment.PATH, cache_directory: f.selection.cache_directory,
-      entry: "copilot" as const, launcher_path: f.selection.launcher_path, settings_path: join(repo, ".vh-adlc/docs-drift.yaml") } };
+      entry: f.selection.entry, launcher_path: f.selection.launcher_path, settings_path: join(repo, ".vh-adlc/docs-drift.yaml") } };
 }

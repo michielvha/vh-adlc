@@ -14,6 +14,11 @@ export function sameAccount(left: PublisherAccount, right: PublisherAccount): bo
   return sameLogin(left.actor, right.actor) && left.actor_id === right.actor_id;
 }
 
+/** Restore a matched account's spelling for the caller's complete bound-value comparison. */
+export function projectRecordedAccount<Current extends PublisherAccount>(current: Current, recorded: PublisherAccount): Current {
+  return sameAccount(current, recorded) ? { ...current, actor: recorded.actor } : current;
+}
+
 export function samePublicationIdentity(left: PublicationIdentity, right: PublicationIdentity): boolean {
   return left.repository.toLowerCase() === right.repository.toLowerCase()
     && left.repository_id === right.repository_id && left.default_branch === right.default_branch

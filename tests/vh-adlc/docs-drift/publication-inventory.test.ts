@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { appendIntent, appendOutcome, createJournal, sealPlan, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -12,7 +12,7 @@ import { fixture as manifestFixture } from "./manifest-fixture";
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 
-test.each(["matching", "lost-outcome", "no-intent", "partial", "changed-body", "unrelated-pr", "changed-resolution", "forged-context"])("publication replay accounts only for freshly proven own inventory %s", async scenario => {
+test.each(["matching", "lost-outcome", "no-intent", "partial", "changed-body", "unrelated-pr", "changed-resolution", "forged-context", "case-only"])("publication replay accounts only for freshly proven own inventory %s", async scenario => {
   const { capturePublicationInventory, projectCurrentProposals } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-inventory");
   const f = publicationFixture(roots), bytes = canonicalJSON(projectProposalBindings([], null)), reference = { path: "original-proposals.json", sha256: sha256(bytes) };
   writeFileSync(join(f.artifacts, reference.path), bytes, { mode: 0o600 });
@@ -33,6 +33,7 @@ test.each(["matching", "lost-outcome", "no-intent", "partial", "changed-body", "
     actor: "fixture-bot", actor_id: 20, actor_type: "Bot", head_sha: plan.manifest.bindings.candidate_commit, head_ref: String(effect.payload.branch),
     head_repository: identity, base_sha: plan.manifest.bindings.source_commit, base_ref: "main", base_repository: identity };
   const current = [structuredClone(created)];
+  if (scenario === "case-only") current[0].actor = "FIXTURE-BOT";
   if (scenario === "changed-body") current[0].body += "Changed after the verified native lookup\n";
   if (scenario === "unrelated-pr") current.push({ ...created, number: 74, head_ref: "docs-drift/unrelated" });
   const transport = { ...f.transport, kind: "native" as const, observe: async () => scenario === "partial"
@@ -45,7 +46,7 @@ test.each(["matching", "lost-outcome", "no-intent", "partial", "changed-body", "
     const projected = projectCurrentProposals(current, scenario === "changed-resolution" ? "a".repeat(64) : null, selected);
     return { context, projected };
   };
-  if (["matching", "lost-outcome"].includes(scenario)) {
+  if (["matching", "lost-outcome", "case-only"].includes(scenario)) {
     const { context, projected } = await check();
     expect(projected).toEqual(projectProposalBindings([], null));
     expect(current).toHaveLength(1); expect(context.observations).toHaveLength(1);
@@ -103,4 +104,36 @@ test.each(["branch-only", "partial-metadata", "delivered", "delivered-alias", "m
   };
   if (["branch-only", "partial-metadata", "delivered", "delivered-alias"].includes(scenario)) expect(await check()).toEqual(projectProposalBindings([original], null));
   else await expect(check()).rejects.toThrow();
+});
+
+
+test.each(["case", "account-id", "row-id", "body"])("retained inventory projects only the matching original account row: %s", async change => {
+  const { capturePublicationInventory, projectCurrentProposals } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-inventory");
+  const f = publicationFixture(roots), repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
+  const original: PullRequestInput[] = [
+    { number: 11, actor: "Fixture-Bot", actor_id: 20 },
+    { number: 12, actor: "Fixture-Owner", actor_id: 30 },
+    { number: 13, actor: "Legacy-Bot", actor_id: 90 },
+  ].map(item => ({ ...item, state: "open", merged_at: null, body: "Original proposal", draft: true, actor_type: "Bot",
+    head_sha: f.input.manifest.bindings.candidate_commit, head_ref: "docs-drift/" + item.number, head_repository: repository,
+    base_sha: f.input.manifest.bindings.source_commit, base_ref: "main", base_repository: repository }));
+  const bytes = canonicalJSON(projectProposalBindings(original, null)), reference = { path: "account-rows.json", sha256: sha256(bytes) };
+  writeFileSync(join(f.artifacts, reference.path), bytes, { mode: 0o600 });
+  const input = manifestFixture({ ...f.input.manifest.bindings, proposals_sha256: reference.sha256 }, f.input.manifest.effects);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, adoption_sha256: f.policy.adoption_sha256,
+    context: "trial", transport: "native", publication_kind: "advisory", corrections: [], attention: [] });
+  const journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan });
+  const current = original.map(item => ({ ...item, actor: item.actor.toUpperCase() }));
+  if (change === "account-id") current[1].actor_id++;
+  if (change === "row-id") current[1].number = 14;
+  if (change === "body") current[1].body += " Material change";
+  const check = async () => {
+    const context = await capturePublicationInventory({ source_repo: f.repo, artifact_root: f.artifacts, journal_directory: journal.directory,
+      original: reference, transport: { ...f.transport, kind: "native" }, objects: writePublicationObjects(f.store, plan, journal.header), current_proposals: current });
+    return projectCurrentProposals(current, null, context);
+  };
+  if (change === "case") expect(await check()).toEqual(projectProposalBindings(original, null));
+  else await expect(check()).rejects.toThrow();
+  expect(current[1].actor).toBe("FIXTURE-OWNER");
+  expect(readFileSync(join(f.artifacts, reference.path)).equals(bytes)).toBe(true);
 });

@@ -1,3 +1,4 @@
+import { projectRecordedAccount, sameAccount } from "./identity";
 import { PublicationScopeChanged } from "./publish";
 import type { PullRequestInput } from "../github-read";
 import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
@@ -47,7 +48,7 @@ export async function capturePublicationInventory(input: {
     const proposal = matches[0], payload = effect.payload;
     // Full title/labels/payload are checked by the fresh native observer. Inventory fields must agree with that exact effect too.
     if (proposal.state !== "open" || proposal.merged_at !== null || proposal.body !== payload.body || proposal.draft !== payload.draft
-      || proposal.actor !== plan.manifest.actor || proposal.actor_id !== plan.manifest.actor_id || proposal.head_ref !== payload.branch
+      || !sameAccount(proposal, plan.manifest) || proposal.head_ref !== payload.branch
       || proposal.head_sha !== plan.manifest.bindings.candidate_commit || proposal.head_repository?.id !== plan.manifest.repository_id
       || proposal.base_ref !== payload.base || proposal.base_repository.id !== plan.manifest.repository_id) throw new PublicationScopeChanged("Fresh own publication inventory changed");
     result.own.push(projectProposalBindings([proposal], null).inventory[0]);
@@ -73,7 +74,7 @@ export async function capturePublicationInventory(input: {
       || typeof original.title !== "string" || !Array.isArray(original.labels) || typeof sourcePayload.body !== "string"
       || original.body_sha256 !== sha256(Buffer.from(sourcePayload.body))
       || !canonicalJSON({ title: original.title, body: sourcePayload.body, labels: original.labels, draft: original.draft }).equals(canonicalJSON(sourcePayload))
-      || !canonicalJSON({ ...projected, head_sha: original.head_sha, body_sha256: original.body_sha256,
+      || !canonicalJSON({ ...projectRecordedAccount(projected, original), head_sha: original.head_sha, body_sha256: original.body_sha256,
         title: original.title, labels: original.labels, draft: original.draft }).equals(canonicalJSON(original)))
       throw new PublicationScopeChanged("Current own refresh target changed outside its reviewed fields");
     const updateStarted = journal.events.some(event => event.kind === "intent" && event.effect_id === update.id);
@@ -108,9 +109,13 @@ export async function capturePublicationInventory(input: {
 
 /** Normalize only exact freshly observed own publication against the reviewed original inventory. */
 export function projectCurrentProposals(inventory: PullRequestInput[], resolutionSHA: string | null, context?: PublicationInventory): Projection {
-  const current = projectProposalBindings(inventory, resolutionSHA);
-  if (context === undefined) return current;
+  const observed = projectProposalBindings(inventory, resolutionSHA);
+  if (context === undefined) return observed;
   if (!ownedContexts.has(context)) throw Error("Original native publication inventory context required");
+  const current = { ...observed, inventory: observed.inventory.map(item => {
+    const recorded = context.own.find(row => row.number === item.number) ?? context.original.inventory.find(row => row.number === item.number);
+    return recorded ? projectRecordedAccount(item, recorded) : item;
+  }) };
   for (const own of context.own) {
     const matches = current.inventory.filter(item => item.number === own.number);
     if (matches.length !== 1 || !canonicalJSON(matches[0]).equals(canonicalJSON(own))) throw new PublicationScopeChanged("Fresh own publication inventory changed");

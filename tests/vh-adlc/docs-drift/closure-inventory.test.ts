@@ -115,3 +115,25 @@ test("closure inventory requires the exact source operation consolidation and na
     expect(() => requireClosureInventoryScope(context, { ...scope, ...patch })).toThrow(PublicationScopeChanged);
   }
 });
+
+
+test.each(["case", "account-id", "material-login", "row-id", "body"])("closure recovery binds each retained account row through case-only observations: %s", async change => {
+  const f = await fixture("closed"), raw = f.proposals.get(1)!;
+  raw.actor = raw.actor.toUpperCase();
+  f.comments.get(1)![0].actor = "FIXTURE-BOT";
+  if (change === "account-id") raw.actor_id++;
+  if (change === "material-login") raw.actor += "-other";
+  if (change === "row-id") raw.number++;
+  if (change === "body") raw.body += "Changed body";
+  const before = structuredClone([...f.proposals]), comments = structuredClone([...f.comments]);
+  const check = () => captureClosureInventory({ source_repo: f.repo, artifact_root: f.artifact_root,
+    journal_directory: f.journal.directory, original: f.original, transport: f.transport, objects: f.objects, reader: f.collection.reader });
+  if (change === "case") {
+    const context = await check();
+    const original = context.original.closure.originals.find(item => item.number === 1)!;
+    expect(projectClosureReader(f.collection.reader, context).pull(1)).toEqual(original);
+    expect(raw.actor).toBe(raw.actor.toUpperCase());
+  } else await expect(check()).rejects.toThrow();
+  expect([...f.proposals]).toEqual(before);
+  expect([...f.comments]).toEqual(comments);
+});

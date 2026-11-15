@@ -2132,3 +2132,24 @@ test.each([
   expect(calls.filter(call => call.args.at(-1) === "user/20")).toHaveLength(2);
   expect(calls.every(call => call.args.includes("GET") || call.args.includes("graphql"))).toBe(true);
 });
+
+test.each(["case", "account-id", "material-login"])("an applied native creation binds its original account with zero replay: %s", async change => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect: Effect = { id: "pr", kind: "pr-create", payload: { base: "main", branch: "docs-drift/one", title: "Exact title",
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("pr"), labels: ["documentation"], draft: true } };
+  await f.transport.execute(f.plan, effect, f.objects);
+  f.update(state => {
+    const user = state.prs[0].user as { login: string; id: number };
+    user.login = change === "material-login" ? "other-bot" : "FIXTURE-BOT";
+    if (change === "account-id") user.id = 21;
+    state.viewer_login = "FIXTURE-BOT";
+  });
+  const before = readFileSync(f.calls, "utf8").trim().split("\n").length;
+  const observed = await f.transport.observe(f.plan, effect, f.objects);
+  if (change === "case") expect(observed.state).toBe("done");
+  else expect(observed.state).not.toBe("done");
+  const later = readFileSync(f.calls, "utf8").trim().split("\n").slice(before).map(line => JSON.parse(line) as { program: string; args: string[] });
+  expect(later.every(call => call.program === "gh" && (call.args.includes("GET") || call.args.includes("graphql")))).toBe(true);
+  expect(f.inspect().prs).toHaveLength(1);
+});

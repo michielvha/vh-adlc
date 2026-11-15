@@ -7,14 +7,14 @@ import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import type { collectClosureWorkerInputs } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-worker";
 
 export async function closureRuntimeFixture(roots: string[], method: "merge" | "squash" | "rebase" = "merge", fault = "none",
-  configure?: Parameters<typeof nativeClosureFixture>[4]) {
+  configure?: Parameters<typeof nativeClosureFixture>[4], publisher?: Parameters<typeof runtimeFixture>[6]) {
   const adopted = await runtimeFixture(roots, true, false,
-    { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source }, true);
-  const f = await nativeClosureFixture(roots, method, fault, adopted.repo, configure);
+    { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source }, true, undefined, publisher);
+  const f = await nativeClosureFixture(roots, method, fault, adopted.repo, configure, adopted.selection.identity);
   const options = { repo: f.repo, source: f.source, artifact_root: f.artifacts, owner: "closure-test", run: "closure-worker",
     selection: { schema_version: 1, source_commit: f.source, consolidation: 20, operation_id: "closure-worker" },
     credential: "synthetic-read-token", path: f.environment.PATH!, cache_directory: adopted.selection.cache_directory,
-    entry: "copilot" as const, launcher_path: adopted.selection.launcher_path, settings_path: join(f.repo, ".vh-adlc/docs-drift.yaml") };
+    entry: adopted.selection.entry, launcher_path: adopted.selection.launcher_path, settings_path: join(f.repo, ".vh-adlc/docs-drift.yaml") };
   return { ...f, adopted, options };
 }
 

@@ -1,3 +1,4 @@
+import type { EntryIdentities, PublisherEntry } from "../../../plugins/vh-adlc/scripts/docs-drift/identity";
 /** Toy retained runtimes for helper and normal CLI controls. No model or hosted execution. */
 import { cpSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,7 +11,7 @@ import { publicationFixture } from "./publication-fixture";
 import { commit, pin, runtimeIdentity, write } from "./adoption-fixture";
 import { settingsFixture } from "./settings-fixture";
 
-export async function runtimeFixture(roots: string[], upgrade = false, bounded = false, role?: { model: string; identity_source: IdentitySource | null; native_model?: string; argv?: string[]; client_program?: string; provider?: "copilot" | "claude" }, fullComponent = false, legacyIDs?: number[]) {
+export async function runtimeFixture(roots: string[], upgrade = false, bounded = false, role?: { model: string; identity_source: IdentitySource | null; native_model?: string; argv?: string[]; client_program?: string; provider?: "copilot" | "claude" }, fullComponent = false, legacyIDs?: number[], publisher?: { entry: PublisherEntry; identities: EntryIdentities }) {
   const shared = publicationFixture(roots), prefix = "plugins/vh-adlc/";
   if (fullComponent) cpSync(join(import.meta.dir, "../../../plugins/vh-adlc"), join(shared.repo, prefix), { recursive: true });
   if (fullComponent) write(shared.repo, prefix + "plugin.json", '{"name":"vh-adlc","version":"0.13.0"}\n');
@@ -23,7 +24,8 @@ export async function runtimeFixture(roots: string[], upgrade = false, bounded =
     provider: role?.provider ?? "copilot", distribution_sha256: sha256(distribution) });
   const candidateDistribution = upgrade ? Buffer.from(distribution.toString().replace("fixture-1.0.0", "fixture-2.0.0")) : distribution;
   const candidateClient = upgrade ? { ...client, version: "fixture-2.0.0", distribution_sha256: sha256(candidateDistribution) } : client;
-  const approvedSource = { pin: componentPin, client, bounded, role, legacy_ids: legacyIDs };
+  const approvedSource = { pin: componentPin, client, bounded, role, legacy_ids: legacyIDs,
+    ...(publisher ? { entry_identities: publisher.identities } : {}) };
   const f = upgrade ? fullDefinitionUpgradeFixture(roots, { approved: approvedSource, candidate_client: candidateClient })
     : trialDefinitionFixture(roots, { approved: approvedSource });
   const current = "policySource" in f ? f.policySource : f.staged;
@@ -31,21 +33,23 @@ export async function runtimeFixture(roots: string[], upgrade = false, bounded =
   readGit(f.repo, "switch", "--detach", current);
   const cache = join(f.root, "runtime-cache"); mkdirSync(cache, { mode: 0o700 });
   const retained = bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: shared.repo, pin: componentPin });
-  const scope = { hostname: f.configured.hostname, repository_id: 10, actor_id: 20, entry: "copilot" as const };
+  const entry = publisher?.entry ?? "copilot";
+  const identity = publisher ? { ...runtimeIdentity, ...publisher.identities[entry] } : runtimeIdentity;
+  const scope = { hostname: f.configured.hostname, repository_id: identity.repository_id, actor_id: identity.actor_id, entry };
   const setup = { consumer_repo: f.repo, cache_directory: cache, client_id: "copilot-linux", client, profile_scope: scope,
     distribution, format: "executable" as const, executable: "copilot" };
   const approved = await bootstrap.retainClientDistribution(setup);
   writeFileSync(join(approved.profile_directory, "session-marker"), "Synthetic approved session\n");
   const native = await bootstrap.retainClientDistribution({ ...setup, client: candidateClient, distribution: candidateDistribution, profile_scope: { ...scope,
     trial: { definition_sha256: f.trial.definition_sha256, fixture_id: f.definition.fixture.id } } });
-  const selection = { repo: f.repo, current_default: current, identity: runtimeIdentity, cache_directory: cache,
-    entry: "copilot" as const, definition_sha256: f.trial.definition_sha256,
+  const selection = { repo: f.repo, current_default: current, identity, cache_directory: cache,
+    entry, definition_sha256: f.trial.definition_sha256,
     launcher_path: join(f.repo, f.candidate_settings.runtime_loader.launcher), settings_path: join(f.repo, f.definition.candidate_settings.path) };
   return { ...f, setup, retained, native, approved, selection };
 }
 
 
-export function nativeReader(f: { root: string; candidate: string; inventory_path?: string }, actor = "fixture-bot", errors = false, incompleteInventory = false) {
+export function nativeReader(f: { root: string; candidate: string; inventory_path?: string }, actor = "fixture-bot", errors = false, incompleteInventory = false, actorID = 20) {
   const bin = join(f.root, "native-bin"), trace = join(f.root, "native-reads.jsonl");
   mkdirSync(bin, { mode: 0o700 });
   writeFileSync(join(bin, "gh"), `#!${process.execPath}
@@ -54,12 +58,12 @@ const args = process.argv.slice(2), endpoint = args.find(value => value.startsWi
 appendFileSync(${JSON.stringify(trace)}, JSON.stringify({ args, provider: process.env.COPILOT_GITHUB_TOKEN ?? null,
   credential: process.env.GH_TOKEN === "synthetic-read-token", enterprise: process.env.GH_ENTERPRISE_TOKEN === "synthetic-read-token" }) + "\\n");
 if (args.includes("graphql")) {
-  console.log(JSON.stringify({ data: { viewer: { login: ${JSON.stringify(actor)}, databaseId: 20 } },
+  console.log(JSON.stringify({ data: { viewer: { login: ${JSON.stringify(actor)}, databaseId: ${actorID} } },
     ...(${errors} ? { errors: [{ message: "Synthetic incomplete viewer" }] } : {}) }));
 } else {
   if (args[args.indexOf("--method") + 1] !== "GET") process.exit(91);
   const sha = ${JSON.stringify(f.candidate)};
-  const value = endpoint === "user/20" ? { login: ${JSON.stringify(actor)}, id: 20 }
+  const value = endpoint === ${JSON.stringify("user/" + actorID)} ? { login: ${JSON.stringify(actor)}, id: ${actorID} }
     : endpoint === "repos/fixture/docs" ? { id: 10, full_name: "fixture/docs", default_branch: "main" }
     : endpoint === "repos/fixture/docs/git/ref/heads/main" ? { ref: "refs/heads/main", object: { type: "commit", sha } }
     : endpoint === "repos/fixture/docs/git/commits/" + sha ? { sha, tree: { sha: "a".repeat(40) }, parents: [], message: "Synthetic source" }

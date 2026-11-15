@@ -1,3 +1,4 @@
+import { projectRecordedAccount, sameAccount } from "./identity";
 import type { PullRequestInput, RepositoryReader } from "../github-read";
 import type { ClosureTarget } from "./closure";
 import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
@@ -75,13 +76,12 @@ export async function captureClosureInventory(input: {
       if (!comments.complete || comments.diagnostics.length) throw Error("Complete current closure comment inventory required");
       const matches = comments.items.filter(item => String(item.id) === id);
       const comment = matches[0];
-      if (matches.length !== 1 || typeof comment.body !== "string" || comment.body !== effect.payload.body || comment.actor !== plan.manifest.actor
-        || comment.actor_id !== plan.manifest.actor_id) changed("Current own closure explanation changed");
-      result.comments.push({ number, id: comment.id, body: comment.body, actor: comment.actor, actor_id: comment.actor_id });
+      if (matches.length !== 1 || typeof comment.body !== "string" || comment.body !== effect.payload.body || !sameAccount(comment, plan.manifest)) changed("Current own closure explanation changed");
+      result.comments.push({ number, id: comment.id, body: comment.body, actor: plan.manifest.actor, actor_id: comment.actor_id });
     } else {
       const current = input.reader.pull(number);
       if (id !== String(number) || current.state !== "closed" || current.merged_at !== null
-        || !same({ ...current, state: original.state }, original)) changed("Current own closed proposal changed outside its exact effect");
+        || !same({ ...projectRecordedAccount(current, original), state: original.state }, original)) changed("Current own closed proposal changed outside its exact effect");
       result.closed.push(number);
     }
     result.observations.push({ effect_id: effect.id, resource_id: id, observation_sha256: observed.outcome.observation_sha256 });
@@ -103,7 +103,8 @@ export function projectClosureReader<T extends Reader>(reader: T, context?: Clos
     pull(number: number): PullRequestInput {
       const current = reader.pull(number), original = context.original.closure.originals.find(item => item.number === number);
       if (!original) return current;
-      const normalized = context.closed.includes(number) ? { ...current, state: original.state } : current;
+      const projected = projectRecordedAccount(current, original);
+      const normalized = context.closed.includes(number) ? { ...projected, state: original.state } : projected;
       if (context.closed.includes(number) && (current.state !== "closed" || current.merged_at !== null)
         || !same(normalized, original)) changed("Current closure proposal changed outside proven own effects");
       return structuredClone(original);
@@ -117,7 +118,7 @@ export function projectClosureReader<T extends Reader>(reader: T, context?: Clos
       for (const comment of own) {
         const matches = current.items.filter(item => item.id === comment.id);
         const { number: _number, ...expected } = comment;
-        if (matches.length !== 1 || !same(matches[0], expected)) changed("Fresh own closure explanation changed");
+        if (matches.length !== 1 || !same(projectRecordedAccount(matches[0], expected), expected)) changed("Fresh own closure explanation changed");
       }
       const items = current.items.filter(item => !own.some(comment => comment.id === item.id));
       if (!same(items.map(item => item.id).sort((left, right) => left - right), baseline.payload.prior_ids))

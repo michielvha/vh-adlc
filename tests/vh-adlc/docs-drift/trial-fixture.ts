@@ -15,7 +15,7 @@ import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/r
 import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
 
 /** This creates no native-provider or historical observed-execution evidence. */
-export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean; bound_roles?: boolean; max_entry_bytes?: number; temporary_parent?: string; seed?: { repo: string; commit: string; objects: string[]; resources: [string, Record<string, unknown>][]; settings: ReturnType<typeof settingsFixture> } } = {}) {
+export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean; bound_roles?: boolean; max_entry_bytes?: number; temporary_parent?: string; mapped_entry?: "copilot" | "claude"; seed?: { repo: string; commit: string; objects: string[]; resources: [string, Record<string, unknown>][]; settings: ReturnType<typeof settingsFixture> } } = {}) {
   const root = realpathSync(mkdtempSync(join(options.temporary_parent ?? tmpdir(), "vh-docs-trial-"))); roots.push(root);
   const names = ["source", "origin.git", "tracker.git", "artifacts", "objects", "evidence", "component-source", "runtime"];
   for (const name of names) mkdirSync(join(root, name), { mode: 0o700 });
@@ -29,6 +29,7 @@ export function syntheticTrialFixture(roots: string[], options: { legacy?: boole
     git(source, "switch", "-c", "main");
   } else populateRepository(source, false, scanner);
   const settings = structuredClone(options.seed?.settings ?? settingsFixture()); settings.hostname = "docs-drift.invalid";
+  if (options.mapped_entry) Object.assign(settings.publication, { entry_actors: { hosted: "fixture-bot", copilot: "fixture-bot", claude: "fixture-bot" } });
   if (options.max_entry_bytes !== undefined) settings.reports.max_entry_bytes = options.max_entry_bytes;
   if (options.bound_roles) {
     for (const entry of Object.values(settings.execution.entries)) {
@@ -85,7 +86,7 @@ export function reviseTrialManifest(f: ReturnType<typeof syntheticTrialFixture>,
   return git(f.source, "rev-parse", "HEAD");
 }
 
-export function persistentTrialPublication(roots: string[], fixtureOptions: { legacy?: boolean; bound_roles?: boolean; max_entry_bytes?: number; temporary_parent?: string } = {}) {
+export function persistentTrialPublication(roots: string[], fixtureOptions: { legacy?: boolean; bound_roles?: boolean; max_entry_bytes?: number; temporary_parent?: string; mapped_entry?: "copilot" | "claude" } = {}) {
   const f = syntheticTrialFixture(roots, fixtureOptions);
   const context = loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime });
   const settings = context.settings, operation = "persistent-one";
@@ -104,12 +105,13 @@ export function persistentTrialPublication(roots: string[], fixtureOptions: { le
       title: "Reviewed legacy update", body: publicationMarker(settings, operation) + "\n" + effectMarker("pr"), labels: ["documentation"], draft: true } };
   }
   const input = manifestFixture({ ...bindings, source_commit: f.sourceCommit, candidate_commit: f.sourceCommit,
-    candidate_tree: git(f.source, "rev-parse", f.sourceCommit + "^{tree}"), settings_sha256: sha256(canonicalJSON(f.settings)) }, effects, operation);
+    candidate_tree: git(f.source, "rev-parse", f.sourceCommit + "^{tree}"), settings_sha256: sha256(canonicalJSON(f.settings)) }, effects, operation, { actor: "fixture-bot", actor_id: 20, ...(fixtureOptions.mapped_entry ? { publisher_entry: fixtureOptions.mapped_entry } : {}) });
   const configured = { requested_model: "claude-opus-5.5", adopted_model: "claude-opus-5.5", identity_source: roleIdentitySource };
   const selectedRole = fixtureOptions.bound_roles ? configured : role;
   input.policy = { worker: selectedRole, reviewer: selectedRole };
   const policy = { adoption_sha256: fixtureOptions.bound_roles ? context.context_sha256 : hash("synthetic-only"), publication_kind: "advisory" as const,
-    context: "trial" as const, transport: "collector" as const, pr_draft: true, worker: selectedRole, reviewer: selectedRole };
+    context: "trial" as const, transport: "collector" as const, pr_draft: true,
+    ...(fixtureOptions.mapped_entry ? { publisher_entry: fixtureOptions.mapped_entry } : {}), worker: selectedRole, reviewer: selectedRole };
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policy, corrections: [], attention: [] });
   return { f, context, options: { source_repo: f.source, artifact_root: context.artifacts, object_store: context.store,
     settings, plan, transport: createTrialTransport(context), gate: async () => ({ review: input, policy }) } };

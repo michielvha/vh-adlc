@@ -117,17 +117,17 @@ if (method !== 'GET') {
     let returned;
     if (method === 'POST' && endpoint === 'repos/fixture/docs/pulls') {
         returned = { id: 901, number: 501, state: 'open', merged_at: null, title: payload.title, body: payload.body, draft: payload.draft,
-            labels: [], user: { login: 'fixture-bot', id: state.response_creator_id ?? 20 },
+            labels: [], user: { login: state.viewer_login ?? 'fixture-bot', id: state.response_creator_id ?? state.viewer_id ?? 20 },
             base: { ref: payload.base, sha: state.commit, repo: { id: 10 } },
             head: { ref: payload.head, sha: state.refs['refs/heads/' + payload.head], repo: { id: 10 } } };
-        if (state.repository_identity) { returned.base.repo = state.repository_identity; returned.head.repo = state.repository_identity; returned.user.type = 'Bot'; }
+        if (state.repository_identity) { returned.base.repo = state.repository_identity; returned.head.repo = state.repository_identity; returned.user.type = state.viewer_type ?? 'Bot'; }
         state.prs.push(returned);
     } else if (method === 'POST' && endpoint === 'repos/fixture/docs/issues') {
-        returned = { ...payload, id: 801, number: 601, state: 'open', user: { login: 'fixture-bot', id: state.response_creator_id ?? 20 }, labels: applyLabels(payload.labels) };
+        returned = { ...payload, id: 801, number: 601, state: 'open', user: { login: state.viewer_login ?? 'fixture-bot', id: state.response_creator_id ?? state.viewer_id ?? 20 }, labels: applyLabels(payload.labels) };
         state.issues.push(returned);
     } else if (method === 'POST' && endpoint.endsWith('/comments')) {
         const number = endpoint.split('/').at(-2);
-        returned = { id: 701, body: payload.body, issue_url: 'https://api.github.com/repos/fixture/docs/issues/' + number, user: { login: 'fixture-bot', id: 20 } };
+        returned = { id: 701, body: payload.body, issue_url: 'https://api.github.com/repos/fixture/docs/issues/' + number, user: { login: state.viewer_login ?? 'fixture-bot', id: state.viewer_id ?? 20 } };
         (state.comments[number] ??= []).push(returned);
     } else if (method === 'PATCH' && endpoint.includes('/pulls/')) {
         returned = Object.assign(state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-1))), payload);

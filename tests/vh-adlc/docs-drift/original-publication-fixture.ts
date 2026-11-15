@@ -28,9 +28,9 @@ function capture(root: string, source: string, selectedRole: "worker" | "reviewe
 
 export { retain as retainSyntheticArtifact, capture as captureSyntheticRole };
 
-export async function originalPublicationFixture(roots: string[]) {
+export async function originalPublicationFixture(roots: string[], publisher?: NonNullable<Parameters<typeof bindingFixture>[2]>["publisher"]) {
   let worker: Reference | null = null;
-  const f = await bindingFixture(roots, false, { fullComponent: true, role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source },
+  const f = await bindingFixture(roots, false, { fullComponent: true, publisher, role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source },
     beforeCandidate: async input => {
       const current = await collectWorkerInputs(input.worker_options); expect(current.complete, JSON.stringify(current.diagnostics)).toBe(true);
       const publication = { operation_id: "native-operation", proposal: { kind: "pr-create", payload: { base: "main", branch: "docs-drift/native-operation",
@@ -49,13 +49,13 @@ export async function originalPublicationFixture(roots: string[]) {
 }
 
 /** The existing fake API gains real owned-origin Git refs. All other destinations are refused. */
-export function installOwnedNativeService(f: Pick<Awaited<ReturnType<typeof originalPublicationFixture>>, "root" | "origin" | "source" | "head">) {
+export function installOwnedNativeService(f: Pick<Awaited<ReturnType<typeof originalPublicationFixture>>, "root" | "origin" | "source" | "head"> & { publisher_identity?: { actor: string; actor_id: number } }) {
   const executable = Bun.which("git"), flock = Bun.which("flock");
   if (!executable || !flock) throw Error("Synthetic owned native service requires Git and flock");
   const directory = join(f.root, "native-service"), bin = join(f.root, "native-bin"), statePath = join(f.root, "native-state.json"), calls = join(f.root, "native-service-calls.jsonl");
   mkdirSync(directory, { mode: 0o700 }); mkdirSync(bin, { recursive: true, mode: 0o700 });
   const commit = f.source, tree = readGit(f.origin, "rev-parse", commit + "^{tree}").toString().trim();
-  const state = { commit, tree, publication_commit: f.head, repository_id: 10, git_source: f.origin, git_executable: executable,
+  const state = { ...(f.publisher_identity ? { viewer_login: f.publisher_identity.actor, viewer_id: f.publisher_identity.actor_id, viewer_type: "User" } : {}), commit, tree, publication_commit: f.head, repository_id: 10, git_source: f.origin, git_executable: executable,
     repository_identity: { id: 10, full_name: "fixture/docs", default_branch: "main" },
     refs: {}, prs: [], issues: [], comments: {}, label_race: "none", labels: { documentation: { id: 101, name: "documentation" } },
     metadata_commit: { sha: "f".repeat(40) }, metadata_tree: { sha: "f".repeat(40) }, metadata_blob: { sha: "f".repeat(40) }, blob: { sha: "f".repeat(40) } };

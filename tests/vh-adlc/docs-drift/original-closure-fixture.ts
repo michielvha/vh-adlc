@@ -10,13 +10,13 @@ import { captureSyntheticRole, retainSyntheticArtifact, installOwnedNativeServic
 import { evidence } from "./manifest-fixture";
 import { git } from "./repository-fixture";
 
-export async function originalClosureFixture(roots: string[]) {
-  const f = await closureRuntimeFixture(roots), origin = join(f.adopted.root, "closure-origin");
+export async function originalClosureFixture(roots: string[], publisher?: Parameters<typeof closureRuntimeFixture>[4]) {
+  const f = await closureRuntimeFixture(roots, "merge", "none", undefined, publisher), origin = join(f.adopted.root, "closure-origin");
   git(f.adopted.root, "clone", "--no-local", "--no-checkout", f.repo, origin);
   git(origin, "update-ref", "refs/heads/main", f.source);
   git(origin, "update-ref", "refs/pull/20/head", f.head);
   for (const original of f.proposals.values()) git(origin, "update-ref", "refs/pull/" + original.number + "/head", original.head_sha);
-  const service = installOwnedNativeService({ root: f.adopted.root, origin, source: f.source, head: f.source });
+  const service = installOwnedNativeService({ root: f.adopted.root, origin, source: f.source, head: f.source, publisher_identity: publisher?.identities[publisher.entry] });
   const state = JSON.parse(readFileSync(service.statePath, "utf8")), responses = JSON.parse(readFileSync(f.responses_file, "utf8"));
   state.prs = [responses["repos/fixture/docs/pulls/1"], responses["repos/fixture/docs/pulls/20"]];
   writeFileSync(service.statePath, JSON.stringify(state));

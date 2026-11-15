@@ -180,3 +180,54 @@ test("a changed GraphQL slug at the same ID preserves the native REST account ob
     expect(readNativeContext(f.scope).identity.actor).toBe("fixture-bot");
   } catch (error) { failed = true; throw error; }
 }, 90000);
+
+test("case-only account observations preserve original comparison rows and raw later observations", async () => {
+  try {
+    const f = fixture();
+    await withNativeObservation(f.scope, async observation => {
+      const context = readNativeContext({ ...f.scope, observation });
+      expect(context.repository.pull(1).actor).toBe("fixture-bot");
+      f.pulls[0].user.login = "FIXTURE-BOT"; f.save();
+      writeFileSync(f.program, readFileSync(f.program, "utf8").replaceAll('"fixture-bot"', '"FIXTURE-BOT"'));
+    });
+    const current = readNativeContext(f.scope);
+    expect(current.identity.actor).toBe("FIXTURE-BOT");
+    expect(current.repository.pull(1).actor).toBe("FIXTURE-BOT");
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+test("an uncached large proposal uses its original account spelling after a case-only reread", async () => {
+  try {
+    const body = "x".repeat(OUTPUT_LIMIT / 2 + 1024), f = fixture(body);
+    await withNativeObservation(f.scope, async observation => {
+      const reader = readNativeContext({ ...f.scope, observation }).repository;
+      reader.pull(1);
+      expect(reader.pull(2).actor).toBe("fixture-bot");
+      f.pulls[1].user.login = "FIXTURE-BOT"; f.save();
+      expect(reader.pull(2).actor).toBe("fixture-bot");
+    });
+    expect(readNativeContext(f.scope).repository.pull(2).actor).toBe("FIXTURE-BOT");
+  } catch (error) { failed = true; throw error; }
+}, 90000);
+
+test.each(["case", "account-id", "material-login"])("comment comparison binds its original row and account: %s", async change => {
+  try {
+    const f = fixture(), path = join(f.root, "case-comments.json");
+    const comments = [{ id: 7, body: "Original legacy explanation", user: { login: "Legacy-Bot", id: 90 } }];
+    writeFileSync(path, JSON.stringify(comments));
+    writeFileSync(f.program, readFileSync(f.program, "utf8").replace("const value = endpoint ===",
+      'const value = endpoint?.startsWith("repos/fixture/docs/issues/1/comments?") ? '
+      + 'JSON.parse(require("node:fs").readFileSync(' + JSON.stringify(path) + ', "utf8")) : endpoint ==='));
+    const run = withNativeObservation(f.scope, async observation => {
+      const reader = readNativeContext({ ...f.scope, observation }).repository;
+      expect(reader.comments(1).items[0].actor).toBe("Legacy-Bot");
+      comments[0].user.login = change === "material-login" ? "Different-Bot" : "LEGACY-BOT";
+      if (change === "account-id") comments[0].user.id = 91;
+      writeFileSync(path, JSON.stringify(comments));
+    });
+    if (change === "case") {
+      await run;
+      expect(readNativeContext(f.scope).repository.comments(1).items[0].actor).toBe("LEGACY-BOT");
+    } else await expect(run).rejects.toBeInstanceOf(NativeObservationChanged);
+  } catch (error) { failed = true; throw error; }
+}, 90000);

@@ -13,7 +13,8 @@ function nativePull(proposal: PullRequestInput) {
     base: { sha: proposal.base_sha, ref: proposal.base_ref, repo: proposal.base_repository } };
 }
 
-export async function nativeClosureFixture(roots: string[], method: "merge" | "squash" | "rebase", fault = "none", adoptedRepo?: string, configure?: Parameters<typeof closureFixture>[3]) {
+export async function nativeClosureFixture(roots: string[], method: "merge" | "squash" | "rebase", fault = "none", adoptedRepo?: string, configure?: Parameters<typeof closureFixture>[3],
+  publisher = { actor: "fixture-bot", actor_id: 20 }) {
   const f = await closureFixture(roots, method, false, configure ?? (fault === "required-input" ? selected => ({ ...selected.options,
     collection: { ...selected.collection, snapshot: { ...selected.snapshot,
       required_inputs: [{ id: "current-date", kind: "time", sha256: sha256(Buffer.from("synthetic recorded date")) }] } } }) : undefined), adoptedRepo), artifacts = dirname(f.collection.store.record_path), bin = join(artifacts, "native-bin");
@@ -61,7 +62,7 @@ if (args.includes("graphql")) {
     require("node:fs").writeFileSync(${JSON.stringify(responses_file)}, JSON.stringify(values));
   }
   const viewer = values.__viewer_after && count >= values.__viewer_after.at ? values.__viewer_after.viewer
-    : values.__viewer ?? { login: changed ? "other-fixture-actor" : "fixture-bot", databaseId: changed ? 21 : 20 };
+    : values.__viewer ?? { login: changed ? "other-fixture-actor" : ${JSON.stringify(publisher.actor)}, databaseId: changed ? ${publisher.actor_id + 1} : ${publisher.actor_id} };
   console.log(JSON.stringify({ data: { viewer } })); process.exit(0);
 }
 if (args[args.indexOf("--method") + 1] !== "GET") process.exit(91);
@@ -70,7 +71,7 @@ const reads = require("node:fs").readFileSync(${JSON.stringify(calls)}, "utf8").
 const count = reads.filter(call => call.program === "gh" && call.args.includes("graphql")).length;
 const changed = ${JSON.stringify(fault === "changed-actor")} && count >= 6;
 const viewer = values.__viewer_after && count >= values.__viewer_after.at ? values.__viewer_after.viewer
-  : values.__viewer ?? { login: changed ? "other-fixture-actor" : "fixture-bot", databaseId: changed ? 21 : 20 };
+  : values.__viewer ?? { login: changed ? "other-fixture-actor" : ${JSON.stringify(publisher.actor)}, databaseId: changed ? ${publisher.actor_id + 1} : ${publisher.actor_id} };
 const endpoint = args.at(-1);
 const value = endpoint === "user/" + viewer.databaseId ? { login: viewer.login, id: viewer.databaseId } : values[endpoint];
 if (!value) { console.log("HTTP/2.0 404 Not Found\\r\\n\\r\\n{}"); process.exit(1); }
