@@ -1,0 +1,267 @@
+{
+  "schema_version": 1,
+  "host": "github.com",
+  "repository": "michielvha/stackweaver",
+  "actor": "michielvha",
+  "vocabulary_sha256": "c9e2862ced1819e9569f99434ca0f09686dc10367ee137c19e03cd21dab02e70",
+  "effective_names": {
+    "bug": "bug",
+    "enhancement": "enhancement",
+    "documentation": "documentation",
+    "refactor": "refactor",
+    "security": "security",
+    "ready": "ready",
+    "blocked": "blocked",
+    "partial": "partial",
+    "needs-decision": "needs-decision"
+  },
+  "labels_read": [
+    {
+      "name": "blocked",
+      "color": "b60205",
+      "description": "Named prerequisite missing; blocker in the triage comment"
+    },
+    {
+      "name": "bug",
+      "color": "d73a4a",
+      "description": "Something isn't working"
+    },
+    {
+      "name": "dependencies",
+      "color": "0366d6",
+      "description": "Pull requests that update a dependency file"
+    },
+    {
+      "name": "documentation",
+      "color": "0075ca",
+      "description": "Improvements or additions to documentation"
+    },
+    {
+      "name": "duplicate",
+      "color": "cfd3d7",
+      "description": "This issue or pull request already exists"
+    },
+    {
+      "name": "enhancement",
+      "color": "a2eeef",
+      "description": "New feature or request"
+    },
+    {
+      "name": "go",
+      "color": "16e2e2",
+      "description": "Pull requests that update go code"
+    },
+    {
+      "name": "good first issue",
+      "color": "7057ff",
+      "description": "Good for newcomers"
+    },
+    {
+      "name": "help wanted",
+      "color": "008672",
+      "description": "Extra attention is needed"
+    },
+    {
+      "name": "invalid",
+      "color": "e4e669",
+      "description": "This doesn't seem right"
+    },
+    {
+      "name": "javascript",
+      "color": "168700",
+      "description": "Pull requests that update javascript code"
+    },
+    {
+      "name": "major-upgrade",
+      "color": "ededed",
+      "description": ""
+    },
+    {
+      "name": "needs-decision",
+      "color": "5319e7",
+      "description": "Needs a product/architecture call before work starts"
+    },
+    {
+      "name": "partial",
+      "color": "fbca04",
+      "description": "Some phases shipped; remaining scope in the triage comment"
+    },
+    {
+      "name": "python:uv",
+      "color": "2b67c6",
+      "description": "Pull requests that update python:uv code"
+    },
+    {
+      "name": "question",
+      "color": "d876e3",
+      "description": "Further information is requested"
+    },
+    {
+      "name": "ready",
+      "color": "0e8a16",
+      "description": "Verified unblocked, scope understood - safe to pick up"
+    },
+    {
+      "name": "refactor",
+      "color": "2f6dc8",
+      "description": ""
+    },
+    {
+      "name": "security",
+      "color": "ededed",
+      "description": ""
+    },
+    {
+      "name": "wontfix",
+      "color": "ffffff",
+      "description": "This will not be worked on"
+    }
+  ],
+  "standard": [
+    {
+      "standard": "bug",
+      "name": "bug",
+      "kind": "type",
+      "status": "present"
+    },
+    {
+      "standard": "enhancement",
+      "name": "enhancement",
+      "kind": "type",
+      "status": "present"
+    },
+    {
+      "standard": "documentation",
+      "name": "documentation",
+      "kind": "type",
+      "status": "present"
+    },
+    {
+      "standard": "refactor",
+      "name": "refactor",
+      "kind": "type",
+      "status": "different",
+      "differs": [
+        "description"
+      ]
+    },
+    {
+      "standard": "security",
+      "name": "security",
+      "kind": "type",
+      "status": "different",
+      "differs": [
+        "color",
+        "description"
+      ]
+    },
+    {
+      "standard": "ready",
+      "name": "ready",
+      "kind": "state",
+      "status": "present"
+    },
+    {
+      "standard": "blocked",
+      "name": "blocked",
+      "kind": "state",
+      "status": "different",
+      "differs": [
+        "description"
+      ]
+    },
+    {
+      "standard": "partial",
+      "name": "partial",
+      "kind": "state",
+      "status": "different",
+      "differs": [
+        "description"
+      ]
+    },
+    {
+      "standard": "needs-decision",
+      "name": "needs-decision",
+      "kind": "state",
+      "status": "different",
+      "differs": [
+        "description"
+      ]
+    }
+  ],
+  "unmanaged": [
+    "dependencies",
+    "duplicate",
+    "go",
+    "good first issue",
+    "help wanted",
+    "invalid",
+    "javascript",
+    "major-upgrade",
+    "python:uv",
+    "question",
+    "wontfix"
+  ],
+  "writes": [
+    {
+      "action": "update",
+      "name": "refactor",
+      "before": {
+        "color": "2f6dc8",
+        "description": ""
+      },
+      "after": {
+        "color": "2f6dc8",
+        "description": "Code change that keeps behavior the same"
+      }
+    },
+    {
+      "action": "update",
+      "name": "security",
+      "before": {
+        "color": "ededed",
+        "description": ""
+      },
+      "after": {
+        "color": "d93f0b",
+        "description": "Security weakness or hardening"
+      }
+    },
+    {
+      "action": "update",
+      "name": "blocked",
+      "before": {
+        "color": "b60205",
+        "description": "Named prerequisite missing; blocker in the triage comment"
+      },
+      "after": {
+        "color": "b60205",
+        "description": "Named prerequisite missing; the issue or its document names it"
+      }
+    },
+    {
+      "action": "update",
+      "name": "partial",
+      "before": {
+        "color": "fbca04",
+        "description": "Some phases shipped; remaining scope in the triage comment"
+      },
+      "after": {
+        "color": "fbca04",
+        "description": "Some phases shipped; the issue or its document names what remains"
+      }
+    },
+    {
+      "action": "update",
+      "name": "needs-decision",
+      "before": {
+        "color": "5319e7",
+        "description": "Needs a product/architecture call before work starts"
+      },
+      "after": {
+        "color": "5319e7",
+        "description": "Needs a product or architecture call before work starts"
+      }
+    }
+  ]
+}

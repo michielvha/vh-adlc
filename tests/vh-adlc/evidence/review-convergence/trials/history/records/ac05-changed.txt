@@ -1,0 +1,42 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan, AC-01 row (docs/specs/feature.md:40); Design (docs/specs/feature.md:30)
+EVIDENCE: Design line 30 names `docs(readme): fix a link` as a correct subject. The AC-01 pattern `^[a-z]+: [a-z].*$` does not allow parentheses before the colon. Observed with printf '%s\n' 'docs(readme): fix a link' | grep -Eq '^[a-z]+: [a-z].*$', which printed FAIL. An implementation that accepts this correct subject therefore fails the proof. The earlier row text `^[a-z]+: .+$`, which R-1 reviewed at 2334454, had the same defect, and the change in abba0a7 kept it.
+PROPOSAL: Change the pattern so it accepts an optional parenthesised scope after the type, for example `^[a-z]+(\([a-z0-9-]+\))?: `, and add `docs(readme): fix a link` to the row's must-pass examples.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-01 row (docs/specs/feature.md:40); Design (docs/specs/feature.md:30)
+EVIDENCE: Design line 30 says a subject that ends with a period is wrong and gives `fix: handle empty input.` as the example. The pattern accepts it: printf '%s\n' 'fix: handle empty input.' | grep -Eq '^[a-z]+: [a-z].*$' printed PASS. The row's must-fail list gives only `handle empty input`. This is not a nit under the rule for rows that have passed review. Commit abba0a7 changed the row after R-1's clean pass at 2334454, so the row starts over and has not passed review at its current text.
+PROPOSAL: Make the pattern reject a trailing period, for example by ending it with `[^.]$`, and add `fix: handle empty input.` to the must-fail examples.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (docs/specs/feature.md:30); Acceptance Criteria, AC-01 (docs/specs/feature.md:34); Test Plan, AC-01 row (docs/specs/feature.md:40); frontmatter goal (docs/specs/feature.md:5); Open Questions (docs/specs/feature.md:48)
+EVIDENCE: Design defines a correct subject only as "a type, a colon and a space". It never says which words count as a type or whether case matters. The goal and AC-01 point to "the team's format" and "correct subjects" without defining either. Only the Test Plan pattern adds two rules: the type must be lowercase (`[a-z]+`) and the description must start with a lowercase letter (`[a-z]` after the space). The second rule came in with commit abba0a7, which replaced `.+` with `[a-z].*`. Observed: `fix: Handle empty input` printed FAIL against the pattern, yet it meets Design's stated rule. `foo: bar` passes, although nothing says whether an unknown type is acceptable. Open Questions says "None." while the document settles these trade-offs (scope syntax, trailing period, case, type list) without raising them.
+PROPOSAL: State the full format in Design: the allowed types or "any lowercase word", the scope syntax, the case rule and the trailing period rule. Make AC-01 refer to that definition, and raise each settled trade-off, starting with the lowercase description rule, as an open question for the owner.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-01 row (docs/specs/feature.md:40); Design (docs/specs/feature.md:30)
+EVIDENCE: The proof reads "lint-msg.sh matches the subject against `^[a-z]+: [a-z].*$`". That describes the script's internals. It does not say how to run the script or what counts as a pass. Neither the proof nor Design says how lint-msg.sh gets the subject (an argument, stdin, or a commit message file as a commit-msg hook) or what accept and reject mean (for example exit 0 and non-zero). A script that contains this regex but still exits 0 for every input could be read as passing on inspection. Two implementers could also build different interfaces.
+PROPOSAL: Define the interface and exit status in Design. Rewrite the proof as a test that runs lint-msg.sh on each must-pass and must-fail subject and checks the exit status.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (docs/specs/feature.md:18); Scope (docs/specs/feature.md:26); Design (docs/specs/feature.md:30)
+EVIDENCE: The Owner summary says only "Check commit subjects before a push." No detailed section mentions a push, a pre-push hook or any point where the check runs. Scope covers only the subject format, and Design says only that lint-msg.sh checks a subject. So the timing claim has no support, and an implementer could reasonably build a pre-push hook that nothing else asks for. The summary also leaves out the format itself, the behaviour on rejection, the case and period trade-offs, and the validation state: nothing has been observed, and lint-msg.sh currently exits 0 for every subject.
+PROPOSAL: Rewrite the Owner summary to match the detailed sections. Cover what is checked and when, what happens on rejection, the format decisions and their trade-offs, and that the only proof is planned and none has been observed. Alternatively, add the push integration to Scope and Design if it is intended.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (docs/specs/feature.md:22)
+EVIDENCE: The Background cites lint-msg.sh:1 for "lint-msg.sh accepts every subject today". At abba0a7, line 1 of lint-msg.sh is `#!/bin/sh` and line 2 is `exit 0`, which is what makes it accept every subject. The claim is true but the citation points at the wrong line.
+PROPOSAL: Cite lint-msg.sh:2.

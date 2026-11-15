@@ -1,0 +1,74 @@
+Subject: fixture: record R-1
+
+
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+index 55f5720..c9eded6 100644
+--- a/docs/specs/feature.md
++++ b/docs/specs/feature.md
+@@ -51,3 +51,20 @@ None.
+ 
+ | Date | Review | Kind | Commit | Model | Isolation | Outcome |
+ | --- | --- | --- | --- | --- | --- | --- |
++| 2026-11-14 | R-1 | spec | `0c49696` | fixture | procedural | Blocking findings. |
++
++### R-1
++
++FINDING: F-01
++KIND: factual
++SEVERITY: blocking
++WHERE: Design
++EVIDENCE: The endpoint's warm-up takes up to 8 seconds (probe.sh:2 calls it right after start), so a 5 second timeout fails healthy starts.
++PROPOSAL: Use a 10 second timeout in Design.
++
++FINDING: F-02
++KIND: factual
++SEVERITY: should-fix
++WHERE: Design
++EVIDENCE: The `--legacy` flag has exactly the behavior of no flag, so two implementers could keep or drop it.
++PROPOSAL: Remove the `--legacy` flag from Design, or document why it is kept.
+commit 30ba205b5f10848781489a08b87690cd1ce7b921
+Subject: docs(specs): apply spec review R-1 to the probe timeout
+
+
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+index c9eded6..c41cb18 100644
+--- a/docs/specs/feature.md
++++ b/docs/specs/feature.md
+@@ -1,6 +1,6 @@
+ ---
+ status: draft
+-status_description: "Fixture for a vh-adlc reviewer trial; nothing is accepted or implemented."
++status_description: "Fixture for a vh-adlc reviewer trial; R-1 findings applied, waiting for a new spec review. Nothing is accepted or implemented."
+ issue: null
+ goal: "probe.sh gives up on a slow health check after a fixed timeout."
+ covers:
+@@ -15,11 +15,13 @@ probe.sh gives up on a slow health check after a fixed timeout.
+ 
+ ### Owner summary
+ 
+-Stop waiting for a slow health check after 5 seconds.
++probe.sh waits for its health check with no time limit, so a hung endpoint keeps it waiting indefinitely. After this change curl gives up after 10 seconds and probe.sh exits 2. The limit is 10 seconds because the endpoint can take up to 8 seconds to warm up after start, and a shorter limit would fail healthy starts. There is no flag to change the limit, and retries stay out of scope.
++
++The proof is planned and has not run: `tests/check-timeout.sh` confirms Design and AC-01 name the same limit, and a stub endpoint that sleeps 12 seconds must make probe.sh exit 2. Spec review R-1 raised a blocking finding (the 5 second limit) and a should-fix finding (a `--legacy` flag that changed nothing). This revision applies both, and a new independent review has to pass before the owner can accept.
+ 
+ ### Background
+ 
+-probe.sh waits for the health endpoint with no timeout (probe.sh:2).
++probe.sh waits for the health endpoint with no timeout (probe.sh:2). Spec review R-1 (F-01) reports that the endpoint takes up to 8 seconds to warm up after start; this repository holds no measurement of that warm-up.
+ 
+ ## Scope
+ 
+@@ -27,11 +29,11 @@ In scope: a timeout on the health check. Out of scope: retries.
+ 
+ ## Design
+ 
+-probe.sh passes `--max-time 5` to curl and exits 2 when the check times out. A `--legacy` flag also exists; it selects the same 5 second timeout and the same exit status as running without it.
++probe.sh passes `--max-time 10` to curl and exits 2 when the check times out. The limit leaves room for the endpoint's warm-up of up to 8 seconds (see Background). probe.sh takes no flags.
+ 
+ ## Acceptance Criteria
+ 
+-- [ ] AC-01: A health check that takes longer than 5 seconds makes probe.sh exit 2.
++- [ ] AC-01: A health check that takes longer than 10 seconds makes probe.sh exit 2.
+ 
+ ## Test Plan
+ 

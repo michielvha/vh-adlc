@@ -24,7 +24,7 @@ import { loopContext, type LoopContext } from "./procedure";
 import { cacheReviewPages } from "./pages";
 import { pluginStatus } from "./plugin-version";
 import { applicableRungs, featureDelta, mayAdvance, runRungs } from "./rungs";
-import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, skipMarker } from "./delivery";
+import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, repositoryVisibility, skipMarker } from "./delivery";
 import { claim, isolation } from "./claim";
 import { diffPaths, rangePaths } from "./git-paths";
 import { writeFileSync } from "node:fs";
@@ -99,7 +99,10 @@ export async function main(argv: string[]): Promise<number> {
       } });
     console.log(JSON.stringify(result)); return result.status === "claimed" ? 0 : 3;
   }
-  if (command === "ci") { console.log(JSON.stringify(ciReport(settings))); return 0; }
+  if (command === "ci") {
+    const visibility = settings.ci_trigger === "manual" ? "unknown" : repositoryVisibility(repo);
+    console.log(JSON.stringify(ciReport(settings, visibility))); return 0;
+  }
   if (command === "skip") {
     const base = execSync(`git merge-base ${need(options, "base")} HEAD`, { cwd: repo }).toString().trim();
     const supportsSkipPaths = conventionSupportsSkipPaths(need(options, "docs-revision"));

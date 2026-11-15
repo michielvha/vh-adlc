@@ -39,8 +39,12 @@ That is an illustration, not evidence that the example feature exists. The autho
 when scope, proof or decisions change. The detailed sections remain authoritative, and old specs stay
 valid without a bulk rewrite.
 
-Run `vh-adlc-spec review <path>` for an independent spec review. Resolve the
-findings. Before asking you to accept, the agent summarizes the proposed behavior,
+Run `vh-adlc-spec review <path>` for an independent spec review. The reviewer rates
+each finding blocking, should-fix or nit, by what it would change in the build or
+in a proof, and returns every finding it can find in one pass. The agent applies a
+pass's findings as one revision: it asks you about judgement findings first, then
+makes the fixes and your answers in one commit. A nit never causes a revision on its
+own; it is fixed alongside other fixes or listed for you. Before asking you to accept, the agent summarizes the proposed behavior,
 scope, significant permissions and side effects, migration, and validation status
 in the conversation. It identifies deferred tests and explains what your acceptance
 authorizes, so you can decide without reading the full document. Revised specs get

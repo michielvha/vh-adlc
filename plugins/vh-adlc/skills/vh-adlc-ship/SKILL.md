@@ -48,8 +48,8 @@ files and its project procedure, whose local rules apply alongside this procedur
 `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` before pushing and never
 pushes or reports the feature complete unless it may advance at HEAD; after the merge, the delivery check
 runs the same command with `--merge <merge commit>` from a checkout of that merge commit; results from any other
-commit block. The feature lands by merge commit only. With `ci_trigger: manual`, report CI with
-`bun scripts/loop/cli.ts ci` and dispatch nothing; decide the skip marker with `cli.ts skip`, and after the
+commit block. The feature lands by merge commit only. Always run `bun scripts/loop/cli.ts ci` and pass on any
+`warning` it returns in the report, without blocking. With `ci_trigger: manual`, report CI from it and dispatch nothing; decide the skip marker with `cli.ts skip`, and after the
 merge report delivery with `cli.ts delivery` (`references/loop-settings.md`, Delivery). A `host` route that names a model runs with it as a requested model. When loop settings exist, `cli.ts skip` replaces the documentation-only skip-marker rule in Deliver,
 including its report when the resolved convention does not support declared paths.
 
@@ -117,10 +117,14 @@ branch's lifetime, and the merge is not finished until that branch is gone.
 Merge without `--delete-branch`, then run `after-merge` for that PR as
 `references/branches.md` describes. It removes the remote branch, its stale
 tracking ref and the local branch, but only while their tips are contained in
-the merged PR head. A branch with commits pushed after the merge is kept.
+the merged PR head. A branch with commits pushed after the merge is kept. It
+also removes the branch's clean worktree, the one with no changed tracked or
+untracked files, and keeps it with a reason when it holds ignored files, is
+locked, or is the worktree `after-merge` runs from. Approving the merge is the
+request for that removal.
 
-Report every outcome and kept reason. A branch kept because a worktree holds it
-stays until the owner asks for worktree cleanup. When GitHub's
+Report every outcome and kept reason. A feature shipped from its owning
+worktree is removed, with its branch, by the next sweep. When GitHub's
 `delete_branch_on_merge` setting is off, say so and suggest a branch-hygiene
 plan, which proposes enabling it. A ship request alone does not authorize a
 merge or repository-setting changes.

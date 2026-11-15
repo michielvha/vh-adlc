@@ -1,0 +1,7 @@
+MODEL: scripted-reviewer
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Scope
+EVIDENCE: Scope says "one name argument", which reads as at least one.
+PROPOSAL: Say "exactly one name argument" in Scope.

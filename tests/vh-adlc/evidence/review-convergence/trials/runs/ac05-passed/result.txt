@@ -1,0 +1,44 @@
+=== turn 1
+MODEL: claude-opus-5-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan row AC-01; Design
+EVIDENCE: Design says "A correct subject starts with a type, a colon and a space, for example `fix: handle empty input` or `docs(readme): fix a link`." The AC-01 proof pattern `^[a-z]+: .+$` does not match `docs(readme): fix a link`, because `(` is not in `[a-z]` and no `: ` directly follows `docs`. The row passed review at R-1 (commit 04fd812 already held the row's current text, and `git diff 04fd812 e0683d9` touches only the Review Log). The standard still rates a pattern that rejects a correct output as blocking, because the proof then fails a correct implementation.
+PROPOSAL: Allow an optional scope in the pattern, for example `^[a-z]+(\([a-z0-9-]+\))?: .*[^.]$`, and add `docs(readme): fix a link` to the row's must-pass examples.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria AC-01; Test Plan row AC-01
+EVIDENCE: Design never says how lint-msg.sh gets the subject (argument, stdin or a commit message file), and it never says what accepting and rejecting look like (exit status, output). AC-01 says only "accepts correct subjects and rejects wrong ones". The proof says "lint-msg.sh matches the subject against `^[a-z]+: .+$`", which describes the internals and is not a check that can be run with a pass condition. lint-msg.sh:1-2 is `#!/bin/sh` / `exit 0`, so the tree does not set an interface either.
+PROPOSAL: In Design, define the input channel and the exit codes, for example subject as the first argument, exit 0 to accept and non-zero to reject. Then rewrite the AC-01 proof as a test that runs the script on each listed example and checks its exit status.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria AC-01; Open Questions
+EVIDENCE: The goal is "the team's format", but no source or Sources section defines that format. Design gives examples but leaves open which types are allowed (any `[a-z]+`, or a fixed list such as fix, docs, feat), whether a scope is allowed and what characters it may contain, whether the trailing period rule is part of the format (it appears only as a "wrong" example), and whether there is a length limit. Two implementers would build different validators. Open Questions says "None." even though these trade-offs are settled without the owner.
+PROPOSAL: State the full format rules in Design and cite where the team's format comes from. Raise the type list and the scope rule as Open Questions for the owner.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary; Scope; Design
+EVIDENCE: The Owner summary says "Check commit subjects before a push." Scope and Design never mention a push, a Git hook or any wiring. They describe only a script that checks a subject. The summary also leaves out the scope boundary (the body is out of scope), the format defaults, the validation state (no proof observed yet; lint-msg.sh currently accepts everything) and the owner decisions.
+PROPOSAL: Either add hook wiring (for example a commit-msg or pre-push hook) to Scope, Design and the criteria, or reword the summary to match the script-only scope. Then extend the summary to cover scope, defaults, validation state and decisions.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan row AC-01; Design
+EVIDENCE: Design calls `fix: handle empty input.` wrong because it ends with a period, but `^[a-z]+: .+$` matches it, so the proof would pass an implementation that accepts it. The row passed review at R-1 (commit 04fd812 held its current text with NO FINDINGS), and this finding only widens a free-text pattern row that has passed review to catch more wrong output.
+PROPOSAL: Add `fix: handle empty input.` to the must-fail examples and make the pattern reject a trailing period.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background
+EVIDENCE: "lint-msg.sh accepts every subject today (lint-msg.sh:1)". Line 1 is `#!/bin/sh`; the unconditional `exit 0` is on lint-msg.sh:2.
+PROPOSAL: Cite lint-msg.sh:2, or lint-msg.sh:1-2.

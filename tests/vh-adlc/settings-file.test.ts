@@ -88,6 +88,13 @@ describe("the file the loader reads", () => {
       value: { schema_version: 1, source_roots: ["src"], label_map: { bug: "defect" } } });
   });
 
+  test("Stackweaver's triage settings read with every label_map entry intact", () => {
+    const copy = readFileSync(resolve(import.meta.dir, "triage/stackweaver-triage.yaml"), "utf8");
+    const value = load(checkout({ ".vh-adlc/triage.yaml": copy })).value as { label_map: Record<string, string> };
+    expect(value.label_map).toEqual({ bug: "bug", enhancement: "enhancement", documentation: "documentation",
+      refactor: "refactor", security: "security", "major-upgrade": "major-upgrade" });
+  });
+
   test("an explicit .yaml path is read in place of the default", () => {
     const root = checkout({ "config/triage.yaml": yaml });
     expect(load(root, "config/triage.yaml")).toMatchObject({ path: "config/triage.yaml", configured: true });

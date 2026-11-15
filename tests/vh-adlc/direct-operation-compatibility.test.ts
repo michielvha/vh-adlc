@@ -4,12 +4,16 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "../..");
 const baseline = "b313327b134bc5ecfa7167856d4b567f8701ba06";
-// The owner requested a conversational summary before accepting a completed spec.
-// Keep that intentional change as the spec baseline; other operation bodies retain theirs.
-const specSummaryBaseline = "116accd0a50e2c0da741a0ed6f762f177c61babd";
+// The owner requested a conversational summary before accepting a completed spec, and later accepted
+// docs/specs/spec-review-convergence.md, which changes author mode and review step 4 (last at R-20). Keep that
+// intentional text as the spec baseline; other operation bodies retain theirs.
+const specSummaryBaseline = "8a07bb287b2b07b990630dd384cadeacec0949c2";
+// The owner approved the rule that an agent-behavior proof needs a committed script that reruns it
+// (docs/specs/reproducible-agent-proofs.md, parked in favour of this short rule). Keep it as the implement baseline.
+const implementBaseline = "8d5a639bf3626a95901a125c0aeeff3e24b0f335";
 test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resume"])("direct %s keeps its approved operation body", (name) => {
   const path = `plugins/vh-adlc/skills/vh-adlc-${name}/SKILL.md`;
-  const revision = name === "spec" ? specSummaryBaseline : baseline;
+  const revision = name === "spec" ? specSummaryBaseline : name === "implement" ? implementBaseline : baseline;
   const old = Bun.spawnSync(["git", "show", `${revision}:${path}`], { cwd: root, stdout: "pipe", stderr: "pipe" });
   expect(old.exitCode).toBe(0);
   const body = (text: string) => text.slice(text.indexOf("The plugin directory is two levels"));
@@ -34,6 +38,17 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     if (name === "spec" || name === "review") for (const phrase of ["scripts/loop/cli.ts review", "references/review-protocol.md", "pending", "requested model"]) expect(loop).toContain(phrase);
     current = (current.slice(0, loopStart) + current.slice(loopEnd)).replace(/\n+$/, "\n");
   }
+  // Shared issue labels (docs/specs/shared-issue-labels.md) add one section to the operations that file issues.
+  if (name === "investigate" || name === "spec") {
+    const start = current.indexOf("## Issue labels\n");
+    expect(start).toBeGreaterThan(0);
+    const next = current.indexOf("\n## ", start + 1), end = next < 0 ? current.length : next + 1;
+    const section = current.slice(start, end);
+    for (const phrase of ["scripts/labels/cli.ts file", "references/issues.md", "--preview", "--approved-digest", "missing labels", `--operation ${name}`]) expect(section).toContain(phrase);
+    if (name === "investigate") for (const phrase of ["act now", "--waiting-on prerequisite", "--waiting-on decision", "reject"]) expect(section).toContain(phrase);
+    if (name === "spec") expect(section).toContain("no state label");
+    current = (current.slice(0, start) + current.slice(end)).replace(/\n+$/, "\n");
+  } else expect(current).not.toContain("## Issue labels\n");
   if (name === "implement" || name === "ship") {
     const start = current.indexOf("## Documentation impact\n"), end = current.indexOf("## Start\n", start);
     expect(start).toBeGreaterThan(0); expect(end).toBeGreaterThan(start);
@@ -67,5 +82,15 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
   }
   const prefix = current.slice(current.indexOf("## Generic intake"), current.indexOf("The plugin directory is two levels"));
   expect(prefix).toBe("## Generic intake\n\nFor generic vh-adlc requests without an operation name, follow `references/lifecycle.md`; then continue here.\n\n");
-  expect(body(current)).toBe(body(old.stdout.toString()));
+  // A baseline taken after loop settings landed carries the same section; compare both without it.
+  let previous = old.stdout.toString();
+  const oldLoop = previous.indexOf("## Loop routes\n");
+  if (oldLoop > 0) {
+    const next = previous.indexOf("\n## ", oldLoop + 1);
+    previous = (previous.slice(0, oldLoop) + previous.slice(next < 0 ? previous.length : next + 1)).replace(/\n+$/, "\n");
+  }
+  // A baseline taken after documentation impact landed carries that section too.
+  const oldImpact = previous.indexOf("## Documentation impact\n");
+  if (oldImpact > 0) previous = previous.slice(0, oldImpact) + previous.slice(previous.indexOf("## Start\n", oldImpact));
+  expect(body(current)).toBe(body(previous));
 });

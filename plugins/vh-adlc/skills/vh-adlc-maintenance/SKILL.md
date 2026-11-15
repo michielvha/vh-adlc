@@ -47,9 +47,10 @@ are unavailable; missing inputs remain blockers. Normal runs follow these steps.
    A read-tools host needs the trusted operator's verified typed result for reconciliation; without
    it, keep its analysis and security accounting visibly pending.
 7. Check stale branches in every sweep with `references/branches.md`. First run `auto-delete` and
-   offer to enable GitHub's automatic merged-branch deletion where it is off. Then plan, report the plan and its
-   digest, and apply it once selected, or right away when the request already asked for removal.
-   After any merge this run performs, run `after-merge` for that PR.
+   offer to turn GitHub's branch auto-deletion on where it is off. Then plan, report it with its
+   digest, and apply it once selected, or at once if the request asked for removal. It covers clean
+   worktrees and their ignored files; a plan listing ignored paths waits for digest approval. After
+   each merge this run makes, run `after-merge` for that PR.
 
 Use available host capabilities; serial analysis is supported. Do not depend on commands, hooks,
 subagents, question tools or a particular model. An unavailable collector requires a verified supplied

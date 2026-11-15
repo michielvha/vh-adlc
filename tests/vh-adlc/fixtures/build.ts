@@ -45,6 +45,7 @@ export type Fixtures = {
   revisionB: string;
   revisionC: string;
   revisionD: string;
+  revisionPrevious: string;
   project: string;
   origin: string;
   worktree: string;
@@ -109,8 +110,12 @@ function initRepo(home: string, dir: string) {
   git(home, dir, "config", "init.defaultBranch", "main");
 }
 
+// PREVIOUS_DOCS_PIN is the docs revision the repository pinned before the review convergence change, whose
+// feature-document standard defines no severities. Old-pin scenarios pin a fixture project to its tree.
+const PREVIOUS_DOCS_PIN = "d8f07c9dd69038375a535af8ad586086688f85ab";
+
 // The docs fixture: revision A is the real vhco-pro/docs tree at the plugin pin.
-function buildDocs(home: string, dir: string): { a: string; b: string; c: string; d: string } {
+function buildDocs(home: string, dir: string): { a: string; b: string; c: string; d: string; previous: string } {
   initRepo(home, dir);
   git(home, dir, "fetch", "-q", "--depth", "1", "https://github.com/vhco-pro/docs", pin());
   git(home, dir, "read-tree", "-u", "--reset", "FETCH_HEAD");
@@ -141,8 +146,14 @@ function buildDocs(home: string, dir: string): { a: string; b: string; c: string
   git(home, dir, "rm", "-q", "guides/humanize-prose.md");
   git(home, dir, "commit", "-q", "-m", "docs revision D (no humanize prose guide)");
   const d = git(home, dir, "rev-parse", "HEAD");
-  git(home, dir, "checkout", "-q", "main");
-  return { a, b, c, d };
+  // The previous-pin revision is the real docs tree at PREVIOUS_DOCS_PIN, on its own root.
+  git(home, dir, "checkout", "-q", "--orphan", "previous-pin");
+  git(home, dir, "fetch", "-q", "--depth", "1", "https://github.com/vhco-pro/docs", PREVIOUS_DOCS_PIN);
+  git(home, dir, "read-tree", "-u", "--reset", "FETCH_HEAD");
+  git(home, dir, "commit", "-q", "-m", "docs previous pin (vhco-pro/docs before the severity definitions)");
+  const previous = git(home, dir, "rev-parse", "HEAD");
+  git(home, dir, "checkout", "-q", "-f", "main");
+  return { a, b, c, d, previous };
 }
 
 const FEATURE = `---
@@ -310,7 +321,7 @@ export function build(dir: string): Fixtures {
   const work = join(dir, "work");
   mkdirSync(work);
   const docs = join(dir, "docs");
-  const { a, b, c, d } = buildDocs(home, docs);
+  const { a, b, c, d, previous } = buildDocs(home, docs);
   const project = join(dir, "project");
   const origin = join(dir, "origin.git");
   const worktree = join(dir, "project-other-work");
@@ -326,7 +337,7 @@ export function build(dir: string): Fixtures {
   const pluginB = join(dir, "plugin-b");
   fixturePlugin(pluginA, a, wrapper, home, version, work);
   fixturePlugin(pluginB, b, wrapper, home, version, work);
-  return { dir, docs, revisionA: a, revisionB: b, revisionC: c, revisionD: d, project, origin, worktree, otherPlugin, pluginA, pluginB, home, log, wrapper };
+  return { dir, docs, revisionA: a, revisionB: b, revisionC: c, revisionD: d, revisionPrevious: previous, project, origin, worktree, otherPlugin, pluginA, pluginB, home, log, wrapper };
 }
 
 if (import.meta.main) {
