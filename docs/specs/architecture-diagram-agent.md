@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "All five criteria met in independent review R-9."
+status_description: "All five criteria met in independent review R-11."
 issue: null
 branch: feat/architecture-diagram-agent
 goal: "From a design brief or repository sources, the shared vh-adlc plugin produces an evidence-backed architecture diagram that the owner can edit in draw.io and embed in documentation."
@@ -131,6 +131,7 @@ None. The owner selected AWS and OCI-to-local fixtures, same-request rendering, 
 | 2026-11-14 | R-8 | implementation | `7cd15314eb48ac223a6126006fd55ad049d0dc3c` | unknown | procedural | Four criteria met, one unmet and three findings |
 | 2026-11-14 | R-9 | implementation | `b5149c1249d66b6c6c773d8c8b79d48ebb4225e2` | unknown | procedural | Five criteria met and no findings |
 | 2026-11-15 | R-10 | spec | `53943500fa750071f20c2937e779e8a4ae64ad3a` | unknown | procedural | No findings |
+| 2026-11-15 | R-11 | implementation | `53943500fa750071f20c2937e779e8a4ae64ad3a` | unknown | procedural | Five criteria met and no findings |
 
 ### R-1
 
@@ -350,6 +351,28 @@ EVIDENCE: I regraded all six latest native intake cases using `b5149c1` and matc
 ### R-10
 
 NO FINDINGS
+
+### R-11
+
+CRITERION: AC-01 An explicit architecture diagram request reaches the same shared workflow in Codex and Claude when each installs the candidate from its vhco-tools marketplace catalog.
+VERDICT: met
+EVIDENCE: At `53943500fa750071f20c2937e779e8a4ae64ad3a`, I installed 0.23.0 from each native catalog into a fresh profile. All 154 files in each install matched the candidate. The package checker and discovery tests passed. The installed diagram skill, reference and export helper match the files from the R-9 native sessions, where both hosts read the installed skill on request.
+
+CRITERION: AC-02 The AWS repository and OCI-to-local fixtures produce diagrams whose depicted scope, components, boundaries and arrows agree with their evidence or carry the proposed label, with unresolved relationships visible in the brief.
+VERDICT: met
+EVIDENCE: The diagram source and fixtures match R-9 byte for byte. I regraded all four delivered bundles with the merged target and matched their hashes to the manifests from the source and drawing inspection. The AWS diagrams preserve the three documented hops and omit the dependency-only bucket. The OCI diagrams preserve the proposed backup path and record the unresolved restore without drawing it.
+
+CRITERION: AC-03 A successful request produces a brief, an editable native draw.io file with movable nested groups, and a matching local SVG with recognizable fixture icons, readable labels and legible routes.
+VERDICT: met
+EVIDENCE: The export helper, schema inputs and fixture code match R-9. I matched all four bundles to the artifacts checked in the Desktop editor and inspected at documentation and phone widths. All four passed the XSD and reference checks. The offline SVG exports matched byte for byte or differed only in the generated SVG ID and its references. The editor drags moved the named children with their boundaries.
+
+CRITERION: AC-04 An unavailable prerequisite, asset hash mismatch, failed export or existing destination leaves existing artifacts intact. Two successful renders competing for one unused destination yield one complete set of files and one collision. A retry can publish to a different unused destination.
+VERDICT: met
+EVIDENCE: The 82 focused tests passed at the merged target, including the failure, collision and retry checks. I confirmed that the runtime and failure case match the prior native trials, checked the renderer invocation markers and verified that both failed trials left the final directory absent.
+
+CRITERION: AC-05 A request with sufficient evidence renders in the same request. A useful partial view renders with the gaps documented. A request whose main relationship cannot be established gets a clarification before writing final output.
+VERDICT: met
+EVIDENCE: I reapplied the merged target's grader to all six retained native intake cases and observed no failures. Both hosts rendered the AWS and partial OCI cases within their original requests. The OCI briefs record the missing restore relationship. Both clarification transcripts request the missing input, and both final directories remain absent.
 
 ## Sources
 
