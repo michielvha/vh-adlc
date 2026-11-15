@@ -113,4 +113,4 @@ installation evidence.
 
 ## Architecture diagram skill
 
-The shared `vh-adlc` package introduces `vh-adlc-diagram` in plugin version 0.22.0. The skill becomes available from the marketplace when that package is published. The [workflow](../user-guides/workflows.md#architecture-diagrams) lists the local renderer and asset prerequisites.
+The shared `vh-adlc` package introduces `vh-adlc-diagram` in plugin version 0.23.0. The skill becomes available from the marketplace when that package is published. The [workflow](../user-guides/workflows.md#architecture-diagrams) lists the local renderer and asset prerequisites.
