@@ -1615,6 +1615,7 @@ None.
 | 2026-11-15 | R-83 | spec | `aa70bfadfc062832b998051264630d14d3bbcc30` | claude-opus-5-5 | procedural | Two citation nits, with no blocking or should-fix findings. All 338 required fragments read, inputs unchanged and owned process cleanup confirmed. |
 | 2026-11-15 | R-83 | spec | `aa70bfadfc062832b998051264630d14d3bbcc30` | n/a | n/a | accepted by owner |
 | 2026-11-15 | R-84 | spec | `348bb29ec83814347747bfd493ef82bdd7c32abe` | claude-opus-5-5 | procedural | One should-fix on public skill inventory and four metadata/evidence nits. All 192 required fragments read, packet unchanged and owned cleanup confirmed. |
+| 2026-11-15 | R-85 | spec | `108dd689cf2a0e1bd4014bec21080178a623db8b` | claude-opus-5-5 | procedural | Four factual metadata/evidence nits, with no blocking or should-fix findings. All 231 required fragments read, packet unchanged and owned cleanup confirmed. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -2130,6 +2131,36 @@ SEVERITY: nit
 WHERE: Tasks T118 and T120 (spec 0089 line 19; spec 0090 line 5); Tasks preamble (spec 0043 line 6); Open Questions (spec 0108 line 12)
 EVIDENCE: The Tasks preamble says "Each task is one coherent commit with its observed checks recorded below it". T118 and T120 are ticked with no Evidence block beneath them. Their checks appear only in Context ("Integration with the published diagram skill"; "T120 is complete" in "Mapped controllers and scoped native account observations"). The neighboring ticked T114 and T115 keep evidence under the task. Separately, Open Questions reads "None. The owner approved recommendation A on 2026-11-15." It does not name the question or the option, and the reader has to infer it from the Context "Owner decision" paragraph. The standard says an answered question is folded into the document and removed.
 PROPOSAL: Add short Evidence lines under T118 and T120 that point to their Context records and retained logs. Reduce Open Questions to "None.", or name the decision folded into Context "Owner decision and publication authority on 2026-11-15".
+
+### R-85
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Canonical refresh findings and exact current checks", second paragraph (spec 0009 line 33 to spec 0010 line 1: "T112 carries the comparison-path negative controls, T111 carries the missing-entry usage/control, and T31 carries exact verification"); Tasks T112 R8 paragraph (spec 0091 line 11: "R8-03 exact affected-suite verification is complete at `3d8f4c7`"); Tasks T31 (spec 0092 line 6); Tasks T111 R8 paragraph (spec 0091 line 3)
+EVIDENCE: Context assigns R8-03 to T31. T31's text never mentions R8-03, and T112 says R8-03 verification is already complete, so the document gives two answers about who owns R8-03 and whether it is done. The original R8-03 proposal asks for "full runs of `delivery-ack.test.ts`, `trial-setup.test.ts`, `publisher-identities.test.ts` and `cli.test.ts`" plus one native-transport acknowledgement case (publisher-component-claude-r8/returned-records.txt 0001 lines 27 to 30). The exact 3d8f4c7 run instead covers delivery-ack, trial-setup, cli and recovery (verify-ack-3d8f4c7/results.json lines 62 to 70), and the log reports "Ran 396 tests across 4 files" (acknowledgement-setup-cli-neighbors.stderr 0006 line 40). publisher-identities.test.ts is absent from that run; its last exact run is at the predecessor 7dff346 (verify-lookup-7dff346/results.json lines 64 to 66). The native-transport case passed only in an out-of-repository adapted copy, "1 pass, 186 filtered out" (native-ack-extra.log lines 4 to 6), and Context itself calls it "exploratory until incorporated". So "complete" overstates what R8-03 asked for. Nothing an implementer builds changes.
+PROPOSAL: Choose one owner for the remaining R8-03 work and state it the same way in Context, T112 and T31. Either add an exact-source publisher-identities.test.ts run and the incorporated native-transport case, or change "complete" to name the four suites actually rerun and the two items that remain.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Canonical refresh findings and exact current checks", first paragraph (spec 0009 lines 29 to 31); Tasks T118 file list and Evidence (spec 0089 lines 8 to 10)
+EVIDENCE: The heading says "exact current checks", and the paragraph says R-84's findings "are stored verbatim" and that the public guides and test were corrected. The only supplied `review check` output is for R-83 (measured/original-review-check.json: `"review":"R-83","equal":true`). No R-84 equality output is cited. My own comparison confirms that the stored R-84 subsection matches spec-claude-r7/returned-records.txt. The cited correction run, r84-public-inventory-green.log, records no argv, source commit or clean-state record. The red log ran in a working tree (r84-public-inventory-red.log 0005 line 3, `/home/m/code/vh-adlc-docs-drift-spec/tests/...`). context.md also describes these as "73 workingtree cases before commit". T118 presents the 73-case/390-assertion result without that label. It sits beside exact-source records that this document carefully separates from working-tree runs, for example in the R8-03 and component R3 F-02 handling. The T118 evidence also says the "installation page" was corrected, but T118's file list does not name docs/get-started/installation.md. The feature-document standard says each task "names the file it touches".
+PROPOSAL: Label the 73-case result as a pre-commit working-tree observation, or cite an exact-source run at the commit that holds the correction. Cite the retained `review check --review R-84` output. Add docs/get-started/installation.md to T118's file list.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter status_description (spec 0001 line 3: "Publisher and recovery fixes are pushed in draft PR #98"); Context "Owner summary", fifth paragraph (spec 0001 line 78: "Implementation is published through draft PR #98")
+EVIDENCE: Context records a push of c3b6a05 with the `gh pr view` output (spec 0005 line 5). It also records CI on pushed 27b9466 (spec 0006 line 21) and "pushed `13c5653`" (spec 0007 line 1). Later publisher and recovery commits, including 875eef2 "Recovery account scope", 453ffc0 "recovery corrections", df2d49c, 7dff346 and 3d8f4c7, are not described as pushed. No later PR head or CI observation is cited. The publication authority paragraph requires "reporting its exact CI state" (spec 0005 line 1). feature-documents.md says Context claims cite "a command and its output", and that the summary distinguishes planned checks from observed proof. The present-tense claim that the recovery fixes are in PR #98 has no cited observation.
+PROPOSAL: Record the current observed PR #98 head and its CI state with the retained `gh pr view` output. Otherwise, reword the status line and summary to say which recorded commit is pushed and that later fixes are local.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Current implementation checkpoint" (spec 0001 lines 80 to 84, continuing into spec 0002 line 1)
+EVIDENCE: The section headed "Current implementation checkpoint" describes the 2026-11-14 T91 to T102 work at 445ca6 and the earlier 63d6c86 integration. It also says "Canonical R-66 freshness is recorded with its metadata corrections and a passing in-progress gate." The current state recorded later in Context is quite different. The latest canonical review is R-84 at 348bb29 (spec 0009 line 31). The latest qualified component review is R8 at 3d8f4c7. The candidate is 0.24.0, and the standalone verified CLI is 0.32.0 (spec 0001 line 78; spec 0009 line 15). R-78 F-03 and R-79 F-03 corrected the same kind of stale "latest/current" labelling for the upstream sections. Nothing an implementer builds changes.
+PROPOSAL: Retitle the section as a dated earlier checkpoint, for example "Implementation checkpoint on 2026-11-14". State that the R-66 gate result belongs to that time.
 
 ## Sources
 
