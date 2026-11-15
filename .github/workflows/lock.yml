@@ -1,0 +1,54 @@
+name: Lock binary
+
+# After each release, moves the plugin's binary lock to it when the binary changed, through a PR that
+# merges itself once CI passes. scripts/release/lock-binary.sh decides and does the work.
+on:
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: lock-binary
+  cancel-in-progress: false
+
+jobs:
+  lock:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      # The App token, unlike GITHUB_TOKEN, starts CI on the pushed branch and may merge the PR.
+      - id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.token.outputs.token }}
+      - id: lock
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          TAG: ${{ github.event.workflow_run.head_branch }}
+        run: scripts/release/lock-binary.sh "$TAG"
+      - if: steps.lock.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.token.outputs.token }}
+          VERSION: ${{ steps.lock.outputs.version }}
+          BOT: ${{ steps.token.outputs.app-slug }}[bot]
+        run: |
+          branch="chore/lock-$VERSION"
+          git switch -c "$branch"
+          git -c user.name="$BOT" -c user.email="$BOT@users.noreply.github.com" commit -qam "chore(vh-adlc): lock the $VERSION binary"
+          git push -q origin "$branch"
+          gh pr create --base main --head "$branch" --title "chore(vh-adlc): lock the $VERSION binary" \
+            --body "Automated by .github/workflows/lock.yml: v$VERSION changed the binary. checksums.txt is signed by the release key and every archive matches it. Merges itself when CI passes."
+          # Wait for the PR's CI to start, then for it to finish; merge only when every check passed.
+          for _ in $(seq 30); do [ "$(gh pr view "$branch" --json statusCheckRollup -q '.statusCheckRollup | length')" -gt 0 ] && break; sleep 20; done
+          gh pr checks "$branch" --watch --fail-fast
+          gh pr merge "$branch" --merge --delete-branch --subject "chore(vh-adlc): lock the $VERSION binary"
