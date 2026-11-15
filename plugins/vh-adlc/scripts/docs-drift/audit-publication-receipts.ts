@@ -1,3 +1,4 @@
+import { isPublisherLogin } from "./identity";
 import { realpathSync } from "node:fs";
 import { GitHubReadError } from "../github-read";
 import { readCollectedAuditProposalContext, type collectAuditProposalInputs } from "./audit-proposal-inputs";
@@ -61,14 +62,14 @@ export async function collectAuditPublicationReceipts(input: { repo: string; sou
       const binding = bindings.get(proposal.number); if (!binding) throw Error("Complete original audit publication binding required");
       const entry: Entry = { number: proposal.number, binding_sha256: binding, eligibility: "unreviewed", reviewed: null, receipt: null, diagnostics: [] };
       result.proposals.push(entry);
-      if (proposal.actor !== settings.publication.actor || proposal.state !== "open" || proposal.merged_at !== null) {
+      if (!isPublisherLogin(settings, proposal.actor) || proposal.state !== "open" || proposal.merged_at !== null) {
         entry.diagnostics.push("Legacy or terminal proposal has no current shared reviewed delivery; verify its source and result separately"); continue;
       }
       try {
         const { title: _title, labels: _labels, ...core } = proposal;
         const observed = await readReviewedProposal({ reader: initial.repository, settings, proposal: core,
           verifyPlan: (bytes, observedNative) => createAdoptedPublicationVerifier({ store: context.store, current_default: context.current_default,
-            identity: context.identity, proposal: core })(bytes, observedNative) });
+            identity: context.identity, entry: context.entry, proposal: core })(bytes, observedNative) });
         entry.reviewed = observed.reviewed; entry.receipt = observed.receipt; entry.eligibility = "reviewed"; result.reviewed_proposals++;
       } catch (error) {
         if (error instanceof PublicationEvidenceChanged) throw new PublicationScopeChanged("Native reviewed publication changed during audit collection");

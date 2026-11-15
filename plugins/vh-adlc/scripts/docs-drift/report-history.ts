@@ -1,3 +1,4 @@
+import { isPublisherLogin, sameLogin } from "./identity";
 import { randomUUID } from "node:crypto";
 import { constants, closeSync, mkdirSync, writeFileSync, fstatSync, lstatSync, openSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { join, relative, isAbsolute } from "node:path";
@@ -434,7 +435,7 @@ export async function readReviewedProposal(options: {
   if (current.state !== "open" || current.merged_at !== null
     || current.base_repository.full_name.toLowerCase() !== settings.repository.toLowerCase()
     || current.base_ref !== settings.default_branch || current.head_repository?.id !== current.base_repository.id
-    || current.actor !== settings.publication.actor) invalid("current owned PR changed or unavailable");
+    || !isPublisherLogin(settings, current.actor)) invalid("current owned PR changed or unavailable");
   canonicalJSON(current.body);
   const markers = [...current.body.matchAll(/<!-- vh-adlc-docs-drift\b[^\r\n]*? -->/gu)];
   if (markers.length !== 1) invalid("missing or ambiguous operation marker");
@@ -452,7 +453,7 @@ export async function readReviewedProposal(options: {
   const reviewed = await options.verifyPlan(bytes, native);
   if (reviewed === null) invalid("review policy does not accept this receipt");
   for (const key of ["repository", "repository_id", "operation_id", "actor", "actor_id", "head", "tree", "body_sha256"] as const) {
-    if (reviewed[key] !== native[key]) invalid("reviewed publication payload mismatch");
+    if (key === "actor" ? !sameLogin(reviewed.actor, native.actor) : reviewed[key] !== native[key]) invalid("reviewed publication payload mismatch");
   }
   if (!Array.isArray(reviewed.corrections) || !Array.isArray(reviewed.attention)) invalid("reviewed item bindings");
   for (const correction of reviewed.corrections) hash(correction);

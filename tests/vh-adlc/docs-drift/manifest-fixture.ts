@@ -23,7 +23,7 @@ export function evidence(id: string, target: string, returned: string): NativeRo
   };
 }
 
-export function fixture(selectedBindings = bindings, selectedEffects?: Effect[], operationId = "operation-1") {
+export function fixture(selectedBindings = bindings, selectedEffects?: Effect[], operationId = "operation-1", publisher?: Pick<ActionManifest, "actor" | "actor_id" | "publisher_entry">) {
   const effects: Effect[] = selectedEffects ?? [
     { id: "push", kind: "push", payload: { ref: "refs/heads/docs-drift/one", head: selectedBindings.candidate_commit } },
     { id: "pr", kind: "pr-create", payload: { base: "main", branch: "docs-drift/one", title: "Repair docs", body: "Exact reviewed body\n", labels: ["documentation"], draft: true } },
@@ -31,7 +31,7 @@ export function fixture(selectedBindings = bindings, selectedEffects?: Effect[],
   const worker = evidence("worker", workerInputDigest(selectedBindings), canonicalJSON({ input_sha256: workerInputDigest(selectedBindings), edits: [], publication: effects.find(effect => effect.kind === "pr-create")?.payload ?? null }).toString());
   const manifest: ActionManifest = {
     schema_version: 1, operation_id: operationId, repository: "fixture/docs", repository_id: 10,
-    actor: "fixture-bot", actor_id: 20, bindings: selectedBindings, effects,
+    actor: "fixture-bot", actor_id: 20, ...publisher, bindings: selectedBindings, effects,
     worker: { invocation_id: worker.invocation_id, context_id: worker.context_id, native_sha256: worker.native_sha256, returned_sha256: worker.returned_sha256 },
   };
   const reviewer = evidence("reviewer", manifestDigest(manifest), "NO FINDINGS\n");

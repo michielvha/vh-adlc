@@ -1,3 +1,4 @@
+import { sameAccount, type PublisherEntry } from "./identity";
 import type { PullRequestInput } from "../github-read";
 import { readCompatibleAdoptionLineage } from "./adoption-lineage";
 import { readRecordedRoleModel, verifyRuntimeAdoption } from "./adoption";
@@ -21,10 +22,10 @@ export class RetainedPublicationIneligible extends Error {
 
 /** Native ref/object collection calls this verifier; it supplies neither fresh support nor execution grants. */
 export function createAdoptedPublicationVerifier(input: {
-  store: OwnedObjectStore; current_default: string; identity: PublicationIdentity; proposal: PullRequestInput;
+  store: OwnedObjectStore; current_default: string; identity: PublicationIdentity; entry?: PublisherEntry; proposal: PullRequestInput;
 }) {
   const { store, current_default: current, identity, proposal } = structuredClone(input), repo = store.root;
-  const allowed = new Set(readCompatibleAdoptionLineage({ store, current_default: current, identity }));
+  const allowed = new Set(readCompatibleAdoptionLineage({ store, current_default: current, identity, entry: input.entry }));
   const currentSettings = loadCommittedSettings(repo, current).settings;
   return (bytes: Buffer, native: Omit<NativePublicationBinding, "corrections" | "attention">): ReviewedPublication => {
     function fail(reason: string): never { throw new RetainedPublicationIneligible(reason); }
@@ -33,33 +34,36 @@ export function createAdoptedPublicationVerifier(input: {
       const original = readPlan(), manifest = original.manifest, bindings = manifest.bindings;
       if (original.context !== "production" || original.transport !== "native") fail("requires production native evidence");
       if (!allowed.has(original.adoption_sha256)) fail("adoption is outside the approved compatible lineage");
-      if (proposal.state !== "open" || proposal.merged_at !== null || proposal.actor !== identity.actor || proposal.actor_id !== identity.actor_id
+      if (proposal.state !== "open" || proposal.merged_at !== null || !sameAccount(proposal, manifest)
         || proposal.base_repository.id !== identity.repository_id || proposal.head_repository?.id !== identity.repository_id
         || proposal.base_repository.full_name.toLowerCase() !== identity.repository.toLowerCase()
         || proposal.head_repository.full_name.toLowerCase() !== identity.repository.toLowerCase() || proposal.base_ref !== identity.default_branch)
         fail("current owned proposal identity changed");
-      if (native.repository !== identity.repository || native.repository_id !== identity.repository_id || native.actor !== identity.actor
-        || native.actor_id !== identity.actor_id || native.head !== proposal.head_sha || native.body_sha256 !== sha256(Buffer.from(proposal.body))
+      if (native.repository !== identity.repository || native.repository_id !== identity.repository_id || !sameAccount(native, manifest) || native.head !== proposal.head_sha || native.body_sha256 !== sha256(Buffer.from(proposal.body))
         || native.operation_id !== manifest.operation_id || native.ref !== currentSettings.publication.receipt_ref_prefix + manifest.operation_id
-        || manifest.repository !== native.repository || manifest.repository_id !== native.repository_id || manifest.actor !== native.actor || manifest.actor_id !== native.actor_id)
+        || manifest.repository !== native.repository || manifest.repository_id !== native.repository_id)
         fail("native publication identity or receipt changed");
       // These snapshots require complete owned histories before a negative ancestry verdict is meaningful.
       const source = captureBareSnapshot(repo, bindings.source_commit), candidate = captureBareSnapshot(repo, native.head);
       if (!isGitAncestor(repo, bindings.source_commit, current) || !isGitAncestor(repo, bindings.source_commit, native.head))
         fail("original source is not an ancestor of the current default or proposal head");
-      const adopted = verifyRuntimeAdoption({ repo, current_default: bindings.source_commit, identity });
+      const producer = { ...identity, actor: native.actor, actor_id: native.actor_id };
+      const adopted = verifyRuntimeAdoption({ repo, current_default: bindings.source_commit, identity: producer, entry: manifest.publisher_entry });
       if (adopted.adoption_sha256 !== original.adoption_sha256) fail("original source adoption changed");
       const stable = deriveSourceWorkerInputs(source);
       for (const key of Object.keys(stable) as Array<keyof typeof stable>) if (bindings[key] !== stable[key]) fail("original source bindings changed");
       const settings = source.settings;
-      const policies = Object.entries(settings.execution.entries).map(([entry, roles]) => {
-        const receipt = entry === "hosted" ? "hosted_advisory" : entry === "copilot" ? "copilot_entry" : "claude_entry";
-        const policy: PlanPolicy = { adoption_sha256: adopted.adoption_sha256, context: "production", transport: "native",
-          publication_kind: original.publication_kind, pr_draft: settings.publication.pr_state[original.publication_kind] === "draft",
-          worker: { requested_model: roles.worker.model, adopted_model: fullModel(readRecordedRoleModel(adopted.receipts, receipt, "worker")), identity_source: roles.worker.identity_source },
-          reviewer: { requested_model: roles.reviewer.model, adopted_model: fullModel(readRecordedRoleModel(adopted.receipts, receipt, "reviewer")), identity_source: roles.reviewer.identity_source } };
-        return policy;
-      });
+      const policies = Object.entries(settings.execution.entries)
+        .filter(([entry]) => manifest.publisher_entry === undefined || entry === manifest.publisher_entry)
+        .map(([entry, roles]) => {
+          const receipt = entry === "hosted" ? "hosted_advisory" : entry === "copilot" ? "copilot_entry" : "claude_entry";
+          const policy: PlanPolicy = { adoption_sha256: adopted.adoption_sha256, context: "production", transport: "native",
+            publication_kind: original.publication_kind,
+            ...(settings.publication.entry_actors ? { publisher_entry: manifest.publisher_entry } : {}), pr_draft: settings.publication.pr_state[original.publication_kind] === "draft",
+            worker: { requested_model: roles.worker.model, adopted_model: fullModel(readRecordedRoleModel(adopted.receipts, receipt, "worker")), identity_source: roles.worker.identity_source },
+            reviewer: { requested_model: roles.reviewer.model, adopted_model: fullModel(readRecordedRoleModel(adopted.receipts, receipt, "reviewer")), identity_source: roles.reviewer.identity_source } };
+          return policy;
+        });
       const policy = policies.find(candidate => (["worker", "reviewer"] as const).every(role => {
         const observed = original.roles[role], expected = candidate[role];
         return observed.requested_model === expected.requested_model && observed.model === expected.adopted_model
@@ -90,7 +94,7 @@ export function createAdoptedPublicationVerifier(input: {
           fail("normalized correction bindings changed");
       }
       return freezeJSON({ repository: native.repository, repository_id: native.repository_id, operation_id: native.operation_id,
-        actor: native.actor, actor_id: native.actor_id, head: native.head, tree, body_sha256: native.body_sha256,
+        actor: manifest.actor, actor_id: manifest.actor_id, head: native.head, tree, body_sha256: native.body_sha256,
         corrections: plan.corrections.map(correctionProjection), attention: structuredClone(plan.attention) });
     } catch (error) {
       if (error instanceof RetainedPublicationIneligible) throw error;

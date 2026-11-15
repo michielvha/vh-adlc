@@ -92,12 +92,12 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
       const collected = await collectActionsHistory({ repo, artifact_root: options.artifact_root, settings, context, reader: initial.repository,
         environment: { PATH: options.path, ...(settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com")
           ? { GH_TOKEN: options.credential } : { GH_ENTERPRISE_TOKEN: options.credential }) },
-        verifyProducer: createAdoptedProducerVerifier({ store, current_default: currentDefault, identity }) });
+        verifyProducer: createAdoptedProducerVerifier({ store, current_default: currentDefault, identity, entry: options.entry }) });
       snapshot = collected; result.receipts = collected.receipts;
       if (!collected.complete) { result.diagnostics.push(...collected.diagnostics); throw Error("Required native report history collection incomplete"); }
     } else if (result.mode === "local-attestation") {
       if (!options.cache_directory || !facts.runtime?.component.component_sha256) throw Error("Original retained component required for local history");
-      localContext = { repo, cache_directory: options.cache_directory, settings, identity, store, current_default: currentDefault,
+      localContext = { repo, cache_directory: options.cache_directory, settings, identity, store, current_default: currentDefault, entry: options.entry,
         source: options.source, component_sha256: facts.runtime.component.component_sha256, run_id: options.run,
         scope_sha256: context.scope_sha256, started_at: captured_at, recheck() {
           const observed = native();
@@ -119,7 +119,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
         throw new PublicationScopeChanged("Native history source or actor changed before output");
       const currentRun = readNativeRun(observed.repository, run.id, run.run_attempt);
       if (runBinding(currentRun) !== runBinding(run)) throw new PublicationScopeChanged("Current native scheduled run changed before output");
-      const producer = createAdoptedProducerVerifier({ store, current_default: currentDefault, identity })(
+      const producer = createAdoptedProducerVerifier({ store, current_default: currentDefault, identity, entry: options.entry })(
         createProducerSource(observed.repository, run.head_sha), currentRun);
       if (!producer) throw Error("Adopted native history producer required for hosted output");
       const report = JSON.parse(Buffer.from(bytes).toString("utf8"));

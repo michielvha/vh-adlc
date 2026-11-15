@@ -603,6 +603,16 @@ export function verifyRuntimeAdoption(options: AdoptionOptions) {
   return freezeJSON({ ...verifyAdoptionRecord(options, { kind: "observed" }), evidence: "owner-attestation" as const });
 }
 
+/** Reopen original owner-attested history. This supplies no current caller or execution authority. */
+export function readRecordedAdoption(options: { repo: string; current_default: string }) {
+  const current = immutable(options.current_default), { settings } = loadCommittedSettings(options.repo, current);
+  const input = committedInput(options.repo, current, settings.publication.adoption_record);
+  if (!input || input.mode !== "100644") fail("original recorded adoption required");
+  const record = parseAdoptionRecord(input.bytes, { kind: "observed" });
+  const recorded = verifyAdoptionRecord({ ...options, current_default: current, identity: nativeIdentity(record.identity), entry: "hosted" }, { kind: "observed" });
+  return freezeJSON({ ...recorded, authority: "none" as const });
+}
+
 /** Only the separate synthetic driver constructs this test-only gate from its owned context. */
 export async function createTrialAdoptionGate(options: { root: string; context_commit: string; runtime_directory: string }) {
   const { loadTrialContext, TRIAL_IDENTITY } = await import("./trial-context");

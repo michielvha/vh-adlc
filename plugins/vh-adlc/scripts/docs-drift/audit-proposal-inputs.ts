@@ -23,7 +23,7 @@ type Result = {
 };
 const originalInputs = new WeakMap<object, ResolutionProposal[]>();
 type OriginalContext = { repo: string; source_commit: string; artifact_root: string; store: OwnedObjectStore;
-  identity: PublicationIdentity; current_default: string; proposals: PublicationPullInput[];
+  identity: PublicationIdentity; current_default: string; entry: WorkerCollectionOptions["entry"]; proposals: PublicationPullInput[];
   bindings: Array<{ number: number; binding_sha256: string }>; references: Array<{ path: string; sha256: string }>;
   inputs_sha256: string; worker_input_sha256: string };
 const originalContexts = new WeakMap<object, OriginalContext>();
@@ -106,7 +106,7 @@ export async function collectAuditProposalInputs(input: WorkerCollectionOptions)
       result.inputs_sha256 = canonicalDigest({ source_commit: options.source, worker_input_sha256: current.worker_input_sha256, originals });
       context = { repo, source_commit: options.source, artifact_root: scope.directory, store: { ...store },
         identity: { repository: identity.repository, repository_id: identity.repository_id, actor: identity.actor, actor_id: identity.actor_id, default_branch: identity.default_branch },
-        current_default: currentDefault, proposals: structuredClone(current.proposals.proposals),
+        current_default: currentDefault, entry: options.entry, proposals: structuredClone(current.proposals.proposals),
         bindings: originals.map(proposal => ({ number: proposal.number, binding_sha256: proposal.binding_sha256 })),
         references: result.proposals.flatMap(proposal => proposal.inputs_reference ? [{ ...proposal.inputs_reference }] : []),
         inputs_sha256: result.inputs_sha256, worker_input_sha256: current.worker_input_sha256 };

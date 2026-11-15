@@ -1,3 +1,4 @@
+import type { PublisherEntry } from "./identity";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, opendirSync, renameSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -16,7 +17,7 @@ import type { PublicationIdentity } from "./transport";
 
 export type LocalHistoryContext = {
   repo: string; cache_directory: string; settings: Settings; identity: PublicationIdentity; store: OwnedObjectStore;
-  current_default: string; source: string; component_sha256: string; run_id: string; scope_sha256: string; started_at: string;
+  current_default: string; source: string; entry?: PublisherEntry; component_sha256: string; run_id: string; scope_sha256: string; started_at: string;
   recheck(): void;
 };
 function registry(context: LocalHistoryContext, create: boolean, indexed = false): string | null {
@@ -54,8 +55,8 @@ export function createLocalInvocationReader(inputContext: LocalHistoryContext) {
         || !isGitAncestor(context.store.root, wanted.source_commit, context.current_default)) throw Error("Local invocation scope or age changed");
       const root = registry(context, false);
       if (root === null) throw Error("Local invocation registry unavailable");
-      const allowed = new Set(readCompatibleAdoptionLineage({ store: context.store, current_default: context.current_default, identity: context.identity }));
-      const adopted = verifyRuntimeAdoption({ repo: context.store.root, current_default: wanted.source_commit, identity: context.identity });
+      const allowed = new Set(readCompatibleAdoptionLineage({ store: context.store, current_default: context.current_default, identity: context.identity, entry: context.entry }));
+      const adopted = verifyRuntimeAdoption({ repo: context.store.root, current_default: wanted.source_commit, identity: context.identity, entry: context.entry });
       if (!allowed.has(adopted.adoption_sha256) || adopted.component_pin.component_sha256 !== wanted.component_sha256
         || loadCommittedSettings(context.store.root, wanted.source_commit).settings.reports.interactive !== "local-attestation")
         throw Error("Local invocation producer is outside approved history");

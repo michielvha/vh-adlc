@@ -26,3 +26,10 @@ export function publisherActor(settings: Settings, entry?: PublisherEntry): stri
   if (entry === undefined || !PUBLISHER_ENTRIES.includes(entry)) throw Error("docs-drift publisher entry required");
   return actors[entry];
 }
+
+
+/** Discovery eligibility only. The original adoption and native numeric account still verify the producer. */
+export function isPublisherLogin(settings: Settings, actor: string): boolean {
+  const configured = settings.publication.entry_actors ?? { hosted: settings.publication.actor };
+  return Object.values(configured).some(login => sameLogin(login, actor));
+}

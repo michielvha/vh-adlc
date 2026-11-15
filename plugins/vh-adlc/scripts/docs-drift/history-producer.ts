@@ -1,5 +1,6 @@
+import type { PublisherEntry } from "./identity";
 import type { WorkflowRunInput } from "../github-read";
-import { collectAdoptionBindings, verifyRuntimeAdoption } from "./adoption";
+import { collectAdoptionBindings, readRecordedAdoption } from "./adoption";
 import { readCompatibleAdoptionLineage } from "./adoption-lineage";
 import { isGitAncestor, readAdoptionInput, readGit } from "./git";
 import { readHistoryWorkflowContract } from "./history-workflow";
@@ -14,10 +15,10 @@ import type { PublicationIdentity } from "./transport";
 function fail(reason: string): never { throw Error("incomplete docs-drift history producer " + reason); }
 
 /** Native history supplies this callback. It accepts no report-provided approval or producer identity. */
-export function createAdoptedProducerVerifier(input: { store: OwnedObjectStore; current_default: string; identity: PublicationIdentity }) {
+export function createAdoptedProducerVerifier(input: { store: OwnedObjectStore; current_default: string; identity: PublicationIdentity; entry?: PublisherEntry }) {
   const store = { ...input.store }, current = input.current_default, identity = { ...input.identity }, repo = store.root;
   requireOwnedStore(store, identity.repository);
-  const allowed = new Set(readCompatibleAdoptionLineage({ store, current_default: current, identity }));
+  const allowed = new Set(readCompatibleAdoptionLineage({ store, current_default: current, identity, entry: input.entry }));
   return (source: ProducerSource, run: WorkflowRunInput): VerifiedProducer | null => {
     try {
       requireOwnedStore(store, identity.repository);
@@ -33,7 +34,9 @@ export function createAdoptedProducerVerifier(input: { store: OwnedObjectStore; 
       if (readAdoptionInput(repo, run.head_sha, ".vh-adlc/docs-drift.yaml") === null) return null;
       const { settings } = loadCommittedSettings(repo, run.head_sha);
       if (settings.publication.mode !== "adopted" || readAdoptionInput(repo, run.head_sha, settings.publication.adoption_record) === null) return null;
-      const adopted = verifyRuntimeAdoption({ repo, current_default: run.head_sha, identity });
+      const adopted = readRecordedAdoption({ repo, current_default: run.head_sha });
+      if (adopted.identity.repository_id !== identity.repository_id || adopted.identity.default_branch !== identity.default_branch
+        || adopted.identity.repository.toLowerCase() !== identity.repository.toLowerCase()) fail("original producer repository changed");
       if (!allowed.has(adopted.adoption_sha256)) return null;
       if (run.workflow_id !== settings.reports.workflow_id || ![settings.reports.workflow_path,
         settings.reports.workflow_path + "@" + settings.default_branch, settings.reports.workflow_path + "@refs/heads/" + settings.default_branch,
