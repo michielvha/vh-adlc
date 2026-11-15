@@ -368,6 +368,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-15 | R-1 | spec | `ef7f01b8b85a78c3c26aebb77aab526eed13d54a` | claude-opus-5-5 | procedural | One blocking, twelve should-fix and two nit findings |
 | 2026-11-15 | R-2 | spec | `b34ba95382ee1ceb78d0c6c2ac5d751dc65b0ff3` | claude-opus-5-5 | procedural | One blocking, sixteen should-fix and three nit findings |
+| 2026-11-15 | R-3 | spec | `09de0c3e2a106f48ae3f72e8859362a9193cc308` | claude-opus-5-5 | procedural | One blocking, ten should-fix and three nit findings |
 
 ### R-1
 
@@ -617,6 +618,106 @@ SEVERITY: nit
 WHERE: Design, History ("per candidate its key, category, home, tier, status and a one-line summary")
 EVIDENCE: `status` is a field of the versioned `retro-report` format, but its values are defined nowhere in the document (new, recurring, covered, fix that did not hold, or something else).
 PROPOSAL: List the allowed `status` values in the format definition.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: AC-06 ("apart from the new report the run leaves the fixture repository, report directory, system temporary directory and trackers unchanged"); Test Plan row AC-06 ("compare `git status --porcelain` and file hash lists of ... the system temporary directory before and after (must differ only by the one report)"); Design, Effects and failure ("Each run first removes `vh-adlc-retro-*` temporary directories and `.retro-*.tmp` files older than one hour"); Owner summary ("The skill writes nothing else except its own temporary files")
+EVIDENCE: The Claude Code host writes to the system temporary directory during every session, whatever a skill does. `find /tmp/claude-1000 -mmin -10` during this review listed entries the host wrote, such as `/tmp/claude-1000/bash-edit-diff/<id>/objects`, `refs` and `HEAD` (Git stores for bash edit diffs) and `/tmp/claude-1000/-home-m-code-stackweaver/<session id>/tasks` and `scratchpad`. `find /tmp -maxdepth 1 -mmin -10` also showed new files from other concurrent sessions. The report is never written to the temporary directory, so the row requires a byte-identical temporary directory, and any recorded Claude Code run fails it. The Design's own cleanup of stale `vh-adlc-retro-*` entries changes the directory as well whenever any exist. The proof therefore fails a correct implementation.
+PROPOSAL: Limit the check to the entries the skill owns: after the run, no `vh-adlc-retro-<run id>` directory and no `.retro-*.tmp` file remains, and a seeded stale entry of each kind is gone. Say that host-owned temporary files are outside the comparison, and align AC-06's wording with that.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Analysis ("`~/.claude/CLAUDE.md` and the project's auto-memory index and the notes it links on Claude Code"); Design, Session and repository ("by session id"; "on Claude Code from `CLAUDE_CODE_SESSION_ID`"); Background ("Claude Code stores each session as `~/.claude/projects/<project>/<session-id>.jsonl`"); Scope ("fixture user-level files"); Fixture table row P9 and the paragraph below it ("The fixture memory note holds one planted secret"); AC-05; AC-06; AC-09; Test Plan rows AC-02, AC-03, AC-04, AC-05, AC-06 and AC-09
+EVIDENCE: The repository's existing recorded-run harness isolates hosts by relocating their configuration. `plugins/vh-adlc/scripts/triage/controller-clients.ts:20` sets `env.CLAUDE_CONFIG_DIR=profile` for Claude Code and `:17` sets `env.CODEX_HOME=profile` for Codex. The Design honours `CODEX_HOME` but hard-codes `~/.claude` for the user-level instruction file, the auto-memory index and transcript lookup. Under that harness, a Claude Code run would read the owner's real `~/.claude/CLAUDE.md` instead of the fixture file P9 depends on, and would never read the fixture memory note that holds AC-06's secret. The Test Plan never says how the fixture user-level files are put in place on either host. The only other way is to edit the owner's real global files. The Design also does not say where a session named by id is looked up (which projects directory or sessions tree, under which configuration root).
+PROPOSAL: Resolve Claude Code's user-level files and transcripts from `CLAUDE_CONFIG_DIR` when set (default `~/.claude`), as `CODEX_HOME` is resolved for Codex, and define the id-to-path lookup on each host. State in the Test Plan that each recorded run uses an isolated profile holding the fixture user-level files, as `controller-clients.ts` does.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary ("your user-level instruction and memory files"); Design, Analysis ("and `AGENTS.md` under `CODEX_HOME` (default `~/.codex`) on Codex CLI"); Terminology (Home, "the owner's user-level instruction or memory files"); AC-06 ("including a secret planted in a fixture memory note"); Test Plan row AC-06 ("the memory-note secret included"); Fixture table paragraph ("The fixture memory note holds one planted secret")
+EVIDENCE: Codex CLI keeps user-level memory files: `ls ~/.codex/memories` lists `MEMORY.md` and `memory_summary.md`. Codex sessions load them: grepping the first 400,000 bytes of two recent rollouts for `memory_summary\|memories/MEMORY.md` gives 4 and 6 matches. On Codex the Design reads only `AGENTS.md`, so the Owner summary's claim that memory files are read is false there. The covered check and the size check cannot see Codex memories. AC-06's memory-note secret is never read in a Codex run, so that part of the proof passes vacuously on Codex.
+PROPOSAL: Add the Codex memory files under `CODEX_HOME` to the user-level inputs, or exclude them by name in the Owner summary and Design with the reason. Then plant the AC-06 user-level secret in a file each host's run actually reads.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Extraction and redaction ("It stops at the turn that invoked the current retro run and skips each earlier retro run, from its invocation to its `save` command"; "including every file in the sibling `subagents/` and `tool-results/` directories"); Terminology (Session, "up to the turn that invoked the current retro run, without the turns of earlier retro runs (AC-08)"); AC-08; Test Plan row AC-08
+EVIDENCE: The document does not say how the script recognises a retro invocation on either host: a Skill tool call, a slash command, intake routing or a read of `SKILL.md`. An earlier run interrupted before `save` has no end marker, so "from its invocation to its `save` command" either skips the rest of the transcript, including real work and the current run's boundary, or is undefined. The skipped turns' side files are still included. During this review, a 68.4 KB Bash output was saved as `.../45f9d85b-.../tool-results/b8syjstcy.txt`, with only a 2 KB preview left in the transcript. An earlier retro run's digest read lands in `tool-results/` the same way, and `extract` includes "every file" there. That brings back the self-evidence the cut-off exists to remove. The Terminology row cites AC-08, but neither AC-08 nor any Test Plan row tests the cut-off or the skip, so an implementation without them passes. The cut-off was added by the revision that answered R-2 F-16.
+PROPOSAL: Define the invocation and end markers per host, the handling of an earlier run with no `save`, and that side files referenced only from skipped or later turns are excluded. Add `bun test` cases for each, with a fixture holding one completed and one interrupted earlier run.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Extraction and redaction ("when the digest would exceed 500,000 characters ... the digest never exceeds that size"); Design, Analysis ("The model reads the digest"); Terminology (Digest, "the bounded, redacted JSON ... the only form of the transcript the model reads"); AC-08; Test Plan row AC-08
+EVIDENCE: The document does not say how the model reads a digest of up to 500,000 characters. In this review the host's Read tool stopped at a 25,000-token cap and returned lines 1 to 526 of a 625-line, 68.4 KB file. A 68.4 KB Bash output was replaced by a 2 KB preview and a side-file path. A 500,000-character digest needs many paged reads, and if it is written as one JSON value on one line, line-based paging cannot split it. AC-08 passes when the run completes and P4 appears, so an implementation whose model reads only part of the digest passes whenever P4 falls in the part it read.
+PROPOSAL: Specify the digest's layout for reading, for example JSON Lines in ordered chunks below a stated per-read size, and require the skill to read every chunk. In the large fixture, place a planted problem's only evidence in the last chunk and make the checklist require it.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Severity and order ("medium for a mistake caught before commit, or waste repeated within the session; low for single waste, a no-op instruction or instruction size"); Fixture table rows P3 and P8; first-run and second-run order paragraph; AC-02; AC-07; Test Plan rows AC-02, AC-03, AC-04, AC-05 and AC-07
+EVIDENCE: The base-severity rule does not decide two fixture rows. P3, "Twenty searches and reads before finding the settings file", is one detour; it can be read as single waste (low) or as waste repeated within the session (medium). The fixture expects medium. P8, "The agent guessed at a failure because the dev server log was not readable", can be read as a mistake caught before commit (medium) or as single waste (low). The fixture expects low. Under the low reading of P3, the first-run order becomes P1, P7, P9, P2, P3, P8, P4, P5 instead of the stated P1, P7, P3, P9, P2, P8, P4, P5. An implementation that follows one careful reading of the Design then fails AC-02, and the grader cannot derive the expected rows from the Design.
+PROPOSAL: Define "waste repeated within the session" (for example, the same kind of call more than a stated number of times toward one goal) and give navigation and information-access candidates an explicit base severity when no mistake follows. Then check that P3 and P8 follow from those rules.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Session and repository ("the current checkout is used if its `origin` remote matches the one the transcript records"; "The repository key is the `origin` remote's `owner/name`"); AC-11; Test Plan row AC-11
+EVIDENCE: The claim that a transcript records the origin remote is not cited. Claude Code transcripts have no session-level remote field. Their top-level keys include `cwd`, `gitBranch`, `sessionId` and `version`, but no remote. The only remote found is inside `toolUseResult.bashEditDiff` of Bash commands that edit files, as `"origin":{"host":"github.com","remote":"<owner>/<name>",...}`, and it appears in 32 of the 60 most recent Claude transcripts (`grep -q '"origin":{"host"'`). Codex records the remote as a URL, `session_meta.payload.git.repository_url`. So on Claude Code the removed-worktree path, which the shared key exists for, often has nothing to compare. The two hosts record different forms, and the key rule does not say how a remote without exactly `owner/name` (a subgroup path, a local path) is keyed. AC-11 runs on a fixture transcript, so a field no real host writes passes.
+PROPOSAL: Name the field each host records and cite it, say that a transcript without one makes the skill ask, and define how URL and `host` plus `owner/name` forms are normalised before matching and keying. Build the AC-11 fixtures from those real record shapes.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Extraction and redaction (`extract --transcript <file> --output <file>`); Design, Session and repository ("A transcript from the other host ends the run with that reason and no report"); Terminology (Session, "A transcript from the host running the skill"); AC-10; Test Plan row AC-10 ("`extract` ... on a file in the other host's format reports the reason")
+EVIDENCE: Rejecting another host's transcript requires knowing the running host, but no command takes it and the Design names no signal for it. In this session's tool shell, `env` shows `CLAUDECODE` and `CLAUDE_CODE_SESSION_ID` set; Codex sets `CODEX_SESSION_ID` and `CODEX_THREAD_ID`. One implementer will sniff those, another will add a flag, and the AC-10 `bun test`, which runs with no host, needs one of them. The previous revision had `extract --transcript <file> --host <claude|codex>`, and this revision removed the flag (`git diff b34ba95 09de0c3`).
+PROPOSAL: Name how the running host is decided (a `--host` flag the skill fills in, or a stated environment rule), and say how the AC-10 test sets it.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Extraction and redaction (shape list: "bearer tokens", "Slack tokens (`xox` prefixes)", "`sk-` API keys", "JSON Web Tokens"); AC-06 ("no string matching a listed secret shape"); Test Plan row AC-06 ("`grep` the digest and the saved report for ... the shape patterns (must find none)")
+EVIDENCE: The recorded-run check judges free text with patterns the document never writes down. "`sk-` API keys" gives no length or word boundary, so a grader's `sk-[A-Za-z0-9]+` matches inside ordinary words such as `task-list`, `risk-free` or `disk-usage` in a correct report. A loose redactor's pattern would also destroy that evidence. "bearer tokens", "`xox` prefixes" and "JSON Web Tokens" are equally open. The `bun test` part lists some must-redact and must-survive examples, but the grep part of the row has none, as the standard requires for a free-text pattern proof. This row has not passed review (R-2 F-06 and F-07 named it).
+PROPOSAL: Give each shape's exact pattern in one place, the Design or `references/retro.md` named as the source, and have both the redactor and the recorded-run grep use that list. Add must-survive examples such as `task-list` and `risk-free` to the row.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Effects and failure ("Each run first removes `vh-adlc-retro-*` temporary directories and `.retro-*.tmp` files older than one hour, left by interrupted runs"; "Concurrent runs get different report names"); Owner summary ("The skill writes nothing else except its own temporary files")
+EVIDENCE: The cleanup deletes entries by name prefix and age in a shared directory, with no check that a retro run created them or that the run is dead. `/tmp` already holds `/tmp/vh-adlc-retro-R1.txt` and `/tmp/vh-adlc-retro-R2.txt` (regular files modified at 10:04 and 10:21 today, written by another session), so the prefix is not exclusive. A digest directory's modification time does not change when it is read. A live run older than one hour therefore loses its digest to a concurrent run, for example one extracting a 532,507,317-byte rollout and then analysing it. The concurrent-run statement does not cover this path. The Owner summary also omits that a run deletes other runs' leftovers.
+PROPOSAL: Match only names in the exact run-id format, and decide staleness by a liveness record, such as a lock file with the owning process id, rather than age alone. Otherwise drop cross-run cleanup and state what is left behind. Mention the deletion in the Owner summary.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-09 ("with the session variable unset, it asks the owner and writes no report"); Test Plan row AC-09 ("A recorded run per host with that variable unset")
+EVIDENCE: Both hosts set the session variable themselves in the shells they give the agent. In this session `env` shows `CLAUDE_CODE_SESSION_ID` set by the host, and R-2 F-01 observed Codex setting `CODEX_SESSION_ID` and `CODEX_THREAD_ID` the same way. The row names no way to start a real host session in which the skill sees the variable unset. The proof as written may not be executable, and an operator could improvise by having the agent run a step under `env -u`, which tests a different path than the skill's.
+PROPOSAL: State how the variable is removed for the recorded run, or prove the unset path with a `bun test` on `locate` under an environment without the variable and keep the recorded run for the set path only.
+
+FINDING: F-12
+KIND: factual
+SEVERITY: nit
+WHERE: Background ("`docs/get-started/installation.md:107` counts the package's skills"); Scope ("the skill count in `docs/get-started/installation.md`")
+EVIDENCE: `docs/get-started/installation.md:107` says "The package contains fifteen skills", and its list omits `vh-adlc-diagram`, while `ls plugins/vh-adlc/skills | wc -l` gives 16. Incrementing the stated count gives sixteen, not the seventeen the Scope sets for the tests.
+PROPOSAL: State that the line becomes seventeen and names `vh-adlc-diagram` and `vh-adlc-retro`.
+
+FINDING: F-13
+KIND: judgement
+SEVERITY: nit
+WHERE: Fixture table row P5 ("beside an `.editorconfig` with `charset = utf-8`"); Terminology (No-op instruction, "restates what a configured tool or check already enforces"; Covering rule, "A configured check nothing runs is not a covering rule")
+EVIDENCE: P1's lint configuration does not count because nothing runs it. P5 is justified by an `.editorconfig` that, in the fixture, nothing runs either. P5 still qualifies as a no-op because UTF-8 is the host default, but the fixture's stated reason rests on the enforcement clause that the covering-rule definition treats the other way.
+PROPOSAL: Justify P5 by the host default, or add a hook or CI step that applies the `.editorconfig`.
+
+FINDING: F-14
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, History ("The key is `<category>:<home class>:<kebab-case slug>`"; fields "category, home, home class")
+EVIDENCE: The persisted `format: 1` block does not list the allowed tokens for category or home class. The category names in the Analysis table contain spaces and capitals ("Instruction size and no-ops"), and the home classes are prose ("Consumer repository", "User-level files"). The same report contract is read across versions and on rollback.
+PROPOSAL: List the exact category and home-class tokens in the format definition in `references/retro.md`.
 
 ## Sources
 
