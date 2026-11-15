@@ -1166,7 +1166,10 @@ for (const mode of ["scalar", "mapped"] as const) test.each(["body", "creator-lo
 });
 
 for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-update", "pr-close"] as const) {
-  test.each(["case", "account-id", "material-login", "wrong-row", "missing-original", "changed-original", "configured-alias", "foreign-controller", "foreign-row-repository"] as const)(`${mode} ${kind} delivery verifies its bound original legacy creator: %s`, async change => {
+  const sharedCases = ["case", "account-id", "material-login", "wrong-row", "missing-original", "changed-original", "configured-alias",
+    "foreign-controller", "foreign-row-repository", "corrupt-controller"] as const;
+  const structuralCases = kind === "pr-close" ? ["closure-effects", "closure-inputs-digest", "closure-actor-id"] as const : ["snapshot-kind"] as const;
+  test.each([...sharedCases, ...structuralCases])(`${mode} ${kind} delivery verifies its bound original legacy creator: %s`, async change => {
     const { projectProposalBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposals");
     const { lookupAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-lookup");
     const { f, effect } = await collectorDeliveryFixture(kind, { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER",
@@ -1180,15 +1183,16 @@ for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-update
       head_ref: "docs-audit/legacy", head_repository: repository,
       base_sha: f.plan.manifest.bindings.source_commit, base_ref: "main",
       base_repository: change === "foreign-row-repository" ? { ...repository, id: 11 } : repository };
-    const snapshot = projectProposalBindings([original], null);
-    const target = { source_commit: f.plan.manifest.bindings.source_commit, identity: await f.transport.identity(),
+    const snapshot = { ...projectProposalBindings([original], null), ...(change === "snapshot-kind" ? { kind: "another-snapshot" } : {}) };
+    const identity = await f.transport.identity();
+    const target = { source_commit: f.plan.manifest.bindings.source_commit, identity: { ...identity, ...(change === "closure-actor-id" ? { actor_id: 31 } : {}) },
       target: { kind: "docs-drift-closure-target", authority: "none", verification_ready: false, complete: true, diagnostics: [],
-        effects: f.input.manifest.effects, already_closed: [], closure: { complete: true, diagnostics: [], repository: "fixture/docs", repository_id: 10,
+        effects: change === "closure-effects" ? f.input.manifest.effects.slice(0, -1) : f.input.manifest.effects, already_closed: [], closure: { complete: true, diagnostics: [], repository: "fixture/docs", repository_id: 10,
           current_default: f.plan.manifest.bindings.source_commit, consolidation: null, record: null, originals: [original],
           inputs_sha256: hash("synthetic original closure inputs"), interval: null }, verification_scopes: [], inputs_sha256: hash("synthetic original target") } };
     const bytes = canonicalJSON(kind === "pr-close" ? target : snapshot), reference = { path: "original-legacy-source.json", sha256: sha256(bytes) };
     writeFileSync(join(f.artifacts, reference.path), bytes, { mode: 0o600 });
-    const bindings = { ...f.input.manifest.bindings, ...(kind === "pr-close" ? { assessment_sha256: reference.sha256, proposals_sha256: sha256(canonicalJSON(target.target.closure)) } : { proposals_sha256: reference.sha256 }) };
+    const bindings = { ...f.input.manifest.bindings, ...(kind === "pr-close" ? { assessment_sha256: reference.sha256, proposals_sha256: change === "closure-inputs-digest" ? hash("different original closure inputs") : sha256(canonicalJSON(target.target.closure)) } : { proposals_sha256: reference.sha256 }) };
     f.input = fixture(bindings, f.input.manifest.effects, f.input.manifest.operation_id, { actor: f.input.manifest.actor, actor_id: f.input.manifest.actor_id,
       ...(f.input.manifest.publisher_entry ? { publisher_entry: f.input.manifest.publisher_entry } : {}) });
     f.plan = sealPlan({ reviewed: validateReviewedManifest(f.input), grants: f.input.grants, ...f.policy, corrections: [], attention: [] });
@@ -1208,6 +1212,7 @@ for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-update
     if (change === "configured-alias") user.login = f.settings.publication.entry_actors?.hosted ?? f.settings.publication.actor;
     if (change === "account-id") user.id++;
     if (change === "missing-original") rmSync(controllerPath);
+    if (change === "corrupt-controller") writeFileSync(controllerPath, "{invalid", { mode: 0o600 });
     if (change === "changed-original") writeFileSync(join(f.artifacts, reference.path), Buffer.concat([bytes, Buffer.from("\n")]), { mode: 0o600 });
     if (change === "foreign-controller") {
       const controller = JSON.parse(readFileSync(controllerPath, "utf8")); controller.plan_sha256 = hash("another original operation");
@@ -1232,9 +1237,12 @@ for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-update
       expect(accepted.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
     } else {
       const reasons = { "account-id": "delivery-current-target-changed", "material-login": "delivery-current-target-changed",
-        "wrong-row": "delivery-original-creator-binding-changed", "missing-original": "ENOENT",
+        "wrong-row": "delivery-original-creator-binding-changed", "missing-original": "delivery-original-creator-unavailable",
         "changed-original": "docs-drift original evidence artifact changed", "configured-alias": "delivery-current-target-changed",
-        "foreign-controller": "delivery-original-controller-changed", "foreign-row-repository": "delivery-original-creator-binding-changed" };
+        "foreign-controller": "delivery-original-controller-changed", "foreign-row-repository": "delivery-original-creator-binding-changed",
+        "corrupt-controller": "delivery-original-controller-changed", "closure-effects": "delivery-original-creator-binding-changed",
+        "closure-inputs-digest": "delivery-original-creator-binding-changed", "closure-actor-id": "delivery-original-creator-binding-changed",
+        "snapshot-kind": "delivery-original-creator-binding-changed" };
       await expect(lookupAppliedDelivery(scope)).rejects.toThrow(reasons[change]);
     }
     expect(canonicalJSON(published.journal.plan)).toEqual(plan);

@@ -12,9 +12,9 @@ import { canonicalDigest, canonicalJSON } from "../../../plugins/vh-adlc/scripts
 import { effectDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 
 type Reference = { path: string; sha256: string };
-export async function refreshFixture(roots: string[], legacy = false, fault?: "title" | "body" | "head" | "number" | "draft" | "fork" | "alias" | "id-only" | "foreign-author") {
+export async function refreshFixture(roots: string[], legacy = false, fault?: "title" | "body" | "head" | "number" | "draft" | "fork" | "alias" | "id-only" | "foreign-author", beforeDraft = true) {
   let worker: Reference | null = null;
-  const before = { title: "Earlier proposal", body: "Original source proposal\n", labels: ["documentation"], draft: true };
+  const before = { title: "Earlier proposal", body: "Original source proposal\n", labels: ["documentation"], draft: beforeDraft };
   const branch = fault === "id-only" ? "feature/owner-work" : legacy || fault === "foreign-author" ? "docs-audit/legacy" : "docs-drift/earlier";
   const foreign = fault === "id-only" || fault === "foreign-author";
   const original = (source: string) => {

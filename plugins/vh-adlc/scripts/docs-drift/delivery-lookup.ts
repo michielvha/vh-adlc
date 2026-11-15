@@ -57,8 +57,16 @@ function originalResourceCreator(options: { source_repo: string; artifact_root: 
   const { plan, effect, original } = options;
   if (effect.kind !== "pr-update" && effect.kind !== "pr-close") throw Error("delivery-original-creator-unavailable");
   const closure = effect.kind === "pr-close", field = closure ? "original_target" : "proposal_snapshot";
-  const controllerBytes = readArtifact(join(options.artifact_root, plan.manifest.operation_id + (closure ? ".closure-controller.json" : ".controller.json")));
-  const controller = exactRecord(JSON.parse(controllerBytes.toString()), ["schema_version", "kind", "plan_sha256", "inputs_sha256", field], "delivery-original-controller-changed");
+  let controllerBytes: Buffer, parsed: unknown;
+  try {
+    controllerBytes = readArtifact(join(options.artifact_root, plan.manifest.operation_id + (closure ? ".closure-controller.json" : ".controller.json")));
+    parsed = JSON.parse(controllerBytes.toString());
+  } catch (error) {
+    if (error instanceof SyntaxError) throw Error("delivery-original-controller-changed");
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") throw Error("delivery-original-creator-unavailable");
+    throw error;
+  }
+  const controller = exactRecord(parsed, ["schema_version", "kind", "plan_sha256", "inputs_sha256", field], "delivery-original-controller-changed");
   if (!canonicalJSON(controller).equals(controllerBytes) || controller.schema_version !== 1
     || controller.kind !== (closure ? "docs-drift-closure-controller" : "docs-drift-publication-controller")
     || controller.plan_sha256 !== sha256(canonicalJSON(plan))) throw Error("delivery-original-controller-changed");

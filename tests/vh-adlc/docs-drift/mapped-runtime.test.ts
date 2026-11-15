@@ -149,8 +149,10 @@ test("a native mapped closure acknowledges a recased legacy original using its r
     const originalPlan = canonicalJSON(pending.journal.plan), state = JSON.parse(readFileSync(f.service.statePath, "utf8"));
     const original = state.prs.find((pr: { number: number }) => pr.number === close.payload.number);
     expect(original.user.id).not.toBe(identities.copilot.actor_id);
+    const originalLogin = original.user.login;
     original.state = "open";
-    original.user.login = original.user.login.toUpperCase();
+    original.user.login = originalLogin.toUpperCase();
+    expect(original.user.login).not.toBe(originalLogin);
     writeFileSync(f.service.statePath, JSON.stringify(state));
     const store = f.target.worker_inputs!.target!.store!;
     const settings = captureSnapshot(f.repo, f.source).settings;
@@ -162,6 +164,12 @@ test("a native mapped closure acknowledges a recased legacy original using its r
         request_sha256: sha256(Buffer.from("Synthetic owner preserves the reopened legacy original")) }) });
     expect(result.state, result.reason).toBe("acknowledged");
     expect(canonicalJSON(result.journal.plan)).toEqual(originalPlan);
+    const acknowledgement = result.journal.events.find((event: { kind: string }) => event.kind === "acknowledged-delivery");
+    if (!acknowledgement?.payload.lookup) throw Error("missing native legacy creator lookup");
+    const retained = JSON.parse(readFileSync(acknowledgement.payload.lookup.path, "utf8")).lookup;
+    expect(retained.creator_projection).toEqual({ recorded_login_sha256: sha256(Buffer.from(originalLogin)),
+      observed_login_sha256: sha256(Buffer.from(original.user.login)) });
+    expect(retained.current.user_login_sha256).toBe(sha256(Buffer.from(original.user.login)));
     const final = JSON.parse(readFileSync(f.service.statePath, "utf8"));
     expect(final.prs.find((pr: { number: number }) => pr.number === close.payload.number).state).toBe("open");
     const calls = readFileSync(f.service.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
