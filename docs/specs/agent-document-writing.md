@@ -225,6 +225,100 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-15 | R-1 | spec | `ef7f01b8b85a78c3c26aebb77aab526eed13d54a` | claude-opus-5-5 | procedural | One blocking, eight should-fix and four nit findings |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Trial, measures 2 and 3 and "raw transcripts stay in the temporary run, as both harnesses already do"); Test Plan row AC-05; Scope (trial bullet); covers frontmatter
+EVIDENCE: The Claude Code scenario harness deletes every session transcript. In tests/vh-adlc/scenarios/run.ts:133-147, session() always calls p.dispose() in a finally block, and tests/vh-adlc/scenarios/host.ts:37 defines dispose as rmSync(config, { recursive: true, force: true }). The session .jsonl transcripts live under that config directory (host.ts toolUses walks join(p.config, "projects")). VH_ADLC_KEEP does not help, because it only keeps the SCRATCH fixture dirs (run.ts:1821), and the profile is not one of them (host.ts:27 uses its own mkdtemp). claude() runs with --output-format json (host.ts:96), so Turn.raw holds only the final result object. The summary writes Turns and Cost but no tool-call count (run.ts:1797-1798), and it keeps reports only for failing runs (run.ts:1811-1813). So on Claude Code the blind grader has no transcript, and measure 3 has no tool-call count. The claim that both harnesses already keep raw transcripts is true only of the lifecycle harness (lifecycle/run.ts:4, :82). Scope and covers include no change to the scenario harness.
+PROPOSAL: Add the scenario harness change to Scope and covers: persist each session transcript, or at least its tool calls and turn count, to a named location outside the repository before dispose. Otherwise restate measures 2 and 3 for Claude Code from data the harness actually records. Correct the Design sentence either way.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, "A skill passes when ..."); Context, Owner summary paragraph 4 ("improves by more than the spread between repeated baseline runs"); Acceptance Criteria AC-05; Test Plan row AC-05
+EVIDENCE: Measure 1 is "the share of runs whose deterministic checks all pass", which gives one number per arm per case. That number has no "spread between the base arm's own runs". Each run is 0 or 1, so the per-run spread is 0 when all base runs pass, which leaves no room to improve, and 1 otherwise, which no share can exceed. For violations, turns and tool calls, the document never says which statistic of the rewrite arm is compared (mean, median or worst run). It never says that fewer turns or tool calls counts as better, although fewer tool calls can also mean skipped checks. It also leaves unclear whether "on both hosts" covers the improvement clause or only the no-worse clause. AC-05 repeats the rule without resolving any of this. Two implementers could score the same runs as pass and fail.
+PROPOSAL: Define the decision rule exactly. Name the per-case statistic for each measure, the direction counted as an improvement, how the base spread is computed (for example max minus min across the five base runs), and whether the improvement must appear on both hosts or on either. Apply the same wording in the Owner summary and AC-05.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Trial paragraph 2, "Run order alternates so model drift during the trial affects both arms"); Test Plan row AC-05 ("with `--repeat 5`")
+EVIDENCE: A lifecycle harness invocation runs one arm only. It takes either --source-ref or --package (tests/vh-adlc/lifecycle/run.ts:24-25) and expands --repeat into consecutive runs of that arm (scenario-plan.ts:26). So `--repeat 5` per arm, as the Test Plan prescribes, runs five baseline runs back to back and then five rewrite runs, which contradicts the alternation the Design requires. The harness also stops the remaining repeats after any execution failure (run.ts:134, `if (result.status === "execution-failed") break;`) and refuses a non-empty output directory (run.ts:30). The document does not say how a truncated arm or an execution-failed run counts toward the five.
+PROPOSAL: Pick one method. Either alternate with separate `--repeat 1` invocations into fresh output directories, or drop the alternation claim. Then say how an execution-failed or truncated run is counted and whether it is rerun.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Rewrite pass step 1 "at the base commit"; Trial "base text"; "A failing skill's file is restored to the base text"); Acceptance Criteria AC-03, AC-04, AC-05 ("byte-identical to the base commit"); Test Plan rows AC-03, AC-04, AC-05; Context, Background (counts on `c676010`)
+EVIDENCE: The document never defines "the base commit". The three files change on main all the time. `git log --since=2026-10-15 --oneline ef7f01b -- <file> | wc -l` gives ship 19, review 12 and implement 13. The latest is 12e3164 on 2026-11-14, which changes vh-adlc-ship/SKILL.md. Feature branches here merge origin/main in. If main changes a skill during the trial, three things follow. The inventory and the baseline arm describe a stale text. A failed skill restored "to the base text" reverts main's change after a merge. Alternatively AC-05's byte-identity cannot hold without that revert.
+PROPOSAL: Define the base as one recorded commit, for example the feature branch's fork point. Say what happens when main changes one of the three files before shipping: redo that skill's inventory and trial, or keep main's version of a failed skill. Word AC-05 as identical to that skill's text on the merged default branch rather than to a fixed commit.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Rewrite pass "in order ship, review, implement"; Trial "For each skill"); Acceptance Criteria AC-05
+EVIDENCE: The skills call each other. vh-adlc-ship/SKILL.md:71 obtains a fresh review "as `../vh-adlc-review/SKILL.md` describes". The Claude Code completion scenarios run implement and then completion review (tests/vh-adlc/scenarios/run.ts:1410 FINISH, S12.x). The Design trials each skill separately but never says whether one skill's rewrite arm also carries the other skills' rewrites. It also does not say how a result measured with a rewritten review is treated when the review rewrite later fails and is restored. The pass verdicts that AC-05 attributes to single skills can be confounded.
+PROPOSAL: State the arm composition. For example, each skill's rewrite arm changes only that skill against the base text of the other two, and the final combination of passing rewrites is rerun on the cases that reach more than one of them before shipping.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-02; Acceptance Criteria AC-02; Context, Background (prohibition count method)
+EVIDENCE: The AC-02 proof finds prohibitions with `grep -n -i -w -E 'never|do not|must not|cannot'`. Many prohibitions in these files use other forms. Examples: ship:17 "It is not authority to merge"; ship:88-89 "no commit of it carries the skip-CI marker"; review:67 "store nothing: report the pending handoff and stop"; implement:17 "it is not authority to push that branch"; implement:84 "create no branch". A rewrite that keeps such bare prohibitions without a positive target passes the row. feature-documents.md (Test plan) also requires that "A proof that judges free text with a pattern lists its must-pass and must-fail examples in the row", and the row has none. The row has not passed review, so this is not a widening nit.
+PROPOSAL: Make the proof read every sentence of each rewritten file, with the grep only as a locator. Alternatively, widen the pattern to include "not", "no", "nothing" and "only ... when" forms. In either case, list must-pass and must-fail example sentences in the row.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: covers frontmatter; Scope; Design (Trial paragraph 1, "a skill no existing case reaches gets the smallest added case")
+EVIDENCE: The Design lets implementation add a harness case. Any such case and the trial measurements depend on tests/vh-adlc/scenarios/ (run.ts, host.ts) and tests/vh-adlc/lifecycle/ (scenario-plan.ts, fixtures.ts, run.ts). covers lists neither. It lists only tests/vh-adlc/check.test.ts and the evidence directory, although feature-documents.md says covers "lists every path whose change can affect the feature". Scope names harness additions only under Out of scope ("beyond what a trial needs"), never as an in-scope change. An uncovered harness edit would not make the implementation review stale.
+PROPOSAL: Add tests/vh-adlc/scenarios/ and tests/vh-adlc/lifecycle/ to covers. Add a Scope bullet for the harness additions the trial may need, including the transcript capture from F-01.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-04; Acceptance Criteria AC-04; Context, Background (base run of 1,683 pass and 6 fail)
+EVIDENCE: Background says four of the six base failures are 5-second timeouts. The suite is timing sensitive. AC-04 passes only when "the final run's failures are a subset of the base run's". A timing test that passed in the single base run and times out in the single final run fails AC-04 on a correct text-only change. The row has no rerun or retry rule.
+PROPOSAL: Add a rule for a new failure: rerun that test in isolation at both commits, and count it only if it fails at the final commit and passes at the base. Or run each suite more than once and compare stable failures.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, measure 2 "an independent grader"); Test Plan row AC-05
+EVIDENCE: The grader's count decides the no-worse rule and can decide the improvement rule, but the document leaves the grader undefined. It does not say which model or host runs it, how it is kept independent of the implementing session, what prompt or record format it returns, or whether a rule removed in the rewrite still counts when the agent breaks it. The repository has no loop route for such a role: `git ls-tree -r --name-only ef7f01b | grep ^.vh-adlc/` lists only cleanup.yaml and triage.yaml. Two implementers would get different counts from the same transcripts.
+PROPOSAL: Name the grader route and its isolation, and give its record format, for example one line per violation naming the inventory rule ID and the transcript evidence. State that removed rules stay in the inventory the grader scores.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: Scope (Out of scope, "the other twelve skills")
+EVIDENCE: `git ls-tree -d --name-only ef7f01b plugins/vh-adlc/skills/ | wc -l` prints 16, so 13 skills remain besides ship, review and implement.
+PROPOSAL: Say "the other thirteen skills", or name them by exclusion without a count.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (citations `tests/vh-adlc/lifecycle/run.ts:57-62` and `tests/vh-adlc/scenarios/run.ts:5`); Design (Trial, `tests/vh-adlc/scenarios/run.ts:5`)
+EVIDENCE: The baseline or candidate choice is made at lifecycle/run.ts:24-25 and :44-51. Lines 57-62 cover Codex auth, marketplace add and version. scenarios/run.ts:5 is the usage line. The harness runs its own checkout because of `const ROOT = resolve(import.meta.dir, "..", "..", "..")` at :17.
+PROPOSAL: Cite lifecycle/run.ts:24-25,44-51 and scenarios/run.ts:17.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary (paragraphs 1, 4 and 6); Context, Background; Design (Routing; Trial paragraph 1)
+EVIDENCE: The Owner summary says "Nothing has been reviewed or run yet". Background reports an observed `bun test tests/vh-adlc` run on c676010 and an observed `npm run check` on the companion guide. I reran that check in /home/m/code/vhco-pro-docs-write-for-agents: "Checked 36 Markdown files: local links, metadata, and writing constraints pass." The summary also omits two things the owner is accepting. Routing says a docs change between pins that alters a rule "stops the pin move and returns to the owner". Trial lets implementation add a harness case.
+PROPOSAL: Say which baseline checks were observed and that the trial itself has not run. Add one sentence each on the pin-move stop condition and the possible added harness case.
+
+FINDING: F-13
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Rewrite pass step 2, "Rewrite under the guide")
+EVIDENCE: The package canary checks that no sentence from pinned docs pages appears in the package. It reads pages at the plugin pin and lists them in CANARY_PAGES (tests/vh-adlc/check.test.ts:54-67, :417-427). The plugin pin stays at 1ccf8f3 and guides/write-for-agents.md is not in that list. A rewrite that copies guide sentences into a skill would pass every check. That breaks the package's rule against restating docs pages.
+PROPOSAL: Add one sentence to step 2: the rewrite applies the guide in the skill's own words and copies no guide sentence. The AC-03 or AC-02 review then checks it.
 
 ## Sources
 

@@ -241,6 +241,114 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-15 | R-1 | spec | `ef7f01b8b85a78c3c26aebb77aab526eed13d54a` | claude-opus-5-5 | procedural | One blocking, twelve should-fix and two nit findings |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Input item 1, "the transcript, up to its last line at read time"); Scope (no extraction script listed); Background (session stored as `<session-id>.jsonl`); Out of scope ("analysing several transcripts in one run"); Test Plan rows AC-02 through AC-07 (small fixture only)
+EVIDENCE: The transcript the Background cites as observed, ~/.claude/projects/-home-m-code-stackweaver/0443e578-6437-5521-b63e-27f043a5ac80.jsonl, is 12987694 bytes (`ls -laS`). Other local sessions are 44641892 bytes (Claude) and 216954826 and 224418744 bytes (Codex rollouts under ~/.codex/sessions/2026/11/). Claude also keeps each session's subagent transcripts and offloaded large tool outputs beside the main file: that session's directory holds `subagents/` (8 files, e.g. agent-a6d6fbd72502c1fd7.jsonl) and `tool-results/` (6 files). The Design has the model read the whole transcript once, Scope adds no script to extract or summarise it, and the fixtures are small, so every proof passes on an implementation that cannot read a typical real session. Review work and oversized tool output, which the Review standards and Tool economy categories need, often live in those side files, and the document neither includes nor excludes them.
+PROPOSAL: Specify how a large transcript is read: a deterministic extraction script in Scope with its output shape and limits, and whether `subagents/` and `tool-results/` belong to "the session". Add a Test Plan proof on a transcript at least as large as the cited 13 MB session.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner summary ("the current one by default"); Design (Input, "with neither, the skill reads the current session's transcript"); Test Plan (no row exercises the default)
+EVIDENCE: The document never says how the skill identifies its own session. Picking the most recently modified file in the project directory selects the wrong transcript when several sessions share a project, which the consumer instructions describe as routine (stackweaver CLAUDE.md, "Multiple Claude sessions ... routinely work on this repo at once"). Claude Code exposes `CLAUDE_CODE_SESSION_ID` in the environment (observed with `env`), but the document names no mechanism for either host, Codex included. Every Test Plan row names the fixture transcript explicitly, so the headline default is never proven.
+PROPOSAL: Define the per-host source of the current session id, with a stop-and-ask path when it cannot be determined, and add a recorded-run proof of the default on both hosts while a second session is active in the same project.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Report, "named by date, host and session id", "Existing files are never overwritten"); Design (Effects and failure, "Two concurrent runs on the same transcript write two reports with different names", "a report file it wrote atomically"); Design (History comparison)
+EVIDENCE: Two runs on the same transcript on the same day get the same date, host and session id. Under the naming rule they get the same name, which contradicts the claim of different names, and the no-overwrite rule then leaves the second run with no defined outcome. A deliberate rerun on the same session, for example after an interrupted run, saves a second report whose candidates match the first on category, home and change, so the next run counts one session as a recurrence. That fakes the signal the Owner summary calls the strongest a retrospective has. The atomic-write claim has no mechanism in Scope (no script), and a temp-file-and-rename approach can leave a temp file behind, which contradicts "writes only its new report file".
+PROPOSAL: Add a unique run component to the file name, define the rerun case, and exclude reports with the same host and session id from recurrence counting. Name the write mechanism that makes the file complete or absent.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner summary (lines 52-53, "A candidate an earlier report raised and the environment has since fixed, but which happened again, is reported as a fix that did not hold"); Design (History comparison, "whose earlier report also noted that the change was made"); Design (Report ranking, second tier); Design (Analysis, covered candidates "why it did not hold")
+EVIDENCE: The skill is report-only and never edits a saved report, and a report is written before the owner acts on any candidate. No earlier report can therefore record that its own proposal was later applied, and the Design forbids inferring a fix from absence. As written, the "fix that did not hold" tier can only fire if an intermediate report happened to list the candidate as covered, and that path is not described. The Owner summary defines the case differently ("the environment has since fixed"), which is detectable now: the candidate matches an earlier report and the covered check finds a current rule for it.
+PROPOSAL: Define a fix that did not hold as a recurring candidate that the current covered check finds already addressed, or say what record marks a change as made. Make the Owner summary and the Design state the same rule, and give it a proof.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Report, ranking tiers and "category, severity"); Owner summary ("ranks above new ones of the same kind"); AC-02 ("ranked as the Design orders them"); AC-03; AC-07; Test Plan rows AC-02, AC-03, AC-04, AC-05 and AC-07
+EVIDENCE: The tiers cover a defect that reached a commit or review, a fix that did not hold, recurring candidates and waste. A mistake that was caught before commit, a no-op instruction, which is neither defect nor waste, and a covered candidate have no tier, and ties have no order. "Severity" is a required field, but no values are defined. The Owner summary ranks recurring candidates above new ones "of the same kind", while the Design ranks every recurring candidate above all non-defect new ones regardless of kind. The fixture description does not say which planted problem reached a commit, which is repeated, or which is generic rather than project-specific (AC-03). A grader therefore cannot derive the expected order or homes, and the proofs can pass a wrong ordering.
+PROPOSAL: Define the severity values and give every candidate kind, covered candidates included, exactly one tier with a tie rule. Align the Owner summary. Specify for each planted fixture problem its expected tier, home class and position.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Terminology (Recurring candidate); Design (History comparison, "A match on category, home and proposed change"); Design (Effects and failure, "saved reports remain readable by a later version"); AC-07
+EVIDENCE: The proposed change is model-written free text, so the same problem will almost never produce identical text in two runs, and the document does not say whether a match is exact or by meaning, or who decides. Two implementers would build different matchers, and the AC-07 grader inherits whichever one was built. Comparison "uses only what the reports recorded", but the Markdown report has no defined machine-readable fields and no format version. The document covers a later version reading old reports but not a rolled-back version reading reports a newer version wrote.
+PROPOSAL: Define the match rule, for example a normalised home path plus category plus a stable candidate key recorded in the report. Give the saved report a versioned structured section, and state what an older version does with a newer report.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Report location, "a repository without an `origin` remote uses its root directory path ... so all worktrees of one repository share one history", and "validated as triage validates its own `report_dir`"); Design (Input, "resolves the repository from the transcript's working directory, or the current checkout when they agree"); Owner summary ("History then survives worktree removal")
+EVIDENCE: Each worktree has its own root directory, so a path-derived key gives each worktree a separate history, which contradicts "share one history". Triage validates `report_dir` with `resolveInside`, which rejects absolute paths and anything outside the checkout (plugins/vh-adlc/scripts/triage/settings.ts:41-44, :130). A configured retro `report_dir` would therefore sit inside a worktree and be lost when the worktree is removed, the case the per-user default exists to avoid. The document does not define what happens when the transcript's working directory and the current checkout disagree, or when that directory is a deleted worktree, which the Owner summary calls the common case. No schema is given for the new `.vh-adlc/retro.yaml` (schema version, unknown keys).
+PROPOSAL: Key the no-origin case on the repository's common Git directory. Define repository resolution for the disagreeing and deleted-worktree cases. State whether a configured `report_dir` may be absolute or outside the checkout, and give `retro.yaml` a schema.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner summary (line 60, "sends nothing outside the machine. Secrets are redacted before anything is shown or saved"); Design (Report, `<REDACTED>` rule); Design (Effects and failure, "no tracker or network call"); AC-06; Test Plan row AC-06
+EVIDENCE: The skill runs inside a hosted model session. The model must read the transcript, secrets included, before it can redact them, and that content goes to the model provider. A Codex transcript analysed on Claude Code, or the reverse, moves session content to a second provider. Scope has no deterministic redaction step, so redaction depends on the model, and the AC-06 grep checks only the planted literal values, so it passes an implementation that leaks other secret shapes.
+PROPOSAL: Either redact with a deterministic pre-pass before the model reads the transcript and test it against a fixed list of secret shapes, or scope the claim to "writes nothing outside the machine except through the host model" and state the cross-provider case for the owner.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope ("Registration in the package checks and discovery tests"); Background (check.test.ts:22-26, triage discovery.test.ts:22); Scope (intake routing in lifecycle.md); covers (no plugins/vh-adlc/references/loop.md)
+EVIDENCE: The checker has three skill classes with different requirements (tests/vh-adlc/check.test.ts:16-26). Scheduled operations must name `guides/humanize-prose.md` and contain `vh-adlc knowledge` (:260-266); content operations need only frontmatter (:241-246); host operations skip knowledge (:279-297). The document does not say which class retro joins, which knowledge pages it resolves, whether it uses the verified binary, or how it behaves when the repository is unpinned. loop.md lists that behaviour per operation (plugins/vh-adlc/references/loop.md:63-65), and loop.md is not in covers. The skill-total assertions at triage/discovery.test.ts:13 and maintenance/discovery.test.ts:12 (both `toHaveLength(16)`) also change; the Background cites only :22. Lifecycle already routes "Diagnosis or findings" to investigate (lifecycle.md:55), and the document gives no rule separating a request like "what went wrong in this session" from that row. The same gap was raised for docs drift (docs/specs/shared-docs-drift.md:529).
+PROPOSAL: Name the class and the checker list, the knowledge pages including the humanize guide for the report prose, and the unpinned behaviour, and add loop.md to covers if it changes. Give the lifecycle row a rule against the investigate row, and test an ambiguous request in AC-01.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner summary (line 43, "judgement-only standards go to the review step, because the reviewer has the least context pressure"); Design (Analysis table, Review standards row, "A rule in the consumer's project procedure or a spec-review lens"); Design ("only judgement-level standards are proposed as review rules"); Out of scope ("any change to the reviewer agent")
+EVIDENCE: `project_procedure` is read by every SDD operation, the implementer included (plugins/vh-adlc/references/loop-settings.md:40), so a standard placed there loads into the agent with the most context pressure. `lenses` apply only to spec reviews (loop-settings.md:42). The implementation reviewer returns criterion records and defects, with no standards input (plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md, "An implementation review"). Neither named home puts a code-level judgement standard in front of a code reviewer, so the prior-art rule the document says it adopts is not achieved, and changing the reviewer is out of scope.
+PROPOSAL: Name a home that a code review actually reads, or raise as an Open Question whether the reviewer should gain a project-standards input. Otherwise state plainly that the adopted rule is weakened.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Input items 2 and 4); Design (Analysis, covered check "searches the files it read"); Terminology (Home); Owner summary ("you keep memory notes")
+EVIDENCE: The prior art checks steering files "in the repo OR the user's global scope" (/tmp/mp-skills-src/repo skills/engineering/retro/SKILL.md, Global AGENTS.md category). The Input reads only repository files. User-level always-loaded files, such as ~/.claude/CLAUDE.md, the auto-memory index and ~/.codex/AGENTS.md, are never read. So Instruction size and no-ops cannot see them, and the covered check will propose rules that a user-level file or memory note already states.
+PROPOSAL: Add the host's user-level always-loaded instruction and memory files to the Input as read-only sources, for both the size check and the covered check, or exclude them by name with the reason.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Analysis table, Instruction size and no-ops trigger, "Always-loaded files whose instructions the session shows changed nothing"); AC-02 ("an instruction the session shows to be a no-op")
+EVIDENCE: One session cannot show that an instruction changes nothing. It can only show that the instruction did not apply to that task. Read literally, the trigger flags every rule the session did not exercise and proposes deleting rules that matter in other tasks. The prior art triggers on unwieldy steering files and on instructions that do not modify behaviour, not on one session's silence. The fixture's planted no-op has no stated property that tells a grader a true no-op from an unexercised rule.
+PROPOSAL: Define a no-op by the instruction's content, for example one that restates a default or something the tooling already enforces, rather than by one session's absence of effect. Give the fixture's planted no-op and one relevant but unexercised rule that must not be flagged.
+
+FINDING: F-13
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan (rows AC-02, AC-03, AC-04, AC-05 and AC-07, "an independent grader"); Design (Input, configured-missing location ends as unavailable; unparseable or unsupported transcript ends with no candidates)
+EVIDENCE: The grader is not identified as a person, a model or a script, and has no written checklist beyond the criteria, so the pass conditions are not reproducible. The Design defines several outcomes no criterion or row exercises: a configured report location that is missing or unreadable ends as unavailable rather than a first run, an unparseable or unsupported-host transcript ends with a reason and no candidates, and the fix-that-did-not-hold tier.
+PROPOSAL: Name the grader and its written checklist per planted problem. Add rows or criteria for the unavailable location, the unparseable or unsupported transcript and the fix-that-did-not-hold case.
+
+FINDING: F-14
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Analysis, "A mechanical violation is always proposed as a deterministic check in the consumer's existing guardrail"); Analysis table (Deterministic checks row, "or a repository with none wired"); Terminology (Home, vh-adlc for generic process lessons)
+EVIDENCE: "the consumer's existing guardrail" does not fit a repository with no guardrail, which the same table makes a finding, or a generic mechanical lesson whose home is vh-adlc.
+PROPOSAL: Say "in the home's guardrail, adding one where none is wired".
+
+FINDING: F-15
+KIND: judgement
+SEVERITY: nit
+WHERE: Scope ("model-invoked"); Open Questions ("None.")
+EVIDENCE: The prior art sets `disable-model-invocation: true` (retro/SKILL.md frontmatter at 5863806). This document makes a file-writing skill model-invoked without recording that as an owner decision, while the Owner summary attributes the other choices to the owner.
+PROPOSAL: State whether model invocation is an owner decision, or raise it as an Open Question.
 
 ## Sources
 
