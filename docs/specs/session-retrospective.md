@@ -339,6 +339,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-15 | R-1 | spec | `ef7f01b8b85a78c3c26aebb77aab526eed13d54a` | claude-opus-5-5 | procedural | One blocking, twelve should-fix and two nit findings |
+| 2026-11-15 | R-2 | spec | `b34ba95382ee1ceb78d0c6c2ac5d751dc65b0ff3` | claude-opus-5-5 | procedural | One blocking, sixteen should-fix and three nit findings |
 
 ### R-1
 
@@ -446,6 +447,148 @@ SEVERITY: nit
 WHERE: Scope ("model-invoked"); Open Questions ("None.")
 EVIDENCE: The prior art sets `disable-model-invocation: true` (retro/SKILL.md frontmatter at 5863806). This document makes a file-writing skill model-invoked without recording that as an owner decision, while the Owner summary attributes the other choices to the owner.
 PROPOSAL: State whether model invocation is an owner decision, or raise it as an Open Question.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Owner summary ("On Codex the skill asks you to name the session, because Codex exposes no current-session identifier"); Background ("Codex CLI 0.163.0 exposes no such variable"); Design, Session and repository ("on Codex CLI, or when the variable is missing, it asks the owner to name the session"); AC-09 ("a Codex CLI run asks the owner to name the session"); Test Plan row AC-09 ("A recorded Codex CLI run with no session named; pass when the agent asks for the session and writes no report")
+EVIDENCE: `codex --version` prints `codex-cli 0.163.0`. I ran `codex exec -s read-only --skip-git-repo-check "Run exactly this shell command and print its output verbatim: env | grep -E '^CODEX_(SESSION|THREAD)_ID='"` in an empty temporary directory. It printed `CODEX_SESSION_ID=01a1de7c-bf95-7033-99a8-2071e5bf6b71` and `CODEX_THREAD_ID=01a1de7c-bf95-7033-99a8-2071e5bf6b71`, and the newest rollout was `~/.codex/sessions/2026/11/15/rollout-2026-11-15T10-14-40-01a1de7c-bf95-7033-99a8-2071e5bf6b71.jsonl`, so the variable names the current session's rollout file exactly. The Background's only support is `grep -rhoE "CODEX_[A-Z_]+" plugins tests`, which shows what the plugin references (CODEX_HOME 33 times, CODEX_DISABLED 3 times), not what Codex exposes. The claim was added by the revision that answered R-1 F-02. Because it is false, the Codex default the design builds (always ask) and the AC-09 proof (pass only if it asks) are built on a missing mechanism that actually exists.
+PROPOSAL: Correct the Background, then define the Codex default from `CODEX_SESSION_ID` or `CODEX_THREAD_ID` with the ask path only when it is absent, and change AC-09 and its Test Plan row to prove that a Codex run reviews its own rollout while a newer one exists. If asking on Codex is still preferred, raise that trade-off as an Open Question rather than resting it on the false fact.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Severity and order (tier table, "Each candidate gets one tier"); Design, Analysis ("Before proposing a candidate, the skill searches every file it read for a rule that already covers it"); Terminology (Fix that did not hold); Fixture table rows P1 and P2; AC-02; AC-07
+EVIDENCE: The tier kinds overlap and no precedence is given. P2 is a mistake caught before commit (tier 4) and a covered candidate that is not recurring (tier 7); the fixture expects 7, so a first-matching-tier rule, which gives P1 tier 2 and second-run P3 tier 3 as the fixture expects, gives P2 tier 4 instead. P1 is a banned API call that "the repository's configured lint rule flags", so under the covered check the lint rule already covers it, making it both tier 2 and tier 7; the fixture expects 2. No single rule reproduces all fixture rows, and a covered defect that reached a commit has no determinable tier. This table was introduced by the revision that answered R-1 F-05.
+PROPOSAL: State an explicit precedence (for example, the lowest-numbered tier that applies, with covered-and-not-recurring placed where the fixture needs it) and whether a configured but unwired check counts as an existing rule for the covered test, then make the P1 and P2 fixture rows follow that rule.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-02 ("lists a candidate for each planted problem in the fixture table below ... in the order the table gives"); Fixture table and the order paragraph beneath it ("First-run order: P1, P3, then P4 and P5 by first evidence line, then P2"); Design, Severity and order ("then by their first evidence line in the session"); Design, Report and save ("evidence (digest source lines and a short quote)"); Test Plan row AC-02, AC-03, AC-04, AC-05 (checklist item "order")
+EVIDENCE: The table rows run P1 to P6, which is not the first-run order the paragraph gives (P2 last), so "the order the table gives" read literally contradicts the tiers; P6 is in the table yet must not be listed. The tie rule uses "first evidence line in the session", but P5 is a no-op instruction whose evidence is a line of `AGENTS.md` and `.editorconfig`, not a session line, and the report's evidence field is defined as digest source lines only, so P5 has no defined evidence or position against P4. The document also does not say whether unplanted extra candidates are allowed or how the order check treats them; a real run on a fixture session will usually produce some.
+PROPOSAL: Point AC-02 at the order paragraph and exclude P6 explicitly, define evidence and the tie position for candidates whose evidence is a repository or user-level file, and state that the order check is the relative order of the planted candidates with extras allowed (or forbidden).
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, History ("The skill compares a new candidate only with earlier candidates of the same category and home"; key `<category>:<home path ...>:<slug>`); Terminology (Recurring candidate); Fixture table (Home class column, "Consumer repository" only); AC-07; Test Plan row AC-07
+EVIDENCE: The home is a model-chosen file path. P3's change is "a pointer in an instruction file or reference", so one run may choose `AGENTS.md`, another `CLAUDE.md` or a docs page. Because comparison is restricted to an identical normalised home, the same problem proposed in a different file is never compared and never marked recurring. The fixture gives only the home class, not the home path the seeded report records for P2 and P3, so AC-07 passes or fails depending on whether the second run happens to pick the seeded path, and a correct implementation of the stated rule can fail it. The key and home restriction came from the revision that answered R-1 F-06.
+PROPOSAL: Either compare within category across homes of the same class (keeping the key for adopting the earlier slug), or fix the expected home path for each planted problem in the fixture table and the seeded report so the grader can derive the outcome.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-07 ("a seeded report from the same session is listed as a previous run and not counted; a seeded report with a newer format is skipped and listed"); Test Plan row AC-07 ("three seeded reports (another session raising P2 and P3, the same session, a `format: 2` report)"); order paragraph under the Fixture table ("The seeded earlier report raises P2 and P3")
+EVIDENCE: The candidates held by the same-session report and the `format: 2` report are not specified. If they raise nothing beyond P2 and P3, or only P1 (tier 2 either way), an implementation that wrongly counts them as recurrences produces the same tiers and order, so "not counted" and "skipped" are unobservable in the recorded runs and the proof passes a wrong implementation. Only a seeded candidate that would otherwise change tier, such as P4 or P5 at tier 6, makes miscounting visible.
+PROPOSAL: Specify that the same-session and `format: 2` seeded reports each raise P4 or P5 with matching keys, and add checklist items that those stay at tier 6 and are not marked recurring.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Extraction and redaction ("the tool input and output each cut to 600 characters"; "Before anything is written, every string passes through redaction"; "values assigned to keys named `password`, `passwd`, `secret`, `token`, `api_key` or `apikey`"); Owner summary ("The same script removes known secret shapes"); AC-06; Test Plan row AC-06
+EVIDENCE: The order of truncation and redaction is not stated. If the 600-character cut runs first, a PEM block or JWT split at the boundary loses its END marker or its third segment, no longer matches its shape, and a fragment of key material survives into the digest. Key matching is also undefined: real transcripts carry environment dumps such as `DB_PASSWORD=`, `GITHUB_TOKEN=` or `STACKWEAVER_HOSTED_SECRET=` (a variable the consumer's CLAUDE.md names), and an exact-name, case-sensitive matcher misses all of them while a substring matcher catches them. Two implementers build different redactors, and the AC-06 fixture ("one example of every listed secret shape") does not decide between them.
+PROPOSAL: State that redaction runs on the full string before any cut, and define key matching (case-insensitive, and whether names containing or ending with the listed words match), with must-redact and must-survive examples for both in the AC-06 row.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner summary ("The same script removes known secret shapes before the model sees anything"); Design, Analysis (the model reads instruction files, build files, CI workflows, `~/.claude/CLAUDE.md` and the auto-memory index and notes directly); Design, Report and save ("It is shown in the conversation and passed to `save` ... which redacts it again"); Design, Effects and failure; AC-06 ("in the shown or saved report"); Test Plan row AC-06
+EVIDENCE: Only the digest and the saved file pass through the script. The repository files and the user-level instruction and memory files go to the model unredacted, so "before the model sees anything" is false; memory notes are a realistic place for credentials. The report is shown in the conversation before `save` redacts it, so a secret the model quotes from a memory note or instruction file reaches the shown report with no deterministic redaction, which AC-06 forbids. The AC-06 proof plants secrets only in the session, so it passes on this leak. The summary sentence was written by the revision that answered R-1 F-08.
+PROPOSAL: Scope the summary to the transcript, and either show the report only after `save` (displaying the redacted file) or pass the shown text through the same redaction; plant a secret shape in a fixture instruction or memory file for the AC-06 proof.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary ("It writes nothing except its report, creates no issue, and makes no tracker or network call of its own"); Design, Knowledge and invocation ("resolves `guides/humanize-prose.md` with `vh-adlc knowledge` through the verified binary"); Design, Effects and failure ("the run writes nothing: no other file ... no tracker or network call by the skill or its script"); AC-06; Test Plan row AC-06 ("the run log shows no tracker or network command")
+EVIDENCE: `references/loop.md` makes knowledge resolution a fetch that can return `unreachable` and caches each page under `${XDG_CACHE_HOME:-$HOME/.cache}/vh-adlc/docs/<sha>/<page>`, and its first step runs the installer that fetches the binary named in `vh-adlc.lock.json` (plugins/vh-adlc/references/loop.md, "Resolve knowledge" and the installer paragraph). So the skill's own steps can make network calls and write cache files, contradicting both absolute claims, and a grader applying "no network command" to the run log must decide whether `vh-adlc knowledge` or the installer counts.
+PROPOSAL: Exempt the binary install and knowledge resolution, with their cache writes, by name in the Owner summary, Effects and the AC-06 proof, so the proof checks only for tracker and other network commands.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Report and save ("writes it ... to a temporary file in the same directory, links it to the final name only if that name is free, and removes the temporary file on success and on failure"); Design, Effects and failure ("Apart from its digest in the system temporary directory, removed at the end"; "An interrupted save leaves either the complete report or nothing"); Owner summary ("It writes nothing except its report"); AC-06 ("with no temporary file left behind"); Test Plan row AC-06
+EVIDENCE: A process killed between the temporary write and the link, or before cleanup, leaves the temporary file in the report directory and the digest of session content in the system temporary directory; "removes ... on failure" covers handled errors only, so "complete report or nothing" is unsupported for an interrupted run. The temporary name is undefined, so `history`, which reads "every earlier report", may parse a leftover as a report. The AC-06 proof compares only the fixture repository and the report directory, never the system temporary directory, so it passes an implementation that leaves the digest behind. The temporary-file mechanism came from the revision that answered R-1 F-03.
+PROPOSAL: Give the temporary file a name `history` ignores (for example dot-prefixed, not ending in `.md`), say how leftovers from an interrupted run are handled, and extend the AC-06 proof to list the run's temporary directory before and after.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope ("Fixture sessions, a large-session generator"); Design, Extraction and redaction (`--host <claude|codex>`); AC-08; Test Plan rows AC-02, AC-03, AC-04, AC-05, AC-07, AC-08 and AC-10
+EVIDENCE: The document never says which host format the small fixture session is in. The large fixture must have `subagents/` and `tool-results/`, which exist only in the Claude Code layout, so it is a Claude transcript. "A recorded run per host" names where the skill runs, not the transcript format, and the only Codex-format input named anywhere is the "file from another host" negative case in AC-10. The Codex rollout parser can therefore be absent or broken while every proof passes, although the Background's 216 MB and 224 MB examples are Codex rollouts.
+PROPOSAL: Require a Codex-format version of the small fixture (and a large Codex rollout from the generator) and state which fixture each recorded run uses, with `bun test` cases for the Codex parser.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner summary (review standards "the report says plainly that this is weaker"; user-level instruction and memory files read); Design, Analysis (Review standards and Information access rows; covered check over "every file it read", including user-level files); Terminology (Home); AC-03 ("the owner's user-level files"); Fixture table; Test Plan row AC-02, AC-03, AC-04, AC-05
+EVIDENCE: No fixture row plants a review-standards problem, an information-access problem, or anything whose home is the user-level files, and no planted rule lives in a user-level file. So the weakness note the Owner summary promises, two of the six categories, the user-level home class AC-03 names, and the covered check against user-level files (the change made for R-1 F-11) are never exercised; an implementation that never reads user-level files or never emits the weakness note passes every proof.
+PROPOSAL: Add fixture rows for a judgement-level mistake (expecting the project procedure home and the weakness note), an information-access gap, and a covered mistake whose forbidding rule is in a fixture user-level file, with checklist items for each.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-04 ("wired into the consumer's pre-commit hook"); Fixture table row P1 ("committed because no hook runs the lint"); Design, Analysis table (Deterministic checks row, "Wire or add the check in the home's guardrail, adding one where none is wired"); Test Plan row AC-02, AC-03, AC-04, AC-05 ("P1 as a hook check")
+EVIDENCE: The Design never says how the guardrail is chosen; the prior art lets it be "a custom rule in the repo's own linter, a new pre-commit hook, or a new CI job, whichever ... make cheapest" (retro/SKILL.md at 5863806). The fixture does not say whether the repository has CI running the lint. A correct run that proposes wiring the lint into an existing CI job satisfies the Design and fails AC-04.
+PROPOSAL: State the selection rule in the Design (for example, a defect that reached a commit goes to the pre-commit hook) and state in P1 which guardrails the fixture repository has.
+
+FINDING: F-13
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Knowledge and invocation ("Intake routes a request about what to change in the agent's environment after a session (it names a session, a transcript or "this session") to retro, and a request about a defect in the product or its code to investigate; a request that fits both asks"); AC-01; Test Plan row AC-01
+EVIDENCE: The Test Plan's ambiguous example, "what went wrong in this session?", names "this session" and says nothing about a product defect, so the stated rule routes it to retro, while the proof passes only if the agent asks. An implementer writing the lifecycle row from the Design fails the proof; another who copies the example passes. The row for "run a retrospective on this session" also has no stated pass condition. The routing rule came from the revision that answered R-1 F-09 (lifecycle.md:55 routes "Diagnosis or findings" to investigate).
+PROPOSAL: Define what makes a request fit both (for example "what went wrong" without asking for environment changes), make the lifecycle row text match it, and give each recorded AC-01 run its pass condition.
+
+FINDING: F-14
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Analysis ("read-only, the host's user-level files: `~/.claude/CLAUDE.md` and the project's auto-memory index ... on Claude Code, `~/.codex/AGENTS.md` on Codex CLI"); Owner summary ("your user-level instruction and memory files"; "for a Codex transcript reviewed in Claude Code is a second provider"); Terminology (Home)
+EVIDENCE: Cross-host review is supported, but "the host's user-level files" does not say whether that means the host running the skill or the host that produced the transcript. For a Codex transcript reviewed in Claude Code, the files that steered the reviewed session are `~/.codex/AGENTS.md`, yet one reading loads only `~/.claude/CLAUDE.md`, so the covered and no-op checks inspect the wrong instructions and a user-level home names the wrong file. The user-level input was added by the revision that answered R-1 F-11.
+PROPOSAL: Say the user-level files are those of the transcript's host (honouring `CODEX_HOME` and the Claude configuration directory), and add a cross-host recorded run or test that shows which files were read.
+
+FINDING: F-15
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Extraction and redaction ("complete aggregates: tool calls by name, the 20 largest outputs ..., repeated failing commands, and the reads and searches before the first edit of each file"; "when entries exceed 400,000 characters ... aggregates stay complete"); Owner summary ("reduces it to a bounded digest"); Terminology (Digest, "bounded"); Test Plan row AC-08
+EVIDENCE: Only the entries are capped. The per-file reads-before-first-edit list and the repeated failing commands grow with session length, and the sessions this feature targets are the large ones (local Codex rollouts of 217,272,576, 224,716,404 and 532,507,317 bytes, `find ~/.codex/sessions -size +100M`). So the digest is not bounded as claimed, and an implementer must invent a cap or let the model read an unbounded file. The AC-08 generator builds its own shape at 13 MB, so it cannot show the bound holds. The extraction design came from the revision that answered R-1 F-01.
+PROPOSAL: Give each aggregate a cap with a recorded overflow count, or state the total digest limit, and have the AC-08 test assert the digest size on a generated session with many edited files.
+
+FINDING: F-16
+KIND: judgement
+SEVERITY: should-fix
+WHERE: frontmatter goal ("After a finished agent session"); Owner summary ("reviews one session, the current one by default"); Design, Session and repository; Design, History ("previous runs of this session"); Design, Extraction and redaction
+EVIDENCE: The default target is the live session, not a finished one, and the document does not say where the reviewed session ends. On a rerun of the same session, which History explicitly supports, the transcript now contains the earlier retro run's own turns: its `extract`, the read of a digest of up to 400,000 characters, the instruction and memory reads and the report. Without a cut-off these become evidence, for example a tool-economy candidate against vh-adlc's own retro digest, and two implementers will differ on whether to exclude them.
+PROPOSAL: Define the end of the reviewed session (for example, the turn that invoked retro) and state that earlier retro runs' turns in the same transcript are excluded from candidates.
+
+FINDING: F-17
+KIND: factual
+SEVERITY: should-fix
+WHERE: covers frontmatter; Scope ("the two documentation pages")
+EVIDENCE: `docs/get-started/installation.md` enumerates the package ("The package contains fifteen skills: the generic `vh-adlc` entry, eleven engineering operations, ..."), and `docs/reference/compatibility.md` keeps the per-operation host support matrix (for example the `vh-adlc-clean` row for Claude Code and Codex on Linux). Adding a seventeenth skill that claims Claude Code CLI and Codex CLI support changes both, but neither is in covers or Scope, so the implementer will not update them and the docs-impact check will not flag them for this feature.
+PROPOSAL: Add both pages to covers and Scope, with the installation count and a retro row in the support matrix.
+
+FINDING: F-18
+KIND: factual
+SEVERITY: nit
+WHERE: Owner summary ("Real transcripts run from 13 MB to over 200 MB")
+EVIDENCE: Of 29 main transcripts in `~/.claude/projects/-home-m-code-stackweaver`, 2 exceed 13 MB and 2 are under 1 MB (`find . -maxdepth 1 -name '*.jsonl' -size +13M`, `-size -1M`); a 532,507,317-byte Codex rollout also exists. 13 MB is one observed size, not a lower bound.
+PROPOSAL: Say "range up to over 200 MB, and a typical one is several megabytes".
+
+FINDING: F-19
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan row AC-01 ("both discovery counts at seventeen"); Background (triage discovery.test.ts:22)
+EVIDENCE: tests/vh-adlc/triage/discovery.test.ts:23 also asserts `expect(names).toHaveLength(11)` over the lifecycle skills filtered at :22. As a scheduled operation, retro is not excluded there, so that count becomes 12 unless retro is added to the exclusion list; the document names neither.
+PROPOSAL: State that the lifecycle count at :23 moves to 12, or that retro joins the exclusion list.
+
+FINDING: F-20
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, History ("per candidate its key, category, home, tier, status and a one-line summary")
+EVIDENCE: `status` is a field of the versioned `retro-report` format, but its values are defined nowhere in the document (new, recurring, covered, fix that did not hold, or something else).
+PROPOSAL: List the allowed `status` values in the format definition.
 
 ## Sources
 
