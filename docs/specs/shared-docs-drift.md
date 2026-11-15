@@ -224,6 +224,15 @@ The typed publisher identity resolves the authenticated GraphQL viewer's numeric
 
 The first broad local attempt accidentally used Bun's five-second default test limit. It retains its failures in `t111-native-neighbors.log`. The rerun uses the repository CI's existing `--timeout 60000` budget and remains in progress in `t111-native-neighbors-ci-budget.log`. This changes no runtime request deadline. Actual hosted-token acceptance remains open.
 
+
+### Publisher component review follow-up
+
+Actual Claude Code Opus 5.5 reviewed component commit `27b9466a209d5039e006c9059e41875f05f32ae7`. The native capture validates all 61 required fragments, exact model/target, unchanged packet, zero exit and confirmed process cleanup. Original returned records are retained under `.docs-drift-review-archive/publisher-component-claude-r1`, SHA256 `3f70eb732096c12bf59cf822ac2fa9b64457b9d908b1f13c20cd250bbf99453e`. This is a scoped implementation diagnostic and supplies no whole-feature criterion verdict.
+
+F-01 found case-insensitive record-to-record comparison could allow a changed identity to inherit old entry receipts. F-02 found one original record could contain two hosted spellings. F-03 found a mapped interactive trial binding could be labelled without an observed interactive identity. The fix compares predecessor/successor original identities canonically, including repository and numeric identity, requires the original hosted entry to equal the root account exactly, and requires observed identity for a selected interactive trial entry. Later native observations still match recorded logins ignoring case with exact numeric IDs. Original receipt and trial target bytes retain their meanings.
+
+Four controls reproduce these findings in `publisher-component-r1-red-final.log`, including compatible and unaffected-entry trial successors with fresh target-bound receipts and byte-preserved carried entry receipts. All four pass with seven assertions in `publisher-component-r1-focused-green.log`. The expanded adoption, upgrade and trial neighbor run remains in progress. A fresh scoped Claude Code review is required before T115 is ticked. These controls use synthetic metadata and establish no hosted or migration acceptance.
+
 ## Scope
 
 Recovery includes a separately approved delivery acknowledgement that preserves a changed remote resource and permits exact-owned lease cleanup after proof of original ownership and settled execution.

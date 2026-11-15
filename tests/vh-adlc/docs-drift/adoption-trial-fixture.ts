@@ -52,7 +52,7 @@ export function trialAdoptionDelivery(f: Pick<ReturnType<typeof trialAdoptionFix
 
 
 type UpgradeSource = Pick<ReturnType<typeof trialAdoptionFixture>, "source" | "candidate" | "configured"> & {
-  manifest: { fixture_id: string }; record: { receipts: ReturnType<typeof portableRecord>["receipts"] };
+  manifest: { fixture_id: string }; record: { receipts: ReturnType<typeof portableRecord>["receipts"]; entry_identities?: Parameters<typeof portableRecord>[1] };
 };
 
 export function compatibleTrialUpgrade(f: UpgradeSource,
@@ -72,7 +72,7 @@ export function compatibleTrialUpgrade(f: UpgradeSource,
       secrets: { COPILOT_GITHUB_TOKEN: "${{ secrets.COPILOT_GITHUB_TOKEN }}" } } } }).toString());
   options.prepare?.(f.source, configured);
   const candidate = commitAll(f.source); git(f.source, "switch", "main");
-  const current = portableRecord({ repo: f.source, configured, candidate });
+  const current = portableRecord({ repo: f.source, configured, candidate }, f.record.entry_identities);
   for (const receipt of Object.values(current.receipts)) Object.assign(receipt, { evidence_kind: "test-only", fixture_id: f.manifest.fixture_id });
   const carried = ["hosted_advisory", "history_read", "quiescence", "copilot_entry", "claude_entry"];
   for (const name of carried) current.receipts[name] = structuredClone(f.record.receipts[name]!);
@@ -145,7 +145,7 @@ export function trialUpgradeFixture(f: UpgradeSource, options: {
     }
   }
   const candidate = commitAll(f.source); git(f.source, "switch", "main");
-  const fresh = portableRecord({ repo: f.source, configured, candidate });
+  const fresh = portableRecord({ repo: f.source, configured, candidate }, f.record.entry_identities);
   for (const receipt of Object.values(fresh.receipts)) Object.assign(receipt, { evidence_kind: "test-only", fixture_id: f.manifest.fixture_id });
   const affected = definition.affected_entries;
   const carried = ["hosted_advisory", "history_read", "quiescence", "copilot_entry", "claude_entry"].filter(name => name === "quiescence"

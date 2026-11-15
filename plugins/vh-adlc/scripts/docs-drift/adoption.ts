@@ -5,7 +5,7 @@ import { readGit, collectionReaders, readAdoptionInput as committedInput } from 
 import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
 import { classifySettingsLeaves, loadCommittedSettings, parseSettings, settingsProjections } from "./settings";
 import { readTrialDefinition, readTrialHistoryBindings } from "./trial-definition";
-import { PUBLISHER_ENTRIES, publisherActor, sameAccount, sameLogin, samePublicationIdentity,
+import { PUBLISHER_ENTRIES, publisherActor, sameLogin, samePublicationIdentity,
   type EntryIdentities, type PublisherEntry } from "./identity";
 
 type ComponentPin = {
@@ -74,6 +74,8 @@ export function collectTrialBindings(options: AdoptionOptions) {
   if (candidate.protected_sha256 !== policy.prospective_protected_sha256
     || candidate.component_pin.path !== policy.candidate_component.path
     || candidate.component_pin.sha256 !== policy.candidate_component.sha256) fail("prospective trial bindings changed");
+  if (candidate.settings.publication.entry_actors && options.entry !== undefined && options.entry !== "hosted" && !options.identity)
+    fail("current native trial identity");
   let identity = policy.identity;
   if (options.identity) {
     const observed = nativeIdentity(options.identity);
@@ -170,7 +172,7 @@ function readEntryIdentities(record: ReturnType<typeof parseAdoptionRecord>, ide
     return { actor: native.actor, actor_id: native.actor_id };
   };
   const entries = { hosted: read("hosted"), copilot: read("copilot"), claude: read("claude") };
-  if (!sameAccount(entries.hosted, identity)) fail("hosted entry identity");
+  if (!canonicalJSON(entries.hosted).equals(canonicalJSON({ actor: identity.actor, actor_id: identity.actor_id }))) fail("hosted entry identity");
   return entries;
 }
 
@@ -345,8 +347,11 @@ function currentPublisher(recorded: AdoptionResult, options: AdoptionOptions) {
 }
 
 function changedIdentityEntries(previous: AdoptionResult, next: AdoptionResult): PublisherEntry[] {
-  return PUBLISHER_ENTRIES.filter(entry => !sameAccount(previous.entry_identities?.[entry] ?? previous.identity,
-    next.entry_identities?.[entry] ?? next.identity));
+  return PUBLISHER_ENTRIES.filter(entry => {
+    const before = { ...previous.identity, ...previous.entry_identities?.[entry] };
+    const after = { ...next.identity, ...next.entry_identities?.[entry] };
+    return !canonicalJSON(before).equals(canonicalJSON(after));
+  });
 }
 const compatibleCarriedReceipts = ["hosted_advisory", "history_read", "quiescence", "copilot_entry", "claude_entry"];
 

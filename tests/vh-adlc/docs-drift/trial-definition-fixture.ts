@@ -26,12 +26,17 @@ function fixtureBundle(roots: string[], repo: string, source: string,
 
 export function trialDefinitionFixture(roots: string[], options: {
   approved?: Parameters<typeof source>[1];
+  entry_actors?: { hosted: string; copilot: string; claude: string };
   candidate_client?: ReturnType<typeof source>["configured"]["clients"]["copilot-linux"];
   caller?: "extra-job-permission" | "different-secret" | "missing-permissions" | "job-only-permissions";
   history_job_write?: boolean; worker_cron?: boolean;
   bundle_format?: "sha1" | "sha256";
 } = {}) {
   const f = source(roots, options.approved), settings = structuredClone(f.configured);
+  if (options.entry_actors) {
+    Object.assign(settings.publication, { entry_actors: options.entry_actors });
+    settings.pr_discovery.authors = [...new Set([...settings.pr_discovery.authors, ...Object.values(options.entry_actors)])];
+  }
   // Detached maintenance from fixture commits must settle before read-only preservation checks.
   readGit(f.repo, "config", "gc.auto", "0"); readGit(f.repo, "config", "maintenance.auto", "false");
   if (options.candidate_client) settings.clients["copilot-linux"] = options.candidate_client;

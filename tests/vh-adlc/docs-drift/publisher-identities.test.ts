@@ -1,9 +1,11 @@
 import { afterAll, expect, test } from 'bun:test';
 import { rmSync } from 'node:fs';
 import { parseSettings, settingsProjections } from '../../../plugins/vh-adlc/scripts/docs-drift/settings';
-import { verifyRuntimeAdoption } from '../../../plugins/vh-adlc/scripts/docs-drift/adoption';
-import { canonicalJSON } from '../../../plugins/vh-adlc/scripts/docs-drift/protocol';
+import { collectTrialBindings, verifyRuntimeAdoption } from '../../../plugins/vh-adlc/scripts/docs-drift/adoption';
+import { canonicalJSON, canonicalDigest } from '../../../plugins/vh-adlc/scripts/docs-drift/protocol';
 import { settingsFixture } from './settings-fixture';
+import { compatibleTrialUpgrade, trialUpgradeFixture, trialAdoptionDelivery } from './adoption-trial-fixture';
+import { trialDefinitionFixture } from './trial-definition-fixture';
 import { source, write, commit, portableRecord, deliverRecord, runtimeIdentity } from './adoption-fixture';
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -106,4 +108,64 @@ test('mapped selectors preserve native managed-user underscores', () => {
   value.publication.entry_actors.claude = 'fixture-owner_enterprise';
   value.pr_discovery.authors.push('fixture-owner_enterprise');
   expect(parseSettings(value).publication.entry_actors?.copilot).toBe('fixture-owner_enterprise');
+});
+
+
+test('an original hosted entry must retain the exact root identity spelling', () => {
+  const base = source(roots), settings = { ...base.configured, publication: { ...base.configured.publication, entry_actors: entries },
+    pr_discovery: { ...base.configured.pr_discovery, authors: [...new Set(Object.values(entries))] } };
+  write(base.repo, '.vh-adlc/docs-drift.yaml', canonicalJSON(settings));
+  const f = { ...base, configured: settings, candidate: commit(base.repo, 'synthetic hosted identity spelling') };
+  const identities = { hosted: { actor: 'FIXTURE-BOT', actor_id: 20 }, copilot: { actor: 'fixture-owner', actor_id: 30 },
+    claude: { actor: 'fixture-owner', actor_id: 30 } };
+  const current = deliverRecord(f, portableRecord(f, identities));
+  expect(() => verifyRuntimeAdoption({ repo: f.repo, current_default: current, entry: 'hosted', identity: runtimeIdentity })).toThrow('hosted entry identity');
+});
+
+test('mapped interactive trial bindings require an observed native identity', () => {
+  const f = trialDefinitionFixture(roots, { entry_actors: entries });
+  expect(() => collectTrialBindings({ repo: f.repo, current_default: f.staged, entry: 'claude' })).toThrow('current native trial identity');
+  expect(collectTrialBindings({ repo: f.repo, current_default: f.staged, entry: 'claude',
+    identity: { ...runtimeIdentity, actor: 'Fixture-Owner', actor_id: 30 } }).identity.actor).toBe('Fixture-Owner');
+});
+
+test.each(['compatible', 'trial'] as const)('a %s successor cannot recase a carried native identity', route => {
+  const base = source(roots), settings = { ...base.configured, publication: { ...base.configured.publication, entry_actors: entries },
+    pr_discovery: { ...base.configured.pr_discovery, authors: [...new Set(Object.values(entries))] } };
+  write(base.repo, '.vh-adlc/docs-drift.yaml', canonicalJSON(settings));
+  write(base.repo, settings.execution.scheduled_workflow, canonicalJSON({ on: { schedule: [{ cron: '0 6 * * *' }], workflow_dispatch: null },
+    permissions: settings.execution.permissions, jobs: { worker: { uses: './' + settings.execution.worker_workflow,
+      with: { component_pin: settings.component_pin, pr_draft: settings.publication.pr_state.advisory === 'draft' },
+      secrets: { COPILOT_GITHUB_TOKEN: '${{ secrets.COPILOT_GITHUB_TOKEN }}' } } } }));
+  const f = { ...base, configured: settings, candidate: commit(base.repo, 'synthetic mapped predecessor') };
+  const identities = { hosted: { actor: 'fixture-bot', actor_id: 20 }, copilot: { actor: 'fixture-owner', actor_id: 30 },
+    claude: { actor: 'fixture-owner', actor_id: 30 } };
+  const original = { source: f.repo, configured: settings, candidate: f.candidate, record: portableRecord(f, identities),
+    manifest: { fixture_id: '00000000-0000-0000-0000-000000000001' } };
+  const successor = route === 'compatible' ? compatibleTrialUpgrade(original) : trialUpgradeFixture(original, { surface: 'hosted', change_definition: definition => {
+    definition.classification = 'execution'; definition.affected_entries = ['hosted']; definition.component_entries = ['hosted']; definition.changed_rules = [];
+  } });
+  const record = successor.record;
+  // Convert only synthetic receipt metadata into the production parser's observed-shaped fixture.
+  // These controls establish no native or hosted acceptance.
+  function observedShape(value: unknown): void {
+    if (!value || typeof value !== 'object') return;
+    Reflect.deleteProperty(value, 'fixture_id');
+    if ('evidence_kind' in value) Reflect.set(value, 'evidence_kind', 'observed');
+    for (const child of Object.values(value)) observedShape(child);
+  }
+  observedShape(record);
+  const selected = { ...original, configured: successor.configured, candidate: successor.candidate, record };
+  const valid = trialAdoptionDelivery(selected);
+  expect(verifyRuntimeAdoption({ repo: f.repo, current_default: valid, entry: 'hosted', identity: runtimeIdentity }).evidence).toBe('owner-attestation');
+  record.entry_identities!.copilot.actor = 'Fixture-Owner';
+  // Fresh successor receipts can bind the new target while carried entry receipts retain their old bytes.
+  const target = canonicalDigest({ schema_version: 2, repository: successor.configured.repository,
+    source_candidate: record.source_candidate, protected_sha256: record.protected_sha256,
+    component_pin_sha256: record.component_pin_sha256, identity: record.identity, entry_identities: record.entry_identities });
+  for (const [name, receipt] of Object.entries(record.receipts))
+    if (!record.predecessor.carry_receipts.includes(name)) receipt.bindings_sha256 = target;
+  const changed = trialAdoptionDelivery(selected);
+  expect(() => verifyRuntimeAdoption({ repo: f.repo, current_default: changed, entry: 'hosted', identity: runtimeIdentity })).toThrow(
+    route === 'compatible' ? 'compatible upgrade changes execution bindings' : 'upgrade affected surface inventory');
 });
