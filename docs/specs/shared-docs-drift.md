@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "The owner-confirmed ordinary-installation and capability-preserving design has a fresh R-95 review with no blocking or should-fix findings. T121 to T130 are ready for implementation."
+status: in-progress
+status_description: "Implementing the owner-confirmed simpler design on its existing feature branch after the fresh R-95 review. Scanner parity is measured. Replacement runtime and installed/hosted migration acceptance remain open."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
