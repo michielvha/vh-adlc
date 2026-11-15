@@ -1,7 +1,7 @@
 ---
 status: draft
 status_description: "Draft after spec reviews R-1 to R-4; R-4 findings are recorded, not applied. On 2026-11-15 the owner moved this to its own session: apply what matters, ignore edge-case findings that only trigger re-review, keep v1 simple."
-issue: null
+issue: https://github.com/michielvha/vh-adlc/issues/101
 goal: "After an agent session, the owner gets a saved, ranked list of concrete changes to the agent's environment that would have prevented that session's mistakes and waste, each naming where it belongs and whether it has happened before."
 covers:
   - .agents/plugins/marketplace.json
