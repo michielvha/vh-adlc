@@ -34,10 +34,10 @@ test.each([null, "unknown", 1])("a malformed original publisher entry %j is refu
   expect(() => parseActionManifest({ ...manifest(), publisher_entry })).toThrow();
 });
 
-test("mapped publication shape binds the original entry selector and preserves its recorded spelling", () => {
+test("mapped publication shape binds the original entry selector", () => {
   const original = manifest();
   expect(() => validatePublicationShape({ manifest: original, context: "trial", publication_kind: "advisory" }, settings(), true)).not.toThrow();
-  expect(original.actor).toBe("Fixture-Owner");
+  expect(parseActionManifest(original).actor).toBe("Fixture-Owner");
   expect(() => validatePublicationShape({ manifest: { ...original, publisher_entry: "hosted" }, context: "trial", publication_kind: "advisory" }, settings(), true)).toThrow();
   const { publisher_entry, ...unselected } = original;
   expect(() => validatePublicationShape({ manifest: unselected, context: "trial", publication_kind: "advisory" }, settings(), true)).toThrow();

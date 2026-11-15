@@ -170,7 +170,12 @@ test("a changed GraphQL slug at the same ID preserves the native REST account ob
       const original = readNativeContext({ ...f.scope, observation }).identity;
       expect(original.actor).toBe("fixture-bot");
       // The first occurrence belongs to GraphQL. The REST account response deliberately stays unchanged.
-      writeFileSync(f.program, readFileSync(f.program, "utf8").replace('"fixture-bot"', '"alternate-graphql-slug"'));
+      const program = readFileSync(f.program, "utf8"), changed = program.replace('"fixture-bot"', '"alternate-graphql-slug"');
+      expect(changed).not.toBe(program);
+      writeFileSync(f.program, changed);
+      const reply = Bun.spawnSync([f.program, "api", "--method", "POST", "graphql"], { env: f.environment, stdout: "pipe", stderr: "pipe" });
+      expect(reply.exitCode).toBe(0);
+      expect(JSON.parse(reply.stdout.toString()).data.viewer).toEqual({ login: "alternate-graphql-slug", databaseId: 20 });
     });
     expect(readNativeContext(f.scope).identity.actor).toBe("fixture-bot");
   } catch (error) { failed = true; throw error; }
