@@ -124,3 +124,49 @@ test.each(["copilot", "claude"] as const)("the mapped %s owner resumes a pending
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { failed = true; throw error; }
 }, 600000);
+
+test("a native mapped closure acknowledges a recased legacy original using its retained controller source", async () => {
+  try {
+    const { originalClosureFixture } = await import("./original-closure-fixture");
+    const { captureRepositoryState, captureSnapshot } = await import("../../../plugins/vh-adlc/scripts/docs-drift/snapshot");
+    const f = await originalClosureFixture(roots, { entry: "copilot", identities });
+    const controller = await import(join(f.adopted.retained.directory, "scripts/docs-drift/closure-controller.ts"));
+    const journal = await import(join(f.adopted.retained.directory, "scripts/docs-drift/journal.ts"));
+    const transportModule = await import(join(f.adopted.retained.directory, "scripts/docs-drift/transport.ts"));
+    const recovery = await import(join(f.adopted.retained.directory, "scripts/docs-drift/recovery.ts"));
+    const { canonicalJSON, sha256 } = await import("../../../plugins/vh-adlc/scripts/docs-drift/protocol");
+    const before = captureRepositoryState(f.repo), close = f.target.manifest!.effects.find(effect => effect.kind === "pr-close")!;
+    const append = journal.appendOutcome;
+    let lost = false;
+    const fault = spyOn(journal, "appendOutcome").mockImplementation((current: unknown, id: string, outcome: unknown) => {
+      if (id === close.id && !lost) { lost = true; throw Error("Synthetic lost native legacy closure outcome"); }
+      return append(current, id, outcome);
+    });
+    let pending;
+    try { pending = await controller.publishClosure(f.publication); } finally { fault.mockRestore(); }
+    expect(lost).toBe(true);
+    expect(pending.state, pending.reason).toBe("pending");
+    const originalPlan = canonicalJSON(pending.journal.plan), state = JSON.parse(readFileSync(f.service.statePath, "utf8"));
+    const original = state.prs.find((pr: { number: number }) => pr.number === close.payload.number);
+    expect(original.user.id).not.toBe(identities.copilot.actor_id);
+    original.state = "open";
+    original.user.login = original.user.login.toUpperCase();
+    writeFileSync(f.service.statePath, JSON.stringify(state));
+    const store = f.target.worker_inputs!.target!.store!;
+    const settings = captureSnapshot(f.repo, f.source).settings;
+    const transport = transportModule.createNativeTransport({ source_repo: f.repo, artifact_root: f.artifacts, object_store: store,
+      settings, credential: f.publication.credential, path: f.publication.path });
+    const result = await recovery.acknowledgeDeliveries({ source_repo: f.repo, journal_directory: pending.journal.directory, object_store: store,
+      settings, transport, acknowledge_effect_ids: [close.id], retire_effect_ids: [], authorize: async (scope: unknown) => ({
+        kind: "owner-delivery-acknowledgement", source: "owner-current-request", scope_sha256: sha256(canonicalJSON(scope)),
+        request_sha256: sha256(Buffer.from("Synthetic owner preserves the reopened legacy original")) }) });
+    expect(result.state, result.reason).toBe("acknowledged");
+    expect(canonicalJSON(result.journal.plan)).toEqual(originalPlan);
+    const final = JSON.parse(readFileSync(f.service.statePath, "utf8"));
+    expect(final.prs.find((pr: { number: number }) => pr.number === close.payload.number).state).toBe("open");
+    const calls = readFileSync(f.service.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
+    expect(calls.filter(call => call.program === "gh" && call.args.includes("PATCH") && call.args.includes("repos/fixture/docs/pulls/" + close.payload.number))).toHaveLength(1);
+    expect(calls.filter(call => call.program === "gh" && call.args.includes("POST") && call.args.includes("repos/fixture/docs/issues/" + close.payload.number + "/comments"))).toHaveLength(1);
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } catch (error) { failed = true; throw error; }
+}, 600000);

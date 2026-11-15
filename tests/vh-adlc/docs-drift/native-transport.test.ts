@@ -2173,3 +2173,35 @@ test("native creation retains the original manifest and raw recased account with
   expect(calls.filter(call => call.args.includes("POST") && call.args.includes("repos/fixture/docs/pulls"))).toHaveLength(1);
   expect(canonicalJSON(f.plan).equals(original)).toBe(true);
 });
+
+
+test("native acknowledgement recases the original creator during approval and preserves raw evidence", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const f = setup(); await f.transport.identity();
+  const effect: Effect = { id: "delivered", kind: "issue-create", payload: { title: "Reviewed issue",
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("delivered") + "\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+    labels: ["documentation"], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
+  const selected = await startCleanupJournal(f, [effect]);
+  const journal = await executeAttempt({ journal: appendIntent(selected.journal, effect.id), effect, objects: selected.objects, transport: f.transport });
+  f.update(state => { state.issues[0].body += "\nOwner's later edit"; });
+  const plan = canonicalJSON(journal.plan);
+  let approvals = 0;
+  const result = await acknowledgeDeliveries({ source_repo: selected.repo, journal_directory: journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [],
+    authorize: async scope => {
+      approvals++;
+      f.update(state => { state.viewer_login = "FIXTURE-BOT"; (state.issues[0].user as { login: string }).login = "FIXTURE-BOT"; });
+      return { kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+        scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("explicit native fixture acknowledgement") };
+    } });
+  expect(result.state, result.reason ?? undefined).toBe("acknowledged");
+  expect(approvals).toBeGreaterThan(0);
+  expect(canonicalJSON(result.journal.plan)).toEqual(plan);
+  expect(f.inspect().issues[0].body).toEndWith("Owner's later edit");
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBeUndefined();
+  const event = result.journal.events.find(item => item.kind === "acknowledged-delivery");
+  if (!event || !("lookup" in event.payload) || !event.payload.lookup) throw Error("missing native lookup");
+  const observed = JSON.parse(readFileSync(event.payload.lookup.path, "utf8")).lookup;
+  expect(observed.current.user_login_sha256).toBe(sha256(Buffer.from("FIXTURE-BOT")));
+  expect(observed.creator_projection.recorded_login_sha256).toBe(sha256(Buffer.from("fixture-bot")));
+}, 120000);

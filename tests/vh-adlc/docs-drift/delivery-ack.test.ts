@@ -1105,7 +1105,10 @@ for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-create
       } });
     const accepted = change === "before-approval" || change === "during-approval";
     expect(result.state, result.reason ?? undefined).toBe(accepted ? "acknowledged" : "pending");
-    if (!accepted) expect(approvals).toBe(0);
+    if (!accepted) {
+      expect(approvals).toBe(0);
+      expect(result.reason).toBe("acknowledgement-current-actor-changed");
+    }
     expect(f.refs.has(f.settings.publication.lease_ref)).toBe(!accepted);
     expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
     expect(f.executed.filter(id => id === "release")).toHaveLength(accepted ? 1 : 0);
@@ -1120,5 +1123,123 @@ for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-create
       expect(observed.current.user_login_sha256).toBe(sha256(Buffer.from("FIXTURE-OWNER")));
       expect(observed.creator_projection.recorded_login_sha256).toBe(sha256(Buffer.from("Fixture-Owner")));
     }
+  });
+}
+
+for (const mode of ["scalar", "mapped"] as const) test.each(["body", "creator-login", "creator-id"] as const)(`${mode} acknowledgement revalidates a resource edit accompanying native recasing: %s`, async change => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, effect } = await collectorDeliveryFixture("issue-create", { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER",
+    ...(mode === "mapped" ? { entry: "copilot" as const } : {}) });
+  const pending = await publish(publicationOptions(f));
+  const application = readAppliedDelivery({ source_repo: f.repo, journal_directory: pending.journal.directory,
+    effect_id: effect.id, settings: f.settings, transport: "collector" });
+  const resource = f.resources.get("issues/" + application.number)!;
+  resource.body = String(resource.body) + "\nOwner edit before approval";
+  const identity = await f.transport.identity(), original = canonicalJSON(pending.journal.plan);
+  let approvals = 0, observed: Buffer | undefined;
+  const result = await acknowledgeDeliveries({ source_repo: f.repo, journal_directory: pending.journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [],
+    authorize: async scope => {
+      approvals++;
+      if (approvals === 1) {
+        f.transport.identity = async () => ({ ...identity, actor: "FIXTURE-OWNER" });
+        const user = resource.user as { login: string; id: number };
+        user.login = change === "creator-login" ? "someone-else" : "FIXTURE-OWNER";
+        if (change === "creator-id") user.id++;
+        if (change === "body") resource.body = String(resource.body) + "\nAnother edit during approval";
+        observed = canonicalJSON(resource);
+      }
+      return { kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+        scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("owner approves the initially observed exact scope") };
+    } });
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe(change === "body" ? "acknowledgement-approved-scope-changed" : "delivery-current-target-changed");
+  // The controller checks the same owner request again before collecting fresh resource facts.
+  expect(approvals).toBe(2);
+  expect(result.journal.events.some(event => event.kind === "acknowledged-delivery")).toBe(false);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(pending.objects.lease_object);
+  expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+  expect(f.executed).not.toContain("release");
+  if (!observed) throw Error("missing during-approval resource observation");
+  expect(canonicalJSON(resource)).toEqual(observed);
+  expect(canonicalJSON(result.journal.plan)).toEqual(original);
+});
+
+for (const mode of ["scalar", "mapped"] as const) for (const kind of ["pr-update", "pr-close"] as const) {
+  test.each(["case", "account-id", "material-login", "wrong-row", "missing-original", "changed-original", "configured-alias", "foreign-controller", "foreign-row-repository"] as const)(`${mode} ${kind} delivery verifies its bound original legacy creator: %s`, async change => {
+    const { projectProposalBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposals");
+    const { lookupAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-lookup");
+    const { f, effect } = await collectorDeliveryFixture(kind, { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER",
+      ...(mode === "mapped" ? { entry: "copilot" as const } : {}) });
+    let resource = f.resources.get("pulls/77")!;
+    (resource.head as { ref: string }).ref = "docs-audit/legacy";
+    resource.user = { login: "Legacy-Bot", id: 90 };
+    const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
+    const original = { number: change === "wrong-row" ? 78 : 77, state: "open" as const, merged_at: null, body: String(resource.body), draft: false,
+      actor: "Legacy-Bot", actor_id: 90, actor_type: "Bot", head_sha: f.plan.manifest.bindings.candidate_commit,
+      head_ref: "docs-audit/legacy", head_repository: repository,
+      base_sha: f.plan.manifest.bindings.source_commit, base_ref: "main",
+      base_repository: change === "foreign-row-repository" ? { ...repository, id: 11 } : repository };
+    const snapshot = projectProposalBindings([original], null);
+    const target = { source_commit: f.plan.manifest.bindings.source_commit, identity: await f.transport.identity(),
+      target: { kind: "docs-drift-closure-target", authority: "none", verification_ready: false, complete: true, diagnostics: [],
+        effects: f.input.manifest.effects, already_closed: [], closure: { complete: true, diagnostics: [], repository: "fixture/docs", repository_id: 10,
+          current_default: f.plan.manifest.bindings.source_commit, consolidation: null, record: null, originals: [original],
+          inputs_sha256: hash("synthetic original closure inputs"), interval: null }, verification_scopes: [], inputs_sha256: hash("synthetic original target") } };
+    const bytes = canonicalJSON(kind === "pr-close" ? target : snapshot), reference = { path: "original-legacy-source.json", sha256: sha256(bytes) };
+    writeFileSync(join(f.artifacts, reference.path), bytes, { mode: 0o600 });
+    const bindings = { ...f.input.manifest.bindings, ...(kind === "pr-close" ? { assessment_sha256: reference.sha256, proposals_sha256: sha256(canonicalJSON(target.target.closure)) } : { proposals_sha256: reference.sha256 }) };
+    f.input = fixture(bindings, f.input.manifest.effects, f.input.manifest.operation_id, { actor: f.input.manifest.actor, actor_id: f.input.manifest.actor_id,
+      ...(f.input.manifest.publisher_entry ? { publisher_entry: f.input.manifest.publisher_entry } : {}) });
+    f.plan = sealPlan({ reviewed: validateReviewedManifest(f.input), grants: f.input.grants, ...f.policy, corrections: [], attention: [] });
+    const controllerPath = join(f.artifacts, f.plan.manifest.operation_id + (kind === "pr-close" ? ".closure-controller.json" : ".controller.json"));
+    writeFileSync(controllerPath, canonicalJSON({ schema_version: 1, kind: kind === "pr-close" ? "docs-drift-closure-controller" : "docs-drift-publication-controller",
+      plan_sha256: sha256(canonicalJSON(f.plan)), inputs_sha256: hash("synthetic original invocation"),
+      ...(kind === "pr-close" ? { original_target: reference } : { proposal_snapshot: reference }) }), { mode: 0o600 });
+    const published = await publish(publicationOptions(f));
+    expect(published.state).toBe("pending");
+    resource = f.resources.get("pulls/77")!;
+    if (kind === "pr-close") resource.state = "open";
+    else resource.body = String(resource.body) + "\nOwner's later edit";
+    const applied = readAppliedDelivery({ source_repo: f.repo, journal_directory: published.journal.directory, effect_id: effect.id, settings: f.settings, transport: "collector" });
+    const plan = canonicalJSON(published.journal.plan), success = readFileSync(applied.successes[0].path), user = resource.user as { login: string; id: number };
+    user.login = "LEGACY-BOT";
+    if (change === "material-login") user.login = "another-legacy-author";
+    if (change === "configured-alias") user.login = f.settings.publication.entry_actors?.hosted ?? f.settings.publication.actor;
+    if (change === "account-id") user.id++;
+    if (change === "missing-original") rmSync(controllerPath);
+    if (change === "changed-original") writeFileSync(join(f.artifacts, reference.path), Buffer.concat([bytes, Buffer.from("\n")]), { mode: 0o600 });
+    if (change === "foreign-controller") {
+      const controller = JSON.parse(readFileSync(controllerPath, "utf8")); controller.plan_sha256 = hash("another original operation");
+      writeFileSync(controllerPath, canonicalJSON(controller), { mode: 0o600 });
+    }
+    const scope = { source_repo: f.repo, journal_directory: published.journal.directory, effect_id: effect.id, settings: f.settings, transport: f.transport };
+    if (change === "case") {
+      const observed = await lookupAppliedDelivery(scope);
+      expect(observed.current.user_id).toBe(90);
+      expect(observed.current.user_login_sha256).toBe(sha256(Buffer.from("LEGACY-BOT")));
+      expect(observed.creator_projection?.recorded_login_sha256).toBe(sha256(Buffer.from("Legacy-Bot")));
+      const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+      user.login = "Legacy-Bot";
+      const accepted = await acknowledgeDeliveries({ ...scope, object_store: f.store, acknowledge_effect_ids: [effect.id], retire_effect_ids: [],
+        authorize: async approval => {
+          user.login = "LEGACY-BOT";
+          return { kind: "owner-delivery-acknowledgement", source: "owner-current-request", scope_sha256: sha256(canonicalJSON(approval)),
+            request_sha256: hash("owner preserves the original legacy resource after a later edit") };
+        } });
+      expect(accepted.state, accepted.reason ?? undefined).toBe("acknowledged");
+      expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+      expect(accepted.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
+    } else {
+      const reasons = { "account-id": "delivery-current-target-changed", "material-login": "delivery-current-target-changed",
+        "wrong-row": "delivery-original-creator-binding-changed", "missing-original": "ENOENT",
+        "changed-original": "docs-drift original evidence artifact changed", "configured-alias": "delivery-current-target-changed",
+        "foreign-controller": "delivery-original-controller-changed", "foreign-row-repository": "delivery-original-creator-binding-changed" };
+      await expect(lookupAppliedDelivery(scope)).rejects.toThrow(reasons[change]);
+    }
+    expect(canonicalJSON(published.journal.plan)).toEqual(plan);
+    expect(readFileSync(applied.successes[0].path)).toEqual(success);
+    expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+    expect(f.executed.filter(id => id === "release")).toHaveLength(change === "case" ? 1 : 0);
   });
 }

@@ -186,3 +186,13 @@ test.each(["trial-bindings", "prepare-trial-fixture"] as const)("normal %s CLI f
     identity: { actor: "fixture-owner", actor_id: 30 } });
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 60000);
+
+test("mapped preparation requires its selected entry before allocating a fixture", () => {
+  const f = trialDefinitionFixture(roots, { entry_actors: { hosted: "fixture-bot", copilot: "fixture-owner", claude: "fixture-owner" } });
+  const directory = join(f.root, "missing-entry-output"); mkdirSync(directory, { mode: 0o700 });
+  const before = captureRepositoryState(f.repo);
+  expect(() => setup.prepareTrialFixture({ repo: f.repo, current_default: f.staged, identity: runtimeIdentity, directory }))
+    .toThrow("docs-drift publisher entry required");
+  expect(readdirSync(directory)).toEqual([]);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+});

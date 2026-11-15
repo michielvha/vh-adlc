@@ -1,5 +1,7 @@
 import { sameAccount, sameLogin } from "./identity";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { readBoundArtifact } from "./evidence-input";
+import { exactRecord } from "./publication-decisions";
 import { readAppliedDelivery, readBefore, projectBeforeSource, type AppliedDelivery } from "./delivery-proof";
 import { readArtifact, readJournal, type SealedPlan } from "./journal";
 import { canonicalJSON, sha256 } from "./protocol";
@@ -50,6 +52,47 @@ function inventory(items: unknown[], marker: string, selected: string): number[]
   return matches.sort((left, right) => left - right);
 }
 
+/** Recover a legacy creator only from the original resource row already bound by this plan. */
+function originalResourceCreator(options: { source_repo: string; artifact_root: string; plan: SealedPlan; effect: Effect; original: Facts }) {
+  const { plan, effect, original } = options;
+  if (effect.kind !== "pr-update" && effect.kind !== "pr-close") throw Error("delivery-original-creator-unavailable");
+  const closure = effect.kind === "pr-close", field = closure ? "original_target" : "proposal_snapshot";
+  const controllerBytes = readArtifact(join(options.artifact_root, plan.manifest.operation_id + (closure ? ".closure-controller.json" : ".controller.json")));
+  const controller = exactRecord(JSON.parse(controllerBytes.toString()), ["schema_version", "kind", "plan_sha256", "inputs_sha256", field], "delivery-original-controller-changed");
+  if (!canonicalJSON(controller).equals(controllerBytes) || controller.schema_version !== 1
+    || controller.kind !== (closure ? "docs-drift-closure-controller" : "docs-drift-publication-controller")
+    || controller.plan_sha256 !== sha256(canonicalJSON(plan))) throw Error("delivery-original-controller-changed");
+  const bytes = readBoundArtifact({ ...options, reference: controller[field] });
+  if (sha256(bytes) !== (closure ? plan.manifest.bindings.assessment_sha256 : plan.manifest.bindings.proposals_sha256)) throw Error("delivery-original-creator-binding-changed");
+  const source = record(JSON.parse(bytes.toString()));
+  if (!canonicalJSON(source).equals(bytes)) throw Error("delivery-original-creator-binding-changed");
+  let inventory: unknown;
+  if (closure) {
+    const identity = record(source.identity), target = record(source.target), inputs = record(target.closure);
+    if (source.source_commit !== plan.manifest.bindings.source_commit || identity.repository !== plan.manifest.repository
+      || identity.repository_id !== plan.manifest.repository_id || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id
+      || target.kind !== "docs-drift-closure-target" || target.complete !== true || !same(target.effects, plan.manifest.effects)
+      || inputs.repository !== plan.manifest.repository || inputs.repository_id !== plan.manifest.repository_id
+      || inputs.current_default !== plan.manifest.bindings.source_commit || sha256(canonicalJSON(inputs)) !== plan.manifest.bindings.proposals_sha256)
+      throw Error("delivery-original-creator-binding-changed");
+    inventory = inputs.originals;
+  } else {
+    if (source.schema_version !== 1 || source.kind !== "docs-drift-proposal-snapshot") throw Error("delivery-original-creator-binding-changed");
+    inventory = source.inventory;
+  }
+  if (!Array.isArray(inventory)) throw Error("delivery-original-creator-unavailable");
+  const matches = inventory.map(record).filter(row => row.number === original.number);
+  const creator = matches[0];
+  if (matches.length !== 1 || typeof creator.actor !== "string" || typeof creator.actor_id !== "number"
+    || creator.actor_id !== original.user_id || sha256(Buffer.from(creator.actor)) !== original.user_login_sha256)
+    throw Error("delivery-original-creator-binding-changed");
+  const repository = record(creator.base_repository);
+  if (repository.id !== plan.manifest.repository_id || typeof repository.full_name !== "string"
+    || repository.full_name.toLowerCase() !== plan.manifest.repository.toLowerCase() || creator.base_ref !== original.base_ref)
+    throw Error("delivery-original-creator-binding-changed");
+  return { actor: creator.actor, actor_id: creator.actor_id };
+}
+
 /** Re-read native state independently from the retained application response. */
 export async function lookupAppliedDelivery(options: {
   source_repo: string; journal_directory: string; effect_id: string; settings: Settings; transport: PublicationTransport;
@@ -76,11 +119,13 @@ export async function lookupAppliedDelivery(options: {
   let creator_projection: DeliveryLookup["creator_projection"];
   if (current.user_login_sha256 !== original.user_login_sha256) {
     const nativeCreator = record(record(resources.resource).user);
-    // The verified applied response binds the original own creator's ID and exact spelling hash.
-    if (!sameAccount(creator, plan.manifest) || original.user_id !== creator.actor_id || original.user_login_sha256 !== sha256(Buffer.from(creator.actor))
-      || typeof nativeCreator.login !== "string" || !sameLogin(nativeCreator.login, creator.actor)) throw Error("delivery-current-target-changed");
+    // Own creations bind the publisher. Legacy PRs bind their independently recorded original author.
+    const ownCreator = sameAccount(creator, plan.manifest) && original.user_id === creator.actor_id
+      && original.user_login_sha256 === sha256(Buffer.from(creator.actor));
+    const recorded = ownCreator ? creator : originalResourceCreator({ ...options, artifact_root: options.transport.artifact_root, plan, effect, original });
+    if (typeof nativeCreator.login !== "string" || !sameLogin(nativeCreator.login, recorded.actor)) throw Error("delivery-current-target-changed");
     creator_projection = { observed_login_sha256: sha256(Buffer.from(nativeCreator.login)),
-      recorded_login_sha256: sha256(Buffer.from(creator.actor)) };
+      recorded_login_sha256: sha256(Buffer.from(recorded.actor)) };
   }
   const marker = publicationMarker(options.settings, plan.manifest.operation_id);
   if (effect.kind !== "pr-close" && effect.kind !== "pr-update") {

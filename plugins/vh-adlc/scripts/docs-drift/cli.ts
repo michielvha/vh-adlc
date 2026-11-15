@@ -252,6 +252,7 @@ Signal consistency reads committed blobs and requires no publication credential.
 Native reads require GH_TOKEN for github.com and *.ghe.com, or GH_ENTERPRISE_TOKEN
 for an enterprise server, to observe the authenticated account and repository.
 Trial preparation requires that credential and the observed current default.
+Mapped policy requires --entry for prepare-trial-fixture.
 It imports the committed synthetic fixture into a new owned directory.
 Runtime inspection verifies the approved retained selection, or the candidate
 bound by trial-definition. Actual model invocation and effect grants are separate.

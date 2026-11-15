@@ -18,7 +18,9 @@ export async function originalClosureFixture(roots: string[], publisher?: Parame
   for (const original of f.proposals.values()) git(origin, "update-ref", "refs/pull/" + original.number + "/head", original.head_sha);
   const service = installOwnedNativeService({ root: f.adopted.root, origin, source: f.source, head: f.source, publisher_identity: publisher?.identities[publisher.entry] });
   const state = JSON.parse(readFileSync(service.statePath, "utf8")), responses = JSON.parse(readFileSync(f.responses_file, "utf8"));
-  state.prs = [responses["repos/fixture/docs/pulls/1"], responses["repos/fixture/docs/pulls/20"]];
+  // Native pull responses include the metadata needed for pre-dispatch delivery baselines.
+  state.prs = [responses["repos/fixture/docs/pulls/1"], responses["repos/fixture/docs/pulls/20"]]
+    .map((proposal: Record<string, unknown>) => ({ ...proposal, title: proposal.title ?? "Synthetic closure proposal", labels: proposal.labels ?? [] }));
   writeFileSync(service.statePath, JSON.stringify(state));
   const options = { ...f.options, path: join(f.adopted.root, "native-bin") + ":" + process.env.PATH };
   const current = await collectClosureWorkerInputs(options);
