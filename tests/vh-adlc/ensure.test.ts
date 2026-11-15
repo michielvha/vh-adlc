@@ -419,7 +419,9 @@ test.each([false, true])("native curl bounds Retry-After and excludes user confi
     }, { timeout_ms: 8000, grace_ms: 100, reap_ms: 2000 });
     expect(outcome.timed_out).toBe(false);
     expect(outcome.reaped).toBe(true);
-    expect(outcome.signals[0]).toEqual({ signal: "SIGTERM", accepted: false });
+    expect(outcome.signals[0]).toEqual({ signal: "SIGTERM", accepted: false, error: "ESRCH" });
+    expect(outcome.confirmed).toBe(true);
+    expect(outcome.survivors).toEqual([]);
     expect(processGroup).toBeGreaterThan(0);
     let groupEmpty = false;
     try { process.kill(-processGroup, 0); }
@@ -498,7 +500,10 @@ test("a native partial transfer times out and falls back to the verified archive
     }, { timeout_ms: 35000, grace_ms: 100, reap_ms: 2000 });
     expect(outcome.timed_out).toBe(false);
     expect(outcome.exit_code).toBe(0);
-    expect(outcome.signals[0]).toEqual({ signal: "SIGTERM", accepted: false });
+    expect(outcome.signals[0]).toEqual({ signal: "SIGTERM", accepted: false, error: "ESRCH" });
+    expect(outcome.confirmed).toBe(true);
+    expect(outcome.group_absent).toBe(true);
+    expect(outcome.survivors).toEqual([]);
     expect(readFileSync(join(f.dir, "partial.stdout"), "utf8").trim()).toBe(cached(f));
     expect(readFileSync(join(f.dir, "partial.stderr"), "utf8")).toContain("curl: (28)");
     expect(requests).toBe(1);
