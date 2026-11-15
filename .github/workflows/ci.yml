@@ -33,7 +33,7 @@ jobs:
       - name: Install and probe the Linux verification boundary
         run: |
           sudo apt-get update
-          sudo apt-get install -y bubblewrap util-linux apparmor
+          sudo apt-get install -y bubblewrap util-linux apparmor libxml2-utils
           sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
           bwrap --unshare-all --ro-bind / / -- /usr/bin/true
           # Command-route reviews run their reviewer in an unprivileged PID namespace through unshare,
@@ -56,6 +56,17 @@ jobs:
         run: |
           bun run --cwd plugins/vh-adlc/scripts/docs-drift typecheck
           bun plugins/vh-adlc/scripts/docs-drift/build-zip.ts --check
+      - name: Build GNU mv with atomic no-replace support
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl --fail --silent --show-error --location --retry 3 --remote-name https://ftp.gnu.org/gnu/coreutils/coreutils-9.7.tar.xz
+          echo 'e8bb26ad0293f9b5a1fc43fb42ba970e312c66ce92c1b0b16713d7500db251bf  coreutils-9.7.tar.xz' | sha256sum --check
+          tar -xf coreutils-9.7.tar.xz
+          cd coreutils-9.7
+          ./configure --disable-nls
+          make -j "$(nproc)"
+          install -D src/mv "$RUNNER_TEMP/diagram-bin/mv"
+          printf '%s\n' "$RUNNER_TEMP/diagram-bin" >> "$GITHUB_PATH"
       - name: Check the vh-adlc package
         run: bun test tests/vh-adlc --timeout 60000
 

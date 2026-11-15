@@ -126,3 +126,7 @@ worker/reviewer/forwarded entry, hosted advisory/history, paired migration and
 cutover/rollback results remain separate acceptance steps. Follow the
 [setup reference](../../plugins/vh-adlc/references/docs-drift-settings.md) and
 [current capability record](compatibility.md#shared-documentation-drift-candidate).
+
+## Architecture diagram skill
+
+The shared `vh-adlc` package introduces `vh-adlc-diagram` in plugin version 0.23.0. The skill becomes available from the marketplace when that package is published. The [workflow](../user-guides/workflows.md#architecture-diagrams) lists the local renderer and asset prerequisites.
