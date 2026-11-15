@@ -33,6 +33,14 @@ installed-role, hosted advisory/history, paired migration and cutover evidence
 before adopting shared publication. Retain legacy routes until their required
 replacement tests and selected cutover pass.
 
+Choose the consumer's publisher accounts during setup. The example's scalar
+`publication.actor` works with a common publisher. A consumer using a hosted
+bot and an interactive owner can add the complete `publication.entry_actors`
+map described in `references/docs-drift-settings.md`, along with matching
+`pr_discovery.authors` and branch coverage. Setup captures each entry's native
+numeric account identity in the new adoption record. Create that record from
+the consumer's own setup, trial and review evidence.
+
 The included dispatch-only workflow is a staged collection diagnostic. Before
 installing it, populate `collection.yaml` from an operator-verified published
 release and put that exact source commit in the caller. Record source release,

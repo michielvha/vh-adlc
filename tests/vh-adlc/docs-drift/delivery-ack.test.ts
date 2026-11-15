@@ -978,3 +978,43 @@ test("inspection after an acknowledged remote release leaves its missing local o
   expect(f.executed).toEqual(executed);
   expect((await acknowledgeDeliveries(options)).state).toBe("acknowledged");
 });
+
+
+test.each(["scalar", "mapped"] as const)("applied %s delivery proof checks the selected original publisher with configured casing", async mode => {
+  const f = publicationFixture(roots, { owned_resources: true, publisher: { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER",
+    ...(mode === "mapped" ? { entry: "copilot" as const } : {}) } });
+  const result = await publish(publicationOptions(f));
+  expect(result.state, result.reason ?? undefined).toBe("complete");
+  const scope = { source_repo: f.repo, journal_directory: result.journal.directory, effect_id: "pr", settings: f.settings, transport: "collector" as const };
+  const proof = readAppliedDelivery(scope);
+  expect(proof.resource_id).toBeGreaterThan(0);
+  const original = canonicalJSON(result.journal.plan), changed = structuredClone(f.settings);
+  if (changed.publication.entry_actors) changed.publication.entry_actors.copilot = "somebody-else";
+  else changed.publication.actor = "somebody-else";
+  expect(() => readAppliedDelivery({ ...scope, settings: changed })).toThrow("delivery-policy-scope-changed");
+  expect(canonicalJSON(result.journal.plan).equals(original)).toBe(true);
+});
+
+
+for (const mode of ["scalar", "mapped"] as const) test.each(["case", "account-id", "material-login"] as const)(`a ${mode} collector creates exactly once under a verified native account observation: %s`, async change => {
+  const f = publicationFixture(roots, { owned_resources: true, publisher: { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER",
+    ...(mode === "mapped" ? { entry: "copilot" as const } : {}) } });
+  const native = await f.transport.identity();
+  f.transport.identity = async () => ({ ...native, actor: change === "material-login" ? "somebody-else" : "fixture-owner", actor_id: change === "account-id" ? 31 : 30 });
+  const original = canonicalJSON(f.plan);
+  if (change !== "case") {
+    await expect(publish(publicationOptions(f))).rejects.toThrow("current-native-repository-or-actor-changed");
+    expect(f.resources.size).toBe(0);
+    expect(f.executed).toEqual([]);
+    expect(canonicalJSON(f.plan).equals(original)).toBe(true);
+    return;
+  }
+  const published = await publish(publicationOptions(f));
+  expect(published.state, published.reason ?? undefined).toBe("complete");
+  expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
+  const raw = [...f.resources.values()].find(item => (item.user as { id: number } | undefined)?.id === 30)!;
+  expect(raw.user).toMatchObject({ login: "fixture-owner", id: 30 });
+  expect(readAppliedDelivery({ source_repo: f.repo, journal_directory: published.journal.directory,
+    effect_id: "pr", settings: f.settings, transport: "collector" }).resource_id).toBeGreaterThan(0);
+  expect(canonicalJSON(published.journal.plan).equals(original)).toBe(true);
+});

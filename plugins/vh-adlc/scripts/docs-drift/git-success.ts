@@ -1,3 +1,4 @@
+import { sameLogin } from "./identity";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
@@ -148,7 +149,7 @@ function validate(value: unknown, options: Scope) {
     || typeof data.hostname !== "string" || !/^[a-z0-9.-]+$/u.test(data.hostname) || typeof data.command_directory !== "string") throw Error("Git application proof changed");
   const identity = object(data.identity, ["repository", "repository_id", "actor", "actor_id", "default_branch"]);
   if (identity.repository !== options.plan.manifest.repository || identity.repository_id !== options.plan.manifest.repository_id
-    || identity.actor !== options.plan.manifest.actor || identity.actor_id !== options.plan.manifest.actor_id
+    || typeof identity.actor !== "string" || !sameLogin(identity.actor, options.plan.manifest.actor) || identity.actor_id !== options.plan.manifest.actor_id
     || typeof identity.default_branch !== "string" || !identity.default_branch || /[\r\n\0]/u.test(identity.default_branch)) throw Error("Git application actor changed");
   if (!canonicalJSON(commandScope(options, data.command_directory, data.hostname, projected)).equals(canonicalJSON(data.command))) throw Error("Git application command proof changed");
   return { updates: projected.updates, hostname: data.hostname, identity: identity as PublicationIdentity, command_directory: data.command_directory };

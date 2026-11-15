@@ -231,3 +231,24 @@ test.each(["case", "account-id", "material-login"])("comment comparison binds it
     } else await expect(run).rejects.toBeInstanceOf(NativeObservationChanged);
   } catch (error) { failed = true; throw error; }
 }, 90000);
+
+
+test.each(["case", "account-id", "material-login"] as const)("a recorded comparison identity preserves raw native observation and rejects changed scope: %s", async change => {
+  const f = fixture(), raw = readNativeContext(f.scope).identity;
+  const recorded = { ...raw, actor: change === "material-login" ? "another-account" : "Fixture-Bot", actor_id: change === "account-id" ? 21 : 20 };
+  let entered = 0;
+  const run = () => withNativeObservation({ ...f.scope, comparison_identity: recorded }, async observation => {
+    entered++;
+    expect(readNativeContext({ ...f.scope, observation }).identity).toEqual(recorded);
+  });
+  if (change === "case") {
+    await run();
+    expect(entered).toBe(1);
+    expect(readNativeContext(f.scope).identity).toEqual(raw);
+    expect(readNativeContext({ ...f.scope, comparison_identity: recorded }).identity).toEqual(recorded);
+  } else {
+    await expect(run()).rejects.toThrow("Recorded native account or repository changed");
+    expect(entered).toBe(0);
+    expect(() => readNativeContext({ ...f.scope, comparison_identity: recorded })).toThrow("Recorded native account or repository changed");
+  }
+});

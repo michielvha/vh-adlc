@@ -1,5 +1,5 @@
 /** Owned Git and observed-shaped adoption parser fixtures; no provider or delivery trial. */
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { source, write, commit, portableRecord, deliverRecord, runtimeIdentity } from "./adoption-fixture";
@@ -188,7 +188,7 @@ process.exit(result.exitCode);
   } catch (error) { failed = true; throw error; }
 }, 90000);
 
-function setup(fault = "matching", producer?: "hosted" | "copilot" | "claude") {
+function setup(fault = "matching", producer?: "hosted" | "copilot" | "claude", publisherOverride?: Parameters<typeof fixture>[3]) {
   let f = source(roots, { role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source } });
   const accounts = { hosted: { actor: "fixture-bot", actor_id: 20 }, copilot: { actor: "fixture-owner", actor_id: 30 },
     claude: { actor: "fixture-owner", actor_id: 30 } };
@@ -199,7 +199,7 @@ function setup(fault = "matching", producer?: "hosted" | "copilot" | "claude") {
     f = { ...f, configured };
     write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(configured));
   }
-  const publisher = producer ? { publisher_entry: producer, ...accounts[producer] } : undefined;
+  const publisher = publisherOverride ?? (producer ? { publisher_entry: producer, ...accounts[producer] } : undefined);
   for (const path of f.configured.feedback_files) write(f.repo, path, "[]\n");
   f.candidate = commit(f.repo, "synthetic complete feedback inputs");
   const current = deliverRecord(f, portableRecord(f, producer ? accounts : undefined)), snapshot = captureSnapshot(f.repo, current);
@@ -313,7 +313,32 @@ test.each([
     expect(() => createAdoptedPublicationVerifier({ store: f.store, current_default: f.current, identity: { ...identity, actor_id: actor_id + 1 },
       entry, proposal: f.proposal })).toThrow();
     expect(canonicalJSON(f.plan)).toEqual(bytes);
-    expect(recased.actor).toBe(f.proposal.actor.toUpperCase());
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { failed = true; throw error; }
+}, 90000);
+
+
+test.each([
+  { actor: "fixture-owner", actor_id: 31, publisher_entry: "copilot" as const },
+  { actor: "fixture-owner", actor_id: 30, publisher_entry: "hosted" as const },
+])("original producer adoption refuses internally consistent forged attribution $publisher_entry/$actor_id", async forged => {
+  const { createAdoptedPublicationVerifier, RetainedPublicationIneligible } = await import("../../../plugins/vh-adlc/scripts/docs-drift/reviewed-publication");
+  const f = setup("matching", "copilot", forged), before = captureRepositoryState(f.repo);
+  expect(f.plan.manifest.actor_id).toBe(f.native.actor_id);
+  expect(f.proposal.actor_id).toBe(f.native.actor_id);
+  const verify = createAdoptedPublicationVerifier({ store: f.store, current_default: f.current, identity: runtimeIdentity,
+    entry: "hosted", proposal: f.proposal });
+  const adoption = await import("../../../plugins/vh-adlc/scripts/docs-drift/adoption"), original = adoption.verifyRuntimeAdoption;
+  const calls: Array<Parameters<typeof original>[0]> = [];
+  const check = spyOn(adoption, "verifyRuntimeAdoption").mockImplementation(input => { calls.push(input); return original(input); });
+  let rejected: unknown;
+  try { verify(canonicalJSON(f.plan), f.native); } catch (error) { rejected = error; }
+  finally { check.mockRestore(); }
+  expect(calls).toHaveLength(1);
+  expect(calls[0]).toMatchObject({ current_default: f.current, entry: forged.publisher_entry,
+    identity: { actor: forged.actor, actor_id: forged.actor_id } });
+  expect(rejected).toBeInstanceOf(Error);
+  expect(rejected).not.toBeInstanceOf(RetainedPublicationIneligible);
+  expect((rejected as Error).message).toBe("docs-drift retained publication original evidence unavailable");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 90000);

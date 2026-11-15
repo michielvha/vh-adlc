@@ -1041,3 +1041,46 @@ test("observation-only restoration preserves an unavailable foreign lease as pen
   expect(unavailableReads).toBe(2); expect(f.refs.get(f.settings.publication.lease_ref)).toBe(foreign);
   expect(f.executed).toEqual(executed); expect(result.journal.events.some(event => event.kind === "attempt")).toBe(false);
 });
+
+
+test.each(["scalar", "mapped"] as const)("retained %s inspection binds the original publisher under configured and observed casing", async mode => {
+  const f = publicationFixture(roots, { publisher: { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER",
+    ...(mode === "mapped" ? { entry: "copilot" as const } : {}) } });
+  const execute = f.transport.execute;
+  f.transport.execute = async (...args) => { await execute(...args); if (args[1].kind === "pr-create") throw Error("Synthetic lost creation response"); };
+  const pending = await publish(options(f));
+  f.transport.execute = execute;
+  expect(pending.state).toBe("pending");
+  const native = await f.transport.identity();
+  f.transport.identity = async () => ({ ...native, actor: native.actor.toLowerCase() });
+  const original = canonicalJSON(pending.journal.plan);
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: f.artifacts, settings: f.settings,
+    transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  expect(inspection.policy_state).toBe("current");
+  expect(canonicalJSON(inspection.plan).equals(original)).toBe(true);
+  expect(inspection.plan.manifest.actor).toBe("Fixture-Owner");
+  expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
+});
+
+
+test.each(["case", "account-id", "material-login"] as const)("reconciliation binds the original cleanup account through native observations: %s", async change => {
+  const f = publicationFixture(roots, { publisher: { actor: "Fixture-Owner", actor_id: 30, configured_actor: "FIXTURE-OWNER", entry: "copilot" } });
+  const interrupted = await legacyReceiptInterruption(f), original = await f.transport.identity();
+  let current = { ...original, actor: "fixture-owner" };
+  f.transport.identity = async () => ({ ...current });
+  const common = { source_repo: f.repo, journal_directory: interrupted.journal.directory, object_store: f.store,
+    settings: f.settings, transport: f.transport, retire_effect_ids: ["push", "pr"] };
+  const inspected = await reconcileAbsent({ ...common, inspect_only: true, authorize: async () => { throw Error("Inspection requested authority"); } });
+  const scopes = inspected.inspection_scopes;
+  expect(scopes).toHaveLength(1);
+  expect(scopes![0].actor).toBe(original.actor);
+  const approved = sha256(canonicalJSON(scopes![0]));
+  const result = await reconcileAbsent({ ...common, authorize: async scope => {
+    expect(sha256(canonicalJSON(scope))).toBe(approved);
+    current = { ...original, actor: change === "material-login" ? "another-owner" : "FIXTURE-OWNER", actor_id: change === "account-id" ? 31 : 30 };
+    return { scope_sha256: approved, request_sha256: hash("Synthetic exact owner-approved cleanup") };
+  } });
+  expect(result.state).toBe(change === "case" ? "retired" : "pending");
+  expect(f.executed.includes("pr")).toBe(false);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(change !== "case");
+});

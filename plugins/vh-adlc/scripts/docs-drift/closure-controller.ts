@@ -1,3 +1,4 @@
+import { sameAccount } from "./identity";
 import { selectRecoveryRuntime } from "./bootstrap";
 import { collectNativeClosure } from "./resolution-entry";
 import { existsSync, realpathSync } from "node:fs";
@@ -29,13 +30,15 @@ function requireExecutingRuntime(runtime: { component: { directory: string } }):
 async function currentState(options: Options, inventory?: ClosureInventory, expected?: SealedPlan) {
   if (readGit(options.repo, "rev-parse", "HEAD").toString().trim() !== options.source) throw new PublicationScopeChanged("Closure assessment HEAD changed");
   const { settings } = loadCommittedSettings(options.repo, options.source);
-  const scope = { hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path };
+  const scope = { hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path,
+    comparison_identity: expected ? { repository: expected.manifest.repository, repository_id: expected.manifest.repository_id,
+      actor: expected.manifest.actor, actor_id: expected.manifest.actor_id, default_branch: settings.default_branch } : undefined };
   let checked: Awaited<ReturnType<typeof collectClosureReview>>;
   try {
     checked = await withNativeObservation(scope, async observation => {
       const native = readNativeContext({ ...scope, observation });
       if (native.default_commit !== options.source || expected && (native.identity.repository_id !== expected.manifest.repository_id
-        || native.identity.actor_id !== expected.manifest.actor_id || native.identity.actor !== expected.manifest.actor))
+        || !sameAccount(native.identity, expected.manifest)))
         throw new PublicationScopeChanged("Original closure source or actor changed");
       const result = await collectClosureReview({ ...options, closure_inventory: inventory, observation });
       const current = result.target?.worker_inputs;
@@ -156,7 +159,7 @@ export async function resumeClosure(input: Options & { journal_directory: string
   try {
     const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
     if (native.default_commit !== options.source || native.identity.repository_id !== journal.plan.manifest.repository_id
-      || native.identity.actor_id !== journal.plan.manifest.actor_id || native.identity.actor !== journal.plan.manifest.actor)
+      || !sameAccount(native.identity, journal.plan.manifest))
       throw new PublicationScopeChanged("Original closure recovery source or actor changed");
     // Fresh native collection creates an owned source store. The original journal supplies its stable acquisition objects.
     const collected = await collectNativeClosure({ ...options, selection: { schema_version: 1, source_commit: options.source,

@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import type { PublisherEntry } from "./identity";
 import { collectTrialRetained } from "./trial-recovery";
 import { assertTrialEffectCapacity, encodeTrialEntryReport, trialEffectFailure, TrialEntryOutputBound } from "./trial-output";
 import { OUTPUT_LIMIT } from "./owned-process";
@@ -30,7 +31,7 @@ function inputs(argv: string[]) {
   if (["acknowledge-delivery", "reconcile-publication"].includes(command)) allowed.push("--owner-request");
   if (["inspect-retained", "restore-retained"].includes(command)) allowed.push("--operation-id", "--entry");
   if (command === "collect-closure") allowed.push("--consolidation");
-  if (command === "verify-adoption") allowed.push("--adoption-default");
+  if (command === "verify-adoption") allowed.push("--adoption-default", "--entry");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
     const key = argv[index], value = argv[index + 1];
@@ -45,13 +46,14 @@ function inputs(argv: string[]) {
   if (["prepare-acknowledgement", "acknowledge-delivery", "prepare-reconciliation", "reconcile-publication"].includes(command) && !selection
     || ["acknowledge-delivery", "reconcile-publication"].includes(command) && !ownerRequest) throw Error("synthetic recovery selection or owner request required");
   const operation = values.get("--operation-id"), entry = values.get("--entry");
+  if (entry !== undefined && entry !== "hosted" && entry !== "copilot" && entry !== "claude") throw Error("synthetic publisher entry unavailable");
   if (["inspect-retained", "restore-retained"].includes(command) && (!operation || entry !== "copilot" && entry !== "claude"))
     throw Error("synthetic retained operation and entry required");
   const consolidation = values.get("--consolidation");
   if (command === "collect-closure" && (!consolidation || !/^[1-9][0-9]*$/u.test(consolidation) || !Number.isSafeInteger(Number(consolidation)))) throw Error("synthetic consolidation ID required");
   const adoptionDefault = values.get("--adoption-default");
   if (command === "verify-adoption" && (!adoptionDefault || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(adoptionDefault))) throw Error("synthetic adoption requires an immutable default");
-  return { command, root, contextCommit, adoptionDefault, request, journal, selection, ownerRequest, consolidation, operation, entry, interrupt: values.get("--interrupt-after") };
+  return { command, root, contextCommit, adoptionDefault, request, journal, selection, ownerRequest, consolidation, operation, entry: entry as PublisherEntry | undefined, interrupt: values.get("--interrupt-after") };
 }
 
 /** This executable is confined to explicit setup-owned synthetic contexts by its constructor. */
@@ -120,7 +122,7 @@ export async function main(argv: string[]): Promise<number> {
       if (!options.adoptionDefault) throw Error("synthetic adoption default required");
       const gate = await createTrialAdoptionGate({ root: options.root, context_commit: options.contextCommit,
         runtime_directory: resolve(import.meta.dir, "../..") });
-      data = gate.verify({ current_default: options.adoptionDefault });
+      data = gate.verify({ current_default: options.adoptionDefault, entry: options.entry });
     } else if (options.command === "collect-closure") {
       const closure = await collectTrialClosureInputs(context, Number(options.consolidation));
       complete = closure.complete; data = closure;

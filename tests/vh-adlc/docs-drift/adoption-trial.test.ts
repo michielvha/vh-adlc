@@ -419,3 +419,19 @@ test.each(["uncertain", "duplicate", "unknown", "unordered"] as const)("componen
   const gate = await adoption.createTrialAdoptionGate(f.boundary);
   expect(() => gate.verify({ current_default: upgrade.delivered })).toThrow("component affected entry scope");
 });
+
+
+test.each(["hosted", "copilot", "claude"] as const)("the installed mapped adoption driver forwards its explicit %s entry", async entry => {
+  const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
+  const f = trialAdoptionFixture(roots, true), delivered = trialAdoptionDelivery(f);
+  const result = await executeOwnedProcess({ argv: [process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), "verify-adoption",
+    "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--adoption-default", delivered, "--entry", entry],
+    cwd: f.source, env: Object.fromEntries(["PATH", "HOME", "TMPDIR"].flatMap(key => process.env[key] ? [[key, process.env[key]!]] : [])),
+    capture: "memory", watched_outputs: [], timeout_ms: 30000, stdout: join(f.root, "adoption-entry.stdout"),
+    stderr: join(f.root, "adoption-entry.stderr"), started: () => {} });
+  expect(result.reaped).toBe(true); expect(result.timed_out).toBe(false);
+  const output = JSON.parse(Buffer.from(result.captured?.stdout ?? []).toString());
+  expect(result.exit_code, JSON.stringify(output)).toBe(0);
+  expect(output.data.evidence).toBe("test-only");
+  expect(output.data.current_default).toBe(delivered);
+}, 60000);

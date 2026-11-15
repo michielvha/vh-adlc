@@ -1,3 +1,4 @@
+import { sameLogin } from "./identity";
 import { readGitSuccess } from "./git-success";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
@@ -165,7 +166,7 @@ export function expectedRequest(effect: Effect, repository: string, index: numbe
 }
 function identityScope(plan: SealedPlan, identity: PublicationIdentity): void {
   if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
-    || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id) throw Error("success identity scope changed");
+    || typeof identity.actor !== "string" || !sameLogin(identity.actor, plan.manifest.actor) || identity.actor_id !== plan.manifest.actor_id) throw Error("success identity scope changed");
 }
 function responseScope(effect: Effect, index: number, repository: string, repositoryId: number, actor: string, actorId: number, hostname: string, status: number, facts: Facts, transport: "native" | "collector"): void {
   const method = effect.kind === "pr-create" && index === 1 && transport === "native" ? "PUT" : expectedRequest(effect, repository, index, undefined, transport).method;
@@ -299,7 +300,7 @@ export function readSuccess(options: Scope & { evidence: SuccessEvidence }): Suc
   if (Object.keys(identity).sort().join(",") !== "actor,actor_id,default_branch,repository,repository_id"
     || identity.repository !== options.plan.manifest.repository) throw Error("invalid success actor binding");
   positive(identity.repository_id); positive(identity.actor_id);
-  if (identity.repository_id !== options.plan.manifest.repository_id || identity.actor !== options.plan.manifest.actor
+  if (identity.repository_id !== options.plan.manifest.repository_id || typeof identity.actor !== "string" || !sameLogin(identity.actor, options.plan.manifest.actor)
     || identity.actor_id !== options.plan.manifest.actor_id) throw Error("success identity scope changed");
   for (const field of ["actor", "default_branch"]) {
     if (typeof identity[field] !== "string" || !identity[field] || identity[field].includes("\0")) throw Error("invalid success identity text");

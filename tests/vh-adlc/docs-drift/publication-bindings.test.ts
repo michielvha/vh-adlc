@@ -652,3 +652,15 @@ test.each(["changed-source", "unknown-comparison", "unavailable-runtime"])("publ
     }
   } finally { freshness.mockRestore(); runtime.mockRestore(); }
 }), 60000);
+
+test("a changed original comparison account remains material through publication input collection", async () => {
+  const { collectPublicationInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-inputs");
+  const { readNativeContext } = await import("../../../plugins/vh-adlc/scripts/docs-drift/transport");
+  const f = await bindingFixture(roots, false), before = captureRepositoryState(f.repo);
+  const identity = readNativeContext({ hostname: "github.com", repository: "fixture/docs", credential: "synthetic-read-token", path: f.native.environment.PATH }).identity;
+  const result = await collectPublicationInputs({ ...f.options, comparison_identity: { ...identity, actor_id: identity.actor_id + 1 } });
+  expect(result.complete).toBe(false);
+  expect(result.scope_changed).toBe(true);
+  expect(result.diagnostics).toContain("Recorded native account or repository changed");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+}, 120000);

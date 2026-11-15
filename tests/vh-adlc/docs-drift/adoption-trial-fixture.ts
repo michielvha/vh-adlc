@@ -11,8 +11,8 @@ import { portableRecord, write, type AdoptionSourceFixture } from "./adoption-fi
 import { commitAll, git, put } from "./repository-fixture";
 import { syntheticTrialFixture } from "./trial-fixture";
 
-export function trialAdoptionFixture(roots: string[]) {
-  const f = syntheticTrialFixture(roots, { bound_roles: true });
+export function trialAdoptionFixture(roots: string[], mapped = false) {
+  const f = syntheticTrialFixture(roots, { bound_roles: true, ...(mapped ? { mapped_entry: "copilot" } : {}) });
   const component = computeComponentIdentity(join(f.root, "component-source"), f.manifest.component.source_commit);
   const configured = { ...f.settings, component_pin: ".vh-adlc/docs-drift-components/synthetic.yaml",
     publication: { ...f.settings.publication, mode: "adopted" }, reports: { ...f.settings.reports, workflow_id: 19 } };
@@ -35,7 +35,8 @@ export function trialAdoptionFixture(roots: string[]) {
   put(f.source, TRIAL_CONTEXT_PATH, canonicalJSON(f.manifest).toString());
   const contextCommit = commitAll(f.source);
   const source: AdoptionSourceFixture = { repo: f.source, configured, candidate };
-  const record = portableRecord(source);
+  const account = { actor: "fixture-bot", actor_id: 20 };
+  const record = portableRecord(source, mapped ? { hosted: account, copilot: account, claude: account } : undefined);
   for (const receipt of Object.values(record.receipts)) Object.assign(receipt, { evidence_kind: "test-only", fixture_id: f.manifest.fixture_id });
   const testRecord = { ...record, fixture_id: f.manifest.fixture_id };
   return { ...f, store, settings: configured, sourceCommit: candidate, contextCommit, candidate, configured, record: testRecord,

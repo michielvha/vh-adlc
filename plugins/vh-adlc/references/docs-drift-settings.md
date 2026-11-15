@@ -55,6 +55,43 @@ credentials for trusted consumer code. A consumer needing detector secrets or
 extra network access must go through the protected execution-change grant and
 trial. Scanner execution stays repository-write-free, including feedback.
 
+## Publisher accounts by entry
+
+A consumer can use one account through `publication.actor`. For separate hosted
+and interactive accounts, add the complete `publication.entry_actors` map to its
+settings. Populate these login values from the accounts selected for that
+consumer's credentials.
+
+```yaml
+publication:
+  actor: example-automation[bot]
+  entry_actors:
+    hosted: example-automation[bot]
+    copilot: example-owner
+    claude: example-owner
+```
+
+This fragment extends the consumer's complete `publication` section. Its
+`hosted` value must match `actor` case-insensitively. Declare every entry, include
+each publisher in `pr_discovery.authors`, and cover the publication branch with
+an equal or parent discovery prefix. Copilot and Claude can share an account.
+Their original entry, role receipt and invocation remain independently bound.
+
+The runtime resolves the authenticated viewer's numeric ID through GitHub's
+native account endpoint and records the returned login. Configured logins and
+later native observations compare case-insensitively with exact numeric IDs.
+Adoption records, manifests and retained evidence preserve their original
+spelling and bytes. A materially different login or numeric ID requires the
+existing changed-account handling. Account names in the map supply discovery
+eligibility. Historical publication verification also checks the producing
+source's adoption and original entry.
+
+Scalar adoption retains its version-1 record format. Mapped adoption records
+use version 2 and capture the native account separately for all three entries.
+Create the record through the setup and trial procedure below. Changes to the
+protected publisher configuration follow the affected-entry upgrade procedure,
+including fresh observations for the affected entries.
+
 ## Runtime and hosted entry
 
 `runtime_loader` declares the launcher/provider, argument vector, literal

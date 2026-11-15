@@ -1,3 +1,4 @@
+import { ArtifactChanged } from "./evidence-input";
 import { publisherActor, sameLogin } from "./identity";
 import { PublicationScopeChanged } from "./publish";
 import { realpathSync } from "node:fs";
@@ -19,7 +20,7 @@ type PublicationInputs = {
 /** Collect current native policy, retained runtime and committed candidate facts. Effect grants follow separately. */
 export async function collectPublicationInputs(input: {
   repo: string; source: string; candidate_repo: string; candidate: string; selection: unknown; resolution_record?: { path: string; sha256: string };
-  artifact_root: string; owner: string; run: string; credential: string; path?: string;
+  artifact_root: string; owner: string; run: string; credential: string; path?: string; comparison_identity?: PublicationIdentity;
   protection_context?: Parameters<typeof inspectCandidate>[0]["protection_context"];
   object_store?: OwnedObjectStore; cache_directory: string; entry: "hosted" | "copilot" | "claude"; launcher_path: string; settings_path: string;
 }): Promise<PublicationInputs> {
@@ -37,7 +38,7 @@ export async function collectPublicationInputs(input: {
       resolution_record: options.resolution_record, protection_context: options.protection_context, object_store: options.object_store, artifact_root: root, owner: options.owner, run: options.run });
     if (!result.candidate.complete) { result.diagnostics.push(...result.candidate.diagnostics); throw Error("Committed publication candidate incomplete"); }
     const { settings } = loadCommittedSettings(repo, options.source);
-    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, comparison_identity: options.comparison_identity });
     const context = native();
     result.current_default = context.default_commit; result.identity = context.identity;
     if (!sameLogin(context.identity.actor, publisherActor(settings, options.entry)) || context.identity.default_branch !== settings.default_branch)
@@ -65,7 +66,7 @@ export async function collectPublicationInputs(input: {
       throw new PublicationScopeChanged("Native publication source or actor changed during collection");
     result.complete = true;
   } catch (error) {
-    result.scope_changed ||= error instanceof PublicationScopeChanged;
+    result.scope_changed ||= error instanceof PublicationScopeChanged || error instanceof ArtifactChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Publication input collection unavailable");
   }
   if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidateRepo, candidateBefore)) {

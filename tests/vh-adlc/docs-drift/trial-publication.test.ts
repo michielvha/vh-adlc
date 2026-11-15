@@ -595,9 +595,9 @@ test.each(["copilot", "claude"] as const)("mapped %s collector publication and r
   expect(inspected.authority).toBe("none");
   const other = entry === "copilot" ? "claude" : "copilot";
   writeFileSync(f.path, canonicalJSON({ ...f.request, entry: other }));
-  expect(() => readTrialPublication(f.context, f.path)).toThrow();
+  expect(() => readTrialPublication(f.context, f.path)).toThrow("current publisher entry changed");
   const foreign = await collectTrialRetained(f.context, { operation_id: options.plan.manifest.operation_id, entry: other });
-  expect(foreign.policy_state).not.toBe("current");
+  expect(foreign.policy_state).toBe("unavailable-or-changed");
   expect(foreign.authority).toBe("none");
   expect(readTrialTracker(f.context).commit).toBe(before.commit);
 }, 120000);

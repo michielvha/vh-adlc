@@ -1,3 +1,4 @@
+import { publisherActor, sameAccount, sameLogin } from "./identity";
 import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -21,8 +22,8 @@ export function executeCollectorRefs(options: {
   const selected = plan.manifest.effects.find(item => item.id === effect.id);
   if (plan.transport !== "collector" || plan.context !== "trial" || !selected || effectDigest([selected]) !== effectDigest([effect])
     || identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
-    || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id
-    || options.settings.repository !== identity.repository || options.settings.publication.actor !== identity.actor) throw new PublicationExecutionError(false, true);
+    || !sameAccount(identity, plan.manifest)
+    || options.settings.repository !== identity.repository || !sameLogin(publisherActor(options.settings, plan.manifest.publisher_entry), identity.actor)) throw new PublicationExecutionError(false, true);
   let updates: GitUpdate[];
   const lease = objects.lease_object ?? objects.object, receipt = objects.receipt_object ?? objects.object;
   if (effect.kind === "lease-acquire") {

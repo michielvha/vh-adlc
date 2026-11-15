@@ -152,15 +152,18 @@ type Observation = {
 };
 const nativeObservations = new WeakMap<NativeObservation, Observation>();
 
-function nativeContext(options: NativeContextOptions): NativeContext {
+function nativeContext(options: NativeContextOptions & { comparison_identity?: PublicationIdentity }): NativeContext {
   const environment = nativeEnvironment(options), timeout = options.timeout_ms ?? 30000;
   const reader = createGitHubReader(options.hostname, { inherit_env: false, env: environment, timeout_ms: timeout });
   const repository = createRepositoryReader(reader, options.repository), current = contentsAccess(repository);
-  return { identity: authenticatedIdentity(current, options.hostname, environment, timeout), default_commit: current.head_sha, repository };
+  const identity = authenticatedIdentity(current, options.hostname, environment, timeout);
+  if (options.comparison_identity && !samePublicationIdentity(identity, options.comparison_identity))
+    throw new NativeObservationChanged("Recorded native account or repository changed");
+  return { identity: { ...(options.comparison_identity ?? identity) }, default_commit: current.head_sha, repository };
 }
 
 /** Observe contents access and the authenticated account without constructing an effect transport. */
-export function readNativeContext(options: NativeContextOptions & { observation?: NativeObservation }): NativeContext {
+export function readNativeContext(options: NativeContextOptions & { observation?: NativeObservation; comparison_identity?: PublicationIdentity }): NativeContext {
   if (options.observation === undefined) return nativeContext(options);
   const observed = nativeObservations.get(options.observation);
   if (!observed) throw new NativeObservationUnavailable("Original active native observation required");
@@ -172,10 +175,10 @@ export function readNativeContext(options: NativeContextOptions & { observation?
 }
 
 /** One read-only validation phase shares observations and replays its complete read set before returning. */
-export async function withNativeObservation<T>(options: NativeContextOptions, run: (observation: NativeObservation) => Promise<T>): Promise<T> {
+export async function withNativeObservation<T>(options: NativeContextOptions & { comparison_identity?: PublicationIdentity }, run: (observation: NativeObservation) => Promise<T>): Promise<T> {
   const scope = { hostname: options.hostname, repository: options.repository, credential: options.credential,
     path: options.path ?? process.env.PATH ?? "/usr/bin:/bin", timeout_ms: options.timeout_ms ?? 30000 };
-  const initial = nativeContext(scope), observation = Object.freeze({ [observationBrand]: true as const });
+  const initial = nativeContext({ ...scope, comparison_identity: options.comparison_identity }), observation = Object.freeze({ [observationBrand]: true as const });
   type Reader = NativeContext["repository"];
   const checks: Array<{ digest: string; read(reader: Reader): unknown }> = [];
   let active = true, retained = 0, changed: string | null = null;
@@ -677,18 +680,18 @@ export function createNativeTransport(options: {
     delivery.completed_commands++;
     return successRequest && captured ? projectSuccess(captured.stdout) : null;
   }
-  async function mutation(plan: SealedPlan, method: string, endpoint: string, input: unknown, delivery: NativeDelivery): Promise<ReturnType<typeof projectSuccess>> {
+  async function mutation(plan: SealedPlan, method: string, endpoint: string, input: unknown, delivery: NativeDelivery) {
     if (!endpoint.startsWith(prefix + "/")) throw Error("foreign mutation destination");
     const identity = await nativeIdentity();
-    if (identity.repository_id !== plan.manifest.repository_id || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id) throw Error("native mutation identity changed");
-    return run(plan, nativeMutationArguments(settings.hostname, method, endpoint), canonicalJSON(input), delivery, { protocol: "http" }, { hostname: settings.hostname, method, endpoint, identity });
+    if (identity.repository_id !== plan.manifest.repository_id || !sameAccount(identity, plan.manifest)) throw Error("native mutation identity changed");
+    const response = await run(plan, nativeMutationArguments(settings.hostname, method, endpoint), canonicalJSON(input), delivery, { protocol: "http" }, { hostname: settings.hostname, method, endpoint, identity });
+    return response ? { ...response, identity } : null;
   }
   async function pushRef(plan: SealedPlan, ref: string, head: string | null, expected: string, delivery: NativeDelivery, companion?: { ref: string; head: string; expected: string }): Promise<void> {
     requireOwnedStore(store, settings.repository);
     const updates = [{ ref, head, expected }, ...(companion ? [companion] : [])];
     delivery.identity = await nativeIdentity();
-    if (delivery.identity.repository_id !== plan.manifest.repository_id || delivery.identity.actor !== plan.manifest.actor
-      || delivery.identity.actor_id !== plan.manifest.actor_id) throw Error("native Git mutation identity changed");
+    if (delivery.identity.repository_id !== plan.manifest.repository_id || !sameAccount(delivery.identity, plan.manifest)) throw Error("native Git mutation identity changed");
     const argv = nativePushArguments(settings.hostname, settings.repository, updates);
     await run(plan, argv, null, delivery, { protocol: "git", updates });
   }
@@ -764,7 +767,7 @@ export function createNativeTransport(options: {
           }, delivery);
           const facts = created?.facts;
           if (created?.status !== 201 || !facts || facts.number === null || facts.user_id !== plan.manifest.actor_id
-            || facts.user_login_sha256 !== sha256(Buffer.from(plan.manifest.actor))
+            || facts.user_login_sha256 !== sha256(Buffer.from(created.identity.actor))
             || facts.head_repository_id !== plan.manifest.repository_id || facts.base_repository_id !== plan.manifest.repository_id
             || facts.head_sha !== plan.manifest.bindings.candidate_commit || facts.head_ref !== p.branch || facts.base_ref !== p.base
             || facts.title_sha256 !== sha256(Buffer.from(text(p.title))) || facts.body_sha256 !== sha256(Buffer.from(text(p.body)))

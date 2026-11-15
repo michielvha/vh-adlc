@@ -1,3 +1,4 @@
+import { publisherActor, sameLogin, sameAccount, projectRecordedAccount } from "./identity";
 import { executeAttempt, pendingAttempt, hasEffectAttempt, hasInFlightAttempt } from "./attempts";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync } from "node:fs";
@@ -219,7 +220,7 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
   try { readVerifiedPlan(bytes, options.verify_policy); }
   catch { policy_state = "unavailable-or-changed"; }
   if (plan.manifest.repository !== options.settings.repository || plan.manifest.repository_id !== identity.repository_id
-    || plan.manifest.actor !== options.settings.publication.actor || plan.manifest.operation_id !== options.operation_id
+    || !sameLogin(plan.manifest.actor, publisherActor(options.settings, plan.manifest.publisher_entry)) || plan.manifest.operation_id !== options.operation_id
     || plan.transport !== options.transport.kind) throw Error("retained operation scope changed");
   let lease_object: string | null = null;
   const lease = await options.transport.ref(options.settings.publication.lease_ref);
@@ -333,9 +334,10 @@ export async function reconcileAbsent(options: {
     const retained = await options.transport.ref(String(receipt.payload.ref));
     if (retained.state === "present" && retained.object !== receiptObject) return blocked("retained-operation-changed");
     if (retained.state === "absent" && terminal(journal, receipt.id)) return blocked("retained-operation-removed");
+    const account = projectRecordedAccount(identity, plan.manifest);
     const scope: ReconciliationScope = { repository: identity.repository, repository_id: identity.repository_id, operation_id: plan.manifest.operation_id,
       plan_sha256: sha256(canonicalJSON(plan)), lease_ref: String(release.payload.ref), lease_object: objects.lease_object,
-      release_effect_id: release.id, retire_effect_ids: [...ids], actor: identity.actor, actor_id: identity.actor_id,
+      release_effect_id: release.id, retire_effect_ids: [...ids], actor: account.actor, actor_id: account.actor_id,
       retain_receipt: retained.state === "absent" ? { effect_id: receipt.id, ref: String(receipt.payload.ref), object: receiptObject } : null };
     if (options.inspect_only) {
       if (lease.state !== "present") return blocked("owned-cleanup-lease-unavailable");
@@ -376,7 +378,7 @@ export async function reconcileAbsent(options: {
     const requireOwnedLease = async () => {
       if (journal.header.recovery_mode === "observation-only") throw Error("original lease ownership proof unavailable");
       const currentIdentity = await options.transport.identity();
-      if (currentIdentity.actor_id !== identity.actor_id || currentIdentity.actor !== identity.actor
+      if (!sameAccount(currentIdentity, identity)
         || currentIdentity.repository_id !== identity.repository_id || currentIdentity.repository !== identity.repository) throw Error("cleanup actor changed");
       const currentLease = await options.transport.ref(scope.lease_ref);
       if (currentLease.state !== "present" || currentLease.object !== objects.lease_object) throw Error("owned cleanup lease changed");

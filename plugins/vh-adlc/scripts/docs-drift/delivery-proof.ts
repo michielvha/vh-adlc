@@ -1,3 +1,4 @@
+import { sameLogin, publisherActor } from "./identity";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
@@ -75,7 +76,7 @@ function validateData(value: unknown, options: Scope): BeforeData {
   if (typeof data.hostname !== "string" || !/^[a-z0-9.-]+$/u.test(data.hostname)) throw Error("invalid delivery baseline host");
   const identity = object(data.identity, ["repository", "repository_id", "actor", "actor_id", "default_branch"]);
   if (identity.repository !== options.plan.manifest.repository || identity.repository_id !== options.plan.manifest.repository_id
-    || identity.actor !== options.plan.manifest.actor || identity.actor_id !== options.plan.manifest.actor_id
+    || typeof identity.actor !== "string" || !sameLogin(identity.actor, options.plan.manifest.actor) || identity.actor_id !== options.plan.manifest.actor_id
     || typeof identity.default_branch !== "string" || !identity.default_branch || /[\r\n\0]/u.test(identity.default_branch)) throw Error("delivery baseline identity changed");
   if (data.source !== null) {
     const source = object(data.source, ["id", "number", "state", "draft", "head_sha", "head_ref", "head_repository_id",
@@ -163,7 +164,7 @@ export function readAppliedDelivery(options: {
   if (plan.transport !== (options.transport ?? "native")) throw Error("native-delivery-proof-required");
   if (plan.transport === "collector" && plan.context !== "trial") throw Error("collector-proof-requires-trial");
   if (journal.header.recovery_mode !== "original" || hasInFlightAttempt(journal, effect)) throw Error("original-delivery-executor-unsettled");
-  if (options.settings.repository !== plan.manifest.repository || options.settings.publication.actor !== plan.manifest.actor) throw Error("delivery-policy-scope-changed");
+  if (options.settings.repository !== plan.manifest.repository || !sameLogin(publisherActor(options.settings, plan.manifest.publisher_entry), plan.manifest.actor)) throw Error("delivery-policy-scope-changed");
   const p = effect.payload;
   if (effect.kind !== "pr-close") {
     const body = String(p.body);

@@ -1,7 +1,7 @@
 /** Native-shaped account and receipt fixtures. These controls establish no provider or hosted acceptance. */
 import { afterAll, expect, spyOn, test } from "bun:test";
 import { join } from "node:path";
-import { readFileSync, rmSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { runtimeFixture } from "./runtime-fixture";
 import { selectApprovedRuntime } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { readAdoptedRolePolicy } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
@@ -38,27 +38,34 @@ test.each(["hosted", "copilot", "claude"] as const)("mapped %s runtime role sele
 }, 120000);
 
 
-test("the mapped owner publishes and resumes through its retained native controller", async () => {
+test.each(["copilot", "claude"] as const)("the mapped %s owner publishes and resumes through its retained native controller", async entry => {
   try {
     const { originalPublicationFixture, installOwnedNativeService } = await import("./original-publication-fixture");
     const { captureRepositoryState } = await import("../../../plugins/vh-adlc/scripts/docs-drift/snapshot");
-    const f = await originalPublicationFixture(roots, { entry: "copilot", identities });
-    expect(f.target.manifest?.publisher_entry).toBe("copilot");
+    const f = await originalPublicationFixture(roots, { entry, identities });
+    expect(f.target.manifest?.publisher_entry).toBe(entry);
     expect(f.target.manifest?.actor_id).toBe(30);
-    const service = installOwnedNativeService({ ...f, publisher_identity: identities.copilot });
+    const service = installOwnedNativeService({ ...f, publisher_identity: identities[entry] });
     const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
     const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
     const published = await controller.publishPublication(f.publication);
     expect(published.state, published.reason).toBe("complete");
-    expect(published.journal.plan.manifest.publisher_entry).toBe("copilot");
+    expect(published.journal.plan.manifest.publisher_entry).toBe(entry);
     const state = JSON.parse(readFileSync(service.statePath, "utf8"));
     expect(state.prs).toHaveLength(1);
-    expect(state.prs[0].user).toMatchObject({ login: identities.copilot.actor, id: identities.copilot.actor_id });
-    await expect(controller.resumePublication({ ...f.publication, entry: "claude", journal_directory: published.journal.directory }))
+    expect(state.prs[0].user).toMatchObject({ login: identities[entry].actor, id: identities[entry].actor_id });
+    await expect(controller.resumePublication({ ...f.publication, entry: entry === "copilot" ? "claude" : "copilot", journal_directory: published.journal.directory }))
       .rejects.toThrow("Original publication controller inputs changed");
     expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toEqual(state.prs);
     const resumed = await controller.resumePublication({ ...f.publication, journal_directory: published.journal.directory });
     expect(resumed.state, resumed.reason).toBe("complete");
+    const recased = JSON.parse(readFileSync(service.statePath, "utf8"));
+    recased.viewer_login = identities[entry].actor.toUpperCase();
+    recased.prs[0].user.login = identities[entry].actor.toUpperCase();
+    writeFileSync(service.statePath, JSON.stringify(recased));
+    const afterCaseChange = await controller.resumePublication({ ...f.publication, journal_directory: published.journal.directory });
+    expect(afterCaseChange.state, afterCaseChange.reason).toBe("complete");
+    expect(afterCaseChange.journal.plan).toEqual(published.journal.plan);
     expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(1);
     expect(captureRepositoryState(f.repo)).toEqual(before);
     expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
@@ -66,25 +73,34 @@ test("the mapped owner publishes and resumes through its retained native control
 }, 600000);
 
 
-test("the mapped owner closes and resumes its reviewed exact batch through the retained native controller", async () => {
+test.each(["copilot", "claude"] as const)("the mapped %s owner closes and resumes its reviewed exact batch through the retained native controller", async entry => {
   try {
     const { originalClosureFixture } = await import("./original-closure-fixture");
     const { captureRepositoryState } = await import("../../../plugins/vh-adlc/scripts/docs-drift/snapshot");
-    const f = await originalClosureFixture(roots, { entry: "copilot", identities });
-    expect(f.target.manifest?.publisher_entry).toBe("copilot");
+    const f = await originalClosureFixture(roots, { entry, identities });
+    expect(f.target.manifest?.publisher_entry).toBe(entry);
     expect(f.target.manifest?.actor_id).toBe(30);
     const before = captureRepositoryState(f.repo);
     const controller = await import(join(f.adopted.retained.directory, "scripts/docs-drift/closure-controller.ts"));
     const published = await controller.publishClosure(f.publication);
     expect(published.state, published.reason).toBe("complete");
+    expect(published.journal.plan.manifest.publisher_entry).toBe(entry);
     const state = JSON.parse(readFileSync(f.service.statePath, "utf8"));
     expect(state.prs.map((pr: { state: string }) => pr.state)).toEqual(["closed", "closed"]);
     expect(state.comments["1"]).toHaveLength(1);
-    expect(state.comments["1"][0].user).toMatchObject({ login: identities.copilot.actor, id: identities.copilot.actor_id });
-    await expect(controller.resumeClosure({ ...f.publication, entry: "claude", journal_directory: published.journal.directory }))
+    expect(state.comments["1"][0].user).toMatchObject({ login: identities[entry].actor, id: identities[entry].actor_id });
+    await expect(controller.resumeClosure({ ...f.publication, entry: entry === "copilot" ? "claude" : "copilot", journal_directory: published.journal.directory }))
       .rejects.toThrow("Original closure controller inputs changed");
     const resumed = await controller.resumeClosure({ ...f.publication, journal_directory: published.journal.directory });
     expect(resumed.state, resumed.reason).toBe("complete");
+    const recased = JSON.parse(readFileSync(f.service.statePath, "utf8"));
+    recased.viewer_login = identities[entry].actor.toUpperCase();
+    recased.comments["1"][0].user.login = identities[entry].actor.toUpperCase();
+    recased.prs[0].user.login = recased.prs[0].user.login.toUpperCase();
+    writeFileSync(f.service.statePath, JSON.stringify(recased));
+    const afterCaseChange = await controller.resumeClosure({ ...f.publication, journal_directory: published.journal.directory });
+    expect(afterCaseChange.state, afterCaseChange.reason).toBe("complete");
+    expect(afterCaseChange.journal.plan).toEqual(published.journal.plan);
     expect(JSON.parse(readFileSync(f.service.statePath, "utf8")).comments["1"]).toHaveLength(1);
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { failed = true; throw error; }

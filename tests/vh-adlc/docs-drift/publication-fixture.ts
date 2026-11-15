@@ -20,7 +20,7 @@ import { projectBeforeSource } from "../../../plugins/vh-adlc/scripts/docs-drift
 
 
 // Older orchestration tests use abstract observations. Owned-resource tests execute the collector.
-export function publicationFixture(roots: string[], options: { owned_resources?: boolean } = {}) {
+export function publicationFixture(roots: string[], options: { owned_resources?: boolean; publisher?: { actor: string; actor_id: number; configured_actor: string; entry?: "copilot" | "claude" } } = {}) {
   const root = realpathSync(mkdtempSync(join(realpathSync(tmpdir()), "vh-drift-publish-")));
   roots.push(root);
   const repo = join(root, "source"), artifacts = join(root, "artifacts"), parent = join(root, "objects"), evidence = join(root, "evidence");
@@ -28,12 +28,17 @@ export function publicationFixture(roots: string[], options: { owned_resources?:
   readGit(repo, "init", "--template=", "-b", "main");
   writeFileSync(join(repo, "README.md"), "Synthetic publisher fixture\n");
   mkdirSync(join(repo, ".vh-adlc"));
-  const settingsBytes = canonicalJSON(settingsFixture());
+  const configured = settingsFixture(), publisher = options.publisher;
+  if (publisher?.entry) {
+    Object.assign(configured.publication, { entry_actors: { hosted: configured.publication.actor, copilot: publisher.configured_actor, claude: publisher.configured_actor } });
+    configured.pr_discovery.authors.push(publisher.configured_actor);
+  } else if (publisher) configured.publication.actor = publisher.configured_actor;
+  const settingsBytes = canonicalJSON(configured);
   writeFileSync(join(repo, ".vh-adlc/docs-drift.yaml"), settingsBytes);
   readGit(repo, "add", "--", "README.md", ".vh-adlc/docs-drift.yaml");
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture");
   const commit = readGit(repo, "rev-parse", "HEAD").toString().trim();
-  const settings = parseSettings(settingsFixture());
+  const settings = parseSettings(configured);
   const effects: Effect[] = [
     { id: "lease", kind: "lease-acquire", payload: { ref: settings.publication.lease_ref } },
     { id: "receipt", kind: "receipt-retain", payload: { ref: settings.publication.receipt_ref_prefix + "operation-1" } },
@@ -41,8 +46,8 @@ export function publicationFixture(roots: string[], options: { owned_resources?:
     { id: "pr", kind: "pr-create", payload: { base: "main", branch: "docs-drift/one", title: "Repair docs", body: "Exact reviewed body\n" + publicationMarker(settings, "operation-1") + "\n" + effectMarker("pr"), labels: ["documentation"], draft: true } },
     { id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } },
   ];
-  const input = fixture({ ...bindings, source_commit: commit, settings_sha256: sha256(settingsBytes) }, effects);
-  const policy = { adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "trial" as const, transport: "collector" as const, pr_draft: true, worker: role, reviewer: role };
+  const input = fixture({ ...bindings, source_commit: commit, settings_sha256: sha256(settingsBytes) }, effects, "operation-1", publisher ? { actor: publisher.actor, actor_id: publisher.actor_id, ...(publisher.entry ? { publisher_entry: publisher.entry } : {}) } : undefined);
+  const policy = { adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "trial" as const, transport: "collector" as const, pr_draft: true, ...(publisher?.entry ? { publisher_entry: publisher.entry } : {}), worker: role, reviewer: role };
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policy, corrections: [], attention: [] });
   const store = createOwnedObjectStore({ parent, evidence_directory: evidence, source_repo: repo, source_commit: commit, repository: "fixture/docs", owner: "fixture", run: "fixture-run" });
   const executed: string[] = [], observed: string[] = [];
@@ -53,7 +58,7 @@ export function publicationFixture(roots: string[], options: { owned_resources?:
   ]);
   const transport: PublicationTransport = {
     kind: "collector", object_store: store.root, artifact_root: artifacts,
-    async identity() { return { repository: "fixture/docs", repository_id: 10, actor: "fixture-bot", actor_id: 20, default_branch: "main" }; },
+    async identity() { return { repository: "fixture/docs", repository_id: 10, actor: publisher?.actor ?? "fixture-bot", actor_id: publisher?.actor_id ?? 20, default_branch: "main" }; },
     async ref(ref) { return refs.has(ref) ? { state: "present", object: refs.get(ref)! } : { state: "absent" }; },
     async readPlanObject(object) {
       const tree = readGit(store.root, "rev-parse", object + "^{tree}").toString().trim();

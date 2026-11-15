@@ -1,3 +1,4 @@
+import { loadCommittedSettings } from "./settings";
 import { publicationEffectsOutput } from "./recovery-output";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { ArtifactChanged } from "./evidence-input";
@@ -14,7 +15,7 @@ import { resumeEffects } from "./recovery";
 import { collectPublicationInputs } from "./publication-inputs";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
 import { readPublicationCandidateProof } from "./publication-proof";
-import { createNativeTransport, readNativeContext } from "./transport";
+import { createNativeTransport, readNativeContext, NativeObservationChanged } from "./transport";
 import { collectPublicationProposals as collectProposals, requireOwnedStore } from "./proposals";
 import { readGit } from "./git";
 import { exactRecord } from "./publication-decisions";
@@ -53,7 +54,16 @@ function importCandidate(source: OwnedObjectStore, candidate: OwnedObjectStore, 
 async function currentState(options: Options, inventory?: PublicationInventory, expected?: SealedPlan) {
   if (readGit(options.repo, "rev-parse", "HEAD").toString().trim() !== options.source
     || readGit(options.candidate_repo, "rev-parse", "HEAD").toString().trim() !== options.candidate) throw new PublicationScopeChanged("Publication assessment or candidate HEAD changed");
-  const checked = await collectCandidateReview({ ...options, inventory_context: inventory });
+  const { settings: selectedSettings } = loadCommittedSettings(options.repo, options.source);
+  const comparison = expected ? { repository: expected.manifest.repository, repository_id: expected.manifest.repository_id,
+    actor: expected.manifest.actor, actor_id: expected.manifest.actor_id, default_branch: selectedSettings.default_branch } : undefined;
+  let checked: Awaited<ReturnType<typeof collectCandidateReview>>;
+  try {
+    checked = await collectCandidateReview({ ...options, inventory_context: inventory, comparison_identity: comparison });
+  } catch (error) {
+    if (error instanceof NativeObservationChanged) throw new PublicationScopeChanged(error.message);
+    throw error;
+  }
   if (!checked.complete) {
     const before = checked.target?.preparation?.worker_inputs;
     const facts = before?.facts ?? checked.target?.bindings?.facts;

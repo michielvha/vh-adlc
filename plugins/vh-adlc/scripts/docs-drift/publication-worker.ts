@@ -87,7 +87,7 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
     const { identity, current_default: currentDefault } = result.facts;
     if (!identity || !currentDefault || !result.facts.runtime) throw Error("Complete native source identity and runtime required");
     result.worker_runtime_sha256 = roleRuntimeDigest(result.facts.runtime, "worker");
-    const native = () => readNativeContext({ hostname: snapshot.settings.hostname, repository: snapshot.settings.repository, credential: options.credential, path: options.path });
+    const native = () => readNativeContext({ hostname: snapshot.settings.hostname, repository: snapshot.settings.repository, credential: options.credential, path: options.path, comparison_identity: options.comparison_identity });
     const context = native();
     if (context.default_commit !== currentDefault || canonicalDigest(context.identity) !== canonicalDigest(identity)) throw new PublicationScopeChanged("Native source or actor changed before proposal collection");
     result.proposals = collectProposals(context.repository, snapshot.settings);

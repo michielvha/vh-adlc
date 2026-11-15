@@ -2153,3 +2153,23 @@ test.each(["case", "account-id", "material-login"])("an applied native creation 
   expect(later.every(call => call.program === "gh" && (call.args.includes("GET") || call.args.includes("graphql")))).toBe(true);
   expect(f.inspect().prs).toHaveLength(1);
 });
+
+
+test("native creation retains the original manifest and raw recased account without repeating an applied creation", async () => {
+  const f = setup();
+  f.update(state => { state.viewer_login = "FIXTURE-BOT"; state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect = f.plan.manifest.effects.find(item => item.kind === "pr-create")!, original = canonicalJSON(f.plan);
+  const result = await f.transport.execute(f.plan, effect, f.objects, "native-case-creation");
+  expect(result?.capture_unverified).not.toBe(true);
+  expect(result?.successes).toHaveLength(2);
+  for (const evidence of result!.successes) {
+    expect(() => readSuccess({ source_repo: join(f.root, "source"), artifact_root: join(f.root, "artifacts"), plan: f.plan, effect,
+      attempt_id: "native-case-creation", evidence })).not.toThrow();
+    expect(JSON.parse(readFileSync(evidence.path, "utf8")).identity.actor).toBe("FIXTURE-BOT");
+  }
+  const observed = await f.transport.observe(f.plan, effect, f.objects);
+  expect(observed.state).toBe("done");
+  const calls = readFileSync(f.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { args: string[] });
+  expect(calls.filter(call => call.args.includes("POST") && call.args.includes("repos/fixture/docs/pulls"))).toHaveLength(1);
+  expect(canonicalJSON(f.plan).equals(original)).toBe(true);
+});

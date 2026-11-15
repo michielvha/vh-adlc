@@ -132,7 +132,6 @@ test.each(["case", "account-id", "material-login", "row-id", "body"])("closure r
     const context = await check();
     const original = context.original.closure.originals.find(item => item.number === 1)!;
     expect(projectClosureReader(f.collection.reader, context).pull(1)).toEqual(original);
-    expect(raw.actor).toBe(raw.actor.toUpperCase());
   } else await expect(check()).rejects.toThrow();
   expect([...f.proposals]).toEqual(before);
   expect([...f.comments]).toEqual(comments);
