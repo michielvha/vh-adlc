@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Drafted 2026-11-15 with every owner decision folded; waits for its first spec review."
+status_description: "Revised after spec review R-1 with the owner's answers folded; waits for a fresh independent spec review."
 issue: null
 goal: "vh-adlc's ship, review and implement skills are rewritten to one pinned standard for agent-read documents only where a controlled trial shows the rewrite makes agent runs better, with every rule kept."
 covers:
@@ -11,6 +11,8 @@ covers:
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
   - tests/vh-adlc/check.test.ts
+  - tests/vh-adlc/scenarios/
+  - tests/vh-adlc/lifecycle/
   - tests/vh-adlc/evidence/agent-document-writing/
 ---
 
@@ -35,30 +37,34 @@ positive targets beside hard guardrails, and pruning no-ops. Two rules adapt it 
 with a recorded failure behind it stays until a run shows it is unneeded, and repeated leading
 words win over the humanize guide's variation inside agent-loaded text. In this repository,
 `AGENTS.md` then routes skill, reviewer and reference authoring to that guide, and its pin moves
-to the commit that merges it.
+to the commit that merges it. If a docs change between the two pins alters a rule vh-adlc's
+operations read, the pin move stops and comes back to you.
 
 The second part is one rewrite pass over the ship, review and implement skills: state targets
 positively and keep each needed prohibition beside its target, give each step a checkable end,
-and delete sentences that change nothing. Every rule in the three files keeps its meaning. A
-rule inventory maps each old rule to its new place, or records why it was removed, and an
-independent reviewer checks that inventory. Phrases the package checks pin stay as they are.
+and delete sentences that change nothing. Every rule keeps its meaning. A rule inventory maps each
+old rule to its new place, or records why it was removed, and an independent reviewer checks it.
 
-You asked for the rewrite to be proven better, not just harmless. Each rewritten skill therefore
-runs against its original in the existing headless harnesses: the scenario harness on Claude Code
-and the lifecycle harness on Codex CLI, which already compares a baseline revision with a
-candidate package. The measures are the harness grade, rule violations an independent grader
-finds in the transcripts, and turns and tool calls. A skill's rewrite ships only if no scenario
-gets worse and at least one measure improves by more than the spread between repeated baseline
-runs. A skill that fails keeps its original text, and the result is recorded either way.
+You asked for proof that the rewrite is better, not just harmless. Each rewritten skill runs against
+its original, five runs per arm on each host: the lifecycle harness on Codex CLI and the scenario
+harness on Claude Code. The scenario harness currently deletes its session transcripts, so it gains
+an opt-in setting that keeps them outside the repository; a skill no existing case reaches may also
+get one small added case. Per case the trial compares passed runs, rule violations found by a blind
+grader, and median turns and tool calls. A rewrite ships only if no case gets worse on passed runs or
+violations on either host, and some case improves on either host. Improvement means more passed
+runs, fewer violations, or, as you chose, fewer median turns or tool calls by more than the
+original's own run-to-run spread. Each skill is tried alone; passing rewrites are then tried
+together. A skill that fails keeps the default branch's text, and the result is recorded either way.
 
 Out of scope: the other skills, the reviewer agent, the references, the plugin's own docs pin,
-consumer repositories and any new mechanical check. The earlier language-drift investigation
-found no consistent benefit from extra prose instructions, which is why the trial gates every
-file. Each comparison runs five times per arm on each host, the count you chose.
+consumer repositories and any new mechanical check.
 
-Nothing has been reviewed or run yet. Accepting this authorizes the vh-adlc implementation and
-its trial runs on a feature branch after the companion docs change merges. Opening and merging the docs PR, and shipping,
-each still need your request.
+Observed so far: the baseline package checks on `c676010` (1,683 pass, 6 fail in this environment)
+and the companion guide's docs check. The trial has not run. Spec review R-1 returned one blocking
+and eight should-fix findings, all applied in this revision with your answers; a fresh review is
+next. Accepting this authorizes the implementation, the harness setting and the trial runs on a
+feature branch after the companion docs change merges. Opening and merging the docs PR, and
+shipping, each still need your request.
 
 ### Background
 
@@ -69,27 +75,43 @@ each still need your request.
   "a reviewed plugin change with a version bump" (`plugins/vh-adlc/knowledge.md:9`).
 - Measured on `c676010` with `wc -w` and
   `grep -o -i -w -E 'never|do not|must not|cannot' <file> | wc -l`: `vh-adlc-ship` has 1,366 words
-  and 12 prohibition words, `vh-adlc-review` 829 and 11, `vh-adlc-implement` 1,380 and 10. These
+  and 12 such words, `vh-adlc-review` 829 and 11, `vh-adlc-implement` 1,380 and 10. Prohibitions also
+  take other forms, such as "It is not authority to merge" and "create no branch" (R-1 F-06). These
   counts locate the work; they are not acceptance targets.
+- The three files change often: since 2026-10-15, ship 19 commits, review 12 and implement 13, the
+  latest `12e3164` on 2026-11-14 (R-1 F-04, `git log --since=2026-10-15 --oneline ef7f01b -- <file>`).
+- The skills call each other: ship obtains a fresh review as `../vh-adlc-review/SKILL.md` describes
+  (`plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:71`), and the Claude Code completion scenarios run
+  implement and then completion review (`tests/vh-adlc/scenarios/run.ts:1410`).
 - The package checks pin phrases in these files: every content and scheduled operation must name
   `guides/humanize-prose.md` and `vh-adlc knowledge` (`tests/vh-adlc/check.test.ts:260-266`);
   implement must name `vh-adlc gate in-progress` and `vh-adlc gate complete`, and ship
   `vh-adlc gate complete` (`tests/vh-adlc/check.test.ts:44-45`, used at `:268-273`); review must name
   `model eligibility` and `unrequested default` and no model name (`tests/vh-adlc/check.test.ts:362-369`).
   The lifecycle fixtures look for a read of `vh-adlc-ship/SKILL.md` (`tests/vh-adlc/lifecycle/fixtures.ts:317`).
+  The package canary rejects sentences copied from pinned docs pages listed in `CANARY_PAGES`
+  (`tests/vh-adlc/check.test.ts:54-67`), which does not list the new guide.
 - `bun test tests/vh-adlc` on unchanged `c676010` in this environment reports 1,683 pass and 6 fail
   in 13m36s: five audit and maintenance tests (four of them 5-second timeouts) and the Bubblewrap
-  `/tmp` cleanup test. AC-04 therefore compares against the base run rather than requiring zero failures.
+  `/tmp` cleanup test. The suite is timing sensitive.
 - `docs/specs/agent-language-drift.md` (abandoned, findings retained) found that extra prose
   instructions "showed no consistent factual benefit over the guide" and that a claim of prevention
   "would exceed the evidence". That study concerned human-read documentation prose, not skill
-  instructions, but it sets the evidence bar this feature states in Scope.
+  instructions, but it is why every rewrite here is gated by a trial.
 - The Claude Code scenario harness runs real headless agent sessions with deterministic checks per
-  scenario and is not part of `bun test` (`tests/vh-adlc/scenarios/run.ts:1-6`). The lifecycle harness
-  runs native Codex CLI trials against either a baseline source revision or a candidate package
-  (`tests/vh-adlc/lifecycle/run.ts:1-3`, `:57-62`, `:84`), and its plan repeats each case a requested
-  number of times (`tests/vh-adlc/lifecycle/scenario-plan.ts:22-26`); its cases include the delivery
-  case `L11-ship` (`tests/vh-adlc/lifecycle/scenario-plan.ts:21-24`).
+  scenario and is not part of `bun test` (`tests/vh-adlc/scenarios/run.ts:1-6`). It runs the checkout
+  it sits in (`const ROOT` at `tests/vh-adlc/scenarios/run.ts:17`) and takes no package or repeat flag
+  (`:1756-1760`). Each session's profile, transcripts included, is deleted after the run: `session()`
+  calls `p.dispose()` in a `finally` block (`:133-147`), which removes the profile directory
+  (`tests/vh-adlc/scenarios/host.ts:37`). Its summary records turns and cost but no tool-call count
+  (`tests/vh-adlc/scenarios/run.ts:1797-1798`).
+- The lifecycle harness runs native Codex CLI trials against either a baseline source revision or a
+  candidate package (`tests/vh-adlc/lifecycle/run.ts:1-3`, `:24-25`, `:44-51`), keeps each run's raw
+  event log (`:82`), refuses a non-empty output directory (`:30`), and stops an arm's remaining repeats
+  after an execution failure (`:134`). Its plan repeats a case 1 to 10 times, consecutively
+  (`tests/vh-adlc/lifecycle/scenario-plan.ts:9-10`, `:26`); its cases include `L11-ship` (`:21-24`).
+- The repository declares no loop routes beyond cleanup and triage settings
+  (`git ls-tree -r --name-only ef7f01b | grep ^.vh-adlc/`), so reviewer roles use the host default.
 - The companion guide is drafted on `vhco-pro/docs` branch `docs/write-for-agents`, based on that
   repository's `origin/main` at `d733cbe`, which contains the current pin (`git merge-base
   --is-ancestor 1ccf8f3 origin/main` succeeds). Its `npm run check` passes: "Checked 36 Markdown files:
@@ -99,12 +121,14 @@ each still need your request.
 
 | Term | Meaning |
 | --- | --- |
-| Rule inventory | A table, kept as evidence, listing every normative statement of a skill at the base commit with its location in the rewritten file or the reason it was removed (AC-03). |
+| Base | The feature branch's fork point from the default branch, recorded in each trial summary; a skill's base text is its text there, or its text on the default branch after a merge that changed it (AC-03, AC-05). |
+| Rule inventory | A table, kept as evidence, listing every normative statement of a skill's base text with an ID, its location in the rewritten file or the reason it was removed (AC-03). |
 | Positive target | The behavior a sentence asks for, stated directly; a hard guardrail that must stay a prohibition sits beside its target (AC-02). |
-| Trial | Repeated harness runs of the scenarios that exercise one skill, once with the base text and once with the rewrite, on both hosts (AC-05). |
+| Trial | Alternating harness runs of the cases that reach one skill, five with its base text and five with its rewrite, on each host (AC-05). |
 
 The changed artifact is the source-distributed vh-adlc plugin payload: up to three skill files, as the
-trial allows, and the two manifests' version. The binary, its lock and the plugin's docs pin are unchanged. The docs guide ships
+trial allows, and the two manifests' version. The test harness setting ships in the repository's tests,
+not in the payload. The binary, its lock and the plugin's docs pin are unchanged. The docs guide ships
 through its own PR in `vhco-pro/docs` first; this repository's pin can only name it after that merge.
 
 ## Scope
@@ -116,14 +140,18 @@ through its own PR in `vhco-pro/docs` first; this repository's pin can only name
 - One rewrite pass over `vh-adlc-ship`, `vh-adlc-review` and `vh-adlc-implement` `SKILL.md`, preserving
   every rule's meaning, with a rule inventory per file under
   `tests/vh-adlc/evidence/agent-document-writing/`.
-- A trial per rewritten skill on Claude Code CLI and Codex CLI, with its summary under
-  `tests/vh-adlc/evidence/agent-document-writing/`; only skills whose trial passes keep the rewrite.
+- An opt-in setting in the Claude Code scenario harness that saves each session's transcript, turn count
+  and tool-call count to a named directory outside the repository before the profile is deleted.
+- At most one added harness case per skill that no existing case reaches, recorded in the trial summary.
+- A trial per rewritten skill on Claude Code CLI and Codex CLI, plus a combined trial of the passing
+  rewrites, with summaries under `tests/vh-adlc/evidence/agent-document-writing/`; only rewrites that
+  pass ship.
 - A patch version bump in both plugin manifests when at least one rewrite ships.
 
-Out of scope, by name: the other twelve skills, `agents/vh-adlc-reviewer.agent.md`, every file under
+Out of scope, by name: the other thirteen skills, `agents/vh-adlc-reviewer.agent.md`, every file under
 `references/`, the plugin docs pin in `knowledge.md`, consumer repositories including Stackweaver,
-a mechanical prose or negation checker, a word-count target, new harness scenarios beyond what a
-trial needs to reach a skill, and any claim of improvement beyond the scenarios the trial ran.
+a mechanical prose or negation checker, a word-count target, harness changes beyond the setting and
+cases above, raw transcripts in the repository, and any claim of improvement beyond the cases run.
 
 ## Design
 
@@ -139,79 +167,110 @@ the owner.
 
 ### Rewrite pass
 
-For each of the three files, in order ship, review, implement:
+The base is recorded when the feature branch is cut. For each of the three files, in order ship,
+review, implement:
 
-1. Extract the rule inventory at the base commit: every sentence that requires, permits or forbids an
-   action, each with its line.
-2. Rewrite under the guide: state each target positively; keep a prohibition only where it is a hard
-   guardrail, beside its positive target; end each step on a checkable completion criterion where the
-   current step has none; replace repeated restatements with one term used consistently; delete
-   sentences that change nothing against the operation's references or the model's default.
+1. Extract the rule inventory from the base text: every sentence that requires, permits or forbids
+   an action, each with an ID and its line.
+2. Rewrite under the guide, in the skill's own words, copying no sentence from the guide: state each
+   target positively; keep a prohibition only where it is a hard guardrail, beside its positive target;
+   end each step on a checkable completion criterion where the current step has none; replace repeated
+   restatements with one term used consistently; delete sentences that change nothing against the
+   operation's references or the model's default.
 3. Complete the inventory: the new line for each rule, or `removed` with the reason. A removal of a
    guardrail cites the reference, review record or lesson that shows it is restated elsewhere or
-   unneeded; a guardrail with a recorded failure and no restatement stays.
+   unneeded; a guardrail with a recorded failure and no restatement stays. Removed rules stay in the
+   inventory.
 4. Keep every phrase listed in Background that a package check pins.
 
 A rule that moves to a shared reference is out of scope; the pass only edits the three files. The
 files keep their frontmatter `name` and `description` unchanged, so discovery and invocation do not move.
 
+When a merge from the default branch changes one of the three files before shipping, that skill's
+base text becomes the merged text: its inventory, rewrite and trial are redone against it, or the
+skill drops out and keeps the default branch's text.
+
+### Trial harness
+
+The scenario harness gains an opt-in environment setting naming a directory outside the repository.
+When set, before `p.dispose()` each session copies its transcript files from the profile's `projects`
+directory into a per-run subdirectory there and records the session's turn count and tool-call count
+(from `toolUses`) in the run summary. When unset, behavior is unchanged. The lifecycle harness needs no
+change: it already keeps each run's event log outside the repository.
+
 ### Trial
 
-For each skill, the trial runs the harness scenarios that invoke it: on Codex CLI, the lifecycle cases
-whose prompts reach the skill (for ship, `L11-ship`), and on Claude Code, the scenario harness cases
-that invoke it. Implementation lists the selected cases per skill before running; a skill no existing
-case reaches gets the smallest added case that does, and that addition is recorded.
+Cases. For each skill, implementation lists before running the cases that reach it: on Codex CLI the
+lifecycle cases whose prompts reach the skill (for ship, `L11-ship`), and on Claude Code the scenario
+cases that invoke it. A skill no existing case reaches on a host gets one small added case there.
 
-Each case runs five times with the base text and five times with the rewrite on each host, the count
-the owner chose over three and ten. On Codex CLI the lifecycle harness takes the arms directly (`--candidate baseline
---source-ref <base>` and `--candidate rewrite --package <dir>`) and its `--repeat` flag, which accepts
-1 to 10 (`tests/vh-adlc/lifecycle/scenario-plan.ts:9-10`). The Claude Code scenario harness has neither
-flag and runs the checkout it sits in (`tests/vh-adlc/scenarios/run.ts:5`, `:1756-1760`), so each arm
-runs from its own worktree at the base or rewrite commit, invoked once per run. Run order alternates so model drift
-during the trial affects both arms. Measures per case:
+Arms. A skill's rewrite arm changes only that skill; the other two keep their base text. Each case runs
+ten times per host, alternating base and rewrite (base, rewrite, base, ...): on Codex CLI as separate
+lifecycle invocations with `--repeat 1` into fresh, empty output directories (`--candidate base-<n>
+--source-ref <base>` and `--candidate rewrite-<n> --package <dir>`); on Claude Code as one scenario
+harness invocation per run from a worktree at the arm's commit, with the transcript setting on. A run
+that ends as an execution failure (the harness or host failed before the agent finished) is rerun, up
+to three times per arm; an arm that still lacks five completed runs makes the trial inconclusive, which
+counts as a fail.
 
-1. harness grade: the share of runs whose deterministic checks all pass;
-2. rule violations: an independent grader, given the rule inventory and each transcript without being
-   told which arm it came from, counts rules the agent broke;
-3. turns and tool calls per run, from the host's transcript.
+Measures, per case and host, over each arm's five completed runs:
 
-A skill passes when, on both hosts, no case's grade drops and no case's violation count rises, and at
-least one measure improves on some case by more than the spread between the base arm's own runs. A
-failing skill's file is restored to the base text in the same branch, and its summary records why.
-The summary lists every case, run, measure and the grader's records; raw transcripts stay in the
-temporary run, as both harnesses already do.
+1. passed runs: how many of the five passed every deterministic check;
+2. violations: the total violation records the grader returned across the five transcripts;
+3. median turns and median tool calls per run, from the host's transcript or event log.
+
+Grader. Each transcript is graded once by a fresh read-only subagent on the host running the trial,
+with the host's default model. It receives only the skill's full rule inventory, removed rules
+included, and the transcript with arm labels and paths that reveal the arm removed. It returns
+`VIOLATION: <rule ID> | <transcript line> | <one-line evidence>` per broken rule, or exactly
+`NO VIOLATIONS`. A reply in any other form is regraded by a new subagent.
+
+Decision. Within a case and host, the rewrite is no worse when it has at least as many passed runs and
+at most as many violations as the base. It improves when it has more passed runs, fewer violations,
+or a median turns or median tool calls lower than the base median by more than the base arm's spread
+for that measure (largest minus smallest of its five runs). A skill passes when it is no worse on every
+case on both hosts and improves on at least one case on at least one host.
+
+Combination. When two or more skills pass, an arm with all passing rewrites runs against the base on
+every case that reaches more than one of them, under the same rules. If that combined trial fails, the
+trial stops and returns to the owner before anything ships.
+
+A failing skill's file is set to its base text on the feature branch, and its summary records why.
+Each summary lists the base, every case, run, measure, spread and grader record. Raw transcripts and
+event logs stay in the directories outside the repository.
 
 ### Failure and rollback
 
-The change is text in the plugin payload. A consumer on the previous plugin version keeps the old
-skills; reverting the PR restores them. No state, schema or binary format changes, and concurrent
-sessions are unaffected until they update the plugin.
+The change is text in the plugin payload plus an opt-in test setting. A consumer on the previous plugin
+version keeps the old skills; reverting the PR restores them. No state, schema or binary format changes,
+and concurrent sessions are unaffected until they update the plugin. A trial interrupted midway leaves
+its completed runs in their output directories and is resumed by running the missing runs.
 
 ## Acceptance Criteria
 
 - [ ] AC-01: `AGENTS.md` routes skill, reviewer prompt and agent-read reference authoring to
       `guides/write-for-agents.md`, and `vh-adlc knowledge` resolves that page at the pinned revision.
-- [ ] AC-02: In the three rewritten skills, every remaining prohibition is a hard guardrail with its
-      positive target in the same sentence or the one before it, and every numbered step ends on a
-      condition an agent can check.
-- [ ] AC-03: Every rule in the three skills at the base commit appears with the same meaning in the
+- [ ] AC-02: In the three skills as shipped, every prohibition is a hard guardrail with its positive
+      target in the same sentence or the one before it, and every numbered step ends on a condition an
+      agent can check.
+- [ ] AC-03: Every rule in each rewritten skill's base text appears with the same meaning in the
       rewritten file, or its removal is recorded with a reason the reviewer accepts, in the rule
       inventory.
-- [ ] AC-04: Every plugin package check that passes at the base commit also passes at the final commit
-      in the same environment, and the three skills' frontmatter `name` and `description` are unchanged.
-- [ ] AC-05: Each skill that ships rewritten passed its trial on Claude Code CLI and Codex CLI: no case
-      got worse on grade or rule violations, and at least one measure improved beyond the base arm's
-      spread. Every skill that did not pass is byte-identical to the base commit.
+- [ ] AC-04: No plugin package check fails at the final commit that passes at the base, and the three
+      skills' frontmatter `name` and `description` are unchanged.
+- [ ] AC-05: Each skill that ships rewritten passed its trial and, when two or more passed, the
+      combined trial, under the decision rule in Design. Every skill that did not pass is identical to
+      its text on the default branch the feature branch last merged.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | Read `AGENTS.md` at the final commit; run `vh-adlc knowledge --repo . --plugin-pin <plugin pin> --page guides/write-for-agents.md` and observe `result` `answered` with the new revision. |
-| AC-02 | Independent implementation review reads each prohibition sentence (`grep -n -i -w -E 'never\|do not\|must not\|cannot'`) and each numbered step in the three files at the final commit and reports any that lacks a positive target or a checkable end. |
-| AC-03 | Independent implementation review walks each rule inventory against `git show <base>:<file>` and the final file, and reports any rule whose meaning changed or whose removal reason it does not accept. |
-| AC-04 | `bun test tests/vh-adlc` at the base and final commits in the same environment; pass when the final run's failures are a subset of the base run's; `git diff <base> -- <three files>` shows no frontmatter change. |
-| AC-05 | The trial summaries under `tests/vh-adlc/evidence/agent-document-writing/`, produced by `bun tests/vh-adlc/lifecycle/run.ts` (Codex CLI, `--candidate baseline --source-ref <base>` and `--candidate rewrite --package <dir>`, with `--repeat 5`) and `bun tests/vh-adlc/scenarios/run.ts` (Claude Code, once per run from a worktree at each arm's commit) on the selected cases; independent implementation review checks each skill's pass or fail against the rule in Design, and `git diff <base> -- <file>` is empty for each failed skill. |
+| AC-02 | Independent implementation review reads every sentence and numbered step of the three files at the final commit, using `grep -n -i -w -E 'never\|do not\|must not\|cannot\|not\|no\|nothing\|only'` only to locate candidates, and reports any prohibition without a positive target or step without a checkable end. Must pass: "Sync with `git fetch` and `git merge --ff-only`; never `git reset --hard` over changes you did not make." and "Push the feature branch only on an explicit ship request." Must fail: "It is not authority to merge." and "Do not skip the review." when no neighbouring sentence states the target. |
+| AC-03 | Independent implementation review walks each rule inventory against the base text and the final file, and reports any rule whose meaning changed, any rule missing from the inventory, any removal reason it does not accept, and any sentence copied from `guides/write-for-agents.md`. |
+| AC-04 | `bun test tests/vh-adlc` once at the base and once at the final commit in the same environment. Each test that fails only at the final commit is rerun alone three times at both commits and counts as a new failure only if it fails in at least two final runs and passes in at least two base runs; pass when there is none. `git diff <base> -- <three files>` shows no frontmatter change. |
+| AC-05 | The trial summaries under `tests/vh-adlc/evidence/agent-document-writing/`, produced as Design describes (Codex CLI: `bun tests/vh-adlc/lifecycle/run.ts` with `--repeat 1` per run into fresh directories; Claude Code: `bun tests/vh-adlc/scenarios/run.ts` per run with the transcript setting on); independent implementation review recomputes each skill's verdict and the combined verdict from the recorded measures and grader records, and `git diff origin/<default branch> -- <file>` after the last merge is empty for each skill that did not pass. |
 
 ## Tasks
 
