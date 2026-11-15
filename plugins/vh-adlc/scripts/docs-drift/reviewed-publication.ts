@@ -1,6 +1,8 @@
 import { sameAccount, type PublisherEntry } from "./identity";
 import type { PullRequestInput } from "../github-read";
 import { readCompatibleAdoptionLineage } from "./adoption-lineage";
+import { readOriginalProductionPolicy } from "./bootstrap";
+import { verifyProductionPreflight } from "./preflight";
 import { readRecordedRoleModel, verifyRuntimeAdoption } from "./adoption";
 import { isGitAncestor, readGit } from "./git";
 import { readRetainedPlan, readVerifiedPlan, type PlanPolicy, type SealedPlan } from "./journal";
@@ -25,16 +27,20 @@ export function createAdoptedPublicationVerifier(input: {
   store: OwnedObjectStore; current_default: string; identity: PublicationIdentity; entry?: PublisherEntry; proposal: PullRequestInput;
 }) {
   const { store, current_default: current, identity, proposal } = structuredClone(input), repo = store.root;
-  const allowed = new Set(readCompatibleAdoptionLineage({ store, current_default: current, identity, entry: input.entry }));
   const currentSettings = loadCommittedSettings(repo, current).settings;
+  const allowed = currentSettings.schema_version === 1
+    ? new Set(readCompatibleAdoptionLineage({ store, current_default: current, identity, entry: input.entry })) : null;
+  if (currentSettings.schema_version === 2) {
+    if (!currentSettings.component) throw Error("Ordinary publication history component required");
+    verifyProductionPreflight({ repo, current_default: current, component: currentSettings.component });
+  }
   return (bytes: Buffer, native: Omit<NativePublicationBinding, "corrections" | "attention">): ReviewedPublication => {
     function fail(reason: string): never { throw new RetainedPublicationIneligible(reason); }
     try {
       function readPlan() { try { return readRetainedPlan(bytes); } catch { fail("invalid retained plan"); } }
       const original = readPlan(), manifest = original.manifest, bindings = manifest.bindings;
-      if (original.schema_version !== 1) fail("version-two flat publication evidence reader required");
       if (original.context !== "production" || original.transport !== "native") fail("requires production native evidence");
-      if (!allowed.has(original.adoption_sha256)) fail("adoption is outside the approved compatible lineage");
+      if (original.schema_version === 1 && !allowed?.has(original.adoption_sha256)) fail("adoption is outside the approved compatible lineage");
       if (proposal.state !== "open" || proposal.merged_at !== null || !sameAccount(proposal, manifest)
         || proposal.base_repository.id !== identity.repository_id || proposal.head_repository?.id !== identity.repository_id
         || proposal.base_repository.full_name.toLowerCase() !== identity.repository.toLowerCase()
@@ -49,22 +55,30 @@ export function createAdoptedPublicationVerifier(input: {
       if (!isGitAncestor(repo, bindings.source_commit, current) || !isGitAncestor(repo, bindings.source_commit, native.head))
         fail("original source is not an ancestor of the current default or proposal head");
       const producer = { ...identity, actor: native.actor, actor_id: native.actor_id };
-      const adopted = verifyRuntimeAdoption({ repo, current_default: bindings.source_commit, identity: producer, entry: manifest.publisher_entry });
-      if (adopted.adoption_sha256 !== original.adoption_sha256) fail("original source adoption changed");
       const stable = deriveSourceWorkerInputs(source);
       for (const key of Object.keys(stable) as Array<keyof typeof stable>) if (bindings[key] !== stable[key]) fail("original source bindings changed");
       const settings = source.settings;
-      const policies = Object.entries(settings.execution.entries)
-        .filter(([entry]) => manifest.publisher_entry === undefined || entry === manifest.publisher_entry)
-        .map(([entry, roles]) => {
-          const receipt = entry === "hosted" ? "hosted_advisory" : entry === "copilot" ? "copilot_entry" : "claude_entry";
-          const policy: PlanPolicy = { adoption_sha256: adopted.adoption_sha256, context: "production", transport: "native",
-            publication_kind: original.publication_kind,
-            ...(settings.publication.entry_actors ? { publisher_entry: manifest.publisher_entry } : {}), pr_draft: settings.publication.pr_state[original.publication_kind] === "draft",
-            worker: { requested_model: roles.worker.model, adopted_model: fullModel(readRecordedRoleModel(adopted.receipts, receipt, "worker")), identity_source: roles.worker.identity_source },
-            reviewer: { requested_model: roles.reviewer.model, adopted_model: fullModel(readRecordedRoleModel(adopted.receipts, receipt, "reviewer")), identity_source: roles.reviewer.identity_source } };
-          return policy;
-        });
+      if (settings.hostname !== currentSettings.hostname || settings.repository !== currentSettings.repository)
+        fail("original publication repository changed");
+      let policies: PlanPolicy[];
+      if (original.schema_version === 2) {
+        if (currentSettings.schema_version !== 2) fail("ordinary current policy required for version-two history");
+        policies = [readOriginalProductionPolicy({ repo, plan: original, identity: producer }).policy];
+      } else {
+        const adopted = verifyRuntimeAdoption({ repo, current_default: bindings.source_commit, identity: producer, entry: manifest.publisher_entry });
+        if (adopted.adoption_sha256 !== original.adoption_sha256) fail("original source adoption changed");
+        policies = Object.entries(settings.execution.entries)
+          .filter(([entry]) => manifest.publisher_entry === undefined || entry === manifest.publisher_entry)
+          .map(([entry, roles]) => {
+            const receipt = entry === "hosted" ? "hosted_advisory" : entry === "copilot" ? "copilot_entry" : "claude_entry";
+            const policy: PlanPolicy = { adoption_sha256: adopted.adoption_sha256, context: "production", transport: "native",
+              publication_kind: original.publication_kind,
+              ...(settings.publication.entry_actors ? { publisher_entry: manifest.publisher_entry } : {}), pr_draft: settings.publication.pr_state[original.publication_kind] === "draft",
+              worker: { requested_model: roles.worker.model, adopted_model: fullModel(readRecordedRoleModel(adopted.receipts, receipt, "worker")), identity_source: roles.worker.identity_source },
+              reviewer: { requested_model: roles.reviewer.model, adopted_model: fullModel(readRecordedRoleModel(adopted.receipts, receipt, "reviewer")), identity_source: roles.reviewer.identity_source } };
+            return policy;
+          });
+      }
       const policy = policies.find(candidate => (["worker", "reviewer"] as const).every(role => {
         const observed = original.roles[role], expected = candidate[role];
         return observed.requested_model === expected.requested_model && observed.model === expected.adopted_model

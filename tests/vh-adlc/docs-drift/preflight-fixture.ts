@@ -11,12 +11,16 @@ import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { CORE_PREFLIGHT_CHECKS, normalizedConfigurationDigest, nativeEntryDigest, preflightReviewTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
 
 const proof = "1".repeat(64);
+type ConfiguredFixture = Omit<ReturnType<typeof installedSettingsFixture>, "reports"> & {
+  reports: Omit<ReturnType<typeof installedSettingsFixture>["reports"], "workflow_id"> & { workflow_id: number };
+};
 export function commit(repo: string, message: string) {
   readGit(repo, "add", "--all");
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", message);
   return readGit(repo, "rev-parse", "HEAD").toString().trim();
 }
-export function preflightFixture(roots: string[], fault = "none", runtime?: { component: ReturnType<typeof computeComponentIdentity>; executable: string }) {
+export function preflightFixture(roots: string[], fault = "none", runtime?: { component: ReturnType<typeof computeComponentIdentity>; executable: string },
+  configure?: (repo: string, settings: ConfiguredFixture) => void) {
   const f = publicationFixture(roots);
   const scanner = readFileSync(join(import.meta.dir, "fixtures/scanner.js"), "utf8")
     .replace("__FIXTURE_CASE__", JSON.stringify("none")).replace("__FIXTURE_ENDPOINT__", JSON.stringify("http://127.0.0.1:1"));
@@ -31,6 +35,7 @@ export function preflightFixture(roots: string[], fault = "none", runtime?: { co
     role.model = "claude-opus-5.5";
     Object.assign(role, { identity_source: { provider: "copilot", event_type: "assistant.message", field_path: ["data", "model"] } });
   }
+  configure?.(f.repo, configured);
   const write = (path: string, bytes: Uint8Array) => { mkdirSync(dirname(join(f.repo, path)), { recursive: true }); writeFileSync(join(f.repo, path), bytes); };
   const before = canonicalJSON(configured), afterSettings = { ...configured, publication: { ...configured.publication, mode: "adopted" } };
   const after = canonicalJSON(afterSettings);

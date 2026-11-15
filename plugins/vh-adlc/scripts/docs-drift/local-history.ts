@@ -1,8 +1,9 @@
-import type { PublisherEntry } from "./identity";
+import { sameAccount, type PublisherEntry } from "./identity";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, opendirSync, renameSync } from "node:fs";
 import { join, relative } from "node:path";
 import { verifyRuntimeAdoption } from "./adoption";
+import { verifyProductionPreflight } from "./preflight";
 import { readCompatibleAdoptionLineage } from "./adoption-lineage";
 import { readBoundArtifact } from "./evidence-input";
 import { isGitAncestor } from "./git";
@@ -55,10 +56,23 @@ export function createLocalInvocationReader(inputContext: LocalHistoryContext) {
         || !isGitAncestor(context.store.root, wanted.source_commit, context.current_default)) throw Error("Local invocation scope or age changed");
       const root = registry(context, false);
       if (root === null) throw Error("Local invocation registry unavailable");
-      const allowed = new Set(readCompatibleAdoptionLineage({ store: context.store, current_default: context.current_default, identity: context.identity, entry: context.entry }));
-      const adopted = verifyRuntimeAdoption({ repo: context.store.root, current_default: wanted.source_commit, identity: context.identity, entry: context.entry });
-      if (!allowed.has(adopted.adoption_sha256) || adopted.component_pin.component_sha256 !== wanted.component_sha256
-        || loadCommittedSettings(context.store.root, wanted.source_commit).settings.reports.interactive !== "local-attestation")
+      const original = loadCommittedSettings(context.store.root, wanted.source_commit).settings;
+      let component: string;
+      if (context.settings.schema_version === 2) {
+        if (!context.settings.component || original.schema_version !== 2 || !original.component || !context.entry) throw Error("Original ordinary local history policy required");
+        verifyProductionPreflight({ repo: context.store.root, current_default: context.current_default, component: context.settings.component,
+          publisher: { entry: context.entry, identity: context.identity } });
+        const producer = verifyProductionPreflight({ repo: context.store.root, current_default: wanted.source_commit, component: original.component });
+        if (!Object.values(producer.checklist.native_entries).some(entry => entry.repository_id === context.identity.repository_id
+          && sameAccount(entry.publisher, context.identity))) throw Error("Original local publisher identity changed");
+        component = original.component.component_sha256;
+      } else {
+        const allowed = new Set(readCompatibleAdoptionLineage({ store: context.store, current_default: context.current_default, identity: context.identity, entry: context.entry }));
+        const adopted = verifyRuntimeAdoption({ repo: context.store.root, current_default: wanted.source_commit, identity: context.identity, entry: context.entry });
+        if (!allowed.has(adopted.adoption_sha256)) throw Error("Local invocation producer is outside approved history");
+        component = adopted.component_pin.component_sha256;
+      }
+      if (component !== wanted.component_sha256 || original.reports.interactive !== "local-attestation")
         throw Error("Local invocation producer is outside approved history");
       const expected = canonicalJSON({ schema_version: 1, kind: "docs-drift-local-invocation", identity: identity(context), invocation: wanted });
       const read = (directory: string, name: string, digest: string) => {

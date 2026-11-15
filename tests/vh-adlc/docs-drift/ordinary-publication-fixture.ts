@@ -62,6 +62,6 @@ export async function ordinaryPublicationFixture(roots: string[]) {
   const authority = retainSyntheticArtifact(artifacts, "owner-authority.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-publication-authority",
     manifest_sha256: target.manifest_sha256, origin: { kind: "owner-request", artifact: instruction },
     effects: target.manifest!.effects.map(effect => ({ id: effect.id, sha256: effectDigest([effect]) })) }));
-  return { ...f, component, source, origin, candidate, head, location, run, artifacts, service, options,
+  return { ...f, component, source, origin, candidate, head, location, run, artifacts, service, options, baseline,
     publication: { ...options, worker_capture: worker, reviewer_capture: reviewer, authority } };
 }

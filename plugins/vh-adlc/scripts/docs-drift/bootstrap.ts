@@ -349,9 +349,9 @@ export async function selectProductionRuntime(input: {
     observed_models: { worker: entry.worker_model, reviewer: entry.reviewer_model } });
 }
 
-/** Reopen only the operation's original policy. This metadata read invokes no native model client. */
-export function readOriginalRuntime(options: {
-  repo: string; directory: string; plan: CurrentSealedPlan; identity: PublicationIdentity;
+/** Reopen committed production policy for recovery and read-only historical attribution. */
+export function readOriginalProductionPolicy(options: {
+  repo: string; plan: CurrentSealedPlan; identity: PublicationIdentity;
 }) {
   const plan = structuredClone(options.plan), source = plan.manifest.bindings.source_commit;
   const loaded = loadCommittedSettings(options.repo, source), settings = loaded.settings, entry = plan.manifest.publisher_entry;
@@ -361,7 +361,6 @@ export function readOriginalRuntime(options: {
     fail("original operation settings or native identity changed");
   if (settings.schema_version !== 2 || !entry || !Object.hasOwn(settings.execution.entries, entry)
     || plan.context !== "production" || plan.transport !== "native") fail("original native production policy required");
-  const inspected = inspectInstalledPayload({ directory: options.directory, expected: plan.component });
   const preflight = verifyProductionPreflight({ repo: options.repo, current_default: source, component: plan.component,
     publisher: { entry, identity: options.identity } });
   const selected = settings.execution.entries[entry], models = preflight.checklist.native_entries[entry];
@@ -371,8 +370,17 @@ export function readOriginalRuntime(options: {
     worker: { requested_model: selected.worker.model, adopted_model: models.worker_model, identity_source: selected.worker.identity_source },
     reviewer: { requested_model: selected.reviewer.model, adopted_model: models.reviewer_model, identity_source: selected.reviewer.identity_source } };
   readVerifiedPlan(canonicalJSON(plan), () => policy);
+  return freezeJSON({ authority: "none" as const, source_commit: source, settings, policy });
+}
+
+/** Original recovery effects additionally require the selected original installed bytes. */
+export function readOriginalRuntime(options: {
+  repo: string; directory: string; plan: CurrentSealedPlan; identity: PublicationIdentity;
+}) {
+  const original = readOriginalProductionPolicy(options), plan = options.plan;
+  const inspected = inspectInstalledPayload({ directory: options.directory, expected: plan.component });
   return freezeJSON({ kind: "docs-drift-original-runtime" as const, authority: "none" as const, purpose: "metadata-recovery" as const,
-    source_commit: source, component: { ...plan.component, directory: inspected.directory }, policy });
+    source_commit: original.source_commit, component: { ...plan.component, directory: inspected.directory }, policy: original.policy });
 }
 
 /** Recovery selects the recorded component and original policy, independently of a successor config. */
