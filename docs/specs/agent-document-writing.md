@@ -285,6 +285,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-15 | R-1 | spec | `ef7f01b8b85a78c3c26aebb77aab526eed13d54a` | claude-opus-5-5 | procedural | One blocking, eight should-fix and four nit findings |
+| 2026-11-15 | R-2 | spec | `b34ba95382ee1ceb78d0c6c2ac5d751dc65b0ff3` | claude-opus-5-5 | procedural | Two blocking, five should-fix and two nit findings |
 
 ### R-1
 
@@ -378,6 +379,71 @@ SEVERITY: nit
 WHERE: Design (Rewrite pass step 2, "Rewrite under the guide")
 EVIDENCE: The package canary checks that no sentence from pinned docs pages appears in the package. It reads pages at the plugin pin and lists them in CANARY_PAGES (tests/vh-adlc/check.test.ts:54-67, :417-427). The plugin pin stays at 1ccf8f3 and guides/write-for-agents.md is not in that list. A rewrite that copies guide sentences into a skill would pass every check. That breaks the package's rule against restating docs pages.
 PROPOSAL: Add one sentence to step 2: the rewrite applies the guide in the skill's own words and copies no guide sentence. The AC-03 or AC-02 review then checks it.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Acceptance Criteria AC-04; Test Plan row AC-04; Scope; covers frontmatter; Context, Background (package checks bullet); Design (Rewrite pass step 4)
+EVIDENCE: tests/vh-adlc/direct-operation-compatibility.test.ts:14 runs `test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resume"])("direct %s keeps its approved operation body", ...)`. It removes only the Loop routes, Documentation impact, ship's Article and promotion handoff and After an authorized merge sections, then asserts `expect(body(current)).toBe(body(previous))` against the owner-approved baselines `b313327b...` (ship, review) and `8d5a639b...` (implement) (lines 6, 13, 16, 94). Any rewrite of those bodies fails the test. I ran `bun test tests/vh-adlc/direct-operation-compatibility.test.ts` at b34ba95: it passes now. AC-04 says "No plugin package check fails at the final commit that passes at the base". With this test unchanged, AC-04 cannot be met by any rewrite that ships. Changing the test's baselines would re-approve the operation bodies, and the test file is not in covers or Scope. Background lists the pinned phrases but never names this test. The R-1 document had the same gap; this revision did not introduce it.
+PROPOSAL: Name direct-operation-compatibility.test.ts in Background, Scope and covers. Say how its approved-body baseline moves for each rewrite that passes and stays for each skill that fails. Moving a baseline the owner approved is a judgement for the owner, so raise it as an Open Question.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: blocking
+WHERE: Acceptance Criteria AC-02 and AC-05; Test Plan row AC-02; Design (Trial, "A failing skill's file is set to its base text"); Context, Owner summary paragraph 4 ("A skill that fails keeps the default branch's text")
+EVIDENCE: AC-02 covers "the three skills as shipped". AC-05 and Design require a skill that fails its trial to stay identical to its default-branch text. The base text breaks AC-02. For example, plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:102 is a standalone paragraph, "Never merge, and never bypass branch protection or rewrite a pushed commit.", and the sentence before it (line 100) is itself the prohibition "Never report a result you did not see." That is the bare stack the AC-02 row lists as must-fail. Design step 2 also adds checkable ends "where the current step has none", which admits that base steps lack them. So whenever a skill fails its trial, which the design treats as an expected result, AC-02 cannot be met and the feature cannot complete. This traces to the previous revision, which changed AC-02 from "In the three rewritten skills" (ef7f01b) to "In the three skills as shipped".
+PROPOSAL: Limit AC-02 to the skills that ship rewritten, as AC-05 already distinguishes them, and word the AC-02 Test Plan row the same way.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Background (package checks bullet); Design (Rewrite pass step 4, "Keep every phrase listed in Background that a package check pins"); covers frontmatter
+EVIDENCE: Background names only check.test.ts and lifecycle/fixtures.ts, but other tests also pin text in these skills. tests/vh-adlc/blog.test.ts:51-57 requires ship to contain "vh-adlc-blog promote", match /internal-only/i and match /Do not.*draft|Never.*draft/. tests/vh-adlc/docs-impact/integration.test.ts:18-24 requires implement and ship to place "## Documentation impact" before "## Start" and to contain "committed HEAD", "missing-page", "--metadata-path", "incomplete" and other phrases. direct-operation-compatibility.test.ts:28-38 and 54-80 pins Loop routes phrases ("replace Enter steps 1 and 6", "replaces the documentation-only skip-marker rule", "verification rungs"), Documentation impact phrases ("before ticking/committing", "owner-authorized", "no completion"), ship promotion text ("Do not invoke", "do not make promotion a feature gate") and cleanup text ("does not authorize a"). Some of these pinned phrases are bare prohibitions that AC-02's rewrite would otherwise restate, so step 4, which relies on the Background list, leaves them out. None of these files is in covers.
+PROPOSAL: List every test that pins text in the three skills, with each pinned phrase or pattern, and add those test files to covers. Say that a pinned prohibition stays verbatim and gains its positive target beside it.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, Arms, "one scenario harness invocation per run from a worktree at the arm's commit"; Trial harness, "records ... in the run summary"); Test Plan row AC-05; Scope (opt-in setting bullet); Context, Owner summary paragraph 4
+EVIDENCE: The scenario harness runs the checkout it sits in (`const ROOT` at tests/vh-adlc/scenarios/run.ts:17) and builds the fixture plugin from that checkout (tests/vh-adlc/fixtures/build.ts:25, :336-338). The document never defines the base arm's commit. If it is the recorded base, the fork point, that worktree has neither the new transcript setting nor any added case, so the base arm yields no transcript and no tool-call count. Also, each invocation writes its summary to the tracked file `tests/vh-adlc/evidence/claude-code/<id>.md` (run.ts:18, :1820 `writeFileSync(join(EVIDENCE, `${s.id}.md`), text)`). The next run overwrites it, so the per-run turn and tool-call counts the Design records "in the run summary" do not survive five runs per arm, and each run leaves tracked files modified in its worktree. This traces to the previous revision's addition of the transcript setting (R-1 F-01) to a run method that uses a worktree per arm.
+PROPOSAL: Define each arm's commit, for example a feature-branch commit that holds the harness setting and added cases with the base or rewritten skill text. Have the setting write each run's turns and tool calls into its per-run directory outside the repository, not into the tracked summary, and say how the tracked evidence files are left afterwards.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, Measures item 3; Decision); Context, Owner summary paragraph 4; Acceptance Criteria AC-05
+EVIDENCE: Measure 3 is "median turns and median tool calls per run, from the host's transcript or event log". On Codex the lifecycle event log parser (tests/vh-adlc/lifecycle/fixtures.ts:441-465) reads thread, agent messages, command executions and MCP calls. `codex exec --json` gives one turn per prompt, so "turns" is either constant per case or undefined. On Claude Code a scenario run can hold several sessions and turns (for example run.ts:867 and :873), and the summary prints turns per turn as a list (run.ts:1797). The document does not say whether a run's turns is the sum, and does not say whether subagent tool calls, which `toolUses` includes (host.ts ToolUse.subagent), count toward tool calls. The improvement clause can rest on this measure alone, so two implementers could score the same runs differently. This traces to the previous revision's restatement of the decision rule (R-1 F-02).
+PROPOSAL: Define turns and tool calls per host: the Codex event types counted, how a scenario run with several sessions sums its turns, and whether subagent and reviewer tool calls count.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, Grader, "arm labels and paths that reveal the arm removed"); Context, Owner summary paragraph 4 ("a blind grader")
+EVIDENCE: Removing labels and paths does not hide the arm. A transcript carries the skill text the agent loaded: Claude Code injects the invoked skill's SKILL.md body into the session transcript, and the Codex lifecycle checks require a command that reads `vh-adlc-ship/SKILL.md` (tests/vh-adlc/lifecycle/fixtures.ts:317), whose `aggregated_output` the event log keeps (fixtures.ts:454). The grader also receives the rule inventory, which records each rule's new line in the rewritten file. It can therefore tell base from rewrite in every transcript. The violation count decides the no-worse rule, so a grader that is not blind can bias the verdict. This traces to the previous revision's grader definition (R-1 F-09).
+PROPOSAL: Redact the loaded skill text from each transcript before grading, give the grader the inventory without new-line locations, or drop the claim that the grader is blind from the Owner summary and Design.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, Arms, "A run that ends as an execution failure (the harness or host failed before the agent finished) is rerun"); Test Plan row AC-05
+EVIDENCE: The lifecycle harness sets `status: "execution-failed"` for `timeout || exitCode !== 0 || parsed.failed` (tests/vh-adlc/lifecycle/run.ts:117). The timeout is the agent's own 720-second limit (run.ts:88), and `parsed.failed` is set on any `turn.failed` or `error` event (fixtures.ts:450). These are agent behaviour, not only harness or host failure. If the harness status is used, a rewrite that makes the agent run past the limit gets its slow runs rerun and dropped from the five scored runs. The scenario harness has no execution-failure status at all: a thrown error becomes a failed "the scenario ran" check (run.ts:1773-1775), and an `isError` turn ends the session (run.ts:141). Two implementers would classify the same runs differently. This traces to the previous revision's rerun rule (R-1 F-03).
+PROPOSAL: Define execution failure per host from observable fields, and state that an agent timeout or a failed agent turn counts as a failed run rather than a rerun.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (package checks bullet, "every content and scheduled operation must name `guides/humanize-prose.md` and `vh-adlc knowledge`")
+EVIDENCE: tests/vh-adlc/check.test.ts:249-266 checks those two phrases inside `for (const op of SCHEDULED)`. Content operations (blog, diagram, docs-impact) are checked at :241-246 only for their name and the absence of a model field.
+PROPOSAL: Say "every scheduled operation", which covers ship, review and implement.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Trial, Arms, the lifecycle command); Test Plan row AC-05
+EVIDENCE: The command given, `--candidate base-<n> --source-ref <base>` or `--candidate rewrite-<n> --package <dir>` with `--repeat 1`, names no case. Without `--cases` the plan runs L01, L02, L04 and L05 (tests/vh-adlc/lifecycle/scenario-plan.ts:21), and an execution failure stops the remaining cases of that invocation (run.ts:134). The Design's own case list, for example `L11-ship`, needs `--cases`.
+PROPOSAL: Add `--cases <case>` to the lifecycle command in Design and in the Test Plan row, one case per invocation.
 
 ## Sources
 
