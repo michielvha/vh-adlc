@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revising the implementation approach after the owner requested a proportionate port that retains the useful audit, resolver and recovery capabilities."
+status_description: "The smaller design retains audit, resolver and recovery capabilities. It waits for a fresh canonical spec review and owner decisions Q1 to Q3 before T121 to T130."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -76,41 +76,61 @@ Move Stackweaver's scheduled documentation audit and stale audit-PR resolver int
 
 The proposed simplification uses the ordinary installed plugin and native clients, shared process/review primitives and one run directory. Callers use eight helper operations. Scanner protocol version 1 and its separate completeness correction remain required. Recovery keeps original account ownership, partial-delivery refusal and evidence-backed owner acknowledgement. Shared execution work must preserve existing loop/triage behavior.
 
-Two guarantees become more practical. Client and plugin versions are recorded and managed through ordinary installation, with fresh review when changed execution inputs affect a pending run. Losing original local application evidence requires a freshly reviewed recovery plan based on observed GitHub state. Automatic restoration through remote receipt chains and retained private executable copies is retired. These tradeoffs are proposed for owner acceptance under Q1.
+Three operational changes need acceptance. Q1 uses ordinary installed clients. Changes to plugin revision, configured role provider/command/model, source/read set, config, candidate, payload, authority or publisher identity need fresh review. Native client, Bun, Git and gh version strings are diagnostic when their required capabilities and observed model still match. Q2 replaces automatic remote restoration after lost local application evidence with explicit reviewed recovery. Q3 replaces adoption receipt chains with a committed staged/adopted gate, approved plugin pin and reviewed migration checklist. Each decision is independent.
 
-Stackweaver's legacy routes stay active through staged testing. Migration uses a recorded checklist of exact release/install, scanner parity, independent paired review, actual model/entry tests, a successful unattended trial, routing switch and rollback. The current code still implements the earlier architecture. Its recorded tests and reviews keep their original commit attribution. This revision has no implementation or migration acceptance yet. GUI and phone checks retain their deferrals.
+Stackweaver's legacy routes stay active through staged testing. Migration uses a recorded checklist of exact release/install, scanner parity, Claude Code Opus 5.5 paired review, actual model/entry tests, a successful unattended real-corpus advisory trial, routing switch and rollback. The trial needs its separately selected provider/publication authority. The current code still implements the earlier architecture. Its recorded tests and reviews keep their original commit attribution. This revision has no implementation or migration acceptance yet. GUI and phone checks retain their deferrals.
 
-Acceptance covers the revised implementation plan and its explicit installation/recovery tradeoffs. Existing publication, provider-execution, private-payload and cutover boundaries still govern those later actions.
+Acceptance covers the revised implementation plan and the installation, lost-evidence recovery and adoption choices the owner selects. Existing publication, provider-execution, private-payload and cutover boundaries still govern those later actions.
 
 ### Simplification basis on 2026-11-15
 
 At published `b7b85398eff501083824a7f2b48032dcd1026f88`, PR #98 adds 50,862 lines across 303 files. The measured additions include 18,967 runtime/tooling lines in 109 files and 25,895 test/fixture lines. Actual Claude Code Opus 5.5 architecture diagnostic reads all 203 supplied fragments, including 28 complete core modules, normative design and complete module inventories. It identifies useful domain controls and excessive execution/adoption infrastructure. The diagnostic is archived as `docs-drift-architecture-claude-r1`, with exact source, original return and qualified model/read/cleanup records. It is distinct from canonical spec acceptance.
 
-Current reuse opportunities and limits are visible in `scripts/triage/owned-process.ts:60`, `scripts/loop/review-route.ts:20` and `:204`. The two model matchers at `scripts/loop/review-route.ts:198` and `scripts/docs-drift/manifests.ts:220` accept different alias families, so reuse must preserve caller semantics. Existing retained runtime gates are in `scripts/docs-drift/bootstrap.ts:465`, `adoption.ts:602` and `role-capture.ts:96`. The old 738-line command surface starts its command groups at `cli.ts:325`. These are implementation observations, not proof that a simpler replacement already works.
+Current reuse opportunities and limits are visible in `scripts/triage/owned-process.ts:60`, `scripts/loop/review-route.ts:20` and `:204`. The two model matchers at `scripts/loop/review-route.ts:198` and `scripts/docs-drift/manifests.ts:220` accept different alias families, so reuse must preserve caller semantics. Existing retained runtime gates are in `scripts/docs-drift/bootstrap.ts:465`, `adoption.ts:602` and `role-capture.ts:96`. The old 738-line command surface starts its command groups at `cli.ts:324`. These are implementation observations, not proof that a simpler replacement already works.
 
-The owning branch integrates upstream `3e3f655`, including the ordinary 0.32.0 binary lock and loop fixes. Main's plugin is 0.24.1. Resolving the two plugin-version conflicts reserves candidate 0.25.0 for this unreleased feature. The owner requested retaining useful capabilities and reducing disproportionate machinery on 2026-11-15.
+Merge `a9be541` integrates upstream `3e3f655`, including the ordinary 0.32.0 binary lock and loop fixes. `git show origin/main:plugins/vh-adlc/plugin.json` at that upstream declares 0.24.1. The merge resolves both plugin manifests to candidate 0.25.0. Package/discovery checks at `5deb4b4` pass 69 cases and 301 assertions in `simplification-upstream-package-check.log`. The owner requested retaining useful capabilities and reducing disproportionate machinery on 2026-11-15.
+
+The architecture diagnostic's suggestions to drop delivery acknowledgement, compare numeric account IDs alone and split this port into additional feature documents are declined. The owner selected the useful audit/resolver/recovery capabilities as one migration, including original-account handling and acknowledgement.
 
 ### Review lens
 
 Architecture proportionality is a should-fix lens for this revision and its implementation review. Every retained subsystem needs a concrete audit/resolver, recovery or migration behavior and an explanation where an existing shared primitive cannot preserve that behavior. This lens favors reuse or removal when they satisfy the retained outcome. It introduces no line-count target or requirement to weaken correctness checks.
 
+### Terms used here
+
+| Term | Meaning | Existing criterion |
+| --- | --- | --- |
+| Docs-drift audit | Account for the declared corpus and ground each assessed finding in current source. | AC-01, AC-02 |
+| Resolve | Recheck selected proposals and record the current disposition of every selected hunk. | AC-04 |
+| Prepare | Apply selected eligible corrections to an owned candidate under current permission. | AC-03, AC-05 |
+| Advisory | An independently reviewed proposed PR awaiting the project's normal merge decision. | AC-05 |
+| New attention | A new or materially changed unresolved decision or verification item. | AC-05 |
+| Carried attention | An unresolved item whose current binding still matches eligible earlier evidence. | AC-05 |
+| Carried delivery | A freshly supported correction already present in an exact open reviewed proposal. | AC-05 |
+| Delivery acknowledgement | Current owner approval to preserve a proven applied delivery's later edits and stop original replay, retaining non-success. | AC-05 |
+| Run directory | One private external directory holding the run's inputs, review, approved plan, journal and report. | AC-05, AC-07 |
+| Migration checklist | A reviewed, source/payload-bound record of required release/install/trial/parity/switch/rollback checks. | AC-06, AC-07 |
+| Adoption | A reviewed configuration switch from staged to adopted mode, bound to the approved plugin pin and checklist. | AC-06 |
+| Synthetic test | A hermetic fake-service or scratch-namespace check that grants no real-corpus execution. | AC-07 |
+| Unattended trial | A separately authorized scheduled-style run against the real consumer corpus, with provider execution and bounded advisory draft publication. | AC-06, AC-07 |
+
 ### Historical implementation evidence before this revision
 
 The dated checkpoints below retain their original scope and source attribution. Their earlier architecture, task references, capability and acceptance statements describe the preceding baseline. Current Scope, Design, criteria and active tasks define the proposed replacement.
 
-### Implementation checkpoint on 2026-11-14
+#### Implementation checkpoint on 2026-11-14
 
 The owner selected full coverage parity on 2026-11-14. T91 implements current feature-gate matching, including valid double-star declarations, with shared Go and TypeScript vectors and ownership checks. T92 to T95 retain current-result verification and exact carried-delivery evidence. Local code checkpoint `445ca6280c202fec06b380c07ae6b1b001455716` implements saved-pair-directed invocation lookup with legacy cache reading. T102 adds legacy negative controls and tests the single saved-pair window. Original scoped findings and corrections remain in Tasks and implementation history. The composed normal-entry checkpoint runs against `445ca6` in its owned frozen copy and retains that source attribution.
 
 The T105/T104 native checkpoint precedes the earlier upstream integration. Main `63d6c86d7c12a34b98b8435cc2f520285063c9ad` was integrated into the owning branch with candidate 0.22.0 after resolving its two version conflicts against main 0.21.1. The verified binary is 0.26.0 with SHA256 `48202cb38be99870ccbbb8e79efa0aa31aed6087bb909ca88c4123b1016d0df6`. AGENTS resolves engineering rules at `1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff`. Canonical R-66 freshness and its passing in-progress gate belong to that earlier checkpoint. Earlier test counts describe their recorded revisions.
 
-### Publisher correction checkpoint
+#### Publisher correction checkpoint
 
 Canonical R-77 qualifies all 348 lossless read fragments across 60 original public/synthetic sources at `ece4603b9884ded53712f1e8bc3c4d9f8ed2012c`. Original file bytes and ordered fragment reconstruction match. The native model is `claude-opus-5.5`; the process exits zero, is reaped, has no surviving owned processes and reports no outside/private reads. `spec-copilot-r82` retains its original return and validation. Interrupted capture 79 remains excluded from canonical clean-review evidence. R-75's complete same-session read qualification preserves its original incomplete read attempt and lossless completion separately.
 
 Before implementation, the unchanged scalar parser accepts the saved synthetic record/settings/Git bundle in `scalar-adoption-before-entry-map`. Four selected local-history controls pass 19 assertions, with 29 other cases filtered, in `pre-entry-map-native-casing-baseline.log`. The original normal publication gate passes before `scalar-publication-casing-before-entry-map.json` reproduces its same-ID case-only native login refusal; a changed numeric ID refuses too, with unchanged caller state and zero model/remote effects. `protected-selector-case-baseline.json` shows configured spelling preserved and a different protected settings digest after recasing. It observes no upgrade-route execution. These are original scalar source baselines. T111 to T113 remain pending, with no new publisher behavior or whole-feature migration readiness claimed.
 
-### Earlier source checkpoints
+#### Earlier source checkpoints
 
 These observations predate T107 to T110 and retain their original source attribution.
 
@@ -118,25 +138,25 @@ Existing audit PRs are checked against current source in owned copies. Saved-rep
 
 The local shared skill now includes audit, preparation, resolution, post-merge closure, greenfield setup and recovery instructions. Its documented command templates pass the production parser and a missing-settings scan preserves the caller. Shared intake and the effect-permission matrix are integrated with passing compatibility checks. Copilot diagnostic 126 returns three guide should-fixes and one knowledge-page nit. The corrections preserve eligible red first-discovery history, disclose the agent/operator semantic permission check, name and grammar-check resolve/closure commands, and bind the knowledge set to committed settings. The corrected 61-case checkpoint passes with 415 assertions plus repository checks. The retained-controller guide correction and staged greenfield collection examples now pass their composed local checkpoint. Fresh scoped re-review and actual adoption acceptance remain pending.
 
-### Earlier upstream observation on 2026-11-14
+#### Earlier upstream observation on 2026-11-14
 
 An earlier read-only fetch observed `63d6c86d7c12a34b98b8435cc2f520285063c9ad`, including plugin 0.21.1 and engineering pin `1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff`. The current T105 checkpoint retains its earlier source/base attribution. The local merge resolves the two manifest-version conflicts with candidate 0.22.0. It also removes extra EOF padding from five owned TypeScript files and framing after the final archived review, preserving its original final text. Upstream proof transcripts retain their original bytes. T106 verifies the integrated state and canonical spec freshness; T105 resumes the implementation follow-ups.
 
-### Native closure request cost
+#### Native closure request cost
 
 The timed serial closure fixture records 1,465 native-service calls, including 1,310 REST requests, before its process limit. Its last request is 0.23 seconds before the timeout record, showing continuing collection. GitHub documents a usual built-in Actions-token allowance of 1,000 REST requests per repository per hour. T105 reproduces that ordinary hosted constraint in an owned fixture and corrects repeated collection. The interrupted larger-window diagnostic and all timeout attempts remain in the review archive. T104 was completed after the corrected T105 checkpoint. The source is `t104-normal-delivery-serial-checkpoint-closure-publish-resume.log` and the preserved fixture's `native-service-calls.jsonl`. [GitHub REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api)
 
-### Local history retention
+#### Local history retention
 
 Local invocation metadata uses the explicitly selected private runtime cache. `reports.max_runs` bounds the saved report pairs inspected, and `max_age_seconds` bounds eligibility. New records are indexed by invocation digest; the timestamp-addressed format remains readable. Each metadata file is byte-bounded. Completed metadata and interrupted `.pending-*` files stay in the owner-controlled cache until explicit cleanup, preserving recovery evidence. T24 and T27 carry these setup and retention instructions into the operator guides. Current implementation is in `scripts/docs-drift/local-history.ts`, `stageLocalInvocation` and `createLocalInvocationReader`, together with `report-history.ts`, `collectLocalHistory`.
 
-### Corpus-wide finding compatibility
+#### Corpus-wide finding compatibility
 
 The consumer can emit corpus-wide findings with no single document. The shared finding validator previously required a document path and rejected that input. T107 restores this input range before the consumer protocol correction. A corpus finding retains its scope and current source-evidence obligation. Document-bound findings retain their document quote requirement; actual edit protection and publication authority remain separately enforced.
 
 T29 source inspection also identifies a native-provider gap. The prior role builder, process wrapper and stream decoder permitted Copilot only, while the accepted migration preserves Stackweaver's Claude scheduled scanning provider. T109 adds that missing source path before staged consumer acceptance. This does not authorize an actual provider/model trial or a scanning-provider change. The local Claude CLI reports version 2.1.325; its read-only help supplies the supported command flags. OAuth-capable configuration must remain usable because the existing scheduled workflow uses that credential path.
 
-### Terms used here
+#### Historical glossary and context
 
 | Term | Meaning | Existing criterion |
 | --- | --- | --- |
@@ -186,11 +206,11 @@ During T16, the authenticated actor query was checked against GitHub's installat
 Evidence-only receipt refs and synthetic trial branches contain no authored work. Their separately authorized, exact-owned retirement/cleanup under the accepted Design is an intended exception to the pinned delivery convention's stale unmerged-branch restriction; it still requires the recorded ownership and retention checks. Maintenance sweeps list retained receipt branches as kept unmerged branches until that specific cleanup is authorized and eligible. This grants no generic unmerged-branch deletion.
 
 
-### Review routing and renewed acceptance
+#### Review routing and renewed acceptance
 
 On 2026-11-14 the owner accepted R-77 at `ece4603b9884ded53712f1e8bc3c4d9f8ed2012c` and requested Claude Code Opus 5.5 for subsequent development reviews. The accepted installed-entry acceptance tests retain their named providers. The next implementation tasks preserve both publisher identities and existing scalar records.
 
-### Claude review follow-up and native identity acquisition
+#### Claude review follow-up and native identity acquisition
 
 The owner's 2026-11-14 instruction selects Claude Code Opus 5.5 for development spec, scoped source, implementation and preliminary paired-parity reviews. T111, T112, T32, T33 and T38 use that route. R-79 identified that a final adoption-paired receipt has a separate protected runtime binding. R-80 then found the attempted extension into all runtime reviewer settings exceeded the recorded choice and introduced credential, proof and task-order conflicts. That extension is withdrawn. That revision restored Scope, Design, Acceptance Criteria, Test Plan and covers byte-for-byte to R-77. The subsequent owner decision below authorizes the narrow Design/Test Plan reviewer clarification. Generic and staged consumer runtime reviewer settings retain their existing provider, model and credential contracts.
 
@@ -202,35 +222,35 @@ On 2026-11-15 a normal merge integrated observed main `19bb6bcb20282ceac72c06d54
 
 The current source baseline passes `bun test tests/vh-adlc/loop/delivery.test.ts` with eighteen cases and thirty-two assertions, retained in `.docs-drift-review-archive/publisher-upstream-delivery-baseline.log`. It also passes 217 cases and 412 assertions across `settings.test.ts`, `adoption.test.ts`, `trial-definition.test.ts`, `upgrades.test.ts` and `github-input.test.ts`, retained in `.docs-drift-review-archive/publisher-baseline-before-t111.log`. The owned diagnostic `.docs-drift-review-archive/reproduce-hosted-interactive-adoption.ts` passes original hosted scalar adoption, then observes the interactive-owner refusal and unsupported explicit entry-map refusal. Its result `.docs-drift-review-archive/hosted-interactive-adoption-before-t111.json` records unchanged caller and record bytes and synthetic-only execution. The byte-preserved pre-change scalar bundle, settings and record also pass the current parser at `1f6a20a5e784c9a9a56afbf5b39bf53a0a2e9418`, including a same-ID recased native observation with original identity spelling, record hash and caller state preserved. `.docs-drift-review-archive/recheck-frozen-scalar-adoption.ts` and `frozen-scalar-before-t111-recheck.json` retain that synthetic-only regression. These are pre-change baselines. T111 to T113 implementation and all composite criteria remain open.
 
-### Owner decision and publication authority on 2026-11-15
+#### Owner decision and publication authority on 2026-11-15
 
 The owner selected the recommended development-only reviewer clarification and requested the feature push and installed vh-adlc update. This also accepts this narrow clarification once its Claude Code review is clean, as the presented recommendation requested. Development reviews run on Claude Code Opus 5.5. The existing configured runtime reviewer roles and credential bindings supply the actual T35 operation-review proof and T37 final adoption receipt. Design and the AC-07 proof now name each evidence producer explicitly. This resolves R-81 F-01 without changing runtime provider configuration. T37's prerequisite names the preliminary T33 parity check, followed by final C review and operator inspection of that original artifact before D. Every prior native review record remains verbatim.
 
 The commands `codex plugin marketplace upgrade vhco-tools --json` and `codex plugin add vh-adlc@vhco-tools --json`, retained in `.docs-drift-review-archive/installed-vh-adlc-update-20261115.json`, resolve the published main payload `vh-adlc@vhco-tools` to `0.22.0`, matching the version declared by published main `19bb6bcb20282ceac72c06d5418491b026ce32ed`. This is version equality, observed with `git show origin/main:plugins/vh-adlc/plugin.json` in `.docs-drift-review-archive/r83-current-state.json`. The verified companion binary is `0.26.0`. The retained `command -v vh-adlc` output selects the user-local `0.26.0` binary. The system-path binary reports `0.19.0`. These current path/version observations are retained in `.docs-drift-review-archive/r83-current-state.json`. These installation observations cover published payloads. The unreleased source candidate is `0.23.0`. This publication authority covers pushing the feature branch, opening its PR and reporting its exact CI state. Feature and migration readiness continue to follow observed checks and explicit remaining evidence.
 
-### Source package reconciliation before publication
+#### Source package reconciliation before publication
 
 The installed marketplace package remains published `0.22.0`. The owner-authorized feature candidate now declares unreleased `0.23.0` in both plugin manifests. The actual package test first reported 63 passes and one failure because the package changed without a version advance. After the manifest update, the same command passes all 64 cases and 230 assertions. Original red and green outputs are `.docs-drift-review-archive/pre-push-plugin-check.log` and `pre-push-plugin-check-green.log`. The outgoing 331-commit baseline passes a redacted Gitleaks scan with no detected secrets, retained in `pre-push-secrets.log`. The feature was pushed as draft PR #98 at `c3b6a05a643284fa79da97c82b969e17bd13209b`. `gh pr view 98 --repo michielvha/vh-adlc --json url,headRefOid,isDraft,statusCheckRollup` and its original output are retained in `.docs-drift-review-archive/r83-current-state.json`. It names remaining publisher and migration evidence.
 
-### R-82 corrections and retained evidence
+#### R-82 corrections and retained evidence
 
 A bulk prose replacement modified one sentence quoted inside R-81 F-03. The original native return is restored. The entire pre-session Review Log remains byte-identical to pre-session canonical document commit `1d607990001961df4ef329aff2461d3e7da0fced` apart from appended rows, and every new R-78 to R-82 subsection matches its original returned-record file. `vh-adlc review check` passes R-77 through R-82. The restoration and equality assertions are rerunnable through `.docs-drift-review-archive/restore-original-review-records.py`; the current binary-check results are retained in `r83-review-record-equality.json`. Future prose edits are scoped before Review Log and guard its digest. The summary now names the push/PR authority, conditional acceptance and remaining merge/release/live approvals.
 
 T35 proves the literal AC-07 Copilot operation-review requirement using the current candidate's Copilot-provider reviewer binding and its native capture. The owner-selected development reviewer remains Claude Code. This clarifies current evidence eligibility while preserving the accepted configurable runtime design. R-82 F-03's suggested normative wording change remains a nit under the pinned feature-document rule. The task grammar and installation citations are corrected in metadata.
 
-### R-83 acceptance and verification
+#### R-83 acceptance and verification
 
 Claude Code Opus 5.5 R-83 at `aa70bfadfc062832b998051264630d14d3bbcc30` returned two citation nits and no blocking or should-fix findings. Both metadata citations are corrected. The owner's conditional acceptance on 2026-11-15 is therefore applied to that exact reviewed baseline. No further normative requirement changes accompany these corrections. Native read/model/record qualification is retained in `.docs-drift-review-archive/spec-claude-r6/validation.json`.
 
 The original package red and green logs retain their original observation. The fresh 64-case check below records its exact source commit and logs, so package evidence remains tied to a concrete candidate. The local Go/vet/lint/modules/types/bundle/registration results at pushed `c3b6a05` are retained in `.docs-drift-review-archive/ship-c3b6a05-checks.json`.
 
-### First published platform CI correction
+#### First published platform CI correction
 
 The macOS job for pushed `c3b6a05` failed four cases. Three curl tests expected the former signal shape and rejected the owned-process helper's `error: ESRCH` diagnostic for an already exited group. One maintenance discovery test still expected fifteen skills after docs-drift added the sixteenth. The original native job log is `.docs-drift-review-archive/ci-c3b6a05-macos.log`. The correction expects the exact `ESRCH` result and additionally requires confirmed cleanup and no surviving owned processes. The partial-transfer case also asserts group absence. The discovery count advances to sixteen.
 
 The focused command `bun test tests/vh-adlc/ensure.test.ts tests/vh-adlc/maintenance/discovery.test.ts --test-name-pattern 'native curl bounds|a native partial transfer|owned-process signal record|maintenance is a discoverable' --timeout 45000` passes five cases and fifty-five assertions, with thirty-seven filtered cases. `.docs-drift-review-archive/ci-portability-fixes-focused.log` retains its original output. This corrects the observed CI assertions and preserves the runtime cleanup behavior.
 
-### Publisher-entry implementation checkpoint
+#### Publisher-entry implementation checkpoint
 
 The initial real-helper regressions fail twice before the implementation because entry mappings are unsupported and the interactive owner cannot select an adopted identity. The implementation adds an optional protected entry map, strict discovery coverage and a version-two adoption record containing native per-entry accounts bound into receipt targets. Original scalar records retain their version-one shape and hashes. The selected native account must match its recorded login ignoring case and numeric ID exactly. Bootstrap forwards the selected entry. Historical predecessor evidence validates its recorded accounts independently of the current entry, while identity changes still require affected-entry trial evidence.
 
@@ -239,14 +259,14 @@ The first four cases pass after the change. Additional current controls pass 95 
 Mapped selectors also preserve the underscore suffix used by GitHub Enterprise Managed Users. The matching control first failed and then passed. GitHub's username reference describes that suffix. [Username considerations for external authentication](https://docs.github.com/en/enterprise-cloud%40latest/admin/managing-iam/iam-configuration-reference/username-considerations-for-external-authentication).
 
 
-### Native authenticated publisher acquisition
+#### Native authenticated publisher acquisition
 
 The typed publisher identity resolves the authenticated GraphQL viewer's numeric ID through the existing GET-only reader at `user/{id}`. It verifies the returned numeric ID exactly and preserves the REST login. The owned installation-token fixture uses a GraphQL bot slug and REST bot suffix at the same ID, without depending on the authenticated-user endpoint. Changed or missing IDs, missing or malformed logins and unavailable account responses are refused. These six controls first fail in `t111-native-account-red.log` and pass with twenty-five assertions in `t111-native-account-green-3.log`. TypeScript verification passes. The added account read is re-observed by the existing native-observation lifecycle. Its request-count control changes from eighteen to twenty-one calls and separately checks all three numeric account requests.
 
 The first broad local attempt accidentally used Bun's five-second default test limit. It retains its failures in `t111-native-neighbors.log`. The rerun uses the repository CI's existing `--timeout 60000` budget and remains in progress in `t111-native-neighbors-ci-budget.log`. This changes no runtime request deadline. Actual hosted-token acceptance remains open.
 
 
-### Publisher component review follow-up
+#### Publisher component review follow-up
 
 Actual Claude Code Opus 5.5 reviewed component commit `27b9466a209d5039e006c9059e41875f05f32ae7`. The native capture validates all 61 required fragments, exact model/target, unchanged packet, zero exit and confirmed process cleanup. Original returned records are retained under `.docs-drift-review-archive/publisher-component-claude-r1`, SHA256 `3f70eb732096c12bf59cf822ac2fa9b64457b9d908b1f13c20cd250bbf99453e`. This is a scoped implementation diagnostic and supplies no whole-feature criterion verdict.
 
@@ -255,7 +275,7 @@ F-01 found case-insensitive record-to-record comparison could allow a changed id
 Four controls reproduce these findings in `publisher-component-r1-red-final.log`, including compatible and unaffected-entry trial successors with fresh target-bound receipts and byte-preserved carried entry receipts. All four pass with seven assertions in `publisher-component-r1-focused-green.log`. The expanded adoption, upgrade and trial neighbor run remains in progress. A fresh scoped Claude Code review is required before T115 is ticked. These controls use synthetic metadata and establish no hosted or migration acceptance.
 
 
-### Publisher follow-up verification
+#### Publisher follow-up verification
 
 The expanded adoption/upgrade/trial run passes 269 cases and 406 assertions across five files in `publisher-component-r1-green-neighbors.log`. The four original review regressions are included. Actual Claude Code Opus 5.5 then reads all 90 required fragments at `b2dc4f83be93b169b3d51cd1a9b65da0fe1c9276`, with original packet/model/target and process cleanup verified. It returns one should-fix finding in two native-observation tests, retained in `publisher-component-claude-r2/returned-records.txt`, SHA256 `babc4ecc7e3ed4aeab2058dd346fe29d214e25f6f51adafc4c540d70ef7be24b`. Those tests changed the first GraphQL login literal, while the typed actor now comes from REST. Both failures are reproduced in `publisher-component-r2-red.log`.
 
@@ -264,21 +284,21 @@ The tests now change the actual REST observation, and a separate control preserv
 While the feature CI was running, main advanced to `c676010` through PR #99 and used plugin version 0.23.0. The pushed feature's macOS job then passed 1,226 cases but failed its package-version comparison, with two platform skips. Its exact original log is `ci-27b9466-macos.log`. The installed Codex marketplace plugin was refreshed to that published 0.23.0 version, while the verified CLI remains 0.26.0. Upstream integration and the feature candidate's next version are tracked before the next push.
 
 
-### Original operation publisher-entry binding
+#### Original operation publisher-entry binding
 
 The reviewed manifest can now retain a strict original `publisher_entry` for mapped settings. Its value contributes to the original manifest digest, while legacy scalar manifests retain their absent field. Publication shape checks select that entry's configured actor, and native publication/closure controllers propagate the selected entry before independent review. Native role policy collection forwards its runtime entry to adoption validation. Current and eligible synthetic recovery policies must equal the retained original entry, including when two entries share the same account.
 
 The parser/shape controls first fail twice in `t112-original-entry-red.log`. A separate recovery-policy control then reproduces cross-entry admission in `t112-entry-policy-red.log`. All six now pass with thirteen assertions in `t112-entry-policy-green.log`, and TypeScript verification passes. Existing manifest, journal, publication and collector neighbors are running in `t112-entry-policy-neighbors.log`. This checkpoint supplies the retained entry binding. The rest of T112, including historical producer verification, retained-resource comparison projections and full mapped native/collector regressions, remains open.
 
 
-### Integration with the published diagram skill
+#### Integration with the published diagram skill
 
 Main `c676010` is integrated through an ordinary merge on the owning feature branch. Both documentation workflows, both discovery catalogs and both CI setup paths are retained. The feature candidate advances to unreleased plugin 0.24.0 because published main now uses 0.23.0. The installed marketplace package is 0.23.0 and the verified CLI is 0.26.0. The current implementation procedure was reloaded from that installed package.
 
 The combined discovery check initially passes seventy-four cases and fails the remaining sixteen-skill assertion. The corrected seventeen-skill inventory passes all seventy-five cases and 393 assertions in `upstream-diagram-integration-green.log`. `actionlint`, staged whitespace/conflict checks and `vh-adlc lint docs/specs/shared-docs-drift.md --plugin-pin 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff` pass. The diagram skill, helper, tests and spec match the upstream versions. This integration supplies no final docs-drift acceptance result.
 
 
-### Integrated component review and evidence qualification
+#### Integrated component review and evidence qualification
 
 Actual Claude Code Opus 5.5 reads all 102 required fragments at pushed `13c5653327cbf3a5707b3d3a8a6398de8e3521ce`, with native model, target, packet and owned-process cleanup validated. Its original records are retained in `publisher-component-claude-r3/returned-records.txt`, SHA256 `6cf0479df92303705b82c08f4d61143b26aba9a20f417016f89f6577eece265d`. F-01 requires mapped normal-entry tests for each landed controller path. T117 remains unchecked, and the explicit path obligations below remain required in T112. The six library controls and 111 passing scalar neighbors establish their own local results.
 
@@ -287,7 +307,7 @@ F-02 identifies missing source/command/exit metadata in the supplied logs. Earli
 F-03's test now asserts that the program changed and directly observes the alternate GraphQL slug at the same numeric ID. F-04's spelling assertion reads a parsed derived manifest. The current local run of `bun test tests/vh-adlc/docs-drift/native-observation.test.ts tests/vh-adlc/docs-drift/publisher-operations.test.ts --timeout 60000` passes eighteen cases and 351 assertions in `publisher-component-r3-nits-green.log`. No final criterion is inferred from this working-tree result. The broad exploratory native run retains one timed-out normal closure child in `t111-native-neighbors-ci-budget.log`; its remaining controls continue. The superseded five-second-default run was cancelled through its verified owned PID, with no surviving owned processes recorded in `superseded-test-cleanup.json`.
 
 
-### Cross-entry historical producer verification
+#### Cross-entry historical producer verification
 
 Historical proposal reading now authenticates the invoking entry through its current native account, then verifies each retained proposal using its own original manifest entry, source adoption, exact numeric author ID and recorded role policy. A configured map member alone supplies discovery eligibility. Original records and reviewed digests retain their bytes, and a later case-only native author spelling returns the original recorded spelling in the derived reviewed result. Scalar historical plans keep their absent entry field.
 
@@ -298,7 +318,7 @@ The normal audit receipt context now preserves the invoking entry, and scheduled
 The isolated verification at pushed `13c5653` now completes all 269 adoption/upgrade/trial cases with 406 assertions, zero exit and confirmed cleanup. Its exact command and source are retained in `verify-13c5653/results.json`; the clone stays at the recorded source. That result validates the earlier publisher foundation. It supplies no result for this later historical-reader change.
 
 
-### Normal closure-role command recovery
+#### Normal closure-role command recovery
 
 The broad local native run completes 470 cases and retains one failure in 471 cases. The failing normal closure-role command also times out at pushed `13c5653` in its isolated verification copy, with zero surviving owned processes. Its sixty-second child limit expires while independent role verification repeats native reads outside the shared observation phase.
 
@@ -306,7 +326,7 @@ Each normal closure-role CLI command now uses the existing final-replayed native
 
 Both frozen verification copies now finish with clean Git state. The `13c5653` copy records every command/exit for its six completed phases, including the resolved 250-file compiler project. The `3417270` copy records its compiler/file-list and 161-case historical neighbor run, with 979 assertions, zero exits and confirmed cleanup. The byte-preserved original scalar bundle also passes the `3417270` parser with its original identity spelling and record hash. These records close the missing-command/target metadata gap for their stated commits. They supply no final result for later source changes.
 
-### Mapped controllers and scoped native account observations
+#### Mapped controllers and scoped native account observations
 
 The retained mapped owner publication controller publishes and resumes one PR, and refuses a same-account switch from Copilot to Claude. The retained mapped closure controller publishes its exact explanation and close batch, resumes without repeating the explanation, and refuses the same entry switch. Three role-policy controls select the original receipt for hosted, Copilot and Claude accounts. Two eligible collector controls run `readTrialPublication` and `collectTrialRetained` through mapped settings, preserving the original entry and refusing another entry's current policy. These synthetic controls establish local composition and send no provider or GitHub operation.
 
@@ -314,7 +334,7 @@ The working-tree account projection tests first reproduce the case-only PR/comme
 
 The normal closure-role CLI correction passes at exact committed `c49c8016203f30aab35df917aece170bd940900c`: repository typecheck, resolved compiler file list and the actual selected CLI test all exit zero with confirmed owned-process cleanup. Its 28 assertions cover unchanged deadlines, bounded account reads and rejection of a late material change. `verify-closure-c49c801/results.json` retains source, commands and completion records. The final source checkout is clean. Qualified Claude Code R6 includes the complete normal CLI at `df2d49c` and finds no defect in this scoped timeout correction. Its isolated exact-source retry retains unchanged deadlines and passes 28 assertions. T120 is complete.
 
-### Recovery account scope and Claude follow-up
+#### Recovery account scope and Claude follow-up
 
 Exact `875eef2b47065ca9165d8f60c8caf4ebb987f1fb` now passes repository TypeScript, 38 mapped runtime/collector cases with 722 assertions, and 245 native/inventory cases with 1,360 assertions. The immutable source finishes clean, with confirmed cleanup for each command. `verify-publishers-875eef2/results.json`, its original stdout/stderr and `output-index.json` retain the target, commands and counts. The older immutable verification folders also now have output indices linking their unchanged result records to their original output files and digests, including the resolved compiler file lists.
 
@@ -324,7 +344,7 @@ The next working batch fixes configured/native account comparisons in the collec
 
 The mapped adoption CLI previously refused its required explicit entry. All three installed test-only entry controls and the scalar driver control now pass 21 assertions. Their fixed synthetic identity, setup grant and namespace remain bound. Greenfield reference/example instructions describe scalar and mapped setup with each consumer's own evidence. Native closure resume passes after publisher/comment/original-row recasing for Copilot and Claude, with the latter passing fifteen assertions. The Copilot native publication controller now passes eighteen assertions through baseline and recased resume after the original identity is forwarded through the complete candidate-binding path. The corresponding Claude publication run remains pending. The full T112 matrix, committed-source verification, qualified review and migration acceptance remain pending. Original failed runs stay in the local archive.
 
-### Qualified component review and recovery corrections
+#### Qualified component review and recovery corrections
 
 Actual Claude Code Opus 5.5 reads all 236 required fragments at `453ffc09d75c73a460bca47c3e06ab93d807d3df`. Target, native model, packet integrity and owned-process cleanup validate. Its original five records remain in `publisher-component-claude-r5/returned-records.txt`, SHA256 `291763ee96651301a3ea14f2f6cebe28990174926b08e419783ef506a0342038`. The first two findings identify a dropped worker comparison identity and late reconciliation account ownership. The missing worker-stage comparison first fails its dedicated control. An immutable prior-source reproduction with a consistent retained receipt reaches four authority calls and writes two retirements under another configured account. The original-account invariant fails in `foreign-reconciliation-453ffc0-red.log`. The working fix forwards the comparison into worker collection and refuses a foreign reconciliation actor before scope, authority or retirement. Thirteen focused controls pass 69 assertions, and the corrected retained-receipt matrix then passes eight cases with fifty assertions, including a legitimate same-account completion control.
 
@@ -334,7 +354,7 @@ The review's completed-journal nit is addressed by interrupting native-fixture w
 
 Historical PR reads also reproduce a case-only first/final author refusal. Scoped row projection now passes 62 history/producer cases with 319 assertions. Applied PR, issue and comment lookup controls preserve original evidence and raw resource rows while deriving the original own-creator comparison hash; thirty-six selected lookup controls pass 158 assertions. Closure explanation account comparisons retain numeric-ID and material-name refusals. T112 still requires its complete legacy-author/carried-delivery and configured/native matrix. New working changes require committed-source checks and fresh scoped review before their tasks are ticked.
 
-### Current lookup and trial setup corrections
+#### Current lookup and trial setup corrections
 
 Claude Code Opus 5.5 R6 reads all 156 required fragments at `df2d49c6f6bd15e067d5cb3a030ba5c9a7346116`. Native model, exact target, packet integrity and owned-process cleanup validate. The first validator incorrectly required adjacent metadata lines. Its corrected parser accepts blank separators while preserving every model, target, read-coverage and integrity check. The original return and first validation remain unchanged. R6 finds one should-fix and two nits. The lookup correction retains the observed creator hash and records the verified original spelling separately. Six controls first reproduce the lost observation. Forty-two lookup/explanation neighbor cases then pass 188 assertions, including reads of the retained artifact.
 
@@ -342,7 +362,7 @@ The exact clean `df2d49c` checkout passes strict TypeScript and its resolved com
 
 The normal trial setup helper and CLI omitted the selected mapped publisher entry. Five tests first fail for the missing entry and rejected option. The fix forwards the explicit entry through both commands and observes the native interactive account for `trial-bindings`. Scalar offline binding inspection preserves its existing behavior. All 39 trial-setup and publisher-identity cases pass 92 assertions. These lookup and setup results are working-tree observations pending committed-source verification and fresh scoped review. The complete T111/T112 matrix and migration acceptance remain open.
 
-### Reviewed setup and acknowledgement follow-up
+#### Reviewed setup and acknowledgement follow-up
 
 The native marketplace refresh still selects published plugin 0.23.0. The newer standalone runtime 0.32.0 is installed after verification of its detached release signature, the pinned primary key fingerprint and archive checksum. The plugin keeps its declared locked runtime for reproducible plugin operations. This feature candidate remains unreleased.
 
@@ -354,11 +374,11 @@ The acknowledgement path now uses the original account's numeric ID and case-ins
 
 The remaining T112 legacy-author/carried-delivery matrix, final full feature gate, private paired migration, marketplace/model and hosted adoption remain open. No production route is switched by these corrections.
 
-### Upstream freshness refresh
+#### Upstream freshness refresh
 
 At exact `348bb29ec83814347747bfd493ef82bdd7c32abe`, both `vh-adlc fresh docs/specs/shared-docs-drift.md --plugin-pin 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff` invocations identify R-83 as stale solely from covered upstream drift. `spec-freshness-348bb29/commands.json` records each binary, its version, source commit and exit. The original outputs are `fresh-0.32.0.json` and `fresh-0.26.0.json` in that folder. The output field `local_sha` identifies the local default-branch ref, while the command record separately binds the checked-out source HEAD. The integrated diagram release changed seven covered workflow, manifest, marketplace and discovery paths on main `c676010`. The accepted normative baseline is unchanged. The drift became covered-stale at the T118 integration. The later component checkpoints ran before this canonical refresh and confer no passing lifecycle-gate claim. R-84 records the refresh findings. Existing owner acceptance remains attached to the unchanged baseline.
 
-### Canonical refresh findings and exact current checks
+#### Canonical refresh findings and exact current checks
 
 Canonical R-84 qualifies all 192 fragments at `348bb29`, with the actual requested Claude Code Opus 5.5, unchanged packet and confirmed process cleanup. Its public inventory should-fix and four factual metadata nits are stored verbatim. The public guides and their test now describe seventeen skills and four content operations and include the diagram row. These changes preserve the accepted normative baseline.
 
@@ -366,7 +386,7 @@ Qualified component R8 at `3d8f4c758a63425ed33db3965523623ad59d7782` reads all 8
 
 A supplementary native transport probe at the same frozen source recases its creator during acknowledgement approval. It passes seven assertions while retaining the native observed hash, original plan, later body edit and exact lease cleanup. Its added test is outside the repository and remains exploratory until incorporated. `native-ack-reproducer-source.json` records the original test source digest and absolute-import adaptation. The ordinary native reader hashes request method, hostname, endpoint and status, excluding per-request timestamps, at `plugins/vh-adlc/scripts/docs-drift/transport.ts:435`. The full feature matrix, final gate and migration acceptance remain open.
 
-### Clean canonical refresh and current publication evidence
+#### Clean canonical refresh and current publication evidence
 
 Canonical R-85 at `108dd689cf2a0e1bd4014bec21080178a623db8b` qualifies all 231 fragments with the requested native Claude Code Opus 5.5 and confirmed cleanup. Its four factual nits and no blocking or should-fix findings are stored unchanged. `vh-adlc review check --review R-85` returns equal, and `vh-adlc gate in-progress` passes under rules 1 and the existing docs pin. The unchanged normative baseline keeps its existing owner acceptance.
 
@@ -374,7 +394,7 @@ T31 records the completed R8-03 exact-source follow-up at `230c2e84403be0032c9a6
 
 The public count correction also passes at exact clean `108dd68`, with all 73 cases and 390 assertions in `verify-public-108dd68/results.json`. `r84-original-record-equality.json` retains the actual successful R-84 original-return comparison. `published-pr98-108dd68.json` records `gh pr view 98 --repo michielvha/vh-adlc --json number,url,headRefOid,isDraft,statusCheckRollup` with head `108dd689cf2a0e1bd4014bec21080178a623db8b` and draft state true. `ci-108dd68-observation.json` records the corresponding run 43700780769. At that observation, verify succeeds and the remaining three jobs are running. This observes the pushed recovery fixes through their descendant head. Later working-tree corrections remain local until their own push is observed.
 
-### Legacy resource creator proof and completed review controls
+#### Legacy resource creator proof and completed review controls
 
 The remaining legacy PR creator case first fails four positive controls against immutable `3d8f4c7`, while twenty negative controls pass. `verify-ack-3d8f4c7/legacy-delivery-baseline.log` and its source/adaptation record retain that baseline. The correction reads the existing original controller reference and its plan-bound original proposal/closure source. It selects the exact resource row and original account hash and ID, checks repository/base scope, and compares the fresh native login case-insensitively. Current publisher-map membership supplies no fallback. Missing or changed source remains pending. Original plans, success captures and native observation hashes retain their bytes.
 
@@ -384,7 +404,7 @@ R8-01/R8-02 controls and the incorporated native own-creator acknowledgement pas
 
 The delivery rule considers the full PR diff when deciding skip eligibility. Earlier docs-only updates in this code-bearing PR carried skip markers. Their history stays unchanged, and their skipped checks supply no pass. Further updates use normal CI under the pinned delivery convention.
 
-### Recovery follow-up after component R9
+#### Recovery follow-up after component R9
 
 Actual Claude Code Opus 5.5 component R9 at `230c2e8` qualifies all 127 required fragments with unchanged inputs and confirmed cleanup. Its four nits cover stable missing/corrupt-controller errors, internally inconsistent original-source controls, a stronger native projection assertion and current committed-source verification. Original records remain in `publisher-component-claude-r9/returned-records.txt`.
 
@@ -392,7 +412,7 @@ The controller now returns stable domain errors for missing or corrupt original 
 
 The strengthened real native mapped closure acknowledgement passes fourteen assertions and verifies both the retained raw observed hash and separate original-creator projection. The new retained native publication-controller acknowledgement passes nineteen assertions, preserving the original plan and candidate while issuing one update, creating no replacement PR and releasing its original lease once. Evidence is in `r9-native-closure-projection-green.log` and `r9-native-legacy-refresh-ack-green.log`. The fixture uses an existing ready PR, consistent with the established acknowledgement contract for unchanged draft state. The clean-source repeat at `9da22f3` confirms both native cases, all 219 acknowledgement neighbors, types and resolved file inclusion with confirmed cleanup; qualified component R10 reviews that target. The later narrow diagnostic follow-up is recorded below.
 
-### Final diagnostic follow-up after component R10
+#### Final diagnostic follow-up after component R10
 
 Actual Claude Code Opus 5.5 component R10 at `9da22f349d5df90d2c0c60822f4bc766d07a860c` qualifies all 127 required fragments, with three nits and no blocking or should-fix findings. Original returns and validation remain in `publisher-component-claude-r10`. The private-controller control confirms unsafe file permissions retain their original refusal. A missing bound source first reproduces four failures alongside four passing private-controller controls in `r10-missing-source-red.log`. Mapping only that source read's ENOENT to the stable unavailable reason then passes all 56 legacy cases with 356 assertions in `r10-legacy-controls-green.log`; strict TypeScript passes in `r10-followup-types.log`.
 
@@ -414,7 +434,7 @@ Use the ordinary plugin installation and shared execution primitives. Replace th
 
 The canonical skill selects audit, resolve or post-merge cleanup from the owner's request. An ambiguous request gets one scope clarification. Audit inventories the corpus and proposes confirmed corrections. Resolve rechecks selected audit PRs against current source and combines their supported changes. Post-merge cleanup closes selected originals only after verifying the merged replacement and each original hunk's disposition.
 
-Stackweaver keeps its existing scanner and project companion. The scanner protocol remains version 1, including raw-byte document accounting and required execution-unit accounting. The earlier separate scanner-completeness correction remains a prerequisite for adoption. The shared implementation continues using hardened Git reads, the existing strict YAML reader and docs-impact coverage matching. Current entry points are `scan.ts:187`, `snapshot.ts:248` and `settings.ts:396` at the implementation checkpoint recorded in Context.
+Stackweaver keeps its existing scanner and project companion. The scanner protocol remains version 1, including raw-byte document accounting and required execution-unit accounting. The earlier separate scanner-completeness correction remains a prerequisite for adoption. The shared implementation continues using hardened Git reads, the existing strict YAML reader and docs-impact coverage matching. Current entry points are `scan.ts:187`, `snapshot.ts:248` and `settings.ts:321` and `settings.ts:453` at the implementation checkpoint recorded in Context.
 
 The replacement committed configuration describes repository/host/default branch, documentation scope, required detector selectors/options, scanner arguments, feedback/procedure paths, generators/checks, proposal discovery, publisher accounts, report history, selected native role commands and existing credential-reference names. It uses the shared strict YAML reader. Unknown fields, incomplete setup and unreadable policy get an actionable setup result before provider execution or writes. Its schema distinguishes the replacement configuration from the unreleased staged format. Scanner protocol version 1 remains independently stable.
 
@@ -424,11 +444,11 @@ The normal entry is harness-agnostic. The installed skill and one shared helper 
 
 Use the ordinary marketplace installation, plugin revision and verified binary installer. Record the actual plugin revision, native client version, Bun version, requested model, observed model and operation target in the run. The adopter provisions its normal client and credentials. Setup checks required commands/capabilities before work. CI continues using the declared toolchain. Publication uses the selected validated run inputs without repeating an exact Bun-version equality check for every effect.
 
-An installed plugin update takes effect through ordinary installation and the adopter's reviewed configuration. A pending run carries its original input and tool-version record. Resuming with changed execution inputs requires a fresh independent review and the applicable current owner/procedure approval. If the original reviewed inputs cannot be established, retain the pending run and prepare a freshly reviewed plan from observed current state. Missing execution evidence is an explicit handoff.
+An installed plugin update takes effect through ordinary installation and the adopter's reviewed configuration. A pending run carries its original input and tool-version record. Changes to plugin revision, configured role provider/command/requested or observed model, source/read set, configuration, candidate, payload, authority or publisher identity require a fresh independent review and applicable current owner/procedure approval. Native client, Bun, Git and gh version strings are diagnostic only when setup capability checks and the observed model still match. A failed capability/identity check remains pending. A version-only patch difference cannot by itself invalidate completed semantic review. If the original reviewed inputs cannot be established, retain the pending run and prepare a freshly reviewed plan from observed current state. Missing execution evidence is an explicit handoff.
 
-Reuse the existing bounded executor in `scripts/triage/owned-process.ts:60` for native role processes. Its current contract lacks docs-drift's output-limit and cancellation controls, so add only those needed options with unchanged defaults and existing-caller regressions before replacing the duplicate implementation. Cancellation/timeout must clean the owned process tree and preserve failed captures. Never kill processes by executable name.
+Reuse the existing bounded executor in `scripts/triage/owned-process.ts:60` for native role processes. Its current contract lacks watched output-file bounds, bounded in-memory capture with a drain deadline, startup-callback cancellation, cancellation handling and output limits. Add only these needed options with unchanged defaults and existing-caller regressions. Move scanner, native GitHub mutation and role-process callers together before removing the duplicate executor. Native mutation responses stay in bounded memory and only their safe projections reach disk. Cancellation/timeout must clean the owned process tree and preserve failed captures. Never kill processes by executable name.
 
-Reuse compatible execution and identity primitives from `scripts/loop/review-route.ts:204`. Its current API requires a feature document and spec/implementation review kind. Documentation assessment retains its own target and response format. Share a lower-level primitive where both real callers need it, while preserving the lifecycle review API and outcomes. Do not fabricate a feature document to run a documentation review. Existing model matchers have different alias policies; preserve each caller's accepted/rejected identities when consolidating shared code.
+Reuse compatible execution and identity primitives from `scripts/loop/review-route.ts:204`. Its current API requires a feature document and spec/implementation review kind. Documentation assessment retains its own target and response format. Share a lower-level primitive where both real callers need it, while preserving the lifecycle review API and outcomes. Do not fabricate a feature document to run a documentation review. Existing model matchers have different alias policies, so preserve each caller's accepted/rejected identities when consolidating shared code. Lifecycle reviews retain their current PID-namespace requirement. Docs-drift accepts its existing confirmed marker-based process cleanup on portable hosts and records that boundary honestly. It gains no stronger confinement claim from sharing an executor.
 
 Worker and reviewer run in separate contexts against recorded targets. Preserve the configured worker/reviewer providers, models and credential ownership, including the consumer's existing Claude OAuth flow. A reviewer gets read-only tools. Validate its observed native model/context, successful process completion and exact source/candidate or payload target. Unsupported/mismatched identities, timeouts, errors and changed targets leave review pending. A fresh context or a configured model name alone cannot establish an independent successful review.
 
@@ -436,7 +456,7 @@ Worker and reviewer run in separate contexts against recorded targets. Preserve 
 
 Enumerate expected documents and detector inputs from the selected committed Git tree. Compare scanner-reported inventories, raw-byte digests and per-unit outcomes with those independently derived sets. Missing/duplicate documents, skipped reads, incomplete/throwing units, changed inputs and unreadable feedback leave the assessment incomplete. Complete empty results remain distinct from missing output.
 
-Run trusted scanner code in its owned source copy with ambient provider/publisher credentials, Git credential helpers, askpass hooks and agent sockets excluded. Preserve the caller's files, index, refs and Git objects. Use explicit owned scratch/object stores for native proposal reads. Scanner messages, document prose and PR text provide evidence and confer no execution authority.
+Run trusted scanner code in its owned source copy with ambient provider/publisher credentials, Git credential helpers, askpass hooks and agent sockets excluded. Preserve the caller's logical state, including HEAD, its branch/owned refs, staged index entries, tracked/untracked work and configuration. Reuse the shared logical snapshot with one entry/exit comparison per invocation. Stat-only index refreshes, object repacking and maintenance metadata do not count as semantic writes. Actual file/index/ref changes still fail preservation checks. Keep all writes/fetches in explicit owned copies/object stores, outside the caller's Git objects. Protect foreign resources through their recorded ownership. Scanner messages, document prose and PR text provide evidence and confer no execution authority.
 
 Read the document and relevant source before confirming each candidate. Record confirmed drift, still accurate or unknown with its reason and evidence. Preserve unknown and unassessed items. Product defects get a separate proposed repair or issue. An intended contract, historical record or deliberately incomplete compatibility matrix remains meaningful even when its implementation is incomplete.
 
@@ -454,7 +474,7 @@ Keep a resolution record linking original proposal/hunk identities, decisions, s
 
 Reports start with a short explanation, applied/proposed fixes, unresolved decisions and recommendations. Detailed evidence remains accessible from the report. Required missing observations and failed execution remain visible. A complete scheduled run containing only unchanged previously reported items succeeds while listing all unresolved items and owned open proposals. New attention, incomplete collection, failed review or pending publication/recovery remains non-successful.
 
-Keep both scheduled and interactive history. Read scheduled reports through the existing authenticated GitHub reader/native artifact-download facility, selecting an exact repository, workflow, branch, event, run attempt and artifact. Enforce configured count/age/byte bounds and validate the extracted report schema and regular bounded paths. Use maintained native archive handling instead of shipping a second vendored ZIP implementation solely for history. Interactive reports use an owner-private external run directory and bounded index. Repository identity, stable finding IDs, evidence changes and eligible proposal references govern carry-forward. Invalid, mismatched or incomplete required history prevents a green carry-forward claim. History grants no write authority and never transfers an interrupted run to another publisher.
+Keep both scheduled and interactive history. Read scheduled reports through the existing authenticated GitHub reader/native artifact-download facility, selecting an exact repository, workflow, branch, event, run attempt and artifact. Keep the existing bounded ZIP reader and locked vendored dependency for history ingestion. Before materializing an entry, validate its path, unique name, regular-file kind, entry count, declared/actual per-entry size and aggregate expanded bytes. Traversal, symlinks/nonregular entries, duplicates and false sizes fail closed. The authenticated reader selects bounded archive bytes and the existing reader validates them. This retains the current installed-payload behavior without adding a system unzip dependency or a new extractor. Validate the report schema and provenance after bounded extraction. Interactive reports use an owner-private external run directory and bounded index. Repository identity, stable finding IDs, evidence changes and eligible proposal references govern carry-forward. Invalid, mismatched or incomplete required history prevents a green carry-forward claim. History grants no write authority and never transfers an interrupted run to another publisher.
 
 ### One run directory and a smaller helper interface
 
@@ -468,7 +488,7 @@ Private stage functions may remain when they make code and tests easier to under
 
 Use one exact reviewed plan of ordered effects. Each effect records its native target, expected preimage, desired payload, publisher account and stable correlation marker. Persist intent before sending a mutation and record the settled outcome afterwards. Record bounded native resource IDs and applied fields needed to distinguish complete, partial and unknown delivery. Preserve the original source/plan bytes while comparing native observations separately.
 
-Keep a repository-scoped compare-and-swap lease for cross-host writers. Actions concurrency supplements that lease. The run records the lease's exact owner and expected ref value. A conflicting/unknown owner blocks writes. Release only the run's own lease after every effect is accounted for. Never infer ownership from branch or resource naming.
+Keep a repository-scoped compare-and-swap lease for cross-host writers. Actions concurrency supplements that lease. The run records the lease's exact owner and expected ref value. The lease and atomic journal claim identify the active writer instance as well as the run. Acquire a revision-CAS attempt claim immediately before dispatch. A second resumer, including a copied run on another host, cannot dispatch while that claim is active or unsettled. Reuse the existing attempt/claim safeguards. A conflicting/unknown owner blocks writes. Normal release accounts for every effect and releases only the exact owned lease. Never infer ownership from branch or resource naming.
 
 Before each write, recheck current permission, native repository/publisher identity, source/read-set freshness, target preimage and review/payload validity. Validate immutable local inputs once into the run and reuse them during that invocation. Changes to live inputs stop the plan. Preserve whole-operation original ownership even when the current publisher map changes.
 
@@ -476,9 +496,9 @@ On retry, observe native state by exact resource identity and marker before repl
 
 Owner-approved acknowledgement remains available through resume. It requires a settled original mutation, direct evidence that all approved fields applied, exact original publisher/resource bindings and a fresh approval of the current changed resource and remaining cleanup. Record it as a terminal decision that preserves the changed resource and prevents original business replay. Keep its non-success report and retain the lease while another effect remains unresolved. Use the same plan, journal and bounded native observations. Remove the parallel adoption/receipt restoration machinery after its simpler replacement has equivalent tests for these retained outcomes.
 
-Local journal loss has a practical recovery limit. Observe current GitHub state, retain uncertainty and require a freshly reviewed/approved replacement plan when original application evidence is unavailable. Automatic reconstruction from remote receipt refs and retained historical runtime caches is retired. Ordinary reports and original failed artifacts remain available. No missing proof is reconstructed or treated as success.
+Local journal loss has a practical recovery limit. Observe current GitHub state, retain uncertainty and require a freshly reviewed/approved replacement plan when original application evidence is unavailable. Automatic reconstruction from remote receipt refs and retained historical runtime caches is retired. A fresh recovery review may propose cleanup of an exact observed lease object/value only after the original writer is confirmed stopped and no mutation remains unsettled. The current owner must approve that exact cleanup; perform it by compare-and-swap and record non-success abandonment, without asserting that unknown business effects succeeded. Missing ownership, live-writer or request-settlement evidence keeps the lease pending. A fresh business plan follows only after that cleanup. Ordinary reports and original failed artifacts remain available. No missing proof is reconstructed or treated as success.
 
-Publisher selection supports the scheduled bot and interactive owner. Compare configured/native login case-insensitively with exact numeric IDs. Keep recorded evidence unchanged through case-only later observations. A material login or numeric-ID change stops the old operation. A different authorized publisher may read eligible history and begin a freshly reviewed operation, while original-operation recovery stays bound to its original account.
+Publisher selection supports the scheduled bot and interactive owner. Acquire the authenticated viewer's numeric ID, resolve it through the native REST account endpoint and retain the REST login. This handles the same bot appearing as a GraphQL slug and REST bracketed login. Compare configured/native login case-insensitively with exact numeric IDs. Every configured publisher must appear in explicit discovery authors, and a discovery prefix must cover its publication branch prefix. Keep recorded evidence unchanged through case-only later observations. A material login or numeric-ID change stops the old operation. A different authorized publisher may read eligible history and begin a freshly reviewed operation, while original-operation recovery stays bound to its original account.
 
 ### Migration, compatibility and rollout
 
@@ -486,11 +506,11 @@ The public shared feature remains on its owning branch. Its previous code and ch
 
 The staged Stackweaver branch still contains the old configuration and trial entry. Inventory its callers and any real retained runs before replacing unreleased formats. Preserve its separate scanner correction, detector behavior, legacy JSON/console/exits, feedback files, local procedure, existing Claude command, Monday 09:00 UTC schedule, secret mappings and notifications. Record exact shared/consumer revisions. A required old pending run gets an explicit retention/review handoff before cleanup.
 
-Replace C/D adoption receipt assembly and affected-entry upgrade classification with one recorded migration checklist. It records the exact released plugin/runtime, real marketplace install/discovery, model/entry trials, scanner parity, reviewed consumer mapping, scheduled trial, legacy inventory/freeze, routing switch and rollback result. Future upgrades receive ordinary reviewed configuration/pin changes and the checks affected by that change. Publication state and installation alone cannot establish operation support.
+Replace C/D adoption receipt assembly and historical upgrade receipt chains with one recorded migration checklist. Keep a machine-enforced committed staged/adopted mode and exact approved plugin pin. Before every production write, adopted mode, the installed revision's pin match and a complete checklist bound to the consumer/config/plugin must pass. Staged mode permits read-only reports. Its real-corpus trial exception requires a current exact grant for the selected consumer/source, native entry/publisher, trial run and bounded advisory draft effects. The grant never permits merging or unrelated issues/closures. A command flag or checklist entry cannot supply that authority. A checklist is recorded operator/reviewer evidence, with schema, source/payload bindings and required passed checks validated by the helper. It grants no authority by itself and claims no protection against malicious same-user forgery. It records the exact released plugin/runtime, real marketplace install/discovery, model/entry trials, scanner parity, reviewed consumer mapping, scheduled trial, legacy inventory/freeze, routing switch and rollback result. Future upgrades receive ordinary reviewed configuration/pin changes. The reviewer selects checks from a fixed table, and mixed changes take the union. Procedure/report-only changes need relevant document/package tests and installed routing smoke checks. Scanner/scope/feedback changes also need scanner/protocol and corpus-parity checks. Effect/recovery changes also need installed fake-service interruption/concurrency checks. Provider, role model/command, credential mapping or publisher identity changes need actual affected native-entry trials. An unclassified change remains pending for scoped review. Record the selected rows and original outcomes in the checklist. Publication state and installation alone cannot establish operation support.
 
-Before consumer cutover, publish the reviewed shared dependency under its configured checks, install its actual marketplace payload in isolated profiles, exercise the selected native operations and run a successful unattended shared trial. Keep legacy routes active until those observations and the owner's existing cutover boundary are satisfied. A disposable rollback rehearsal restores legacy routing and schedule while preserving reports and pending-operation evidence. GUI and phone checks retain their owner-approved deferrals. Other unperformed host/model surfaces remain unclaimed.
+Before consumer cutover, publish the reviewed shared dependency under its configured checks, install its actual marketplace payload in isolated profiles and exercise the selected native operations. The unattended trial uses the real consumer corpus, its scanner, configured native worker/reviewer and bounded advisory draft publication, under separately selected provider/publication authority. Hermetic tests and scratch-namespace exercises cannot replace that observation. The preliminary paired shared/consumer migration review runs through actual Claude Code Opus 5.5 under the exact private packet approval. Validate its original native model/target/context and process outcome. Automatic runtime operation reviews keep their configured provider/model/credential bindings and their own captured native identity. Keep legacy routes active until those observations and the owner's existing cutover boundary are satisfied. A disposable rollback rehearsal restores legacy routing and schedule while preserving reports and pending-operation evidence. GUI and phone checks retain their owner-approved deferrals. Other unperformed host/model surfaces remain unclaimed.
 
-The two intentional reductions requiring the owner's acceptance are ordinary installed-client/version management in place of retained private executable copies, and freshly reviewed recovery after loss of original local application evidence in place of automatic remote reconstruction. Complete collection, protected documents, independent review, both publisher identities, remembered findings and evidence-backed surviving-journal recovery remain required.
+The three independent choices requiring the owner's acceptance are ordinary installed-client/version management in Q1, explicit reviewed recovery after lost local application evidence in Q2, and checklist-backed staged/adopted gating and upgrade checks in Q3. Complete collection, protected documents, independent review, both publisher identities, remembered findings and evidence-backed surviving-journal recovery remain required.
 
 ## Acceptance Criteria
 
@@ -506,28 +526,28 @@ The two intentional reductions requiring the owner's acceptance are ordinary ins
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Run the canonical skill against Stackweaver's bounded fixture and a second adopter with different scanner/roots/statuses/generators. Exercise audit, selected resolve and post-merge modes, ambiguous intake, missing policy/knowledge and existing docs-impact routing. Load every shipped example through the same strict reader. Verify the eight documented helper operations accept one run directory and invoke their real stage functions. |
+| AC-01 | Run the canonical skill against Stackweaver's bounded fixture and a second adopter with different scanner/roots/statuses/generators. Exercise audit, selected resolve and post-merge modes, ambiguous intake, missing policy/knowledge and existing docs-impact routing. Load every shipped example through the same strict reader. Verify the eight documented helper operations accept one run directory and invoke their real stage functions. Check the canonical policy references and public guides against those operations and their actual recovery/resources. |
 | AC-02 | Retain protocol/scan/snapshot tests for complete empty/findings reports, exact raw-byte Git inventories, required-unit subset/zero-input selectors, skipped/throwing units, invalid encodings/paths, unknown detectors and stale source. Omitted documents and echoed fabricated digests must fail completeness. Exercise hardened Git/filter/replace/promisor controls and a scanner with canary credentials and forbidden writes. Test still-accurate historical claims and unknown/runtime-only claims alongside confirmed stale references. |
-| AC-03 | Retain protection/preparation tests for declared/absent/broken roots, shared Go/TypeScript coverage parity, claimed specs, byte-identical review/proof/history records, local-format editable ranges, active writer coordination and generated files. Exercise dirty caller state and recorded owned PR stores. Report-only and failure paths must preserve files/index/refs/objects and foreign resources. |
+| AC-03 | Retain protection/preparation tests for declared/absent/broken roots, shared Go/TypeScript coverage parity, claimed specs, byte-identical review/proof/history records, local-format editable ranges, active writer coordination and generated files. Exercise dirty caller state and recorded owned PR stores. Report-only and failure paths must preserve logical files/index/ref state and foreign resources. A caller index stat refresh and background git maintenance during collection must leave the assessment complete, alongside real file/index/ref mutation refusals. |
 | AC-04 | Run full-diff resolution, feedback and closure tests for duplicate/conflicting/stale proposals, wrong detector versus interpretation, stale suppression retirement and binary/generated changes. Verify a complete merged consolidation closes only selected accounted-for originals, an unmerged or modified replacement leaves them open and a changed explanation needs fresh review. |
-| AC-05 | Run real helper/native fake-service paths for independently reviewed audit/publication/closure and both bot/owner accounts. Test before-send failure, response loss, intent/outcome interruption, partial text/labels/draft, concurrent leases, same-account recasing, changed ID/material login, foreign recovery and stale review. Preserve original plan/evidence bytes and count remote effects once. Exercise exact owner acknowledgement, missing/contradictory application evidence, unresolved neighboring effects and cleanup crashes. Verify green unchanged attention, new/changed attention, incomplete history, and cross-entry read-only history without ownership transfer. |
-| AC-06 | Compare legacy scanner JSON/console/exits and real-corpus collection in the isolated consumer branch. Run bounded private paired review after its exact packet approval. Test fresh marketplace install/upgrade and installed command routing, normal client/version preflight, an authorized successful unattended trial, legacy freeze/inventory, the actual routing switch and disposable rollback. Preserve runtime providers/credential references and notification configuration byte-for-byte unless a separately selected change requires otherwise. |
-| AC-07 | Run strict TypeScript with resolved file inclusion, Go tests/vet/lint/module checks, full plugin/registration tests, package/discovery checks and Linux/macOS CI at recorded commits. Exercise unchanged loop/triage callers when shared helpers change. Test interrupted-run handling after a client/plugin upgrade and loss of local application evidence, requiring fresh review where specified. Compare before/after module/command/config surfaces and identify every retained component by a real caller and behavior. Rebuild via the actual release path, verify published integrity, perform isolated Codex/Claude marketplace install/upgrade/discovery and authorized Copilot/Claude operations using the installed payload. Preserve explicit GUI/phone deferrals. |
+| AC-05 | Run real helper/native fake-service paths for independently reviewed audit/publication/closure and both bot/owner accounts. Test before-send failure, response loss, intent/outcome interruption, partial text/labels/draft, concurrent leases, two same-directory resumers and copied-run cross-host resumers, same-account recasing, changed ID/material login, foreign recovery and stale review. Preserve original plan/evidence bytes and count remote effects once. Exercise exact owner acknowledgement, missing/contradictory application evidence, unresolved neighboring effects and cleanup crashes. Verify green unchanged attention, new/changed attention, incomplete history and cross-entry read-only history without ownership transfer. Test exact-owner lease abandonment after journal loss with a stopped writer and settled requests, refusing missing ownership, live writers, unsettled requests and changed CAS values. Test GraphQL/REST bot representations with one numeric ID, missing discovery authors and uncovered publication prefixes. Retain ZIP traversal, duplicate-name, nonregular-entry, false-size, entry-count and expanded-byte limit controls. |
+| AC-06 | Compare legacy scanner JSON/console/exits and real-corpus collection in the isolated consumer branch. Run bounded private paired review through actual Claude Code Opus 5.5 after its exact packet approval, validating original native model/target/context and process completion. Test fresh marketplace install/upgrade and installed command routing, normal client/version preflight, an authorized successful unattended real-corpus advisory draft-publication trial, legacy freeze/inventory, the actual routing switch and disposable rollback. Preserve runtime providers/credential references and notification configuration byte-for-byte unless a separately selected change requires otherwise. |
+| AC-07 | Run strict TypeScript with resolved file inclusion, Go tests/vet/lint/module checks, full plugin/registration tests, package/discovery checks and Linux/macOS CI at recorded commits. Exercise unchanged loop/triage callers when shared helpers change. Test interrupted-run handling after plugin/role/source/config/candidate/payload/authority/publisher changes, requiring fresh review. A diagnostic-only Bun/Git/gh/native-client version patch keeps unchanged review usable when capabilities and observed model match. Test lost local application evidence and exact approved lease abandonment. Test staged production refusal, wrong installed pin, incomplete/mismatched checklist and the fixed changed-surface upgrade rows. Compare before/after module/command/config surfaces and identify every retained component by a real caller and behavior. Rebuild via the actual release path, verify published integrity, perform isolated Codex/Claude marketplace install/upgrade/discovery and authorized Copilot/Claude operations using the installed payload. Preserve explicit GUI/phone deferrals. |
 
 ## Tasks
 
 The following tasks implement the revised baseline after spec review and owner acceptance. Earlier checked tasks below retain their original completed-work evidence.
 
 - [ ] T121 `tests/vh-adlc/docs-drift/, staged Stackweaver migration callers` - Inventory real and development callers, pending-run artifacts and retained compatibility needs. Record a failing ordinary-install/run-directory entry case and the before-change API/module/config surface. Keep old runtime artifacts where an actual pending run needs them. (AC-01, AC-05, AC-06, AC-07)
-- [ ] T122 `plugins/vh-adlc/scripts/docs-drift/{settings,cli,bootstrap}.ts, examples/docs-drift/, tests/vh-adlc/docs-drift/` - Replace private runtime setup with strict consumer-owned ordinary client/role configuration and one versioned run directory. Pass missing-command, unsupported capability, changed execution inputs and unknown/old schema controls. Preserve scanner protocol version 1. (AC-01, AC-02, AC-07)
-- [ ] T123 `plugins/vh-adlc/scripts/triage/owned-process.ts, scripts/loop/review-route.ts, scripts/docs-drift/role-*.ts, tests/vh-adlc/{triage,loop,docs-drift}/` - Reuse actual shared process/review primitives with only needed output/cancellation options. Pass independent target/model/context checks and unchanged existing-caller tests, including distinct alias semantics. Remove the duplicate executor after parity. (AC-03, AC-05, AC-07)
-- [ ] T124 `plugins/vh-adlc/scripts/docs-drift/{scan,snapshot,protection,preparation,resolve,closure}.ts, tests/vh-adlc/docs-drift/` - Carry the verified scanner, source protection, full-diff decisions and feedback through the simpler run interface. Pass completeness, protected-history and changed-source/target refusals. (AC-01, AC-02, AC-03, AC-04)
-- [ ] T125 `plugins/vh-adlc/scripts/docs-drift/{publish,recovery,journal,delivery-ack,transport}.ts, tests/vh-adlc/docs-drift/` - Consolidate publication and recovery around the same exact plan/journal/native observations. Pass partial-delivery, cross-host lease, same-account recasing, acknowledgement, unknown application and crash-retry controls with each remote effect counted once. Retire receipt restoration only after the specified replacement limits are tested. (AC-04, AC-05, AC-07)
-- [ ] T126 `plugins/vh-adlc/scripts/docs-drift/*history*.ts, scripts/github-read.ts, tests/vh-adlc/docs-drift/` - Preserve scheduled/interactive reports and green unchanged attention using bounded native artifact/history reads. Pass changed/foreign/incomplete report controls and cross-entry history without write authority. Remove the history-only vendored ZIP path after replacement coverage. (AC-05, AC-07)
-- [ ] T127 `plugins/vh-adlc/scripts/docs-drift/, references/docs-drift*.md, skills/vh-adlc-docs-drift/, examples/docs-drift/, tests/vh-adlc/docs-drift/` - Remove unreachable installer/adoption/trial/compatibility glue and obsolete tests after caller inventory and retained-outcome parity. Verify every remaining helper has a real caller, all examples work and the eight-operation interface is complete. Compare the actual final surface to T121. (AC-01, AC-05, AC-07)
+- [ ] T122 `plugins/vh-adlc/scripts/docs-drift/{settings,cli,bootstrap}.ts, examples/docs-drift/, tests/vh-adlc/docs-drift/` - Replace private runtime setup with strict consumer-owned ordinary client/role configuration and one versioned run directory. Pass missing-command, unsupported capability, changed review-bound fields, unchanged diagnostic version patches, bot dual representation, discovery-author/prefix and unknown/old schema controls. Preserve scanner protocol version 1. (AC-01, AC-02, AC-07)
+- [ ] T123 `plugins/vh-adlc/scripts/triage/owned-process.ts, scripts/loop/review-route.ts, scripts/docs-drift/role-*.ts, tests/vh-adlc/{triage,loop,docs-drift}/` - Reuse actual shared process/review primitives with only needed output/cancellation options. Pass independent target/model/context checks and unchanged existing-caller tests, including distinct alias semantics, scanner watched-file bounds, bounded native mutation memory capture without raw disk output, startup-callback cancellation and portable marker-cleanup support without weakening lifecycle review boundaries. Remove the duplicate executor after parity. (AC-03, AC-05, AC-07)
+- [ ] T124 `plugins/vh-adlc/scripts/docs-drift/{scan,snapshot,protection,preparation,resolve,closure}.ts, tests/vh-adlc/docs-drift/` - Carry the verified scanner, source protection, full-diff decisions and feedback through the simpler run interface. Pass completeness, protected-history, benign index/maintenance churn and real changed-source/target refusals. (AC-01, AC-02, AC-03, AC-04)
+- [ ] T125 `plugins/vh-adlc/scripts/docs-drift/{publish,recovery,journal,delivery-ack,transport}.ts, tests/vh-adlc/docs-drift/` - Consolidate publication and recovery around the same exact plan/journal/native observations. Pass partial-delivery, concurrent/cross-host same-run claims, same-account recasing, bot/discovery identity, acknowledgement, exact approved lost-journal lease abandonment, unknown application and crash-retry controls with each remote effect counted once. Retire receipt restoration only after the specified replacement limits are tested. (AC-04, AC-05, AC-07)
+- [ ] T126 `plugins/vh-adlc/scripts/docs-drift/*history*.ts, scripts/github-read.ts, tests/vh-adlc/docs-drift/` - Preserve scheduled/interactive reports and green unchanged attention using bounded native artifact/history reads. Pass changed/foreign/incomplete report controls and cross-entry history without write authority. Retain the existing bounded ZIP reader and its malicious-archive controls instead of introducing an unbounded native extraction replacement. (AC-05, AC-07)
+- [ ] T127 `plugins/vh-adlc/scripts/docs-drift/, references/{docs-drift*,lifecycle,authority,review-protocol}.md, skills/vh-adlc-docs-drift/, examples/docs-drift/, README.md, docs/{user-guides/workflows,reference/compatibility,reference/marketplace,get-started/installation}.md, tests/vh-adlc/docs-drift/` - Remove unreachable installer/adoption/trial/compatibility glue and obsolete tests after caller inventory and retained-outcome parity. Verify every remaining helper has a real caller, all examples work and the eight-operation interface is complete. Public guides and policy rows must describe only the operations and recovery/resources actually provided. Compare the actual final surface to T121. (AC-01, AC-05, AC-07)
 - [ ] T128 `Stackweaver staged migration config, companion, command, workflow and tests` - Update the isolated staged adopter to the replacement interface and checklist, preserving legacy behavior and routing. Run corpus/protocol/feedback/config parity and disposable rollback tests at exact commits. (AC-01, AC-02, AC-03, AC-06)
-- [ ] T129 `shared and consumer verification evidence, docs/specs/shared-docs-drift.md` - Run exact committed-source repository/package/portable checks and Claude Code Opus 5.5 implementation review with a proportionality check. Retain failed observations, criterion outcomes and all remaining external acceptance gaps. Prepare the exact bounded private paired packet for its required destination approval. (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07)
-- [ ] T130 `published shared payload, installed/model/hosted trial and consumer cutover` - Under the existing separate publication/execution/cutover grants, verify actual release/marketplace integrity, native discovery/operations, paired migration, successful unattended trial, legacy freeze/inventory and routing/rollback. Mark completion only after original evidence, independent review and the complete gate establish every criterion. (AC-06, AC-07)
+- [ ] T129 `shared and consumer verification evidence, docs/specs/shared-docs-drift.md` - Run exact committed-source repository/package/portable checks and actual Claude Code Opus 5.5 implementation and preliminary paired migration reviews, validating native model/target/context and cleanup, with a proportionality check. Retain failed observations, criterion outcomes and all remaining external acceptance gaps. Prepare the exact bounded private paired packet for its required destination approval. (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07)
+- [ ] T130 `published shared payload, installed/model/hosted trial and consumer cutover` - Under the existing separate publication/execution/cutover grants, verify actual release/marketplace integrity, native discovery/operations, paired migration, successful real-corpus unattended advisory trial, checklist-backed staged/adopted and pin gating, affected-upgrade checks, legacy freeze/inventory and routing/rollback. Mark completion only after original evidence, independent review and the complete gate establish every criterion. (AC-06, AC-07)
 
 ### Previously completed implementation tasks
 
@@ -1084,16 +1104,38 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 ## Open Questions
 
-### Q1: Accept ordinary installed clients and explicit recovery review after lost local evidence?
+### Q1: Use ordinary installed clients and record runtime versions?
 
-**Recommendation**. Accept the proposed practical contract. Keep complete scanning, independent review, protected documents, remembered findings, both publishers, safe retries and evidence-backed acknowledgement. Manage clients through ordinary installation, and require a new reviewed/approved recovery plan when original application evidence is lost.
+**Recommendation:** A. Keep the normal plugin/client installation and record versions. Changes to plugin revision, configured role provider/command/model, source/read set, config, candidate, payload, authority or publisher require fresh review. Native client, Bun, Git and gh version strings are diagnostic when capability checks and the observed model still match.
 
 | Option | You get | It costs |
 | --- | --- | --- |
-| **A. Proposed practical contract** | The useful audit/resolver/recovery capabilities with a smaller setup and execution surface. | Client/plugin changes can require fresh review for a pending run. Loss of original local application evidence needs explicit recovery work. |
-| B. Retain the earlier exact-runtime and remote-restoration guarantees | Original executable retention and automatic reconstruction where the old receipt/evidence chain remains sufficient. | The installer, historical runtime/adoption/receipt machinery and corresponding maintenance/testing remain in scope. |
+| **A. Ordinary installed clients** | Normal client/authentication flow and a smaller installer/configuration surface. | Original executable copies are no longer privately retained. Review-bound changes need fresh review. |
+| B. Retained private execution copies | The earlier exact-executable recovery environment. | Retained client/component installation and its compatibility machinery stay in scope. |
 
-**Why this is yours**. This changes two accepted operational guarantees. The replacement design is proposed and still needs acceptance after its fresh spec review.
+**Why this is yours:** This changes the accepted exact-runtime retention guarantee.
+
+### Q2: Require explicit reviewed recovery after original local application evidence is lost?
+
+**Recommendation:** A. Observe current GitHub state and require a fresh independently reviewed/approved recovery plan. Exact observed lease cleanup needs the current owner's approval, a stopped original writer and settled mutations, and records non-success. Unknown ownership or unsettled activity stays pending.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Explicit recovery after evidence loss** | Safe surviving-journal resume and acknowledgement, with a smaller remote-restoration system. | Lost local proof can require manual review and exact lease cleanup. Some unknown cases remain pending. |
+| B. Retain automatic remote restoration | Recovery through the earlier retained runtime and receipt chain when sufficient evidence survives. | The remote restoration and historical execution machinery remain in scope. |
+
+**Why this is yours:** This reduces automatic recovery after loss of the original local evidence.
+
+### Q3: Replace adoption receipt chains with a committed mode/pin gate and reviewed checklist?
+
+**Recommendation:** A. Check staged/adopted mode, the approved plugin pin and a complete source/payload-bound checklist before production writes. Use the Design's fixed changed-surface table to select upgrade checks, including actual native trials for provider/model/credential/publisher changes.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Gated migration checklist** | Recorded migration and affected-upgrade verification with a smaller adoption interface. | The helper validates recorded checklist evidence and bindings instead of walking historical receipt chains. |
+| B. Retain the earlier adoption chains | The previous receipt lineage and upgrade-classification mechanism. | That framework and its tests remain part of this feature. |
+
+**Why this is yours:** This changes the accepted adoption and upgrade evidence mechanism. Publication permission remains independently required under either option.
 
 ## Review Log
 
@@ -1737,51 +1779,6 @@ WHERE: Context "Current implementation checkpoint" (spec 0001 lines 80 to 84, co
 EVIDENCE: The section headed "Current implementation checkpoint" describes the 2026-11-14 T91 to T102 work at 445ca6 and the earlier 63d6c86 integration. It also says "Canonical R-66 freshness is recorded with its metadata corrections and a passing in-progress gate." The current state recorded later in Context is quite different. The latest canonical review is R-84 at 348bb29 (spec 0009 line 31). The latest qualified component review is R8 at 3d8f4c7. The candidate is 0.24.0, and the standalone verified CLI is 0.32.0 (spec 0001 line 78; spec 0009 line 15). R-78 F-03 and R-79 F-03 corrected the same kind of stale "latest/current" labelling for the upstream sections. Nothing an implementer builds changes.
 PROPOSAL: Retitle the section as a dated earlier checkpoint, for example "Implementation checkpoint on 2026-11-14". State that the R-66 gate result belongs to that time.
 
-## Sources
-
-- GitHub REST users reference, read 2026-11-15. Durable numeric-ID lookup supports GitHub App installation tokens and returns a native login and numeric ID. [Get a user using their ID](https://docs.github.com/en/rest/users/users#get-a-user-using-their-id).
-
-- [GitHub REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api). The ordinary built-in Actions-token allowance motivates the native closure quota regression in T105.
-- [Git revision traversal](https://git-scm.com/docs/git-rev-list)
-- [GitHub workflow runs API](https://docs.github.com/en/rest/actions/workflow-runs) and [GitHub CLI run listing](https://cli.github.com/manual/gh_run_list) identify native run status and conclusion values used in quiescence records.
-
-- [curl manual](https://curl.se/docs/manpage.html) documents transfer/connection limits, disabled retries and `-q`. The installer makes one bounded attempt per route and excludes user curl configuration.
-
-- [Earlier pinned feature-document standard](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md) and [template](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/feature-document-template.md): one child document, owner decisions, review and status gates.
-- [Earlier pinned documentation conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md), [delivery rules](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md) and [prose guide](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md): publication boundaries, authoritative local rules and concise owner-facing prose.
-- [Earlier pinned agent entry point](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/AGENTS.md): source-grounded task routing and retained consumer instructions.
-- Stackweaver files cited in Context were inspected locally at `d77259358c87aebc93ad76231ae245fd790c043a`; private report bodies, application source and secrets are not copied into this draft.
-
-- [GitHub local plugin directories](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/plugin-directories), [CLI configuration directory](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference) and [programmatic reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference), consulted 2026-11-05: explicit plugin loading, isolated configuration and update controls. Local CLI help confirms `--plugin-dir`, `COPILOT_HOME` and automatic-update controls; actual new-operation loading remains a required test.
-- [GitHub Actions artifacts REST API](https://docs.github.com/en/rest/actions/artifacts): artifact IDs, expiry/digest/run metadata, archive retrieval and Actions read permission for private resources used by the proposed history reader.
-- [GitHub Actions workflow runs REST API](https://docs.github.com/en/rest/actions/workflow-runs): native workflow/event/branch/head/attempt metadata used to distinguish adopted scheduled producer runs from other workflows and pull-request runs.
-- [yauzl 3.4.0 source](https://github.com/thejoshwolfe/yauzl/tree/f5798e15204ffbb9a428b00217e4659684a41b0f): exact tagged ZIP-library source selected for bundling; its documented buffer/lazy-entry/filename/size-validation APIs support the proposed bounded wrapper. Package installation and integrity remain implementation verification.
-
-- [Official yauzl 3.4.0 npm metadata](https://registry.npmjs.org/yauzl/3.4.0) and [Bun 1.4.4 release](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4). T10 records registry integrity, exact upstream-source comparison and verified Linux build-tool execution.
-
-- [GitHub workflow jobs API](https://docs.github.com/en/rest/actions/workflow-jobs). T12 uses the fixed run-attempt jobs endpoint and native step outcomes under the existing Actions read permission. The run API examples also document branch-qualified workflow paths, which are checked against the recorded default branch or exact native head.
-
-- [Earlier engineering entry point](https://github.com/vhco-pro/docs/blob/f781ee7b0404e80194aa568af3284888cc222017/AGENTS.md) and [owner-summary guidance](https://github.com/vhco-pro/docs/blob/f781ee7b0404e80194aa568af3284888cc222017/conventions/feature-documents.md). T40 integrates the published upstream pin and adds a summary and glossary of the accepted behavior.
-
-GitHub documents that the actual `merge_commit_sha` after a merge identifies the resulting merge commit, squashed commit or rebased default tip. T51 reads that identity separately from a hypothetical pre-merge test commit. [GitHub pull-request REST documentation](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request)
-
-Git documents all-or-none ref updates for an atomic push and failure when the server lacks that capability. T52 verifies those outcomes against an owned local receive-pack server. [Git push documentation](https://git-scm.com/docs/git-push)
-
-- [GitHub labels REST API](https://docs.github.com/en/rest/issues/labels#get-a-label) provides the repository label-identity lookup used to compare native canonical spelling. Read-only GETs for `cli/cli` labels `bug` and `BUG` returned the same label ID and canonical name during implementation.
-
-- [Git reference reads](https://docs.github.com/en/rest/git/refs#get-a-reference) and [Git commit object reads](https://docs.github.com/en/rest/git/commits#get-a-commit-object) use repository Contents read permission. Native ref absence rechecks the current publication repository identity, default ref and native commit, retaining those requests before classifying visible absence.
-
-- Bun's archive API provides in-memory regular-file reads and tar extraction. [Bun archive documentation](https://bun.sh/docs/runtime/archive).
-- Copilot exposes explicit configuration/cache locations and update suppression for scoped probes. [Copilot CLI configuration directory](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference), [Copilot programmatic reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference).
-- Claude exposes separate configuration and update controls for the version-only probe. [Claude Code environment variables](https://code.claude.com/docs/en/env-vars).
-
-The bounded client-distribution reader uses Bun for regular tar files and the runtime zlib API for capped gzip expansion. It validates ustar metadata separately so omitted entries cannot become an accepted package. Extended archive formats require an explicitly supported setup path. [Bun archive reference](https://bun.sh/docs/runtime/archive), [Node zlib options](https://nodejs.org/api/zlib.html#class-options)
-
-Non-executing client upgrade signals use the documented provider npm package names as intake identifiers. Runtime selection continues to use independently pinned native distributions. [Copilot CLI installation](https://docs.github.com/en/copilot/get-started/cli-quickstart), [Claude Code setup](https://code.claude.com/docs/en/setup), [Codex source installation guide](https://github.com/openai/codex#installation)
-
-- The earlier T40 integration selected `d8f07c9dd69038375a535af8ad586086688f85ab` for its recorded checkpoints. [Engineering entry point](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/AGENTS.md), [terminal output](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/conventions/terminal-output.md), [delivery rules](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/conventions/delivery.md).
-- T106 selects the current engineering pin `1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff`. [Current engineering entry point](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/AGENTS.md), [feature-document standard](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/conventions/feature-documents.md).
-
 ### R-86
 
 FINDING: F-01
@@ -1867,3 +1864,48 @@ SEVERITY: nit
 WHERE: Frontmatter status_description.
 EVIDENCE: The line reads "Revising the implementation approach after the owner requested a proportionate port that retains the useful audit, resolver and recovery capabilities." The standard's frontmatter example defines this field as "One line on the current state and what it waits for." The line does not name the pending canonical spec review of this revision or the owner's Q1 decision, which are what the gate's next rules will report. R-65 F-01 and R-84 F-02 corrected the same omission. Nothing built changes.
 PROPOSAL: Append "It waits for the canonical spec review of this revision and the owner's Q1 decision; T121 to T130 follow acceptance."
+
+## Sources
+
+- GitHub REST users reference, read 2026-11-15. Durable numeric-ID lookup supports GitHub App installation tokens and returns a native login and numeric ID. [Get a user using their ID](https://docs.github.com/en/rest/users/users#get-a-user-using-their-id).
+
+- [GitHub REST rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api). The ordinary built-in Actions-token allowance motivates the native closure quota regression in T105.
+- [Git revision traversal](https://git-scm.com/docs/git-rev-list)
+- [GitHub workflow runs API](https://docs.github.com/en/rest/actions/workflow-runs) and [GitHub CLI run listing](https://cli.github.com/manual/gh_run_list) identify native run status and conclusion values used in quiescence records.
+
+- [curl manual](https://curl.se/docs/manpage.html) documents transfer/connection limits, disabled retries and `-q`. The installer makes one bounded attempt per route and excludes user curl configuration.
+
+- [Earlier pinned feature-document standard](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md) and [template](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/feature-document-template.md): one child document, owner decisions, review and status gates.
+- [Earlier pinned documentation conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md), [delivery rules](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md) and [prose guide](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md): publication boundaries, authoritative local rules and concise owner-facing prose.
+- [Earlier pinned agent entry point](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/AGENTS.md): source-grounded task routing and retained consumer instructions.
+- Stackweaver files cited in Context were inspected locally at `d77259358c87aebc93ad76231ae245fd790c043a`; private report bodies, application source and secrets are not copied into this draft.
+
+- [GitHub local plugin directories](https://docs.github.com/en/copilot/how-tos/copilot-sdk/features/plugin-directories), [CLI configuration directory](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference) and [programmatic reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference), consulted 2026-11-05: explicit plugin loading, isolated configuration and update controls. Local CLI help confirms `--plugin-dir`, `COPILOT_HOME` and automatic-update controls; actual new-operation loading remains a required test.
+- [GitHub Actions artifacts REST API](https://docs.github.com/en/rest/actions/artifacts): artifact IDs, expiry/digest/run metadata, archive retrieval and Actions read permission for private resources used by the proposed history reader.
+- [GitHub Actions workflow runs REST API](https://docs.github.com/en/rest/actions/workflow-runs): native workflow/event/branch/head/attempt metadata used to distinguish adopted scheduled producer runs from other workflows and pull-request runs.
+- [yauzl 3.4.0 source](https://github.com/thejoshwolfe/yauzl/tree/f5798e15204ffbb9a428b00217e4659684a41b0f): exact tagged ZIP-library source selected for bundling; its documented buffer/lazy-entry/filename/size-validation APIs support the proposed bounded wrapper. Package installation and integrity remain implementation verification.
+
+- [Official yauzl 3.4.0 npm metadata](https://registry.npmjs.org/yauzl/3.4.0) and [Bun 1.4.4 release](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4). T10 records registry integrity, exact upstream-source comparison and verified Linux build-tool execution.
+
+- [GitHub workflow jobs API](https://docs.github.com/en/rest/actions/workflow-jobs). T12 uses the fixed run-attempt jobs endpoint and native step outcomes under the existing Actions read permission. The run API examples also document branch-qualified workflow paths, which are checked against the recorded default branch or exact native head.
+
+- [Earlier engineering entry point](https://github.com/vhco-pro/docs/blob/f781ee7b0404e80194aa568af3284888cc222017/AGENTS.md) and [owner-summary guidance](https://github.com/vhco-pro/docs/blob/f781ee7b0404e80194aa568af3284888cc222017/conventions/feature-documents.md). T40 integrates the published upstream pin and adds a summary and glossary of the accepted behavior.
+
+GitHub documents that the actual `merge_commit_sha` after a merge identifies the resulting merge commit, squashed commit or rebased default tip. T51 reads that identity separately from a hypothetical pre-merge test commit. [GitHub pull-request REST documentation](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request)
+
+Git documents all-or-none ref updates for an atomic push and failure when the server lacks that capability. T52 verifies those outcomes against an owned local receive-pack server. [Git push documentation](https://git-scm.com/docs/git-push)
+
+- [GitHub labels REST API](https://docs.github.com/en/rest/issues/labels#get-a-label) provides the repository label-identity lookup used to compare native canonical spelling. Read-only GETs for `cli/cli` labels `bug` and `BUG` returned the same label ID and canonical name during implementation.
+
+- [Git reference reads](https://docs.github.com/en/rest/git/refs#get-a-reference) and [Git commit object reads](https://docs.github.com/en/rest/git/commits#get-a-commit-object) use repository Contents read permission. Native ref absence rechecks the current publication repository identity, default ref and native commit, retaining those requests before classifying visible absence.
+
+- Bun's archive API provides in-memory regular-file reads and tar extraction. [Bun archive documentation](https://bun.sh/docs/runtime/archive).
+- Copilot exposes explicit configuration/cache locations and update suppression for scoped probes. [Copilot CLI configuration directory](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference), [Copilot programmatic reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-programmatic-reference).
+- Claude exposes separate configuration and update controls for the version-only probe. [Claude Code environment variables](https://code.claude.com/docs/en/env-vars).
+
+The bounded client-distribution reader uses Bun for regular tar files and the runtime zlib API for capped gzip expansion. It validates ustar metadata separately so omitted entries cannot become an accepted package. Extended archive formats require an explicitly supported setup path. [Bun archive reference](https://bun.sh/docs/runtime/archive), [Node zlib options](https://nodejs.org/api/zlib.html#class-options)
+
+Non-executing client upgrade signals use the documented provider npm package names as intake identifiers. Runtime selection continues to use independently pinned native distributions. [Copilot CLI installation](https://docs.github.com/en/copilot/get-started/cli-quickstart), [Claude Code setup](https://code.claude.com/docs/en/setup), [Codex source installation guide](https://github.com/openai/codex#installation)
+
+- The earlier T40 integration selected `d8f07c9dd69038375a535af8ad586086688f85ab` for its recorded checkpoints. [Engineering entry point](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/AGENTS.md), [terminal output](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/conventions/terminal-output.md), [delivery rules](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/conventions/delivery.md).
+- T106 selects the current engineering pin `1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff`. [Current engineering entry point](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/AGENTS.md), [feature-document standard](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/conventions/feature-documents.md).
