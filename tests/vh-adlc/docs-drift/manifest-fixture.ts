@@ -19,7 +19,8 @@ export function evidence(id: string, target: string, returned: string): NativeRo
   return {
     invocation_id: id, context_id: id + "-context", provider: "copilot", target_sha256: target, isolation: "procedural",
     native, native_sha256: sha256(native), returned: records, returned_sha256: sha256(records),
-    process: { pid: 123, exit_code: 0, reaped: true, timed_out: false, cancelled: null, output_limit: false },
+    process: { pid: 123, exit_code: 0, reaped: true, timed_out: false, cancelled: null, output_limit: false,
+      confirmed: true, group_absent: true, survivors: [], boundary: "marker", signals: [] },
   };
 }
 

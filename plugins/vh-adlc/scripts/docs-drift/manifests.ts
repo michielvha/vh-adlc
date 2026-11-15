@@ -1,3 +1,4 @@
+import { recordedProcessCompleted } from "./owned-process";
 import { PUBLISHER_ENTRIES, type PublisherEntry } from "./identity";
 import { canonicalJSON, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { parseIdentitySource, type IdentitySource } from "./settings";
@@ -244,7 +245,7 @@ export function verifyRoleIdentity(evidence: NativeRoleEvidence, policy: RolePol
   id(evidence.invocation_id); id(evidence.context_id); digest(evidence.target_sha256);
   if (!["structural", "procedural", "unknown"].includes(evidence.isolation)) invalid("review isolation record");
   const process = evidence.process;
-  if (process.exit_code !== 0 || !process.reaped || process.timed_out || process.cancelled !== null || process.output_limit) invalid("native process completion");
+  if (!recordedProcessCompleted(process)) invalid("native process completion");
   if (sha256(evidence.native) !== evidence.native_sha256 || sha256(evidence.returned) !== evidence.returned_sha256) invalid("original native artifact digest");
   const native = decodeUTF8(evidence.native);
   let events: unknown[];

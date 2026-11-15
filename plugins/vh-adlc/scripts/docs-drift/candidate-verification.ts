@@ -3,7 +3,7 @@ import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import { publishArtifact, readArtifact } from "./journal";
 import { inspectCandidate } from "./preparation";
-import { executeOwnedProcess, type OwnedProcess } from "./owned-process";
+import { executeOwnedProcess, ownedClientCompleted, type OwnedProcess } from "./owned-process";
 import { canonicalDigest, canonicalJSON, sha256 } from "./protocol";
 import { scanArtifactReferences } from "./scan-evidence";
 import { runScan, scannerEnvironment, type ScanRun } from "./scan";
@@ -62,7 +62,7 @@ export async function verifyCandidate(input: Parameters<typeof inspectCandidate>
       command.stdout = reference(stdout); command.stderr = reference(stderr); command.completion = reference(completion);
       if (!matchesRepositoryState(checkout, state)) throw Error(`Configured candidate ${purpose} changed its source or Git state`);
       const process = command.process;
-      if (process.exit_code !== 0 || !process.reaped || process.timed_out || process.cancelled || process.output_limit)
+      if (!ownedClientCompleted(process))
         throw Error(`Configured candidate ${purpose} failed`);
     }
     result.complete = true;

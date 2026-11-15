@@ -1,3 +1,4 @@
+import { recordedProcessCompleted } from "./owned-process";
 import { reconcileAbsent, type ReconciliationScope } from "./recovery";
 import { readRecoveryAuthority } from "./recovery-authority";
 import { recoveryEffectsOutput } from "./recovery-output";
@@ -14,7 +15,6 @@ import { PublicationScopeChanged, type PublicationGate, type PublishOptions, typ
 import { loadTrialContext, type TrialContext } from "./trial-context";
 import { createTrialTransport } from "./trial-transport";
 import { loadCommittedSettings } from "./settings";
-import type { OwnedProcess } from "./owned-process";
 
 function exact(value: unknown, fields: string[]): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)
@@ -44,14 +44,12 @@ function nativeRole(context: TrialContext, value: unknown, binding: SealedPlan["
   if (input.process !== null && typeof input.process === "object" && Object.hasOwn(input.process, "path")) {
     return readNativeRoleArtifacts({ source_repo: context.source, artifact_root: context.artifacts, references: input, binding, policy });
   }
-  const completion = exact(input.process, ["pid", "exit_code", "timed_out", "cancelled", "output_limit", "reaped"]);
-  if (typeof completion.pid !== "number" || !Number.isSafeInteger(completion.pid) || completion.pid < 1
-    || completion.exit_code !== 0 || completion.timed_out !== false || completion.cancelled !== null
-    || completion.output_limit !== false || completion.reaped !== true) throw Error("synthetic publication native process incomplete");
+  if (!recordedProcessCompleted(input.process)) throw Error("synthetic publication native process incomplete");
+  const completion = input.process;
   const native = retained(context, input.native), returned = retained(context, input.returned);
   return { invocation_id: binding.invocation_id, context_id: binding.context_id, provider: binding.provider,
     target_sha256: binding.target_sha256, isolation: binding.isolation, native, returned,
-    native_sha256: binding.native_sha256, returned_sha256: binding.returned_sha256, process: completion as OwnedProcess };
+    native_sha256: binding.native_sha256, returned_sha256: binding.returned_sha256, process: completion };
 }
 
 /** Only the immutable setup test grant supplies collector authority. Request/report flags supply none. */

@@ -9,7 +9,7 @@ import { reportTime } from "./report";
 import type { AttentionProjection, HistorySnapshot } from "./report";
 import type { Settings } from "./settings";
 import { externalArtifactDirectory } from "./snapshot";
-import { executeOwnedProcess } from "./owned-process";
+import { executeOwnedProcess, ownedClientCompleted } from "./owned-process";
 
 export type HistoryContext = { repository: string; scope_sha256: string; run_id: string; started_at: string };
 /** Internal result of adopted-source verification. A report or CLI flag cannot supply this result. */
@@ -300,7 +300,7 @@ export async function downloadActionsArtifact(options: {
     watched_outputs: [], timeout_ms: options.timeout_ms ?? 60000, max_output_bytes: settings.reports.max_archive_bytes,
     started: pid => writeFileSync(join(root, "process-start.json"), canonicalJSON({ pid }), { flag: "wx", mode: 0o600 }) });
   writeFileSync(join(root, "process-result.json"), canonicalJSON(execution), { flag: "wx", mode: 0o600 });
-  if (execution.exit_code !== 0 || !execution.reaped || execution.timed_out || execution.cancelled || execution.output_limit) invalid("native archive download failed");
+  if (!ownedClientCompleted(execution)) invalid("native archive download failed");
   const bytes = readFileSync(archivePath);
   if (bytes.length !== artifact.size_in_bytes || "sha256:" + sha256(bytes) !== artifact.digest) invalid("downloaded API digest or size");
   return { bytes, archive_path: archivePath, record_path: record, record_sha256: sha256(readFileSync(record)) };

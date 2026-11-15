@@ -1,5 +1,5 @@
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
-import type { OwnedProcess } from "./owned-process";
+import { recordedProcessCompleted, type OwnedProcess } from "./owned-process";
 import { readArtifact } from "./journal";
 import { canonicalJSON, decodeUTF8, sha256, verifyProtocolBindings } from "./protocol";
 import { assessScan, type ScanRun } from "./scan";
@@ -23,11 +23,7 @@ export function scanArtifactReferences(scan: ScanRun, root: string): ScanArtifac
 }
 
 export function requireSuccessfulProcess(value: unknown): asserts value is OwnedProcess {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) fail("process required");
-  const p = value as Record<string, unknown>;
-  if (Object.keys(p).sort().join(",") !== "cancelled,exit_code,output_limit,pid,reaped,timed_out"
-    || typeof p.pid !== "number" || !Number.isSafeInteger(p.pid) || p.pid < 1 || p.exit_code !== 0 || p.timed_out !== false
-    || p.cancelled !== null || p.output_limit !== false || p.reaped !== true) fail("successful reaped process required");
+  if (!recordedProcessCompleted(value)) fail("successful reaped process required");
 }
 
 /** Validate the original execution independently of later use of its source copy. */

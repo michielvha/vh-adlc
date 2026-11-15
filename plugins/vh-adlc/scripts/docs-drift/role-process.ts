@@ -6,7 +6,7 @@ import { readGit } from "./git";
 import { publishArtifact, readArtifact } from "./journal";
 import { verifyRoleIdentity, type NativeRoleEvidence, type RolePolicy } from "./manifests";
 import { decodeNativeRoleOutput } from "./native-role-output";
-import { executeOwnedProcess, type OwnedProcess } from "./owned-process";
+import { executeOwnedProcess, ownedClientCompleted, type OwnedProcess } from "./owned-process";
 import { canonicalDigest, canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { readNativeRoleCapture } from "./role-capture";
 import { artifactDirectoryScope, captureRepositoryState, matchesRepositoryState } from "./snapshot";
@@ -72,8 +72,7 @@ export async function captureNativeRoleProcess(input: Options) {
     const completion = retain("process.json", canonicalJSON(result.process)); result.artifacts.process = completion;
     if (startup.failure !== null) throw Error(startup.failure);
     unchanged();
-    if (result.process.exit_code !== 0 || !result.process.reaped || result.process.timed_out
-      || result.process.cancelled !== null || result.process.output_limit) throw Error("Native role process incomplete");
+    if (!ownedClientCompleted(result.process)) throw Error("Native role process incomplete");
     const bytes = readArtifact(native), decoded = decodeNativeRoleOutput({ provider: options.provider, native: bytes,
       expected_context: options.context_id, expected_cwd: realpathSync(options.cwd) });
     result.artifacts.native = { path: relative(scope.directory, native), sha256: sha256(bytes) };

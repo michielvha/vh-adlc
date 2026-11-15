@@ -11,6 +11,9 @@
     "./**/*.ts",
     "./vendor/*.d.cts",
     "../../../../tests/vh-adlc/docs-drift/**/*.ts",
-    "../../../../tests/vh-adlc/git-read.test.ts"
+    "../../../../tests/vh-adlc/git-read.test.ts",
+    "../../../../tests/vh-adlc/triage/owned-process.test.ts",
+    "../../../../tests/vh-adlc/loop/owned-process.test.ts",
+    "../../../../tests/vh-adlc/loop/review-route.test.ts"
   ]
 }

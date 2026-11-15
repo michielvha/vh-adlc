@@ -1,4 +1,4 @@
-import { executeOwnedProcess, outputSize, OUTPUT_LIMIT } from "./owned-process";
+import { executeOwnedProcess, ownedClientCompleted, outputSize, OUTPUT_LIMIT } from "./owned-process";
 import type { OwnedProcess as ScanProcess } from "./owned-process";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -257,8 +257,7 @@ export async function runScan(snapshot: Snapshot, options: ScanOptions): Promise
       if (outputSize(bindingsPath) > OUTPUT_LIMIT) throw new Error("invalid bindings file");
       verifyProtocolBindings(readFileSync(bindingsPath), snapshot.protocol);
     } catch { gap("bindings-changed", "The scanner changed or removed its owned bindings file."); }
-    if (result.process.exit_code !== 0 || !result.process.reaped || result.process.timed_out ||
-        result.process.cancelled || result.process.output_limit) {
+    if (!ownedClientCompleted(result.process)) {
       gap("scanner-process", "The scanner failed, timed out, was cancelled or exceeded its output bound.");
     }
     if (outputSize(output) > OUTPUT_LIMIT) throw new Error("scanner output bound");

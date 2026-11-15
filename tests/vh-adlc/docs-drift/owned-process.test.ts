@@ -62,7 +62,8 @@ test(`memory capture handles an escaped pipe holder (overflow=${overflow})`, asy
       max_output_bytes: 1024, timeout_ms: 100, started: () => {},
     });
     expect(Date.now() - begin).toBeLessThan(4000);
-    expect(result.output_limit).toBe(true);
+    expect(result.output_limit).toBe(false);
+    expect(result.confirmed).toBe(true);
     expect(existsSync(join(root, "stdout"))).toBe(false);
     returned = true;
     await Bun.sleep(300);

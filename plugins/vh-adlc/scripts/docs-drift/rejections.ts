@@ -1,3 +1,4 @@
+import { recordedProcessCompleted } from "./owned-process";
 import { nativePushArguments, type GitUpdate } from "./git-success";
 import { expectedRequest, nativeMutationArguments } from "./success";
 import { loadCommittedSettings } from "./settings";
@@ -160,8 +161,7 @@ function observedCommand(options: Scope, directory: string, protocol: RejectionP
   if (request.input !== null && !readArtifact(join(directory, "payload.json")).equals(request.input)) throw Error("rejected input changed");
   const processBytes = readArtifact(join(directory, "process.json"));
   const status = JSON.parse(decodeUTF8(processBytes)) as Record<string, unknown>;
-  if (typeof status.exit_code !== "number" || status.exit_code <= 0 || status.reaped !== true
-    || status.timed_out !== false || status.cancelled !== null || status.output_limit !== false) throw Error("incomplete rejected command");
+  if (typeof status.exit_code !== "number" || status.exit_code <= 0 || !recordedProcessCompleted(status, status.exit_code)) throw Error("incomplete rejected command");
   const projected = owner.capture === "projected-v2";
   const stdout = readArtifact(join(directory, projected ? "rejection-response.json" : "stdout"));
   const observed = projected ? projectedRejection(stdout, protocol)

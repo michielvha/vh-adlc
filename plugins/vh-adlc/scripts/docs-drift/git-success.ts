@@ -1,3 +1,4 @@
+import { recordedProcessCompleted } from "./owned-process";
 import { sameLogin } from "./identity";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
@@ -122,7 +123,7 @@ function commandScope(options: Scope, directory: string, hostname: string, proje
       || completed.operation_id !== options.plan.manifest.operation_id || completed.effect_id !== options.effect.id
       || completed.attempt_id !== options.attempt_id || completed.completed !== true || completed.request_sha256 !== owner.argv_sha256
       || completed.projection_sha256 !== sha256(canonicalJSON(projected))) throw Error("fixture ref application unsettled");
-  } else if (status.exit_code !== 0 || status.reaped !== true || status.timed_out !== false || status.cancelled !== null || status.output_limit !== false) throw Error("Git application command unsettled");
+  } else if (!recordedProcessCompleted(status)) throw Error("Git application command unsettled");
   return { owner_sha256: sha256(ownerBytes), process_sha256: sha256(processBytes), request_sha256: digest(owner.argv_sha256) };
 }
 

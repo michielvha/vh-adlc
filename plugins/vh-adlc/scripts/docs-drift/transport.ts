@@ -17,7 +17,7 @@ import { canonicalJSON, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { effectMarker } from "./manifests";
 import { publicationMarker } from "./report-history";
 import { retainAbsence, retainLookup, type AbsenceEvidence } from "./observations";
-import { executeOwnedProcess, OUTPUT_LIMIT } from "./owned-process";
+import { executeOwnedProcess, ownedClientCompleted, OUTPUT_LIMIT } from "./owned-process";
 import { externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
 import { isRefreshTarget, requireOwnedStore } from "./proposals";
 import { readGit } from "./git";
@@ -642,14 +642,14 @@ export function createNativeTransport(options: {
     const result = await executeOwnedProcess({ argv: command, cwd: store.root, env: Object.fromEntries(Object.entries(gitEnvironment(environment)).filter((entry): entry is [string, string] => entry[1] !== undefined)),
       watched_outputs: [], stdout, stderr, capture: "memory", timeout_ms: options.timeout_ms ?? 30000,
       started: pid => { delivery.sent = true; delivery.reaped = false; publishArtifact(join(directory, "started.json"), canonicalJSON({ pid })); } });
-    delivery.reaped = result.reaped;
+    delivery.reaped = result.reaped && result.confirmed === true;
     const { captured, ...processStatus } = result;
     publishArtifact(join(directory, "process.json"), canonicalJSON(processStatus));
     if (protocol && captured && !result.output_limit) {
       const projection = projectRejection(captured.stdout, protocol);
       if (projection) publishArtifact(join(directory, "rejection-response.json"), projection);
     }
-    if (result.exit_code !== 0 || !result.reaped || result.timed_out || result.cancelled !== null || result.output_limit) {
+    if (!ownedClientCompleted(result)) {
       if (protocol && delivery.attempt_id !== null && delivery.completed_commands === 0 && delivery.effect.kind !== "pr-update") {
         try {
           delivery.rejection = retainRejection({ artifact_root: root, source_repo: options.source_repo, plan,

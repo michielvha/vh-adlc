@@ -2205,3 +2205,29 @@ test("native acknowledgement recases the original creator during approval and pr
   expect(observed.current.user_login_sha256).toBe(sha256(Buffer.from("FIXTURE-BOT")));
   expect(observed.creator_projection.recorded_login_sha256).toBe(sha256(Buffer.from("fixture-bot")));
 }, 120000);
+
+test("unconfirmed native cleanup leaves the mutation attempt unsettled", async () => {
+  const f = setup();
+  await f.transport.identity();
+  const selected = acquisition(f), journal = appendIntent(selected.journal, selected.effect.id);
+  const kill = process.kill.bind(process);
+  let deniedGroup: number | undefined;
+  const probe = spyOn(process, "kill").mockImplementation((pid, signal) => {
+    if (pid < 0 && (deniedGroup === undefined || deniedGroup === pid)) {
+      deniedGroup = pid;
+      throw Object.assign(Error("synthetic process-group permission denial"), { code: "EPERM" });
+    }
+    return kill(pid, signal);
+  });
+  try {
+    const error = await executeAttempt({ journal, effect: selected.effect, objects: selected.objects, transport: f.transport })
+      .then(() => null, (error: unknown) => error);
+    expect(error).toBeInstanceOf(PublicationExecutionError);
+    if (!(error instanceof PublicationExecutionError)) throw Error("Expected an unsettled native mutation");
+    expect(error.sent).toBe(true);
+    expect(error.reaped).toBe(false);
+    const retained = readJournal(journal.directory, journal.source_repo);
+    expect(pendingAttempt(retained, selected.effect)).toBe("attempt-not-reaped");
+    expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(selected.objects.lease_object);
+  } finally { probe.mockRestore(); }
+});

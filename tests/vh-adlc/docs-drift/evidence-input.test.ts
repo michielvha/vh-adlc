@@ -118,3 +118,22 @@ test.each(["changed", "missing"])("original artifact changes stay distinct from 
   expect(caught).toBeInstanceOf(Error);
   expect(caught instanceof ArtifactChanged).toBe(scenario === "changed");
 });
+
+test.each([
+  { confirmed: false }, { group_absent: false }, { survivors: [999] }, { boundary: "unknown" },
+  { signals: "missing signal records" }, { signals: [{ signal: "SIGINT", accepted: true }] },
+  { signals: [{ signal: "SIGTERM", accepted: "yes" }] },
+])("role evidence refuses inconsistent cleanup observations %j", changed => {
+  const f = inputs();
+  f.references.process = f.retain("invalid-cleanup.json", canonicalJSON({ ...f.reviewed.worker.process, ...changed }));
+  expect(() => readNativeRoleArtifacts({ ...f.options, references: f.references })).toThrow("native process incomplete");
+});
+
+test("legacy role process records keep their original cleanup guarantees", () => {
+  const f = inputs(), process = f.reviewed.worker.process;
+  f.references.process = f.retain("legacy-process.json", canonicalJSON({ pid: process.pid, exit_code: process.exit_code,
+    timed_out: process.timed_out, cancelled: process.cancelled, output_limit: process.output_limit, reaped: process.reaped }));
+  const evidence = readNativeRoleArtifacts({ ...f.options, references: f.references });
+  expect(evidence.process.exit_code).toBe(0);
+  expect(evidence.process.confirmed).toBeUndefined();
+});

@@ -3,7 +3,7 @@ import { dirname, join, relative } from "node:path";
 import { gitReadArguments } from "../git-read";
 import { readGit, writeMetadataObject } from "./git";
 import { publishArtifact } from "./journal";
-import { executeOwnedProcess } from "./owned-process";
+import { executeOwnedProcess, ownedClientCompleted } from "./owned-process";
 import { canonicalDigest, canonicalJSON, compareUTF8, protocolPath, sha256 } from "./protocol";
 import { requireOwnedStore } from "./proposals";
 import { evaluateProtection, type ProtectionContext, type ProtectionResult } from "./protection";
@@ -139,7 +139,7 @@ export async function prepareEdits(input: {
         publishArtifact(stdout, stdoutBytes); publishArtifact(stderr, stderrBytes);
         publishArtifact(join(root, phase + "-result.json"), canonicalJSON({ kind: "docs-drift-preparation-git", process: completion,
           capture_verified: captured !== undefined, expected_exit_code: expectedExit, stdout_sha256: sha256(stdoutBytes), stderr_sha256: sha256(stderrBytes) }));
-        if (!captured || completion.exit_code !== expectedExit || !completion.reaped || completion.timed_out || completion.cancelled !== null || completion.output_limit)
+        if (!captured || !ownedClientCompleted(completion, expectedExit))
           throw Error("preparation Git " + phase + " failed");
         return captured.stdout;
       }

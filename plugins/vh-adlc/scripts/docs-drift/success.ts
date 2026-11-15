@@ -1,3 +1,4 @@
+import { recordedProcessCompleted } from "./owned-process";
 import { sameLogin } from "./identity";
 import { readGitSuccess } from "./git-success";
 import { randomUUID } from "node:crypto";
@@ -213,8 +214,6 @@ function commandScope(options: Scope, directory: string, hostname: string, metho
     || owner.effect_id !== options.effect.id || owner.attempt_id !== options.attempt_id) throw Error("success command scope changed");
   const processBytes = readArtifact(join(directory, collector ? "fixture-result.json" : "process.json"));
   const process = object(JSON.parse(decodeUTF8(processBytes)));
-  if (!collector && (process.exit_code !== 0 || process.reaped !== true || process.timed_out !== false
-    || process.cancelled !== null || process.output_limit !== false)) throw Error("incomplete successful command");
   const input = readArtifact(join(directory, "payload.json"));
   const expected = expectedRequest(options.effect, options.plan.manifest.repository, index, endpoint, options.plan.transport);
   if (typeof hostname !== "string" || !hostname || /[\r\n\0]/u.test(hostname) || method !== expected.method || endpoint !== expected.endpoint
@@ -236,6 +235,7 @@ function commandScope(options: Scope, directory: string, hostname: string, metho
       || realpathSync(before.path) !== before.path) throw Error("foreign collector baseline");
     return { ...command, baseline_sha256: digest(before.sha256) };
   }
+  if (!recordedProcessCompleted(process)) throw Error("incomplete successful command");
   return command;
 }
 

@@ -1,3 +1,4 @@
+import { recordedProcessCompleted } from "./owned-process";
 import { dirname, join } from "node:path";
 import { lstatSync, realpathSync } from "node:fs";
 import { readArtifact, type SealedPlan } from "./journal";
@@ -55,16 +56,13 @@ export function readNativeRoleArtifacts(options: {
     parsed = JSON.parse(decodeUTF8(processBytes));
     if (!canonicalJSON(parsed).equals(processBytes)) fail("process JSON");
   } catch { fail("process JSON"); }
-  const completion = object(parsed, ["pid", "exit_code", "timed_out", "cancelled", "output_limit", "reaped"]);
-  if (typeof completion.pid !== "number" || !Number.isSafeInteger(completion.pid) || completion.pid < 1
-    || completion.exit_code !== 0 || completion.timed_out !== false || completion.cancelled !== null
-    || completion.output_limit !== false || completion.reaped !== true) fail("native process incomplete");
+  if (!recordedProcessCompleted(parsed)) fail("native process incomplete");
+  const completion = parsed;
   const binding = options.binding;
   const evidence: NativeRoleEvidence = { invocation_id: binding.invocation_id, context_id: binding.context_id,
     provider: binding.provider, target_sha256: binding.target_sha256, isolation: binding.isolation,
     native, native_sha256: binding.native_sha256, returned, returned_sha256: binding.returned_sha256,
-    process: { pid: completion.pid, exit_code: completion.exit_code, timed_out: completion.timed_out,
-      cancelled: completion.cancelled, output_limit: completion.output_limit, reaped: completion.reaped } };
+    process: completion };
   const { records: _records, ...verified } = verifyRoleIdentity(evidence, options.policy);
   if (!canonicalJSON(verified).equals(canonicalJSON(binding))) fail("sealed role binding changed");
   return evidence;

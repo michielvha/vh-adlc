@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { clientArchivePath, inspectClientArchive } from "./client-archive";
-import { executeOwnedProcess, type OwnedProcess } from "./owned-process";
+import { executeOwnedProcess, ownedClientCompleted, recordedProcessCompleted, type OwnedProcess } from "./owned-process";
 import { parseClientBinding } from "./settings";
 import { collectAdoptionBindings, collectTrialBindings, parseComponentPin, verifyRuntimeAdoption } from "./adoption";
 import type { PublicationIdentity } from "./transport";
@@ -268,7 +268,8 @@ export async function inspectRetainedClient(input: { cache_directory: string; co
   const nativeBytes = readRuntimeFile(join(root, "version-process.json"));
   const native = runtimeJSON(nativeBytes, ["schema_version", "kind", "client_id", "distribution_sha256", "executable_sha256",
     "capture_verified", "stdout_sha256", "stderr_sha256", "process"]);
-  const completion = runtimeObject(native.process, ["pid", "exit_code", "timed_out", "cancelled", "output_limit", "reaped"]);
+  if (!recordedProcessCompleted(native.process)) fail("native client version evidence");
+  const completion = native.process;
   const stdout = readRuntimeFile(join(root, "version-stdout"), 65536), stderr = readRuntimeFile(join(root, "version-stderr"), 65536);
   const owner = runtimeJSON(readRuntimeFile(join(root, "version-owner.json")), ["pid", "argv_sha256"]);
   const argv = [executable, ...(client.provider === "copilot" ? ["--no-auto-update"] : []), "--version"];
@@ -351,7 +352,7 @@ export async function retainClientDistribution(input: {
     client_id: options.client_id, distribution_sha256: client.distribution_sha256,
     executable_sha256: retained.find(row => row.path === executable)?.sha256, capture_verified: captured !== undefined,
     stdout_sha256: sha256(stdout), stderr_sha256: sha256(stderr), process: completion }));
-  if (versionProcess.exit_code !== 0 || !versionProcess.reaped || versionProcess.timed_out || versionProcess.cancelled !== null || versionProcess.output_limit || !captured) fail("owned client version process incomplete");
+  if (!ownedClientCompleted(versionProcess) || !captured) fail("owned client version process incomplete");
   nativeClientVersion(stdout, client);
   inspectRetainedFiles(directory, expected);
   const record: ClientRecord = { schema_version: 1, kind: "docs-drift-retained-client", client_id: options.client_id, client,

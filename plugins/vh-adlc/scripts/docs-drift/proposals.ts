@@ -3,7 +3,7 @@ import type { PublicationPullInput, PullRequestInput, RepositoryReader } from ".
 import { readGit } from "./git";
 import { gitEnvironment, gitReadArguments } from "../git-read";
 import { join } from "node:path";
-import { executeOwnedProcess } from "./owned-process";
+import { executeOwnedProcess, ownedClientCompleted } from "./owned-process";
 import { canonicalDigest, canonicalJSON, decodeUTF8, protocolPath, sha256 } from "./protocol";
 import type { Settings } from "./settings";
 import { sameAccount, sameLogin } from "./identity";
@@ -165,7 +165,7 @@ async function fetchFixedRefs(store: OwnedObjectStore, options: ProposalFetchOpt
     timeout_ms: options.timeout_ms ?? 60000,
     started: pid => writeFileSync(join(root, "process-start.json"), canonicalJSON({ pid }), { flag: "wx", mode: 0o600 }) });
   writeFileSync(join(root, "process-result.json"), canonicalJSON(execution), { flag: "wx", mode: 0o600 });
-  if (execution.exit_code !== 0 || !execution.reaped || execution.timed_out || execution.cancelled || execution.output_limit) throw Error("incomplete fetch process");
+  if (!ownedClientCompleted(execution)) throw Error("incomplete fetch process");
   return root;
 }
 
