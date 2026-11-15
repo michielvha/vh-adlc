@@ -315,3 +315,21 @@ test.each(["shared", "legacy", "inventoried-human", "inventoried-other-namespace
     actor_id: scenario === "shared" ? 20 : 21, head_ref: scenario === "shared" ? "docs-drift/one" : scenario.includes("human") || scenario.includes("other-namespace") ? "feature/owner-work" : "docs-audit/one", head_repository_id: 10 };
   expect(isRefreshTarget(settings, identity, target)).toBe(scenario === "shared" || scenario === "legacy");
 });
+
+test.each(['scalar', 'mapped'] as const)('discovery matches native login casing within declared scopes in %s settings', mode => {
+  const value = settingsFixture();
+  const publication = mode === 'mapped' ? { ...value.publication,
+    entry_actors: { hosted: 'fixture-bot', copilot: 'fixture-owner', claude: 'fixture-owner' } } : value.publication;
+  const settings = parseSettings({ ...value, publication,
+    pr_discovery: { ...value.pr_discovery, authors: ['FIXTURE-BOT', 'FIXTURE-OWNER'] } });
+  const api = reader(routes([
+    pull(1),
+    pull(2, { user: { login: 'LEGACY-BOT', id: 14, type: 'Bot' },
+      head: { sha: 'c'.repeat(40), ref: 'docs-audit/legacy', repo: repository } }),
+    pull(3, { user: { login: 'not-declared', id: 15, type: 'User' } }),
+  ]));
+  const result = collectProposals(api.selected, settings);
+  expect(result.complete).toBe(true);
+  expect(result.proposals.map(proposal => proposal.number)).toEqual([1, 2]);
+  expect(result.proposals[1].actor).toBe('LEGACY-BOT');
+});

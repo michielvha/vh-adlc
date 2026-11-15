@@ -9,6 +9,7 @@ import { publicationFixture } from "./publication-fixture";
 import type { IdentitySource } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { settingsFixture } from "./settings-fixture";
 import { hash } from "./manifest-fixture";
+import type { EntryIdentities, PublisherEntry } from "../../../plugins/vh-adlc/scripts/docs-drift/identity";
 
 export const pin = () => ({ schema_version: 1 as const, source_repository: "fixture/shared", source_commit: "a".repeat(40),
   source_release: "v1.0.0", plugin_version: "0.11.0", component_sha256: hash("fixture component") });
@@ -52,12 +53,13 @@ export const runtimeIdentity = { repository: "fixture/docs", repository_id: 10, 
 
 // Observed-shaped owner-attestation parser fixtures only. They establish no native host execution.
 export type AdoptionSourceFixture = Pick<ReturnType<typeof source>, "repo" | "configured" | "candidate"> & { native_model?: string };
-export function portableRecord(f: AdoptionSourceFixture) {
+export function portableRecord(f: AdoptionSourceFixture, identities?: EntryIdentities) {
   const bindings = collectAdoptionBindings(f.repo, f.candidate);
   const trialHistory = readTrialHistoryBindings({ repo: f.repo, source: f.candidate, settings: bindings.settings });
-  const target = hash(canonicalJSON({ schema_version: 1, repository: f.configured.repository,
+  const target = hash(canonicalJSON({ schema_version: identities ? 2 : 1, repository: f.configured.repository,
     source_candidate: f.candidate, protected_sha256: bindings.protected_sha256,
-    component_pin_sha256: bindings.component_pin.sha256, identity: runtimeIdentity }).toString());
+    component_pin_sha256: bindings.component_pin.sha256, identity: runtimeIdentity,
+    ...(identities ? { entry_identities: identities } : {}) }).toString());
   const requirements = {
     hosted_advisory: ["collection_complete", "independent_review", "reviewed_draft_payload", "report_uploaded", "lease_complete"],
     history_read: ["native_history_read", "producer_verified", "permissions_bound"],
@@ -70,6 +72,8 @@ export function portableRecord(f: AdoptionSourceFixture) {
     copilot_install: ["fresh_install", "upgrade", "discovery", "helper_preservation"],
   };
   const receipts = Object.fromEntries(Object.entries(requirements).map(([name, observations]) => {
+    const publisher: PublisherEntry | null = name === "hosted_advisory" || name === "history_read" ? "hosted"
+      : name === "copilot_entry" ? "copilot" : name === "claude_entry" ? "claude" : null;
     const entry = name === "hosted_advisory" ? f.configured.execution.entries.hosted
       : name === "claude_entry" ? f.configured.execution.entries.claude
       : name === "copilot_entry" || name === "paired_review" ? f.configured.execution.entries.copilot : null;
@@ -80,6 +84,7 @@ export function portableRecord(f: AdoptionSourceFixture) {
       artifact_sha256: hash(name + " synthetic original bytes"), bindings_sha256: target, outcome: "passed", native_conclusion: "success",
       worker_model: name === "paired_review" || entry === null ? null : f.native_model ?? entry.worker.model,
       reviewer_model: entry === null ? null : f.native_model ?? entry.reviewer.model, client_bindings,
+      ...(identities && publisher ? { publisher_identity: identities[publisher] } : {}),
       observations: Object.fromEntries(observations.map(observation => [observation, true])),
       ...(name === "history_read" ? trialHistory ?? { producer_workflow_id: f.configured.reports.workflow_id,
         producer_workflow_path: f.configured.execution.scheduled_workflow, reader_workflow_id: 222,
@@ -89,9 +94,10 @@ export function portableRecord(f: AdoptionSourceFixture) {
         workflow_state: "disabled_manually", drained_runs: [],
         queued_run_ids: [], in_progress_run_ids: [], interactive_request_sha256: hash("synthetic explicit freeze") } : {}) }];
   }));
-  return { schema_version: 1, kind: "docs-drift-adoption", source_candidate: f.candidate,
+  return { schema_version: identities ? 2 : 1, kind: "docs-drift-adoption", source_candidate: f.candidate,
     protected_sha256: bindings.protected_sha256, protected_manifest: bindings.protected_manifest,
-    component_pin_sha256: bindings.component_pin.sha256, identity: runtimeIdentity, receipts, predecessor: null };
+    component_pin_sha256: bindings.component_pin.sha256, identity: runtimeIdentity, receipts, predecessor: null,
+    ...(identities ? { entry_identities: identities } : {}) };
 }
 export function deliverRecord(f: ReturnType<typeof source>, record: ReturnType<typeof portableRecord>) {
   write(f.repo, f.configured.publication.adoption_record, canonicalJSON(record));

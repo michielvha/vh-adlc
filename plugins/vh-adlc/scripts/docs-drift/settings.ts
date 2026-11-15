@@ -1,6 +1,7 @@
 import { readGit, verifiedHelperEnvironment } from "./git";
 import { readYAML } from "../settings-file";
 import { protocolPath, sha256 } from "./protocol";
+import { PUBLISHER_ENTRIES, sameLogin, type PublisherEntry } from "./identity";
 
 export type SettingClassification = "ordinary" | "protected" | "trial-setup";
 export type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };
@@ -227,7 +228,7 @@ function executionSettings(value: unknown, clients: ReturnType<typeof clientSett
 function publicationSettings(value: unknown, selectedRepository: string, base: string) {
   const input = object(value, [
     "repository", "base", "actor", "branch_prefix", "mode", "adoption_record", "pr_state", "lease_ref", "receipt_ref_prefix",
-    "resolution_root", "closure", "merge_methods",
+    "resolution_root", "closure", "merge_methods", "entry_actors",
   ], "publication");
   if (repository(input.repository, "publication repository") !== selectedRepository || ref(input.base, "publication base") !== base) invalid("publication destination");
   const states = object(input.pr_state, ["advisory", "resolve"], "publication pr_state");
@@ -244,8 +245,20 @@ function publicationSettings(value: unknown, selectedRepository: string, base: s
   }
   const methods = unique(strings(input.merge_methods, "publication merge_methods", true), "publication merge_methods");
   for (const method of methods) choice(method, ["merge", "squash", "rebase"], "publication merge_methods");
+  const actor = text(input.actor, "publication actor");
+  const entries: { entry_actors?: Record<PublisherEntry, string> } = {};
+  if (Object.hasOwn(input, "entry_actors")) {
+    const selected = object(input.entry_actors, PUBLISHER_ENTRIES, "publication entry_actors");
+    const login = (entry: PublisherEntry) => {
+      const value = text(selected[entry], "publication entry_actors " + entry);
+      if (!/^[A-Za-z0-9_][A-Za-z0-9_-]*(?:\[bot\])?$/iu.test(value)) invalid("publication entry_actors " + entry);
+      return value;
+    };
+    entries.entry_actors = { hosted: login("hosted"), copilot: login("copilot"), claude: login("claude") };
+    if (!sameLogin(entries.entry_actors.hosted, actor)) invalid("publication entry_actors hosted");
+  }
   return {
-    repository: selectedRepository, base, actor: text(input.actor, "publication actor"), branch_prefix: branchPrefix,
+    repository: selectedRepository, base, actor, branch_prefix: branchPrefix, ...entries,
     mode: choice(input.mode, ["staged", "adopted"], "publication mode"),
     adoption_record: yamlPath(input.adoption_record, "publication adoption_record"),
     pr_state: { advisory: choice(states.advisory, ["draft", "ready"], "publication pr_state advisory"),
@@ -321,6 +334,16 @@ export function parseSettings(value: unknown) {
   if (publication.mode === "adopted" && componentPin === null) invalid("adopted component_pin");
   const discovery = object(input.pr_discovery, ["repository", "base", "authors", "branch_prefixes"], "pr_discovery");
   if (repository(discovery.repository, "pr_discovery repository") !== selectedRepository || ref(discovery.base, "pr_discovery base") !== base) invalid("pr_discovery destination");
+  const authors = unique(strings(discovery.authors, "pr_discovery authors", true), "pr_discovery authors");
+  const branchPrefixes = unique(strings(discovery.branch_prefixes, "pr_discovery branch_prefixes", true)
+    .map(value => ref(value, "pr_discovery branch_prefixes", true)), "pr_discovery branch_prefixes");
+  if (publication.entry_actors !== undefined) {
+    for (const login of Object.values(publication.entry_actors)) {
+      if (!authors.some(author => sameLogin(author, login))) invalid("pr_discovery authors missing publisher " + login);
+    }
+    if (!branchPrefixes.some(prefix => publication.branch_prefix.startsWith(prefix)))
+      invalid("pr_discovery branch_prefixes missing publication " + publication.branch_prefix);
+  }
   const legacy = object(input.legacy_proposals, ["authors", "branch_prefixes", "ids"], "legacy_proposals");
   if (!Array.isArray(legacy.ids)) invalid("legacy_proposals ids");
   const legacyIDs = legacy.ids.map(id => positive(id, "legacy_proposals ids"));
@@ -349,9 +372,7 @@ export function parseSettings(value: unknown) {
     pr_discovery: {
       repository: selectedRepository,
       base,
-      authors: unique(strings(discovery.authors, "pr_discovery authors", true), "pr_discovery authors"),
-      branch_prefixes: unique(strings(discovery.branch_prefixes, "pr_discovery branch_prefixes", true)
-        .map(value => ref(value, "pr_discovery branch_prefixes", true)), "pr_discovery branch_prefixes"),
+      authors, branch_prefixes: branchPrefixes,
     },
     publication, reports, runtime_loader: loaderSettings(input.runtime_loader), clients, execution,
     legacy_proposals: {

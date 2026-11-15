@@ -204,3 +204,13 @@ test("a missing dormant trial bundle leaves the earlier approved runtime usable"
     .toEqual(f.bindings.component_pin.value);
   expect(() => adoption.collectTrialBindings({ repo: f.repo, current_default: current })).toThrow("committed blob");
 });
+
+test('trial setup retains the recorded native spelling when the configured actor is recased', () => {
+  const f = trialDefinitionFixture(roots);
+  f.configured.publication.actor = 'FIXTURE-BOT';
+  const current = commitTrialDefinition(f);
+  const policy = adoption.collectTrialBindings({ repo: f.repo, current_default: current, identity: runtimeIdentity });
+  expect(policy.identity.actor).toBe(f.definition.identity.actor);
+  expect(policy.identity.actor).toBe('fixture-bot');
+  expect(policy.identity.actor_id).toBe(runtimeIdentity.actor_id);
+});

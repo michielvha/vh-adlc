@@ -2,6 +2,7 @@ import { collectionReaders, readAdoptionInput, readGit } from "./git";
 import { canonicalJSON, freezeJSON, protocolPath, withinPrefix } from "./protocol";
 import { parseSettings, type Settings } from "./settings";
 import { verifyConfiguredWorkerCaller, verifyWorkerCallers } from "./worker-callers";
+import { PUBLISHER_ENTRIES, sameLogin } from "./identity";
 
 function fail(reason: string): never { throw Error("incomplete docs-drift trial definition " + reason); }
 function object(value: unknown, fields: string[]): Record<string, unknown> {
@@ -74,14 +75,18 @@ export function readTrialDefinition(options: { repo: string; source: string; set
   const { definition, value } = selectedDefinition(repo, source, settings), root = trialRoot(value);
   const identity = object(root.identity, ["hostname", "repository", "repository_id", "actor", "actor_id", "default_branch"]);
   if (identity.hostname !== settings.hostname || identity.repository !== settings.repository
-    || identity.actor !== settings.publication.actor || identity.default_branch !== settings.default_branch) fail("consumer identity");
-  const nativeIdentity = { repository: settings.repository, repository_id: positive(identity.repository_id), actor: settings.publication.actor,
+    || typeof identity.actor !== "string" || !sameLogin(identity.actor, settings.publication.actor)
+    || identity.default_branch !== settings.default_branch) fail("consumer identity");
+  const nativeIdentity = { repository: settings.repository, repository_id: positive(identity.repository_id), actor: identity.actor,
     actor_id: positive(identity.actor_id), default_branch: settings.default_branch };
   const candidateSettings = blob(root.candidate_settings), candidateComponent = blob(root.candidate_component);
   const candidate = parseSettings(collectionReaders().yaml(candidateSettings.bytes));
   if (candidate.repository !== settings.repository || candidate.hostname !== settings.hostname
-    || candidate.default_branch !== settings.default_branch || candidate.publication.actor !== settings.publication.actor
+    || candidate.default_branch !== settings.default_branch || !sameLogin(candidate.publication.actor, settings.publication.actor)
     || candidate.publication.mode !== "adopted" || candidate.component_pin !== candidateComponent.path) fail("candidate consumer selection");
+  const previousActors = settings.publication.entry_actors, nextActors = candidate.publication.entry_actors;
+  if (previousActors && nextActors && PUBLISHER_ENTRIES.some(entry => !sameLogin(previousActors[entry], nextActors[entry])))
+    fail("candidate consumer publisher selection");
   if (candidate.execution.scheduled_workflow !== settings.execution.scheduled_workflow) fail("existing scheduled caller");
   const activeInputs = ["AGENTS.md", ".vh-adlc/docs-drift.yaml", settings.project_procedure, settings.execution.scheduled_workflow,
     settings.execution.worker_workflow, settings.execution.claude_command, settings.runtime_loader.launcher];

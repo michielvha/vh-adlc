@@ -6,6 +6,7 @@ import { canonicalJSON, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./p
 import { requireOwnedStore } from "./proposals";
 import { loadCommittedSettings } from "./settings";
 import type { OwnedObjectStore } from "./snapshot";
+import { publisherActor, sameLogin } from "./identity";
 
 export const TRIAL_CONTEXT_PATH = ".vh-adlc/docs-drift-trial.json";
 export const TRIAL_IDENTITY = Object.freeze({ repository: "fixture/docs", repository_id: 10,
@@ -82,7 +83,7 @@ export function loadTrialContext(options: { root: string; context_commit: string
     || readGit(source, "diff", "--name-only", sourceCommit, contextCommit).toString().trim() !== TRIAL_CONTEXT_PATH) fail("record-only immutable context child required");
   const settings = loadCommittedSettings(source, sourceCommit).settings;
   if (settings.repository !== TRIAL_IDENTITY.repository || settings.hostname !== "docs-drift.invalid"
-    || settings.default_branch !== TRIAL_IDENTITY.default_branch || settings.publication.actor !== TRIAL_IDENTITY.actor
+    || settings.default_branch !== TRIAL_IDENTITY.default_branch || !sameLogin(publisherActor(settings, "hosted"), TRIAL_IDENTITY.actor)
     || settings.publication.repository !== TRIAL_IDENTITY.repository || settings.pr_discovery.repository !== TRIAL_IDENTITY.repository
     || digest(manifest.clients_sha256) !== sha256(canonicalJSON(settings.clients))) fail("synthetic settings identity");
   const defaultRef = "refs/heads/" + settings.default_branch;

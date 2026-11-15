@@ -469,7 +469,7 @@ export async function selectApprovedRuntime(input: {
   const options = { ...input }, policyRepo = options.policy_repo ?? options.repo;
   inspectCacheLocation(options.cache_directory, options.repo);
   if (policyRepo !== options.repo) inspectCacheLocation(options.cache_directory, policyRepo);
-  const adopted = verifyRuntimeAdoption({ repo: policyRepo, current_default: options.current_default, identity: options.identity });
+  const adopted = verifyRuntimeAdoption({ repo: policyRepo, current_default: options.current_default, identity: options.identity, entry: options.entry });
   const bindings = collectAdoptionBindings(policyRepo, options.current_default), settings = bindings.settings;
   const launcherSHA = inspectEntryInput(policyRepo, options.current_default, settings.runtime_loader.launcher, options.launcher_path, options.repo);
   const settingsSHA = inspectEntryInput(policyRepo, options.current_default, ".vh-adlc/docs-drift.yaml", options.settings_path, options.repo);
@@ -487,7 +487,7 @@ export async function selectRecoveryRuntime(input: {
 }) {
   const options = structuredClone(input);
   inspectCacheLocation(options.cache_directory, options.repo);
-  const adopted = verifyRuntimeAdoption({ repo: options.repo, current_default: options.source_commit, identity: options.identity });
+  const adopted = verifyRuntimeAdoption({ repo: options.repo, current_default: options.source_commit, identity: options.identity, entry: options.entry });
   if (adopted.adoption_sha256 !== options.adoption_sha256) fail("original recovery adoption changed");
   const bindings = collectAdoptionBindings(options.repo, options.source_commit), settings = bindings.settings;
   const runtime = await retainedRuntimeEntry({ ...options, settings, pin: adopted.component_pin, identity: adopted.identity,

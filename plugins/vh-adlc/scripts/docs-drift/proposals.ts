@@ -6,14 +6,15 @@ import { join } from "node:path";
 import { executeOwnedProcess } from "./owned-process";
 import { canonicalDigest, canonicalJSON, decodeUTF8, protocolPath, sha256 } from "./protocol";
 import type { Settings } from "./settings";
+import { sameAccount, sameLogin } from "./identity";
 import type { OwnedObjectStore } from "./snapshot";
 
 /** Refreshing a configured legacy target preserves its author. The executing actor stays separate. */
 export function isRefreshTarget(settings: Settings, identity: { actor: string; actor_id: number; repository_id: number },
   target: { number: number; actor: string; actor_id: number; head_ref: string; head_repository_id: number | null }): boolean {
-  const shared = target.actor === identity.actor && target.actor_id === identity.actor_id
+  const shared = sameAccount(target, identity)
     && target.head_ref.startsWith(settings.publication.branch_prefix);
-  const legacy = settings.legacy_proposals.authors.includes(target.actor)
+  const legacy = settings.legacy_proposals.authors.some(author => sameLogin(author, target.actor))
     && settings.legacy_proposals.branch_prefixes.some(prefix => target.head_ref.startsWith(prefix));
   return target.head_repository_id === identity.repository_id && (shared || legacy);
 }
@@ -28,8 +29,8 @@ export function collectProposals(reader: RepositoryReader, settings: Settings) {
     if (!open.complete && !open.diagnostics.length) diagnostics.push("Open proposal collection incomplete");
     const selected = new Map<number, PullRequestInput>();
     for (const proposal of open.items) {
-      const shared = settings.pr_discovery.authors.includes(proposal.actor) && settings.pr_discovery.branch_prefixes.some(prefix => proposal.head_ref.startsWith(prefix));
-      const legacy = settings.legacy_proposals.authors.includes(proposal.actor) && settings.legacy_proposals.branch_prefixes.some(prefix => proposal.head_ref.startsWith(prefix));
+      const shared = settings.pr_discovery.authors.some(author => sameLogin(author, proposal.actor)) && settings.pr_discovery.branch_prefixes.some(prefix => proposal.head_ref.startsWith(prefix));
+      const legacy = settings.legacy_proposals.authors.some(author => sameLogin(author, proposal.actor)) && settings.legacy_proposals.branch_prefixes.some(prefix => proposal.head_ref.startsWith(prefix));
       if (shared || legacy || settings.legacy_proposals.ids.includes(proposal.number)) selected.set(proposal.number, proposal);
     }
     for (const id of settings.legacy_proposals.ids) {

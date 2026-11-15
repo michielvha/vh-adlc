@@ -5,6 +5,8 @@ import { readGit, collectionReaders, readAdoptionInput as committedInput } from 
 import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
 import { classifySettingsLeaves, loadCommittedSettings, parseSettings, settingsProjections } from "./settings";
 import { readTrialDefinition, readTrialHistoryBindings } from "./trial-definition";
+import { PUBLISHER_ENTRIES, publisherActor, sameAccount, sameLogin, samePublicationIdentity,
+  type EntryIdentities, type PublisherEntry } from "./identity";
 
 type ComponentPin = {
   schema_version: 1; source_repository: string; source_commit: string; source_release: string;
@@ -15,7 +17,7 @@ function immutable(value: unknown): string {
   if (typeof value !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(value)) fail("immutable commit required");
   return value;
 }
-function object(value: unknown, keys: string[], label = "object"): Record<string, unknown> {
+function object(value: unknown, keys: readonly string[], label = "object"): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) fail("invalid " + label);
   canonicalJSON(value);
   const input = value as Record<string, unknown>;
@@ -64,7 +66,7 @@ function collectSelectedBindings(repo: string, sourceCommit: string, committed: 
 }
 
 /** Committed setup is non-granting. Actual fixture ownership and trial permission are separate. */
-export function collectTrialBindings(options: { repo: string; current_default: string; identity?: PublicationIdentity }) {
+export function collectTrialBindings(options: AdoptionOptions) {
   const source = immutable(options.current_default), current = loadCommittedSettings(options.repo, source).settings;
   const policy = readTrialDefinition({ repo: options.repo, source, settings: current });
   const candidate = collectSelectedBindings(options.repo, source, { settings: policy.candidate_settings.value,
@@ -72,9 +74,20 @@ export function collectTrialBindings(options: { repo: string; current_default: s
   if (candidate.protected_sha256 !== policy.prospective_protected_sha256
     || candidate.component_pin.path !== policy.candidate_component.path
     || candidate.component_pin.sha256 !== policy.candidate_component.sha256) fail("prospective trial bindings changed");
-  const normalized = (identity: PublicationIdentity) => ({ ...identity, repository: identity.repository.toLowerCase(), actor: identity.actor.toLowerCase() });
-  if (options.identity && !canonicalJSON(normalized(nativeIdentity(options.identity))).equals(canonicalJSON(normalized(policy.identity)))) fail("current native trial identity");
-  return freezeJSON({ ...policy, source_commit: source, candidate, authority: "none" as const });
+  let identity = policy.identity;
+  if (options.identity) {
+    const observed = nativeIdentity(options.identity);
+    if (!sameLogin(observed.actor, publisherActor(candidate.settings, options.entry))) fail("current native trial identity");
+    if (candidate.settings.publication.entry_actors && options.entry !== "hosted") {
+      if (observed.repository.toLowerCase() !== policy.identity.repository.toLowerCase()
+        || observed.repository_id !== policy.identity.repository_id || observed.default_branch !== policy.identity.default_branch)
+        fail("current native trial identity");
+      identity = observed;
+    } else if (!samePublicationIdentity(observed, policy.identity)) fail("current native trial identity");
+  }
+  return freezeJSON({ ...policy, identity, source_commit: source, candidate, authority: "none" as const,
+    ...(candidate.settings.publication.entry_actors && options.entry
+      ? { publisher_entry: options.entry, hosted_identity: policy.identity } : {}) });
 }
 
 /** Check structural C/D assembly. The evidence verifier separately validates the record contents. */
@@ -129,13 +142,43 @@ function nativeIdentity(value: unknown): PublicationIdentity {
 }
 
 type AdoptionBoundary = { kind: "observed" } | { kind: "test-only"; fixture_id: string };
+type AdoptionOptions = { repo: string; current_default: string; identity?: PublicationIdentity; entry?: PublisherEntry };
 
 function parseAdoptionRecord(bytes: Uint8Array, boundary: AdoptionBoundary) {
-  const record = object(collectionReaders().yaml(bytes), ["schema_version", "kind", "source_candidate", "protected_sha256",
-    "protected_manifest", "component_pin_sha256", "identity", "receipts", "predecessor", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])]);
+  const value = collectionReaders().yaml(bytes);
+  const mapped = value !== null && typeof value === "object" && Reflect.get(value, "schema_version") === 2;
+  const record = object(value, ["schema_version", "kind", "source_candidate", "protected_sha256",
+    "protected_manifest", "component_pin_sha256", "identity", "receipts", "predecessor",
+    ...(mapped ? ["entry_identities"] : []), ...(boundary.kind === "test-only" ? ["fixture_id"] : [])]);
   if (boundary.kind === "test-only" && record.fixture_id !== boundary.fixture_id) fail("synthetic adoption fixture identity");
-  if (record.schema_version !== 1 || record.kind !== "docs-drift-adoption") fail("record schema");
+  if ((record.schema_version !== 1 && record.schema_version !== 2) || record.kind !== "docs-drift-adoption") fail("record schema");
   return record;
+}
+
+function readEntryIdentities(record: ReturnType<typeof parseAdoptionRecord>, identity: PublicationIdentity,
+  settings: ReturnType<typeof collectAdoptionBindings>["settings"]): EntryIdentities | undefined {
+  if (settings.publication.entry_actors === undefined) {
+    if (record.schema_version !== 1) fail("scalar adoption record schema");
+    return undefined;
+  }
+  if (record.schema_version !== 2) fail("mapped adoption entry identities required");
+  const values = object(record.entry_identities, PUBLISHER_ENTRIES, "entry identities");
+  const read = (entry: PublisherEntry) => {
+    const account = object(values[entry], ["actor", "actor_id"], "entry identity " + entry);
+    const native = nativeIdentity({ ...identity, ...account });
+    if (!sameLogin(native.actor, publisherActor(settings, entry))) fail("configured entry identity " + entry);
+    return { actor: native.actor, actor_id: native.actor_id };
+  };
+  const entries = { hosted: read("hosted"), copilot: read("copilot"), claude: read("claude") };
+  if (!sameAccount(entries.hosted, identity)) fail("hosted entry identity");
+  return entries;
+}
+
+function receiptPublisher(name: string): PublisherEntry | null {
+  if (name === "hosted_advisory" || name === "history_read") return "hosted";
+  if (name === "copilot_entry") return "copilot";
+  if (name === "claude_entry") return "claude";
+  return null;
 }
 
 /** Read the observed field from a portable receipt set validated by the adoption gate. */
@@ -150,24 +193,29 @@ function recordedModelMatches(requested: string | null, observed: unknown): bool
   return requested === null ? observed === null : modelMatches(requested, fullModel(observed));
 }
 
-function verifyRecordedReceipts(repo: string, value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number, boundary: AdoptionBoundary, carried?: { names: string[]; receipts: unknown }): void {
+function verifyRecordedReceipts(repo: string, value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number, boundary: AdoptionBoundary, entries?: EntryIdentities, carried?: { names: string[]; receipts: unknown }): void {
   const receipts = object(value, Object.keys(receiptRequirements));
-  const target = canonicalDigest({ schema_version: 1, repository: bindings.settings.repository,
-    source_candidate: candidate, protected_sha256: bindings.protected_sha256, component_pin_sha256: bindings.component_pin.sha256, identity });
+  const target = canonicalDigest({ schema_version: entries ? 2 : 1, repository: bindings.settings.repository,
+    source_candidate: candidate, protected_sha256: bindings.protected_sha256, component_pin_sha256: bindings.component_pin.sha256, identity,
+    ...(entries ? { entry_identities: entries } : {}) });
   for (const name of Object.keys(receiptRequirements) as (keyof typeof receiptRequirements)[]) {
     if (carried?.names.includes(name)) {
       const previous = object(carried.receipts, Object.keys(receiptRequirements));
       if (!canonicalJSON(receipts[name]).equals(canonicalJSON(previous[name]))) fail("carried receipt changed " + name);
       continue;
     }
+    const publisher = receiptPublisher(name);
     const receipt = object(receipts[name], ["schema_version", "kind", "evidence_kind", "source_commit", "artifact_sha256",
       "bindings_sha256", "outcome", "native_conclusion", "worker_model", "reviewer_model", "client_bindings", "observations",
+      ...(entries && publisher ? ["publisher_identity"] : []),
       ...(boundary.kind === "test-only" ? ["fixture_id"] : []),
       ...(name === "history_read" ? ["producer_workflow_id", "producer_workflow_path", "reader_workflow_id", "reader_workflow_path"] : []),
       ...(name === "quiescence" ? ["workflow_id", "workflow_path", "observed_at", "queued_run_ids", "in_progress_run_ids", "interactive_request_sha256", "workflow_state", "drained_runs"] : [])], "receipt " + name);
     if (receipt.schema_version !== 1 || receipt.kind !== name || receipt.evidence_kind !== boundary.kind
       || (boundary.kind === "test-only" && receipt.fixture_id !== boundary.fixture_id)
       || adoptionDigest(receipt.bindings_sha256) !== target) fail(boundary.kind + " record receipt " + name);
+    if (entries && publisher && !canonicalJSON(receipt.publisher_identity).equals(canonicalJSON(entries[publisher])))
+      fail("recorded publisher identity " + name);
     // Consumer receipts target C. Install receipts target the pinned shared component source.
     const source = name.endsWith("_install") ? bindings.component_pin.value.source_commit : candidate;
     if (immutable(receipt.source_commit) !== source) fail("recorded source target " + name);
@@ -234,7 +282,7 @@ function recordHistory(repo: string, ancestor: string, descendant: string, path:
  * Historical native execution and artifact contents are verified separately by the operator.
  * This read-only result supplies no publication, cleanup, workflow or merge authority.
  */
-function readAdoptionFrame(options: { repo: string; current_default: string; identity?: PublicationIdentity }, boundary: AdoptionBoundary) {
+function readAdoptionFrame(options: AdoptionOptions, boundary: AdoptionBoundary) {
   const { repo, current_default: current } = options;
   immutable(current);
   if (loadCommittedSettings(repo, current).settings.publication.mode !== "adopted") fail("consumer is not adopted");
@@ -250,12 +298,9 @@ function readAdoptionFrame(options: { repo: string; current_default: string; ide
     || !canonicalJSON(record.protected_manifest).equals(canonicalJSON(original.protected_manifest))
     || bindings.protected_sha256 !== original.protected_sha256) fail("protected record bindings changed");
   const identity = nativeIdentity(record.identity);
-  if (!options.identity) fail("current native adoption identity");
-  const observed = nativeIdentity(options.identity);
-  const normalized = (value: PublicationIdentity) => ({ ...value, repository: value.repository.toLowerCase(), actor: value.actor.toLowerCase() });
   if (identity.repository.toLowerCase() !== bindings.settings.repository || identity.actor.toLowerCase() !== bindings.settings.publication.actor.toLowerCase()
-    || identity.default_branch !== bindings.settings.default_branch
-    || !canonicalJSON(normalized(identity)).equals(canonicalJSON(normalized(observed)))) fail("current native adoption identity");
+    || identity.default_branch !== bindings.settings.default_branch) fail("recorded adoption identity");
+  const entryIdentities = readEntryIdentities(record, identity, bindings.settings);
   const history = recordHistory(repo, candidate, current, path);
   if (history.some(item => item.record !== null && (item.record.mode !== "100644" || item.record.sha256 !== input.sha256))) {
     fail("immutable adoption record changed");
@@ -272,7 +317,8 @@ function readAdoptionFrame(options: { repo: string; current_default: string; ide
   verifyRetainedInputs(repo, candidate, current, [[path, input.sha256], [original.component_pin.path, original.component_pin.sha256]]);
   const result = freezeJSON({ kind: "docs-drift-runtime-adoption", current_default: current,
     source_candidate: candidate, delivery_commit: delivery, record_path: path, adoption_sha256: input.sha256,
-    protected_sha256: bindings.protected_sha256, component_pin: bindings.component_pin.value, identity, receipts: record.receipts });
+    protected_sha256: bindings.protected_sha256, component_pin: bindings.component_pin.value, identity, receipts: record.receipts,
+    ...(entryIdentities ? { entry_identities: entryIdentities } : {}) });
   return { result, record, original, deliveryTime };
 }
 
@@ -284,7 +330,24 @@ function verifyRetainedInputs(repo: string, base: string, candidate: string, inp
   }
 }
 
-type AdoptionResult = ReturnType<typeof readAdoptionFrame>["result"];
+type AdoptionResult = ReturnType<typeof readAdoptionFrame>["result"] & {
+  publisher_entry?: PublisherEntry; hosted_identity?: PublicationIdentity;
+};
+
+function currentPublisher(recorded: AdoptionResult, options: AdoptionOptions) {
+  if (!options.identity) fail("current native adoption identity");
+  const entry = options.entry;
+  if (recorded.entry_identities && (entry === undefined || !PUBLISHER_ENTRIES.includes(entry))) fail("publisher entry required");
+  const identity = recorded.entry_identities && entry
+    ? { ...recorded.identity, ...recorded.entry_identities[entry] } : recorded.identity;
+  if (!samePublicationIdentity(identity, nativeIdentity(options.identity))) fail("current native adoption identity");
+  return { identity, ...(recorded.entry_identities ? { publisher_entry: entry, hosted_identity: recorded.identity } : {}) };
+}
+
+function changedIdentityEntries(previous: AdoptionResult, next: AdoptionResult): PublisherEntry[] {
+  return PUBLISHER_ENTRIES.filter(entry => !sameAccount(previous.entry_identities?.[entry] ?? previous.identity,
+    next.entry_identities?.[entry] ?? next.identity));
+}
 const compatibleCarriedReceipts = ["hosted_advisory", "history_read", "quiescence", "copilot_entry", "claude_entry"];
 
 function predecessorLink(value: unknown, boundary: AdoptionBoundary) {
@@ -302,7 +365,8 @@ function predecessorLink(value: unknown, boundary: AdoptionBoundary) {
 function verifyCompatibility(repo: string, value: unknown, previous: AdoptionResult, next: ReturnType<typeof readAdoptionFrame>, boundary: AdoptionBoundary) {
   const changes = compareUpgradeBindings({ repo, approved_default: previous.current_default,
     source_candidate: next.result.source_candidate, identity: next.result.identity }, previous);
-  if (changes.known_affected_entries.length) fail("compatible upgrade changes execution bindings");
+  if (changes.known_affected_entries.length || changedIdentityEntries(previous, next.result).length)
+    fail("compatible upgrade changes execution bindings");
   verifyComponentReview(value, previous, next, boundary);
 }
 
@@ -368,7 +432,7 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
   let value = collectionReaders().yaml(definitionInput.bytes);
   let expectedCases: ReturnType<typeof readTrialDefinition>["expected"]["cases"] | null = null;
   if (value !== null && typeof value === "object" && !Array.isArray(value) && Reflect.get(value, "kind") === "docs-drift-trial") {
-    const policy = collectTrialBindings({ repo, current_default: previous.current_default, identity: previous.identity });
+    const policy = collectTrialBindings({ repo, current_default: previous.current_default, identity: previous.identity, entry: "hosted" });
     if (policy.candidate.protected_sha256 !== next.result.protected_sha256
       || (boundary.kind === "test-only" && policy.fixture.id !== boundary.fixture_id)) fail("full upgrade trial binding");
     expectedCases = policy.expected.cases;
@@ -392,9 +456,11 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
     componentEntries = selected;
   }
   if (definition.classification === "execution" && changes.component.changed && componentEntries === null) fail("component contract coverage required");
+  const identityChanges = changedIdentityEntries(previous, next.result);
+  const knownAffected = all.filter(entry => changes.known_affected_entries.includes(entry) || identityChanges.includes(entry));
   const affected = componentEntries !== null
-    ? all.filter(entry => componentEntries.includes(entry) || changes.known_affected_entries.includes(entry))
-    : changes.component.changed || definition.classification !== "execution" ? [...all] : changes.known_affected_entries;
+    ? all.filter(entry => componentEntries.includes(entry) || knownAffected.includes(entry))
+    : changes.component.changed || definition.classification !== "execution" ? [...all] : knownAffected;
   if (!affected.length || !canonicalJSON(definition.affected_entries).equals(canonicalJSON(affected))) fail("upgrade affected surface inventory");
   const carried = compatibleCarriedReceipts.filter(name => name === "quiescence"
     || (name === "hosted_advisory" || name === "history_read" ? !affected.includes("hosted")
@@ -402,7 +468,7 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
   if (!canonicalJSON(link.carry_receipts).equals(canonicalJSON(carried))) fail("trial carried receipt inventory");
   const policyBlobs = ["AGENTS.md", previousSettings.project_procedure, next.original.settings.project_procedure,
     previousSettings.scanner.adapter, next.original.settings.scanner.adapter];
-  const policyChanged = changes.changed_settings.some(path => !["clients", "execution", "runtime_loader", "component_pin"].includes(String(path[0]))
+  const policyChanged = identityChanges.length > 0 || changes.changed_settings.some(path => !["clients", "execution", "runtime_loader", "component_pin"].includes(String(path[0]))
     && !(path[0] === "publication" && path[1] === "adoption_record")) || changes.changed_blobs.some(path => policyBlobs.includes(path));
   const historyPolicyChanged = changes.changed_settings.some(path => path[0] === "reports"
     || (path[0] === "execution" && path[1] === "permissions" && path[2] === "actions"));
@@ -488,13 +554,15 @@ function verifyHistoricalAdoptionInputs(repo: string, current: string, boundary:
 }
 
 /** Walk immutable predecessor defaults before accepting any carried observation. */
-function verifyAdoptionRecord(options: { repo: string; current_default: string; identity?: PublicationIdentity }, boundary: AdoptionBoundary): AdoptionResult {
+function verifyAdoptionRecord(options: AdoptionOptions, boundary: AdoptionBoundary): AdoptionResult {
   const frames: ReturnType<typeof readAdoptionFrame>[] = [], seen = new Set<string>();
+  let publisher: ReturnType<typeof currentPublisher> | null = null;
   let current = options.current_default;
   while (true) {
     if (seen.has(current)) fail("cyclic predecessor adoption");
     seen.add(current);
     const frame = readAdoptionFrame({ ...options, current_default: current }, boundary);
+    if (publisher === null) publisher = currentPublisher(frame.result, options);
     frames.push(frame);
     verifyRetainedInputs(options.repo, current, options.current_default,
       [[frame.result.record_path, frame.result.adoption_sha256], [frame.original.component_pin.path, frame.original.component_pin.sha256]]);
@@ -508,7 +576,7 @@ function verifyAdoptionRecord(options: { repo: string; current_default: string; 
   let previous: AdoptionResult | null = null;
   for (const frame of frames.reverse()) {
     if (previous === null) {
-      verifyRecordedReceipts(options.repo, frame.record.receipts, frame.original, frame.result.source_candidate, frame.result.identity, frame.deliveryTime, boundary);
+      verifyRecordedReceipts(options.repo, frame.record.receipts, frame.original, frame.result.source_candidate, frame.result.identity, frame.deliveryTime, boundary, frame.result.entry_identities);
     } else {
       const link = predecessorLink(frame.record.predecessor, boundary);
       if (link.default_commit !== previous.current_default || link.record_path !== previous.record_path
@@ -516,17 +584,17 @@ function verifyAdoptionRecord(options: { repo: string; current_default: string; 
       const carried = link.route === "compatible" ? compatibleCarriedReceipts : verifyTrialSuccessor(options.repo, link, previous, frame, boundary);
       if (link.route === "compatible") verifyCompatibility(options.repo, link.compatibility, previous, frame, boundary);
       verifyRecordedReceipts(options.repo, frame.record.receipts, frame.original, frame.result.source_candidate, frame.result.identity,
-        frame.deliveryTime, boundary, { names: carried, receipts: previous.receipts });
+        frame.deliveryTime, boundary, frame.result.entry_identities, { names: carried, receipts: previous.receipts });
     }
     previous = frame.result;
   }
-  if (previous === null) fail("missing adoption record");
+  if (previous === null || publisher === null) fail("missing adoption record");
   verifyHistoricalAdoptionInputs(options.repo, options.current_default, boundary);
-  return previous;
+  return freezeJSON({ ...previous, ...publisher });
 }
 
 /** Production always requires observed owner-attested receipts. */
-export function verifyRuntimeAdoption(options: { repo: string; current_default: string; identity?: PublicationIdentity }) {
+export function verifyRuntimeAdoption(options: AdoptionOptions) {
   return freezeJSON({ ...verifyAdoptionRecord(options, { kind: "observed" }), evidence: "owner-attestation" as const });
 }
 
@@ -534,15 +602,15 @@ export function verifyRuntimeAdoption(options: { repo: string; current_default: 
 export async function createTrialAdoptionGate(options: { root: string; context_commit: string; runtime_directory: string }) {
   const { loadTrialContext, TRIAL_IDENTITY } = await import("./trial-context");
   const setup = Object.freeze({ ...options }), context = loadTrialContext(setup);
-  return Object.freeze({ fixture_id: context.fixture_id, verify(input: { current_default: string }) {
+  return Object.freeze({ fixture_id: context.fixture_id, verify(input: { current_default: string; entry?: PublisherEntry }) {
     loadTrialContext(setup);
     const current = immutable(input.current_default);
     try { readGit(context.source, "merge-base", "--is-ancestor", context.source_commit, current); }
     catch { fail("synthetic adoption default outside owned source"); }
     const { settings } = loadCommittedSettings(context.source, current);
     if (settings.hostname !== "docs-drift.invalid" || settings.repository !== TRIAL_IDENTITY.repository
-      || settings.default_branch !== TRIAL_IDENTITY.default_branch || settings.publication.actor !== TRIAL_IDENTITY.actor) fail("synthetic adoption namespace");
-    const result = verifyAdoptionRecord({ repo: context.source, current_default: current, identity: TRIAL_IDENTITY },
+      || settings.default_branch !== TRIAL_IDENTITY.default_branch || !sameLogin(publisherActor(settings, "hosted"), TRIAL_IDENTITY.actor)) fail("synthetic adoption namespace");
+    const result = verifyAdoptionRecord({ repo: context.source, current_default: current, identity: TRIAL_IDENTITY, entry: input.entry },
       { kind: "test-only", fixture_id: context.fixture_id });
     return freezeJSON({ ...result, evidence: "test-only" as const, fixture_id: context.fixture_id });
   } });
@@ -553,12 +621,12 @@ const clientSignalPath = ".vh-adlc/docs-drift-client-upgrade-signals.yaml";
 const clientPackages = { copilot: "@github/copilot", claude: "@anthropic-ai/claude-code", codex: "@openai/codex" } as const;
 
 /** Signals are non-executing intake. Their mismatch never selects or replaces a runtime. */
-export function checkUpgradeSignals(options: { repo: string; source: string; identity?: PublicationIdentity }) {
+export function checkUpgradeSignals(options: { repo: string; source: string; identity?: PublicationIdentity; entry?: PublisherEntry }) {
   const source = immutable(options.source), { settings } = loadCommittedSettings(options.repo, source);
   let selectedPin: ComponentPin, selectedSettings = settings, target: "candidate-trial" | "adopted";
   if (settings.publication.mode === "staged") {
     if (settings.trial === null) return freezeJSON({ status: "staged-no-target", source_commit: source, matches: null });
-    const trial = collectTrialBindings({ repo: options.repo, current_default: source, identity: options.identity });
+    const trial = collectTrialBindings({ repo: options.repo, current_default: source, identity: options.identity, entry: options.entry });
     selectedPin = trial.candidate.component_pin.value;
     selectedSettings = trial.candidate.settings;
     target = "candidate-trial";
@@ -568,7 +636,7 @@ export function checkUpgradeSignals(options: { repo: string; source: string; ide
     const record = parseAdoptionRecord(input.bytes, { kind: "observed" });
     // Consistency checks use only committed identity. Runtime selection still requires native identity.
     selectedPin = verifyAdoptionRecord({ repo: options.repo, current_default: source,
-      identity: nativeIdentity(record.identity) }, { kind: "observed" }).component_pin;
+      identity: nativeIdentity(record.identity), entry: "hosted" }, { kind: "observed" }).component_pin;
     target = "adopted";
   }
   const input = committedInput(options.repo, source, componentSignalPath), clientInput = committedInput(options.repo, source, clientSignalPath);
@@ -601,9 +669,9 @@ export function checkUpgradeSignals(options: { repo: string; source: string; ide
  * This read-only comparison supplies no adoption or effect authority.
  */
 export function collectUpgradeChanges(options: {
-  repo: string; approved_default: string; source_candidate: string; identity: PublicationIdentity;
+  repo: string; approved_default: string; source_candidate: string; identity: PublicationIdentity; entry?: PublisherEntry;
 }) {
-  const adopted = verifyRuntimeAdoption({ repo: options.repo, current_default: options.approved_default, identity: options.identity });
+  const adopted = verifyRuntimeAdoption({ repo: options.repo, current_default: options.approved_default, identity: options.identity, entry: options.entry });
   return compareUpgradeBindings(options, adopted);
 }
 
@@ -656,6 +724,8 @@ function compareUpgradeBindings(options: { repo: string; approved_default: strin
         .some(entry => entry.worker.client === path[1] || entry.reviewer.client === path[1]));
       mark(...(selected.length ? selected : entries));
     } else if (path[0] === "runtime_loader") mark(...entries);
+    else if (path[0] === "publication" && path[1] === "entry_actors"
+      && (path[2] === "hosted" || path[2] === "copilot" || path[2] === "claude")) mark(path[2]);
     else if (path[0] === "execution" && path[1] === "entries" && (path[2] === "hosted" || path[2] === "copilot" || path[2] === "claude")) mark(path[2]);
     else if (path[0] === "execution" && path[1] === "claude_command") mark("claude");
     else if (path[0] === "execution") mark("hosted");
