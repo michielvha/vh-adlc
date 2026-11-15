@@ -13,8 +13,8 @@ Use vh-adlc to repair this regression and finish locally.
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
 repository and selects a procedure. The candidate package combines this entry,
-eleven engineering operations, three content operations and one host-cleanup
-operation, giving sixteen skills. Check
+eleven engineering operations, four content operations and one host-cleanup
+operation, giving seventeen skills. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -53,6 +53,7 @@ see [installation](../get-started/installation.md).
 | Review | `vh-adlc-review` | Dispatch an independent implementation review of an exact commit. |
 | Ship | `vh-adlc-ship` | On an explicit request, push the branch, open or update the PR, and update the issue. Never merges. |
 | Resume | `vh-adlc-resume` | Reconstruct the state and continue the next safe step. |
+| Architecture diagram | `vh-adlc-diagram` | Create and verify repository-grounded draw.io architecture diagrams. |
 | Documentation impact | `vh-adlc-docs-impact` | Find and review docs affected by selected code changes. |
 | Documentation drift candidate | `vh-adlc-docs-drift` | Audit the configured corpus, resolve selected stale docs-audit PRs and freshly review selected post-merge closures. |
 | Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |

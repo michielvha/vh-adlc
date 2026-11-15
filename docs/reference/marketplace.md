@@ -129,4 +129,4 @@ cutover/rollback results remain separate acceptance steps. Follow the
 
 ## Architecture diagram skill
 
-The shared `vh-adlc` package introduces `vh-adlc-diagram` in plugin version 0.23.0. The skill becomes available from the marketplace when that package is published. The [workflow](../user-guides/workflows.md#architecture-diagrams) lists the local renderer and asset prerequisites.
+`vh-adlc-diagram` is included in the shared marketplace package from plugin version 0.23.0. The [workflow](../user-guides/workflows.md#architecture-diagrams) lists the local renderer and asset prerequisites.
