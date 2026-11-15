@@ -46,7 +46,8 @@ test("one native observation deduplicates repeated reads and replays its origina
       }
     });
     const calls = f.calls();
-    expect(calls).toHaveLength(18);
+    expect(calls).toHaveLength(21);
+    expect(calls.filter(call => call.args.includes("user/20"))).toHaveLength(3);
     expect(calls.filter(call => call.args.includes("repos/fixture/docs"))).toHaveLength(5);
     expect(calls.filter(call => call.args.includes("repos/fixture/docs/git/ref/heads/main"))).toHaveLength(5);
     expect(calls.filter(call => call.args.includes("repos/fixture/docs/git/commits/" + f.candidate))).toHaveLength(3);

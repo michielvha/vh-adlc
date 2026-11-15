@@ -65,7 +65,14 @@ if (args.includes("graphql")) {
   console.log(JSON.stringify({ data: { viewer } })); process.exit(0);
 }
 if (args[args.indexOf("--method") + 1] !== "GET") process.exit(91);
-const values = JSON.parse(require("node:fs").readFileSync(${JSON.stringify(responses_file)}, "utf8")), value = values[args.at(-1)];
+const values = JSON.parse(require("node:fs").readFileSync(${JSON.stringify(responses_file)}, "utf8"));
+const reads = require("node:fs").readFileSync(${JSON.stringify(calls)}, "utf8").trim().split("\\n").map(line => JSON.parse(line));
+const count = reads.filter(call => call.program === "gh" && call.args.includes("graphql")).length;
+const changed = ${JSON.stringify(fault === "changed-actor")} && count >= 6;
+const viewer = values.__viewer_after && count >= values.__viewer_after.at ? values.__viewer_after.viewer
+  : values.__viewer ?? { login: changed ? "other-fixture-actor" : "fixture-bot", databaseId: changed ? 21 : 20 };
+const endpoint = args.at(-1);
+const value = endpoint === "user/" + viewer.databaseId ? { login: viewer.login, id: viewer.databaseId } : values[endpoint];
 if (!value) { console.log("HTTP/2.0 404 Not Found\\r\\n\\r\\n{}"); process.exit(1); }
 console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
 `, { mode: 0o700 });

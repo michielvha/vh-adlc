@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpath
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { reconcileAbsent, inspectRetainedOperation, restoreRetainedOperation } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
-import { createNativeTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
+import { createNativeTransport, readNativeContext } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { sealPlan, writePlanObject, createJournal, writePublicationObjects, appendIntent, appendOutcome, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -51,7 +51,7 @@ function setup() {
   const statePath = join(root, "state.json"), calls = join(root, "calls.jsonl");
   const readme = readGit(repo, "show", "HEAD:README.md"), blobSha = readGit(repo, "rev-parse", "HEAD:README.md").toString().trim();
   const planBytes = canonicalJSON(plan);
-  const state = { commit, tree, publication_commit: commit, repository_id: 10,
+  const state = { viewer_login: "fixture-bot", viewer_id: 20, account_status: 0, account_response: null as Record<string, unknown> | null, commit, tree, publication_commit: commit, repository_id: 10,
     metadata_commit: { sha: objects.object, tree: { sha: objects.tree }, parents: [] as Array<{ sha: string }>, message: "retained metadata" },
     metadata_tree: { sha: objects.tree, truncated: false, tree: [{ path: "plan.json", mode: "100644", type: "blob", sha: objects.blob }] },
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
@@ -2095,4 +2095,40 @@ test.each(["matching", "changed-facts"] as const)("native conflict retirement re
   expect(f.inspect().refs[f.settings.publication.lease_ref] !== undefined).toBe(scenario !== "matching");
   const calls = readFileSync(f.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
   expect(calls.some(call => call.program === "gh" && call.args.includes("PATCH"))).toBe(false);
+});
+
+
+test("native identity resolves a GraphQL bot slug through its exact numeric REST account", async () => {
+  const f = setup();
+  f.update(state => {
+    state.viewer_login = "fixture-bot";
+    state.account_response = { login: "fixture-bot[bot]", id: 20 };
+    state.app_token = true;
+  });
+  const identity = await f.transport.identity();
+  expect(identity.actor).toBe("fixture-bot[bot]");
+  expect(identity.actor_id).toBe(20);
+  const context = readNativeContext({ hostname: "github.com", repository: "fixture/docs", credential: "synthetic-credential",
+    path: join(f.root, "bin") + ":" + process.env.PATH });
+  expect(context.identity).toEqual(identity);
+  const calls = readFileSync(f.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { args: string[] });
+  expect(calls.filter(call => call.args.at(-1) === "user/20")).toHaveLength(2);
+  expect(calls.some(call => call.args.at(-1) === "user")).toBe(false);
+});
+
+test.each([
+  { name: "changed ID", response: { login: "fixture-bot[bot]", id: 21 }, status: 0 },
+  { name: "missing ID", response: { login: "fixture-bot[bot]" }, status: 0 },
+  { name: "missing login", response: { id: 20 }, status: 0 },
+  { name: "malformed account", response: { login: 7, id: 20 }, status: 0 },
+  { name: "unavailable account", response: null, status: 403 },
+])("native identity refuses $name after authenticated numeric lookup", async ({ response, status }) => {
+  const f = setup();
+  f.update(state => { state.account_response = response; state.account_status = status; });
+  await expect(f.transport.identity()).rejects.toThrow();
+  expect(() => readNativeContext({ hostname: "github.com", repository: "fixture/docs", credential: "synthetic-credential",
+    path: join(f.root, "bin") + ":" + process.env.PATH })).toThrow();
+  const calls = readFileSync(f.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { args: string[] });
+  expect(calls.filter(call => call.args.at(-1) === "user/20")).toHaveLength(2);
+  expect(calls.every(call => call.args.includes("GET") || call.args.includes("graphql"))).toBe(true);
 });

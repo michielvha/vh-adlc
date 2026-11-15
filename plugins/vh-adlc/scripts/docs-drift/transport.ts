@@ -130,8 +130,12 @@ function authenticatedIdentity(repo: ReturnType<typeof contentsAccess>, hostname
   const envelope = record(JSON.parse(response.stdout.toString()) as unknown);
   if (Object.hasOwn(envelope, "errors") && (!Array.isArray(envelope.errors) || envelope.errors.length !== 0)) throw Error("native viewer query incomplete");
   const viewer = record(record(envelope.data).viewer);
-  return { repository: repo.full_name.toLowerCase(), repository_id: repo.id, default_branch: text(repo.default_branch),
-    actor: text(viewer.login), actor_id: positive(viewer.databaseId) };
+  text(viewer.login);
+  const viewerID = positive(viewer.databaseId);
+  const reader = createGitHubReader(hostname, { inherit_env: false, env: environment, timeout_ms: timeout });
+  const account = actor(reader.get(`user/${viewerID}`));
+  if (account.actor_id !== viewerID) throw Error("native authenticated account ID changed");
+  return { repository: repo.full_name.toLowerCase(), repository_id: repo.id, default_branch: text(repo.default_branch), ...account };
 }
 
 type NativeContextOptions = {

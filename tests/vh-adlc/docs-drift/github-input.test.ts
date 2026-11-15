@@ -3,7 +3,7 @@ import { afterEach, expect, test } from "bun:test";
 import { chmodSync, lstatSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { createGitHubReader, createRepositoryReader } from "../../../plugins/vh-adlc/scripts/github-read";
+import { createGitHubReader, createRepositoryReader, ghRead } from "../../../plugins/vh-adlc/scripts/github-read";
 import { collectProposals, fetchCurrentDefault, fetchProposalObjects, readProposalDiff } from "../../../plugins/vh-adlc/scripts/docs-drift/proposals";
 import { captureRepositoryState, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { canonicalDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -332,4 +332,17 @@ test.each(['scalar', 'mapped'] as const)('discovery matches native login casing 
   expect(result.complete).toBe(true);
   expect(result.proposals.map(proposal => proposal.number)).toEqual([1, 2]);
   expect(result.proposals[1].actor).toBe('LEGACY-BOT');
+});
+
+
+test("numeric native account reads keep the GET route and hostname boundary", () => {
+  const root = directory();
+  writeFileSync(join(root, "gh"), `#!${process.execPath}
+console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify({ login: "fixture-bot[bot]", id: 20 }));
+`, { mode: 0o700 });
+  const options = { inherit_env: false, env: { PATH: root } };
+  const api = createGitHubReader("github.com", options);
+  expect(api.get("user/20")).toEqual({ login: "fixture-bot[bot]", id: 20 });
+  for (const endpoint of ["user/0", "user/-20", "user/name", "user/20/extra", "user/20evil", "https://foreign.invalid/user/20"])
+    expect(() => ghRead("github.com", endpoint, options)).toThrow("invalid-github-read-target");
 });

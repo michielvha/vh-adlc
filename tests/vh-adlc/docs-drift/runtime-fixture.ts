@@ -50,7 +50,7 @@ export function nativeReader(f: { root: string; candidate: string; inventory_pat
   mkdirSync(bin, { mode: 0o700 });
   writeFileSync(join(bin, "gh"), `#!${process.execPath}
 import { appendFileSync } from "node:fs";
-const args = process.argv.slice(2), endpoint = args.find(value => value.startsWith("repos/"));
+const args = process.argv.slice(2), endpoint = args.find(value => value.startsWith("repos/") || value.startsWith("user/"));
 appendFileSync(${JSON.stringify(trace)}, JSON.stringify({ args, provider: process.env.COPILOT_GITHUB_TOKEN ?? null,
   credential: process.env.GH_TOKEN === "synthetic-read-token", enterprise: process.env.GH_ENTERPRISE_TOKEN === "synthetic-read-token" }) + "\\n");
 if (args.includes("graphql")) {
@@ -59,7 +59,8 @@ if (args.includes("graphql")) {
 } else {
   if (args[args.indexOf("--method") + 1] !== "GET") process.exit(91);
   const sha = ${JSON.stringify(f.candidate)};
-  const value = endpoint === "repos/fixture/docs" ? { id: 10, full_name: "fixture/docs", default_branch: "main" }
+  const value = endpoint === "user/20" ? { login: ${JSON.stringify(actor)}, id: 20 }
+    : endpoint === "repos/fixture/docs" ? { id: 10, full_name: "fixture/docs", default_branch: "main" }
     : endpoint === "repos/fixture/docs/git/ref/heads/main" ? { ref: "refs/heads/main", object: { type: "commit", sha } }
     : endpoint === "repos/fixture/docs/git/commits/" + sha ? { sha, tree: { sha: "a".repeat(40) }, parents: [], message: "Synthetic source" }
     : endpoint === "repos/fixture/docs/pulls?state=open&base=main&per_page=100&page=1" ? (${incompleteInventory} ? { message: "Synthetic missing inventory" } : ${f.inventory_path ? `JSON.parse(require("node:fs").readFileSync(${JSON.stringify(f.inventory_path)}, "utf8"))` : "[]"})

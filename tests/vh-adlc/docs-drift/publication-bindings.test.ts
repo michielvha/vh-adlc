@@ -142,7 +142,8 @@ appendFileSync(trace, JSON.stringify({ endpoint }) + "\\n");
 if (${JSON.stringify(outside)}) proposal.body = "Synthetic selected original" + (pulls >= (${JSON.stringify(scenario)} === "outside-during-fetch" ? 1 : 2) ? " Changed" : "");
 if (args.includes("graphql")) { console.log(JSON.stringify({ data: { viewer: { login: "fixture-bot", databaseId: 20 } } })); process.exit(0); }
 if (args[args.indexOf("--method") + 1] !== "GET") process.exit(91);
-const value = endpoint === "repos/fixture/docs" ? repository
+const value = endpoint === "user/20" ? { login: "fixture-bot", id: 20 }
+  : endpoint === "repos/fixture/docs" ? repository
   : endpoint === "repos/fixture/docs/git/ref/heads/main" ? { ref: "refs/heads/main", object: { type: "commit", sha: source } }
   : endpoint === "repos/fixture/docs/git/commits/" + source ? { sha: source, tree: { sha: "a".repeat(40) }, parents: [], message: "Synthetic source" }
   : endpoint === "repos/fixture/docs/pulls?state=open&base=main&per_page=100&page=1" ? [proposal]

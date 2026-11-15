@@ -105,7 +105,7 @@ if (args[0] === 'pr' && args[1] === 'ready') {
     save();
     process.exit(0);
 }
-const endpoint = args.find(a => a === 'user' || a.startsWith('repos/'));
+const endpoint = args.find(a => a === 'user' || a.startsWith('user/') || a.startsWith('repos/'));
 const method = option('--method');
 if (method !== 'GET') {
     const rejection = state.reject_http || (state.reject_labels && method === 'PUT' && endpoint.endsWith('/labels') ? 403 : 0);
@@ -142,7 +142,11 @@ if (method !== 'GET') {
     process.exit(0);
 }
 let status = 200, value;
-if (endpoint === 'user') {
+if (endpoint?.startsWith('user/')) {
+    if (state.account_status) { status = state.account_status; value = { message: 'Synthetic native account unavailable' }; }
+    else value = state.account_response ?? { login: state.viewer_login ?? 'fixture-bot', id: state.viewer_id ?? 20 };
+}
+else if (endpoint === 'user') {
     if (state.app_token) {
         status = 403;
         value = { message: 'Resource not accessible by integration' };

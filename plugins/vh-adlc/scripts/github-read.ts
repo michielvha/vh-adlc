@@ -56,7 +56,7 @@ export function ghRead(hostname: string, endpoint: string, options: ReadOptions 
   const url = new URL(endpoint.startsWith("https://") ? endpoint : `https://${apiHost}/${endpoint}`);
   const path = url.pathname.replace(/^\/api\/v3\//, "/");
   if (url.protocol !== "https:" || url.hostname !== apiHost || url.port || url.username || url.password || url.hash ||
-      !/^\/(?:user$|repos\/[a-z0-9-]+\/[a-z0-9_.-]+(?:\/|$)|repositories\/[1-9]\d*(?:\/|$)|orgs\/[a-z0-9-]+\/repos$)/i.test(path) ||
+      !/^\/(?:user(?:$|\/[1-9]\d*$)|repos\/[a-z0-9-]+\/[a-z0-9_.-]+(?:\/|$)|repositories\/[1-9]\d*(?:\/|$)|orgs\/[a-z0-9-]+\/repos$)/i.test(path) ||
       /[\x00-\x20\x7f]/.test(endpoint)) throw Error("invalid-github-read-target");
   const argv = ["gh", "api", "--hostname", hostname, "--method", "GET"];
   if (options.projection) argv.push(endpoint, "--jq", options.projection);

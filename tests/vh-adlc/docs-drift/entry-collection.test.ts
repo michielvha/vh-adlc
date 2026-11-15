@@ -48,7 +48,8 @@ if (args.includes("graphql")) { console.log(JSON.stringify({ data: { viewer: { l
 if (args[args.indexOf("--method") + 1] !== "GET") process.exit(90);
 const source = ${JSON.stringify(source)}, repository = ${JSON.stringify(repository)}, proposal = ${JSON.stringify(proposal)};
 if (${JSON.stringify(fault)} === "changed-body" && reads.some(read => read.kind === "gh" && read.args.at(-1) === "repos/fixture/docs/pulls/1")) proposal.body += " Changed";
-const value = endpoint === "repos/fixture/docs" ? repository
+const value = endpoint === "user/20" ? { login: "fixture-bot", id: 20 }
+  : endpoint === "repos/fixture/docs" ? repository
   : endpoint === "repos/fixture/docs/git/ref/heads/main" ? { ref: "refs/heads/main", object: { type: "commit", sha: source } }
   : endpoint === "repos/fixture/docs/git/commits/" + source ? { sha: source, tree: { sha: "a".repeat(40) }, parents: [], message: "Fixture" }
   : endpoint === "repos/fixture/docs/pulls/1" && ${JSON.stringify(fault)} !== "missing-pr" ? proposal : null;
