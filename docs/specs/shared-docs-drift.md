@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "The owner approved the development-only reviewer clarification, conditional acceptance after a clean Claude Code review, and feature-branch push and PR. Development reviews use Claude Code Opus 5.5. Configured runtime reviewers supply their own T35/T37 evidence. Publisher implementation and migration tests remain open."
+status: planned
+status_description: "Owner accepted the reviewed development-review clarification. Publisher implementation and remaining migration proof are next."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
