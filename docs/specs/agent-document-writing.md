@@ -365,6 +365,7 @@ None.
 | 2026-11-15 | R-1 | spec | `ef7f01b8b85a78c3c26aebb77aab526eed13d54a` | claude-opus-5-5 | procedural | One blocking, eight should-fix and four nit findings |
 | 2026-11-15 | R-2 | spec | `b34ba95382ee1ceb78d0c6c2ac5d751dc65b0ff3` | claude-opus-5-5 | procedural | Two blocking, five should-fix and two nit findings |
 | 2026-11-15 | R-3 | spec | `09de0c3e2a106f48ae3f72e8859362a9193cc308` | claude-opus-5-5 | procedural | One blocking, three should-fix and six nit findings |
+| 2026-11-15 | R-4 | spec | `fc1b66539fc6b13d92d6473230911e8fbaf31691` | claude-opus-5-5 | procedural | Eight should-fix and three nit findings |
 
 ### R-1
 
@@ -595,6 +596,85 @@ SEVERITY: nit
 WHERE: Design (Trial, Arms; Glossary "Arm commit")
 EVIDENCE: The lifecycle harness takes its driver, case list and grader from the checkout it runs in (tests/vh-adlc/lifecycle/run.ts:14, :26, :32 copies `import.meta.dir`). It takes only `plugins/vh-adlc` from `--source-ref` (`git archive sourceRef plugins/vh-adlc`, :44-47). A lifecycle case added on the arm commits is therefore used only when the invocation runs from a checkout that already has it. Design names the arm commit only through `--source-ref`, and says a worktree at the arm commit only for Claude Code.
 PROPOSAL: Say that the Codex invocations for both arms run from a checkout at the base arm commit, so both arms use the same driver and any added case.
+
+### R-4
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, Execution failure); Test Plan row AC-05
+EVIDENCE: The paragraph says a run is rerun "when the host's model service returned an error (a rate-limit, overload or API error event or turn)". The next sentence says "a `turn.failed` or `error` event, an error turn or a failed check is a failed run and counts". These are the same observables. On Codex CLI the parser sets failed on any `turn.failed` or `error` event and records nothing else about it (tests/vh-adlc/lifecycle/fixtures.ts:450), and a rate limit or overload arrives as one of those events. On Claude Code a service error comes back as a Turn with isError true (tests/vh-adlc/scenarios/host.ts:119), which is the "error turn" the counting clause names. The document gives no field or message pattern that separates a service error, which is rerun, from an agent error, which counts. One implementer reruns an overloaded run and another scores it as a failed run, and a single failed run moves passed runs toward the two-run margin. This traces to the previous revision, which added the model-service clause when it answered R-3 F-02.
+PROPOSAL: Name the exact distinguishing evidence per host, for example the error message classes or HTTP statuses (429, 529, 5xx) in the Codex event and in the Claude Code result text, and state that an error event or error turn without that evidence counts as a failed run.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, Cases, "cases whose prompts invoke the skill"; Trial, Combination, "every listed case that invokes more than one of them"); Context, Owner summary paragraph 3 ("Only cases that exercise a step the rewrite changed"); Acceptance Criteria AC-05
+EVIDENCE: Two of the three skills are mostly loaded by another skill, not by a prompt. Ship step 1 loads review mid-run: "Obtain a fresh one in this run, as `../vh-adlc-review/SKILL.md` describes" (plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:70-71). The FINISH prompt is "/vh-adlc-implement greeting-name ... If it is finished, mark it complete" (tests/vh-adlc/scenarios/run.ts:1410), and implement then routes to completion review (plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:124-127). Background says these scenarios "run implement and then completion review". If "invoke" means the prompt names the skill, the review trial drops every case where ship or implement loads review, and the combination almost never runs, because no listed prompt names two skills; it is then "skipped and recorded as such", which defeats the confounding check R-1 F-05 asked for. If "invoke" means the run loads the skill, both run. The Owner summary uses a third wording, "exercise a step". The previous revision changed "reach" to "invoke" in both paragraphs.
+PROPOSAL: Define the case set as cases whose run loads the skill, observed as a read or injection of its SKILL.md in the transcript or event log, whether the prompt or another skill caused it, and use the same word in Cases, Combination and the Owner summary.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope (bullet "At most one added harness case per skill that no existing case reaches"); Design (Trial, Cases, "A skill with no such case on a host gets one small added case there"); Context, Owner summary paragraph 3 ("a skill no existing case reaches may also get one small added case")
+EVIDENCE: Design adds a case per host, so a skill with no qualifying case on either host gets two, while Scope allows at most one per skill. Design's trigger is "no such case", meaning no case that invokes the skill and whose deterministic checks cover a changed step. Scope and the summary trigger only when "no existing case reaches" the skill. Example: L11-ship reaches ship on Codex, but if the rewrite changes only steps L11-ship does not check, Design requires a new case and Scope forbids it. The previous revision narrowed the Cases rule (answer to R-3 F-02) without updating Scope or the summary.
+PROPOSAL: Make Scope and the summary say at most one added case per skill per host, added when no existing case on that host invokes the skill and checks a changed step.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-05; Acceptance Criteria AC-05; Design (Trial, Cases; the paragraph "Each summary lists the base, every case, run, measure, spread and grader record")
+EVIDENCE: The AC-05 proof only "recomputes each skill's verdict and the combined verdict from the recorded measures and grader records". It never checks the case list, which the implementing session draws up itself by judging which changed steps each case's deterministic checks cover, and which now limits which cases run at all ("Only those cases run"). Leaving out a case where the rewrite does worse, or adding a case tailored after the rewrite was written, passes the proof. Nor does the proof check that the recorded passed runs, turns and tool calls match the raw logs, or that the grader saw redacted transcripts. The summaries do not record where the raw transcripts and event logs are kept, so the reviewer cannot find them. A proof that checks only arithmetic over self-reported numbers can pass on a wrong implementation. This traces to the previous revision's case filter.
+PROPOSAL: Record each changed step and, for every case on each host that loads the skill, whether its checks cover a changed step and why; record the raw output directory of every run. Have the AC-05 review check the case list against the rewrite diff and the harness checks, and recompute at least passed runs, turns and tool calls from the raw logs.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan rows AC-04 and AC-06; Acceptance Criteria AC-04 and AC-06 ("every other skill keeps its current baseline"); Context, Terminology and delivery (Base)
+EVIDENCE: Base is "the feature branch's fork point", and the AC-04 and AC-06 rows diff against `<base>`, while the feature branch merges the default branch (Design, Rewrite pass). The compatibility test churns on main: `git log --since=2026-10-15 -- tests/vh-adlc/direct-operation-compatibility.test.ts` lists ten commits, five of them on 2026-11-14 moving the spec and implement constants. After a merge that brings one of those moves in, `git diff <base> -- tests/vh-adlc/direct-operation-compatibility.test.ts` shows another constant changed, and the AC-06 row ("the other constants are unchanged") fails a correct implementation. The previous revision added that clause. AC-04 has the same gap: `git diff <base> -- <three files>` shows main's own frontmatter edits, and the base suite run misses failures main introduced. The AC-05 row already handles this with `<M>`, the default-branch commit last merged.
+PROPOSAL: Compare in the AC-04 and AC-06 rows against `<M>` as the AC-05 row defines it, and run the AC-04 base suite at `<M>`.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Trial, Combination; Trial, Sign-off); Acceptance Criteria AC-05; Context, Owner summary paragraphs 3 and 4
+EVIDENCE: Combination runs "an arm with all passing rewrites". Sign-off then lets the owner decline any one of them, and "the skill is set to its base text like a failed one". When three skills pass and the combination of all three passes, but the owner declines review, the shipped pair (ship and implement with base review) was never tried together. Design neither says whether the combination is rerun on the remaining set nor orders sign-off before or after the combination. AC-05 asks only that the combined trial passed "when two or more passed", which the three-skill run satisfies. The same gap opens when the combined trial is worse, the owner is consulted, and a subset goes ahead. One implementer reruns the combination on the shipped set; another ships on the earlier result.
+PROPOSAL: Run the combined trial on the exact set that will ship, after sign-off, and word AC-05 as "the combined trial of the skills that ship rewritten".
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Routing, "whether it changes any rule this repository's operations read"); Context, Owner summary paragraph 2 ("alters a rule vh-adlc's operations read"); Scope (AGENTS.md bullet); Acceptance Criteria AC-01
+EVIDENCE: The commits between the pins are already known. In /home/m/code/vhco-pro-docs-write-for-agents, `git log --no-merges 1ccf8f3..origin/main` lists cdf5e62 and 0635c1f (delivery: private repository CI) and three PHP commits, and `git diff --stat 1ccf8f3 origin/main` touches conventions/delivery.md (+39), conventions/repository-security.md, AGENTS.md and guides/onboard-a-repository.md. The new delivery section adds a rule addressed to vh-adlc: "In the vh-adlc loop, declare the command as a verification rung and set `ci_trigger: manual`". The ship, review and implement skills all read conventions/delivery.md (vh-adlc-ship/SKILL.md:59, vh-adlc-review/SKILL.md:31, vh-adlc-implement/SKILL.md:58), and `vh-adlc knowledge` here reports source "repository", so the moved pin governs them. michielvha/vh-adlc is public (`gh repo view` reports PUBLIC), so the private-repository rule may not apply here. Under the summary's test ("a rule vh-adlc's operations read") the move stops; under Design's ("this repository's operations") it may not. Two implementers decide differently, and a stop leaves AC-01 unmet with no defined path.
+PROPOSAL: Use one wording in both places, list the five known commits with the verdict for each, and if any changes a rule raise it now as an Open Question rather than at implementation time.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope (bullets "A patch version bump in both plugin manifests" and "An opt-in setting in the Claude Code scenario harness"); Design (Trial harness, "When unset, behavior is unchanged"; Failure and rollback, "A consumer on the previous plugin version keeps the old skills"); Acceptance Criteria; Test Plan
+EVIDENCE: No criterion covers the version bump, and no test enforces one: `grep -n version tests/vh-adlc/check.test.ts` finds no manifest bump check, and both manifests read 0.23.0 (plugins/vh-adlc/plugin.json:4, plugins/vh-adlc/.claude-plugin/plugin.json:3). Hosts cache the plugin by version (the installed copy here sits under .../vh-adlc/0.23.0), so a rewrite shipped without the bump does not reach consumers who already hold that version, and every AC can still be met. The harness setting's promise that unset behavior is unchanged, including that tracked tests/vh-adlc/evidence/claude-code/<id>.md files are still written (run.ts:1818), is also outside every criterion; the scenario harness is not part of `bun test`, so AC-04 does not cover it.
+PROPOSAL: Add a criterion that both manifests carry the same patch-bumped version when at least one rewrite ships, and the same version otherwise, with a Test Plan row; add a check or written procedure showing the scenario harness without the setting writes the same files as before.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Scope (bullet "One rewrite pass ... preserving every rule's meaning")
+EVIDENCE: Design steps 2 and 3 delete sentences and record removals, and AC-03 accepts an accepted removal. R-3 F-07 aligned the goal and the Owner summary to "every rule kept or its removal recorded and accepted", but the Scope bullet still says "preserving every rule's meaning".
+PROPOSAL: Word the Scope bullet as "keeping every rule's meaning or recording and accepting its removal".
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: covers frontmatter
+EVIDENCE: Background names tests/vh-adlc/blog/run.ts:70-71 as pinning ship's "Article and promotion handoff" section, and the scenario harness builds its fixture plugin from tests/vh-adlc/fixtures/build.ts (:25, :336-338). tests/vh-adlc/review-convergence.test.ts:20-29 resolves pages at the repository pin in AGENTS.md, which this feature moves. None of tests/vh-adlc/blog/, tests/vh-adlc/fixtures/ or tests/vh-adlc/review-convergence.test.ts is in covers.
+PROPOSAL: Add those paths to covers.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Trial, Measures item 3, "tool calls its command-execution and MCP tool-call events, as the lifecycle parser reads them")
+EVIDENCE: The parser pushes an MCP call on both `item.started` and `item.completed` (tests/vh-adlc/lifecycle/fixtures.ts:456-458), and a successful `github.fetch` a third time (:459-462). It records command executions once, on `item.completed` (:453-455). Counting the parser's entries counts each MCP call two or three times; counting distinct calls does not.
+PROPOSAL: Say tool calls are distinct command-execution items plus distinct MCP tool-call item ids, each counted once.
 
 ## Sources
 
