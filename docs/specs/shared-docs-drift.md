@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Owner accepted the reviewed development-review clarification. Publisher implementation and remaining migration proof are next."
+status: in-progress
+status_description: "Publisher implementation is resumed on the existing feature branch. Focused entry-map regressions reproduce the missing behavior. Draft PR #98 is pushed, with CI and acceptance work tracked."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
