@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after spec review R-3 with the owner's answers folded; waits for a fresh independent spec review."
+status_description: "Draft after spec reviews R-1 to R-4; R-4 findings are recorded, not applied. On 2026-11-15 the owner moved this to its own session: apply what matters, ignore edge-case findings that only trigger re-review. Waits on the companion vhco-pro/docs guide PR."
 issue: null
 goal: "vh-adlc's ship, review and implement skills are rewritten to one pinned standard for agent-read documents only where a controlled trial shows the rewrite makes agent runs better, with every rule kept or its removal recorded and accepted."
 covers:
