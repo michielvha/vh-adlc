@@ -187,6 +187,10 @@ The owner selected the recommended development-only reviewer clarification and r
 
 Native Codex marketplace refresh and installation resolve `vh-adlc@vhco-tools` to `0.22.0`, matching published main `19bb6bcb20282ceac72c06d5418491b026ce32ed`. The verified companion binary is `0.26.0`. This publication authority covers pushing the feature branch, opening its PR and reporting its exact CI state. Feature and migration readiness continue to follow observed checks and explicit remaining evidence.
 
+### Source package reconciliation before publication
+
+The installed marketplace package remains published `0.22.0`. The owner-authorized feature candidate now declares unreleased `0.23.0` in both plugin manifests. The actual package test first reported 63 passes and one failure because the package changed without a version advance. After the manifest update, the same command passes all 64 cases and 230 assertions. Original red and green outputs are `.docs-drift-review-archive/pre-push-plugin-check.log` and `pre-push-plugin-check-green.log`. The outgoing 331-commit baseline passes a redacted Gitleaks scan with no detected secrets, retained in `pre-push-secrets.log`. Publication will use a draft feature PR with explicit remaining publisher and migration evidence.
+
 ## Scope
 
 Recovery includes a separately approved delivery acknowledgement that preserves a changed remote resource and permits exact-owned lease cleanup after proof of original ownership and settled execution.
