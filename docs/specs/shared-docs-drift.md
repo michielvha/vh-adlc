@@ -90,6 +90,10 @@ Current reuse opportunities and limits are visible in `scripts/triage/owned-proc
 
 The owning branch integrates upstream `3e3f655`, including the ordinary 0.32.0 binary lock and loop fixes. Main's plugin is 0.24.1. Resolving the two plugin-version conflicts reserves candidate 0.25.0 for this unreleased feature. The owner requested retaining useful capabilities and reducing disproportionate machinery on 2026-11-15.
 
+### Review lens
+
+Architecture proportionality is a should-fix lens for this revision and its implementation review. Every retained subsystem needs a concrete audit/resolver, recovery or migration behavior and an explanation where an existing shared primitive cannot preserve that behavior. This lens favors reuse or removal when they satisfy the retained outcome. It introduces no line-count target or requirement to weaken correctness checks.
+
 ### Historical implementation evidence before this revision
 
 The dated checkpoints below retain their original scope and source attribution. Their earlier architecture, task references, capability and acceptance statements describe the preceding baseline. Current Scope, Design, criteria and active tasks define the proposed replacement.
