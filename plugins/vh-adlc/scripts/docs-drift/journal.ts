@@ -185,7 +185,7 @@ export function readArtifact(path: string): Buffer {
     return readFileSync(fd);
   } finally { closeSync(fd); }
 }
-function eventFiles(directory: string): string[] {
+export function numberedRecordFiles(directory: string): string[] {
   privateDirectory(directory);
   const files = readdirSync(directory).sort();
   for (const file of files) {
@@ -393,7 +393,7 @@ export function readJournal(directory: string, sourceRepo: string, expected?: { 
     || directory !== join(dirname(directory), "docs-drift-" + header.operation_id)
     || !readArtifact(join(dirname(directory), header.operation_id + ".journal-owner.json")).equals(headerBytes)) fail("changed resource record");
   const eventDirectory = join(directory, "events");
-  const files = eventFiles(eventDirectory), events: Event[] = [];
+  const files = numberedRecordFiles(eventDirectory), events: Event[] = [];
   let previous = sha256(headerBytes);
   for (const [index, file] of files.entries()) {
     if (file !== String(index + 1).padStart(10, "0") + ".json") fail("lost event revision");
@@ -403,7 +403,7 @@ export function readJournal(directory: string, sourceRepo: string, expected?: { 
     validateEvent(event, plan, events, header);
     events.push(event); previous = sha256(bytes);
   }
-  if (!canonicalJSON(files).equals(canonicalJSON(eventFiles(eventDirectory)))) fail("journal read conflict");
+  if (!canonicalJSON(files).equals(canonicalJSON(numberedRecordFiles(eventDirectory)))) fail("journal read conflict");
   if (expected && (expected.revision !== events.length || expected.digest !== previous)) fail("revision conflict");
   return { directory, source_repo: source, header, plan, events, revision: events.length, digest: previous };
 }

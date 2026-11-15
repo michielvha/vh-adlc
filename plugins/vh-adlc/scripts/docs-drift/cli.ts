@@ -41,6 +41,7 @@ import { collectPublicationInputs } from "./publication-inputs";
 import { collectNativeResolution, collectNativeClosure, collectNativeClosureTarget, closureTargetOutput } from "./resolution-entry";
 import { readBoundArtifact } from "./evidence-input";
 import { canonicalJSON, decodeUTF8, protocolPath } from "./protocol";
+import { runDirectoryMain } from "./run-cli";
 
 type Diagnostic = { code: string; message: string };
 export type CLIReport = {
@@ -445,6 +446,7 @@ function failureDiagnostics(error: unknown, code: string): Diagnostic[] {
 
 /** Technical collection feeds the controller's separate semantic decisions and effect grants. */
 export async function main(argv: string[]): Promise<number> {
+  if (argv.includes("--run-dir")) return runDirectoryMain(argv);
   if (argv.length === 1 && ["--help", "help"].includes(argv[0])) { writeSync(1, usage); return 0; }
   let report: CLIReport;
   try {

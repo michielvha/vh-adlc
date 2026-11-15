@@ -303,12 +303,18 @@ export function artifactDirectoryScope(directory: string, sourceRepo: string) {
   const stat = lstatSync(directory);
   if (!stat.isDirectory() || stat.isSymbolicLink() || canonical !== directory ||
       (process.getuid && stat.uid !== process.getuid()) || (stat.mode & 0o077) !== 0) incomplete("private artifact directory required");
+  const scope = externalResourceScope(sourceRepo);
+  scope.assertExternal(canonical);
+  return { directory: canonical, ...scope };
+}
+
+/** Check future resource paths before creating them, using the same caller and Git exclusions. */
+export function externalResourceScope(sourceRepo: string) {
   const worktrees = nulFields(readGit(sourceRepo, "worktree", "list", "--porcelain", "-z"))
     .filter(field => field.subarray(0, 9).equals(Buffer.from("worktree ")))
     .map(field => realpathSync(decodeUTF8(field.subarray(9))));
   const protectedPaths = [...worktrees, realpathSync(gitPath(sourceRepo, "--git-common-dir")), realpathSync(gitPath(sourceRepo, "--git-path", "objects"))];
-  outside(canonical, protectedPaths);
-  return { directory: canonical, assertExternal(path: string) { outside(path, protectedPaths); } };
+  return { assertExternal(path: string) { outside(path, protectedPaths); } };
 }
 
 /** Record the exact assessment resource before creating or fetching into its new bare store. */
