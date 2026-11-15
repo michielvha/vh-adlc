@@ -1,13 +1,13 @@
 // Verification rungs (references/loop-settings.md): declared checks with a path condition or `always`.
 // Every applicable rung must pass at the commit being pushed, completed or delivered. A failed rung
-// always blocks; a rung that could not run blocks unless the owner allowed that exact rung, or that
-// exact skipped subcheck, for this run.
+// always blocks; a rung that could not run, timed out included, blocks unless the owner allowed that exact rung,
+// or that exact skipped subcheck, for this run.
 import type { LoopSettings } from "./settings";
 import { diffPaths, statusEntries } from "./git-paths";
 
-export type Rung = { name: string; when: "always" | { paths: string[] }; command?: string; procedure?: string; skipped_pattern?: string };
+export type Rung = { name: string; when: "always" | { paths: string[] }; command?: string; procedure?: string; skipped_pattern?: string; timeout_minutes?: number };
 export type RungState = "passed" | "failed" | "not run";
-export type RungResult = { name: string; state: RungState; reason: string; commit: string; exit_code?: number; skipped?: string[]; output?: string };
+export type RungResult = { name: string; state: RungState; reason: string; commit: string; exit_code?: number; skipped?: string[]; timed_out?: true; output?: string };
 
 function git(repo: string, args: string[]): string {
   const run = Bun.spawnSync(["git", ...args], { cwd: repo, stdout: "pipe", stderr: "pipe", env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" } });
@@ -42,11 +42,20 @@ export async function runRungs(repo: string, rungs: Rung[], options: { timeoutMs
   const results: RungResult[] = [];
   for (const rung of rungs) {
     if (rung.procedure !== undefined) { results.push({ name: rung.name, state: "not run", reason: "a written procedure; record its result", commit }); continue; }
-    const child = Bun.spawn(["bash", "-c", rung.command!], { cwd: repo, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
-    const timer = setTimeout(() => child.kill("SIGKILL"), options.timeoutMs ?? 60 * 60_000);
+    // A rung's declared limit wins over the run's; without either, a command gets an hour.
+    const limit = rung.timeout_minutes !== undefined ? rung.timeout_minutes * 60_000 : options.timeoutMs ?? 60 * 60_000;
+    const child = Bun.spawn(["bash", "-c", rung.command!], { cwd: repo, stdout: "pipe", stderr: "pipe", stdin: "ignore", detached: true });
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); } }, limit);
     const [stdout, stderr, exit] = await Promise.all([new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited]);
     clearTimeout(timer);
     const output = `${stdout}${stderr}`;
+    if (timedOut) {
+      const seconds = limit / 1000;
+      // A timeout is a check that could not finish, not a failed one: it blocks like any rung that did not run.
+      results.push({ name: rung.name, state: "not run", timed_out: true, reason: `timed out: stopped at its time limit of ${seconds >= 60 ? `${Math.round(seconds / 60)} min` : `${seconds} s`}; raise timeout_minutes for this rung if the check needs longer`, commit, output });
+      continue;
+    }
     if (exit === 126 || exit === 127) { results.push({ name: rung.name, state: "not run", reason: "the command could not run", commit, exit_code: exit, output }); continue; }
     if (exit !== 0) { results.push({ name: rung.name, state: "failed", reason: `exit ${exit}`, commit, exit_code: exit, output }); continue; }
     const skipped = rung.skipped_pattern ? output.split("\n").flatMap(line => {

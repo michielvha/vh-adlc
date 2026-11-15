@@ -1,6 +1,6 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
 import { isAbsolute, relative, sep } from "node:path";
-import { git, origin, resolveInside } from "../triage/settings";
+import { origin, resolveInside } from "../triage/settings";
 import { settingsFile, readYAML } from "../settings-file";
 import type { Profile, Settings } from "./types";
 
@@ -34,16 +34,9 @@ export function text(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim() || value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value)) invalid(field);
   return value;
 }
-/** A public repository-owner login is transport metadata, never an auth/effect grant. */
+/** The origin identity; a login-shaped HTTPS username is transport metadata, never an auth or effect grant. */
 export function auditOrigin(root: string): { repository: string; hostname: string } {
-  try { return origin(root); } catch { /* Keep the neutral parser unchanged; handle only this bounded form. */ }
-  let url: URL;
-  try { url = new URL(git(root, "remote", "get-url", "origin")); } catch { invalid("origin"); }
-  const repository = url.pathname.replace(/^\//, "").replace(/\.git$/, "");
-  if (url.protocol !== "https:" || url.password || url.port || url.search || url.hash ||
-      !/^[A-Za-z0-9-]{1,39}$/.test(url.username) || !/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/.test(repository) ||
-      repository.split("/").some(part => [".", ".."].includes(part)) || url.username.toLowerCase() !== repository.split("/")[0].toLowerCase()) invalid("origin");
-  return { repository, hostname: url.hostname.toLowerCase() };
+  try { return origin(root); } catch { invalid("origin"); }
 }
 function file(root: string, value: unknown, field: string): string {
   const path = text(value, field);

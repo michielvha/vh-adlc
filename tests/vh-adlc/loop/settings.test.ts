@@ -1,6 +1,6 @@
 // Loop settings: the route each loop role runs on, read from `.vh-adlc/loop.yaml`.
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { loadLoopSettings, routeFor } from "../../../plugins/vh-adlc/scripts/loop/settings";
@@ -122,4 +122,22 @@ describe("the per-user override", () => {
     const settings = loadLoopSettings(checkout({ ".vh-adlc/loop.yaml": full }), { overridePath: join(checkout(), "absent.yaml") });
     expect(settings.roles.spec_reviewer.argv?.[0]).toBe("/usr/bin/copilot");
   });
+});
+
+describe("review_scratch entries", () => {
+  // A scratch entry is excluded from the preservation check, never read, so it is checked by its path
+  // alone: a worktree whose node_modules is a symlink into another checkout must still load.
+  test("an entry that is a symlink pointing outside the checkout is accepted", () => {
+    const outside = realpathSync(mkdtempSync(join(tmpdir(), "vh-loop-outside-")));
+    const root = checkout({ ".vh-adlc/loop.yaml": "schema_version: 1\nreview_scratch: [frontend/node_modules]\n" });
+    mkdirSync(join(root, "frontend"), { recursive: true });
+    symlinkSync(outside, join(root, "frontend/node_modules"));
+    expect(loadLoopSettings(root, { overridePath: null }).review_scratch).toEqual(["frontend/node_modules"]);
+    rmSync(outside, { recursive: true, force: true });
+  });
+  for (const bad of ["../outside", "/abs/path", ".git/hooks", "a\\b"])
+    test(`a lexically unsafe entry (${bad}) is still refused`, () => {
+      const root = checkout({ ".vh-adlc/loop.yaml": `schema_version: 1\nreview_scratch: [${JSON.stringify(bad)}]\n` });
+      expect(refusal(() => loadLoopSettings(root, { overridePath: null }))).toContain("review_scratch[0]");
+    });
 });

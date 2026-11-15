@@ -41,7 +41,7 @@ within scope or hand it off. Undeclared repositories retain their existing flow.
 This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
 host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
-files and its project procedure, whose local rules apply alongside this procedure. With declared verification rungs, each task's verification step runs
+files and its project procedure, whose local rules apply alongside this procedure. If its `plugin.stale` is true, stop before any write and report its `warning`: the session runs an older plugin than the host has installed. If it reports `plugin.binary_warning`, run only the binary `scripts/ensure-vh-adlc.sh` prints, never a `vh-adlc` found on PATH. With declared verification rungs, each task's verification step runs
 `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` in place of the `AGENTS.md`
 command lookup, and a task is not ticked unless every applicable rung passed at its commit. A `host` route that names a model runs with it as a requested model. To claim, first run `bun scripts/loop/cli.ts isolation --repo <dir> --host-worktree-tool <true|false>`:
 on `enter-host-worktree`, enter a worktree with the host's own worktree tool and continue there; on `stop`,
