@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "R-105 has no blocking or should-fix findings. Consumer tests reproduce a green report over unresolved remote recovery refs; T143 corrects it before migration."
+status: draft
+status_description: "Revising lost-runner recovery for the owner's approved atomic administrative-abandonment choice. The fresh spec review and acceptance remain pending."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -1412,7 +1412,7 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 ## Open Questions
 
-None. The owner confirmed ordinary plugin/client installation and the recommended capability-preserving migration checklist on 2026-11-15.
+None. The owner selected atomic administrative abandonment on 2026-11-16. The normative revision and fresh review follow the draft transition.
 
 ## Review Log
 
