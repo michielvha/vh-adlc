@@ -225,10 +225,12 @@ obligation.
 | Publication lease acquisition | Selected publication/trial grant explicitly naming acquisition and its exact ref namespace. |
 | Owned lease release | Selected grant explicitly naming release, original ownership and exact object comparison, with terminal effects or gated reconciliation. |
 | Receipt creation and retention | Selected grant naming the immutable retained namespace and its operation refs. Keep completed and other terminal receipt refs indefinitely. |
+| Administrative abandonment | Owner's exact current approval of the repository, operation, lease/receipt refs and observed object IDs after lost original ownership. An administrator uses ordinary Git compare-and-swap only for those unresolved ref/object pairs, retains the inspection and approval, and supplies no delivery or settlement proof. Preserve completed and other terminal receipts indefinitely. Follow `references/docs-drift-review.md`, Lost hosted origin and administrative abandonment. |
 | Delivery acknowledgement | Owner's actual current approval of the exact presented lookup scope and evidence digests, original ownership, settled requests and fully applied eligible effects. |
 | Workflow dispatch | Current trial/cutover grant naming the exact workflow and selected inputs. |
 | Workflow disable/enable | Current cutover/rollback grant naming the exact workflow and effect. |
 | Workflow-run cancellation | Current grant naming the identified run and cancellation effect. |
+| Committed synthetic trial grant | Separate owner-approved committed trial definition selected by path/digest, binding the component, workflow/event/head, native models, fixture namespace, effects and credential-selected publisher. Bind the actual run ID/attempt at launch. Dispatch input alone creates no grant. This standing trial permission covers only its declared synthetic scope and supplies no production authority. Follow `references/docs-drift-settings.md`, Staged adoption and upgrades. |
 | Synthetic draft PR | Separate trial grant naming the destination/namespace, selected fixture and draft-PR effect. |
 | Owned trial PR/branch cleanup | Selected trial cleanup grant naming exact recorded owned resources. |
 | Merged-branch cleanup | Applicable exact cleanup or merge grant under `references/branches.md`, with its retained ownership and preservation checks. |
