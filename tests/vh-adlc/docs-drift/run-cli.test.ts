@@ -1,9 +1,12 @@
 import { afterAll, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { fixture as manifestFixture, bindings, hash } from "./manifest-fixture";
+import { createJournal, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -16,10 +19,10 @@ function fixture() {
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Owned ordinary example");
   return { root, repo, directory, source: readGit(repo, "rev-parse", "HEAD").toString().trim() };
 }
-function invoke(f: ReturnType<typeof fixture>, command: string, extra: string[] = [], state = join(f.root, "state")) {
+function invoke(f: ReturnType<typeof fixture>, command: string, extra: string[] = [], state = join(f.root, "state"), nativePath = process.env.PATH) {
   const result = Bun.spawnSync([process.execPath, resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"),
     command, "--repo", f.repo, "--run-dir", f.directory, ...extra], {
-    env: { PATH: process.env.PATH, HOME: process.env.HOME, XDG_STATE_HOME: state, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
+    env: { PATH: nativePath, HOME: process.env.HOME, XDG_STATE_HOME: state, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
     stdout: "pipe", stderr: "pipe", timeout: 60000,
   });
   const parsed: unknown = JSON.parse(result.stdout.toString());
@@ -137,4 +140,31 @@ test("static collection records a component mismatch while retaining its scan", 
   expect(result.status).toBe(0);
   expect(result.report.diagnostics).toEqual([expect.stringContaining("component")]);
   expect(invoke(f, "publish").report.outcome).toBe("setup-required");
+});
+
+function retainedBytes(directory: string): unknown[] {
+  return readdirSync(directory).sort().map(name => {
+    const path = join(directory, name), stat = lstatSync(path);
+    return [name, stat.mode, stat.isDirectory() ? retainedBytes(path) : readFileSync(path).toString("base64")];
+  });
+}
+test.each(["absent", "original"])("receipt retirement matches unknown-action parsing with an %s run", kind => {
+  const f = fixture(), bin = join(f.root, "native-bin"), calls = join(f.root, "transport-calls");
+  mkdirSync(bin);
+  writeFileSync(join(bin, "gh"), "#!/usr/bin/env bun\nimport { appendFileSync } from 'node:fs'; appendFileSync(" + JSON.stringify(calls) + ", 'called'); process.exit(94);\n", { mode: 0o755 });
+  const nativePath = bin + ":" + process.env.PATH;
+  if (kind === "original") {
+    expect(invoke(f, "scan", ["--source", f.source], join(f.root, "state"), nativePath).status).toBe(0);
+    const input = manifestFixture({ ...bindings, source_commit: f.source }, [], "unsupported-action");
+    createJournal({ source_repo: f.repo, artifact_root: f.directory, plan: sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
+      adoption_sha256: hash("diagnostic"), publication_kind: "advisory", context: "production", transport: "native", corrections: [], attention: [] }) });
+  }
+  const before = existsSync(f.directory) ? retainedBytes(f.directory) : null;
+  for (const action of ["unsupported-action", "retire-receipt"]) {
+    const result = invoke(f, "resume", ["--action", action], join(f.root, "state"), nativePath);
+    expect(result.status).toBe(2);
+    expect(result.report).toMatchObject({ command: "resume", outcome: "incomplete", diagnostics: ["Select a supported resume action."] });
+    expect(existsSync(f.directory) ? retainedBytes(f.directory) : null).toEqual(before);
+    expect(existsSync(calls)).toBe(false);
+  }
 });

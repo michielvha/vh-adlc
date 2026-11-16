@@ -14,6 +14,7 @@ export function readPublicationAuthority(options: {
   if (!canonicalJSON(parsed).equals(bytes)) throw Error("Publication authority canonical record required");
   const request = exactRecord(parsed, ["schema_version", "kind", "manifest_sha256", "origin", "effects"], "Publication authority fields changed");
   const manifest = parseActionManifest(options.manifest), digest = manifestDigest(manifest);
+  if (manifest.effects.some(effect => effect.kind === "receipt-retire")) throw Error("Publication authority does not support receipt-retire");
   if (request.schema_version !== 1 || request.kind !== "docs-drift-publication-authority") throw Error("Publication authority actual scoped request required");
   if (request.manifest_sha256 !== digest) throw Error("Publication authority manifest changed");
   if (!canonicalJSON(request.effects).equals(canonicalJSON(manifest.effects.map(effect => ({ id: effect.id, sha256: effectDigest([effect]) })))))

@@ -56,7 +56,7 @@ function optionsFor(argv: string[]) {
   const source = options.get("--source"), action = options.get("--action");
   if (source !== undefined && !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(source)) throw Error("Select a full immutable source commit.");
   if (action !== undefined && command !== "resume") throw Error("Recovery actions belong to resume.");
-  if (action !== undefined && !["continue", "inspect", "restore", "reconcile", "acknowledge", "retire-receipt"].includes(action))
+  if (action !== undefined && !["continue", "inspect", "restore", "reconcile", "acknowledge"].includes(action))
     throw Error("Select a supported resume action.");
   if (proposals.length && command !== "resolve" && command !== "close") throw Error("Proposal selection belongs to resolve or close.");
   const operation = options.get("--operation-id");
@@ -290,7 +290,7 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
         Object.assign(report, retainPublicationResult({ repo: options.repo, run, location, command: options.command,
           result, artifact: "publication_result" }));
       } else {
-        throw new SetupRequired("Receipt retirement remains unavailable in this candidate. Preserve the record and inspect it with resume --action inspect.");
+        throw new SetupRequired("The selected run operation is unavailable.");
       }
     }
   } catch (error) {

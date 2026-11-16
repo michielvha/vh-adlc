@@ -43,6 +43,12 @@ test("retained original closure controller publishes only its exact approved exp
     expect(state.comments["1"][0].body).toBe(f.target.manifest!.effects.find(effect => effect.kind === "comment-create")!.payload.body);
     expect(git(f.origin, "for-each-ref", "--format=%(refname)", "refs/heads/docs-drift-lease")).toBe("");
     expect(git(f.origin, "for-each-ref", "--format=%(refname)", "refs/heads/docs-drift-receipts/closure-worker")).toBe("refs/heads/docs-drift-receipts/closure-worker");
+    const receiptRef = "refs/heads/docs-drift-receipts/closure-worker";
+    expect(git(f.origin, "rev-parse", receiptRef)).toBe(result.objects.receipt_object ?? result.objects.object);
+    const calls = readFileSync(f.service.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
+    expect(calls.some(call => call.program === "git" && call.args.includes("push")
+      && (call.args.includes(":" + receiptRef) || call.args.includes("--delete") && call.args.includes(receiptRef))
+      || call.program === "gh" && call.args.includes("DELETE") && call.args.some(arg => arg.includes("git/refs/heads/docs-drift-receipts/")))).toBe(false);
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveFailedRoots = true; throw error; }
 }, 365000);

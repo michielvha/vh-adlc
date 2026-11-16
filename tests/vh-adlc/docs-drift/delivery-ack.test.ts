@@ -118,6 +118,8 @@ async function interruptedAcknowledgementFixture(reaped = true) {
 
 test("acknowledgement journal schema is distinct, stops replay and rejects ordinary cleanup authority", async () => {
   const { f, interrupted, effect, grant, acknowledgement } = await interruptedAcknowledgementFixture();
+  const receiptRef = f.settings.publication.receipt_ref_prefix + "operation-1", receipt = f.refs.get(receiptRef);
+  expect(receipt).toBe(interrupted.objects.receipt_object ?? interrupted.objects.object);
   const journal = appendAcknowledgement(interrupted.journal, effect.id, acknowledgement);
   expect(readJournal(journal.directory, f.repo).events.at(-1)?.kind).toBe("acknowledged-delivery");
   expect(isObservationOnly(journal)).toBe(true);
@@ -148,6 +150,8 @@ test("acknowledgement journal schema is distinct, stops replay and rejects ordin
   expect(recovered.state).toBe("acknowledged");
   expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
   expect(f.executed.filter(id => id === "release")).toHaveLength(1);
+  expect(f.refs.get(receiptRef)).toBe(receipt);
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr", "release"]);
 });
 
 for (const mode of ["generic-grant", "missing-request", "scope", "application", "settlement", "foreign-lookup", "relative-lookup", "extra"] as const) {

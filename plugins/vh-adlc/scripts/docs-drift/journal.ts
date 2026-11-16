@@ -106,6 +106,8 @@ function parsePlan(value: unknown): SealedPlan {
     hash(input.approval_sha256); hash(input.policy_sha256); parseComponentBinding(input.component);
   } else { hash(input.approval_sha256); hash(input.adoption_sha256); }
   const manifest = parseActionManifest(input.manifest);
+  if (input.schema_version === 2 && manifest.effects.some(effect => effect.kind === "receipt-retire"))
+    fail("receipt-retire is unsupported in version-two operations");
   if (manifestDigest(manifest) !== hash(input.manifest_sha256)) fail("plan manifest digest");
   const roles = exact(input.roles, ["worker", "reviewer"]);
   const worker = roleBinding(roles.worker), reviewer = roleBinding(roles.reviewer);

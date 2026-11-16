@@ -224,8 +224,7 @@ operator/agent obligation.
 | Superseded-PR closure | Separate selected closure grant after observed consolidation merge and fresh complete per-hunk/record review. |
 | Publication lease acquisition | Selected publication/trial grant explicitly naming acquisition and its exact ref namespace. |
 | Owned lease release | Selected grant explicitly naming release, original ownership and exact object comparison, with terminal effects or gated reconciliation. |
-| Receipt creation and retention | Selected grant naming the immutable retained namespace and its operation refs. |
-| Receipt retirement | Separate cleanup grant naming exact recorded owned refs/objects after linked proposal/recovery needs finish. Preserve foreign, moved or unrecorded refs. |
+| Receipt creation and retention | Selected grant naming the immutable retained namespace and its operation refs. Keep completed and other terminal receipt refs indefinitely. |
 | Delivery acknowledgement | Owner's actual current approval of the exact presented lookup scope and evidence digests, original ownership, settled requests and fully applied eligible effects. |
 | Workflow dispatch | Current trial/cutover grant naming the exact workflow and selected inputs. |
 | Workflow disable/enable | Current cutover/rollback grant naming the exact workflow and effect. |

@@ -28,10 +28,11 @@ test("the docs-drift authority matrix keeps every runtime effect and recovery ap
   const actions = rows.slice(2).map(row => row.split("|")[1].trim());
   const required = ["Assessment and local report", "CI diagnostic upload", "Prepare/resolve edits and generators", "Local checkpoint commit",
     "Push and advisory/resolve PR", "Owned consolidation-branch refresh", "Issue creation", "Explanation comment", "Superseded-PR closure",
-    "Publication lease acquisition", "Owned lease release", "Receipt creation and retention", "Receipt retirement", "Delivery acknowledgement",
+    "Publication lease acquisition", "Owned lease release", "Receipt creation and retention", "Delivery acknowledgement",
     "Workflow dispatch", "Workflow disable/enable", "Workflow-run cancellation", "Synthetic draft PR", "Owned trial PR/branch cleanup",
     "Merged-branch cleanup", "Merge or release"];
   expect(actions).toEqual(required);
+  expect(section).toContain("terminal receipt refs indefinitely");
   expect(new Set(actions).size).toBe(actions.length);
   const acknowledgement = rows.find(row => row.includes("| Delivery acknowledgement |"));
   for (const requirement of ["actual current approval", "lookup", "evidence digests"]) expect(acknowledgement).toContain(requirement);

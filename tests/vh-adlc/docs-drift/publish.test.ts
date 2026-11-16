@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { publish, validatePublicationShape } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
-import { createJournal, writePublicationObjects, sealPlan, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendInvalidation, createJournal, writePublicationObjects, sealPlan, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { resumeEffects } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
 import { fixture, hash, bindings } from "./manifest-fixture";
@@ -22,6 +22,16 @@ test("one publisher delivers exact reviewed payloads under the owned lease and r
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
   expect(f.refs.has(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(true);
   expect(result.journal.plan.manifest.effects[3].payload.body).toBe(f.plan.manifest.effects[3].payload.body);
+  const receiptRef = f.settings.publication.receipt_ref_prefix + "operation-1", receipt = f.refs.get(receiptRef);
+  expect(receipt).toBe(result.objects.receipt_object ?? result.objects.object);
+  const resumed = await resumeEffects({ ...options(f), journal_directory: result.journal.directory });
+  expect(resumed.state).toBe("complete");
+  expect(f.refs.get(receiptRef)).toBe(receipt);
+  appendInvalidation(readJournal(result.journal.directory, f.repo), "pr", "synthetic-later-review-invalidation");
+  const invalidated = await resumeEffects({ ...options(f), journal_directory: result.journal.directory });
+  expect(invalidated.state).toBe("invalidated");
+  expect(f.refs.get(receiptRef)).toBe(receipt);
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr", "release"]);
 });
 
 test("a pending foreign lease prevents every publication and cleanup effect", async () => {

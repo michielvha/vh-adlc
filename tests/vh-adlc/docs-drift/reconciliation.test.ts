@@ -31,6 +31,8 @@ function input(f: Awaited<ReturnType<typeof abandoned>>["f"], directory: string)
 
 test("exact new cleanup authority can retire a known-absent action and release only its lease", async () => {
   const { f, interrupted } = await abandoned();
+  const receiptRef = f.settings.publication.receipt_ref_prefix + "operation-1", receipt = f.refs.get(receiptRef);
+  expect(receipt).toBe(interrupted.objects.receipt_object ?? interrupted.objects.object);
   f.input.grants = []; f.input.reviewer.native = Buffer.from("old publication proof unavailable");
   const result = await reconcileAbsent(input(f, interrupted.journal.directory));
   expect(result.state).toBe("retired");
@@ -42,6 +44,8 @@ test("exact new cleanup authority can retire a known-absent action and release o
   const normal = await resumeEffects({ ...options(f), journal_directory: result.journal.directory });
   expect(normal.state).toBe("retired");
   expect(f.executed.filter(id => id === "pr")).toHaveLength(0);
+  expect(f.refs.get(receiptRef)).toBe(receipt);
+  expect(f.executed).toEqual(["lease", "receipt", "push", "release"]);
 });
 
 test("report data and stale or absent cleanup grants authorize no retirement or release", async () => {

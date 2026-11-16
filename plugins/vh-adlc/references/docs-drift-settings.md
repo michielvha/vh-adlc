@@ -158,7 +158,7 @@ timestamp-addressed records remain readable. Each metadata record is byte-bounde
 Completed records and interrupted `.pending-*` files remain until explicit
 owned cleanup. Preserve them with journals, receipts and linked artifacts when
 recovery still needs them. An age/count eligibility limit leaves saved evidence
-on disk. Receipt retirement has its own exact-ref grant.
+on disk. The workflow retains completed and other terminal receipt refs indefinitely.
 
 ## Staged adoption and upgrades
 
