@@ -148,7 +148,7 @@ test("a failed scan can retry in the same directory while preserving its origina
   const path = join(f.directory, "stages/0000000001.json"), first = readFileSync(path);
   expect(invoke(f, "scan").status).toBe(0);
   expect(readFileSync(path)).toEqual(first);
-  expect(readdirSync(join(f.directory, "stages"))).toEqual(["0000000001.json", "0000000002.json"]);
+  expect(readdirSync(join(f.directory, "stages")).sort()).toEqual(["0000000001.json", "0000000002.json"]);
 });
 
 test("an explicitly changed execution profile cannot silently reuse a run", () => {

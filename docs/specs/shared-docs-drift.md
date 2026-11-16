@@ -88,6 +88,14 @@ This revision incorporates the owner's atomic-abandonment decision after a sched
 
 The owner selected atomic administrative abandonment after qualified Claude Code Opus 5.5 diagnostic r15 established the durable-data limit. `journal.ts:502` appends outcomes locally, while `journal.ts:533` writes immutable plan-only Git metadata. Without the original runner, a receipt alone cannot distinguish an unresolved operation from a retained terminal operation. The lease is the automatic pending signal. The outside-helper administrative procedure must remove the lease and all selected unresolved receipts in one atomic compare-and-swap push. A moved or missing approved ref rejects the entire attempt and requires reobservation plus new exact approval. Completed and other terminal receipts remain retained indefinitely. An unsupported lease-only deletion can permit a fresh green report with an orphan receipt present. This change removes the earlier lease-only-pending promise and introduces no completion record or settlement proof.
 
+### Verification and review on 2026-11-16
+
+The unchanged isolated `5a08753` checkpoint completes every declared stage, including 4,031 passing plugin tests across 262 files with 18,550 assertions. Its source snapshot remains unchanged while the owning feature branch advances. Linux CI at the same pushed commit passes every case except the retry test's unsorted directory-list assertion. The runner returns the same two stage files in reverse order. T145 sorts that exact membership comparison, retains original-stage byte checks and passes all 74 normal CLI cases with 200 assertions. The original failed CI log remains retained. macOS, Go verification and remote-gui CI pass at their recorded source.
+
+The current private consumer corpus trial freezes `d10355a6` and its twelve identified overlays into owned commit `5e622c4971ae2c8f113b813a8dd211fb89df8118`. Shared collection completes all twelve detector units over 867 documents, with 814 findings and 63 suppressions. Original/current legacy JSON bytes, console and exits match. Normalized shared findings, suppressions and stale counts also match. The first parity run retains a failed caller-preservation assertion. The exact-source recheck saves both logical caller snapshots, confirms their equality and passes every parity check. Consumer entry/protocol tests pass 24 cases and 126 assertions with 65 classified caller references. These source checks establish no released-install, native-provider or hosted acceptance.
+
+R-106's four should-fix findings and two nits are recorded verbatim. The original publisher already rechecks its exact lease before each business dispatch in `publish.ts:133` and `recovery.ts:138`. The new live-controller regression passes and fails when only that existing fence is removed. The owner is being asked to confirm a stopped original executor as an additional manual-abandonment precondition, exact current-operation receipt selection, uniform pre-role lease checks and a definite lease-only-deletion scenario. T143's local correction is committed at `3894648c`; the normative clarification and its renewed review follow that answer. T144/T128 and final acceptance stay open.
+
 ### Simplification basis on 2026-11-15
 
 At published `b7b85398eff501083824a7f2b48032dcd1026f88`, PR #98 adds 50,862 lines across 303 files. The measured additions include 18,967 runtime/tooling lines in 109 files and 25,895 test/fixture lines. Actual Claude Code Opus 5.5 architecture diagnostic reads all 203 supplied fragments, including 28 complete core modules, normative design and complete module inventories. It identifies useful domain controls and excessive execution/adoption infrastructure. The diagnostic is archived as `docs-drift-architecture-claude-r1`, with exact source, original return and qualified model/read/cleanup records. It is distinct from canonical spec acceptance.
@@ -855,6 +863,10 @@ The following tasks implement the revised baseline after spec review and owner a
 
   The actual bot-owned scheduled-entry pair passes two cases and forty assertions for a retained lease and fresh independently reviewed collection after both selected refs are removed. That test's original sequential administrative deletion is diagnostic, with the newly approved atomic procedure and its consumer rehearsal assigned to T144/T128. A separate native-Git feasibility probe verifies matching atomic deletion, stale lease, stale receipt, missing receipt and an atomic-disabled server, preserving terminal receipts and every ref on rejected attempts. No provider or real GitHub write occurs. Qualified actual Claude Code Opus 5.5 diagnostic r16 reads all 81 fragments and finds no blocking patch defect, with missing test coverage and three local corrections applied. The metadata extraction retains each old caller's tree bound, pending diagnostics are recorded once and failed report saving retains incomplete status. Final committed implementation review remains T129. Manual documentation-impact review updates the ordinary audit guide's pending projection and history eligibility, retaining the accepted recovery procedure for T144's separately reviewed revision.
 
+- [x] T145 `tests/vh-adlc/docs-drift/run-cli.test.ts` - Correct the filesystem-order assumption exposed by Linux CI, retaining exact stage membership and original-stage byte preservation. (AC-07)
+
+  Evidence. Actual CI at pushed `5a08753` fails because `readdirSync` returns the two expected stage files in reverse order. The expected set and bytes are correct. Sorting only that assertion passes all 74 normal CLI tests and 200 assertions in `t145-cli-directory-order.log`. The original CI output is retained as `t129-ci-5a-failed.log`. No product execution or timeout changes.
+
 - [ ] T144 `plugins/vh-adlc/references/{authority,docs-drift-review}.md, tests/vh-adlc/docs-drift/authority.test.ts` - Implement the owner-approved atomic administrative-abandonment contract after fresh spec review and acceptance. Document one ordinary atomic Git push with exact object preconditions, unchanged refs after a stale precondition, indefinite terminal-receipt retention and the lease-only-deletion limitation. Prove exact atomic removal permits fresh reviewed assessment, while the retained lease and stale abandonment remain pending. (AC-05, AC-07)
 
 - [ ] T128 `Stackweaver staged migration config, companion, command, workflow and tests` - Update the isolated staged adopter to the replacement interface and checklist, preserving legacy behavior and routing. Run corpus/protocol/feedback/config parity and disposable rollback tests at exact commits. Exercise the actual scheduled-worker route after lost ownership, requiring a pending report while the lease remains, then fresh current collection and review after exact atomic abandonment. Verify all-or-nothing refusal on a stale approved object and explicitly demonstrate the unsupported lease-only-deletion limitation. (AC-01, AC-02, AC-03, AC-06)
@@ -1422,7 +1434,17 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 ## Open Questions
 
-None. The owner selected atomic administrative abandonment on 2026-11-16. The revised contract records that decision and awaits its fresh review and acceptance.
+### Q1: Should atomic abandonment use the four clarified preconditions and report rules?
+
+The recommendation preserves the owner's selected atomic procedure, with these explicit conditions. The original executor has stopped before deletion. Only the present lease's own operation and receipt are eligible. Both local and scheduled audits skip model calls while the lease is present. An unsupported lease-only deletion permits fresh assessment from current findings, without settlement or replay authority.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| A. Accept the clarifications | A defined manual hand-off, exact receipt scope and deterministic report tests. | The inspection must establish that the original executor has stopped. |
+| B. Revisit recovery behavior | The owner selects different conditions before implementation. | The revised recovery contract and tests wait for that choice. |
+
+The existing publisher already checks its lease between effects. Confirming the executor has stopped prevents further dispatch. Requests with lost outcomes retain their unknown status. This changes the manual procedure's preconditions. The owner's response is pending.
+
 
 ## Review Log
 
