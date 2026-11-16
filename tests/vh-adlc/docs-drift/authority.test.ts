@@ -33,6 +33,11 @@ test("the docs-drift authority matrix keeps every runtime effect and recovery ap
     "Merged-branch cleanup", "Merge or release"];
   expect(actions).toEqual(required);
   expect(section).toContain("terminal receipt refs indefinitely");
+  const introduction = section?.split("| Action | Authority and conditions |")[0];
+  expect(introduction).toContain("Administrative abandonment and delivery acknowledgement require the owner's actual current approval");
+  expect(introduction).toContain("only standing source for the synthetic trial scope");
+  expect(section).toContain("Acknowledgement and administrative abandonment exclude standing adopted procedures");
+  expect(section).toContain("Automatic expiry and job cancellation authorize neither action");
   expect(new Set(actions).size).toBe(actions.length);
   const acknowledgement = rows.find(row => row.includes("| Delivery acknowledgement |"));
   for (const requirement of ["actual current approval", "lookup", "evidence digests"]) expect(acknowledgement).toContain(requirement);

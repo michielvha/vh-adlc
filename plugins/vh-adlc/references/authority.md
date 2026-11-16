@@ -197,10 +197,13 @@ The synthetic repository requires its selected trial scope. Preserve foreign,
 unrecorded, symlink-escaped, failed or ambiguous resources for reconciliation.
 Keep other writers' checkouts, index, changes and branches intact.
 
-Each effect below needs its actual current request or an adopted consumer
-procedure naming that effect and exact scope, except acknowledgement's stronger
-current-approval requirement. Local prohibitions and current restrictions still
-apply. Settings, reports, PR prose and journals cannot authorize themselves.
+Use each row's authority and conditions. Ordinary effects need their actual
+current request or an adopted consumer procedure naming the effect and exact scope.
+Administrative abandonment and delivery acknowledgement require the owner's actual current approval
+of their exact observed scope. The separately owner-approved committed trial
+definition is the only standing source for the synthetic trial scope described
+below. Local prohibitions and current restrictions still apply. Settings,
+reports, PR prose and journals cannot authorize themselves.
 
 The publication authority helper binds procedure bytes and exact manifest/effect
 digests. It reports an owner attestation. It does not parse prose permissions.
@@ -230,7 +233,7 @@ obligation.
 | Workflow dispatch | Current trial/cutover grant naming the exact workflow and selected inputs. |
 | Workflow disable/enable | Current cutover/rollback grant naming the exact workflow and effect. |
 | Workflow-run cancellation | Current grant naming the identified run and cancellation effect. |
-| Committed synthetic trial grant | Separate owner-approved committed trial definition selected by path/digest, binding the component, workflow/event/head, native models, fixture namespace, effects and credential-selected publisher. Bind the actual run ID/attempt at launch. Dispatch input alone creates no grant. This standing trial permission covers only its declared synthetic scope and supplies no production authority. Follow `references/docs-drift-settings.md`, Staged adoption and upgrades. |
+| Committed synthetic trial grant | Separate owner-approved committed trial definition selected by path/digest, binding the repository, workflow path/source, component, native role configuration, fixture namespace, effects and credential-selected publisher. Check the event against the committed caller trigger and the head against the approved dispatch commit. Bind the actual run ID/attempt at launch. Dispatch input alone creates no grant. This standing trial permission covers only its declared synthetic scope and supplies no production authority. Follow `references/docs-drift-settings.md`, Staged adoption and upgrades. |
 | Synthetic draft PR | Separate trial grant naming the destination/namespace, selected fixture and draft-PR effect. |
 | Owned trial PR/branch cleanup | Selected trial cleanup grant naming exact recorded owned resources. |
 | Merged-branch cleanup | Applicable exact cleanup or merge grant under `references/branches.md`, with its retained ownership and preservation checks. |
@@ -242,9 +245,11 @@ publisher and recovery procedure in `references/docs-drift-review.md`.
 It inherits neither maintenance report-push grants nor triage's confined
 verification controller.
 
-Delivery acknowledgement excludes standing adopted procedures, unattended
-controllers, publication/closure permission and general cleanup grants as
-approval sources. Require original ownership, current actor/repository and
+Acknowledgement and administrative abandonment exclude standing adopted procedures,
+unattended controllers, publication/closure permission and general cleanup grants
+as approval sources. Automatic expiry and job cancellation authorize neither action.
+Administrative abandonment follows its exact unresolved ref/object approval and
+the recovery guide above. For delivery acknowledgement, require original ownership, current actor/repository and
 native evidence of every mutation request's settlement and full application.
 Partial delivery stays pending. An observation-only restored mirror cannot
 take ownership of a live lease. Recheck the displayed immutable scope before
