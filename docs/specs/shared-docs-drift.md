@@ -1454,6 +1454,8 @@ None. The owner confirmed ordinary plugin/client installation and the recommende
 | 2026-11-16 | R-100 | spec | `91c7b5f0aa81b35a07cd573e61ce05df02b0c40a` | claude-opus-5-5 | procedural | No blocking or should-fix findings. One terminology nit retained under the pinned rule. All 62 required fragments read with qualified model, target and cleanup. |
 | 2026-11-16 | R-100 | spec | `91c7b5f0aa81b35a07cd573e61ce05df02b0c40a` | n/a | n/a | accepted by owner |
 
+| 2026-11-16 | R-101 | spec | `27bb468499d7d9c3fd4310cf3ad2471b58779695` | claude-opus-5-5 | procedural | No blocking or should-fix findings. Three nits retained under the pinned rule. All 61 required fragments read with qualified native model, target, unchanged packet and cleanup. Default-branch-only refresh preserves the accepted normative baseline. |
+
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
 ### R-57
@@ -2581,6 +2583,27 @@ SEVERITY: nit
 WHERE: Design "One run directory and a smaller helper interface", second paragraph (`shared-docs-drift.md:594`, "Completed and otherwise terminal operations, including acknowledged, retired and invalidated ones, retain their immutable receipt refs indefinitely"); Test Plan AC-05 row (`:669`, "Include acknowledged, retired and invalidated terminal outcomes in retained-ref checks"); Context "Approved follow-up on 2026-11-16", R-98 paragraph (`:125`, "including acknowledged, retired and invalidated operations"); Tasks T138 (`:746`, "known-absence retirement").
 EVIDENCE: At `:594` and `:669` the bare word "retired" stands next to sentences about removing the `retire-receipt` selector and refusing the `receipt-retire` effect, in the same sentence or the one before. A reader can take "retired operations" to mean operations whose receipt was retired, which is the capability this correction removes. In the code the word means something else: `journal.ts` `validateEvent` handles the `retired-absence` event (`Retirement` with `never_dispatched` or `unapplied`), which `reconcile-publication` appends for a business effect proven absent. Only T138 says "known-absence retirement", and R-99 F-02 had to explain "retired (known-absence reconciliation)" in its own evidence. The words come from the R-98 correction. T138's wording settles what is built and tested, so the implementation does not change.
 PROPOSAL: Replace "retired" with "known-absence retired" (or "reconciled as known absent") at `:594`, `:669` and in the R-98 paragraph so the terms match T138 and the `retired-absence` journal event.
+
+### R-101
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Default-branch refresh on 2026-11-16", first paragraph (`docs/specs/shared-docs-drift.md:165`, "Its documentation-impact guidance preserves an old symbol spelling when the record describes the old API. The paired test now checks that phrase.")
+EVIDENCE: The supplied drift `main-drift.patch` changes `plugins/vh-adlc/references/docs-impact.md:95-100`. The new text reads: "When a change removes or renames a name a reader types or sees, such as a service, environment variable, configuration key, flag, endpoint, image or UI label, search every document for the old spelling, not only documents whose metadata matches the change. A hit outside an upgrade instruction is Stale." `tests/vh-adlc/docs-impact/integration.test.ts` only adds "old spelling" to its required phrase list. The guidance tells reviewers to search for old spellings and mark them Stale. It says nothing about preserving an old spelling when a record describes the old API. A search of `docs-impact.md` finds no "old API" wording; line 117 keeps its earlier general "Keep intended contracts and historical claims" sentence. The upstream change therefore runs close to the opposite direction of the Context sentence. Scope, Design, criteria, Test Plan and covers do not depend on this sentence, so nothing built or proved changes.
+PROPOSAL: Rewrite the sentence to say that docs-impact now requires a repository-wide search for a removed or renamed user-visible name's old spelling, treating hits outside upgrade instructions as Stale, and that the paired test checks the "old spelling" phrase.
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Owner summary", last paragraph (`docs/specs/shared-docs-drift.md:85`, "The revised spec has a fresh accepted Claude Code Opus 5.5 review."); Context "Default-branch refresh on 2026-11-16" (`:165`, "A fresh actual Claude Code Opus 5.5 spec review replaces R-100's drifted review before implementation resumes."); Context R-100 paragraph (`:129`, "covers continuation after this fresh clean review"); Tasks T140 manual documentation impact (`:779`, "R-100 stays fresh").
+EVIDENCE: At this target, `:165` and the dispatch context say R-100's review went stale after the `452de73` to `1c03959` default-branch merge, and that a replacement spec review is required before implementation resumes. The Owner summary still says the spec has a fresh accepted review and does not mention the default-branch refresh or the pending replacement review. The standard asks the summary to state validation state, separate planned checks from observed proof, and explain material changes since the last accepted scope. Under the standard's acceptance rule, a default-branch-only re-review keeps the acceptance when the baseline is unchanged, so `accepted` is unaffected. Once this replacement pass is clean, the summary sentence is accurate again. The `:129` and `:779` statements are dated checkpoint history and can stay.
+PROPOSAL: Add one sentence to the Owner summary saying the 2026-11-16 default-branch merge left the normative baseline unchanged and that a fresh replacement spec review of that baseline is required (or, once stored, names it), with the existing R-100 acceptance still applying.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design "One run directory and a smaller helper interface", second paragraph (`docs/specs/shared-docs-drift.md:615`, "including acknowledged, retired and invalidated ones"); Test Plan AC-05 row (`:690`, "Include acknowledged, retired and invalidated terminal outcomes in retained-ref checks"); Context R-98 paragraph (`:125`, "including acknowledged, retired and invalidated operations"); Context R-99 paragraph (`:127`, "completed, acknowledged, retired and invalidated outcomes"); Tasks T138 (`:767`, "known-absence retirement").
+EVIDENCE: This repeats R-100 F-01 unchanged (R-100 cited the same text at `:594`, `:669`, `:125` and `:746` before the lines moved). The bare word "retired" still sits beside sentences about removing the `retire-receipt` selector and refusing `receipt-retire` effects. In `journal.ts`, the term is the `retired-absence` event (`Retirement` with `never_dispatched` or `unapplied`) used for known-absence reconciliation, as only T138 says. The baseline has not changed since R-100, and under the pinned nit rule an unapplied nit stays until a later revision touches it. T138's wording settles what is built and tested.
+PROPOSAL: When a later revision touches these lines, replace "retired" with "known-absence retired" at `:615`, `:690`, `:125` and `:127` so they match T138 and the `retired-absence` journal event.
 
 ## Sources
 
