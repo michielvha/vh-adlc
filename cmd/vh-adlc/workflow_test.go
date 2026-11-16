@@ -103,7 +103,7 @@ func TestCIWorkflow(t *testing.T) {
 	}
 	version := w.Jobs["version"]
 	if !strings.HasPrefix(version.Uses, "vhco-pro/version-workflow/.github/workflows/version.yml@") ||
-		!slices.Equal(dependencies(t, version.Needs), []string{"verify", "checker", "checker-macos", "remote-gui"}) {
+		!slices.Equal(dependencies(t, version.Needs), []string{"verify", "checker", "checker-macos", "remote-gui", "paseo-hosts"}) {
 		t.Error("versioning must call the shared version workflow after every check, through native needs")
 	}
 	if _, ok := version.With["dry-run"]; ok {
