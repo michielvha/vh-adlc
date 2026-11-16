@@ -376,6 +376,11 @@ describe("review model eligibility", () => {
     expect(text).toContain("leave the review visibly pending");
   });
 
+  test("reports name hosted items by their full URL", () => {
+    const text = read(join(PKG, "references", "loop.md"));
+    for (const phrase of ["full URL where it is first mentioned", "repository or document hosted online", "A\nlocal file keeps its path"]) expect(text).toContain(phrase);
+  });
+
   test("installer invocation does not depend on extracted executable bits", () => {
     const text = read(join(PKG, "references", "loop.md"));
     expect(text).toContain('VH_ADLC=$(bash "<plugin directory>/scripts/ensure-vh-adlc.sh")');
