@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { assertRunStageOrder, createRunArtifactWriter, createRunDirectory, readRunDirectory, appendRunStage } from "../../../plugins/vh-adlc/scripts/docs-drift/run-directory";
 import { installedSettingsFixture } from "./settings-fixture";
@@ -100,6 +100,26 @@ test("missing host ownership leaves the surviving directory observation-only", (
   const run = readRunDirectory(f.input);
   expect(run.origin).toBe("observation-only");
   expect(() => appendRunStage(run, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
+});
+
+test("an existing external origin alias preserves opened-run ownership and stage appends", () => {
+  const f = fixture(), alias = join(f.root, "origin-alias"), run = createRunDirectory(f.input);
+  symlinkSync(f.input.origins, alias);
+  const reopened = readRunDirectory({ ...f.input, origins: alias });
+  expect(reopened.origin).toBe("original");
+  expect(reopened.manifest).toEqual(run.manifest);
+  appendRunStage(reopened, { command: "scan", state: "complete", artifacts: {} });
+  expect(readRunDirectory({ ...f.input, origins: alias }).stages).toHaveLength(1);
+});
+
+test.each(["caller", "git", "run", "parent"])("an origin alias targeting the %s cannot confer ownership", target => {
+  const f = fixture(), run = createRunDirectory(f.input), alias = join(f.root, "origin-alias");
+  const directory = target === "caller" ? f.repo : target === "git" ? join(f.repo, ".git") : target === "run" ? f.input.directory : f.root;
+  writeFileSync(join(directory, run.manifest.id + ".json"), readFileSync(join(f.input.directory, "run.json")), { mode: 0o600 });
+  symlinkSync(directory, alias);
+  const observed = readRunDirectory({ ...f.input, origins: alias });
+  expect(observed.origin).toBe("observation-only");
+  expect(() => appendRunStage(observed, { command: "publish", state: "pending", artifacts: {} })).toThrow("original");
 });
 
 test("an explicitly restored observation directory creates no host execution origin", () => {

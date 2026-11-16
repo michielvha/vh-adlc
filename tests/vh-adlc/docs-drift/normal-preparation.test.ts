@@ -1,6 +1,6 @@
 /** Exercise normal preparation through owned native processes. No actual provider or remote writes. */
 import { afterAll, expect, test } from "bun:test";
-import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ordinaryComponentFixture, preflightFixture } from "./preflight-fixture";
 import { auditClient } from "./native-audit-client-fixture";
@@ -25,9 +25,9 @@ test("normal prepare retains the original worker selection and edits only its ow
   git(f.root, "clone", "--bare", "--no-local", f.repo, origin);
   const service = installOwnedNativeService({ root: f.root, origin, source, head: source, publisher_identity: { actor: "fixture-owner", actor_id: 30 } });
   const before = captureRepositoryState(f.repo), nativeBefore = readFileSync(service.statePath), refs = git(origin, "for-each-ref");
-  async function invoke(command: string) {
+  async function invoke(command: string, selectedDirectory = directory) {
     const result = await executeOwnedProcess({ argv: [process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), command,
-      "--repo", f.repo, "--run-dir", directory, ...(command === "scan" ? ["--source", source] : [])], cwd: f.repo,
+      "--repo", f.repo, "--run-dir", selectedDirectory, ...(command === "scan" ? ["--source", source] : [])], cwd: f.repo,
       env: { PATH: join(f.root, "native-bin") + ":" + process.env.PATH, HOME: process.env.HOME!, GH_TOKEN: "synthetic-native-token",
         COPILOT_GITHUB_TOKEN: "synthetic-selected-provider", XDG_STATE_HOME: state, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
       capture: "memory", watched_outputs: [], timeout_ms: 900000, stdout: join(f.root, command + ".stdout"),
@@ -61,6 +61,29 @@ test("normal prepare retains the original worker selection and edits only its ow
   expect(readFileSync(service.statePath)).toEqual(nativeBefore); expect(git(origin, "for-each-ref")).toBe(refs);
   const manifest = final?.artifacts.reviewed_plan;
   if (!manifest) throw Error("Exact reviewed manifest required");
+  const callsBeforeRefusals = readFileSync(service.calls);
+  const missingApproval = await invoke("publish");
+  expect(missingApproval.result.exit_code).toBe(2);
+  expect(missingApproval.report).toMatchObject({ outcome: "setup-required" });
+  const copy = join(f.root, "copied-prepared-run"); cpSync(directory, copy, { recursive: true });
+  const copied = await invoke("publish", copy);
+  expect(copied.result.exit_code).toBe(2);
+  expect(copied.report).toMatchObject({ outcome: "setup-required" });
+  const reviewer = final?.artifacts.reviewer_capture;
+  if (!reviewer) throw Error("Original reviewer capture required");
+  const rolePath = join(directory, reviewer.path), unavailable = rolePath + ".unavailable";
+  renameSync(rolePath, unavailable);
+  try {
+    const missingRole = await invoke("publish");
+    expect(missingRole.result.exit_code).toBe(2);
+    expect(missingRole.report).toMatchObject({ outcome: "incomplete" });
+  } finally { renameSync(unavailable, rolePath); }
+  writeFileSync(join(directory, "approval.yaml"), "manifest_sha256: " + "f".repeat(64) + "\nrequest: Approve another synthetic batch\n", { mode: 0o600 });
+  const wrongApproval = await invoke("publish");
+  expect(wrongApproval.result.exit_code).toBe(2);
+  expect(wrongApproval.report).toMatchObject({ outcome: "incomplete" });
+  expect(readFileSync(service.calls)).toEqual(callsBeforeRefusals);
+  expect(readFileSync(service.statePath)).toEqual(nativeBefore); expect(git(origin, "for-each-ref")).toBe(refs);
   writeFileSync(join(directory, "approval.yaml"), "manifest_sha256: " + manifest.sha256 + "\nrequest: Approve this exact synthetic publication batch\n", { mode: 0o600 });
   const head = git(preparation.prepared.checkout, "rev-parse", "HEAD");
   git(origin, "fetch", "--no-write-fetch-head", preparation.prepared.checkout, head);

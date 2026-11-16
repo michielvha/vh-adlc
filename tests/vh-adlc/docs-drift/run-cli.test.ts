@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync, readdirSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
@@ -16,10 +16,10 @@ function fixture() {
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Owned ordinary example");
   return { root, repo, directory, source: readGit(repo, "rev-parse", "HEAD").toString().trim() };
 }
-function invoke(f: ReturnType<typeof fixture>, command: string, extra: string[] = []) {
+function invoke(f: ReturnType<typeof fixture>, command: string, extra: string[] = [], state = join(f.root, "state")) {
   const result = Bun.spawnSync([process.execPath, resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"),
     command, "--repo", f.repo, "--run-dir", f.directory, ...extra], {
-    env: { PATH: process.env.PATH, HOME: process.env.HOME, XDG_STATE_HOME: join(f.root, "state"), BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, XDG_STATE_HOME: state, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
     stdout: "pipe", stderr: "pipe", timeout: 60000,
   });
   const parsed: unknown = JSON.parse(result.stdout.toString());
@@ -77,6 +77,30 @@ test("resume inspects a surviving run using its recorded source", () => {
   const resumed = invoke(f, "resume", ["--action", "inspect"]);
   expect(resumed.status).toBe(0);
   expect(resumed.report).toMatchObject({ command: "resume", outcome: "collected", source_commit: f.source, stage: "scan" });
+});
+
+test.each(["resolve", "prepare", "verify", "publish", "close"])("a copied run refuses normal %s before adding an executing stage", command => {
+  const f = fixture(), caller = captureRepositoryState(f.repo);
+  expect(invoke(f, "scan", ["--source", f.source]).status).toBe(0);
+  const copy = { ...f, directory: join(f.root, "copied-run") };
+  cpSync(f.directory, copy.directory, { recursive: true });
+  const original = readFileSync(join(copy.directory, "run.json")), stages = readdirSync(join(copy.directory, "stages"));
+  const result = invoke(copy, command);
+  expect(result.status).toBe(2);
+  expect(result.report).toMatchObject({ command, outcome: "setup-required", diagnostics: [expect.stringContaining("original host ownership")] });
+  expect(readFileSync(join(copy.directory, "run.json"))).toEqual(original);
+  expect(readdirSync(join(copy.directory, "stages"))).toEqual(stages);
+  expect(captureRepositoryState(f.repo)).toEqual(caller);
+});
+
+test("an existing XDG state alias preserves original ownership through normal scan and resume", () => {
+  const f = fixture(), state = join(f.root, "state"), alias = join(f.root, "state-alias");
+  mkdirSync(state, { mode: 0o700 });
+  symlinkSync(state, alias);
+  expect(invoke(f, "scan", ["--source", f.source], alias).status).toBe(0);
+  const resumed = invoke(f, "resume", ["--action", "inspect"], alias);
+  expect(resumed.status).toBe(0);
+  expect(resumed.report.summary).toContain("Original run retained");
 });
 
 test("a failed scan can retry in the same directory while preserving its original stage", () => {

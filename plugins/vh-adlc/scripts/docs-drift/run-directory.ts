@@ -120,6 +120,7 @@ export function readRunDirectory(input: RunOptions): RunDirectory {
   if (snapshot.settings.schema_version === 2 && manifest.source_repo === options.repo
     && scope.directory === manifest.directory && identity.device === manifest.device && identity.inode === manifest.inode) {
     try {
+      options.origins = realpathSync(options.origins);
       artifactDirectoryScope(options.origins, options.repo);
       scope.assertExternal(options.origins);
       if (options.origins === scope.directory || options.origins.startsWith(scope.directory + "/")
