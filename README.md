@@ -84,6 +84,7 @@ This repository hosts the **vhco-tools** marketplace. Each plugin installs separ
 | --- | --- |
 | `vh-adlc` | Development workflows, feature gates, and independent reviews. |
 | `remote-gui` | Share local apps through private tailnet links and hand a fresh browser to the human. |
+| `paseo-hosts` | Onboard Linux servers as SSH-only Paseo daemons and link the Paseo desktop app to them. |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes. |
 | `github-app-registration` | Register GitHub Apps and save their credentials locally. |
 | `codex-qr-pairing` | Generate a fresh QR code for pairing with this Codex host. |
