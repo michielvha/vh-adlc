@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "R-100 has no blocking or should-fix findings and the owner-approved receipt-retention correction is accepted. Ready to resume its existing implementation branch. Installed/hosted migration acceptance remains open."
+status: in-progress
+status_description: "Implementing the accepted R-100 receipt-retention correction and approved runtime simplification on the existing branch. Final cleanup, installed/hosted verification and Stackweaver migration remain open."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
