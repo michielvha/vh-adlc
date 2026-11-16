@@ -30,8 +30,14 @@ test("an operation binds its original publisher entry before independent review"
   expect(parseActionManifest(fixture().manifest)).not.toHaveProperty("publisher_entry");
 });
 
-test.each([null, "unknown", 1])("a malformed original publisher entry %j is refused", publisher_entry => {
+test.each([null, "", "bad/name", "two names", 1])("a malformed original publisher entry %j is refused", publisher_entry => {
   expect(() => parseActionManifest({ ...manifest(), publisher_entry })).toThrow();
+});
+
+test("a named publisher profile still requires its configured publisher policy", () => {
+  const original = parseActionManifest({ ...manifest(), publisher_entry: "nightly-2" });
+  expect(original.publisher_entry).toBe("nightly-2");
+  expect(() => validatePublicationShape({ manifest: original, context: "trial", publication_kind: "advisory" }, settings(), true)).toThrow("publisher entry");
 });
 
 test("mapped publication shape binds the original entry selector", () => {

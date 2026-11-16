@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { appendIntent, appendAttempt, appendAttemptEnd, appendRetirement, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject, writePublicationObjects, publicationObjectIDs } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendIntent, appendAttempt, appendAttemptEnd, appendRetirement, appendOutcome, createJournal, readJournal, readRetainedPlan, readVerifiedPlan, sealPlan, writePlanObject, writePublicationObjects, publicationObjectIDs } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { createOwnedObjectStore, captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -359,9 +359,13 @@ test("candidate proof binds delivery while retained legacy plans preserve their 
 });
 
 test.each(["production-native", "trial-native", "trial-collector"] as const)("version-two plans separate grants and context policy for %s", context => {
-  const input = fixture(), reviewed = validateReviewedManifest(input);
+  const input = context === "trial-native" ? fixture(bindings, undefined, "operation-1", { actor: "fixture-bot", actor_id: 20, publisher_entry: "hosted" }) : fixture();
+  const reviewed = validateReviewedManifest(input);
   const component = { plugin_version: "0.25.0", source_commit: "d".repeat(40), component_sha256: hash("installed component") };
+  const launch = { hostname: "github.com", repository: "fixture/docs", repository_id: 10, actor: "fixture-bot", actor_id: 20,
+    workflow_id: 100, workflow_path: ".github/workflows/trial.yml", event: "workflow_dispatch" as const, head_commit: bindings.source_commit, run_id: 501, run_attempt: 1 };
   const policy = { schema_version: 2 as const, policy_sha256: hash(context), component,
+    ...(context === "trial-native" ? { trial_launch: launch, publisher_entry: "hosted" } : {}),
     context: context === "production-native" ? "production" as const : "trial" as const,
     transport: context === "trial-collector" ? "collector" as const : "native" as const,
     publication_kind: "advisory" as const, pr_draft: true, worker: role, reviewer: role };
@@ -374,4 +378,14 @@ test.each(["production-native", "trial-native", "trial-collector"] as const)("ve
   expect(() => readVerifiedPlan(canonicalJSON(plan), () => ({ ...policy, policy_sha256: hash("different context policy") }))).toThrow("policy");
   expect(() => readVerifiedPlan(canonicalJSON(plan), () => ({ ...policy, component: { ...component, component_sha256: hash("different component") } }))).toThrow("policy");
   expect(() => readVerifiedPlan(canonicalJSON(plan), () => ({ ...policy, transport: policy.transport === "native" ? "collector" : "native" }))).toThrow("policy");
+  if (context === "trial-native") {
+    const { trial_launch: _launch, ...retained } = plan;
+    const bytes = canonicalJSON(retained);
+    expect(canonicalJSON(readRetainedPlan(bytes))).toEqual(bytes);
+    const { trial_launch: _policyLaunch, ...unsupported } = policy;
+    expect(() => sealPlan({ reviewed, grants: input.grants, ...unsupported, corrections: [], attention: [] })).toThrow("native trial launch");
+    expect(() => readVerifiedPlan(bytes, () => unsupported)).toThrow("original native trial launch");
+    for (const changed of [{ ...launch, head_commit: "f".repeat(40) }, { ...launch, actor_id: 21 }, { ...launch, repository_id: 11 }])
+      expect(() => readRetainedPlan(canonicalJSON({ ...plan, trial_launch: changed }))).toThrow("native trial launch manifest changed");
+  }
 });

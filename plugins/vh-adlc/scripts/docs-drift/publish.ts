@@ -2,9 +2,11 @@ import { publisherActor, sameLogin, sameAccount } from "./identity";
 import { executeAttempt, hasEffectAttempt } from "./attempts";
 import { policyBinding, appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRecoveryOnly, createJournal, readJournal, readVerifiedPlan, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { effectMarker, manifestDigest, parseActionManifest, validateReviewedManifest, type Effect } from "./manifests";
-import { canonicalJSON } from "./protocol";
+import { canonicalJSON, withinPrefix } from "./protocol";
 import { publicationMarker } from "./report-history";
 import { loadCommittedSettings, type Settings } from "./settings";
+import { readOriginalNativeTrialPolicy } from "./trial-definition";
+import { readGit } from "./git";
 import type { OwnedObjectStore } from "./snapshot";
 import { externalArtifactDirectory } from "./snapshot";
 import type { PlanObjects, PublicationTransport } from "./transport";
@@ -76,8 +78,17 @@ export async function verifyPublicationGate(options: PublishOptions, journal: Jo
     context: gate.policy.context, transport: gate.policy.transport, publication_kind: gate.policy.publication_kind, corrections: plan.corrections, attention: plan.attention, candidate_verification_sha256: plan.candidate_verification_sha256 });
   if (!canonicalJSON(current).equals(canonicalJSON(plan))) fail("changed current review or authority");
   const committed = loadCommittedSettings(options.source_repo, plan.manifest.bindings.source_commit);
-  if (committed.settings_sha256 !== plan.manifest.bindings.settings_sha256 || !canonicalJSON(committed.settings).equals(canonicalJSON(options.settings))) fail("source settings binding");
-  validatePublicationShape(plan, committed.settings, gate.policy.pr_draft);
+  let settings = committed.settings;
+  if (plan.schema_version === 2 && plan.context === "trial" && plan.transport === "native") {
+    const original = readOriginalNativeTrialPolicy({ repo: options.source_repo, plan, identity: { repository: plan.manifest.repository,
+      repository_id: plan.manifest.repository_id, actor: plan.manifest.actor, actor_id: plan.manifest.actor_id, default_branch: committed.settings.default_branch } });
+    const paths = readGit(options.object_store.root, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z",
+      plan.manifest.bindings.source_commit, plan.manifest.bindings.candidate_commit).toString().split("\0").filter(Boolean);
+    if (paths.some(path => !original.namespace.paths.some(root => withinPrefix(path, root)))) fail("native trial candidate outside declared paths");
+    settings = original.settings;
+  }
+  if (committed.settings_sha256 !== plan.manifest.bindings.settings_sha256 || !canonicalJSON(settings).equals(canonicalJSON(options.settings))) fail("source settings binding");
+  validatePublicationShape(plan, settings, gate.policy.pr_draft);
   const identity = await options.transport.identity();
   if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
     || !sameAccount(identity, plan.manifest)

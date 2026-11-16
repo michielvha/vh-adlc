@@ -1,6 +1,7 @@
 import { verifyProductionPreflight } from "./preflight";
 import { readRecordedRoleModel, verifyRuntimeAdoption } from "./adoption";
-import type { selectOperationRuntime, InstalledRuntime } from "./bootstrap";
+import type { selectOperationRuntime, InstalledRuntime, NativeTrialRuntime } from "./bootstrap";
+import { samePublicationIdentity } from "./identity";
 import type { PublicationIdentity } from "./transport";
 import { isAbsolute, join } from "node:path";
 import { ArtifactChanged, readBoundArtifact, readNativeRoleArtifacts } from "./evidence-input";
@@ -83,10 +84,12 @@ export function readNativeRoleCapture(options: {
 }
 
 
-type Runtime = Awaited<ReturnType<typeof selectOperationRuntime>>;
+type Runtime = Awaited<ReturnType<typeof selectOperationRuntime>> | NativeTrialRuntime;
 
 /** Ordinary disjoint default advances preserve this retained execution contract. */
 export function roleRuntimeDigest(runtime: Runtime | InstalledRuntime, role: Role): string {
+  if (runtime.kind === "docs-drift-native-trial-runtime")
+    return canonicalDigest({ kind: runtime.kind, runtime_sha256: roleRuntimeDigest(runtime.runtime, role), policy_sha256: runtime.trial.policy.policy_sha256 });
   if (runtime.kind === "docs-drift-installed-runtime") {
     const selected = runtime[role], { directory: _directory, ...component } = runtime.component;
     return canonicalDigest({ kind: runtime.kind, settings_sha256: runtime.settings_sha256, component, entry: runtime.entry,
@@ -101,6 +104,13 @@ export function roleRuntimeDigest(runtime: Runtime | InstalledRuntime, role: Rol
 /** Read the adopted full model from its validated historical receipt, independently of the requested selector. */
 export function readAdoptedRolePolicy(options: { repo: string; current_default: string; identity: PublicationIdentity; runtime: Runtime; role: Role }): RolePolicy {
   const runtime = options.runtime;
+  if (runtime.kind === "docs-drift-native-trial-runtime") {
+    const { policy, source_commit, settings } = runtime.trial, launch = policy.trial_launch;
+    if (options.current_default !== source_commit || runtime.runtime.source_commit !== source_commit || runtime.runtime.entry !== policy.publisher_entry
+      || !samePublicationIdentity(options.identity, { repository: launch.repository, repository_id: launch.repository_id, actor: launch.actor,
+        actor_id: launch.actor_id, default_branch: settings.default_branch })) fail("original native trial role scope changed");
+    return policy[options.role];
+  }
   if (runtime.kind === "docs-drift-installed-runtime") {
     const { plugin_version, source_commit, component_sha256 } = runtime.component;
     const preflight = verifyProductionPreflight({ ...options, component: { plugin_version, source_commit, component_sha256 },

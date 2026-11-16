@@ -103,6 +103,22 @@ fresh explanation. Preserve foreign or moved leases.
 If local artifacts are lost, inspect or restore the retained operation into a
 new private artifact directory using its original full source and operation ID.
 
+For a version-two native trial, confirm its original committed definition when
+restoring observations through the run-directory interface.
+
+```text
+bun <plugin>/scripts/docs-drift/cli.ts resume --repo <repo> --source <original-source> \
+  --run-dir <new-private-external-directory> --action restore \
+  --operation-id <original-operation> --trial-definition-sha256 <definition-sha256>
+```
+
+The definition selects its original isolated namespace. Its recorded workflow,
+event, head, run, attempt and publisher remain bound to the original plan.
+Restoration grants observation-only ownership. The bounded `observed_refs`
+summary supplies ref names and object IDs for the separately approved
+administrative Git handoff. Original records with insufficient launch evidence
+remain inspectable and return an execution handoff.
+
 ```text
 bun <plugin>/scripts/docs-drift/cli.ts inspect-retained --repo <repo> --source <source> \
   --artifact-root <artifacts> --operation-id <operation>

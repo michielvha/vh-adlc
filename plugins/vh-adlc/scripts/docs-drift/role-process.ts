@@ -25,10 +25,11 @@ type Options = {
 export async function captureConfiguredRole(input: Pick<Options, "source_repo" | "candidate_repo" | "artifact_root" | "source_commit" | "role" | "policy" | "target_sha256" | "cwd"> & {
   runtime: Parameters<typeof roleRuntimeDigest>[0]; prompt: string; environment: Record<string, string | undefined>;
 }): Promise<Reference> {
+  const runtime = input.runtime.kind === "docs-drift-native-trial-runtime" ? input.runtime.runtime : input.runtime;
   const result = await captureNativeRoleProcess({ source_repo: input.source_repo, candidate_repo: input.candidate_repo,
     artifact_root: input.artifact_root, source_commit: input.source_commit, role: input.role, policy: input.policy,
     target_sha256: input.target_sha256, runtime_sha256: roleRuntimeDigest(input.runtime, input.role), timeout_ms: 900000,
-    ...buildNativeRoleInvocation(input) });
+    ...buildNativeRoleInvocation({ ...input, runtime }) });
   if (!result.complete || !result.capture) throw Error(result.diagnostics.join("\n") || "Configured native role incomplete");
   return result.capture;
 }

@@ -45,7 +45,7 @@ function optionsFor(argv: string[]) {
   const options = new Map<string, string>(), proposals: number[] = [];
   for (let index = 1; index < argv.length; index += 2) {
     const name = argv[index], value = argv[index + 1];
-    if (!["--repo", "--run-dir", "--source", "--entry", "--proposal", "--action", "--operation-id"].includes(name)
+    if (!["--repo", "--run-dir", "--source", "--entry", "--proposal", "--action", "--operation-id", "--trial-definition-sha256"].includes(name)
       || !value || value.startsWith("--") || options.has(name)) throw Error("Unknown, duplicate or incomplete run option.");
     if (name === "--proposal") {
       if (!/^[1-9][0-9]*$/u.test(value) || !Number.isSafeInteger(Number(value))) throw Error("Select exact positive proposal numbers.");
@@ -65,8 +65,11 @@ function optionsFor(argv: string[]) {
     || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/u.test(operation))) throw Error("Select an exact operation for resume inspection or restoration.");
   if (action === "restore" && (!operation || !source)) throw Error("Restoration requires the original --source and --operation-id.");
   if (command === "close" && proposals.length > 1) throw Error("Close selects one merged replacement with --proposal.");
+  const trialDefinition = options.get("--trial-definition-sha256");
+  if (trialDefinition !== undefined && (command !== "resume" || action !== "restore" || !/^[a-f0-9]{64}$/u.test(trialDefinition)))
+    throw Error("Select an exact committed trial-definition digest only for observation-only restoration.");
   return { command, repo: realpathSync(repo), directory: resolve(directory), source,
-    entry: options.get("--entry"), proposals, operation, action: action ?? "continue" };
+    entry: options.get("--entry"), proposals, operation, trialDefinition, action: action ?? "continue" };
 }
 function operationDirectory(run: RunDirectory, repo: string) {
   const reference = latestArtifact(run, "journal");
@@ -89,7 +92,9 @@ function operationSummary(run: RunDirectory, directory: string, repo: string) {
   return { schema_version: plan.schema_version, operation_id: plan.manifest.operation_id, approval_sha256: plan.approval_sha256,
     policy: plan.schema_version === 1 ? { adoption_sha256: plan.adoption_sha256 } : { policy_sha256: plan.policy_sha256, component: plan.component },
     execution_origin: run.origin, revision: journal.revision, pending_effect_ids: journal.pending_effect_ids,
-    handoff: plan.schema_version === 1 ? "Inspect with this entry. Execution requires the original version-one implementation and setup." : null };
+    handoff: plan.schema_version === 1 ? "Inspect with this entry. Execution requires the original version-one implementation and setup."
+      : plan.context === "trial" && plan.transport === "native" && plan.trial_launch === undefined
+        ? "Original native trial launch evidence is required for execution." : null };
 }
 
 function componentForRun(repo: string, source: string) {
@@ -155,25 +160,29 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
       && Boolean(latestArtifact(run, "candidate") && latestArtifact(run, "approval") && latestArtifact(run, "journal"));
     const continueClosure = options.command === "resume" && options.action === "continue" && run.origin === "original"
       && Boolean(latestArtifact(run, "closure_review") && latestArtifact(run, "approval") && latestArtifact(run, "journal"));
-    if (options.command === "resume" && options.action === "restore") {
+    const retainedDirectory = options.command === "resume" && options.action !== "restore" ? operationDirectory(run, options.repo) : null;
+    if (retainedDirectory) report.operation = operationSummary(run, retainedDirectory, options.repo);
+    if (options.command === "resume" && options.action !== "inspect" && report.operation?.handoff) {
+      report.outcome = "pending";
+      report.summary = report.operation.handoff;
+    } else if (options.command === "resume" && options.action === "restore") {
       if (!options.operation) throw Error("Exact original operation required.");
       const settings = loadCommittedSettings(options.repo, run.manifest.source_commit).settings;
       const credential = await readNativeCredential({ hostname: settings.hostname, cwd: options.repo });
       const result = await collectNativeRetained({ repo: options.repo, source: run.manifest.source_commit, artifact_root: run.directory,
-        operation_id: options.operation, owner: run.manifest.id, run: randomUUID(), credential, restore: true });
+        operation_id: options.operation, owner: run.manifest.id, run: randomUUID(), credential, restore: true,
+        trial_definition_sha256: options.trialDefinition });
       report.retained_operation = result.retained_operation;
       report.outcome = result.outcome === "collected" ? "collected" : "pending";
       report.diagnostics = result.diagnostics.map(diagnostic => diagnostic.message);
       report.summary = "Durable native observations restored. Original application, settlement and host ownership evidence remains required for effects.";
     } else if (options.command === "resume" && (options.action === "inspect" || options.action === "continue" && !continuePublication && !continueClosure)) {
-      const directory = operationDirectory(run, options.repo);
-      if (directory) report.operation = operationSummary(run, directory, options.repo);
       if (options.operation && options.operation !== report.operation?.operation_id) throw Error("Selected operation differs from the retained run.");
       report.outcome = report.operation?.pending_effect_ids.length || stage?.state === "pending" || stage?.state === "setup-required" ? "pending" : "collected";
       report.summary = run.origin === "original" ? "Original run retained. Resume uses its recorded stages and inputs."
         : "Observation-only run. Its original executing ownership is unavailable.";
     } else if (options.command === "resume" && ["acknowledge", "reconcile"].includes(options.action)) {
-      const directory = operationDirectory(run, options.repo), selection = latestArtifact(run, "recovery_selection"), authority = latestArtifact(run, "approval");
+      const directory = retainedDirectory, selection = latestArtifact(run, "recovery_selection"), authority = latestArtifact(run, "approval");
       if (!directory || !selection || !authority) throw Error("Retain the exact recovery selection and current approval before executing recovery.");
       if (run.origin !== "original") throw Error("Original host ownership required for recovery effects.");
       const settings = loadCommittedSettings(options.repo, run.manifest.source_commit).settings;

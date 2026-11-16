@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { readJournal, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { readJournal, sealPlan, type PolicyBinding } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { readAppliedDelivery } from "../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
@@ -55,10 +55,16 @@ test("a report flag cannot authorize synthetic publication", () => {
   expect(git(f.origin, "for-each-ref", "--format=%(refname)")).toBe("refs/heads/main");
 });
 
-async function publicationRequest(kind: "advisory" | "resolve" = "advisory", max_entry_bytes?: number, temporary_parent?: string, mapped_entry?: "copilot" | "claude") {
+async function publicationRequest(kind: "advisory" | "resolve" = "advisory", max_entry_bytes?: number, temporary_parent?: string, mapped_entry?: "copilot" | "claude", planVersion: 1 | 2 = 1) {
   const fixture = persistentTrialPublication(roots, { bound_roles: true, max_entry_bytes, temporary_parent, mapped_entry }), { context } = fixture;
   const { review, policy: originalPolicy } = await fixture.options.gate();
-  const policy = { ...originalPolicy, publication_kind: kind };
+  const { plugin_version, source_commit, component_sha256 } = context.component;
+  const binding: PolicyBinding = planVersion === 2
+    ? { schema_version: 2, policy_sha256: context.context_sha256, component: { plugin_version, source_commit, component_sha256 } }
+    : { adoption_sha256: context.context_sha256 };
+  const policy = { ...binding, context: originalPolicy.context, transport: originalPolicy.transport, publication_kind: kind,
+    pr_draft: originalPolicy.pr_draft, worker: originalPolicy.worker, reviewer: originalPolicy.reviewer,
+    ...(originalPolicy.publisher_entry ? { publisher_entry: originalPolicy.publisher_entry } : {}) };
   const options = { ...fixture.options,
     plan: sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy, corrections: [], attention: [] }),
     gate: async () => ({ review, policy }) };
@@ -77,16 +83,38 @@ async function publicationRequest(kind: "advisory" | "resolve" = "advisory", max
   return { ...fixture, options, request, path };
 }
 
-test("a synthetic request revalidates original role artifacts before every common publisher step", async () => {
-  const { f, context, path } = await publicationRequest();
+test.each([1, 2] as const)("a version-%s synthetic request preserves its original context without a production checklist", async planVersion => {
+  const { f, context, path } = await publicationRequest("advisory", undefined, undefined, undefined, planVersion);
   const options = readTrialPublication(context, path);
-  if (options.plan.schema_version !== 1) throw Error("Original legacy plan required");
-  expect(options.plan.adoption_sha256).toBe(context.context_sha256);
+  expect(options.plan.schema_version).toBe(planVersion);
+  if (options.plan.schema_version === 1) expect(options.plan.adoption_sha256).toBe(context.context_sha256);
+  else {
+    expect(options.plan.policy_sha256).toBe(context.context_sha256);
+    expect(options.plan.component.component_sha256).toBe(context.component.component_sha256);
+  }
   expect(options.transport.kind).toBe("collector");
   const result = await publish(options);
   expect(result.state).toBe("complete");
   expect(git(f.origin, "rev-parse", "refs/heads/docs-drift/persistent")).toBe(f.sourceCommit);
   expect(git(f.source, "status", "--porcelain")).toBe("");
+}, 60000);
+
+test.each(["fixture-digest", "component", "context", "transport"] as const)("current collector policy refuses changed %s before effects", async field => {
+  const { f, context, options, request, path } = await publicationRequest("advisory", undefined, undefined, undefined, 2);
+  const plan = structuredClone(options.plan);
+  if (plan.schema_version !== 2) throw Error("Current collector plan required");
+  if (field === "fixture-digest") plan.policy_sha256 = "f".repeat(64);
+  if (field === "component") plan.component.component_sha256 = "f".repeat(64);
+  if (field === "context") plan.context = "production";
+  if (field === "transport") plan.transport = "native";
+  const bytes = canonicalJSON(plan);
+  writeFileSync(join(context.artifacts, request.plan.path), bytes);
+  request.plan.sha256 = sha256(bytes);
+  writeFileSync(path, canonicalJSON(request));
+  const refs = git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)"), tracker = readTrialTracker(context).commit;
+  expect(() => readTrialPublication(context, path)).toThrow();
+  expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
+  expect(readTrialTracker(context).commit).toBe(tracker);
 }, 60000);
 
 test("the common publisher consumes original process artifact references", async () => {
@@ -184,9 +212,10 @@ test("the installed synthetic entry resumes an interrupted applied creation with
   } catch (error) { preserveFailedTrialRoots = true; throw error; }
 }, 90000);
 
-test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "foreign-lease"] as const)("installed recovery presents an exact scope and preserves an edited delivery (%s)", async approval => {
+test.each(["approved", "approved-v2", "standing-procedure", "changed-scope", "missing-proof", "foreign-lease"] as const)("installed recovery presents an exact scope and preserves an edited delivery (%s)", async scenario => {
   try {
-  const { f, context, options, path } = await publicationRequest("resolve");
+  const approval = scenario === "approved-v2" ? "approved" : scenario;
+  const { f, context, options, path } = await publicationRequest("resolve", undefined, undefined, undefined, scenario === "approved-v2" ? 2 : 1);
   const publication = readTrialPublication(context, path), execute = publication.transport.execute;
   expect(publication.plan.publication_kind).toBe("resolve");
   publication.transport.execute = async (...args) => {
@@ -334,9 +363,10 @@ test("installed recovery entries refuse outside, nested and linked journals with
   } catch (error) { preserveFailedTrialRoots = true; throw error; }
 }, 180000);
 
-test.each(["approved", "missing", "wrong-purpose", "foreign-lease"])("installed trial reconciliation uses the common recovery authority and preserves non-success: %s", async approval => {
+test.each(["approved", "approved-v2", "missing", "wrong-purpose", "foreign-lease"])("installed trial reconciliation uses the common recovery authority and preserves non-success: %s", async scenario => {
   try {
-  const { f, context, path } = await publicationRequest(), publication = readTrialPublication(context, path), execute = publication.transport.execute;
+  const approval = scenario === "approved-v2" ? "approved" : scenario;
+  const { f, context, path } = await publicationRequest("advisory", undefined, undefined, undefined, scenario === "approved-v2" ? 2 : 1), publication = readTrialPublication(context, path), execute = publication.transport.execute;
   publication.transport.execute = async (...args) => {
     if (args[1].id === "pr") throw new PublicationExecutionError(false, true);
     return execute(...args);
@@ -583,9 +613,9 @@ test("installed publish capacity refusal preserves the cause and creates no jour
 }, 120000);
 
 
-test.each(["copilot", "claude"] as const)("mapped %s collector publication and retained inspection preserve the original entry", async entry => {
+test.each([["copilot", 1], ["claude", 1], ["copilot", 2], ["claude", 2]] as const)("mapped %s version-%s collector publication and retained inspection preserve the original entry", async (entry, planVersion) => {
   const { collectTrialRetained } = await import("../../../plugins/vh-adlc/scripts/docs-drift/trial-recovery");
-  const f = await publicationRequest("advisory", undefined, undefined, entry);
+  const f = await publicationRequest("advisory", undefined, undefined, entry, planVersion);
   const options = readTrialPublication(f.context, f.path);
   expect(options.plan.manifest.publisher_entry).toBe(entry);
   const published = await publish(options);

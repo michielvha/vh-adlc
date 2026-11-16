@@ -7,6 +7,7 @@ import { requireOwnedStore } from "./proposals";
 import { loadLegacyCommittedSettings } from "./settings";
 import type { OwnedObjectStore } from "./snapshot";
 import { publisherActor, sameLogin } from "./identity";
+import { policyBinding, type PolicyBinding, type SealedPlan } from "./journal";
 
 export const TRIAL_CONTEXT_PATH = ".vh-adlc/docs-drift-trial.json";
 export const TRIAL_IDENTITY = Object.freeze({ repository: "fixture/docs", repository_id: 10,
@@ -128,3 +129,17 @@ export function loadTrialContext(options: { root: string; context_commit: string
     context_sha256: sha256(bytes), tracker_initial_commit: commit(manifest.tracker_initial_commit), component: expected });
 }
 export type TrialContext = ReturnType<typeof loadTrialContext>;
+
+/** Collector policy describes only the original hermetic fixture. */
+export function collectorPolicyBinding(context: TrialContext, version: SealedPlan["schema_version"]): PolicyBinding {
+  if (version === 1) return { adoption_sha256: context.context_sha256 };
+  const { plugin_version, source_commit, component_sha256 } = context.component;
+  return { schema_version: 2, policy_sha256: context.context_sha256, component: { plugin_version, source_commit, component_sha256 } };
+}
+
+export function matchesCollectorPolicy(context: TrialContext, plan: SealedPlan): boolean {
+  return plan.context === "trial" && plan.transport === "collector"
+    && canonicalJSON(policyBinding(plan)).equals(canonicalJSON(collectorPolicyBinding(context, plan.schema_version)))
+    && plan.manifest.bindings.source_commit === context.source_commit
+    && plan.manifest.bindings.settings_sha256 === loadLegacyCommittedSettings(context.source, context.source_commit).settings_sha256;
+}

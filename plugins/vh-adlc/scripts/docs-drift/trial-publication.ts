@@ -12,7 +12,7 @@ import { effectDigest, manifestDigest, validateReviewedManifest, type NativeRole
 import { readNativeRoleArtifacts } from "./evidence-input";
 import { canonicalJSON, decodeUTF8, protocolPath, sha256 } from "./protocol";
 import { PublicationScopeChanged, type PublicationGate, type PublishOptions, type PublishResult } from "./publish";
-import { loadTrialContext, type TrialContext } from "./trial-context";
+import { collectorPolicyBinding, matchesCollectorPolicy, loadTrialContext, type TrialContext } from "./trial-context";
 import { createTrialTransport } from "./trial-transport";
 import { loadCommittedSettings } from "./settings";
 
@@ -68,13 +68,11 @@ export function readTrialPublication(selected: TrialContext, requestPath: string
     return { requested_model: selected.model, adopted_model: selected.model, identity_source: selected.identity_source };
   };
   const workerPolicy = rolePolicy("worker"), reviewerPolicy = rolePolicy("reviewer");
-  const plan = readVerifiedPlan(retained(context, request.plan), () => ({ adoption_sha256: context.context_sha256,
+  const currentPolicy = (plan: SealedPlan): PlanPolicy => ({ ...collectorPolicyBinding(context, plan.schema_version),
     context: "trial", transport: "collector", publication_kind: publicationKind, pr_draft: true,
     ...(context.settings.publication.entry_actors ? { publisher_entry: request.entry as "copilot" | "claude" } : {}),
-    worker: workerPolicy, reviewer: reviewerPolicy }));
-  const policy: PlanPolicy = { adoption_sha256: context.context_sha256, context: "trial", transport: "collector",
-    publication_kind: publicationKind, pr_draft: true,
-    ...(context.settings.publication.entry_actors ? { publisher_entry: request.entry as "copilot" | "claude" } : {}), worker: workerPolicy, reviewer: reviewerPolicy };
+    worker: workerPolicy, reviewer: reviewerPolicy });
+  const plan = readVerifiedPlan(retained(context, request.plan), currentPolicy), policy = currentPolicy(plan);
   const manifest = plan.manifest, candidate = manifest.bindings.candidate_commit;
   if (manifest.bindings.source_commit !== context.source_commit || manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256
     || readGit(context.store.root, "rev-parse", "--verify", "--end-of-options", candidate + "^{commit}").toString().trim() !== candidate
@@ -110,9 +108,7 @@ export async function runTrialAcknowledgement(selected: TrialContext, selectionP
     return value;
   }
   const journal = readJournal(selection.journal_directory, context.source), plan = journal.plan;
-  if (plan.schema_version !== 1 || plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
-    || plan.manifest.bindings.source_commit !== context.source_commit
-    || plan.manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256) throw Error("synthetic acknowledgement original context changed");
+  if (!matchesCollectorPolicy(context, plan)) throw Error("synthetic acknowledgement original context changed");
   if (ownerRequestPath) preflight?.(journal);
   let scope: AcknowledgementScope | null = null;
   const result = await acknowledgeDeliveries({ source_repo: context.source, journal_directory: journal.directory,
@@ -146,9 +142,7 @@ export async function runTrialReconciliation(selected: TrialContext, selectionPa
   if (lookups === null || typeof lookups !== "object" || Array.isArray(lookups) || Object.keys(lookups).some(id => !ids.includes(id)))
     throw Error("synthetic reconciliation selected lookups required");
   const journal = readJournal(selection.journal_directory, context.source), plan = journal.plan;
-  if (plan.schema_version !== 1 || plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
-    || plan.manifest.bindings.source_commit !== context.source_commit
-    || plan.manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256)
+  if (!matchesCollectorPolicy(context, plan))
     throw Error("synthetic reconciliation original context changed");
   if (ownerRequestPath) preflight?.(journal);
   const limit = Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes);

@@ -215,6 +215,22 @@ test("retained inspection refuses a foreign operation or modified metadata bytes
   expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
 });
 
+test.each(["sync", "async"])("retained inspection validates the selected original before observing effects (%s)", async mode => {
+  const { f } = await interruptedPR();
+  let verified = 0, observed = 0;
+  const observe = f.transport.observe;
+  f.transport.observe = async (...args) => { observed++; return observe(...args); };
+  await expect(inspectRetainedOperation({ source_repo: f.repo, artifact_root: f.artifacts,
+    settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy,
+    verify_original: () => {
+      verified++;
+      if (mode === "async") return Promise.reject(Error("selected original refused"));
+      throw Error("selected original refused");
+    } })).rejects.toThrow("selected original refused");
+  expect(verified).toBe(1); expect(observed).toBe(0);
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
+});
+
 test("retained byte buffers cannot change while independent outcomes are inspected", async () => {
   const { f } = await interruptedPR();
   const read = f.transport.readPlanObject, observe = f.transport.observe;
@@ -617,8 +633,12 @@ test("a completed retained operation can be reconstructed read-only while anothe
     const artifacts = join(f.root, "historical-observer"); mkdirSync(artifacts, { mode: 0o700 });
     f.transport = { ...f.transport, artifact_root: artifacts };
     if (when === "before-inspection") f.refs.set(f.settings.publication.lease_ref, foreign.object);
+    const verified: string[] = [];
     const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifacts,
-      settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+      settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy,
+      verify_original: plan => { verified.push(plan.manifest.operation_id); plan.manifest.operation_id = "mutated"; } });
+    expect(verified).toEqual(["operation-1"]);
+    expect(inspection.plan.manifest.operation_id).toBe("operation-1");
     f.refs.set(f.settings.publication.lease_ref, foreign.object);
     const before = [...f.executed];
     const restored = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifacts } });

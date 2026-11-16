@@ -187,7 +187,10 @@ async function restoredAcquisition(options: PublishOptions, journal: Journal, ob
 
 type RetainedOptions = {
   source_repo: string; artifact_root: string; settings: Settings; transport: PublicationTransport; operation_id: string;
+  /** Historical policy failure downgrades the observation's policy state. */
   verify_policy: (plan: SealedPlan) => PlanPolicy | null;
+  /** A refusal of this independent original-plan clone aborts inspection. */
+  verify_original?: (plan: SealedPlan) => void | Promise<void>;
 };
 export type RetainedInspection = {
   state: "inspection"; policy_state: "current" | "unavailable-or-changed"; directory: string; plan: SealedPlan; ref: string; objects: PlanObjects; lease_object: string | null; receipt_object: string | null;
@@ -216,6 +219,7 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
     || [objects.object, objects.tree, objects.blob].some(value => !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(value))
     || objects.plan_sha256 !== sha256(bytes)) throw Error("retained metadata object binding");
   const plan = readRetainedPlan(bytes);
+  await options.verify_original?.(structuredClone(plan));
   let policy_state: RetainedInspection["policy_state"] = "current";
   try { readVerifiedPlan(bytes, options.verify_policy); }
   catch { policy_state = "unavailable-or-changed"; }

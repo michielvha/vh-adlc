@@ -1,12 +1,13 @@
 import { verifyProductionPreflight } from "./preflight";
+import { readNativeTrialPolicy, readOriginalNativeTrialPolicy } from "./trial-definition";
 import { sameAccount } from "./identity";
-import { readVerifiedPlan, type CurrentSealedPlan, type PolicyBinding, type SealedPlan } from "./journal";
+import { policyBinding, readVerifiedPlan, type CurrentSealedPlan, type PolicyBinding, type SealedPlan } from "./journal";
 import { randomUUID } from "node:crypto";
 import { clientArchivePath, inspectClientArchive } from "./client-archive";
 import { executeOwnedProcess, ownedClientCompleted, recordedProcessCompleted, type OwnedProcess } from "./owned-process";
 import { loadCommittedSettings, parseClientBinding, parseInstalledClient } from "./settings";
 import { collectAdoptionBindings, collectTrialBindings, parseComponentPin, verifyRuntimeAdoption } from "./adoption";
-import type { PublicationIdentity } from "./transport";
+import { readNativeContext, type PublicationIdentity } from "./transport";
 import { publishArtifact, syncDirectory } from "./journal";
 import { chmodSync, closeSync, constants, existsSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -333,6 +334,23 @@ export async function selectInstalledRuntime(input: {
 
 export type InstalledRuntime = NonNullable<Awaited<ReturnType<typeof selectInstalledRuntime>>["runtime"]>;
 
+/** A committed synthetic launch grant selects ordinary native clients before activation. */
+export async function selectNativeTrialRuntime(options: {
+  repo: string; current_default: string; directory: string; entry: string; credential: string; path?: string;
+  run_id: number; run_attempt: number; definition_sha256: string; publication_kind?: "advisory" | "resolve";
+}) {
+  const { settings } = loadCommittedSettings(options.repo, options.current_default);
+  if (settings.schema_version !== 2) fail("ordinary native trial settings required");
+  const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+  if (native.default_commit !== options.current_default) fail("native trial current default changed");
+  const trial = readNativeTrialPolicy({ ...options, identity: native.identity, reader: native.repository });
+  if (trial.definition_sha256 !== options.definition_sha256) fail("selected native trial definition changed");
+  const selected = await selectInstalledRuntime({ ...options, source_commit: options.current_default });
+  if (!selected.complete || !selected.runtime) fail(selected.diagnostics.join(". "));
+  return freezeJSON({ kind: "docs-drift-native-trial-runtime" as const, authority: "none" as const, runtime: selected.runtime, trial });
+}
+export type NativeTrialRuntime = Awaited<ReturnType<typeof selectNativeTrialRuntime>>;
+
 /** Select ordinary native roles only after the committed flat policy matches the observed account. */
 export async function selectProductionRuntime(input: {
   repo: string; current_default: string; directory: string; entry: string; identity: PublicationIdentity; path?: string;
@@ -376,10 +394,11 @@ export function readOriginalProductionPolicy(options: {
 export function readOriginalRuntime(options: {
   repo: string; directory: string; plan: CurrentSealedPlan; identity: PublicationIdentity;
 }) {
-  const original = readOriginalProductionPolicy(options), plan = options.plan;
+  const plan = options.plan, original = plan.context === "trial"
+    ? readOriginalNativeTrialPolicy(options) : readOriginalProductionPolicy(options);
   const inspected = inspectInstalledPayload({ directory: options.directory, expected: plan.component });
   return freezeJSON({ kind: "docs-drift-original-runtime" as const, authority: "none" as const, purpose: "metadata-recovery" as const,
-    source_commit: original.source_commit, component: { ...plan.component, directory: inspected.directory }, policy: original.policy });
+    source_commit: original.source_commit, component: { ...plan.component, directory: inspected.directory }, settings: original.settings, policy: original.policy });
 }
 
 /** Recovery selects the recorded component and original policy, independently of a successor config. */
@@ -412,7 +431,8 @@ export function requireExecutionBun(schemaVersion: SealedPlan["schema_version"],
   if (schemaVersion === 1 && version !== "1.4.4") throw Error("Original retained execution Bun version required");
 }
 
-export function runtimePolicyBinding(runtime: Awaited<ReturnType<typeof selectOperationRuntime>>): PolicyBinding {
+export function runtimePolicyBinding(runtime: Awaited<ReturnType<typeof selectOperationRuntime>> | NativeTrialRuntime): PolicyBinding {
+  if (runtime.kind === "docs-drift-native-trial-runtime") return policyBinding(runtime.trial.policy);
   if (runtime.kind === "docs-drift-installed-runtime") {
     const { plugin_version, source_commit, component_sha256 } = runtime.component;
     return { schema_version: 2, policy_sha256: runtime.policy_sha256, component: { plugin_version, source_commit, component_sha256 } };
@@ -679,7 +699,7 @@ export async function selectRecoveryRuntime(input: {
   const runtime = await retainedRuntimeEntry({ ...options, settings, pin: adopted.component_pin, identity: adopted.identity,
     launcher_sha256: sha256(readGit(options.repo, "show", options.source_commit + ":" + settings.runtime_loader.launcher)),
     settings_sha256: bindings.settings_sha256 });
-  return freezeJSON({ kind: "docs-drift-recovery-runtime", authority: "none", purpose: "metadata-recovery", source_commit: options.source_commit,
+  return freezeJSON({ kind: "docs-drift-recovery-runtime" as const, authority: "none", purpose: "metadata-recovery", source_commit: options.source_commit,
     adoption_sha256: adopted.adoption_sha256, entry: options.entry, ...runtime });
 }
 

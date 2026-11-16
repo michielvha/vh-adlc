@@ -1,4 +1,4 @@
-import type { PublisherEntry } from "./identity";
+import { sameAccount, type PublisherEntry } from "./identity";
 import type { ExecutionEvidence } from "./success";
 import { createHash, randomUUID } from "node:crypto";
 import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
@@ -15,7 +15,11 @@ import { writeMetadataObject } from "./git";
 
 type RoleBinding = Omit<ReviewedManifest["worker"], "records">;
 type LegacyPolicyBinding = { adoption_sha256: string };
-type CurrentPolicyBinding = { schema_version: 2; policy_sha256: string; component: InstalledComponentBinding };
+export type NativeTrialLaunch = {
+  hostname: string; repository: string; repository_id: number; actor: string; actor_id: number;
+  workflow_id: number; workflow_path: string; event: "workflow_dispatch"; head_commit: string; run_id: number; run_attempt: number;
+};
+type CurrentPolicyBinding = { schema_version: 2; policy_sha256: string; component: InstalledComponentBinding; trial_launch?: NativeTrialLaunch };
 export type PolicyBinding = LegacyPolicyBinding | CurrentPolicyBinding;
 type PlanContents = {
   manifest: ActionManifest; manifest_sha256: string; approval_sha256: string; context: "production" | "trial"; transport: "native" | "collector";
@@ -33,7 +37,8 @@ export type PlanPolicy = PolicyBinding & {
 /** Preserve each format's own policy semantics without rewriting original retained bytes. */
 export function policyBinding(value: PolicyBinding): PolicyBinding {
   return "policy_sha256" in value
-    ? { schema_version: 2, policy_sha256: value.policy_sha256, component: structuredClone(value.component) }
+    ? { schema_version: 2, policy_sha256: value.policy_sha256, component: structuredClone(value.component),
+      ...(value.trial_launch === undefined ? {} : { trial_launch: structuredClone(value.trial_launch) }) }
     : { adoption_sha256: value.adoption_sha256 };
 }
 export function policyDigest(value: PolicyBinding): string {
@@ -78,6 +83,19 @@ function identifier(value: unknown): string {
   if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/u.test(value)) fail("invalid identifier");
   return value;
 }
+export function parseTrialLaunch(value: unknown): NativeTrialLaunch {
+  const launch = exact(value, ["hostname", "repository", "repository_id", "actor", "actor_id", "workflow_id", "workflow_path", "event", "head_commit", "run_id", "run_attempt"]);
+  if (![launch.hostname, launch.repository, launch.actor, launch.workflow_path, launch.head_commit].every(value =>
+    typeof value === "string" && value.length > 0 && !value.includes("\0"))
+    || ![launch.repository_id, launch.actor_id, launch.workflow_id, launch.run_id, launch.run_attempt].every(value =>
+      typeof value === "number" && Number.isSafeInteger(value) && value > 0)
+    || launch.event !== "workflow_dispatch") fail("invalid native trial launch");
+  const checked = launch as NativeTrialLaunch;
+  if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(checked.head_commit)
+    || !/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(checked.workflow_path)
+    || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(checked.repository)) fail("invalid native trial launch scope");
+  return freezeJSON(checked);
+}
 function parseCanonical(bytes: Uint8Array): unknown {
   let value: unknown;
   try { value = JSON.parse(decodeUTF8(bytes)); } catch { fail("invalid JSON"); }
@@ -96,8 +114,11 @@ function roleBinding(value: unknown): RoleBinding {
 function parsePlan(value: unknown): SealedPlan {
   const hasProof = value !== null && typeof value === "object" && Object.hasOwn(value, "candidate_verification_sha256");
   const version = value !== null && typeof value === "object" ? Reflect.get(value, "schema_version") : undefined;
+  const nativeTrial = version === 2 && Reflect.get(value as object, "context") === "trial" && Reflect.get(value as object, "transport") === "native";
+  const hasLaunch = value !== null && typeof value === "object" && Object.hasOwn(value, "trial_launch");
   const input = exact(value, ["schema_version", "manifest", "manifest_sha256", ...(version === 2 ? ["approval_sha256", "policy_sha256", "component"] : ["approval_sha256", "adoption_sha256"]),
-    "context", "transport", "publication_kind", "review_verdict", "roles", "corrections", "attention", ...(hasProof ? ["candidate_verification_sha256"] : [])]);
+    "context", "transport", "publication_kind", "review_verdict", "roles", "corrections", "attention", ...(hasProof ? ["candidate_verification_sha256"] : []),
+    ...(nativeTrial && hasLaunch ? ["trial_launch"] : [])]);
   const proof = hasProof ? hash(input.candidate_verification_sha256) : undefined;
   if ((input.schema_version !== 1 && input.schema_version !== 2) || input.review_verdict !== "clean" || !["production", "trial"].includes(String(input.context))
     || !["native", "collector"].includes(String(input.transport)) || (input.context === "production" && input.transport !== "native")) fail("plan context or verdict");
@@ -106,6 +127,12 @@ function parsePlan(value: unknown): SealedPlan {
     hash(input.approval_sha256); hash(input.policy_sha256); parseComponentBinding(input.component);
   } else { hash(input.approval_sha256); hash(input.adoption_sha256); }
   const manifest = parseActionManifest(input.manifest);
+  if (nativeTrial && hasLaunch) {
+    const launch = parseTrialLaunch(input.trial_launch);
+    if (launch.head_commit !== manifest.bindings.source_commit || launch.repository.toLowerCase() !== manifest.repository.toLowerCase()
+      || launch.repository_id !== manifest.repository_id || !sameAccount(launch, manifest) || !manifest.publisher_entry)
+      fail("native trial launch manifest changed");
+  }
   if (input.schema_version === 2 && manifest.effects.some(effect => effect.kind === "receipt-retire"))
     fail("receipt-retire is unsupported in version-two operations");
   if (manifestDigest(manifest) !== hash(input.manifest_sha256)) fail("plan manifest digest");
@@ -148,13 +175,16 @@ export function sealPlan(options: SealOptions & CurrentPolicyBinding): CurrentSe
 export function sealPlan(options: SealOptions & PolicyBinding): SealedPlan;
 export function sealPlan(options: SealOptions & PolicyBinding): SealedPlan {
   requireReviewedManifest(options.reviewed);
+  if ("policy_sha256" in options && options.context === "trial" && options.transport === "native" && options.trial_launch === undefined)
+    fail("native trial launch required for a new plan");
   const { manifest, manifest_sha256, worker, reviewer } = options.reviewed;
   authorizeEffects(manifest, options.grants);
   const { records: workerRecords, ...workerBinding } = worker;
   const { records: reviewerRecords, ...reviewerBinding } = reviewer;
   return parsePlan({
     ...("policy_sha256" in options
-      ? { schema_version: 2, approval_sha256: sha256(canonicalJSON(options.grants)), policy_sha256: options.policy_sha256, component: options.component }
+      ? { schema_version: 2, approval_sha256: sha256(canonicalJSON(options.grants)), policy_sha256: options.policy_sha256, component: options.component,
+        ...(options.trial_launch === undefined ? {} : { trial_launch: options.trial_launch }) }
       : { schema_version: 1, approval_sha256: sha256(canonicalJSON(options.grants)), adoption_sha256: options.adoption_sha256 }),
     manifest, manifest_sha256, context: options.context, transport: options.transport,
     publication_kind: options.publication_kind, review_verdict: "clean", roles: { worker: workerBinding, reviewer: reviewerBinding },
@@ -171,6 +201,8 @@ export function readRetainedPlan(bytes: Uint8Array): SealedPlan {
 /** The native adopter supplies current policy. A plan cannot authorize its own historical evidence. */
 export function readVerifiedPlan(bytes: Uint8Array, verifyPolicy: (plan: SealedPlan) => PlanPolicy | null): SealedPlan {
   const plan = readRetainedPlan(bytes);
+  if (plan.schema_version === 2 && plan.context === "trial" && plan.transport === "native" && plan.trial_launch === undefined)
+    fail("original native trial launch required for execution");
   const policy = verifyPolicy(structuredClone(plan));
   if (policy === null || !canonicalJSON(policyBinding(policy)).equals(canonicalJSON(policyBinding(plan))) || policy.context !== plan.context || policy.transport !== plan.transport || policy.publication_kind !== plan.publication_kind) fail("current policy unavailable or changed");
   if (policy.publisher_entry !== plan.manifest.publisher_entry) fail("current publisher entry changed");

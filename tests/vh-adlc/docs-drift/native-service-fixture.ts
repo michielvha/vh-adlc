@@ -156,6 +156,11 @@ else if (endpoint === 'user') {
 }
 else if (endpoint === 'repos/fixture/docs')
     value = { id: state.repository_id, full_name: 'fixture/docs', default_branch: 'main' };
+else if (endpoint?.startsWith('repos/fixture/docs/actions/runs/')) {
+    const parts = endpoint.split('/');
+    value = (state.workflow_runs ?? []).find(run => run.id === Number(parts[5]) && (!parts[7] || run.run_attempt === Number(parts[7])));
+    if (!value) { status = 404; value = { message: 'Synthetic workflow run unavailable' }; }
+}
 else if (state.git_source && endpoint?.startsWith('repos/fixture/docs/git/commits/')) {
     const object = endpoint.split('/').at(-1);
     if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(object)) process.exit(91);

@@ -2,6 +2,7 @@ import { bindRunJournal, type RunDirectory } from "./run-directory";
 import { realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { requireExecutionBun, selectOriginalOperationRuntime } from "./bootstrap";
+import { readNativeTrialSettings } from "./trial-definition";
 import { fetchCurrentDefault } from "./proposals";
 import { readJournal } from "./journal";
 import { acknowledgeDeliveries, reconcileAbsent, type AcknowledgementScope, type ReconciliationScope } from "./recovery";
@@ -51,7 +52,7 @@ async function collectContext(input: RecoveryOptions, execution?: Purpose, run?:
   if (plan.manifest.bindings.source_commit !== options.source || plan.transport !== "native") throw Error("Original native recovery source required");
   const selection = readSelection(options.selection, options.source, plan.manifest.operation_id);
   if (execution && execution !== selection.purpose) throw Error("Recovery command purpose differs from its selected operation");
-  const { settings } = loadCommittedSettings(repo, options.source);
+  let { settings } = loadCommittedSettings(repo, options.source);
   const comparison = { repository: plan.manifest.repository, repository_id: plan.manifest.repository_id,
     actor: plan.manifest.actor, actor_id: plan.manifest.actor_id, default_branch: settings.default_branch };
   const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential,
@@ -61,6 +62,7 @@ async function collectContext(input: RecoveryOptions, execution?: Purpose, run?:
     || observed.identity.actor_id !== plan.manifest.actor_id || observed.identity.actor !== plan.manifest.actor) throw Error("Recovery original repository and actor required");
   const runtime = await selectOriginalOperationRuntime({ repo, directory: resolve(import.meta.dir, "../.."), plan,
     identity: observed.identity, cache_directory: options.cache_directory, entry: options.entry });
+  if (runtime.kind === "docs-drift-original-runtime") settings = runtime.settings;
   if (execution && realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/recovery-controller.ts"))
     throw Error("Original retained recovery controller required");
   let originalRun: RunDirectory | undefined;
@@ -81,7 +83,7 @@ async function collectContext(input: RecoveryOptions, execution?: Purpose, run?:
   if (!matchesRepositoryState(repo, before)) throw Error("Caller changed during recovery collection");
   const transport = createNativeTransport({ source_repo: repo, artifact_root: root, object_store: store, settings, credential: options.credential, path: options.path, run: originalRun });
   const common = { source_repo: repo, journal_directory: journal.directory, object_store: store, settings, transport };
-  return { options, repo, before, settings, runtime, native, observed, store, selection, common };
+  return { options, repo, before, settings, runtime, native, observed, store, selection, common, plan };
 }
 
 /** Inspect only. The same lower recovery path stops before authority and preserves the journal. */
@@ -137,7 +139,12 @@ export async function applyRecovery(input: RecoveryOptions & { authority: unknow
       throw Error("Current recovery authority source changed");
     return readRecoveryAuthority({ source_repo: context.repo, artifact_root: context.common.transport.artifact_root, reference, purpose: selected.purpose, scope,
       current_procedure: () => {
-        const current = loadCommittedSettings(context.store.root, fresh.default_commit).settings;
+        let current = loadCommittedSettings(context.store.root, fresh.default_commit).settings;
+        if (context.plan.schema_version === 2 && context.plan.context === "trial") {
+          if (!current.trial) throw Error("Recovery current trial procedure unavailable");
+          current = readNativeTrialSettings({ repo: context.store.root, source: fresh.default_commit,
+            definition_sha256: current.trial.definition_sha256 }).settings;
+        }
         if (current.repository !== context.settings.repository || current.hostname !== context.settings.hostname
           || current.publication.lease_ref !== context.settings.publication.lease_ref
           || current.publication.receipt_ref_prefix !== context.settings.publication.receipt_ref_prefix)
