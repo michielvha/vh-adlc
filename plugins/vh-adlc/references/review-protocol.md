@@ -11,7 +11,8 @@ Before dispatching, read the reviewer role's route:
   --kind <spec|implementation> --docs-revision <sha> --binary <path> --plugin-pin <pin>`. It runs the
   configured CLI with the canonical reviewer instructions and the dispatch identity, as
   `references/loop-settings.md` describes. First it caches, at the dispatched docs revision, every
-  convention page the reviewer will read: `conventions/feature-documents.md` and each page that
+  convention page the reviewer will read: the revision's own `AGENTS.md`, `conventions/feature-documents.md`
+  and each page that
   `AGENTS.md` at X or at the revision routes to. A page that cannot be cached leaves the review pending
   before the CLI starts, because a command-route reviewer often cannot fetch one itself. Then: a spec review reads a read-only export of X and is launched
   from it; an implementation review runs in a private clone of X. Afterwards the clone, and the owning

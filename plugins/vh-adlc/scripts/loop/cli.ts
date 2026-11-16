@@ -37,7 +37,8 @@ function args(argv: string[]): Record<string, string> {
   for (let i = 0; i < argv.length; i += 2) {
     const flag = argv[i]!, value = argv[i + 1];
     if (!flag.startsWith("--") || value === undefined) throw Error(`expected --flag value pairs, got ${flag}`);
-    out[flag.slice(2)] = value;
+    // --record may repeat; every value is kept, separated by a NUL no shell argument can contain.
+    out[flag.slice(2)] = flag === "--record" && out.record !== undefined ? `${out.record}\0${value}` : value;
   }
   return out;
 }
@@ -120,7 +121,10 @@ export async function main(argv: string[]): Promise<number> {
     const delta = featureDelta(repo, options.merge ? { merge: options.merge } : { base: need(options, "base") });
     const applicable = applicableRungs(settings, delta.paths);
     // A procedure rung's result is recorded by the operation that performed it, at the current head.
-    const recorded = new Map((options.record ?? "").split(";").filter(Boolean).map(entry => {
+    // Each --record holds one record or several joined by ";". A ";" splits only where another
+    // <rung>=passed|failed: follows, so a record's own text may contain one.
+    const entries = (options.record ?? "").split("\0").flatMap(value => value.split(/;(?=\s*[a-z0-9-]+=(?:passed|failed):)/)).map(entry => entry.trim()).filter(Boolean);
+    const recorded = new Map(entries.map(entry => {
       const match = /^([a-z0-9-]+)=(passed|failed):(.+)$/.exec(entry);
       if (!match) throw Error(`--record expects <rung>=passed|failed:<what was observed>, got ${entry}`);
       return [match[1]!, { state: match[2] as "passed" | "failed", reason: `recorded: ${match[3]}` }] as const;

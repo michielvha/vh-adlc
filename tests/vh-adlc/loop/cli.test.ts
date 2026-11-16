@@ -88,7 +88,8 @@ describe("review pages", () => {
     const run = cliWith(pages.env, "review", "--repo", root, "--document", "docs/specs/f.md", "--commit", commit, "--kind", "spec",
       "--docs-revision", "abc", "--binary", pages.binary, "--plugin-pin", "def");
     expect(run.json).toMatchObject({ status: "ready" });
-    for (const page of ["conventions/feature-documents.md", "conventions/frontend-testing.md", "guides/humanize-prose.md"])
+    // AGENTS.md at the docs revision too: after a merge moves the pin, it is not cached yet, and it routes further pages.
+    for (const page of ["AGENTS.md", "conventions/feature-documents.md", "conventions/frontend-testing.md", "guides/humanize-prose.md"])
       expect([page, existsSync(join(pages.cache, "vh-adlc", "docs", "abc", page))]).toEqual([page, true]);
   });
 
@@ -144,5 +145,20 @@ describe("recorded procedure rungs", () => {
     expect(withRecord.json).toMatchObject({ advance: true, blocking: [] });
     const failed = cli("rungs", "--repo", root, "--base", "main", "--run", "true", "--record", "browser=failed:page broke");
     expect(failed.json).toMatchObject({ advance: false, blocking: ["browser"] });
+  });
+  const two = "schema_version: 1\nverification_rungs:\n  - name: browser\n    when: always\n    procedure: Record the browser pass.\n  - name: live-slot\n    when: always\n    procedure: Record the live slot pass.\n";
+  const reasons = (json: { results: { name: string; reason: string }[] }) => Object.fromEntries(json.results.map(r => [r.name, r.reason]));
+
+  test("every --record flag counts, not only the last", () => {
+    const { root } = repo({ ".vh-adlc/loop.yaml": two });
+    const run = cli("rungs", "--repo", root, "--base", "main", "--run", "true", "--record", "browser=passed:table recorded", "--record", "live-slot=passed:slot 4 clean");
+    expect(run.json).toMatchObject({ advance: true, blocking: [] });
+  });
+
+  test("records joined with semicolons still split, and a semicolon inside a record's text stays in it", () => {
+    const { root } = repo({ ".vh-adlc/loop.yaml": two });
+    const run = cli("rungs", "--repo", root, "--base", "main", "--run", "true", "--record", "browser=passed:Chromium; Firefox both clean;live-slot=passed:slot 4");
+    expect(run.json).toMatchObject({ advance: true, blocking: [] });
+    expect(reasons(run.json)).toEqual({ browser: "recorded: Chromium; Firefox both clean", "live-slot": "recorded: slot 4" });
   });
 });
