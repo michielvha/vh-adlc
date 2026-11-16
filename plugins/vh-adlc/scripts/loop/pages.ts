@@ -7,8 +7,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 const PAGE = /\b(?:conventions|guides|knowledge)\/[A-Za-z0-9._-]+\.md\b/g;
-/** Every reviewer starts with the feature-document standard. */
-const BASE = ["conventions/feature-documents.md"];
+/** Every reviewer starts with the feature-document standard, and reads the revision's own AGENTS.md. */
+const BASE = ["AGENTS.md", "conventions/feature-documents.md"];
 
 export function docsCache(revision: string): string {
   const base = process.platform === "darwin" ? join(homedir(), "Library", "Caches") : (process.env.XDG_CACHE_HOME?.trim() || join(homedir(), ".cache"));

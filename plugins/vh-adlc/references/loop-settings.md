@@ -63,7 +63,8 @@ lands by merge commit only. Without rungs, operations keep reading verification 
 delta, the applicable rungs, a result for every declared rung and whether the feature may advance; a
 rung whose path condition does not hold is listed as not run with that reason and does not block. A written procedure rung
 counts only through `--record <rung>=passed|failed:<what was observed>`, given by the operation that
-performed it, at the current head.
+performed it, at the current head. Repeat `--record` for each procedure rung, or join records with `;`; a `;` inside a record's own text
+stays in it.
 
 ## Delivery
 
