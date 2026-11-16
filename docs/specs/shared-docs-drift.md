@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing the owner-confirmed simpler design on its existing feature branch after the fresh R-95 review. Scanner parity is measured. Replacement runtime and installed/hosted migration acceptance remain open."
+status: draft
+status_description: "Revising the approved receipt-retirement correction before a fresh Claude Code Opus 5.5 spec review. Implemented operation evidence is retained. Installed/hosted migration acceptance remains open."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
