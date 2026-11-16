@@ -10,11 +10,11 @@ const RUNNING = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../plugi
 const made: string[] = [];
 afterAll(() => { for (const dir of made) rmSync(dir, { recursive: true, force: true }); });
 
-function context(record?: string, pathBinary?: string) {
+function context(record?: string | ((dir: string) => string), pathBinary?: string) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), "vh-loop-plugin-"))); made.push(dir);
   Bun.spawnSync(["git", "init", "-q", "-b", "main"], { cwd: dir });
   const config = join(dir, "claude");
-  if (record !== undefined) { mkdirSync(join(config, "plugins"), { recursive: true }); writeFileSync(join(config, "plugins", "installed_plugins.json"), record); }
+  if (record !== undefined) { mkdirSync(join(config, "plugins"), { recursive: true }); writeFileSync(join(config, "plugins", "installed_plugins.json"), typeof record === "function" ? record(dir) : record); }
   const bin = join(dir, "bin"); mkdirSync(bin);
   if (pathBinary !== undefined) { writeFileSync(join(bin, "vh-adlc"), `#!/bin/sh\necho "vh-adlc ${pathBinary}"\n`); chmodSync(join(bin, "vh-adlc"), 0o755); }
   // PATH holds only the fixture's bin and the system directories, so a real vh-adlc elsewhere does not leak in.
@@ -49,4 +49,16 @@ test("a vh-adlc on PATH at another version than the lock is reported, so operati
 test("a vh-adlc on PATH at the locked version raises no binary warning", () => {
   const plugin = context(record(RUNNING), LOCKED);
   expect(plugin.binary_warning).toBeUndefined();
+});
+
+test("a project-scope install for another checkout listed first does not make this session stale", () => {
+  const twoScopes = JSON.stringify({ version: 2, plugins: { "vh-adlc@vhco-tools": [
+    { scope: "project", version: "0.0.1", projectPath: "/tmp/some-other-checkout" }, { scope: "user", version: RUNNING }] } });
+  expect(context(twoScopes)).toMatchObject({ running: RUNNING, installed: RUNNING, stale: false });
+});
+
+test("a project-scope install for this repository wins over the user install", () => {
+  const forThisRepo = (dir: string) => JSON.stringify({ version: 2, plugins: { "vh-adlc@vhco-tools": [
+    { scope: "user", version: RUNNING }, { scope: "project", version: "99.0.0", projectPath: dir }] } });
+  expect(context(forThisRepo)).toMatchObject({ installed: "99.0.0", stale: true });
 });
