@@ -60,7 +60,7 @@ export async function collectPublicationInputs(input: {
       throw new PublicationScopeChanged("Assessed publication source needs fresh collection and review");
     }
     result.runtime = await selectOperationRuntime({ repo, policy_repo: store.root, current_default: context.default_commit, identity: context.identity,
-      cache_directory: options.cache_directory, entry: options.entry, launcher_path: options.launcher_path, settings_path: options.settings_path });
+      entry: options.entry });
     const current = native();
     if (current.default_commit !== context.default_commit || canonicalDigest(current.identity) !== canonicalDigest(context.identity))
       throw new PublicationScopeChanged("Native publication source or actor changed during collection");

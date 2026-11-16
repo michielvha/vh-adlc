@@ -92,7 +92,8 @@ the entire immutable target. Validate native identity, exact artifact digests,
 source/payload freshness and returned records through the production collectors.
 Unavailable or mismatched identity/capability leaves `review pending`.
 
-This operation's runtime adoption and scoped authority report owner-attestation.
+This operation's preflight checklist and scoped authority record owner/reviewer
+attestations.
 Its ordinary cache/journal hashes establish retained-byte integrity and linkage.
 Keep those limits visible. A docs-drift role review supplies its selected
 operation evidence. The formal feature implementation review still uses the

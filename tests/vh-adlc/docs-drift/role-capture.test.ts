@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { chmodSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { ArtifactChanged } from "../../../plugins/vh-adlc/scripts/docs-drift/evidence-input";
 import { verifyRoleIdentity } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
@@ -20,6 +20,14 @@ test("installed role bindings ignore diagnostic versions and installation paths 
     component: { plugin_version: "0.25.0", source_commit: "c".repeat(40), component_sha256: "d".repeat(64), directory: "/missing/plugin" },
     loader: { provider: "claude" as const, argv: ["--plugin-dir", "/missing/plugin"], credential_references: [] } };
   const digest = roleRuntimeDigest(runtime, "worker"), patched = structuredClone(runtime);
+  const production = { ...runtime, kind: "docs-drift-production-runtime" as const, policy_sha256: "e".repeat(64),
+    current_default: runtime.source_commit, observed_models: { worker: "claude-opus-5-5", reviewer: "claude-opus-5-5" } };
+  const { directory: _directory, ...component } = runtime.component;
+  expect(roleRuntimeDigest(production, "worker")).toBe(canonicalDigest({ kind: "docs-drift-installed-runtime",
+    settings_sha256: runtime.settings_sha256, component, entry: runtime.entry, role: "worker",
+    selected: { client: selected.client, client_id: selected.client_id, model: selected.model, argv: selected.argv,
+      identity_source: selected.identity_source }, credential_references: runtime.loader.credential_references,
+    policy_sha256: production.policy_sha256, observed_models: production.observed_models }));
   patched.worker.version = "2.1.326"; patched.worker.executable = "/other/missing/claude";
   patched.component.directory = "/other/missing/plugin"; patched.loader.argv[1] = patched.component.directory;
   expect(roleRuntimeDigest(patched, "worker")).toBe(digest);

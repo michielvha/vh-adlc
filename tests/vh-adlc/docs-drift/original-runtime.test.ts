@@ -1,4 +1,4 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
 import { existsSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readOriginalRuntime } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
@@ -64,4 +64,59 @@ test.each(["account", "settings"] as const)("an internally sealed plan cannot bo
   const f = original(scenario === "account" ? { actor_id: 31 } : { settings_sha256: "f".repeat(64) });
   expect(() => readOriginalRuntime({ repo: f.repo, directory: f.directory, plan: f.plan, identity: f.identity })).toThrow();
   expect(existsSync(f.calls)).toBe(false);
+});
+
+test.each(["producer", "publication", "local"])("unreleased version-one %s history hands off to its original implementation", async kind => {
+  const { source, runtimeIdentity } = await import("./adoption-fixture");
+  const { createAdoptedProducerVerifier } = await import("../../../plugins/vh-adlc/scripts/docs-drift/history-producer");
+  const { createOwnedObjectStore } = await import("../../../plugins/vh-adlc/scripts/docs-drift/snapshot");
+  const { SetupRequired } = await import("../../../plugins/vh-adlc/scripts/docs-drift/settings");
+  const f = source(roots), store = createOwnedObjectStore({ parent: f.artifacts, evidence_directory: f.artifacts,
+    source_repo: f.repo, source_commit: f.candidate, repository: f.configured.repository, owner: "legacy-history", run: "inspection" });
+  if (kind === "producer") {
+    expect(() => createAdoptedProducerVerifier({ store, current_default: f.candidate, identity: runtimeIdentity })).toThrow(SetupRequired);
+  } else if (kind === "publication") {
+    const { createAdoptedPublicationVerifier } = await import("../../../plugins/vh-adlc/scripts/docs-drift/reviewed-publication");
+    const repository = { id: 10, full_name: f.configured.repository, default_branch: "main" };
+    expect(() => createAdoptedPublicationVerifier({ store, current_default: f.candidate, identity: runtimeIdentity,
+      proposal: { number: 1, state: "open", merged_at: null, body: "", draft: true, actor: runtimeIdentity.actor,
+        actor_id: runtimeIdentity.actor_id, actor_type: "Bot", head_sha: f.candidate, head_ref: "docs-drift/legacy", head_repository: repository,
+        base_sha: f.candidate, base_ref: "main", base_repository: repository } })).toThrow(SetupRequired);
+  } else {
+    const { createLocalInvocationReader } = await import("../../../plugins/vh-adlc/scripts/docs-drift/local-history");
+    expect(() => createLocalInvocationReader({ repo: f.repo, store, current_default: f.candidate, source: f.candidate,
+      settings: loadCommittedSettings(f.repo, f.candidate).settings, identity: runtimeIdentity, cache_directory: f.artifacts,
+      component_sha256: "a".repeat(64), run_id: "legacy", scope_sha256: "b".repeat(64), started_at: new Date().toISOString(), recheck() {} })).toThrow(SetupRequired);
+  }
+});
+
+
+test.each(["recovery", "publication resume"])("version-one %s hands off before any native observation or journal change", async kind => {
+  const { publicationFixture } = await import("./publication-fixture");
+  const { createJournal, readJournal, readRetainedPlan } = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+  const { applyRecovery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-controller");
+  const native = await import("../../../plugins/vh-adlc/scripts/docs-drift/transport");
+  const { SetupRequired } = await import("../../../plugins/vh-adlc/scripts/docs-drift/settings");
+  const f = publicationFixture(roots), plan = readRetainedPlan(canonicalJSON({ ...f.plan, context: "production", transport: "native" }));
+  const journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan }), before = journal.digest;
+  const effect = plan.manifest.effects.find(item => item.kind === "pr-create");
+  if (!effect) throw Error("Legacy fixture publication effect required");
+  const observation = spyOn(native, "readNativeContext").mockImplementation(() => { throw Error("Unexpected native observation"); });
+  try {
+    const common = { repo: f.repo, source: plan.manifest.bindings.source_commit, artifact_root: f.artifacts,
+      journal_directory: journal.directory, cache_directory: f.artifacts, entry: "copilot", owner: "legacy-fixture", run: "legacy-inspection", credential: "synthetic" };
+    if (kind === "recovery") {
+      const selection = { schema_version: 1, kind: "docs-drift-recovery-selection", source_commit: common.source,
+        operation_id: plan.manifest.operation_id, purpose: "acknowledgement", acknowledge_effect_ids: [effect.id],
+        retire_effect_ids: [], retirement_lookups: {} };
+      await expect(applyRecovery({ ...common, selection, authority: null, purpose: "acknowledgement" })).rejects.toThrow(SetupRequired);
+    } else {
+      const { resumePublication } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller");
+      await expect(resumePublication({ ...common, candidate_repo: f.repo, candidate: plan.manifest.bindings.candidate_commit,
+        launcher_path: f.repo, settings_path: join(f.repo, ".vh-adlc/docs-drift.yaml"), selection: null, source_verification: null,
+        candidate_verification: null, decisions: null, worker_capture: null, reviewer_capture: null, authority: null })).rejects.toThrow(SetupRequired);
+    }
+    expect(readJournal(journal.directory, f.repo).digest).toBe(before);
+    expect(observation).not.toHaveBeenCalled();
+  } finally { observation.mockRestore(); }
 });

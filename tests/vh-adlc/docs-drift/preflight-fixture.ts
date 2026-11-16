@@ -9,6 +9,7 @@ import { computeComponentIdentity } from "../../../plugins/vh-adlc/scripts/docs-
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { CORE_PREFLIGHT_CHECKS, normalizedConfigurationDigest, nativeEntryDigest, preflightReviewTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
+import type { PublisherAccount } from "../../../plugins/vh-adlc/scripts/docs-drift/identity";
 
 const proof = "1".repeat(64);
 type ConfiguredFixture = Omit<ReturnType<typeof installedSettingsFixture>, "reports"> & {
@@ -19,7 +20,8 @@ export function commit(repo: string, message: string) {
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", message);
   return readGit(repo, "rev-parse", "HEAD").toString().trim();
 }
-export function preflightFixture(roots: string[], fault = "none", runtime?: { component: ReturnType<typeof computeComponentIdentity>; executable: string },
+export function preflightFixture(roots: string[], fault = "none", runtime?: { component: ReturnType<typeof computeComponentIdentity>; executable: string;
+  publishers?: Record<string, PublisherAccount>; models?: { worker: string; reviewer: string } },
   configure?: (repo: string, settings: ConfiguredFixture) => void) {
   const f = publicationFixture(roots);
   const scanner = readFileSync(join(import.meta.dir, "fixtures/scanner.js"), "utf8")
@@ -50,8 +52,10 @@ export function preflightFixture(roots: string[], fault = "none", runtime?: { co
     checks: CORE_PREFLIGHT_CHECKS.map(name => ({ name, status: "passed", component, consumer_commit: candidate, evidence_sha256: proof,
       target_sha256: preflightReviewTarget(base), note: "Synthetic applicability check. Original native observations retain their own targets." })),
     native_entries: Object.fromEntries(Object.entries(settings.execution.entries).map(([entry]) => [entry, {
-      entry_sha256: nativeEntryDigest(settings, entry), worker_model: "claude-opus-5.5", reviewer_model: "claude-opus-5.5",
-      repository_id: 10, publisher: { actor: entry === "hosted" ? "fixture-bot" : "fixture-owner", actor_id: entry === "hosted" ? 20 : 30 },
+      entry_sha256: nativeEntryDigest(settings, entry), worker_model: runtime?.models?.worker ?? "claude-opus-5.5",
+      reviewer_model: runtime?.models?.reviewer ?? "claude-opus-5.5",
+      repository_id: 10, publisher: runtime?.publishers?.[entry]
+        ?? { actor: entry === "hosted" ? "fixture-bot" : "fixture-owner", actor_id: entry === "hosted" ? 20 : 30 },
       component, consumer_commit: candidate, evidence_sha256: proof,
     }])), pending_operations: [] };
   if (fault === "missing-check") checklist.checks.pop();

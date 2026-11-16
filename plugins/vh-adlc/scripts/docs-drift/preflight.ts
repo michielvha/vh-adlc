@@ -1,4 +1,7 @@
+import { realpathSync } from "node:fs";
 import { isGitAncestor, readAdoptionInput, readGit, verifiedHelperEnvironment } from "./git";
+import { currentRuntimeValidation } from "./runtime-validation";
+export { withRuntimeValidation as withPreflightValidation } from "./runtime-validation";
 import { publisherActor, sameAccount, sameLogin } from "./identity";
 import { fullModel, modelMatches, ref } from "./manifests";
 import { canonicalDigest, canonicalJSON, freezeJSON, protocolPath } from "./protocol";
@@ -148,10 +151,30 @@ export function parsePreflightChecklist(value: unknown) {
     review: { target_sha256: hash(review.target_sha256), evidence_sha256: hash(review.evidence_sha256), model: fullModel(review.model) }, checks, native_entries, pending_operations });
 }
 
-/** Validate the committed C-to-D activation and current policy. Current effect grants remain separate. */
-export function verifyProductionPreflight(options: { repo: string; current_default: string; component: Component;
+export type PreflightSnapshot = ReturnType<typeof readProductionPreflight>;
+
+type PreflightOptions = { repo: string; current_default: string; component: Component;
   publisher?: { entry: string; identity: PublicationIdentity };
-}) {
+};
+
+export function verifyProductionPreflight(options: PreflightOptions) {
+  const scope = currentRuntimeValidation()?.preflights;
+  const immutable = { repo: realpathSync(options.repo), current_default: options.current_default, component: options.component };
+  const key = canonicalDigest(immutable);
+  let verified = scope?.get(key);
+  if (!verified) {
+    verified = readProductionPreflight(immutable);
+    scope?.set(key, verified);
+  }
+  if (options.publisher) {
+    const { entry, identity } = options.publisher, observed = verified.result.checklist.native_entries[entry];
+    if (!observed || identity.repository.toLowerCase() !== verified.settings.repository || identity.repository_id !== observed.repository_id
+      || identity.default_branch !== verified.settings.default_branch || !sameAccount(identity, observed.publisher)) fail("native repository or publisher identity changed");
+  }
+  return verified.result;
+}
+
+function readProductionPreflight(options: Omit<PreflightOptions, "publisher">) {
   const current = loadCommittedSettings(options.repo, options.current_default).settings;
   if (current.schema_version !== 2 || current.publication.mode !== "adopted" || !current.publication.checklist_path || !current.component)
     fail("new production work requires adopted ordinary settings and a complete checklist");
@@ -196,10 +219,5 @@ export function verifyProductionPreflight(options: { repo: string; current_defau
       || !modelMatches(selected.worker.model, observed.worker_model) || !modelMatches(selected.reviewer.model, observed.reviewer_model)
       || !selected.worker.identity_source || !selected.reviewer.identity_source) fail("native entry configuration or observed model changed");
   }
-  if (options.publisher) {
-    const { entry, identity } = options.publisher, observed = checklist.native_entries[entry];
-    if (!observed || identity.repository.toLowerCase() !== current.repository || identity.repository_id !== observed.repository_id
-      || identity.default_branch !== current.default_branch || !sameAccount(identity, observed.publisher)) fail("native repository or publisher identity changed");
-  }
-  return freezeJSON({ authority: "none" as const, policy_sha256: canonicalDigest(checklist), checklist, activation_commit: activation });
+  return { settings: current, result: freezeJSON({ authority: "none" as const, policy_sha256: canonicalDigest(checklist), checklist, activation_commit: activation }) };
 }

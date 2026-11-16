@@ -12,13 +12,13 @@ All `references/` and `scripts/` paths start there. For generic requests, use
 Read `references/docs-drift.md` for audit, resolve and post-merge closure.
 Use ordinary verified-binary setup and pinned knowledge from `references/loop.md`.
 Read `references/docs-drift-settings.md` for missing settings, staged adoption,
-runtime selection and retained artifacts. Read `references/docs-drift-review.md`
+ordinary native-client selection and retained artifacts. Read `references/docs-drift-review.md`
 before independent assessment, candidate review, publication or recovery.
 Apply `references/authority.md` to each selected effect.
 
 Keep the scanner, detector policy, feedback, generators and project-specific
-commands in the consumer repository. Collection starts from an exact clean
-owned source. The request selects report-only or authorized preparation and
+commands in the consumer repository. Use the eight operations in the workflow reference with one helper-owned run
+directory. Collection starts from an exact clean owned source. The request selects report-only or authorized preparation and
 delivery. Ambiguous documentation-audit intent needs a scope question first.
 
 Use the same procedure on any harness. Independent review runs in a separate

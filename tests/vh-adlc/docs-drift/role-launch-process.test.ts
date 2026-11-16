@@ -28,14 +28,14 @@ console.log(JSON.stringify({ type: "session.start", data: { sessionId: get("--se
 console.log(JSON.stringify({ type: "fixture.launch", data: { profile: process.env.COPILOT_HOME, args } }));
 console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-opus-5.5", content: "MODEL: claude-opus-5.5\\n" + get("--prompt") } }));
 `, { mode: 0o700 });
-    const selected = { executable, client: { provider: "copilot" }, model: "opus", argv: ["--no-auto-update"], profile_directory: join(f.root, "worker-profile") };
-    const runtime = { component: { directory: join(f.root, "selected-component") }, loader: { provider: "copilot" as const,
+    const selected = { executable, client: { provider: "copilot" }, model: "opus", argv: ["--no-auto-update"] };
+    const runtime = { authentication: "native" as const, component: { directory: join(f.root, "selected-component") }, loader: { provider: "copilot" as const,
       argv: ["--plugin-dir", join(f.root, "selected-component")], credential_references: ["COPILOT_GITHUB_TOKEN"] },
-      worker: selected, reviewer: { ...selected, profile_directory: join(f.root, "reviewer-profile") } };
+      worker: selected, reviewer: { ...selected } };
     const source = readGit(f.repo, "rev-parse", "HEAD").toString().trim(), before = captureRepositoryState(f.repo);
     const workerTarget = hash("original worker target"), reviewTarget = hash("original review target");
     const base = { source_repo: f.repo, source_commit: source, artifact_root: f.artifacts, policy: role, timeout_ms: 10000 };
-    const launch = { runtime, cwd: f.repo, artifact_root: f.artifacts, environment: { PATH: process.env.PATH,
+    const launch = { runtime, cwd: f.repo, artifact_root: f.artifacts, environment: { PATH: process.env.PATH, HOME: f.root, COPILOT_HOME: join(f.root, "native-profile"),
       COPILOT_GITHUB_TOKEN: "synthetic-selected-credential", GH_TOKEN: "synthetic-ambient-credential", NODE_OPTIONS: "--require=/ambient/code", COPILOT_AGENT_SESSION_ID: "ambient-context" } };
     const worker = await captureNativeRoleProcess({ ...base, ...buildCopilotRoleInvocation({ ...launch, role: "worker",
       prompt: JSON.stringify({ input_sha256: workerTarget, edits: [], publication: null }) + "\n" }),
@@ -54,7 +54,7 @@ console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-o
     expect(first.binding.invocation_id).not.toBe(second.binding.invocation_id);
     for (const [capture, expected] of [[first, runtime.worker], [second, runtime.reviewer]] as const) {
       const observed = Buffer.from(capture.evidence.native).toString().trim().split("\n").map(line => JSON.parse(line)).find(event => event.type === "fixture.launch");
-      expect(observed.data.profile).toBe(expected.profile_directory); expect(observed.data.args).toContain(expected.model);
+      expect(observed.data.profile).toBe(launch.environment.COPILOT_HOME); expect(observed.data.args).toContain(expected.model);
       expect(observed.data.args).toContain(runtime.component.directory);
     }
     expect(captureRepositoryState(f.repo)).toEqual(before);

@@ -10,7 +10,6 @@ import { settingsFixture } from "./settings-fixture";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-const entry = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts");
 function fixture(scenario: string) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-drift-candidate-verification-"))); roots.push(root);
   const repo = join(root, "source"), candidate = join(root, "candidate"), artifacts = join(root, "artifacts");
@@ -48,27 +47,26 @@ function fixture(scenario: string) {
   return { root, repo, candidate, artifacts, source, head, selection };
 }
 
-test.each(["passed", "failed", "mutate-file", "mutate-index", "mutate-ref", "mutate-config", "no-commands", "scanner-gap"])("normal committed-candidate verification %s", scenario => {
+test.each(["passed", "failed", "mutate-file", "mutate-index", "mutate-ref", "mutate-config", "no-commands", "scanner-gap"])("committed-candidate verification %s", async scenario => {
   const f = fixture(scenario), before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
-  const outcome = Bun.spawnSync([process.execPath, entry, "verify-candidate", "--repo", f.repo, "--source", f.source,
-    "--candidate-repo", f.candidate, "--candidate", f.head, "--artifact-root", f.artifacts,
-    "--selection", "selection.json", "--selection-sha256", sha256(f.selection)], { stdout: "pipe", stderr: "pipe", timeout: 60000,
-    env: { ...process.env, GH_TOKEN: "fixture-secret", GITHUB_TOKEN: "fixture-secret", ANTHROPIC_API_KEY: "fixture-secret", SSH_AUTH_SOCK: "/unavailable" } });
-  const report = JSON.parse(outcome.stdout.toString()), success = ["passed", "no-commands"].includes(scenario);
-  expect(outcome.exitCode).toBe(success ? 0 : 2);
-  expect(report.verification?.complete).toBe(success);
-  expect(report.verification?.authority).toBe("none");
-  expect(report.verification?.candidate_commit).toBe(f.head);
+  const { verifyCandidate } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification");
+  const verification = await verifyCandidate({ repo: f.repo, source: f.source, candidate_repo: f.candidate, candidate: f.head,
+    artifact_root: f.artifacts, selection: JSON.parse(f.selection.toString()), owner: "fixture-owner", run: "fixture-verification" });
+  const report = { verification }, success = ["passed", "no-commands"].includes(scenario);
+  expect(verification.complete).toBe(success);
+  expect(verification.authority).toBe("none");
+  expect(verification.candidate_commit).toBe(f.head);
   if (scenario === "failed") expect(report.verification.diagnostics).toContain("Configured candidate verification failed");
   if (scenario.startsWith("mutate-")) expect(report.verification.diagnostics).toContain("Configured candidate verification changed its source or Git state");
   if (scenario === "scanner-gap") expect(report.verification.diagnostics).toContain("Candidate scan incomplete");
   if (success) {
     const retained = report.verification.evidence;
+    if (!retained) throw Error("Successful verification evidence required");
     expect(sha256(readFileSync(join(f.artifacts, retained.path)))).toBe(retained.sha256);
     expect(report.verification.commands).toHaveLength(scenario === "no-commands" ? 0 : 1);
     if (scenario === "passed") {
       const command = report.verification.commands[0];
-      expect(command.process.exit_code).toBe(0);
+      expect(command.process?.exit_code).toBe(0);
       expect(readFileSync(join(f.artifacts, command.stdout.path), "utf8")).toContain("verified committed guide");
     }
   }
@@ -152,25 +150,6 @@ test("logical verification survives index refresh and garbage collection, with o
   expect(readFileSync(join(f.artifacts, proof.path)).equals(bytes)).toBe(true);
 });
 
-test.each(["matching", "changed-output"])("normal original verification check %s", async scenario => {
-  const { verifyCandidate } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification");
-  const f = fixture("passed"), verified = await verifyCandidate({ repo: f.repo, source: f.source, candidate_repo: f.candidate, candidate: f.head,
-    selection: JSON.parse(f.selection.toString()), artifact_root: f.artifacts, owner: "fixture-owner", run: "fixture-run" });
-  expect(verified.complete).toBe(true);
-  if (scenario === "changed-output") writeFileSync(join(f.artifacts, verified.commands[0].stdout.path), "Later changed output\n", { mode: 0o600 });
-  const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
-  const outcome = Bun.spawnSync([process.execPath, entry, "check-verification", "--repo", f.repo, "--source", f.source,
-    "--candidate-repo", f.candidate, "--candidate", f.head, "--artifact-root", f.artifacts, "--selection", "selection.json", "--selection-sha256", sha256(f.selection),
-    "--verification", verified.evidence!.path, "--verification-sha256", verified.evidence!.sha256], { stdout: "pipe", stderr: "pipe", timeout: 60000 });
-  const report = JSON.parse(outcome.stdout.toString());
-  expect(outcome.exitCode).toBe(scenario === "matching" ? 0 : 2);
-  if (scenario === "matching") expect(report.verification).toMatchObject({ complete: true, authority: "none", candidate_commit: f.head });
-  else expect(report.diagnostics.map((item: { message: string }) => item.message).join("\n")).toContain("artifact changed");
-  expect(captureRepositoryState(f.repo)).toEqual(before);
-  expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
-});
-
-
 test("failed verification evidence retention preserves owned resource locators and incomplete status", async () => {
   const { verifyCandidate } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification");
   const f = fixture("passed"), publish = artifacts.publishArtifact;
@@ -200,17 +179,6 @@ test("checking original verification reuses the retained store without allocatin
   expect(readCandidateVerificationArtifacts({ ...options, reference: result.evidence }).complete).toBe(true);
   expect(readdirSync(f.artifacts).sort()).toEqual(before);
 });
-
-test.each(["--verification", "--verification-sha256"])("original verification check names missing %s", missing => {
-  const f = fixture("passed"), supplied = missing === "--verification" ? ["--verification-sha256", "0".repeat(64)] : ["--verification", "missing.json"];
-  const outcome = Bun.spawnSync([process.execPath, entry, "check-verification", "--repo", f.repo, "--source", f.source,
-    "--candidate-repo", f.candidate, "--candidate", f.head, "--artifact-root", f.artifacts,
-    "--selection", "selection.json", "--selection-sha256", sha256(f.selection), ...supplied], { stdout: "pipe", stderr: "pipe", timeout: 60000 });
-  const report = JSON.parse(outcome.stdout.toString());
-  expect(outcome.exitCode).toBe(2);
-  expect(report.diagnostics.map((item: { message: string }) => item.message).join("\n")).toContain(missing);
-});
-
 
 test.each(["generation-passed", "generation-failed", "generation-mutates"])("declared generation is observed before candidate verification: %s", async scenario => {
   const { verifyCandidate } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification");

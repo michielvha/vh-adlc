@@ -31,12 +31,12 @@ test.each(["publish", "lost-outcome-resume"])("one original closure stays within
         return append(current, effectID, outcome);
       });
       let pending: Awaited<ReturnType<typeof controller.publishClosure>>;
-      try { pending = await controller.publishClosure(f.publication); }
+      try { pending = await f.invoke(run => controller.publishClosure(f.publication, run)); }
       finally { fault.mockRestore(); }
       expect(injected).toBe(true);
       expect(pending.state, pending.reason ?? undefined).toBe("pending");
-      result = await controller.resumeClosure({ ...f.publication, journal_directory: pending.journal.directory });
-    } else result = await controller.publishClosure(f.publication);
+      result = await f.invoke(run => controller.resumeClosure({ ...f.publication, journal_directory: pending.journal.directory }, run));
+    } else result = await f.invoke(run => controller.publishClosure(f.publication, run));
     const observed = JSON.parse(readFileSync(f.service.statePath, "utf8"));
     console.error("Owned closure REST counts", JSON.stringify({ mode, preparation, execution: observed.rest_requests, total: preparation + observed.rest_requests }));
     expect(result.state, result.reason ?? undefined).toBe("complete");

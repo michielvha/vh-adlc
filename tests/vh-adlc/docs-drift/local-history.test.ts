@@ -3,7 +3,8 @@ import { afterAll, expect, spyOn, test } from "bun:test";
 import * as fs from "node:fs";
 import { chmodSync, linkSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { source, portableRecord, deliverRecord, runtimeIdentity, pin, write, commit } from "./adoption-fixture";
+import { runtimeIdentity } from "./adoption-fixture";
+import { preflightFixture } from "./preflight-fixture";
 import { canonicalDigest, canonicalJSON, compareUTF8, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { buildReport } from "../../../plugins/vh-adlc/scripts/docs-drift/report";
 import { collectLocalHistory, createLocalEnvelope } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
@@ -36,23 +37,24 @@ function withDirectoryOrder<T>(root: string, compare: (left: string, right: stri
   } finally { ordered.mockRestore(); }
 }
 function fixture(expired = false, nonLocal = false) {
-  const f = source(roots);
-  f.configured.reports.interactive = "local-attestation"; f.configured.reports.local_history_roots = ["history"];
-  if (nonLocal) { f.configured.reports.interactive = "none"; f.configured.reports.local_history_roots = []; }
-  write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(f.configured));
-  if (!nonLocal) f.candidate = commit(f.repo, "synthetic local history policy");
-  const current = deliverRecord(f, portableRecord(f)), cache = join(f.artifacts, "local-cache");
+  const base = preflightFixture(roots, "none", undefined, (_repo, configured) => {
+    configured.reports.interactive = nonLocal ? "none" : "local-attestation";
+    configured.reports.local_history_roots = nonLocal ? [] : ["history"];
+  });
+  // Bind the fixture's local owner to the preflight's actual interactive account.
+  const account = { ...runtimeIdentity, actor: "fixture-owner", actor_id: 30 };
+  const f = { ...base, configured: base.afterSettings, candidate: base.checklist.candidate_commit }, current = f.head(), cache = join(f.artifacts, "local-cache");
   mkdirSync(cache, { mode: 0o700 });
   const store = createOwnedObjectStore({ parent: f.artifacts, evidence_directory: f.artifacts, source_repo: f.repo,
     source_commit: current, repository: f.configured.repository, owner: "local-history-fixture", run: "metadata" });
   const bare = { origin: "local-attestation" as const, context: "production" as const, repository: f.configured.repository,
-    id: "previous-owned-run", source_commit: current, component_sha256: pin().component_sha256,
+    id: "previous-owned-run", source_commit: current, component_sha256: f.component.component_sha256,
     request_sha256: sha256(Buffer.from("synthetic original request")), scope_sha256: sha256(Buffer.from("synthetic scope")),
     report_sha256: sha256(Buffer.from("synthetic report bytes")),
     completed_at: new Date(Date.now() - (expired ? 8 * 86400000 : 10000)).toISOString() };
   const invocation: OwnedInvocation = { ...bare, invocation_sha256: canonicalDigest(bare) };
   const context = { repo: f.repo, cache_directory: cache, settings: loadCommittedSettings(f.repo, current).settings,
-    identity: runtimeIdentity, store, current_default: current, source: current, component_sha256: bare.component_sha256,
+    identity: account, entry: "interactive", store, current_default: current, source: current, component_sha256: bare.component_sha256,
     run_id: bare.id, scope_sha256: bare.scope_sha256, started_at: new Date().toISOString(), recheck: () => {} };
   // Defensive reader fixture: the source must independently adopt local history even if the caller context selects it.
   if (nonLocal) { context.settings.reports.interactive = "local-attestation"; context.settings.reports.local_history_roots = ["history"]; }

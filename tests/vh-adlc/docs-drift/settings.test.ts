@@ -174,6 +174,14 @@ test("ordinary settings use configured client commands and harness-neutral entry
   expect(settingsProjections(settings).protected.clients).toEqual(settings.clients);
 });
 
+test("ordinary report history needs no obsolete reader command and preserves older source fields", () => {
+  const input = installedSettingsFixture(), reports = { ...input.reports };
+  Reflect.deleteProperty(reports, "history_reader_argv");
+  expect(Object.hasOwn(parseSettings({ ...input, reports }).reports, "history_reader_argv")).toBe(false);
+  const previous = { ...input, reports: { ...reports, history_reader_argv: ["bun", "old-history-reader.ts"] } };
+  expect(parseSettings(previous).reports).toMatchObject({ history_reader_argv: ["bun", "old-history-reader.ts"] });
+});
+
 
 test("publisher selection binds a configured profile independently of the invoking harness", () => {
   const settings = parseSettings(installedSettingsFixture());

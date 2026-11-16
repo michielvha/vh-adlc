@@ -1,15 +1,13 @@
 /** Synthetic consumer and observed-shaped attestation fixtures. No native acceptance is claimed. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { readTrialHistoryBindings } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-definition";
-import { collectAdoptionBindings } from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationFixture } from "./publication-fixture";
 import type { IdentitySource } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { settingsFixture } from "./settings-fixture";
 import { hash } from "./manifest-fixture";
-import type { EntryIdentities, PublisherEntry } from "../../../plugins/vh-adlc/scripts/docs-drift/identity";
+import type { EntryIdentities } from "../../../plugins/vh-adlc/scripts/docs-drift/identity";
 
 export const pin = () => ({ schema_version: 1 as const, source_repository: "fixture/shared", source_commit: "a".repeat(40),
   source_release: "v1.0.0", plugin_version: "0.11.0", component_sha256: hash("fixture component") });
@@ -55,56 +53,3 @@ export function source(roots: string[], options: { entry_identities?: EntryIdent
 }
 
 export const runtimeIdentity = { repository: "fixture/docs", repository_id: 10, actor: "fixture-bot", actor_id: 20, default_branch: "main" };
-
-// Observed-shaped owner-attestation parser fixtures only. They establish no native host execution.
-export type AdoptionSourceFixture = Pick<ReturnType<typeof source>, "repo" | "configured" | "candidate"> & { native_model?: string; entry_identities?: EntryIdentities };
-export function portableRecord(f: AdoptionSourceFixture, identities: EntryIdentities | undefined = f.entry_identities) {
-  const bindings = collectAdoptionBindings(f.repo, f.candidate);
-  const trialHistory = readTrialHistoryBindings({ repo: f.repo, source: f.candidate, settings: bindings.settings });
-  const target = hash(canonicalJSON({ schema_version: identities ? 2 : 1, repository: f.configured.repository,
-    source_candidate: f.candidate, protected_sha256: bindings.protected_sha256,
-    component_pin_sha256: bindings.component_pin.sha256, identity: runtimeIdentity,
-    ...(identities ? { entry_identities: identities } : {}) }).toString());
-  const requirements = {
-    hosted_advisory: ["collection_complete", "independent_review", "reviewed_draft_payload", "report_uploaded", "lease_complete"],
-    history_read: ["native_history_read", "producer_verified", "permissions_bound"],
-    quiescence: ["schedule_disabled", "runs_drained", "interactive_frozen", "no_legacy_owners"],
-    copilot_entry: ["audit", "resolve", "closure", "issue", "acknowledgement", "ownership_denials", "settlement_denials", "retained_loader", "role_dispatch"],
-    claude_entry: ["audit", "resolve", "closure", "issue", "acknowledgement", "ownership_denials", "settlement_denials", "retained_loader", "role_dispatch", "forwarded_arguments", "command_binding"],
-    paired_review: ["shared_target", "consumer_target", "no_blocking_findings", "owner_acceptance"],
-    codex_install: ["fresh_install", "upgrade", "discovery", "helper_preservation"],
-    claude_install: ["fresh_install", "upgrade", "discovery", "helper_preservation"],
-    copilot_install: ["fresh_install", "upgrade", "discovery", "helper_preservation"],
-  };
-  const receipts = Object.fromEntries(Object.entries(requirements).map(([name, observations]) => {
-    const publisher: PublisherEntry | null = name === "hosted_advisory" || name === "history_read" ? "hosted"
-      : name === "copilot_entry" ? "copilot" : name === "claude_entry" ? "claude" : null;
-    const entry = name === "hosted_advisory" ? f.configured.execution.entries.hosted
-      : name === "claude_entry" ? f.configured.execution.entries.claude
-      : name === "copilot_entry" || name === "paired_review" ? f.configured.execution.entries.copilot : null;
-    const clientNames = entry === null ? [] : name === "paired_review" ? [entry.reviewer.client]
-      : [entry.worker.client, entry.reviewer.client];
-    const client_bindings = Object.fromEntries(Object.entries(f.configured.clients).filter(([id]) => clientNames.includes(id)));
-    return [name, { schema_version: 1, kind: name, evidence_kind: "observed", source_commit: name.endsWith("_install") ? bindings.component_pin.value.source_commit : f.candidate,
-      artifact_sha256: hash(name + " synthetic original bytes"), bindings_sha256: target, outcome: "passed", native_conclusion: "success",
-      worker_model: name === "paired_review" || entry === null ? null : f.native_model ?? entry.worker.model,
-      reviewer_model: entry === null ? null : f.native_model ?? entry.reviewer.model, client_bindings,
-      ...(identities && publisher ? { publisher_identity: identities[publisher] } : {}),
-      observations: Object.fromEntries(observations.map(observation => [observation, true])),
-      ...(name === "history_read" ? trialHistory ?? { producer_workflow_id: f.configured.reports.workflow_id,
-        producer_workflow_path: f.configured.execution.scheduled_workflow, reader_workflow_id: 222,
-        reader_workflow_path: f.configured.execution.worker_workflow } : {}),
-      ...(name === "quiescence" ? { workflow_id: f.configured.reports.workflow_id,
-        workflow_path: f.configured.execution.scheduled_workflow, observed_at: "2000-01-01T00:00:00Z",
-        workflow_state: "disabled_manually", drained_runs: [],
-        queued_run_ids: [], in_progress_run_ids: [], interactive_request_sha256: hash("synthetic explicit freeze") } : {}) }];
-  }));
-  return { schema_version: identities ? 2 : 1, kind: "docs-drift-adoption", source_candidate: f.candidate,
-    protected_sha256: bindings.protected_sha256, protected_manifest: bindings.protected_manifest,
-    component_pin_sha256: bindings.component_pin.sha256, identity: runtimeIdentity, receipts, predecessor: null,
-    ...(identities ? { entry_identities: identities } : {}) };
-}
-export function deliverRecord(f: ReturnType<typeof source>, record: ReturnType<typeof portableRecord>) {
-  write(f.repo, f.configured.publication.adoption_record, canonicalJSON(record));
-  return commit(f.repo, "synthetic portable attestation child");
-}

@@ -3,7 +3,7 @@ import { readFeatureClassification } from "../docs-impact/collection";
 import { randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
-import { readGit } from "./git";
+import { mapGitBlobs, readGit } from "./git";
 import { loadCommittedSettings } from "./settings";
 import type { Settings } from "./settings";
 import { canonicalDigest, canonicalJSON, compareUTF8, createProtocolBindings, decodeUTF8, protocolPath, sha256, withinPrefix } from "./protocol";
@@ -65,18 +65,24 @@ export { completeHistory as requireCompleteHistory };
 /** Read raw tree identities and bytes without checkout filters or automatic object fetching. */
 export function readCommittedTree(repo: string, sourceCommit: string): TreeBlob[] {
   commitID(sourceCommit);
-  return nulFields(readGit(repo, "ls-tree", "-r", "--full-tree", "-z", sourceCommit)).map(row => {
+  const entries = nulFields(readGit(repo, "ls-tree", "-r", "--full-tree", "--long", "-z", sourceCommit)).map(row => {
     const tab = row.indexOf(9);
     if (tab < 0) incomplete("unreadable Git tree entry");
     const metadata = row.subarray(0, tab).toString("ascii");
-    const fields = /^(100644|100755|120000|160000) (blob|commit) ([a-f0-9]{40}(?:[a-f0-9]{24})?)$/u.exec(metadata);
-    if (!fields || (fields[1] === "160000") !== (fields[2] === "commit")) incomplete("unsupported Git tree entry");
+    const fields = /^(100644|100755|120000|160000) (blob|commit) ([a-f0-9]{40}(?:[a-f0-9]{24})?) +(-|[0-9]+)$/u.exec(metadata);
+    if (!fields || (fields[1] === "160000") !== (fields[2] === "commit")
+      || (fields[2] === "commit") !== (fields[4] === "-")
+      || fields[2] === "blob" && !Number.isSafeInteger(Number(fields[4]))) incomplete("unsupported Git tree entry");
     const path = protocolPath(decodeUTF8(row.subarray(tab + 1)));
     return {
-      path, mode: fields[1], oid: fields[3],
-      bytes: fields[2] === "blob" ? readGit(repo, "cat-file", "blob", fields[3]) : Buffer.alloc(0),
+      path, mode: fields[1], oid: fields[3], size: fields[2] === "blob" ? Number(fields[4]) : 0,
     };
   });
+  const objects = entries.filter(entry => entry.mode !== "160000").map(({ oid, size }) => ({ oid, size }));
+  const contents = mapGitBlobs(repo, objects, bytes => bytes);
+  let index = 0;
+  return entries.map(({ path, mode, oid }) => ({ path, mode, oid,
+    bytes: mode === "160000" ? Buffer.alloc(0) : contents[index++] }));
 }
 
 function sorted(values: string[]): string[] {

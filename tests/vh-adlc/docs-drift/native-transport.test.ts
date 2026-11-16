@@ -2271,6 +2271,9 @@ test("version-two native writes bind their journal first and stop after original
     { actor: "fixture-bot", actor_id: 20, publisher_entry: "hosted" });
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, schema_version: 2,
     policy_sha256: hash("synthetic native trial policy"), component: settings.component, context: "trial", transport: "native",
+    trial_launch: { hostname: settings.hostname, repository: settings.repository, repository_id: 10, actor: "fixture-bot", actor_id: 20,
+      workflow_id: 101, workflow_path: ".github/workflows/synthetic-trial.yml", event: "workflow_dispatch",
+      head_commit: source, run_id: 501, run_attempt: 1 },
     publication_kind: "advisory", corrections: [], attention: [] });
   let journal = createJournal({ source_repo: f.repo, artifact_root: run.directory, plan });
   const objects = writePublicationObjects(store, plan, journal.header);

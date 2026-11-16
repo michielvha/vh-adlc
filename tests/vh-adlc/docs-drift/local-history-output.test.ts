@@ -1,4 +1,4 @@
-/** Retained CLI and owned local-history fixtures. No actual paid-model or provider acceptance. */
+/** Retained audit controller and owned local-history fixtures. No actual paid-model or provider acceptance. */
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -17,17 +17,18 @@ test.each(["matching", "actor-casing"])("retained local audit owns its invocatio
     const result = runHistoryOutput(f, `
 const fs = await import("node:fs"), { join } = await import("node:path");
 const { captureRepositoryState } = await import(plugin + "/scripts/docs-drift/snapshot.ts");
-const args = ["run-audit", "--repo", options.repo, "--source", options.source, "--artifact-root", options.artifact_root,
-  "--cache-root", options.cache_directory, "--entry", "copilot", "--launcher", options.launcher_path, "--settings", options.settings_path,
-  "--source-verification", options.source_verification.path, "--source-verification-sha256", options.source_verification.sha256,
-  "--decisions", options.decisions.path, "--decisions-sha256", options.decisions.sha256];
-function run() {
+const { persistLocalAuditOutput } = await import(plugin + "/scripts/docs-drift/local-history-output.ts");
+const { auditSessionOutput } = await import(plugin + "/scripts/docs-drift/audit-session.ts");
+const { randomUUID } = await import("node:crypto");
+async function run() {
   const before = JSON.stringify(captureRepositoryState(options.repo));
-  const child = Bun.spawnSync([process.execPath, plugin + "/scripts/docs-drift/cli.ts", ...args], { env: process.env, timeout: 360000 });
-  const output = JSON.parse(child.stdout.toString());
-  return { code: child.exitCode, output, preserved: JSON.stringify(captureRepositoryState(options.repo)) === before };
+  const session = await withRuntimeValidation(() => runAuditSession({ ...options, run: randomUUID() }));
+  const saved = persistLocalAuditOutput({ repo: options.repo, source: options.source, artifact_root: options.artifact_root, session });
+  const output = auditSessionOutput(session, 524288, saved);
+  return { code: output.outcome === "collected" ? 0 : output.outcome === "attention" ? 1 : 2, output,
+    preserved: JSON.stringify(captureRepositoryState(options.repo)) === before };
 }
-const first = run();
+const first = await run();
 let second = null;
 if (first.output.audit_session?.complete && first.output.report_artifacts?.files.provenance_json) {
   // Explicit report-save permission in this owned synthetic consumer. The ordinary audit preserves its caller.
@@ -40,7 +41,7 @@ if (first.output.audit_session?.complete && first.output.report_artifacts?.files
     const executable = ${JSON.stringify(join(f.root, "native-bin/gh"))};
     writeFileSync(executable, readFileSync(executable, "utf8").replaceAll("fixture-bot", "FiXtUrE-BoT"));
   }
-  second = run();
+  second = await run();
 }
 const result = { first, second };
 `, { session: false, timeoutMs: 780000 });
@@ -79,7 +80,7 @@ writeFileSync(executable, native.replaceAll("fixture-bot", "changed-actor"));
 let actor; try { actor = observe(save(session)); } finally { writeFileSync(executable, native); }
 const originalNative = transport.readNativeContext;
 const sourceFault = spyOn(transport, "readNativeContext").mockImplementation(input => ({ ...originalNative(input),
-  default_commit: ${JSON.stringify(JSON.parse(readFileSync(join(f.repo, f.configured.publication.adoption_record), "utf8")).source_candidate)} }));
+  default_commit: ${JSON.stringify(f.checklist.candidate_commit)} }));
 let source; try { source = observe(save(session)); } finally { sourceFault.mockRestore(); }
 const link = fs.linkSync;
 const pairFault = spyOn(fs, "linkSync").mockImplementation((from, to) => {

@@ -16,15 +16,12 @@ test("retained hosted audit prepares bounded native pre-upload history provenanc
   try {
     const f = await historyOutputFixture(roots), before = captureRepositoryState(f.repo);
     const result = runHistoryOutput(f, `
-const args = ["run-audit", "--repo", options.repo, "--source", options.source, "--artifact-root", options.artifact_root,
-  "--cache-root", options.cache_directory, "--entry", "hosted", "--launcher", options.launcher_path, "--settings", options.settings_path,
-  "--source-verification", options.source_verification.path, "--source-verification-sha256", options.source_verification.sha256,
-  "--decisions", options.decisions.path, "--decisions-sha256", options.decisions.sha256];
-const child = Bun.spawnSync([process.execPath, plugin + "/scripts/docs-drift/cli.ts", ...args], {
-  env: process.env, timeout: 360000 });
-if (child.exitCode !== 0) throw Error(child.stderr.toString() || child.stdout.toString());
-const result = { code: child.exitCode, output: JSON.parse(child.stdout.toString()) };
-`, { session: false });
+const { persistHostedAuditOutput } = await import(plugin + "/scripts/docs-drift/history-output.ts");
+const { auditSessionOutput } = await import(plugin + "/scripts/docs-drift/audit-session.ts");
+const saved = persistHostedAuditOutput({ repo: options.repo, source: options.source, artifact_root: options.artifact_root, session });
+const output = auditSessionOutput(session, 524288, saved);
+const result = { code: output.outcome === "collected" ? 0 : 2, output };
+`);
     expect(result.code, JSON.stringify(result)).toBe(0);
     const saved = result.output.report_artifacts;
     expect(saved.complete, JSON.stringify(saved)).toBe(true);
@@ -61,7 +58,7 @@ const { canonicalJSON } = await import(plugin + "/scripts/docs-drift/protocol.ts
 const save = selected => persistHostedAuditOutput({ repo: options.repo, source: options.source, artifact_root: options.artifact_root, session: selected });
 const copied = save(JSON.parse(JSON.stringify(session)));
 const wrapped = save({ ...session });
-const interactive = await collectNativeReportHistory({ ...options, entry: "copilot" });
+const interactive = await collectNativeReportHistory({ ...options, entry: "copilot", hosted_run_attempt: undefined, run: globalThis.crypto.randomUUID() });
 if (!interactive.complete) throw Error(JSON.stringify(interactive));
 const report = canonicalJSON(readOriginalAuditReport(session.report));
 let interactiveError = null, copiedError = null;

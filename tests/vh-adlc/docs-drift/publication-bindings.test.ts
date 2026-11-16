@@ -1,16 +1,12 @@
 import { runtimePolicyBinding } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
-import { executeOwnedProcess } from "../../../plugins/vh-adlc/scripts/docs-drift/owned-process";
 import { bindingFixture } from "./binding-fixture";
 import { afterAll, expect, spyOn, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, realpathSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import * as artifacts from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
-import type { WorkerCollectionOptions } from "../../../plugins/vh-adlc/scripts/docs-drift/publication-worker";
 import { verifyCandidate } from "../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
-import { nativeReader, runtimeFixture } from "./runtime-fixture";
 import { commitAll, git, put } from "./repository-fixture";
 
 const roots: string[] = [];
@@ -24,22 +20,6 @@ function preserveFailure<Args extends unknown[], Result>(run: (...args: Args) =>
     try { return await run(...args); }
     catch (error) { preserveFailedBindingRoots = true; throw error; }
   };
-}
-async function captureBindingCommand(argv: string[], env: NodeJS.ProcessEnv, timeout: number) {
-  const directory = realpathSync(mkdtempSync(join(tmpdir(), "vh-binding-command-"))); roots.push(directory);
-  writeFileSync(join(directory, "invocation.json"), canonicalJSON({ kind: "test-control", argv, cwd: process.cwd(), timeout_ms: timeout }), { flag: "wx", mode: 0o600 });
-  const result = await executeOwnedProcess({ argv, cwd: process.cwd(),
-    env: Object.fromEntries(Object.entries(env).filter((pair): pair is [string, string] => typeof pair[1] === "string")),
-    capture: "memory", watched_outputs: [], timeout_ms: timeout, stdout: join(directory, "stdout"), stderr: join(directory, "stderr"),
-    started: pid => writeFileSync(join(directory, "started.json"), canonicalJSON({ kind: "test-control", pid }), { flag: "wx", mode: 0o600 }) });
-  const { captured, ...metadata } = result, stdout = Buffer.from(captured?.stdout ?? []), stderr = Buffer.from(captured?.stderr ?? []);
-  for (const [name, bytes] of [["stdout", stdout], ["stderr", stderr], ["process.json", canonicalJSON(metadata)]] as const)
-    writeFileSync(join(directory, name), bytes, { flag: "wx", mode: 0o600 });
-  const diagnostic = JSON.stringify({ directory, ...metadata, stderr: stderr.toString().slice(0, 512) });
-  expect(metadata.reaped, diagnostic).toBe(true); expect(metadata.timed_out, diagnostic).toBe(false);
-  expect(metadata.output_limit, diagnostic).toBe(false); expect(metadata.cancelled, diagnostic).toBe(null);
-  expect(stdout.length, diagnostic).toBeGreaterThan(0);
-  return { stdout, stderr, exitCode: metadata.exit_code, process: metadata };
 }
 const fixture = (incomplete: boolean, options?: Parameters<typeof bindingFixture>[2]) => bindingFixture(roots, incomplete, options);
 
@@ -76,26 +56,10 @@ test.each(["matching", "coordinated", "coordination-origin-changed", "coordinati
       candidate_tree: git(f.candidate, "rev-parse", f.head + "^{tree}"), assessment_sha256: f.baseline.scan_artifacts!.report.sha256 });
     expect(result.corrections).toHaveLength(1);
     expect(result.corrections[0]).toMatchObject({ path: "docs/guide.md", postimage_sha256: sha256(Buffer.from("# Current candidate guide\n")) });
-    expect(result.facts?.runtime?.kind).toBe("docs-drift-approved-runtime");
+    expect(result.facts?.runtime?.kind).toBe("docs-drift-production-runtime");
   } else expect(result.diagnostics.length).toBeGreaterThan(0);
   expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
 }), 60000);
-
-test.each(["matching", "partial-inventory"])("normal publication binding entry %s", preserveFailure(async (scenario: string) => {
-  const f = await fixture(scenario === "partial-inventory"), options = f.options;
-  const selection = canonicalJSON(f.selection); writeFileSync(join(f.artifacts, "selection.json"), selection, { mode: 0o600 });
-  const entry = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts");
-  const outcome = await captureBindingCommand([process.execPath, entry, "bind-publication", "--repo", f.repo, "--source", f.source,
-    "--candidate-repo", f.candidate, "--candidate", f.head, "--artifact-root", f.artifacts, "--selection", "selection.json", "--selection-sha256", sha256(selection),
-    "--cache-root", options.cache_directory, "--entry", options.entry, "--launcher", options.launcher_path, "--settings", options.settings_path,
-    "--source-verification", options.source_verification.path, "--source-verification-sha256", options.source_verification.sha256,
-    "--candidate-verification", options.candidate_verification.path, "--candidate-verification-sha256", options.candidate_verification.sha256,
-    "--decisions", options.decisions.path, "--decisions-sha256", options.decisions.sha256], f.native.environment, 60000);
-  const report = JSON.parse(outcome.stdout.toString());
-  expect(outcome.exitCode).toBe(scenario === "matching" ? 0 : 2);
-  if (scenario === "matching") expect(report.publication_bindings).toMatchObject({ complete: true, authority: "none", bindings: { source_commit: f.source, candidate_commit: f.head } });
-  else expect(report.diagnostics.map((item: { message: string }) => item.message).join("\n")).toContain("Complete current proposal inventory required");
-}), 125000);
 
 async function resolveFixture(scenario: string) {
   const f = await fixture(false), { captureSnapshot } = await import("../../../plugins/vh-adlc/scripts/docs-drift/snapshot");
@@ -286,35 +250,21 @@ test("normal binding collection accepts a complete source scan when only the rep
 }), 60000);
 
 
-// Allow the existing sixty-second fixture and sixty-second owned child, plus cleanup.
-for (const surface of ["api", "cli"]) test("normal worker-input collection precedes the candidate and matches its later review binding " + surface, preserveFailure(async () => {
+test("worker-input collection precedes the candidate and matches its later review binding", preserveFailure(async () => {
   let target = "";
   const f = await fixture(false, { beforeCandidate: async input => {
     expect(existsSync(join(input.repo, "../binding-candidate"))).toBe(false);
     const before = captureRepositoryState(input.repo);
-    if (surface === "api") {
-      const { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
-      const result = await collectWorkerInputs(input.worker_options);
-      expect(result.diagnostics).toEqual([]); expect(result.complete).toBe(true); expect(result.authority).toBe("none");
-      target = result.worker_input_sha256!;
-    } else {
-      const entry = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), options = input.worker_options;
-      const proof = options.source_verification as { path: string; sha256: string }, decisions = options.decisions as { path: string; sha256: string };
-      const outcome = await captureBindingCommand([process.execPath, entry, "collect-worker-inputs", "--repo", input.repo, "--source", input.source,
-        "--artifact-root", input.artifacts, "--source-verification", proof.path, "--source-verification-sha256", proof.sha256,
-        "--decisions", decisions.path, "--decisions-sha256", decisions.sha256, "--cache-root", options.cache_directory,
-        "--entry", options.entry, "--launcher", options.launcher_path, "--settings", options.settings_path], { ...process.env, PATH: options.path, GH_TOKEN: "synthetic-read-token" }, 60000);
-      const report = JSON.parse(outcome.stdout.toString());
-      expect(outcome.exitCode, JSON.stringify(report.diagnostics)).toBe(0);
-      expect(report.worker_inputs).toMatchObject({ complete: true, authority: "none" });
-      target = report.worker_inputs.worker_input_sha256;
-    }
+    const { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+    const result = await collectWorkerInputs(input.worker_options);
+    expect(result.diagnostics).toEqual([]); expect(result.complete).toBe(true); expect(result.authority).toBe("none");
+    target = result.worker_input_sha256!;
     expect(captureRepositoryState(input.repo)).toEqual(before);
   } });
   const { collectPublicationBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-bindings");
   const result = await collectPublicationBindings(f.options);
   expect(result.diagnostics).toEqual([]); expect(result.worker_input_sha256).toBe(target);
-}), surface === "cli" ? 125000 : 60000);
+}), 60000);
 
 test.each(["source-only", "resolve", "partial-inventory", "changed-proof"])("normal worker inputs retain source/original bindings and refuse incomplete inputs %s", preserveFailure(async (scenario: string) => {
   const f = scenario === "resolve" ? await resolveFixture("matching") : await fixture(scenario === "partial-inventory", { sourceCheckNeedsRepair: scenario === "source-only" });
@@ -363,8 +313,7 @@ test("worker input snapshot retention failure preserves caller state and owned r
 }), 60000);
 
 
-// Allow the existing sixty-second fixture and sixty-second owned child, plus cleanup.
-for (const scenario of ["matching", "coordinated", "changed-coordination", "cli", "alias", "alias-only-observed", "successor-model", "missing-edits", "wrong-returned-input", "changed-target", "outside-edit", "unknown-capability", "malformed-publication"]) test("normal preparation reads only the original worker handoff " + scenario, preserveFailure(async () => {
+for (const scenario of ["matching", "coordinated", "changed-coordination", "alias", "alias-only-observed", "successor-model", "missing-edits", "wrong-returned-input", "changed-target", "outside-edit", "unknown-capability", "malformed-publication"]) test("normal preparation reads only the original worker handoff " + scenario, preserveFailure(async () => {
   const { collectWorkerPreparation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/worker-preparation");
   const { roleRuntimeDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-capture");
   const { evidence, role } = await import("./manifest-fixture");
@@ -407,27 +356,16 @@ for (const scenario of ["matching", "coordinated", "changed-coordination", "cli"
   } });
   if (scenario === "changed-coordination") writeFileSync(join(f.artifacts, "coordination-owner.txt"), "Changed owner request\n");
   const before = captureRepositoryState(f.repo);
-  let result: Awaited<ReturnType<typeof collectWorkerPreparation>>;
-  if (scenario === "cli") {
-    if (!captured) throw Error("missing original worker fixture capture");
-    const entry = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), options = f.options;
-    const capture = captured as { path: string; sha256: string };
-    const outcome = await captureBindingCommand([process.execPath, entry, "read-worker-preparation", "--repo", f.repo, "--source", f.source,
-      "--artifact-root", f.artifacts, "--source-verification", options.source_verification.path, "--source-verification-sha256", options.source_verification.sha256,
-      "--decisions", options.decisions.path, "--decisions-sha256", options.decisions.sha256, "--cache-root", options.cache_directory,
-      "--entry", options.entry, "--launcher", options.launcher_path, "--settings", options.settings_path,
-      "--worker-capture", capture.path, "--worker-capture-sha256", capture.sha256], f.native.environment, 60000);
-    const report = JSON.parse(outcome.stdout.toString()); expect(outcome.exitCode, JSON.stringify(report.diagnostics)).toBe(0); result = report.worker_preparation;
-  } else result = await collectWorkerPreparation({ ...f.options, worker_capture: captured });
-  if (["matching", "coordinated", "cli", "alias"].includes(scenario)) { expect(result.diagnostics).toEqual([]); expect(result.selection).toEqual(f.selection); expect(result.publication).toBe(null); }
+  const result = await collectWorkerPreparation({ ...f.options, worker_capture: captured });
+  if (["matching", "coordinated", "alias"].includes(scenario)) { expect(result.diagnostics).toEqual([]); expect(result.selection).toEqual(f.selection); expect(result.publication).toBe(null); }
   else {
     const reasons: Record<string, string> = { "changed-coordination": "artifact changed", "wrong-returned-input": "Original worker input target changed", "changed-target": "original launch target or context changed",
-      "outside-edit": "outside", "unknown-capability": "recorded native identity source", "alias-only-observed": "native model identity", "successor-model": "adopted native identity", "missing-edits": "Advisory decisions do not account for selected edits", "malformed-publication": "effect payload" };
+      "outside-edit": "outside", "unknown-capability": "native entry configuration or observed model changed", "alias-only-observed": "native model identity", "successor-model": "adopted native identity", "missing-edits": "Advisory decisions do not account for selected edits", "malformed-publication": "effect payload" };
     expect(result.diagnostics.join("\n")).toContain(reasons[scenario]);
   }
-  expect(result.complete).toBe(["matching", "coordinated", "cli", "alias"].includes(scenario)); expect(result.authority).toBe("none");
+  expect(result.complete).toBe(["matching", "coordinated", "alias"].includes(scenario)); expect(result.authority).toBe("none");
   expect(captureRepositoryState(f.repo)).toEqual(before);
-}), scenario === "cli" ? 125000 : 60000);
+}), 60000);
 
 
 test.each(["legacy", "scan-only"])("worker input rechecks reuse their original assessed store %s", preserveFailure(async (mode: string) => {
@@ -445,7 +383,6 @@ test.each(["legacy", "scan-only"])("worker input rechecks reuse their original a
 }), 60000);
 
 async function originalCandidateCase(scenario: string) {
-  const startedAt = performance.now();
   const { collectReviewTarget } = await import("../../../plugins/vh-adlc/scripts/docs-drift/review-target");
   const { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
   const { roleRuntimeDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-capture");
@@ -469,38 +406,8 @@ async function originalCandidateCase(scenario: string) {
         native: retain("review-author-native.jsonl", original.native), returned: retain("review-author-returned.txt", original.returned), process: retain("review-author-process.json", canonicalJSON(original.process)) } }));
   } });
   const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
-  const invokeReview = async (command: string, extra: string[] = []) => {
-    const preparationBudget = scenario === "cli" ? 60000 : 120000;
-    // Refuse before launch if setup consumed the child's separately reserved budget.
-    expect(performance.now() - startedAt, "Fixture and in-process target exceeded their preparation budget").toBeLessThan(preparationBudget);
-    if (!captured) throw Error("missing review-target author fixture");
-    const reference = captured as { path: string; sha256: string }, selection = canonicalJSON(f.selection), options = f.options;
-    writeFileSync(join(f.artifacts, "review-selection.json"), selection, { mode: 0o600 });
-    const entry = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts");
-    const argv = [process.execPath, entry, command, "--repo", f.repo, "--source", f.source,
-      "--candidate-repo", f.candidate, "--candidate", f.head, "--artifact-root", f.artifacts, "--selection", "review-selection.json", "--selection-sha256", sha256(selection),
-      "--cache-root", options.cache_directory, "--entry", options.entry, "--launcher", options.launcher_path, "--settings", options.settings_path,
-      "--source-verification", options.source_verification.path, "--source-verification-sha256", options.source_verification.sha256,
-      "--candidate-verification", options.candidate_verification.path, "--candidate-verification-sha256", options.candidate_verification.sha256,
-      "--decisions", options.decisions.path, "--decisions-sha256", options.decisions.sha256,
-      "--worker-capture", reference.path, "--worker-capture-sha256", reference.sha256, ...extra];
-    const environment = Object.fromEntries(Object.entries(f.native.environment).filter((pair): pair is [string, string] => typeof pair[1] === "string"));
-    const completion = await executeOwnedProcess({ argv, cwd: f.repo, env: environment, watched_outputs: [], capture: "memory",
-      stdout: join(f.artifacts, command + "-stdout.txt"), stderr: join(f.artifacts, command + "-stderr.txt"), timeout_ms: 120000,
-      started: pid => { writeFileSync(join(f.artifacts, command + "-launch.json"), canonicalJSON({ pid, argv }), { mode: 0o600 }); } });
-    const { captured: output, ...metadata } = completion;
-    writeFileSync(join(f.artifacts, command + "-stdout.txt"), Buffer.from(output?.stdout ?? []), { mode: 0o600 });
-    writeFileSync(join(f.artifacts, command + "-stderr.txt"), Buffer.from(output?.stderr ?? []), { mode: 0o600 });
-    writeFileSync(join(f.artifacts, command + "-process.json"), canonicalJSON(metadata), { mode: 0o600 });
-    expect(metadata.reaped).toBe(true); expect(metadata.timed_out, JSON.stringify(metadata)).toBe(false);
-    expect(metadata.exit_code, Buffer.from(output?.stderr ?? []).toString() + JSON.stringify(metadata)).toBe(0);
-    const report = JSON.parse(Buffer.from(output?.stdout ?? []).toString());
-    return report;
-  };
-  let result: Awaited<ReturnType<typeof collectReviewTarget>>;
-  if (scenario === "cli") result = (await invokeReview("collect-review-target")).review_target;
-  else result = await collectReviewTarget({ ...f.options, worker_capture: captured });
-  if (["reviewer", "coordinated-reviewer", "reviewer-cli", "stale-reviewer", "same-reviewer-context", "findings-reviewer", "publication-check", "publication-check-cli", "missing-publication-authority", "retained-execution"].includes(scenario)) {
+  const result = await collectReviewTarget({ ...f.options, worker_capture: captured });
+  if (["reviewer", "coordinated-reviewer", "stale-reviewer", "same-reviewer-context", "findings-reviewer", "publication-check", "missing-publication-authority"].includes(scenario)) {
     expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
     const { collectCandidateReview } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-review");
     const reviewer = evidence("candidate-reviewer", scenario === "stale-reviewer" ? sha256(Buffer.from("old candidate")) : result.manifest_sha256!,
@@ -513,8 +420,8 @@ async function originalCandidateCase(scenario: string) {
     const reviewerCapture = retain("candidate-reviewer-capture.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-role-capture", role: "reviewer", source_commit: f.source,
       runtime_sha256: launch.runtime_sha256, launch: retain("candidate-reviewer-launch.json", canonicalJSON(launch)), binding, artifacts: {
         native: retain("candidate-reviewer-native.jsonl", reviewer.native), returned: retain("candidate-reviewer-returned.txt", reviewer.returned), process: retain("candidate-reviewer-process.json", canonicalJSON(reviewer.process)) } }));
-    if (["publication-check", "publication-check-cli", "missing-publication-authority", "retained-execution"].includes(scenario)) {
-      const { checkPublication, publishPublication } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller");
+    if (["publication-check", "missing-publication-authority"].includes(scenario)) {
+      const { checkPublication } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller");
       const { effectDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/manifests");
       const { readGit } = await import("../../../plugins/vh-adlc/scripts/docs-drift/git");
       const instruction = retain("publication-owner-request.txt", Buffer.from("Synthetic owner request approves this exact publication batch, including its lease, retained receipt, candidate push, PR and lease release.\n"));
@@ -523,37 +430,30 @@ async function originalCandidateCase(scenario: string) {
         effects: result.manifest!.effects.map(effect => ({ id: effect.id, sha256: effectDigest([effect]) })) }));
       const options = { ...f.options, worker_capture: captured, reviewer_capture: reviewerCapture,
         authority: scenario === "missing-publication-authority" ? { ...approval, sha256: "0".repeat(64) } : approval };
-      if (scenario === "retained-execution") await expect(publishPublication(options)).rejects.toThrow("Retained executing publication controller required");
-      else {
-        const checked: Awaited<ReturnType<typeof checkPublication>> = scenario === "publication-check-cli"
-          ? (await invokeReview("check-publication", ["--reviewer-capture", reviewerCapture.path, "--reviewer-capture-sha256", reviewerCapture.sha256,
-            "--authority", approval.path, "--authority-sha256", approval.sha256])).publication_check
-          : await checkPublication(options);
-        if (["publication-check", "publication-check-cli"].includes(scenario)) {
-          expect(checked.diagnostics).toEqual([]); expect(checked.plan?.manifest_sha256).toBe(result.manifest_sha256!);
-          expect(checked.resources?.object_store?.source_commit).toBe(f.source);
-          expect(readGit(checked.resources!.object_store!.root, "rev-parse", f.head + "^{tree}").toString().trim()).toBe(result.manifest!.bindings.candidate_tree);
-        } else expect(checked.diagnostics.join("\n")).toContain("artifact changed");
-        expect(checked.complete).toBe(["publication-check", "publication-check-cli"].includes(scenario)); expect(checked.authority).toBe("none");
-      }
+      const checked = await checkPublication(options);
+      if (scenario === "publication-check") {
+        expect(checked.diagnostics).toEqual([]); expect(checked.plan?.manifest_sha256).toBe(result.manifest_sha256!);
+        expect(checked.resources?.object_store?.source_commit).toBe(f.source);
+        expect(checked.resources?.object_store).toEqual(f.baseline.inspection?.object_store ?? undefined);
+        expect(readGit(checked.resources!.object_store!.root, "rev-parse", f.head + "^{tree}").toString().trim()).toBe(result.manifest!.bindings.candidate_tree);
+      } else expect(checked.diagnostics.join("\n")).toContain("artifact changed");
+      expect(checked.complete).toBe(scenario === "publication-check"); expect(checked.authority).toBe("none");
       expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
       return;
     }
-    const reviewed: Awaited<ReturnType<typeof collectCandidateReview>> = scenario === "reviewer-cli"
-      ? (await invokeReview("read-candidate-review", ["--reviewer-capture", reviewerCapture.path, "--reviewer-capture-sha256", reviewerCapture.sha256])).candidate_review
-      : await collectCandidateReview({ ...f.options, worker_capture: captured, reviewer_capture: reviewerCapture });
-    if (["reviewer", "coordinated-reviewer", "reviewer-cli"].includes(scenario)) {
+    const reviewed = await collectCandidateReview({ ...f.options, worker_capture: captured, reviewer_capture: reviewerCapture });
+    if (["reviewer", "coordinated-reviewer"].includes(scenario)) {
       expect(reviewed.diagnostics).toEqual([]); expect(reviewed.review?.manifest_sha256).toBe(result.manifest_sha256!);
       expect(reviewed.review?.reviewer.invocation_id).toBe("candidate-reviewer"); expect(Object.hasOwn(reviewed, "grants")).toBe(false);
     } else {
       const reasons = { "stale-reviewer": "original launch target or context changed", "same-reviewer-context": "independent review context", "findings-reviewer": "blocking review findings" };
       expect(reviewed.diagnostics.join("\n")).toContain(reasons[scenario as keyof typeof reasons]);
     }
-    expect(reviewed.complete).toBe(["reviewer", "coordinated-reviewer", "reviewer-cli"].includes(scenario)); expect(reviewed.authority).toBe("none");
+    expect(reviewed.complete).toBe(["reviewer", "coordinated-reviewer"].includes(scenario)); expect(reviewed.authority).toBe("none");
     expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
     return;
   }
-  if (["matching", "cli"].includes(scenario)) {
+  if (scenario === "matching") {
     expect(result.diagnostics).toEqual([]); expect(result.manifest_sha256).toBe(manifestDigest(result.manifest!));
     expect(result.manifest?.bindings.candidate_commit).toBe(f.head);
     expect(result.manifest?.worker.invocation_id).toBe("pre-candidate-author");
@@ -567,15 +467,11 @@ async function originalCandidateCase(scenario: string) {
     const reasons = { "changed-selection": "Advisory decisions do not account for selected edits", "missing-proposal": "Original worker publication proposal required", "foreign-branch": "candidate branch scope" };
     expect(result.diagnostics.join("\n")).toContain(reasons[scenario as keyof typeof reasons]);
   }
-  expect(result.complete).toBe(["matching", "cli"].includes(scenario)); expect(result.authority).toBe("none");
+  expect(result.complete).toBe(scenario === "matching"); expect(result.authority).toBe("none");
   expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
 }
 
-test.each(["matching", "changed-selection", "missing-proposal", "foreign-branch", "reviewer", "coordinated-reviewer", "stale-reviewer", "same-reviewer-context", "findings-reviewer", "publication-check", "missing-publication-authority", "retained-execution"])("candidate review target retains the original author %s", preserveFailure(originalCandidateCase), 125000);
-// Reserve fixture60 + child120 + cleanup5; the other entries also need an in-process target60.
-test("candidate review target retains the original author cli", preserveFailure(() => originalCandidateCase("cli")), 185000);
-test.each(["reviewer-cli", "publication-check-cli"])("candidate review target retains the original author %s", preserveFailure(originalCandidateCase), 245000);
-
+test.each(["matching", "changed-selection", "missing-proposal", "foreign-branch", "reviewer", "coordinated-reviewer", "stale-reviewer", "same-reviewer-context", "findings-reviewer", "publication-check", "missing-publication-authority"])("candidate review target retains the original author %s", preserveFailure(originalCandidateCase), 125000);
 test("normal binding rechecks preserve the reviewed input after its exact own PR creation", preserveFailure(async () => {
   const f = await fixture(false, { mutableInventory: true });
   const { collectPublicationBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-bindings");
@@ -636,7 +532,7 @@ test.each(["changed-source", "unknown-comparison", "unavailable-runtime"])("publ
     history_changed: false, required_inputs_changed: false,
     diagnostic: scenario === "unknown-comparison" ? "unavailable-history-or-comparison" : null,
   });
-  const runtime = spyOn(bootstrap, "selectApprovedRuntime").mockImplementation(async () => { throw Error("Synthetic unavailable retained runtime"); });
+  const runtime = spyOn(bootstrap, "selectProductionRuntime").mockImplementation(async () => { throw Error("Synthetic unavailable retained runtime"); });
   try {
     const result = await collectPublicationInputs(f.options);
     expect(result.complete).toBe(false);

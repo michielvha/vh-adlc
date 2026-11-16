@@ -4,12 +4,10 @@ import { join } from "node:path";
 import { originalPublicationFixture, installOwnedNativeService } from "./original-publication-fixture";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
-import { executeOwnedProcess } from "../../../plugins/vh-adlc/scripts/docs-drift/owned-process";
-import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { git } from "./repository-fixture";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 
-test.each(["published", "never-dispatched"])("normal CLI restores only retained native observations without original local proof: %s", async scenario => {
+test.each(["published", "never-dispatched"])("native recovery restores only retained native observations without original local proof: %s", async scenario => {
   // Fail at the missing controller before constructing the expensive native-service fixture.
   const controller = await import("../../../plugins/vh-adlc/scripts/docs-drift/retained-controller");
   const roots: string[] = [];
@@ -24,7 +22,7 @@ test.each(["published", "never-dispatched"])("normal CLI restores only retained 
       return append(journal, id, outcome);
     });
     const original = await (async () => {
-      try { return await publisher.publishPublication(f.publication); } finally { fault.mockRestore(); }
+      try { return await f.invoke(run => publisher.publishPublication(f.publication, run)); } finally { fault.mockRestore(); }
     })();
     expect(original.state, original.reason ?? undefined).toBe(scenario === "published" ? "complete" : "pending");
     if (scenario === "published") {
@@ -43,30 +41,20 @@ test.each(["published", "never-dispatched"])("normal CLI restores only retained 
     const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
     const refs = readGit(f.origin, "for-each-ref", "--format=%(refname) %(objectname)");
     const serviceBefore = readFileSync(service.statePath), callsBefore = readFileSync(service.calls).length;
-    const environment = Object.fromEntries(Object.entries(f.native.environment).filter((pair): pair is [string, string] => typeof pair[1] === "string"));
-    async function invoke(command: "inspect-retained" | "restore-retained") {
-      const argv = [process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), command,
-        "--repo", f.repo, "--source", f.source, "--artifact-root", root, "--operation-id", original.journal.plan.manifest.operation_id];
-      const prefix = join(root, command);
-      const result = await executeOwnedProcess({ argv, cwd: f.repo, env: environment, watched_outputs: [], capture: "memory", timeout_ms: 120000,
-        stdout: prefix + ".stdout", stderr: prefix + ".stderr", started: pid => writeFileSync(prefix + "-started.json", canonicalJSON({ pid, argv }), { mode: 0o600, flag: "wx" }) });
-      const { captured, ...metadata } = result;
-      writeFileSync(prefix + ".stdout", captured?.stdout ?? new Uint8Array(), { mode: 0o600, flag: "wx" });
-      writeFileSync(prefix + ".stderr", captured?.stderr ?? new Uint8Array(), { mode: 0o600, flag: "wx" });
-      writeFileSync(prefix + "-process.json", canonicalJSON(metadata), { mode: 0o600, flag: "wx" });
-      const diagnostic = JSON.stringify({ ...metadata, stderr: Buffer.from(captured?.stderr ?? []).toString().slice(0, 512) });
-      expect(result.reaped, diagnostic).toBe(true); expect(result.timed_out, diagnostic).toBe(false);
-      expect(result.exit_code, diagnostic).toBe(command === "inspect-retained" || scenario === "published" ? 0 : 2);
-      return JSON.parse(Buffer.from(captured?.stdout ?? []).toString());
+    async function inspect(restore = false) {
+      return controller.collectNativeRetained({ repo: f.repo, source: f.source, artifact_root: root,
+        operation_id: original.journal.plan.manifest.operation_id, owner: "fixture-owner", run: "retained-observation",
+        credential: f.options.credential, path: f.options.path, ...(restore ? { restore: true as const } : {}) });
     }
-    const inspection = await invoke("inspect-retained");
+    const inspection = await inspect();
     expect(inspection.retained_operation.authority).toBe("none"); expect(inspection.retained_operation.replay_authority).toBe(false);
     expect(inspection.retained_operation.historical_review_verified).toBe(false);
     expect(inspection.retained_operation.policy_state).toBe("unavailable-or-changed");
-    const restored = await invoke("restore-retained"), summary = restored.retained_operation;
+    const restored = await inspect(true), summary = restored.retained_operation;
     expect(summary.state).toBe(scenario === "published" ? "complete" : "pending");
     if (scenario === "never-dispatched") expect(summary.reason).toBe("retained-restore-no-replay");
     expect(summary.authority).toBe("none"); expect(summary.replay_authority).toBe(false);
+    if (!summary.journal_directory) throw Error("Restored original journal required");
     const journal = readJournal(summary.journal_directory, f.repo);
     expect(journal.header.recovery_mode).toBe("observation-only"); expect(journal.events.some(event => event.kind === "attempt")).toBe(false);
     expect(readGit(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toEqual(refs);
@@ -81,15 +69,3 @@ test.each(["published", "never-dispatched"])("normal CLI restores only retained 
     for (const path of roots) rmSync(path, { recursive: true, force: true });
   } catch (error) { console.error("Preserved owned native retained-entry roots", JSON.stringify(roots)); throw error; }
 }, 360000);
-
-
-test.each(["inspect-retained", "restore-retained"])("normal retained commands reject collector and write-authority flags: %s", command => {
-  for (const flag of ["--transport", "--selection", "--authority"]) {
-    const result = Bun.spawnSync([process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), command,
-      "--repo", "/nonexistent-consumer", "--source", "a".repeat(40), "--artifact-root", "/nonexistent-artifacts", "--operation-id", "operation", flag, "collector"],
-      { stdout: "pipe", stderr: "pipe", timeout: 10000 });
-    expect(result.exitCode, result.stderr.toString()).toBe(2);
-    const report = JSON.parse(result.stdout.toString());
-    expect(report.diagnostics).toEqual([{ code: "command-setup-or-input", message: "unknown " + command + " option" }]);
-  }
-});

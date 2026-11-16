@@ -99,7 +99,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
       const collected = await collectActionsHistory({ repo, artifact_root: options.artifact_root, settings, context, reader: initial.repository,
         environment: { PATH: options.path, ...(settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com")
           ? { GH_TOKEN: options.credential } : { GH_ENTERPRISE_TOKEN: options.credential }) },
-        verifyProducer: createAdoptedProducerVerifier({ store, current_default: currentDefault, identity, entry: options.entry }) });
+        verifyProducer: createAdoptedProducerVerifier({ store, current_default: currentDefault, identity }) });
       snapshot = collected; result.receipts = collected.receipts;
       if (!collected.complete) { result.diagnostics.push(...collected.diagnostics); throw Error("Required native report history collection incomplete"); }
     } else if (result.mode === "local-attestation") {
@@ -126,7 +126,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
         throw new PublicationScopeChanged("Native history source or actor changed before output");
       const currentRun = readNativeRun(observed.repository, run.id, run.run_attempt);
       if (runBinding(currentRun) !== runBinding(run)) throw new PublicationScopeChanged("Current native scheduled run changed before output");
-      const producer = createAdoptedProducerVerifier({ store, current_default: currentDefault, identity, entry: options.entry })(
+      const producer = createAdoptedProducerVerifier({ store, current_default: currentDefault, identity })(
         createProducerSource(observed.repository, run.head_sha), currentRun);
       if (!producer) throw Error("Adopted native history producer required for hosted output");
       const report = JSON.parse(Buffer.from(bytes).toString("utf8"));

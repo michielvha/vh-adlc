@@ -2,14 +2,14 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
 import { settingsFixture } from "./settings-fixture";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-const entry = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts");
+import { collectNativeResolution } from "../../../plugins/vh-adlc/scripts/docs-drift/resolution-entry";
 
 function fixture(hostname = "github.com", fault = "none") {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-drift-entry-collection-"))); roots.push(root);
@@ -37,7 +37,7 @@ if (selected >= 0) {
   if (${JSON.stringify(fault)} === "fetch-failed") process.exit(89);
   args[selected] = ${JSON.stringify(repo)}; args.splice(args.indexOf("fetch"), 0, "-c", "protocol.file.allow=always");
 }
-const child = Bun.spawnSync([${JSON.stringify(realGit)}, ...args], { stdout: "inherit", stderr: "inherit" }); process.exit(child.exitCode);
+const child = Bun.spawnSync([${JSON.stringify(realGit)}, ...args], { stdin: "inherit", stdout: "inherit", stderr: "inherit" }); process.exit(child.exitCode);
 `, { mode: 0o700 });
   writeFileSync(join(bin, "gh"), `#!${process.execPath}
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
@@ -64,20 +64,18 @@ console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
       GH_ENTERPRISE_TOKEN: hostname === "github.com" ? "" : "synthetic-read-token", COPILOT_GITHUB_TOKEN: "synthetic-provider-canary" } };
 }
 
-function invoke(f: ReturnType<typeof fixture>) {
-  const run = Bun.spawnSync([process.execPath, entry, "collect-resolution", "--repo", f.repo, "--source", f.source,
-    "--artifact-root", f.artifacts, "--selection", "selection.json", "--selection-sha256", sha256(f.selection)],
-  { env: f.environment, stdout: "pipe", stderr: "pipe", timeout: 30000 });
-  const report = JSON.parse(run.stdout.toString());
-  return { run, report };
+async function collect(f: ReturnType<typeof fixture>) {
+  return collectNativeResolution({ repo: f.repo, source: f.source, selection: JSON.parse(f.selection.toString()), artifact_root: f.artifacts,
+    owner: "fixture-owner", run: "native-resolution", path: f.environment.PATH,
+    credential: f.environment.GH_TOKEN || f.environment.GH_ENTERPRISE_TOKEN });
 }
 
-test.each(["github.com", "git.fixture.invalid"])("normal full-diff collection uses owned stores on %s", hostname => {
+test.each(["github.com", "git.fixture.invalid"])("native full-diff collection uses owned stores on %s", async hostname => {
   const f = fixture(hostname); put(f.repo, "unrelated-dirty.txt", "Preserve caller\n");
-  const before = captureRepositoryState(f.repo), { run, report } = invoke(f);
-  expect(run.exitCode).toBe(0);
-  expect(report.resolution).toMatchObject({ complete: true, inputs: { complete: true, selected: [1], proposals: [{ head_sha: f.head }] } });
-  expect(report.resolution.inputs.proposals[0].hunks).toHaveLength(1);
+  const before = captureRepositoryState(f.repo), resolution = await collect(f);
+  expect(resolution.complete, resolution.diagnostics.join("\n")).toBe(true);
+  expect(resolution).toMatchObject({ complete: true, inputs: { complete: true, selected: [1], proposals: [{ head_sha: f.head }] } });
+  expect(resolution.inputs!.proposals[0].hunks).toHaveLength(1);
   expect(captureRepositoryState(f.repo)).toEqual(before);
   const events = readFileSync(f.trace, "utf8").trim().split("\n").map(line => JSON.parse(line));
   const fetched = events.filter(event => event.kind === "git-fetch" && event.args.some((value: string) => value.startsWith("https://")));
@@ -87,45 +85,41 @@ test.each(["github.com", "git.fixture.invalid"])("normal full-diff collection us
   expect(events.every(event => event.provider === null)).toBe(true);
 }, 30000);
 
-test.each(["fetch-failed", "missing-pr", "changed-body", "nonancestor-base"])("normal full-diff collection retains incomplete %s", fault => {
-  const f = fixture("github.com", fault), before = captureRepositoryState(f.repo), { run, report } = invoke(f);
-  expect(run.exitCode).toBe(2);
-  expect(report.resolution.complete).toBe(false);
-  expect(report.resolution.diagnostics.length).toBeGreaterThan(0);
-  expect(new Set(report.resolution.diagnostics).size).toBe(report.resolution.diagnostics.length);
-  expect(report.diagnostics.map((item: { message: string }) => item.message)).toEqual(report.resolution.diagnostics);
-  expect(report.diagnostics.every((item: { code: string }) => item.code === "resolution-collection")).toBe(true);
+test.each(["fetch-failed", "missing-pr", "changed-body", "nonancestor-base"])("native full-diff collection retains incomplete %s", async fault => {
+  const f = fixture("github.com", fault), before = captureRepositoryState(f.repo), resolution = await collect(f);
+  expect(resolution.complete).toBe(false);
+  expect(resolution.complete).toBe(false);
+  expect(resolution.diagnostics.length).toBeGreaterThan(0);
+  expect(new Set(resolution.diagnostics).size).toBe(resolution.diagnostics.length);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 30000);
 
-test.each(["empty", "duplicate", "extra-field", "different-source"])("normal resolution refuses invalid selection before native reads %s", fault => {
+test.each(["empty", "duplicate", "extra-field", "different-source"])("native resolution refuses invalid selection before native reads %s", async fault => {
   const f = fixture(), packet = { schema_version: 1, source_commit: fault === "different-source" ? f.head : f.source,
     proposals: fault === "empty" ? [] : fault === "duplicate" ? [1, 1] : [1], ...(fault === "extra-field" ? { approved: true } : {}) };
   f.selection = canonicalJSON(packet); writeFileSync(join(f.artifacts, "selection.json"), f.selection);
-  const before = captureRepositoryState(f.repo), { run, report } = invoke(f);
-  expect(run.exitCode).toBe(2);
-  expect(report.resolution).toBeUndefined();
-  expect(report.diagnostics[0].message).toContain("resolution selection");
+  const before = captureRepositoryState(f.repo);
+  await expect(collect(f)).rejects.toThrow("resolution selection");
   expect(captureRepositoryState(f.repo)).toEqual(before);
   expect(() => readFileSync(f.trace)).toThrow();
 });
 
-test("normal resolution refuses a nondefault source without creating a store", () => {
+test("native resolution refuses a nondefault source without creating a store", async () => {
   const f = fixture(); f.source = f.head;
   f.selection = canonicalJSON({ schema_version: 1, source_commit: f.source, proposals: [1] });
   writeFileSync(join(f.artifacts, "selection.json"), f.selection);
-  const before = captureRepositoryState(f.repo), { run, report } = invoke(f);
-  expect(run.exitCode).toBe(2);
-  expect(report.resolution).toMatchObject({ complete: false, store: null, inputs: null });
-  expect(report.resolution.diagnostics).toContain("resolution collection requires the observed current default source");
+  const before = captureRepositoryState(f.repo), resolution = await collect(f);
+  expect(resolution.complete).toBe(false);
+  expect(resolution).toMatchObject({ complete: false, store: null, inputs: null });
+  expect(resolution.diagnostics).toContain("resolution collection requires the observed current default source");
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
 
-test("normal resolution retains a historical PR base after the default advances", () => {
-  const f = fixture("github.com", "later-default"), before = captureRepositoryState(f.repo), { run, report } = invoke(f);
-  expect(run.exitCode).toBe(0);
-  expect(report.resolution.inputs.proposals[0]).toMatchObject({ base_sha: f.base, head_sha: f.head, merge_base: f.base });
-  expect(report.resolution.inputs.source_commit).toBe(f.source);
+test("native resolution retains a historical PR base after the default advances", async () => {
+  const f = fixture("github.com", "later-default"), before = captureRepositoryState(f.repo), resolution = await collect(f);
+  expect(resolution.complete, resolution.diagnostics.join("\n")).toBe(true);
+  expect(resolution.inputs!.proposals[0]).toMatchObject({ base_sha: f.base, head_sha: f.head, merge_base: f.base });
+  expect(resolution.inputs!.source_commit).toBe(f.source);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });

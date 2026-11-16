@@ -47,7 +47,7 @@ export async function nativeClosureFixture(roots: string[], method: "merge" | "s
 const args = process.argv.slice(2), target = args.indexOf("https://github.com/fixture/docs.git");
 require("node:fs").appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ program: "git", args }) + "\\n", { mode: 0o600 });
 if (target >= 0) { args[target] = ${JSON.stringify(f.repo)}; args.splice(args.indexOf("fetch"), 0, "-c", "protocol.file.allow=always"); }
-const child = Bun.spawnSync([${JSON.stringify(realGit)}, ...args], { stdout: "inherit", stderr: "inherit" }); process.exit(child.exitCode);
+const child = Bun.spawnSync([${JSON.stringify(realGit)}, ...args], { stdin: "inherit", stdout: "inherit", stderr: "inherit" }); process.exit(child.exitCode);
 `, { mode: 0o700 });
   writeFileSync(join(bin, "gh"), `#!${process.execPath}
 const args = process.argv.slice(2);

@@ -66,33 +66,46 @@ export function validatePublicationShape(plan: Pick<SealedPlan, "manifest" | "co
 }
 
 /** Actual source/authority/native artifacts come from the entry's controller, never from report flags. */
+export function createPublicationVerifier(options: PublishOptions): (journal: Journal | null) => Promise<void> {
+  let sourceBinding: Buffer | null = null;
+  return async journal => {
+    if (externalArtifactDirectory(options.artifact_root, options.source_repo)
+      !== externalArtifactDirectory(options.transport.artifact_root, options.source_repo)) fail("artifact root binding");
+    if (options.transport.kind !== options.plan.transport || options.transport.object_store !== options.object_store.root) fail("transport or object store binding");
+    const gate = await options.gate(journal === null ? null : structuredClone(journal));
+    const plan = readVerifiedPlan(canonicalJSON(options.plan), () => gate.policy);
+    if (manifestDigest(parseActionManifest(gate.review.current)) !== plan.manifest_sha256) throw new PublicationScopeChanged("current-manifest-changed");
+    const checked = validateReviewedManifest(gate.review);
+    const current = sealPlan({ reviewed: checked, grants: gate.review.grants, ...policyBinding(gate.policy),
+      context: gate.policy.context, transport: gate.policy.transport, publication_kind: gate.policy.publication_kind, corrections: plan.corrections, attention: plan.attention, candidate_verification_sha256: plan.candidate_verification_sha256 });
+    if (!canonicalJSON(current).equals(canonicalJSON(plan))) fail("changed current review or authority");
+    const binding = canonicalJSON({ source_repo: options.source_repo, object_store: options.object_store,
+      settings: options.settings, plan });
+    if (sourceBinding !== null && !sourceBinding.equals(binding)) fail("source settings binding changed");
+    if (sourceBinding === null) {
+      const committed = loadCommittedSettings(options.source_repo, plan.manifest.bindings.source_commit);
+      let settings = committed.settings;
+      if (plan.schema_version === 2 && plan.context === "trial" && plan.transport === "native") {
+        const original = readOriginalNativeTrialPolicy({ repo: options.source_repo, plan });
+        const paths = readGit(options.object_store.root, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z",
+          plan.manifest.bindings.source_commit, plan.manifest.bindings.candidate_commit).toString().split("\0").filter(Boolean);
+        if (paths.some(path => !original.namespace.paths.some(root => withinPrefix(path, root)))) fail("native trial candidate outside declared paths");
+        settings = original.settings;
+      }
+      if (committed.settings_sha256 !== plan.manifest.bindings.settings_sha256 || !canonicalJSON(settings).equals(canonicalJSON(options.settings))) fail("source settings binding");
+      sourceBinding = binding;
+    }
+    validatePublicationShape(plan, options.settings, gate.policy.pr_draft);
+    const identity = await options.transport.identity();
+    if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
+      || !sameAccount(identity, plan.manifest)
+      || identity.default_branch !== options.settings.default_branch) throw new PublicationScopeChanged("current-native-repository-or-actor-changed");
+  };
+}
+
+/** A direct check always opens a fresh source-validation scope. */
 export async function verifyPublicationGate(options: PublishOptions, journal: Journal | null): Promise<void> {
-  if (externalArtifactDirectory(options.artifact_root, options.source_repo)
-    !== externalArtifactDirectory(options.transport.artifact_root, options.source_repo)) fail("artifact root binding");
-  if (options.transport.kind !== options.plan.transport || options.transport.object_store !== options.object_store.root) fail("transport or object store binding");
-  const gate = await options.gate(journal === null ? null : structuredClone(journal));
-  const plan = readVerifiedPlan(canonicalJSON(options.plan), () => gate.policy);
-  if (manifestDigest(parseActionManifest(gate.review.current)) !== plan.manifest_sha256) throw new PublicationScopeChanged("current-manifest-changed");
-  const checked = validateReviewedManifest(gate.review);
-  const current = sealPlan({ reviewed: checked, grants: gate.review.grants, ...policyBinding(gate.policy),
-    context: gate.policy.context, transport: gate.policy.transport, publication_kind: gate.policy.publication_kind, corrections: plan.corrections, attention: plan.attention, candidate_verification_sha256: plan.candidate_verification_sha256 });
-  if (!canonicalJSON(current).equals(canonicalJSON(plan))) fail("changed current review or authority");
-  const committed = loadCommittedSettings(options.source_repo, plan.manifest.bindings.source_commit);
-  let settings = committed.settings;
-  if (plan.schema_version === 2 && plan.context === "trial" && plan.transport === "native") {
-    const original = readOriginalNativeTrialPolicy({ repo: options.source_repo, plan, identity: { repository: plan.manifest.repository,
-      repository_id: plan.manifest.repository_id, actor: plan.manifest.actor, actor_id: plan.manifest.actor_id, default_branch: committed.settings.default_branch } });
-    const paths = readGit(options.object_store.root, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z",
-      plan.manifest.bindings.source_commit, plan.manifest.bindings.candidate_commit).toString().split("\0").filter(Boolean);
-    if (paths.some(path => !original.namespace.paths.some(root => withinPrefix(path, root)))) fail("native trial candidate outside declared paths");
-    settings = original.settings;
-  }
-  if (committed.settings_sha256 !== plan.manifest.bindings.settings_sha256 || !canonicalJSON(settings).equals(canonicalJSON(options.settings))) fail("source settings binding");
-  validatePublicationShape(plan, settings, gate.policy.pr_draft);
-  const identity = await options.transport.identity();
-  if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
-    || !sameAccount(identity, plan.manifest)
-    || identity.default_branch !== options.settings.default_branch) throw new PublicationScopeChanged("current-native-repository-or-actor-changed");
+  await createPublicationVerifier(options)(journal);
 }
 
 function pending(journal: Journal, effect: Effect, reason: string, objects: PlanObjects, invalidate = false, recoveryOnly = false): PublishResult {
@@ -104,12 +117,13 @@ function pending(journal: Journal, effect: Effect, reason: string, objects: Plan
 }
 
 export async function publish(options: PublishOptions): Promise<PublishResult> {
-  await verifyPublicationGate(options, null);
+  const verify = createPublicationVerifier(options);
+  await verify(null);
   let journal = createJournal({ source_repo: options.source_repo, artifact_root: options.artifact_root, plan: options.plan });
   const objects = writePublicationObjects(options.object_store, options.plan, journal.header);
   for (const [index, effect] of journal.plan.manifest.effects.entries()) {
     try {
-      await verifyPublicationGate(options, journal);
+      await verify(journal);
       if (index <= 1) {
         const receipt = await options.transport.ref(options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id);
         journal = readJournal(journal.directory, options.source_repo);

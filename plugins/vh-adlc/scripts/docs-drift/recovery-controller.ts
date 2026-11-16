@@ -1,7 +1,7 @@
 import { bindRunJournal, type RunDirectory } from "./run-directory";
 import { realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { requireExecutionBun, selectOriginalOperationRuntime } from "./bootstrap";
+import { selectOriginalOperationRuntime } from "./bootstrap";
 import { readNativeTrialSettings } from "./trial-definition";
 import { fetchCurrentDefault } from "./proposals";
 import { readJournal } from "./journal";
@@ -11,7 +11,7 @@ import { readRecoveryAuthority } from "./recovery-authority";
 import { exactRecord } from "./publication-decisions";
 import { canonicalDigest, freezeJSON } from "./protocol";
 import { artifactDirectoryScope, captureRepositoryState, createOwnedObjectStore, matchesRepositoryState, type OwnedObjectStore } from "./snapshot";
-import { loadCommittedSettings } from "./settings";
+import { loadCommittedSettings, SetupRequired } from "./settings";
 import { createNativeTransport, readNativeContext } from "./transport";
 import { OUTPUT_LIMIT } from "./owned-process";
 import type { AbsenceEvidence } from "./observations";
@@ -61,12 +61,12 @@ async function collectContext(input: RecoveryOptions, execution?: Purpose, run?:
   if (observed.identity.repository_id !== plan.manifest.repository_id || observed.identity.repository !== plan.manifest.repository
     || observed.identity.actor_id !== plan.manifest.actor_id || observed.identity.actor !== plan.manifest.actor) throw Error("Recovery original repository and actor required");
   const runtime = await selectOriginalOperationRuntime({ repo, directory: resolve(import.meta.dir, "../.."), plan,
-    identity: observed.identity, cache_directory: options.cache_directory, entry: options.entry });
-  if (runtime.kind === "docs-drift-original-runtime") settings = runtime.settings;
+    identity: observed.identity, entry: options.entry });
+  settings = runtime.settings;
   if (execution && realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/recovery-controller.ts"))
     throw Error("Original retained recovery controller required");
   let originalRun: RunDirectory | undefined;
-  if (execution && plan.schema_version === 2) {
+  if (execution) {
     if (!run) throw Error("Original run required for version-two recovery");
     originalRun = bindRunJournal(run, journal);
   }
@@ -127,7 +127,8 @@ export async function inspectRecovery(input: RecoveryOptions): Promise<RecoveryI
 
 /** Execute only metadata recovery under fresh exact authority using the original retained code. */
 export async function applyRecovery(input: RecoveryOptions & { authority: unknown; purpose: Purpose }, run?: RunDirectory) {
-  requireExecutionBun(readJournal(input.journal_directory, input.repo).plan.schema_version);
+  if (readJournal(input.journal_directory, input.repo).plan.schema_version !== 2)
+    throw new SetupRequired("Use the original implementation for this operation format.");
   const options = structuredClone(input), context = await collectContext(options, options.purpose, run), selected = context.selection;
   recoveryEffectsOutput({ command: selected.purpose === "acknowledgement" ? "acknowledge-delivery" : "reconcile-publication",
     source: options.source, outcome: "incomplete", limit: Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes), capacity_check: true,

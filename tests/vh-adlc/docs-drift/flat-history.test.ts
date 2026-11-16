@@ -49,7 +49,7 @@ test.each(["matching", "manual-dispatch", "changed-native-blob", "foreign-reposi
   if (fault === "foreign-repository") run.repository = { ...repository, id: 11 };
   if (fault === "wrong-workflow") run.workflow_id++;
   if (fault === "wrong-event" || fault === "manual-dispatch") run.event = "workflow_dispatch";
-  const verify = createAdoptedProducerVerifier({ store: f.store, current_default: f.current, identity: reader, entry: "interactive" });
+  const verify = createAdoptedProducerVerifier({ store: f.store, current_default: f.current, identity: reader });
   if (fault === "matching" || fault === "manual-dispatch") {
     const result = verify(source(f.repo, head), run);
     expect(result?.source_commit).toBe(head); expect(result?.component_sha256).toBe(f.component.component_sha256);

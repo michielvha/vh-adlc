@@ -11,8 +11,12 @@ test("concurrent retained publishers execute an unchanged original batch only on
     const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
     console.error("Owned native concurrency fixture roots", JSON.stringify(roots));
     const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
-    const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
-    const outcomes = await Promise.allSettled([controller.publishPublication(f.publication), controller.publishPublication(f.publication)]);
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") =
+      await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const outcomes = await Promise.allSettled([
+      f.invoke(run => controller.publishPublication(f.publication, run)),
+      f.invoke(run => controller.publishPublication(f.publication, run)),
+    ]);
     const finished = outcomes.filter(outcome => outcome.status === "fulfilled");
     expect(finished).toHaveLength(1); expect(finished[0].value.state).toBe("complete");
     expect(outcomes.filter(outcome => outcome.status === "rejected")).toHaveLength(1);

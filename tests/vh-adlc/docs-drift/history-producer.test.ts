@@ -1,8 +1,9 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { source, write, commit, portableRecord, deliverRecord, runtimeIdentity } from "./adoption-fixture";
-import { compatibleTrialUpgrade, trialAdoptionDelivery } from "./adoption-trial-fixture";
+import { runtimeIdentity } from "./adoption-fixture";
+import { preflightFixture } from "./preflight-fixture";
+import { put } from "./repository-fixture";
 import { canonicalDigest, canonicalJSON, compareUTF8, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { readAdoptionInput, readGit, writeMetadataObject } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { captureRepositoryState, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -17,13 +18,15 @@ let preserveRoots = false;
 afterAll(() => { if (preserveRoots) console.error("Preserved failed history producer roots", JSON.stringify(roots));
   else for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 function fixture() {
-  const f = source(roots);
-  write(f.repo, f.configured.execution.scheduled_workflow, JSON.stringify({ on: { schedule: [{ cron: "0 3 * * *" }] },
-    jobs: { drift: { uses: "./" + f.configured.execution.worker_workflow } } }));
-  write(f.repo, f.configured.execution.worker_workflow, JSON.stringify({ on: { workflow_call: null }, jobs: { report: {
-    "runs-on": "ubuntu-latest", steps: ["collect", "review", "report", "upload", "attention"].map(id => ({ id: "docs-drift-" + id, name: "Drift " + id, run: "synthetic-only" })) } } }));
-  f.candidate = commit(f.repo, "synthetic protected report workflow");
-  const current = deliverRecord(f, portableRecord(f));
+  const base = preflightFixture(roots, "none", undefined, (repo, configured) => {
+    configured.reports.workflow_id = 19;
+    Object.assign(configured.execution, { scheduled_workflow: configured.reports.workflow_path, worker_workflow: ".github/workflows/docs-drift-worker.yml" });
+    put(repo, configured.reports.workflow_path, JSON.stringify({ on: { schedule: [{ cron: "0 3 * * *" }] },
+      jobs: { drift: { uses: "./.github/workflows/docs-drift-worker.yml" } } }));
+    put(repo, ".github/workflows/docs-drift-worker.yml", JSON.stringify({ on: { workflow_call: null }, jobs: { report: {
+      "runs-on": "ubuntu-latest", steps: ["collect", "review", "report", "upload", "attention"].map(id => ({ id: "docs-drift-" + id, name: "Drift " + id, run: "synthetic-only" })) } } }));
+  });
+  const f = { ...base, configured: base.afterSettings, candidate: base.checklist.candidate_commit }, current = f.head();
   const store = createOwnedObjectStore({ parent: f.artifacts, evidence_directory: f.artifacts, source_repo: f.repo,
     source_commit: current, repository: f.configured.repository, owner: "synthetic-history", run: "producer" });
   return { ...f, current, store };
@@ -49,7 +52,7 @@ test.each(["matching", "changed-native-blob", "foreign-repository", "unadopted-s
     const f = fixture(), before = captureRepositoryState(f.repo), verify = createAdoptedProducerVerifier({ store: f.store,
       current_default: f.current, identity: runtimeIdentity });
     const head = fault === "unadopted-source" ? f.candidate : f.current;
-    const original = producerSource(f.repo, head, fault === "changed-native-blob" ? f.configured.execution.worker_workflow : undefined), native = run(head);
+    const original = producerSource(f.repo, head, fault === "changed-native-blob" ? ".github/workflows/docs-drift-worker.yml" : undefined), native = run(head);
     if (fault === "foreign-repository") native.repository = { ...native.repository, id: 11 };
     if (fault === "wrong-source") original.commit_sha = f.candidate;
     if (["changed-native-blob", "foreign-repository", "wrong-source"].includes(fault)) {
@@ -107,37 +110,3 @@ process.exit(result.exitCode);
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveRoots = true; throw error; }
 }, 90000);
-
-// Observed-shaped owner-attestation parser fixtures only; these do not establish actual native adoption.
-test("a verified compatible predecessor remains eligible while test-only successor evidence refuses", async () => {
-  try {
-    const { createAdoptedProducerVerifier } = await import("../../../plugins/vh-adlc/scripts/docs-drift/history-producer");
-    const f = source(roots);
-    write(f.repo, f.configured.execution.worker_workflow, JSON.stringify({ on: { workflow_call: null }, jobs: { report: {
-      "runs-on": "ubuntu-latest", steps: ["collect", "review", "report", "upload", "attention"].map(id => ({ id: "docs-drift-" + id, name: "Drift " + id, run: "synthetic-only" })) } } }));
-    write(f.repo, f.configured.execution.scheduled_workflow, canonicalJSON({ on: { schedule: [{ cron: "0 6 * * *" }], workflow_dispatch: null },
-      permissions: f.configured.execution.permissions, jobs: { worker: { uses: "./" + f.configured.execution.worker_workflow,
-        with: { component_pin: f.configured.component_pin, pr_draft: false }, secrets: { COPILOT_GITHUB_TOKEN: "${{ secrets.COPILOT_GITHUB_TOKEN }}" } } } }));
-    f.candidate = commit(f.repo, "synthetic compatible caller source");
-    const original = { source: f.repo, configured: f.configured, candidate: f.candidate, record: portableRecord(f),
-      manifest: { fixture_id: "00000000-0000-0000-0000-000000000001" } };
-    const successor = compatibleTrialUpgrade(original), record = successor.record;
-    Reflect.deleteProperty(record, "fixture_id"); Reflect.deleteProperty(record.predecessor, "fixture_id"); record.predecessor.evidence_kind = "observed";
-    const compatibility = record.predecessor.compatibility;
-    Reflect.deleteProperty(compatibility, "fixture_id"); compatibility.evidence_kind = "observed";
-    for (const regression of compatibility.regressions) { Reflect.deleteProperty(regression, "fixture_id"); regression.evidence_kind = "observed"; }
-    for (const receipt of Object.values(record.receipts)) { Reflect.deleteProperty(receipt, "fixture_id"); receipt.evidence_kind = "observed"; }
-    const selected = { ...original, configured: successor.configured, candidate: successor.candidate, record }, current = trialAdoptionDelivery(selected);
-    const store = createOwnedObjectStore({ parent: f.artifacts, evidence_directory: f.artifacts, source_repo: f.repo,
-      source_commit: current, repository: f.configured.repository, owner: "synthetic-history", run: "compatible" });
-    const before = captureRepositoryState(f.repo), verify = createAdoptedProducerVerifier({ store, current_default: current, identity: runtimeIdentity });
-    const previous = verify(producerSource(f.repo, successor.previousDefault), run(successor.previousDefault));
-    expect(previous?.source_commit).toBe(successor.previousDefault); expect(previous?.job_name).toBe("worker / report");
-    expect(verify(producerSource(f.repo, current), run(current))?.component_sha256).not.toBe(previous?.component_sha256);
-    expect(captureRepositoryState(f.repo)).toEqual(before);
-    compatibility.evidence_kind = "test-only";
-    const invalid = trialAdoptionDelivery(selected), invalidStore = createOwnedObjectStore({ parent: f.artifacts, evidence_directory: f.artifacts, source_repo: f.repo,
-      source_commit: invalid, repository: f.configured.repository, owner: "synthetic-history", run: "invalid-successor" });
-    expect(() => createAdoptedProducerVerifier({ store: invalidStore, current_default: invalid, identity: runtimeIdentity })).toThrow("compatibility receipt bindings");
-  } catch (error) { preserveRoots = true; throw error; }
-});

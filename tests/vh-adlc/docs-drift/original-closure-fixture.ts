@@ -36,15 +36,3 @@ export async function originalClosureFixture(roots: string[], publisher?: Parame
     origin: { kind: "owner-request", artifact: request }, effects: target.manifest!.effects.map(effect => ({ id: effect.id, sha256: effectDigest([effect]) })) }));
   return { ...f, origin, service, worker, reviewer, target, publication: { ...options, worker_capture: worker, reviewer_capture: reviewer, authority } };
 }
-
-export function closureCLIArguments(f: Awaited<ReturnType<typeof originalClosureFixture>>, command: "check-closure-publication" | "publish-closure" | "resume-closure", journal?: string) {
-  const selected = retainSyntheticArtifact(f.artifacts, "closure-cli-selection.json", canonicalJSON(f.options.selection)), options = f.publication;
-  const argv = [process.execPath, join(f.adopted.retained.directory, "scripts/docs-drift/cli.ts"), command,
-    "--repo", f.repo, "--source", f.source, "--artifact-root", f.artifacts, "--selection", selected.path, "--selection-sha256", selected.sha256,
-    "--cache-root", options.cache_directory, "--entry", options.entry, "--launcher", options.launcher_path, "--settings", options.settings_path,
-    "--worker-capture", f.worker.path, "--worker-capture-sha256", f.worker.sha256,
-    "--reviewer-capture", f.reviewer.path, "--reviewer-capture-sha256", f.reviewer.sha256,
-    "--authority", options.authority.path, "--authority-sha256", options.authority.sha256];
-  if (journal) argv.push("--journal-directory", journal);
-  return argv;
-}

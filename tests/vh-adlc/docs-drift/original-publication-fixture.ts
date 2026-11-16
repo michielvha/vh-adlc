@@ -76,16 +76,3 @@ const result = Bun.spawnSync([...command, ...args], { env: environment, stdin: "
   }
   return { statePath, calls };
 }
-
-export function publicationCLIArguments(f: Awaited<ReturnType<typeof originalPublicationFixture>>, command: "publish" | "resume", journal?: string): string[] {
-  const selected = retain(f.artifacts, "native-cli-selection.json", canonicalJSON(f.selection)), options = f.publication;
-  const argv = [process.execPath, join(f.retained.directory, "scripts/docs-drift/cli.ts"), command, "--repo", f.repo, "--source", f.source,
-    "--candidate-repo", f.candidate, "--candidate", f.head, "--artifact-root", f.artifacts, "--selection", selected.path, "--selection-sha256", selected.sha256,
-    "--cache-root", options.cache_directory, "--entry", options.entry, "--launcher", options.launcher_path, "--settings", options.settings_path,
-    "--source-verification", options.source_verification.path, "--source-verification-sha256", options.source_verification.sha256,
-    "--candidate-verification", options.candidate_verification.path, "--candidate-verification-sha256", options.candidate_verification.sha256,
-    "--decisions", options.decisions.path, "--decisions-sha256", options.decisions.sha256, "--worker-capture", f.worker.path, "--worker-capture-sha256", f.worker.sha256,
-    "--reviewer-capture", f.reviewer.path, "--reviewer-capture-sha256", f.reviewer.sha256, "--authority", f.authority.path, "--authority-sha256", f.authority.sha256];
-  if (journal) argv.push("--journal-directory", journal);
-  return argv;
-}

@@ -1,4 +1,3 @@
-import { legacySettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 /** Real owned Git receipt objects behind a GET-only native fixture. No publication or provider trial. */
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -14,6 +13,7 @@ import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/r
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { sealPlan, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { verifyProductionPreflight } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
 
 export async function auditReceiptFixture(roots: string[], options: { single?: boolean; currentResult?: boolean } = {}) {
   const f = await auditProposalInputsFixture(roots, options.single ? "matching" : "multiple", { role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source } });
@@ -50,8 +50,12 @@ export async function auditReceiptFixture(roots: string[], options: { single?: b
   }
   const selected = { ...bindings, ...deriveSourceWorkerInputs(snapshot), candidate_commit: head, candidate_tree: tree,
     diff_sha256: sha256(readOwnedPatch(store, settings.repository, f.source, head)), delivery_sha256: deliveryDigest([correction], []) };
-  const input = fixture(selected, effects), plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
-    adoption_sha256: sha256(readGit(store.root, "show", f.source + ":" + legacySettings(settings).publication.adoption_record)),
+  if (settings.schema_version !== 2 || !settings.component) throw Error("Ordinary receipt fixture settings required");
+  const policy = verifyProductionPreflight({ repo: f.repo, current_default: f.source, component: settings.component });
+  const publisher = policy.checklist.native_entries[f.options.entry].publisher;
+  const input = fixture(selected, effects, operation, { ...publisher, publisher_entry: f.options.entry });
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
+    schema_version: 2, policy_sha256: policy.policy_sha256, component: settings.component,
     publication_kind: "advisory", context: "production", transport: "native", corrections: [correction], attention: [] });
   const objects = writePlanObject(store, plan), bytes = canonicalJSON(plan), prefix = "repos/fixture/docs";
   const refEndpoint = prefix + "/git/ref/" + ref.slice(5), blobEndpoint = prefix + "/git/blobs/" + objects.blob;

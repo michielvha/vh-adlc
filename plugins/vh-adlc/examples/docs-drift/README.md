@@ -7,14 +7,14 @@ binding is unset. Collection uses no provider credentials.
 
 Install Bun 1.4.4, Node, Git and Bash. Acquire the verified binary through the
 installed plugin's `scripts/ensure-vh-adlc.sh`, then resolve the knowledge pages
-listed in `references/docs-drift.md`. Choose a private external artifact
-directory, create it with owner-only permissions and record its ownership.
+listed in `references/docs-drift.md`. Select a fresh private external run
+directory. The helper creates it with owner-only permissions and records ownership.
 Supply the actual full source commit and installed plugin directory.
 
 ```sh
 DOCS_DRIFT_PLUGIN_DIR="<installed-plugin>" BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 \
   bun scripts/docs-drift-entry.ts scan --repo "<example-checkout>" \
-  --source "<full-commit>" --artifact-root "<private-external-directory>"
+  --source "<full-commit>" --run-dir "<new-private-external-directory>"
 ```
 
 The unchanged example produces complete collection with no link findings.
@@ -44,15 +44,14 @@ publisher's native numeric account identity in the retained operation evidence.
 The committed preflight checklist records the consumer's setup and trial results.
 
 The included dispatch-only workflow is a staged collection diagnostic. Before
-installing it, populate `collection.yaml` from an operator-verified published
-release and put that exact source commit in the caller. Record source release,
-plugin version and the complete component digest separately. The worker compares
-the selected payload with that committed pin and saves only its bounded scan
-envelope. Its placeholder pin deliberately fails setup until configured.
+installing it, populate `component` in `.vh-adlc/docs-drift.yaml` from an
+operator-verified published release and put that exact source commit in the
+caller. The worker compares the selected payload with that committed binding
+and saves its bounded scan envelope. The unset binding fails setup until configured.
 It has read-only contents and actions permissions, no provider secrets and no
 cron trigger. The settings reader requires `actions: read`.
 
-The pin step checks consistency of an operator-verified immutable release.
+The component check establishes consistency of an operator-verified immutable release.
 It executes that selected component's installer and imports its modules to
 compute the compared identity. An operator establishes trust in the release
 before this example runs. A credentialed worker adaptation verifies identity

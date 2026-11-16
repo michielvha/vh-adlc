@@ -43,7 +43,8 @@ test("the docs-drift authority matrix keeps every runtime effect and recovery ap
 test("review protocol dispatches docs-drift through its bound role captures and leaves lifecycle review targeting intact", () => {
   const text = read("review-protocol.md"), section = text.split("## Documentation drift role review\n")[1]?.split("\n## ")[0];
   expect(section).toBeDefined();
-  for (const requirement of ["docs-drift-review.md", "native", "worker", "reviewer", "full model", "review pending", "owner-attestation", "formal feature"])
+  for (const requirement of ["docs-drift-review.md", "native", "worker", "reviewer", "full model", "review pending",
+    "preflight checklist", "scoped authority", "owner/reviewer", "attestations", "retained-byte integrity", "formal feature"])
     expect(section).toContain(requirement);
   for (const original of ["--operation \"spec review\"", "--operation review", "exact commit", "Self-review"]) expect(text).toContain(original);
 });

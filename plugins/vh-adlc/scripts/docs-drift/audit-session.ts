@@ -68,8 +68,8 @@ export async function runAuditSession(input: Options) {
     if (!facts?.runtime || !facts.store || !facts.identity || !facts.current_default || !baseline?.evidence || !baseline.scan?.checkout
       || !current.worker_input_sha256) throw Error("Original source and retained audit runtime required");
     const runtime = facts.runtime;
-    if (Bun.version !== "1.4.4" || realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/audit-session.ts"))
-      throw Error("Audit session must execute through the selected retained component and declared toolchain");
+    if (realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/audit-session.ts"))
+      throw Error("Audit session must execute through the selected installed component");
     const cwd = realpathSync(baseline.scan.checkout), canonicalizer = join(runtime.component.directory, "scripts/docs-drift/protocol.ts");
     outputScope = { repo, artifact_root: scope.directory, source_checkout: cwd };
     const nativePolicy = { repo: facts.store.root, current_default: facts.current_default, identity: facts.identity, runtime };

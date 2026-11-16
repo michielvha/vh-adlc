@@ -1,10 +1,10 @@
 import { expect, test } from "bun:test";
 
 function runtime() {
-  const worker = { executable: "/owned/client/copilot", client: { provider: "copilot" }, profile_directory: "/owned/profiles/worker",
+  const worker = { executable: "/owned/client/copilot", client: { provider: "copilot" },
     model: "opus", argv: ["--no-auto-update", "--reasoning-effort", "high"] };
-  return { component: { directory: "/owned/component" }, loader: { provider: "copilot" as const, argv: ["--plugin-dir", "/owned/component"],
-    credential_references: ["COPILOT_GITHUB_TOKEN"] }, worker, reviewer: { ...worker, profile_directory: "/owned/profiles/reviewer" } };
+  return { authentication: "native" as const, component: { directory: "/owned/component" }, loader: { provider: "copilot" as const, argv: ["--plugin-dir", "/owned/component"],
+    credential_references: ["COPILOT_GITHUB_TOKEN"] }, worker, reviewer: { ...worker } };
 }
 
 test.each(["copilot", "claude"] as const)("ordinary %s launch preserves the existing native authentication locations", async provider => {
@@ -32,7 +32,7 @@ test.each(["copilot", "claude"] as const)("ordinary %s launch preserves the exis
   expect(environment.HOME).toBe("/owner");
 });
 
-test("native role launch uses the selected executable/component/profile/model with a fresh independent context", async () => {
+test("native role launch uses the selected executable/component/model with a fresh independent context", async () => {
   const { buildCopilotRoleInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-launch");
   const selected = runtime(), environment = { PATH: "/owned/tools:/usr/bin:/bin", HOME: "/ambient", COPILOT_HOME: "/ambient/copilot",
     COPILOT_GITHUB_TOKEN: "synthetic-selected-credential", GH_TOKEN: "synthetic-unselected-credential", NODE_OPTIONS: "--require=/ambient/code",
@@ -44,8 +44,8 @@ test("native role launch uses the selected executable/component/profile/model wi
   expect(worker.argv[worker.argv.indexOf("--model") + 1]).toBe("opus");
   expect(worker.argv[worker.argv.indexOf("--plugin-dir") + 1]).toBe(selected.component.directory);
   expect(worker.argv[worker.argv.indexOf("--session-id") + 1]).toBe(worker.context_id);
-  expect(reviewer.context_id).not.toBe(worker.context_id); expect(worker.env.COPILOT_HOME).toBe(selected.worker.profile_directory);
-  expect(reviewer.env.COPILOT_HOME).toBe(selected.reviewer.profile_directory); expect(worker.env.HOME).toBe(selected.worker.profile_directory);
+  expect(reviewer.context_id).not.toBe(worker.context_id); expect(worker.env.COPILOT_HOME).toBe(environment.COPILOT_HOME);
+  expect(reviewer.env.COPILOT_HOME).toBe(environment.COPILOT_HOME); expect(worker.env.HOME).toBe(environment.HOME);
   expect(worker.env.COPILOT_GITHUB_TOKEN).toBe("synthetic-selected-credential"); expect(worker.env.GH_TOKEN).toBeUndefined();
   expect(worker.env.NODE_OPTIONS).toBeUndefined(); expect(worker.env.COPILOT_AGENT_SESSION_ID).toBeUndefined();
   expect(worker.env.COPILOT_AUTO_UPDATE).toBe("false"); expect(worker.env.COPILOT_PLUGIN_DIR_ONLY).toBe("1");
@@ -61,7 +61,7 @@ test("native role launch uses the selected executable/component/profile/model wi
 test.each(["--resume", "--continue", "--session-id=old", "-r", "-p", "--model=other", "--available-tools=bash", "--allow-all", "--agent=ambient", "--additional-mcp-config={}", "--connect", "--", "-C", "unknown-subcommand"])("unsupported protected role argv cannot replace fresh bound launch: %s", async argument => {
   const { buildCopilotRoleInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-launch");
   const selected = runtime(); selected.worker.argv = [argument];
-  expect(() => buildCopilotRoleInvocation({ runtime: selected, role: "worker", cwd: "/owned/source", artifact_root: "/owned/artifacts", prompt: "Bounded prompt", environment: {} })).toThrow("setup required");
+  expect(() => buildCopilotRoleInvocation({ runtime: selected, role: "worker", cwd: "/owned/source", artifact_root: "/owned/artifacts", prompt: "Bounded prompt", environment: { HOME: "/owner" } })).toThrow("setup required");
 });
 
 test.each(["backend", "loader-path", "loader-extra", "credential-override", "relative-executable", "empty-prompt", "oversize-prompt", "invalid-tuning"])("native role launch fails explicit setup rather than selecting an alternate: %s", async fault => {
@@ -74,7 +74,7 @@ test.each(["backend", "loader-path", "loader-extra", "credential-override", "rel
   if (fault === "relative-executable") selected.worker.executable = "copilot";
   if (fault === "invalid-tuning") selected.worker.argv = ["--reasoning-effort", "--resume"];
   expect(() => buildCopilotRoleInvocation({ runtime: selected, role: "worker", cwd: "/owned/source", artifact_root: "/owned/artifacts",
-    prompt: fault === "empty-prompt" ? "" : fault === "oversize-prompt" ? "x".repeat(65537) : "Bounded prompt", environment: {} })).toThrow("setup required");
+    prompt: fault === "empty-prompt" ? "" : fault === "oversize-prompt" ? "x".repeat(65537) : "Bounded prompt", environment: { HOME: "/owner" } })).toThrow("setup required");
 });
 
 test("the generic native launcher preserves Claude scanning and an independent Copilot reviewer", async () => {
@@ -94,7 +94,7 @@ test("the generic native launcher preserves Claude scanning and an independent C
   expect(worker.argv[worker.argv.indexOf("--output-format") + 1]).toBe("stream-json");
   expect(worker.env.CLAUDE_CODE_OAUTH_TOKEN).toBe("synthetic-oauth"); expect(worker.env.ANTHROPIC_API_KEY).toBeUndefined();
   expect(worker.env.COPILOT_GITHUB_TOKEN).toBeUndefined(); expect(worker.env.NODE_OPTIONS).toBeUndefined();
-  expect(worker.env.CLAUDE_CODE_SESSION_ID).toBeUndefined(); expect(worker.env.CLAUDE_CONFIG_DIR).toBe(selected.worker.profile_directory);
+  expect(worker.env.CLAUDE_CODE_SESSION_ID).toBeUndefined(); expect(worker.env.CLAUDE_CONFIG_DIR).toBe(input.environment.CLAUDE_CONFIG_DIR);
   expect(worker.env.DISABLE_AUTOUPDATER).toBe("1"); expect(worker.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC).toBe("1");
   expect(reviewer.provider).toBe("copilot"); expect(reviewer.context_id).not.toBe(worker.context_id);
   expect(reviewer.env.COPILOT_GITHUB_TOKEN).toBe("synthetic-copilot"); expect(reviewer.env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
@@ -104,7 +104,7 @@ test.each(["--resume", "--bare", "--fallback-model", "--session-id", "--dangerou
   const { buildClaudeRoleInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-launch");
   const selected = runtime(), worker = { ...selected.worker, client: { provider: "claude" }, argv: [option] };
   expect(() => buildClaudeRoleInvocation({ runtime: { ...selected, loader: { ...selected.loader, provider: "claude", credential_references: ["CLAUDE_CODE_OAUTH_TOKEN"] }, worker },
-    role: "worker", cwd: "/owned/source", artifact_root: "/owned/artifacts", prompt: "Bounded source review", environment: {} })).toThrow("unsupported protected Claude role argv");
+    role: "worker", cwd: "/owned/source", artifact_root: "/owned/artifacts", prompt: "Bounded source review", environment: { HOME: "/owner" } })).toThrow("unsupported protected Claude role argv");
 });
 
 test("a Claude reviewer receives only read tools and the explicitly selected API credential", async () => {
@@ -112,7 +112,7 @@ test("a Claude reviewer receives only read tools and the explicitly selected API
   const selected = runtime(), worker = { ...selected.worker, client: { provider: "claude" }, argv: ["--effort", "high"] };
   const result = buildClaudeRoleInvocation({ runtime: { ...selected, loader: { ...selected.loader, provider: "claude", credential_references: ["ANTHROPIC_API_KEY"] }, worker, reviewer: worker },
     role: "reviewer", cwd: "/owned/source", artifact_root: "/owned/artifacts", prompt: "Bounded source review",
-    environment: { ANTHROPIC_API_KEY: "synthetic-api", CLAUDE_CODE_OAUTH_TOKEN: "synthetic-unselected-oauth" } });
+    environment: { HOME: "/owner", ANTHROPIC_API_KEY: "synthetic-api", CLAUDE_CODE_OAUTH_TOKEN: "synthetic-unselected-oauth" } });
   expect(result.argv[result.argv.indexOf("--tools") + 1]).toBe("Read,Glob,Grep");
   expect(result.argv[result.argv.indexOf("--allowedTools") + 1]).toBe("Read,Glob,Grep");
   expect(result.env.ANTHROPIC_API_KEY).toBe("synthetic-api"); expect(result.env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
@@ -125,7 +125,7 @@ test("Claude forwards the documented xhigh effort and refuses an undocumented va
   const { buildClaudeRoleInvocation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-launch");
   const selected = runtime(), worker = { ...selected.worker, client: { provider: "claude" }, argv: ["--effort", "xhigh"] };
   const input = { runtime: { ...selected, loader: { ...selected.loader, provider: "claude" as const, credential_references: [] }, worker },
-    role: "worker" as const, cwd: "/owned/source", artifact_root: "/owned/artifacts", prompt: "Bounded source review", environment: {} };
+    role: "worker" as const, cwd: "/owned/source", artifact_root: "/owned/artifacts", prompt: "Bounded source review", environment: { HOME: "/owner" } };
   const result = buildClaudeRoleInvocation(input);
   expect(result.argv[result.argv.indexOf("--effort") + 1]).toBe("xhigh");
   worker.argv = ["--effort", "undocumented"];

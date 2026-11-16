@@ -6,9 +6,6 @@ on:
       component_source:
         required: true
         type: string
-      component_pin:
-        required: true
-        type: string
 
 permissions:
   contents: read
@@ -43,16 +40,15 @@ jobs:
       # payload identity with already trusted tooling before loading it.
       - name: Prepare the locked reader
         run: bash component/plugins/vh-adlc/scripts/ensure-vh-adlc.sh
-      - name: Match the committed collection pin
+      - name: Match the committed component binding
         env:
           BUN_RUNTIME_TRANSPILER_CACHE_PATH: '0'
           DOCS_DRIFT_PLUGIN_DIR: ${{ github.workspace }}/component/plugins/vh-adlc
           COMPONENT_SOURCE: ${{ inputs.component_source }}
-          COMPONENT_PIN: ${{ inputs.component_pin }}
           CONSUMER_SOURCE: ${{ github.sha }}
         run: |
           bun consumer/scripts/check-component.ts --repo consumer --source "$CONSUMER_SOURCE" \
-            --component-repo component --component-source "$COMPONENT_SOURCE" --component-pin "$COMPONENT_PIN"
+            --component-repo component --component-source "$COMPONENT_SOURCE"
       - name: Collect without provider credentials
         id: collection
         env:
@@ -60,11 +56,10 @@ jobs:
           DOCS_DRIFT_PLUGIN_DIR: ${{ github.workspace }}/component/plugins/vh-adlc
           CONSUMER_SOURCE: ${{ github.sha }}
         run: |
-          mkdir -m 700 "$RUNNER_TEMP/docs-drift-collection"
           mkdir -m 700 "$RUNNER_TEMP/docs-drift-output"
           collection_exit=0
           bun consumer/scripts/docs-drift-entry.ts scan --repo consumer --source "$CONSUMER_SOURCE" \
-            --artifact-root "$RUNNER_TEMP/docs-drift-collection" \
+            --run-dir "$RUNNER_TEMP/docs-drift-collection" --entry hosted \
             > "$RUNNER_TEMP/docs-drift-output/scan-envelope.json" || collection_exit=$?
           printf 'exit_code=%s\n' "$collection_exit" >> "$GITHUB_OUTPUT"
       - name: Save the bounded collection diagnostic

@@ -1,13 +1,12 @@
 import { expect, spyOn, test } from "bun:test";
 import { readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { originalPublicationFixture, installOwnedNativeService, retainSyntheticArtifact, publicationCLIArguments } from "./original-publication-fixture";
+import { originalPublicationFixture, installOwnedNativeService, retainSyntheticArtifact } from "./original-publication-fixture";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
-import { executeOwnedProcess } from "../../../plugins/vh-adlc/scripts/docs-drift/owned-process";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 
-test("normal retained recovery inspects and acknowledges a changed delivered PR under fresh owner approval", async () => {
+test("original retained recovery inspects and acknowledges a changed delivered PR under fresh owner approval", async () => {
   const roots: string[] = [];
   try {
     const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
@@ -18,7 +17,7 @@ test("normal retained recovery inspects and acknowledges a changed delivered PR 
       return append(journal, id, outcome);
     });
     let pending;
-    try { pending = await publisher.publishPublication(f.publication); } finally { fault.mockRestore(); }
+    try { pending = await f.invoke(run => publisher.publishPublication(f.publication, run)); } finally { fault.mockRestore(); }
     expect(pending.state, pending.reason ?? undefined).toBe("pending");
     const state = JSON.parse(readFileSync(service.statePath, "utf8")) as { prs: Array<Record<string, unknown>> };
     state.prs[0].title = "Later owner title"; writeFileSync(service.statePath, JSON.stringify(state), { mode: 0o600 });
@@ -34,12 +33,15 @@ test("normal retained recovery inspects and acknowledges a changed delivered PR 
     const hostRecovery = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-controller");
     const artifactsBeforeRefusal = readdirSync(f.artifacts).sort();
     await expect(hostRecovery.applyRecovery({ ...common, entry: "copilot", purpose: "acknowledgement", authority: {} }))
-      .rejects.toThrow("Original retained recovery controller required");
+      .rejects.toThrow("Original run required for version-two recovery");
     expect(readdirSync(f.artifacts).sort()).toEqual(artifactsBeforeRefusal);
-    const recovery = await import(join(f.retained.directory, "scripts/docs-drift/recovery-controller.ts"));
+    const recovery: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-controller") = await import(join(f.retained.directory, "scripts/docs-drift/recovery-controller.ts"));
     const inspected = await recovery.inspectRecovery(common);
     expect(inspected.complete, inspected.diagnostics.join("\n")).toBe(true); expect(inspected.authority).toBe("none");
-    expect(inspected.scopes).toHaveLength(1); expect(inspected.scopes[0].acknowledgements[0]).toMatchObject({ effect_id: "publication", differences: ["title_sha256"] });
+    expect(inspected.scopes).toHaveLength(1);
+    const acknowledgement = inspected.scopes[0];
+    if (!("acknowledgements" in acknowledgement)) throw Error("Acknowledgement scope required");
+    expect(acknowledgement.acknowledgements[0]).toMatchObject({ effect_id: "publication", differences: ["title_sha256"] });
     expect(journals.readJournal(pending.journal.directory, f.repo).digest).toBe(journalBefore);
     const recasedState = JSON.parse(readFileSync(service.statePath, "utf8")) as { viewer_login: string };
     recasedState.viewer_login = "Fixture-Bot"; writeFileSync(service.statePath, JSON.stringify(recasedState), { mode: 0o600 });
@@ -48,29 +50,13 @@ test("normal retained recovery inspects and acknowledges a changed delivered PR 
     expect(recased.scopes[0]).toMatchObject({ actor: "Fixture-Bot", actor_id: pending.journal.plan.manifest.actor_id });
     expect(inspected.scopes[0]).toMatchObject({ actor: pending.journal.plan.manifest.actor, actor_id: pending.journal.plan.manifest.actor_id });
     expect(journals.readJournal(pending.journal.directory, f.repo).digest).toBe(journalBefore);
-    const environment = Object.fromEntries(Object.entries(f.native.environment).filter((pair): pair is [string, string] => typeof pair[1] === "string"));
-    let invocation = 0;
-    const invoke = async (command: string, extra: string[] = []) => {
-      const argv = [process.execPath, join(f.retained.directory, "scripts/docs-drift/cli.ts"), command, "--repo", f.repo, "--source", f.source,
-        "--artifact-root", f.artifacts, "--cache-root", f.options.cache_directory, "--entry", "copilot", "--journal-directory", pending.journal.directory,
-        "--selection", selection.path, "--selection-sha256", selection.sha256, ...extra];
-      const completion = await executeOwnedProcess({ argv, cwd: f.repo, env: environment, watched_outputs: [], capture: "memory", timeout_ms: 300000,
-        stdout: join(f.artifacts, command + "-" + (++invocation) + ".stdout"), stderr: join(f.artifacts, command + "-" + invocation + ".stderr"), started: () => {} });
-      expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
-      return { completion, report: JSON.parse(Buffer.from(completion.captured?.stdout ?? []).toString()) };
-    };
-    const cliInspection = await invoke("inspect-recovery");
-    expect(cliInspection.completion.exit_code, JSON.stringify(cliInspection.report.diagnostics)).toBe(0);
-    expect(cliInspection.report.recovery_inspection.scope_sha256s).toEqual(recased.scope_sha256s);
-    expect(journals.readJournal(pending.journal.directory, f.repo).digest).toBe(journalBefore);
     const request = retainSyntheticArtifact(f.artifacts, "current-recovery-owner.txt", Buffer.from("Synthetic current owner approves this displayed exact acknowledgement and owned-lease cleanup, preserving the later title.\n"));
     const authority = retainSyntheticArtifact(f.artifacts, "current-recovery-authority.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-recovery-authority",
       purpose: "acknowledgement", scope_sha256s: recased.scope_sha256s, origin: { kind: "owner-current-request", artifact: request } }));
-    const applied = await invoke("acknowledge-delivery", ["--authority", authority.path, "--authority-sha256", authority.sha256]);
-    expect(applied.completion.exit_code, JSON.stringify(applied.report.diagnostics)).toBe(1);
-    expect(applied.report.recovery_effects.state).toBe("acknowledged"); expect(applied.report.outcome).toBe("attention");
-    const repeated = await invoke("acknowledge-delivery", ["--authority", authority.path, "--authority-sha256", authority.sha256]);
-    expect(repeated.completion.exit_code).toBe(1); expect(repeated.report.recovery_effects.state).toBe("acknowledged");
+    const applied = await f.invoke(run => recovery.applyRecovery({ ...common, purpose: "acknowledgement", authority }, run));
+    expect(applied.state, JSON.stringify(applied)).toBe("acknowledged");
+    const repeated = await f.invoke(run => recovery.applyRecovery({ ...common, purpose: "acknowledgement", authority }, run));
+    expect(repeated.state).toBe("acknowledged");
     expect(captureRepositoryState(f.repo)).toEqual(before);
     expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs[0].title).toBe("Later owner title");
     // The original resume route must retain the acknowledged status even after its old payload returns.
@@ -80,14 +66,8 @@ test("normal retained recovery inspects and acknowledges a changed delivered PR 
     writeFileSync(join(f.repo, ".vh-adlc/docs-drift.yaml"), readGit(f.repo, "show", f.source + ":.vh-adlc/docs-drift.yaml"));
     writeFileSync(f.options.launcher_path, readGit(f.repo, "show", f.source + ":" + f.options.launcher_path.slice(f.repo.length + 1)));
     const resumeBefore = captureRepositoryState(f.repo);
-    const resumed = await executeOwnedProcess({ argv: publicationCLIArguments(f, "resume", pending.journal.directory), cwd: f.repo,
-      env: environment, watched_outputs: [], capture: "memory", timeout_ms: 300000,
-      stdout: join(f.artifacts, "acknowledged-resume.stdout"), stderr: join(f.artifacts, "acknowledged-resume.stderr"), started: () => {} });
-    expect(resumed.reaped).toBe(true); expect(resumed.timed_out).toBe(false);
-    const resumeReport = JSON.parse(Buffer.from(resumed.captured?.stdout ?? []).toString());
-    expect(resumeReport.publication_effects?.state, JSON.stringify(resumeReport.diagnostics)).toBe("acknowledged");
-    expect(resumed.exit_code).toBe(1); expect(resumeReport.outcome).toBe("attention");
-    expect(JSON.stringify(resumeReport)).not.toContain("Exact synthetic source correction");
+    const resumed = await f.invoke(run => publisher.resumePublication({ ...f.publication, journal_directory: pending.journal.directory }, run));
+    expect(resumed.state, resumed.reason ?? undefined).toBe("acknowledged");
     expect(captureRepositoryState(f.repo)).toEqual(resumeBefore);
     const final = JSON.parse(readFileSync(service.statePath, "utf8")) as { prs: Array<Record<string, unknown>> };
     expect(final.prs).toHaveLength(1); expect(final.prs[0].title).toBe(restored.prs[0].title);
@@ -100,7 +80,7 @@ test("normal retained recovery inspects and acknowledges a changed delivered PR 
   } catch (error) { console.error("Preserved failed native recovery roots", JSON.stringify(roots)); throw error; }
 }, 365000);
 
-test("normal retained reconciliation retires absent writes and settles only the original owned lease", async () => {
+test("original retained reconciliation retires absent writes and settles only the original owned lease", async () => {
   const roots: string[] = [];
   try {
     const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
@@ -111,7 +91,7 @@ test("normal retained reconciliation retires absent writes and settles only the 
       return append(journal, id, outcome);
     });
     let pending;
-    try { pending = await publisher.publishPublication(f.publication); } finally { fault.mockRestore(); }
+    try { pending = await f.invoke(run => publisher.publishPublication(f.publication, run)); } finally { fault.mockRestore(); }
     expect(pending.state, pending.reason ?? undefined).toBe("pending");
     const currentSettings = JSON.parse(readGit(f.repo, "show", f.source + ":.vh-adlc/docs-drift.yaml").toString());
     const currentProcedure = "docs/recovery-procedure.md";
@@ -131,32 +111,23 @@ test("normal retained reconciliation retires absent writes and settles only the 
     const selection = retainSyntheticArtifact(f.artifacts, "reconciliation-selection.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-recovery-selection",
       source_commit: f.source, operation_id: pending.journal.plan.manifest.operation_id, purpose: "reconciliation",
       acknowledge_effect_ids: [], retire_effect_ids: ["candidate", "publication"], retirement_lookups: {} }));
-    const environment = Object.fromEntries(Object.entries(f.native.environment).filter((pair): pair is [string, string] => typeof pair[1] === "string"));
-    let invocation = 0;
-    const invoke = async (command: string, extra: string[] = []) => {
-      const argv = [process.execPath, join(f.retained.directory, "scripts/docs-drift/cli.ts"), command, "--repo", f.repo, "--source", f.source,
-        "--artifact-root", f.artifacts, "--cache-root", f.options.cache_directory, "--entry", "copilot", "--journal-directory", pending.journal.directory,
-        "--selection", selection.path, "--selection-sha256", selection.sha256, ...extra];
-      const name = "reconciliation-" + (++invocation);
-      const completion = await executeOwnedProcess({ argv, cwd: f.repo, env: environment, watched_outputs: [], capture: "memory", timeout_ms: 300000,
-        stdout: join(f.artifacts, name + ".stdout"), stderr: join(f.artifacts, name + ".stderr"), started: () => {} });
-      expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
-      return { completion, report: JSON.parse(Buffer.from(completion.captured?.stdout ?? []).toString()) };
-    };
-    const inspected = await invoke("inspect-recovery"), inspection = inspected.report.recovery_inspection;
-    expect(inspected.completion.exit_code, JSON.stringify(inspected.report.diagnostics)).toBe(0);
+    const recovery: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-controller") = await import(join(f.retained.directory, "scripts/docs-drift/recovery-controller.ts"));
+    const common = { repo: f.repo, source: f.source, artifact_root: f.artifacts, journal_directory: pending.journal.directory,
+      cache_directory: f.options.cache_directory, entry: "copilot", owner: "fixture-owner", run: "fixture-reconciliation",
+      credential: f.options.credential, path: f.options.path, selection: JSON.parse(readFileSync(join(f.artifacts, selection.path), "utf8")) };
+    const inspection = await recovery.inspectRecovery(common);
+    expect(inspection.complete, inspection.diagnostics.join("\n")).toBe(true);
     expect(inspection.authority).toBe("none"); expect(inspection.scope_sha256s).toHaveLength(1);
-    expect(inspection.scopes[0].retire_effect_ids).toEqual(["candidate", "publication"]);
+    expect(inspection.scopes[0]).toHaveProperty("retire_effect_ids");
+    expect("retire_effect_ids" in inspection.scopes[0] ? inspection.scopes[0].retire_effect_ids : null).toEqual(["candidate", "publication"]);
     expect(journals.readJournal(pending.journal.directory, f.repo).digest).toBe(journalBefore);
     const authority = retainSyntheticArtifact(f.artifacts, "reconciliation-authority.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-recovery-authority",
       purpose: "reconciliation", scope_sha256s: inspection.scope_sha256s, origin: { kind: "adopted-procedure", commit: currentDefault,
         path: currentProcedure, sha256: (await import("../../../plugins/vh-adlc/scripts/docs-drift/protocol")).sha256(procedure) } }));
-    const extra = ["--authority", authority.path, "--authority-sha256", authority.sha256];
-    const applied = await invoke("reconcile-publication", extra);
-    expect(applied.completion.exit_code, JSON.stringify(applied.report.diagnostics)).toBe(1);
-    expect(applied.report.recovery_effects.state).toBe("retired"); expect(applied.report.outcome).toBe("attention");
-    const repeated = await invoke("reconcile-publication", extra);
-    expect(repeated.completion.exit_code).toBe(1); expect(repeated.report.recovery_effects.state).toBe("retired");
+    const applied = await f.invoke(run => recovery.applyRecovery({ ...common, purpose: "reconciliation", authority }, run));
+    expect(applied.state, JSON.stringify(applied)).toBe("retired");
+    const repeated = await f.invoke(run => recovery.applyRecovery({ ...common, purpose: "reconciliation", authority }, run));
+    expect(repeated.state).toBe("retired");
     const final = JSON.parse(readFileSync(service.statePath, "utf8")) as { prs: unknown[] };
     expect(final.prs).toHaveLength(0);
     expect(readGit(f.origin, "for-each-ref", "--format=%(refname)", "refs/heads/docs-drift/native-operation", "refs/heads/docs-drift-lease").toString()).toBe("");

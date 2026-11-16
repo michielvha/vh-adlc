@@ -15,8 +15,12 @@ test.each(["disabled-history", "changed-source-proof", "missing-hosted-run", "mi
     const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/history-collection"), f = await bindingFixture(roots, false);
     const before = captureRepositoryState(f.repo);
     if (fault === "changed-source-proof") writeFileSync(join(f.artifacts, f.options.source_verification.path), "Changed original proof\n");
-    const result = await api.collectNativeReportHistory({ ...f.options, ...(fault.startsWith("missing-hosted") ? { entry: "hosted" as const,
-      ...(fault === "missing-hosted-attempt" ? { run: "101" } : {}) } : {}) });
+    const result = await api.collectNativeReportHistory({ ...f.options, ...(fault.startsWith("missing-hosted") ? {
+      entry: "hosted" as const,
+      run: fault === "missing-hosted-run" ? "" : "101",
+      // The ordinary entry selects hosted context from actual invocation metadata.
+      hosted_run_attempt: fault === "missing-hosted-attempt" ? Number.NaN : 1,
+    } : {}) });
     expect(result.complete, JSON.stringify(result.diagnostics)).toBe(fault === "disabled-history"); expect(result.authority).toBe("none");
     if (fault === "disabled-history") {
       expect(result.mode).toBe("none"); expect(result.history).toEqual([]); expect(result.context?.run_id).toBe(f.options.run);

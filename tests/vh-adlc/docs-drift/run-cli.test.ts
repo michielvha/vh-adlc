@@ -7,9 +7,39 @@ import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-dr
 import { fixture as manifestFixture, bindings, hash } from "./manifest-fixture";
 import { createJournal, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
+import { parseRunOptions } from "../../../plugins/vh-adlc/scripts/docs-drift/run-cli";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+
+test.each([
+  "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "inspect-runtime",
+  "trial-bindings", "check-upgrade-signals", "prepare-trial-fixture", "collect-proposals", "run-audit",
+  "collect-report-history", "collect-audit-proposal-inputs", "collect-assessment-review-target", "read-assessment-review",
+  "inspect-retained", "restore-retained", "inspect-recovery", "acknowledge-delivery", "reconcile-publication",
+  "bind-publication", "collect-review-target", "read-candidate-review", "check-publication", "check-candidate",
+  "collect-publication-inputs", "verify-candidate", "check-verification", "check-closure-publication", "publish-closure",
+  "resume-closure", "collect-closure-worker-inputs", "collect-closure-review-target", "read-closure-review",
+  "check-edits", "collect-resolution", "collect-closure", "collect-closure-target",
+])(
+  "normal entry refuses the retired %s command before source access", command => {
+    const result = Bun.spawnSync([process.execPath, resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"),
+      command, "--repo", "/nonexistent-docs-drift-source"], {
+      env: { PATH: "/nonexistent", BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" }, stdout: "pipe", stderr: "pipe", timeout: 10000,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(JSON.parse(result.stdout.toString()).diagnostics).toEqual(["Select scan, report, resolve, prepare, verify, publish, resume or close."]);
+  },
+);
+
+test.each(["--authority", "--model", "--provider", "--worker-capture", "--reviewer-capture", "--assessment",
+  "--history", "--started-at", "--cache-root", "--artifact-root", "--launcher", "--settings", "--selection"])(
+  "normal parser refuses a supplied proof, provider or retired option %s", flag => {
+    expect(() => parseRunOptions(["scan", "--repo", "/nonexistent-source", "--run-dir", "/nonexistent-run", flag, "untrusted"]))
+      .toThrow("Unknown, duplicate or incomplete run option.");
+  },
+);
+
 function fixture() {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-run-cli-"))), repo = join(root, "source"), directory = join(root, "run");
   roots.push(root);

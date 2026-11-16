@@ -1,8 +1,8 @@
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync, utimesSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { captureBareSnapshot, captureRepositoryState, captureSnapshot, checkFreshness, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { captureBareSnapshot, captureRepositoryState, captureSnapshot, checkFreshness, createOwnedObjectStore, readCommittedTree } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
 
@@ -20,6 +20,43 @@ function temporary(): string {
 function fixture(bounded = false) {
   return populateRepository(temporary(), bounded);
 }
+
+test("committed tree reads batch raw blobs while preserving order, modes, links and binary bytes", () => {
+  const { repo, commit: parent } = fixture(), bin = temporary(), trace = join(bin, "git-calls.jsonl");
+  for (let index = 0; index < 48; index++) put(repo, `bulk/${index}.txt`, `raw ${index}\n`);
+  const binary = Buffer.from([0, 10, 255, 13, 10]);
+  writeFileSync(join(repo, "bulk/binary\t試験.bin"), binary);
+  chmodSync(join(repo, "bulk/0.txt"), 0o755);
+  symlinkSync("0.txt", join(repo, "bulk/link"));
+  git(repo, "add", ".");
+  git(repo, "update-index", "--add", "--cacheinfo", "160000," + parent + ",modules/child");
+  git(repo, "commit", "-qm", "raw tree controls");
+  const source = git(repo, "rev-parse", "HEAD"), before = captureRepositoryState(repo);
+  const realGit = Bun.which("git");
+  if (!realGit) throw Error("Git required for snapshot regression");
+  writeFileSync(join(bin, "git"), `#!${process.execPath}
+import { appendFileSync } from "node:fs";
+const args = process.argv.slice(2);
+appendFileSync(${JSON.stringify(trace)}, JSON.stringify(args) + "\\n");
+const result = Bun.spawnSync([${JSON.stringify(realGit)}, ...args], { stdin: "inherit", stdout: "inherit", stderr: "inherit" });
+process.exitCode = result.exitCode;
+`, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  let tree: ReturnType<typeof readCommittedTree>;
+  try {
+    process.env.PATH = bin + ":" + originalPath;
+    tree = readCommittedTree(repo, source);
+  } finally { process.env.PATH = originalPath; }
+  const calls = readFileSync(trace, "utf8").trim().split("\n").map(line => JSON.parse(line) as string[]);
+  expect(calls).toHaveLength(2);
+  expect(calls[1]).toContain("--batch");
+  expect(tree.map(blob => blob.path)).toEqual(git(repo, "ls-tree", "-r", "--name-only", "-z", source).split("\0").filter(Boolean));
+  expect(tree.find(blob => blob.path === "bulk/binary\t試験.bin")?.bytes).toEqual(binary);
+  expect(tree.find(blob => blob.path === "bulk/0.txt")?.mode).toBe("100755");
+  expect(tree.find(blob => blob.path === "bulk/link")).toMatchObject({ mode: "120000", bytes: Buffer.from("0.txt") });
+  expect(tree.find(blob => blob.path === "modules/child")).toMatchObject({ mode: "160000", oid: parent, bytes: Buffer.alloc(0) });
+  expect(captureRepositoryState(repo)).toEqual(before);
+});
 
 test("committed snapshots preserve staged, unstaged, ignored, untracked and Git state", () => {
   const { repo, commit } = fixture();

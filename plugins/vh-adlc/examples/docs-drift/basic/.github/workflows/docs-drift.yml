@@ -11,6 +11,5 @@ jobs:
   collection:
     uses: ./.github/workflows/docs-drift-worker.yml
     with:
-      # Select the full commit of the operator-verified release and match the pin.
+      # Select the full commit of the operator-verified release and match the settings binding.
       component_source: '0000000000000000000000000000000000000000'
-      component_pin: .vh-adlc/docs-drift-components/collection.yaml

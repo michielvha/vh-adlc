@@ -1,12 +1,11 @@
 import { verifyProductionPreflight } from "./preflight";
-import { readRecordedRoleModel, verifyRuntimeAdoption } from "./adoption";
 import type { selectOperationRuntime, InstalledRuntime, NativeTrialRuntime } from "./bootstrap";
 import { samePublicationIdentity } from "./identity";
 import type { PublicationIdentity } from "./transport";
 import { isAbsolute, join } from "node:path";
 import { ArtifactChanged, readBoundArtifact, readNativeRoleArtifacts } from "./evidence-input";
 import type { SealedPlan } from "./journal";
-import { fullModel, modelMatches, type RolePolicy } from "./manifests";
+import { modelMatches, type RolePolicy } from "./manifests";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
 import { artifactDirectoryScope } from "./snapshot";
 import { decodeNativeRoleOutput } from "./native-role-output";
@@ -90,15 +89,12 @@ type Runtime = Awaited<ReturnType<typeof selectOperationRuntime>> | NativeTrialR
 export function roleRuntimeDigest(runtime: Runtime | InstalledRuntime, role: Role): string {
   if (runtime.kind === "docs-drift-native-trial-runtime")
     return canonicalDigest({ kind: runtime.kind, runtime_sha256: roleRuntimeDigest(runtime.runtime, role), policy_sha256: runtime.trial.policy.policy_sha256 });
-  if (runtime.kind === "docs-drift-installed-runtime") {
-    const selected = runtime[role], { directory: _directory, ...component } = runtime.component;
-    return canonicalDigest({ kind: runtime.kind, settings_sha256: runtime.settings_sha256, component, entry: runtime.entry,
-      role, selected: { client: selected.client, client_id: selected.client_id, model: selected.model, argv: selected.argv,
-        identity_source: selected.identity_source }, credential_references: runtime.loader.credential_references,
-      ...("policy_sha256" in runtime ? { policy_sha256: runtime.policy_sha256, observed_models: runtime.observed_models } : {}) });
-  }
-  return canonicalDigest({ adoption_sha256: runtime.adoption_sha256, component: runtime.component, entry: runtime.entry,
-    role, selected: runtime[role], loader: runtime.loader });
+  const selected = runtime[role], { directory: _directory, ...component } = runtime.component;
+  // Preserve the recorded version-two digest format across the internal runtime types.
+  return canonicalDigest({ kind: "docs-drift-installed-runtime", settings_sha256: runtime.settings_sha256, component, entry: runtime.entry,
+    role, selected: { client: selected.client, client_id: selected.client_id, model: selected.model, argv: selected.argv,
+      identity_source: selected.identity_source }, credential_references: runtime.loader.credential_references,
+    ...(runtime.kind === "docs-drift-production-runtime" ? { policy_sha256: runtime.policy_sha256, observed_models: runtime.observed_models } : {}) });
 }
 
 /** Read the adopted full model from its validated historical receipt, independently of the requested selector. */
@@ -111,7 +107,7 @@ export function readAdoptedRolePolicy(options: { repo: string; current_default: 
         actor_id: launch.actor_id, default_branch: settings.default_branch })) fail("original native trial role scope changed");
     return policy[options.role];
   }
-  if (runtime.kind === "docs-drift-installed-runtime") {
+  if (runtime.kind === "docs-drift-production-runtime") {
     const { plugin_version, source_commit, component_sha256 } = runtime.component;
     const preflight = verifyProductionPreflight({ ...options, component: { plugin_version, source_commit, component_sha256 },
       publisher: { entry: runtime.entry, identity: options.identity } });
@@ -122,10 +118,5 @@ export function readAdoptedRolePolicy(options: { repo: string; current_default: 
       fail("observed native role policy changed");
     return { requested_model: selected.model, adopted_model: model, identity_source: selected.identity_source };
   }
-  const adopted = verifyRuntimeAdoption({ ...options, entry: runtime.entry });
-  if (adopted.adoption_sha256 !== runtime.adoption_sha256) fail("current adoption changed");
-  const name = runtime.entry === "hosted" ? "hosted_advisory" : runtime.entry === "copilot" ? "copilot_entry" : "claude_entry";
-  const native = fullModel(readRecordedRoleModel(adopted.receipts, name, options.role)), selected = runtime[options.role];
-  if (!selected.identity_source || !modelMatches(selected.model, native)) fail("adopted native role capability unavailable");
-  return { requested_model: selected.model, adopted_model: native, identity_source: selected.identity_source };
+  fail("verified production or native trial role policy required");
 }

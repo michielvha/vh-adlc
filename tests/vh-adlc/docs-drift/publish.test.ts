@@ -1,8 +1,9 @@
 import { canonicalDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
+import * as settingsModule from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { publish, validatePublicationShape } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
+import { publish, validatePublicationShape, verifyPublicationGate } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { appendInvalidation, createJournal, writePublicationObjects, sealPlan, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
@@ -13,6 +14,36 @@ import { publicationFixture, publicationOptions as options } from "./publication
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 const setup = () => publicationFixture(roots);
+
+test("publication reads immutable source settings once while reopening every live gate", async () => {
+  const f = setup(), selected = options(f), read = spyOn(settingsModule, "loadCommittedSettings");
+  let gates = 0, identities = 0;
+  const identity = f.transport.identity;
+  f.transport.identity = async () => { identities++; return identity(); };
+  selected.gate = async () => { gates++; return f.gate(); };
+  try {
+    const result = await publish(selected);
+    expect(result.state).toBe("complete");
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(gates).toBe(f.plan.manifest.effects.length + 1);
+    expect(identities).toBeGreaterThanOrEqual(gates);
+    await verifyPublicationGate(selected, null);
+    await verifyPublicationGate(selected, null);
+    expect(read).toHaveBeenCalledTimes(3);
+  } finally { read.mockRestore(); }
+});
+
+test("publication refuses a changed source-settings selection before the next write", async () => {
+  const f = setup(), selected = options(f), execute = f.transport.execute;
+  f.transport.execute = async (...args) => {
+    await execute(...args);
+    selected.settings = { ...f.settings, default_branch: "changed" };
+  };
+  const result = await publish(selected);
+  expect(result.state).toBe("pending");
+  expect(f.executed).not.toContain("push");
+  expect(f.executed).not.toContain("pr");
+});
 
 test("one publisher delivers exact reviewed payloads under the owned lease and retained receipt", async () => {
   const f = setup();

@@ -1,6 +1,6 @@
 /** The packaged greenfield example runs collection without provider credentials or remote writes. */
 import { afterAll, expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { readYAML } from "../../../plugins/vh-adlc/scripts/settings-file";
@@ -9,6 +9,8 @@ import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-dr
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { computeComponentIdentity } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { verifyConfiguredWorkerCaller } from "../../../plugins/vh-adlc/scripts/docs-drift/worker-callers";
+import { readRunDirectory, latestRunArtifact } from "../../../plugins/vh-adlc/scripts/docs-drift/run-directory";
+import { readBoundArtifact } from "../../../plugins/vh-adlc/scripts/docs-drift/evidence-input";
 
 const plugin = resolve(import.meta.dir, "../../../plugins/vh-adlc");
 const example = join(plugin, "examples/docs-drift/basic");
@@ -47,27 +49,32 @@ test.each([
 ])("the packaged example collects actual Git inputs with a $name", scenario => {
   try {
     const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-drift-example-"))); roots.push(root);
-    const repo = join(root, "example with spaces"), artifacts = join(root, "artifacts");
-    cpSync(example, repo, { recursive: true }); mkdirSync(artifacts, { mode: 0o700 });
+    const repo = join(root, "example with spaces"), artifacts = join(root, "run"), state = join(root, "state");
+    cpSync(example, repo, { recursive: true });
     if (scenario.missing) unlinkSync(join(repo, "src/server.ts"));
     if (scenario.malformed) writeFileSync(join(repo, "docs/guide.md"), readFileSync(join(repo, "docs/guide.md"), "utf8") + "\n[Invalid link](a%zz.md)\n");
     readGit(repo, "init", "--template=", "-b", "main");
     readGit(repo, "add", "--all");
     readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "Owned packaged example");
     const source = readGit(repo, "rev-parse", "HEAD").toString().trim(), before = captureRepositoryState(repo);
-    const completion = Bun.spawnSync([process.execPath, join(repo, "scripts/docs-drift-entry.ts"), "scan", "--repo", repo, "--source", source, "--artifact-root", artifacts], {
-      env: { PATH: process.env.PATH, HOME: process.env.HOME, LANG: "C", LC_ALL: "C", BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", DOCS_DRIFT_PLUGIN_DIR: plugin },
+    const completion = Bun.spawnSync([process.execPath, join(repo, "scripts/docs-drift-entry.ts"), "scan", "--repo", repo, "--source", source, "--run-dir", artifacts], {
+      env: { PATH: process.env.PATH, HOME: process.env.HOME, XDG_STATE_HOME: state, LANG: "C", LC_ALL: "C", BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", DOCS_DRIFT_PLUGIN_DIR: plugin },
       stdout: "pipe", stderr: "pipe", timeout: 30000,
     });
     expect(completion.exitCode).toBe(0);
     const report = JSON.parse(completion.stdout.toString());
-    expect(report).toMatchObject({ command: "scan", outcome: "collected", assessment: { complete: true } });
-    expect(report.assessment.documents.map((row: { path: string }) => row.path)).toEqual(["docs/guide.md"]);
-    expect(report.assessment.findings).toHaveLength(scenario.findings);
-    if (scenario.findings) expect(report.assessment.findings[0]).toMatchObject({ detector: "local-links", document: "docs/guide.md" });
+    expect(report).toMatchObject({ command: "scan", outcome: "collected", counts: { findings: scenario.findings } });
+    const run = readRunDirectory({ repo, directory: artifacts, origins: join(state, "vh-adlc/docs-drift/origins") });
+    const reference = latestRunArtifact(run, "source_verification");
+    if (!reference) throw Error("Example must retain its original scanner verification");
+    const collected = JSON.parse(readBoundArtifact({ source_repo: repo, artifact_root: artifacts, reference }).toString());
+    expect(collected.complete).toBe(true);
+    expect(collected.scan.documents.map((row: { path: string }) => row.path)).toEqual(["docs/guide.md"]);
+    expect(collected.scan.findings).toHaveLength(scenario.findings);
+    if (scenario.findings) expect(collected.scan.findings[0]).toMatchObject({ detector: "local-links", document: "docs/guide.md" });
     if (scenario.malformed) {
-      expect(report.assessment.documents[0].status).toBe("complete");
-      expect(report.assessment.detectors[0].outcome).toBe("complete");
+      expect(collected.scan.documents[0].status).toBe("complete");
+      expect(collected.scan.detectors[0].outcome).toBe("complete");
     }
     expect(captureRepositoryState(repo)).toEqual(before);
   } catch (error) { failed = true; throw error; }
@@ -79,21 +86,23 @@ test("the collection example binds the original committed component and rejects 
     const repo = join(root, "consumer"); cpSync(example, repo, { recursive: true });
     const componentRepo = resolve(plugin, "../.."), componentSource = readGit(componentRepo, "rev-parse", "HEAD").toString().trim();
     const identity = computeComponentIdentity(componentRepo, componentSource);
-    const pin = { schema_version: 1, source_repository: "michielvha/vh-adlc", source_commit: componentSource,
-      source_release: "v0.0.0-example", plugin_version: identity.plugin_version, component_sha256: identity.component_sha256 };
-    const pinPath = ".vh-adlc/docs-drift-components/collection.yaml";
+    const component = { source_commit: componentSource, plugin_version: identity.plugin_version, component_sha256: identity.component_sha256 };
+    const settings = readYAML(readFileSync(join(example, ".vh-adlc/docs-drift.yaml")), reason => { throw Error(reason); }, { offline: true });
+    if (settings === null || typeof settings !== "object" || Array.isArray(settings)) throw Error("Example settings mapping required");
+    expect(parseSettings(settings).schema_version).toBe(2);
     readGit(repo, "init", "--template=", "-b", "main");
     for (const changed of [false, true]) {
-      writeFileSync(join(repo, pinPath), JSON.stringify({ ...pin, component_sha256: changed ? "f".repeat(64) : pin.component_sha256 }) + "\n");
+      writeFileSync(join(repo, ".vh-adlc/docs-drift.yaml"), JSON.stringify({ ...settings,
+        component: { ...component, component_sha256: changed ? "f".repeat(64) : component.component_sha256 } }) + "\n");
       readGit(repo, "add", "--all");
       readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "Owned component pin example");
       const source = readGit(repo, "rev-parse", "HEAD").toString().trim(), before = captureRepositoryState(repo);
       const run = Bun.spawnSync([process.execPath, join(repo, "scripts/check-component.ts"), "--repo", repo, "--source", source,
-        "--component-repo", componentRepo, "--component-source", componentSource, "--component-pin", pinPath], {
+        "--component-repo", componentRepo, "--component-source", componentSource], {
         env: { PATH: process.env.PATH, HOME: process.env.HOME, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", DOCS_DRIFT_PLUGIN_DIR: plugin },
         stdout: "pipe", stderr: "pipe", timeout: 30000,
       });
-      expect(run.exitCode).toBe(changed ? 2 : 0);
+      expect(run.exitCode, run.stderr.toString()).toBe(changed ? 2 : 0);
       if (!changed) expect(JSON.parse(run.stdout.toString())).toMatchObject({ outcome: "component-matched", authority: "none", component_sha256: identity.component_sha256 });
       expect(captureRepositoryState(repo)).toEqual(before);
     }

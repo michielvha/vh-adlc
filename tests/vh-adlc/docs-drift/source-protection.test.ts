@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inspectPreparation } from "../../../plugins/vh-adlc/scripts/docs-drift/preparation";
@@ -84,21 +84,15 @@ test("source-declared document kinds classify an ordinary local guide without gr
   expect(evaluateProtection(repo, snapshot, []).complete).toBe(true);
 });
 
-test("the normal check-edits command honors committed writers and preserves a dirty consumer procedure", () => {
+test("edit inspection honors committed writers and preserves a dirty consumer procedure", () => {
   const repo = fixture(), path = "docs/guide.md", hash = sha256(readFileSync(join(repo, path)));
   procedure(repo, { other_writers: [{ writer: "active-docs", document: path, document_sha256: hash }] });
   const source = commitAll(repo), input = selected(repo, source);
   put(repo, "docs/docs-procedure.md", "# Keep this unrelated draft\n");
-  const before = captureRepositoryState(repo), artifacts = realpathSync(mkdtempSync(join(tmpdir(), "vh-drift-source-policy-output-"))); roots.push(artifacts);
-  const selection = canonicalJSON(input.selection); writeFileSync(join(artifacts, "selection.json"), selection, { mode: 0o600 });
-  const result = Bun.spawnSync([process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), "check-edits",
-    "--repo", repo, "--source", source, "--artifact-root", artifacts, "--selection", "selection.json", "--selection-sha256", sha256(selection)],
-    { stdout: "pipe", stderr: "pipe", timeout: 30000 });
-  const report = JSON.parse(result.stdout.toString());
-  expect(result.exitCode, JSON.stringify(report)).toBe(2);
-  expect(report.edit_inspection, JSON.stringify(report)).toBeDefined();
-  expect(report.edit_inspection.authority).toBe("none");
-  expect(report.edit_inspection.protection.edits[0].reason).toBe("other-current-writer");
+  const before = captureRepositoryState(repo), inspection = inspectPreparation(input);
+  expect(inspection.complete).toBe(false);
+  expect(inspection.authority).toBe("none");
+  expect(inspection.protection?.edits[0].reason).toBe("other-current-writer");
   expect(captureRepositoryState(repo)).toEqual(before);
 }, 45000);
 

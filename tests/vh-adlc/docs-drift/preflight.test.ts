@@ -1,6 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
-import { selectProductionRuntime } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
+import { selectProductionRuntime, withRuntimeValidation } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { readAdoptedRolePolicy, roleRuntimeDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
 import { join } from "node:path";
 import { commit, ordinaryComponentFixture, preflightFixture } from "./preflight-fixture";
@@ -13,6 +13,26 @@ import { normalizedConfigurationDigest, nativeEntryDigest, preflightReviewTarget
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 const proof = "1".repeat(64);
+
+test("immutable preflight results stay scoped to their exact invocation and publisher", () => {
+  const f = preflightFixture(roots), options = { repo: f.repo, current_default: f.head(), component: f.component,
+    publisher: { entry: "interactive", identity: { repository: "fixture/docs", repository_id: 10,
+      actor: "fixture-owner", actor_id: 30, default_branch: "main" } } };
+  const first = withRuntimeValidation(() => {
+    const { publisher: _publisher, ...immutable } = options;
+    const selected = verifyProductionPreflight(immutable);
+    expect(verifyProductionPreflight(options)).toBe(selected);
+    expect(verifyProductionPreflight(options)).toBe(selected);
+    const worker = { ...options, role: "worker" }, reviewer = { ...options, role: "reviewer" };
+    expect(verifyProductionPreflight(worker)).toBe(selected);
+    expect(verifyProductionPreflight(reviewer)).toBe(selected);
+    expect(() => verifyProductionPreflight({ ...options,
+      publisher: { ...options.publisher, identity: { ...options.publisher.identity, actor_id: 999 } } })).toThrow();
+    return selected;
+  });
+  expect(verifyProductionPreflight(options)).not.toBe(first);
+  expect(withRuntimeValidation(() => verifyProductionPreflight(options))).not.toBe(first);
+});
 
 test("a flat checklist gates the direct reviewed activation without future switch evidence", () => {
   const f = preflightFixture(roots), verified = verifyProductionPreflight({ repo: f.repo, current_default: f.head(), component: f.component });

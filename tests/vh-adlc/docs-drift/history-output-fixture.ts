@@ -1,10 +1,10 @@
 /** Owned Git, observed-shaped adoption and GET-only API fixtures. No hosted/model acceptance. */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { bindingFixture } from "./binding-fixture";
-import { commit, portableRecord, write } from "./adoption-fixture";
+import { put } from "./repository-fixture";
 import { role } from "./manifest-fixture";
-import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
 const client = `#!${process.execPath}
@@ -37,26 +37,20 @@ export async function historyOutputFixture(roots: string[], options: { localHist
     scannerCase: options.scannerCase,
     role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source,
       argv: ["--no-auto-update"], client_program: client },
-    prepareSource: fixture => {
+    configureSource: fixture => {
       const settings = fixture.configured;
       if (options.localHistory) {
         settings.reports.interactive = "local-attestation";
         settings.reports.local_history_roots = [".vh-adlc/docs-drift-history"];
         mkdirSync(join(fixture.repo, ".vh-adlc/docs-drift-history"), { mode: 0o700 });
       }
-      settings.publication.adoption_record = ".vh-adlc/docs-drift-adoptions/history-output.yaml";
-      write(fixture.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings));
-      write(fixture.repo, settings.execution.scheduled_workflow, canonicalJSON({ on: { schedule: [{ cron: "0 3 * * *" }] },
-        jobs: { drift: { uses: "./" + settings.execution.worker_workflow } } }));
-      write(fixture.repo, settings.execution.worker_workflow, canonicalJSON({ on: { workflow_call: null }, jobs: { report: {
+      const scheduled = ".github/workflows/docs-drift.yml", worker = ".github/workflows/docs-drift-worker.yml";
+      put(fixture.repo, scheduled, canonicalJSON({ on: { schedule: [{ cron: "0 3 * * *" }] },
+        jobs: { drift: { uses: "./" + worker } } }).toString());
+      put(fixture.repo, worker, canonicalJSON({ on: { workflow_call: null }, jobs: { report: {
         "runs-on": "ubuntu-latest", steps: ["collect", "review", "report", "upload", "attention"].map(id => ({
-          id: "docs-drift-" + id, name: "Drift " + id, run: "synthetic-only" })) } } }));
-      const candidate = commit(fixture.repo, "synthetic hosted report source");
-      write(fixture.repo, settings.publication.adoption_record, canonicalJSON(portableRecord({ ...fixture, candidate })));
-      return commit(fixture.repo, "synthetic hosted report adoption");
+          id: "docs-drift-" + id, name: "Drift " + id, run: "synthetic-only" })) } } }).toString());
     } });
-  const { retainClientDistribution } = await import("../../../plugins/vh-adlc/scripts/docs-drift/bootstrap");
-  await retainClientDistribution({ ...f.setup, profile_scope: { ...f.setup.profile_scope, entry: "hosted" } });
   const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
   const run = { id: 101, run_attempt: 1, workflow_id: 19, path: ".github/workflows/docs-drift.yml", event: "schedule", status: "in_progress",
     conclusion: null, head_sha: f.source, head_branch: "main", repository, head_repository: repository,
@@ -87,9 +81,10 @@ if (historyValue !== undefined) { console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JS
   writeFileSync(executable, original.replace("  const sha = ", extra + "  const sha = "));
   const decisionBytes = canonicalJSON({ ...f.decisions, decisions: [] });
   writeFileSync(join(f.artifacts, "report-decisions.json"), decisionBytes, { mode: 0o600 });
-  const sessionOptions = { ...f.options, run: "101", entry: options.localHistory ? "copilot" as const : "hosted" as const, hosted_run_attempt: 1,
+  const sessionOptions = { ...f.options, run: options.localHistory ? randomUUID() : "101",
+    entry: options.localHistory ? "copilot" as const : "hosted" as const, hosted_run_attempt: options.localHistory ? undefined : 1,
     decisions: { path: "report-decisions.json", sha256: sha256(decisionBytes) },
-    environment: { PATH: f.native.environment.PATH, COPILOT_GITHUB_TOKEN: "synthetic-selected-provider" }, role_timeout_ms: 10000 };
+    environment: { PATH: f.native.environment.PATH, HOME: f.root, COPILOT_GITHUB_TOKEN: "synthetic-selected-provider" }, role_timeout_ms: 10000 };
   return { ...f, options: sessionOptions, runPath, run };
 }
 
@@ -98,8 +93,9 @@ export function runHistoryOutput(f: Awaited<ReturnType<typeof historyOutputFixtu
   writeFileSync(bridge, `import { readFileSync, writeFileSync } from "node:fs";
 const plugin = ${JSON.stringify(f.retained.directory)};
 const { runAuditSession } = await import(plugin + "/scripts/docs-drift/audit-session.ts");
+const { withRuntimeValidation } = await import(plugin + "/scripts/docs-drift/bootstrap.ts");
 const options = ${JSON.stringify(f.options)};
-${options.session === false ? "" : `const session = await runAuditSession(options);
+${options.session === false ? "" : `const session = await withRuntimeValidation(() => runAuditSession(options));
 if (!session.complete) throw Error(JSON.stringify(session));`}
 ${body}
 writeFileSync(${JSON.stringify(output)}, JSON.stringify(result), { mode: 0o600 });

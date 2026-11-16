@@ -2,14 +2,15 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bindingFixture } from "./binding-fixture";
+import { put } from "./repository-fixture";
 
 export const hostedHistoryFaults = ["matching", "matching-attempt-2", "cancelled", "repository-id", "head-repository-id", "head-sha", "head-branch", "event", "completed", "workflow-id", "path-ref", "run-attempt", "initial-run-id", "final-repository-id", "final-run-attempt"] as const;
 export type HostedHistoryFault = typeof hostedHistoryFaults[number];
 
 export async function hostedHistoryFixture(roots: string[], fault: HostedHistoryFault = "matching") {
-  const f = await bindingFixture(roots, false);
-  const { retainClientDistribution } = await import("../../../plugins/vh-adlc/scripts/docs-drift/bootstrap");
-  await retainClientDistribution({ ...f.setup, profile_scope: { ...f.setup.profile_scope, entry: "hosted" } });
+  const f = await bindingFixture(roots, false, { configureSource: ({ repo }) => {
+    put(repo, ".github/workflows/docs-drift.yml", "name: Fixture schedule\non:\n  schedule:\n    - cron: \"0 3 * * *\"\n");
+  } });
   const executable = join(f.root, "native-bin/gh"), countPath = join(f.root, "history-run-reads"), endpointsPath = join(f.root, "history-run-endpoints.jsonl"), original = readFileSync(executable, "utf8");
   const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
   const native = { id: 101, run_attempt: 1, workflow_id: 19, path: ".github/workflows/docs-drift.yml", event: "schedule", status: "in_progress",

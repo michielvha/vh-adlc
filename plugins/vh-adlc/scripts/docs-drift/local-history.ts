@@ -2,9 +2,7 @@ import { sameAccount, type PublisherEntry } from "./identity";
 import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, opendirSync, renameSync } from "node:fs";
 import { join, relative } from "node:path";
-import { verifyRuntimeAdoption } from "./adoption";
 import { verifyProductionPreflight } from "./preflight";
-import { readCompatibleAdoptionLineage } from "./adoption-lineage";
 import { readBoundArtifact } from "./evidence-input";
 import { isGitAncestor } from "./git";
 import { publishArtifact } from "./journal";
@@ -12,7 +10,7 @@ import { OUTPUT_LIMIT } from "./owned-process";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "./protocol";
 import { parseOwnedInvocation, type OwnedInvocation } from "./report-history";
 import { reportTime } from "./report";
-import { loadCommittedSettings, type Settings } from "./settings";
+import { loadCommittedSettings, SetupRequired, type Settings } from "./settings";
 import { artifactDirectoryScope, type OwnedObjectStore } from "./snapshot";
 import type { PublicationIdentity } from "./transport";
 
@@ -48,6 +46,7 @@ function stamp(value: string) { return new Date(reportTime(value)).toISOString()
 /** Resolve only the invocations named by the bounded saved-pair collection. */
 export function createLocalInvocationReader(inputContext: LocalHistoryContext) {
   const context = { ...inputContext }, diagnostics: string[] = [];
+  if (context.settings.schema_version !== 2) throw new SetupRequired("Use the original implementation to inspect version-one local history.");
   return { diagnostics, read(input: OwnedInvocation): OwnedInvocation | null {
     try {
       const wanted = parseOwnedInvocation(input), completed = reportTime(wanted.completed_at), start = reportTime(context.started_at);
@@ -57,21 +56,14 @@ export function createLocalInvocationReader(inputContext: LocalHistoryContext) {
       const root = registry(context, false);
       if (root === null) throw Error("Local invocation registry unavailable");
       const original = loadCommittedSettings(context.store.root, wanted.source_commit).settings;
-      let component: string;
-      if (context.settings.schema_version === 2) {
-        if (!context.settings.component || original.schema_version !== 2 || !original.component || !context.entry) throw Error("Original ordinary local history policy required");
-        verifyProductionPreflight({ repo: context.store.root, current_default: context.current_default, component: context.settings.component,
-          publisher: { entry: context.entry, identity: context.identity } });
-        const producer = verifyProductionPreflight({ repo: context.store.root, current_default: wanted.source_commit, component: original.component });
-        if (!Object.values(producer.checklist.native_entries).some(entry => entry.repository_id === context.identity.repository_id
-          && sameAccount(entry.publisher, context.identity))) throw Error("Original local publisher identity changed");
-        component = original.component.component_sha256;
-      } else {
-        const allowed = new Set(readCompatibleAdoptionLineage({ store: context.store, current_default: context.current_default, identity: context.identity, entry: context.entry }));
-        const adopted = verifyRuntimeAdoption({ repo: context.store.root, current_default: wanted.source_commit, identity: context.identity, entry: context.entry });
-        if (!allowed.has(adopted.adoption_sha256)) throw Error("Local invocation producer is outside approved history");
-        component = adopted.component_pin.component_sha256;
-      }
+      if (context.settings.schema_version !== 2 || !context.settings.component || original.schema_version !== 2 || !original.component || !context.entry)
+        throw Error("Original ordinary local history policy required");
+      verifyProductionPreflight({ repo: context.store.root, current_default: context.current_default, component: context.settings.component,
+        publisher: { entry: context.entry, identity: context.identity } });
+      const producer = verifyProductionPreflight({ repo: context.store.root, current_default: wanted.source_commit, component: original.component });
+      if (!Object.values(producer.checklist.native_entries).some(entry => entry.repository_id === context.identity.repository_id
+        && sameAccount(entry.publisher, context.identity))) throw Error("Original local publisher identity changed");
+      const component = original.component.component_sha256;
       if (component !== wanted.component_sha256 || original.reports.interactive !== "local-attestation")
         throw Error("Local invocation producer is outside approved history");
       const expected = canonicalJSON({ schema_version: 1, kind: "docs-drift-local-invocation", identity: identity(context), invocation: wanted });

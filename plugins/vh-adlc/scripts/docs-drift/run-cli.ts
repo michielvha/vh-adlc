@@ -39,7 +39,7 @@ type Report = {
   publication_effects?: ReturnType<typeof publicationEffectsOutput>["publication_effects"];
   report_artifacts?: AuditOutputArtifacts | null;
 };
-function optionsFor(argv: string[]) {
+export function parseRunOptions(argv: string[]) {
   const command = RUN_COMMANDS.find(command => command === argv[0]);
   if (!command) throw Error("Select scan, report, resolve, prepare, verify, publish, resume or close.");
   const options = new Map<string, string>(), proposals: number[] = [];
@@ -128,7 +128,7 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
   let report: Report = { schema_version: 1, authority: "none", command: argv[0] ?? "", outcome: "incomplete", run_directory: "", bun_version: Bun.version, diagnostics: [] };
   let caller: { repo: string; digest: string } | undefined;
   try {
-    const options = optionsFor(argv);
+    const options = parseRunOptions(argv);
     caller = { repo: options.repo, digest: canonicalDigest(captureRepositoryState(options.repo)) };
     report.command = options.command; report.run_directory = options.directory;
     const origins = resolve(process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"), "vh-adlc/docs-drift/origins");

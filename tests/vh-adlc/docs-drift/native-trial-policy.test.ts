@@ -8,7 +8,7 @@ import { commit, ordinaryComponentFixture } from "./preflight-fixture";
 import { bindings, fixture as manifestFixture } from "./manifest-fixture";
 import { installedSettingsFixture } from "./settings-fixture";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
-import { readNativeTrialPolicy, readNativeTrialSettings, readTrialHistoryBindings } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-definition";
+import { readNativeTrialPolicy, readNativeTrialSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-definition";
 import { loadCommittedSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { verifyProductionPreflight } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
 import type { WorkflowRunInput } from "../../../plugins/vh-adlc/scripts/github-read";
@@ -71,7 +71,6 @@ test("native trial policy binds observed launch metadata before a production che
   const settings = loadCommittedSettings(f.repo, f.source).settings;
   expect(() => verifyProductionPreflight({ repo: f.repo, current_default: f.source, component: f.definition.component })).toThrow();
   expect(settings.publication.mode).toBe("staged");
-  expect(readTrialHistoryBindings({ repo: f.repo, source: f.source, settings })).toBeNull();
 });
 
 test("native trial repository and publisher names retain case-insensitive account identity", () => {
@@ -131,8 +130,11 @@ test("original native trial runtime reopens its retained launch after a successo
   put(f.repo, ".vh-adlc/docs-drift.yaml", "schema_version: 999\n"); commit(f.repo, "Synthetic successor schema");
   rmSync(component.executable); f.identity.actor = "Fixture-Bot";
   const runtime = await selectOriginalOperationRuntime({ repo: f.repo, directory: component.directory, plan, identity: f.identity,
-    entry: "hosted", cache_directory: component.root });
+    entry: "hosted" });
   expect(runtime.kind).toBe("docs-drift-original-runtime");
+  await expect(selectOriginalOperationRuntime({ repo: f.repo, directory: component.directory, plan,
+    identity: { ...f.identity, actor_id: f.identity.actor_id + 1 }, entry: "hosted" }))
+    .rejects.toThrow("original operation native identity changed");
   expect(canonicalJSON(plan)).toEqual(originalBytes);
   expect(f.calls).toEqual([[501, 2]]);
   expect(existsSync(component.calls)).toBe(false);

@@ -221,24 +221,25 @@ and [settings reference](../../plugins/vh-adlc/references/docs-drift-settings.md
 Use Bun 1.4.4, Git and Bash, plus the configured scanner's runtime. The included
 example scanner requires Node. Prepare the locked verified binary through the
 installed plugin's `scripts/ensure-vh-adlc.sh`, resolve the required knowledge
-pages, and select a clean committed source. Create and record an owner-only
-external artifact directory outside the checkout and its Git directories.
+pages, and select a clean committed source. Choose a fresh external run
+directory outside all checkouts and Git directories. The helper creates and owns it.
 
 ```text
 bun <installed-plugin>/scripts/docs-drift/cli.ts scan --repo <project> \
-  --source <full-commit> --artifact-root <private-external-directory>
+  --source <full-commit> --run-dir <new-private-external-directory>
 ```
 
 `scan` returns its collection result. Findings still need source-based assessment.
 Missing prerequisites or incomplete collection return `incomplete` and exit 2.
 Full audit and resolution use the shared skill and their independently reviewed
-bound inputs. Configure real client distribution/digests, full worker/reviewer
-models and native identity sources during authorized runtime setup. Keep
+bound inputs. Configure ordinary installed client commands, full worker/reviewer models and
+observed native identities during authorized runtime setup. Keep
 credentials in the consumer's normal provisioning system.
 
-Select a private external runtime cache and retain operation journals and their
-approved component/client directories through pending delivery. An upgrade keeps
-old operations attached to their original retained controller and evidence.
+Keep the original run directory and its recorded evidence through pending delivery.
+Recovery effects use an explicitly selected ordinary install or released-source
+checkout matching the original component binding. After an upgrade, the current
+helper can inspect the pending record and report its original-release handoff.
 Follow [recovery](../../plugins/vh-adlc/references/docs-drift-review.md) for exact
 resume, acknowledgement and lease rules. Each host needs its own installation
 and required native checks before replacing its legacy publishing route.

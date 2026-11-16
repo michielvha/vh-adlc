@@ -27,7 +27,8 @@ test("the retained source-only issue controller resumes one delivered issue desp
     const service = installOwnedNativeService(f);
     writeFileSync(join(f.repo, "docs/guide.md"), "Preserve this unrelated source-only caller draft\n");
     const before = captureRepositoryState(f.repo);
-    const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") =
+      await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
     const journal = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts"));
     const append = journal.appendOutcome;
     let interrupted = false;
@@ -36,11 +37,11 @@ test("the retained source-only issue controller resumes one delivered issue desp
       return append(current, id, outcome);
     });
     let pending;
-    try { pending = await controller.publishPublication(options); }
+    try { pending = await f.invoke(run => controller.publishPublication(options, run)); }
     finally { fault.mockRestore(); }
     expect(interrupted).toBe(true); expect(pending.state).toBe("pending");
-    const resumed = await controller.resumePublication({ ...options, journal_directory: pending.journal.directory });
-    expect(resumed.state, resumed.reason).toBe("complete");
+    const resumed = await f.invoke(run => controller.resumePublication({ ...options, journal_directory: pending.journal.directory }, run));
+    expect(resumed.state, resumed.reason ?? undefined).toBe("complete");
     const state = JSON.parse(readFileSync(service.statePath, "utf8"));
     expect(state.issues).toHaveLength(1); expect(state.prs).toHaveLength(0);
     expect(state.issues[0].title).toBe("Investigate documentation baseline");

@@ -13,12 +13,14 @@ export function resolutionFixture(roots: string[], adoptedRepo?: string) {
   roots.push(root);
   const repo = adoptedRepo ?? join(root, "source"), artifacts = join(root, "artifacts");
   if (!adoptedRepo) { mkdirSync(repo); populateRepository(repo); }
-  else { git(repo, "branch", "-f", "main", "HEAD"); git(repo, "switch", "-q", "main"); }
+  else { git(repo, "switch", "-q", "--detach", "HEAD"); git(repo, "branch", "-f", "main", "HEAD"); git(repo, "switch", "-q", "main"); }
   mkdirSync(artifacts, { mode: 0o700 });
   const settings = adoptedRepo ? JSON.parse(readFileSync(join(repo, ".vh-adlc/docs-drift.yaml"), "utf8")) as ReturnType<typeof settingsFixture> : settingsFixture();
   if (adoptedRepo) { put(repo, "src/app.ts", "export const value = 1;\n"); put(repo, "docs/suppressions.yaml", "suppressions: []\n"); }
-  settings.feedback_files.push("docs/corrections.yaml");
-  put(repo, ".vh-adlc/docs-drift.yaml", JSON.stringify(settings) + "\n");
+  if (!settings.feedback_files.includes("docs/corrections.yaml")) {
+    settings.feedback_files.push("docs/corrections.yaml");
+    put(repo, ".vh-adlc/docs-drift.yaml", JSON.stringify(settings) + "\n");
+  }
   put(repo, "docs/guide.md", "# Guide\nOld claim\n");
   put(repo, "docs/corrections.yaml", "corrections:\n  - id: interpret-1\n    note: Keep the declared contract when the earlier interpretation was wrong.\n");
   if (!adoptedRepo) put(repo, "docs/docs-procedure.md", "# Project procedure\nDetector errors use docs/suppressions.yaml. Interpretation errors use docs/corrections.yaml.\n");

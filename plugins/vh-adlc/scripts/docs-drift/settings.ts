@@ -289,11 +289,12 @@ function publicationSettings(value: unknown, selectedRepository: string, base: s
   };
 }
 
-function reportSettings(value: unknown) {
+function reportSettings(value: unknown, installed = false) {
+  const hasReader = !installed || Object.hasOwn(object(value, null, "reports"), "history_reader_argv");
   const input = object(value, [
     "hosted", "interactive", "workflow_path", "workflow_id", "artifact_name_template", "max_age_seconds",
     "max_runs", "max_archive_bytes", "max_entry_bytes", "local_history_roots", "schema_version",
-    "attention_version", "history_reader_argv",
+    "attention_version", ...(hasReader ? ["history_reader_argv"] : []),
   ], "reports");
   const localRoots = paths(input.local_history_roots, "reports local_history_roots");
   const interactive = choice(input.interactive, ["actions", "local-attestation", "none"], "reports interactive");
@@ -311,7 +312,8 @@ function reportSettings(value: unknown) {
     workflow_path: path(input.workflow_path, "reports workflow_path"), workflow_id: input.workflow_id === null ? null : positive(input.workflow_id, "reports workflow_id"),
     artifact_name_template: template, max_age_seconds: positive(input.max_age_seconds, "reports max_age_seconds"), max_runs: positive(input.max_runs, "reports max_runs"),
     max_archive_bytes: archiveBytes, max_entry_bytes: entryBytes, local_history_roots: localRoots,
-    schema_version: 1 as const, attention_version: 1 as const, history_reader_argv: argv(input.history_reader_argv, "reports history_reader_argv"),
+    schema_version: 1 as const, attention_version: 1 as const,
+    ...(hasReader ? { history_reader_argv: argv(input.history_reader_argv, "reports history_reader_argv") } : {}),
   };
 }
 
@@ -370,7 +372,7 @@ function installedSetup(input: Record<string, unknown>, selectedRepository: stri
   const credentials = identifiers(input.credential_references, "credential_references");
   if (credentials.some(name => !/^[A-Z_][A-Z0-9_]*$/u.test(name))) invalid("credential_references");
   return { schema_version: 2 as const, clients, execution, publication, component,
-    credential_references: credentials, reports: reportSettings(input.reports) };
+    credential_references: credentials, reports: reportSettings(input.reports, true) };
 }
 
 /** Validate immutable project policy while retaining the historical settings representation. */

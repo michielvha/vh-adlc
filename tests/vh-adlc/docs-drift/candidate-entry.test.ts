@@ -9,7 +9,8 @@ import { commitAll, git, populateRepository, put } from "./repository-fixture";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-const entry = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts");
+import { readBoundArtifact } from "../../../plugins/vh-adlc/scripts/docs-drift/evidence-input";
+import { inspectCandidate } from "../../../plugins/vh-adlc/scripts/docs-drift/preparation";
 function fixture(fault = "none", format: "sha1" | "sha256" = "sha1") {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-drift-candidate-entry-"))); roots.push(root);
   const repo = join(root, "source"), candidate = join(root, "candidate"), artifacts = join(root, "artifacts");
@@ -35,45 +36,43 @@ function fixture(fault = "none", format: "sha1" | "sha256" = "sha1") {
   const packet = canonicalJSON(selection); writeFileSync(join(artifacts, "selection.json"), packet, { mode: 0o600 });
   return { root, repo, candidate, artifacts, source, head, path, replacement, packet };
 }
-function invoke(f: ReturnType<typeof fixture>, relative = "selection.json", extra: string[] = []) {
-  const result = Bun.spawnSync([process.execPath, entry, "check-candidate", "--repo", f.repo, "--source", f.source,
-    "--candidate-repo", f.candidate, "--candidate", f.head, "--artifact-root", f.artifacts,
-    "--selection", relative, "--selection-sha256", sha256(f.packet), ...extra], { stdout: "pipe", stderr: "pipe", timeout: 30000 });
-  return { result, report: JSON.parse(result.stdout.toString()) };
+function inspect(f: ReturnType<typeof fixture>, resolution_record?: { path: string; sha256: string }) {
+  return inspectCandidate({ repo: f.repo, source: f.source, candidate_repo: f.candidate, candidate: f.head,
+    artifact_root: f.artifacts, selection: JSON.parse(f.packet.toString()), owner: "fixture-owner", run: "candidate-inspection", resolution_record });
 }
 
-test.each(["sha1", "sha256"] as const)("normal candidate inspection binds the complete %s checkpoint and preserves callers", format => {
+test.each(["sha1", "sha256"] as const)("candidate inspection binds the complete %s checkpoint and preserves callers", format => {
   const f = fixture("none", format); put(f.repo, "docs/guide.md", "Preserve original draft\n");
-  const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate), { result, report } = invoke(f);
-  expect(result.exitCode).toBe(0);
-  expect(report.candidate_inspection).toMatchObject({ authority: "none", complete: true, source_commit: f.source, candidate_commit: f.head,
+  const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate), inspection = inspect(f);
+  expect(inspection.complete, inspection.diagnostics.join("\n")).toBe(true);
+  expect(inspection).toMatchObject({ authority: "none", complete: true, source_commit: f.source, candidate_commit: f.head,
     candidate_tree: git(f.candidate, "rev-parse", f.head + "^{tree}") });
-  expect(report.candidate_inspection.diff_sha256).toMatch(/^[a-f0-9]{64}$/u);
+  expect(inspection.diff_sha256).toMatch(/^[a-f0-9]{64}$/u);
   expect(captureRepositoryState(f.repo)).toEqual(before);
   expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
 });
 
-test("normal checkpoint inspection preserves literal path bytes", () => {
-  const f = fixture("literal"), { result, report } = invoke(f);
-  expect(result.exitCode).toBe(0);
-  expect(report.candidate_inspection.changed_paths).toEqual([f.path]);
+test("checkpoint inspection preserves literal path bytes", () => {
+  const f = fixture("literal"), inspection = inspect(f);
+  expect(inspection.complete, inspection.diagnostics.join("\n")).toBe(true);
+  expect(inspection.changed_paths).toEqual([f.path]);
   expect(readFileSync(join(f.candidate, f.path))).toEqual(f.replacement);
 });
 
-test.each(["unchanged", "extra-file", "wrong-bytes", "wrong-mode", "merge", "missing-candidate"])("normal checkpoint inspection refuses %s", fault => {
-  const f = fixture(fault), before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate), { result, report } = invoke(f);
-  expect(result.exitCode).toBe(2);
-  expect(report.candidate_inspection.complete).toBe(false);
-  expect(report.diagnostics.length).toBeGreaterThan(0);
+test.each(["unchanged", "extra-file", "wrong-bytes", "wrong-mode", "merge", "missing-candidate"])("checkpoint inspection refuses %s", fault => {
+  const f = fixture(fault), before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate), inspection = inspect(f);
+  expect(inspection.complete).toBe(false);
+  expect(inspection.complete).toBe(false);
+  expect(inspection.diagnostics.length).toBeGreaterThan(0);
   expect(captureRepositoryState(f.repo)).toEqual(before);
   expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
 });
 
 
 test.each(["uncommitted", "wrong-head"])("immutable candidate inspection preserves unrelated %s overlays", fault => {
-  const f = fixture(fault), before = captureRepositoryState(f.candidate), { result, report } = invoke(f);
-  expect(result.exitCode).toBe(0);
-  expect(report.candidate_inspection.candidate_commit).toBe(f.head);
+  const f = fixture(fault), before = captureRepositoryState(f.candidate), inspection = inspect(f);
+  expect(inspection.complete, inspection.diagnostics.join("\n")).toBe(true);
+  expect(inspection.candidate_commit).toBe(f.head);
   expect(captureRepositoryState(f.candidate)).toEqual(before);
 });
 
@@ -83,9 +82,9 @@ test.each(["root", "descendant"])("candidate evidence refuses a secondary caller
   writeFileSync(join(f.candidate, "private-selection.json"), f.packet, { mode: 0o600 });
   f.artifacts = scenario === "root" ? f.candidate : f.root;
   const relative = scenario === "root" ? "private-selection.json" : "candidate/private-selection.json";
-  const before = captureRepositoryState(f.candidate), { result, report } = invoke(f, relative);
-  expect(result.exitCode).toBe(2);
-  expect(report.diagnostics.some((item: { message: string }) => item.message.includes("overlaps a caller checkout"))).toBe(true);
+  const before = captureRepositoryState(f.candidate);
+  expect(() => readBoundArtifact({ source_repo: f.candidate, artifact_root: f.artifacts,
+    reference: { path: relative, sha256: sha256(f.packet) } })).toThrow("overlaps a caller checkout");
   expect(captureRepositoryState(f.candidate)).toEqual(before);
 });
 
@@ -99,44 +98,44 @@ async function resolutionCandidate(fault: string) {
   if (fault === "wrong-postimages") edits[0].replacement_base64 = Buffer.from("Unselected interpretation\n").toString("base64");
   const packet = canonicalJSON({ schema_version: 1, source_commit: f.snapshot.source_commit, edits });
   const artifacts = dirname(f.collection.store.record_path); writeFileSync(join(artifacts, "selection.json"), packet, { mode: 0o600 });
-  const extra = fault === "unselected" ? [] : ["--resolution-record", fault === "wrong-path" ? "docs/other.yaml" : f.draft.record_path,
-    "--resolution-sha256", fault === "wrong-hash" ? "0".repeat(64) : sha256(f.recordBytes)];
+  const selected = fault === "unselected" ? undefined : { path: fault === "wrong-path" ? "docs/other.yaml" : f.draft.record_path,
+    sha256: fault === "wrong-hash" ? "0".repeat(64) : sha256(f.recordBytes) };
   return { root, repo: assessment, candidate: f.repo, artifacts, source: f.snapshot.source_commit, head: f.head,
-    path: f.edit.path, replacement: Buffer.from(f.edit.replacement_base64, "base64"), packet, extra,
+    path: f.edit.path, replacement: Buffer.from(f.edit.replacement_base64, "base64"), packet, selected,
     resolution: { path: f.draft.record_path, sha256: sha256(f.recordBytes) } };
 }
 
-test.each(["matching", "wrong-hash", "wrong-path", "wrong-postimages", "unselected", "required-input"])("normal candidate inspection binds the durable resolve record %s", async fault => {
+test.each(["matching", "wrong-hash", "wrong-path", "wrong-postimages", "unselected", "required-input"])("candidate inspection binds the durable resolve record %s", async fault => {
   const f = await resolutionCandidate(fault), before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
-  const { result, report } = invoke(f, "selection.json", f.extra);
-  expect(result.exitCode).toBe(fault === "matching" ? 0 : 2);
-  if (fault === "matching") expect(report.candidate_inspection.resolution_record).toEqual(f.resolution);
+  const inspection = inspect(f, f.selected);
+  expect(inspection.complete).toBe(fault === "matching");
+  if (fault === "matching") expect(inspection.resolution_record).toEqual(f.resolution);
   else {
-    expect(report.candidate_inspection.complete).toBe(false);
-    expect(report.diagnostics.length).toBeGreaterThan(0);
-    if (fault !== "unselected") expect(report.diagnostics.some((item: { message: string }) => item.message.includes("resolution"))).toBe(true);
+    expect(inspection.complete).toBe(false);
+    expect(inspection.diagnostics.length).toBeGreaterThan(0);
+    if (fault !== "unselected") expect(inspection.diagnostics.some((message: string) => message.includes("resolution"))).toBe(true);
   }
   expect(captureRepositoryState(f.repo)).toEqual(before);
   expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
 });
 
-test("normal candidate inspection reuses a committed tree for an empty edit selection", () => {
+test("candidate inspection reuses a committed tree for an empty edit selection", () => {
   const f = fixture("unchanged"); f.packet = canonicalJSON({ schema_version: 1, source_commit: f.source, edits: [] });
   writeFileSync(join(f.artifacts, "selection.json"), f.packet);
-  const before = captureRepositoryState(f.candidate), { result, report } = invoke(f);
-  expect(result.exitCode).toBe(0);
-  expect(report.candidate_inspection).toMatchObject({ complete: true, candidate_commit: f.source, changed_paths: [], diff_sha256: sha256(Buffer.alloc(0)) });
+  const before = captureRepositoryState(f.candidate), inspection = inspect(f);
+  expect(inspection.complete, inspection.diagnostics.join("\n")).toBe(true);
+  expect(inspection).toMatchObject({ complete: true, candidate_commit: f.source, changed_paths: [], diff_sha256: sha256(Buffer.alloc(0)) });
   expect(captureRepositoryState(f.candidate)).toEqual(before);
 });
 
 test("committed candidate diff binding ignores caller-local diff configuration and attributes", () => {
-  const f = fixture(), baseline = invoke(f); expect(baseline.result.exitCode).toBe(0);
+  const f = fixture(), baseline = inspect(f); expect(baseline.complete).toBe(true);
   git(f.candidate, "config", "diff.noprefix", "true"); git(f.candidate, "config", "diff.algorithm", "patience");
   git(f.candidate, "config", "core.quotePath", "false");
   put(f.candidate, ".gitattributes", "* -diff\n");
   writeFileSync(join(f.candidate, ".git", "info", "attributes"), "* -diff\n");
-  const before = captureRepositoryState(f.candidate), { result, report } = invoke(f);
-  expect(result.exitCode).toBe(0);
-  expect(report.candidate_inspection.diff_sha256).toBe(baseline.report.candidate_inspection.diff_sha256);
+  const before = captureRepositoryState(f.candidate), inspection = inspect(f);
+  expect(inspection.complete, inspection.diagnostics.join("\n")).toBe(true);
+  expect(inspection.diff_sha256).toBe(baseline.diff_sha256);
   expect(captureRepositoryState(f.candidate)).toEqual(before);
 });

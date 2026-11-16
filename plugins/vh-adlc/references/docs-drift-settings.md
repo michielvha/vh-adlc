@@ -1,191 +1,133 @@
 # Documentation drift setup and adoption
 
-## Greenfield consumer setup
+## Greenfield setup
 
-Missing settings require an explicit setup handoff. Create the consumer's own
-`.vh-adlc/docs-drift.yaml`, scanner protocol entry and project procedure from
-its source and delivery rules. Use the complete examples under
-`examples/docs-drift/` when available in the selected release. Resolve actual
-client distributions, digests, repository/workflow identities and paths for
-that consumer before execution. Keep credentials in its existing secret
-provisioning system and runtime state in selected private external directories.
+Install the shared `vh-adlc` plugin through the harness's ordinary marketplace
+installation and install the configured native clients through their normal
+installation paths. Create `.vh-adlc/docs-drift.yaml`, the scanner protocol
+entry and the project procedure from the complete example under
+`examples/docs-drift/basic/`. Set the consumer's actual repository, scanner,
+workflow and credential-reference names before provider execution.
 
-`scripts/docs-drift/settings.ts` owns the closed version-1 schema and semantic
-validation. It uses the verified binary's shared strict YAML reader through
-`scripts/settings-file.ts`. Committed assessment and current-default policy
-read exact Git blob bytes and hash those bytes. The sole settings filename is
-`.vh-adlc/docs-drift.yaml`. Unknown fields, alternate suffixes and malformed
-values require correction in authorized setup. Dirty/candidate policy cannot
-substitute for current-default adoption policy.
-
-## Consumer contract
+Use `schema_version: 2` and `protocol_version: 1`. Settings are strict YAML at
+that exact filename. Committed-source reads use raw Git blobs and retain their
+original hashes. Unknown fields, malformed values and missing setup leave a
+setup handoff. Credential values belong in the consumer's existing secret
+stores. Choose a private external run directory for each operation.
 
 | Settings | Consumer choices |
 | --- | --- |
-| `schema_version`, `protocol_version` | Both are 1. |
 | `repository`, `hostname`, `default_branch` | Actual assessment and publication destination. |
 | `roots`, `exclusions`, `suffixes` | Tracked documentation inventory and explicit exclusions. |
-| `required_detectors`, `detector_inputs`, `detector_options` | Nonempty unique local detector IDs, one declarative selector per ID and local options. Use `all_inventory` or a roots/exclusions/suffixes subset. |
-| `feedback_files`, `project_procedure` | Exact retained feedback and project procedure paths. |
-| `scanner` | Argument vector, script path, nullable adapter path and timeout. |
-| `verification_commands`, `generation_commands` | Local allowed argument vectors. |
-| `read_set` | Nullable source/reference prefix sets. Incomplete bounds default assessment to the full tracked repository. |
-| `component_pin` | Staged nullable pin path. Adopted policy requires the exact component pin. |
-| `pr_discovery`, `legacy_proposals` | Explicit repository/base, authors, branch namespaces and selected legacy IDs. |
-| `publication` | Actor/destination, staged or adopted mode, adoption record, advisory/resolve draft state, disjoint branch/lease/receipt namespaces, resolution root and allowed merge methods. Closure is `after-merge`. |
-| `reports` | Native Actions provenance, interactive history policy, matching scheduled workflow path/ID, artifact naming and bounded age/count/archive/entry limits. |
-| `runtime_loader`, `clients`, `execution` | Approved isolated launcher, exact client distributions and roles for each entry. |
-| `knowledge_pages` | Additional pinned project/language pages alongside the required shared pages. |
-| Optional `trial` | Committed definition path and exact definition digest. |
+| `required_detectors`, `detector_inputs`, `detector_options` | Unique local detector IDs, declarative input selectors and detector-specific options. |
+| `feedback_files`, `project_procedure` | Suppression/correction stores and project instructions. |
+| `scanner` | Argument vector, script, optional adapter and timeout. |
+| `verification_commands`, `generation_commands` | Allowed project verification and generator vectors. |
+| `read_set` | Source/reference prefixes. Omitted bounds retain the full tracked repository. |
+| `component` | Released plugin version, full source commit and complete component fingerprint, or `null` while setting up static collection. |
+| `clients`, `execution.entries` | Ordinary executable commands and separately configured worker/reviewer models for each named profile. |
+| `credential_references` | Names of role credentials that may be inherited. |
+| `pr_discovery`, `legacy_proposals` | Repository/base, configured authors, branch namespaces and selected legacy proposal IDs. |
+| `publication` | Publisher, staged/adopted mode, checklist path, draft policy, disjoint branch/lease/receipt namespaces, resolution root and allowed merge methods. Closure is `after-merge`. |
+| `reports` | Workflow identity, artifact naming, age/count/archive/entry bounds and interactive history policy. |
+| `execution` | Optional workflow/command paths, runner, permissions and secret-reference mappings retained by the consumer. |
+| `knowledge_pages` | Project/language pages in addition to the required shared knowledge. |
+| Optional `trial` | Original committed trial definition path and exact digest. |
 
-The scanner receives canonical JSON bindings through `--protocol-bindings` and
-writes versioned output through `--protocol-json`, both in owned external
-locations. Its legacy invocation keeps its existing behavior. Collection must
-account for each expected document's raw blob bytes and every required
-detector's actual applicable inputs/outcome. Keep structural detector rules,
-thresholds and exceptions local. The shared validator checks bindings,
-inventories and completeness.
+The scanner receives canonical bindings through `--protocol-bindings` and
+writes versioned output through `--protocol-json` in owned external locations.
+Its ordinary invocation retains its existing behavior. Collection accounts for
+all expected document blobs and every required detector's applicable inputs
+and outcome. Thresholds, exceptions and structural rules belong to the consumer.
 
-Collection uses the fixed runtime/locale/owned-output allowlist and hardened
-Git controls. Strip ambient provider/publisher tokens, mapped job secrets,
-credential URLs, askpass hooks and agent sockets. Disable credential helpers,
-extraheaders and global/system credential configuration through trusted
-controls. Preserve the owner's home and host credentials. This isolates ambient
-credentials for trusted consumer code. A consumer needing detector secrets or
-extra network access must go through the protected execution-change grant and
-trial. Scanner execution stays repository-write-free, including feedback.
+Scanner and verification processes receive the fixed credential-free execution
+environment and hardened Git controls. Their outputs are checked against the
+committed inventory and source. Preserve the owner's home, credentials and
+other checkouts. Additional detector access follows its explicitly selected
+execution-change procedure and trial.
 
-## Publisher accounts by entry
+## Native profiles and installed identity
 
-A consumer can use one account through `publication.actor`. For separate hosted
-and interactive accounts, add the complete `publication.entry_actors` map to its
-settings. Populate these login values from the accounts selected for that
-consumer's credentials.
+Choose profile names for the project, such as `interactive` and `hosted`,
+independently of the orchestrating harness. Each role selects a client ID,
+model and allowed arguments. Copilot and Claude are the supported native role
+backends. Their original native streams must establish the actual full model,
+fresh context and successful final reply. Missing tools, capabilities or model
+identity leave setup/review pending.
 
-```yaml
-publication:
-  actor: example-automation[bot]
-  entry_actors:
-    hosted: example-automation[bot]
-    copilot: example-owner
-    claude: example-owner
-```
+Declare executable commands in `clients`. The runtime uses the clients' normal
+authentication paths and inherits only explicitly named role credentials.
+Install and authenticate them separately through their owning tools.
 
-This fragment extends the consumer's complete `publication` section. Its
-`hosted` value must match `actor` case-insensitively. Declare every entry, include
-each publisher in `pr_discovery.authors`, and cover the publication branch with
-an equal or parent discovery prefix. Copilot and Claude can share an account.
-Their original entry, role receipt and invocation remain independently bound.
+`component` binds `plugin_version`, `source_commit` and `component_sha256`.
+The runtime checks the installed plugin's complete regular-file inventory,
+executable modes and bytes once per invocation. Each new invocation verifies
+its inputs again. An installed payload that differs from the binding leaves
+provider execution and remote effects at setup-required. Static collection and
+its diagnostic report remain available. Bun's exact version is diagnostic for
+ordinary version-two operations. Required execution capabilities still apply.
 
-Select the intended entry with `--entry hosted`, `--entry copilot` or
-`--entry claude` when collecting `trial-bindings` and preparing a mapped
-`prepare-trial-fixture`. Interactive binding collection observes the selected
-account through the existing read credential and requires the observed current
-default as `--source`. Scalar policy ignores entry selection. A non-hosted
-`--entry` still performs the native account/default read. The scalar `trial-bindings`
-call without an entry keeps its offline metadata-inspection behavior.
+Use `publication.actor` for one account, or declare every configured profile
+in `publication.entry_actors`. Include each publisher in `pr_discovery.authors`
+and include its branch namespace in discovery. The runtime reads the native
+account's login and numeric ID. Login comparisons accept case changes while
+preserving original evidence bytes. A changed account ID or material login
+requires fresh selection and evidence.
 
-The runtime resolves the authenticated viewer's numeric ID through GitHub's
-native account endpoint and records the returned login. Configured logins and
-later native observations compare case-insensitively with exact numeric IDs.
-Adoption records, manifests and retained evidence preserve their original
-spelling and bytes. A materially different login or numeric ID requires the
-existing changed-account handling. Account names in the map supply discovery
-eligibility. Historical publication verification also checks the producing
-source's adoption and original entry.
+Read `references/docs-drift-review.md` for scoped approval and original-run
+recovery. The selected client, worker and reviewer retain separate original
+invocations and targets. Runtime hashes and checklists carry owner attestations
+and retained-byte integrity.
 
-Scalar adoption retains its version-1 record format. Mapped adoption records
-use version 2 and capture the native account separately for all three entries.
-Create the record through the setup and trial procedure below. Changes to the
-protected publisher configuration follow the affected-entry upgrade procedure,
-including fresh observations for the affected entries.
+## Reports and history
 
-## Runtime and hosted entry
+Eligible hosted history uses native repository, workflow, run, attempt, jobs
+and artifact observations. Preserve the configured scheduled triggers and manual
+dispatch. Require complete provenance and completed collection. A verified
+`new-attention` report can supply prior attention even when its workflow exits
+nonzero. Cancelled, incomplete and technical-failure runs leave history gaps.
 
-`runtime_loader` declares the launcher/provider, argument vector, literal
-`{plugin_dir}` and `{profile_root}` templates and credential reference names.
-Automatic updates and ambient discovery must both be false. Each client has a
-fixed version/platform, credential-free HTTPS distribution URL and SHA-256.
-Each of `hosted`, `copilot` and `claude` declares worker, independent reviewer
-and publisher vectors. Worker/reviewer roles bind client, full model and native
-identity-source event/field. Missing usable native identity leaves review pending.
-No setting grants provider execution or publication.
+Interactive history selects `actions`, `local-attestation` or `none`.
+Local attestation requires declared private history roots. Preserve its weaker
+provenance in the report. Age/count limits govern eligibility and leave saved
+records on disk. Interrupted and completed records remain available for their
+linked recovery needs. Terminal receipt refs are retained indefinitely.
+The helper collects history itself. New settings omit `history_reader_argv`.
+Older source records preserve that unused field when read.
+Version-one history attribution requires its original implementation. Its plans
+and receipts retain structural inspection and the original-execution handoff.
 
-The read-only audit runner has native Copilot and Claude launch paths. Each role
-uses its selected client, isolated profile and fresh context. Claude keeps the
-ordinary OAuth/API-key authentication path, with only the explicitly named
-credential inherited. The independent reviewer receives read tools. Native stream
-capture requires the original matching context and final successful canonical
-reply. Source tests with toy clients establish these controls. Actual installed
-client/model and hosted observations remain required for adoption.
-
-Use a private retained cache outside caller repositories/Git directories.
-The approved runtime verifies the retained complete component payload and client
-before creating isolated entry profiles. Inspect the exact invoked launcher
-and settings with the selected entry. Preserve the returned diagnostics.
-
-```text
-bun <plugin>/scripts/docs-drift/cli.ts inspect-runtime --repo <repo> --source <source> \
-  --cache-root <cache> --entry <entry> --launcher <launcher> --settings <settings>
-```
-
-Hosted setup supplies the configured worker/scheduled workflow paths, runner,
-permissions and secret-reference mappings. Actions access is read. Use checkout
-with credential persistence disabled. Run collection in a credential-free step
-before exposing role credentials in their required later steps. Use a separate
-collection job if the provider setup cannot preserve that separation. Transfer
-only bound outputs. Keep workflow/artifact upload, provider execution and any
-trial effects within their selected grants. Report output uses the declared
-existing run/repository destination. Upload only its bounded report/provenance
-pair, with the human-readable report available separately as intended.
-
-## History and retention
-
-Hosted eligible history comes from bounded native run/job/artifact observations
-for the configured repository, workflow, attempt and selected source. Require
-complete verified provenance and recorded completed collection. A failed run
-whose verified envelope records `new-attention` is eligible. Incomplete,
-technical-failure, cancelled or missing-provenance runs cannot establish a
-match. Interactive policy selects Actions,
-explicit local attestation or none. `local-attestation` requires declared local
-history roots. History is evidence used to identify already-carried attention.
-Unchanged items remain visible in the new report.
-
-Local invocation metadata lives in the explicitly selected private runtime cache.
-`reports.max_runs` limits inspected saved report pairs and `max_age_seconds`
-limits eligibility. Invocation-digest indexing is current, and older
-timestamp-addressed records remain readable. Each metadata record is byte-bounded.
-Completed records and interrupted `.pending-*` files remain until explicit
-owned cleanup. Preserve them with journals, receipts and linked artifacts when
-recovery still needs them. An age/count eligibility limit leaves saved evidence
-on disk. The workflow retains completed and other terminal receipt refs indefinitely.
+For hosted jobs, keep checkout credential persistence disabled and collection
+credential-free. Expose each role credential only to its owning step. Preserve
+the bounded report/provenance pair and human summary before applying the final
+attention exit. Keep runner, permissions, secret mapping and artifact retention
+in the consumer workflow.
 
 ## Staged adoption and upgrades
 
-Start with `publication.mode: staged`. It denies shared real-corpus effects.
-Use the fixed installed synthetic entry and owned fixture definition under
-its selected trial grant. Collector receipts establish fixture coverage.
-Retain actual native installed-role and hosted advisory/history observations
-separately. Keep legacy routes active until their required replacement evidence
-and explicit cutover are observed. Test rollback while staged and preserve
-legacy configuration needed to reverse the change.
+Start with `publication.mode: staged`. Keep the consumer's existing routes
+active while validating the replacement. A declared synthetic trial uses its
+isolated fixture paths and branch/lease/receipt namespace. Native trials bind
+the original definition, component, workflow, event, head, run, attempt and
+credential-selected publisher. Collector trials retain their hermetic fixture
+binding. Test actual installed native roles and unattended execution separately
+from fixture coverage.
 
-Before adoption cutover D, the operator reads and hashes the original installed
-artifacts and verifies payload, consumer, native-install/model targets and
-results. Commit the approved portable adoption record with those bindings.
-Runtime gates report owner attestation and use that committed portable record
-without requiring the operator's private artifact directory on every host.
-The record grants only effects explicitly adopted by the consumer procedure.
+Prepare candidate C, then a flat preflight checklist naming the released
+component, exact consumer candidate, proposed activation diff and review target.
+Record applicable installation, routing, scanner parity, native trials,
+paired review and rollback evidence. Every configured native profile needs
+its actual observed models and publisher identity. The reviewed activation D
+is C's direct child and changes only its declared activation files plus the
+checklist. Production requires the adopted settings and a matching checklist.
 
-```text
-bun <plugin>/scripts/docs-drift/cli.ts trial-bindings --repo <repo> --source <source>
-```
+Read original evidence during adoption. The portable checklist records those
+observed targets as owner attestations. Each remote effect retains its separate
+current approval and live checks. Keep missing acceptance visible and preserve
+the existing route until the replacement has passed its required checks.
 
-After an upgrade, evaluate protected component/consumer execution, client/model
-identity, secret mapping, lease and closure/supersession contract changes.
-Use `check-upgrade-signals` and the recorded adoption bindings. Compatible
-changes still need independent review and installed checks. Contract-changing
-updates require their explicit trial/re-adoption. Ordinary scope, detector
-options and feedback use normal freshness while preserving that contract.
-Keep unavailable required acceptance visible and the corresponding legacy
-route active until its actual replacement test passes.
+Classify upgrades using the affected component, procedure/report, scanner,
+execution, recovery, workflow and native-entry rows in the preflight helper.
+Repeat their applicable checks and paired review. Preserve original run policy,
+roles, approvals and receipts across upgrades and rollback. Use the recovery
+handoff when an older original implementation is required.

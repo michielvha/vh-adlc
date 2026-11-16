@@ -8,7 +8,7 @@ import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { roleRuntimeDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
 
-export async function sourceOnlyFixture(roots: string[], publicationKind: "issue-create" | "pr-create", fullComponent = false) {
+export async function sourceOnlyFixture(roots: string[], publicationKind: "issue-create" | "pr-create", fullComponent = true) {
   const f = await bindingFixture(roots, false, { sourceCheckNeedsRepair: true, fullComponent,
     role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source } });
   const decisions = retainSyntheticArtifact(f.artifacts, "source-only-decisions.json", canonicalJSON({ ...f.decisions, decisions: [] }));

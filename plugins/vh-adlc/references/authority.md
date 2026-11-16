@@ -208,8 +208,8 @@ Before relying on an adopted procedure, the invoking agent must confirm that
 the committed current procedure explicitly permits each selected effect,
 repository/destination and exact scope. A nonempty or unchanged procedure alone
 supplies no semantic permission. Missing or ambiguous effect authority remains
-pending for the owner. A technical `check-publication` pass preserves this
-operator/agent obligation.
+pending for the owner. Passing the technical publication checks preserves this operator/agent
+obligation.
 
 | Action | Authority and conditions |
 | --- | --- |

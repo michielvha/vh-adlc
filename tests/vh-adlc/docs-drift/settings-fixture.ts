@@ -60,13 +60,14 @@ export function settingsFixture() {
 /** Ordinary client commands and project policy, independent of the invoking harness. */
 export function installedSettingsFixture() {
   const legacy = settingsFixture();
-  const { component_pin: _pin, runtime_loader: _loader, clients: _clients, execution, publication, ...common } = legacy;
+  const { component_pin: _pin, runtime_loader: _loader, clients: _clients, execution, publication, reports: legacyReports, ...common } = legacy;
+  const { history_reader_argv: _reader, ...reports } = legacyReports;
   const { adoption_record: _adoption, ...policy } = publication;
   const previous = execution.entries.copilot;
   const entry = { worker: { ...previous.worker, client: "copilot", argv: [] as string[] },
     reviewer: { ...previous.reviewer, client: "copilot", argv: [] as string[] }, publisher: previous.publisher };
   return {
-    ...common, schema_version: 2 as const,
+    ...common, reports, schema_version: 2 as const,
     component: { plugin_version: "0.25.0", source_commit: "a".repeat(40), component_sha256: "b".repeat(64) },
     credential_references: ["COPILOT_GITHUB_TOKEN"],
     clients: { copilot: { provider: "copilot", executable: "copilot" } },

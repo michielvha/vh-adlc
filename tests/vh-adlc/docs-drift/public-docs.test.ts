@@ -2,7 +2,7 @@
 import { expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { argumentsForCommand } from "../../../plugins/vh-adlc/scripts/docs-drift/cli";
+import { parseRunOptions } from "../../../plugins/vh-adlc/scripts/docs-drift/run-cli";
 
 const root = resolve(import.meta.dir, "../../..");
 const guides = ["README.md", "docs/user-guides/workflows.md", "docs/reference/compatibility.md",
@@ -24,12 +24,12 @@ test("public docs-drift setup templates pass the real argument parser", () => {
       .map(match => match[1].replaceAll(/\\\n\s*/gu, " ").trim().split(/\s+/u));
   });
   expect(commands.length).toBeGreaterThan(0);
-  const values: Record<string, string> = { "<project>": "/fixture/project", "<full-commit>": "a".repeat(40),
-    "<private-external-directory>": "/fixture/artifacts" };
+  const values: Record<string, string> = { "<project>": root, "<full-commit>": "a".repeat(40),
+    "<new-private-external-directory>": "/fixture/run" };
   for (const command of commands) {
-    const parsed = argumentsForCommand(command.map(word => values[word] ?? word));
+    const parsed = parseRunOptions(command.map(word => values[word] ?? word));
     expect(parsed.command).toBe("scan");
-    expect(parsed.repo).toBe("/fixture/project");
+    expect(parsed.repo).toBe(root);
     expect(parsed.source).toBe("a".repeat(40));
   }
 });

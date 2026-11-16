@@ -10,7 +10,7 @@ import { publicationMarker } from "./report-history";
 import { externalArtifactDirectory } from "./snapshot";
 import type { Settings } from "./settings";
 import { UnrecognizedRetainedMetadata, type PublicationTransport, type PlanObjects, type EffectObservation } from "./transport";
-import { PublicationScopeChanged, verifyPublicationGate, type PublishOptions, type PublishResult } from "./publish";
+import { PublicationScopeChanged, createPublicationVerifier, type PublishOptions, type PublishResult } from "./publish";
 
 function terminal(journal: Journal, effectId: string): boolean {
   return journal.events.some(event => event.effect_id === effectId && (event.kind === "outcome" || event.kind === "acknowledged-delivery"));
@@ -21,6 +21,7 @@ function intended(journal: Journal, effectId: string): boolean {
 
 /** Observation can reconcile an old effect. A fresh gate is mandatory before every new remote write. */
 export async function resumeEffects(options: PublishOptions & { journal_directory: string }): Promise<PublishResult> {
+  const verify = createPublicationVerifier(options);
   let journal = readJournal(options.journal_directory, options.source_repo);
   if (dirname(journal.directory) !== externalArtifactDirectory(options.transport.artifact_root, options.source_repo)
     || options.artifact_root !== options.transport.artifact_root) throw Error("selected recovery artifact root changed");
@@ -133,7 +134,7 @@ export async function resumeEffects(options: PublishOptions & { journal_director
       const attempt = pendingAttempt(journal, effect);
       if (attempt) return blocked(effect.id, attempt);
       if (retired.size > 0 || invalidated) return blocked(effect.id, "reconciliation-only-no-replay");
-      await verifyPublicationGate(options, journal);
+      await verify(journal);
       const lease = await options.transport.ref(options.settings.publication.lease_ref);
       if (effect.kind === "lease-acquire") {
         const receipt = await options.transport.ref(options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id);

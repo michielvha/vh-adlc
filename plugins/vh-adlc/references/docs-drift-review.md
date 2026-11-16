@@ -9,36 +9,18 @@ source/artifact digests and command results in the private artifact root.
 Unavailable identity, scope or capability leaves `review pending` and a
 self-contained handoff. Record the observed limits before delivery selection.
 
-The source record returned by `assess-source` and a canonical decision packet
-are original inputs. The production collectors validate their exact bytes and
-bindings. Collect selected worker inputs from those records and the approved
-runtime. Separately authorize actual provider execution.
-
-```text
-bun <plugin>/scripts/docs-drift/cli.ts collect-worker-inputs --repo <repo> --source <source> \
-  --artifact-root <artifacts> --cache-root <cache> --entry <entry> \
-  --launcher <launcher> --settings <settings> \
-  --source-verification <source-verification> --source-verification-sha256 <sha256> \
-  --decisions <decisions> --decisions-sha256 <sha256>
-```
-
-For report assessment, use `run-audit` with that same source/runtime/decision
-argument set to run the native worker and independent reviewer. Lower-level
-`read-worker-preparation`, `collect-assessment-review-target` and
-`read-assessment-review` inspect the exact original captures. Retain all
-collected proposal inputs and bounded prior-report provenance. A passing
-collector validates its recorded technical facts. Semantic verification still
-requires the independent reviewer to inspect the target.
+`scan` retains source verification and `report` retains the configured native
+worker assessment and independent reviewer. The run owns their original
+captures, decision packet, proposal inputs and bounded report-history evidence.
+The helper validates their exact bytes and bindings. The reviewer must inspect
+the complete target and current source.
 
 ## Candidate review and publication
 
-Bind the complete candidate after authorized edits, generators, checkpointing
-and verification. `collect-publication-inputs` collects the exact source,
-candidate, decisions and proposed payload. `bind-publication` also requires
-the original source-verification and candidate-verification records.
-Use `collect-review-target` with the original worker capture to expose the
-complete immutable independent-review target. Use `read-candidate-review`
-with the original reviewer capture to check its records and identity.
+After authorized preparation and checkpointing, `verify` collects the complete
+candidate, source assessment, decisions and proposed effects. It launches the
+independent reviewer against that exact immutable target and retains the native
+reply separately from the candidate.
 
 Review the complete committed assessment, selected changes, protected-document
 handling, feedback, generators/checks, finding-class changes, source/read-set
@@ -54,34 +36,42 @@ published current evidence document can support an issue-only run. Without it,
 retain the report draft and authorized-publication handoff until the document
 is observed published. Local private artifact links cannot supply that permalink.
 
-Run `check-publication` with the complete original source/candidate/runtime/
-selection/verification/role-capture references and the exact authority packet.
-For adopted-procedure authority, first confirm that the committed current
-procedure actually permits each selected effect and its exact destination/scope.
-The helper binds procedure bytes and effect digests and reports owner attestation.
-It does not interpret prose permissions. An unchanged nonempty procedure alone
-cannot supply that semantic authority. Leave missing or ambiguous authority
+Present the exact retained manifest and its digest to the owner. Save the
+actual approval in the run's owner-only `approval.yaml`, using the displayed
+digest and the exact owner request.
+
+```yaml
+manifest_sha256: <displayed-manifest-sha256>
+request: <actual owner approval of this exact displayed batch>
+```
+
+A selected standing grant uses `procedure: <committed-project-procedure-path>`
+in place of `request`. First verify that the committed current procedure
+permits every selected effect and exact destination. The helper binds the
+procedure bytes and effect digests as owner attestations. The harness must
+resolve the permission's actual scope. Missing or ambiguous authority stays
 pending for the owner.
-After its checks and actual publication authority, use `publish` through the
-same production CLI/native transport. Invoke its `cli.ts` from the exact
-approved retained component directory returned by runtime selection. Preserve
-that directory identity and its returned journal location. `publish`,
-`publish-closure`, `resume` and `resume-closure` execute from that exact approved
-retained controller. The original operation retains its controller identity
-across later plugin upgrades.
+
+```text
+bun <plugin>/scripts/docs-drift/cli.ts publish --repo <repo> --run-dir <run>
+```
+
+Execute from the exact original installed component. The run retains that
+controller identity, source policy, native roles and approval across later
+upgrades. Reopen the matching installed release for an original operation
+when the current payload differs.
+
 All hosted and interactive delivery uses this common publisher. An approved
 refresh uses its exact-owned branch-history checks. Follow every effect's
 separate scope from `references/authority.md`, including lease and receipt refs.
 The staged/current-default adoption gate still applies to issues and PRs.
 
-For post-merge resolution, run `collect-closure`, `collect-closure-target`,
-`collect-closure-worker-inputs`, `collect-closure-review-target` and
-`read-closure-review` in the order and with the distinct selection packets in
-`references/docs-drift.md`. Bind the
-actual merged head, current default/body, original selected proposals and exact
-explanation/close payload. `check-closure-publication` and `publish-closure`
-use the same native publisher and journal rules. See `references/docs-drift.md`
-for the immutable-record and limited closure-reassessment conditions.
+For post-merge closure, use `close` as described in the main procedure. Its
+first pass binds the merged head, current default/body, original proposals and
+exact explanation/closure payloads to fresh worker and reviewer captures.
+Approve that displayed manifest before repeating `close`. The same publisher
+and journal gates apply to closure. The immutable record and bounded
+closure-only reassessment conditions remain in the main procedure.
 
 ## Interrupted delivery
 
@@ -92,16 +82,29 @@ submitted payload bindings. Recovery observes actual complete native state
 before any replay. Keep changed, multiple or unavailable matches pending.
 Unchanged resume preserves completed comments and effect IDs.
 
-Use `resume` with the original publication arguments and journal directory,
-or `resume-closure` with the original closure arguments and journal. Both
-run through the original operation's exact approved retained controller and
-revalidate actual current authority, scope and source. Replay requires complete
-known absence plus unchanged original proof, payload and authorization.
-Source/actor/payload changes require a new reviewed/authorized operation and
-fresh explanation. Preserve foreign or moved leases.
+```text
+bun <plugin>/scripts/docs-drift/cli.ts resume --repo <repo> --run-dir <run> --action inspect
+bun <plugin>/scripts/docs-drift/cli.ts resume --repo <repo> --run-dir <run> --action continue
+```
 
-If local artifacts are lost, inspect or restore the retained operation into a
-new private artifact directory using its original full source and operation ID.
+Version-two controller records also bind the original repository, launcher,
+settings and run-cache paths. Keep those recorded paths available for a pending
+operation. Their binding remains part of the original controller record while
+runtime selection uses the ordinary installed component.
+
+Continue through the original run directory and host ownership. Every new effect
+requires fresh current authority, source, native identity and exact payload.
+Replay requires known absence and unchanged original proof. Completed comments
+retain their original effect IDs. Material source, actor or payload changes
+require a fresh reviewed and approved operation, including a fresh explanation.
+
+If the original artifacts or host ownership are lost, restore observations into
+a fresh external run directory with the original full source and operation ID.
+
+```text
+bun <plugin>/scripts/docs-drift/cli.ts resume --repo <repo> --source <original-source> \
+  --run-dir <restored-run> --action restore --operation-id <operation>
+```
 
 For a version-two native trial, confirm its original committed definition when
 restoring observations through the run-directory interface.
@@ -119,29 +122,42 @@ summary supplies ref names and object IDs for the separately approved
 administrative Git handoff. Original records with insufficient launch evidence
 remain inspectable and return an execution handoff.
 
-```text
-bun <plugin>/scripts/docs-drift/cli.ts inspect-retained --repo <repo> --source <source> \
-  --artifact-root <artifacts> --operation-id <operation>
-```
+Restored mirrors retain observation-only ownership. Preserve unresolved effects
+as pending. Original-run recovery requires its surviving application,
+settlement and ownership evidence.
 
-Restored observation-only mirrors can show native outcomes. Missing original
-approval, payload or ownership produces a pending recovery handoff. Restore
-does not recreate original approval. Original ownership remains necessary for
-mutating reconciliation or releasing a live lease.
+The trusted harness uses `inspectRecovery` to present the fresh native lookup,
+exact selection and acknowledgement/reconciliation scopes. After the owner's
+actual scoped decision it retains `recovery_selection` and `approval` artifacts
+through the existing run artifact writer and appends their pending run stage.
+Use `resume --action acknowledge` or `resume --action reconcile` on that
+original run. Those actions recheck the original selection and authority before
+execution. Keep source policy, launchers and other writers' work intact.
+The selected recovery purpose and current lookup remain separate from the
+ordinary publication approval. The controller and run APIs define those retained
+records. [Recovery controller](../scripts/docs-drift/recovery-controller.ts),
+[run artifacts](../scripts/docs-drift/run-directory.ts).
 
-Use `inspect-recovery` to collect a fresh bounded native lookup against the
-original selected journal and scope. Invoke `inspect-recovery`,
-`acknowledge-delivery` and `reconcile-publication` from the original retained
-plugin's `scripts/docs-drift/cli.ts`, using the original retained cache, policy
-and journal evidence. Preserve current worktree policy and launchers during
-that recovery. Report missing retained code/runtime evidence in the pending
-handoff. `<original-retained-plugin>` below is that verified original directory.
+## Lost hosted origin and administrative abandonment
 
-```text
-bun <original-retained-plugin>/scripts/docs-drift/cli.ts inspect-recovery --repo <repo> --source <source> \
-  --artifact-root <artifacts> --cache-root <cache> --entry <entry> \
-  --journal-directory <journal> --selection <selection> --selection-sha256 <sha256>
-```
+For an unresolved operation whose original hosted runner and ownership are
+lost, preserve the ordinary inspect/restore output as
+`abandonment-inspection.json`. Retain the exact current owner approval beside
+it in `approval.txt`. Name the repository, operation, selected lease/receipt
+refs and each observed object ID. Record unknown native outcomes as unknown.
+
+The owner-approved administrator can use ordinary Git compare-and-swap against
+only those exact ref/object pairs. Reobserve changed refs and obtain new exact
+approval. Lease-only cleanup can leave an unresolved receipt, so the next
+scheduled worker must keep its pending report until that evidence is resolved
+or separately abandoned. Completed and otherwise terminal receipts retain their
+refs indefinitely.
+
+Administrative abandonment supplies no delivery or settlement proof and adds
+no terminal event to an observation-only journal. After the exact approved refs
+are removed, the next job must collect current source and proposal state and
+obtain fresh review and approval. Keep the inspection, approval and original
+evidence available for the operator's reconciliation.
 
 ## Delivery acknowledgement
 
@@ -176,9 +192,9 @@ The original verified journal/run ownership and current actor/repository
 binding must still hold. An inferred same-plan lease in a restored mirror
 supplies observations only.
 
-`acknowledge-delivery` uses the inspected recovery argument set plus its exact
-digest-bound authority packet. `reconcile-publication` handles separately
-authorized known-absence reconciliation. Recheck the lookup, ownership and
+`resume --action acknowledge` uses the inspected selection and its exact
+digest-bound current-owner authority. `resume --action reconcile` handles
+separately authorized known-absence reconciliation. Recheck the lookup, ownership and
 evidence before acknowledgement and again before exact-owned atomic lease
 release. Account for every remaining effect first. Preserve release intent,
 lost-response recovery and the immutable retained receipt ref.

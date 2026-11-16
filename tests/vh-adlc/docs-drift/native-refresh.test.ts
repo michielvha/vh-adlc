@@ -14,15 +14,14 @@ test.each(["shared", "legacy"])("normal refresh review target binds the native e
   expect(effects[3].payload).toMatchObject({ number: 17, expected_head: f.head, expected_payload: f.before, title: "Repair the guide", draft: false });
 }, 60000);
 
-test.each(["cli", "interrupted-branch", "interrupted-delivery", "legacy", "alias"])("the retained refresh controller updates one original proposal through %s", async scenario => {
+test.each(["interrupted-branch", "interrupted-delivery", "legacy", "alias"])("the retained refresh controller updates one original proposal through %s", async scenario => {
   const { readFileSync, writeFileSync } = await import("node:fs");
   const { join } = await import("node:path");
   const { spyOn } = await import("bun:test");
   const { reviewRefresh } = await import("./refresh-fixture");
-  const { installOwnedNativeService, publicationCLIArguments } = await import("./original-publication-fixture");
+  const { installOwnedNativeService } = await import("./original-publication-fixture");
   const { readGit } = await import("../../../plugins/vh-adlc/scripts/docs-drift/git");
   const { captureRepositoryState } = await import("../../../plugins/vh-adlc/scripts/docs-drift/snapshot");
-  const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
   const f = await refreshFixture(roots, scenario === "legacy", scenario === "alias" ? "alias" : undefined), publication = reviewRefresh(f);
   const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
   readGit(f.origin, "update-ref", "refs/heads/" + f.branch, f.source);
@@ -30,19 +29,8 @@ test.each(["cli", "interrupted-branch", "interrupted-delivery", "legacy", "alias
   state.prs = [f.original];
   if (scenario === "alias") state.labels.Documentation = state.labels.documentation;
   writeFileSync(service.statePath, JSON.stringify(state), { mode: 0o600 });
-  const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
-  if (scenario === "cli") {
-    const argv = publicationCLIArguments({ ...f, reviewer: publication.reviewer_capture, authority: publication.authority, publication }, "publish");
-    const environment = Object.fromEntries(Object.entries(f.native.environment).filter((pair): pair is [string, string] => typeof pair[1] === "string"));
-    const completed = await executeOwnedProcess({ argv, cwd: f.repo, env: environment, watched_outputs: [], capture: "memory", timeout_ms: 600000,
-      stdout: join(f.artifacts, "refresh-cli.stdout"), stderr: join(f.artifacts, "refresh-cli.stderr"), started: () => {} });
-    expect(completed.reaped).toBe(true); expect(completed.timed_out).toBe(false);
-    const output = Buffer.from(completed.captured?.stdout ?? []).toString();
-    const report = JSON.parse(output);
-    expect(completed.exit_code, JSON.stringify({ diagnostics: report.diagnostics, reason: report.publication_effects?.reason,
-      stderr: Buffer.from(completed.captured?.stderr ?? []).toString() })).toBe(0);
-    expect(report.publication_effects.state).toBe("complete");
-  } else if (scenario.startsWith("interrupted")) {
+  const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+  if (scenario.startsWith("interrupted")) {
     const journal = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts")), append = journal.appendOutcome;
     let injected = false;
     const fault = spyOn(journal, "appendOutcome").mockImplementation((current: unknown, id: string, outcome: unknown) => {
@@ -50,12 +38,12 @@ test.each(["cli", "interrupted-branch", "interrupted-delivery", "legacy", "alias
       return append(current, id, outcome);
     });
     let pending;
-    try { pending = await controller.publishPublication(publication); } finally { fault.mockRestore(); }
-    expect(injected).toBe(true); expect(pending.state, pending.reason).toBe("pending");
-    const resumed = await controller.resumePublication({ ...publication, journal_directory: pending.journal.directory });
-    expect(resumed.state, resumed.reason).toBe("complete");
+    try { pending = await f.invoke(run => controller.publishPublication(publication, run)); } finally { fault.mockRestore(); }
+    expect(injected).toBe(true); expect(pending.state, pending.reason ?? undefined).toBe("pending");
+    const resumed = await f.invoke(run => controller.resumePublication({ ...publication, journal_directory: pending.journal.directory }, run));
+    expect(resumed.state, resumed.reason ?? undefined).toBe("complete");
   } else {
-    const result = await controller.publishPublication(publication); expect(result.state, result.reason).toBe("complete");
+    const result = await f.invoke(run => controller.publishPublication(publication, run)); expect(result.state, result.reason ?? undefined).toBe("complete");
   }
   const final = JSON.parse(readFileSync(service.statePath, "utf8"));
   expect(final.prs).toHaveLength(1); expect(final.prs[0]).toMatchObject({ number: 17, user: f.original.user,
@@ -91,10 +79,10 @@ test("the native publication controller acknowledges its recased legacy refresh 
     readGit(f.origin, "update-ref", "refs/heads/" + f.branch, f.source);
     const service = installOwnedNativeService(f), state = JSON.parse(readFileSync(service.statePath, "utf8"));
     state.prs = [f.original]; writeFileSync(service.statePath, JSON.stringify(state));
-    const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
     const journal = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts")), append = journal.appendOutcome;
     const transportModule = await import(join(f.retained.directory, "scripts/docs-drift/transport.ts"));
-    const recovery = await import(join(f.retained.directory, "scripts/docs-drift/recovery.ts"));
+    const recovery: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/recovery") = await import(join(f.retained.directory, "scripts/docs-drift/recovery.ts"));
     const effect = f.target.manifest!.effects.find(item => item.kind === "pr-update")!;
     let lost = false;
     const fault = spyOn(journal, "appendOutcome").mockImplementation((current: unknown, id: string, outcome: unknown) => {
@@ -102,8 +90,8 @@ test("the native publication controller acknowledges its recased legacy refresh 
       return append(current, id, outcome);
     });
     let pending;
-    try { pending = await controller.publishPublication(publication); } finally { fault.mockRestore(); }
-    expect(lost).toBe(true); expect(pending.state, pending.reason).toBe("pending");
+    try { pending = await f.invoke(run => controller.publishPublication(publication, run)); } finally { fault.mockRestore(); }
+    expect(lost).toBe(true); expect(pending.state, pending.reason ?? undefined).toBe("pending");
     const originalPlan = canonicalJSON(pending.journal.plan), changed = JSON.parse(readFileSync(service.statePath, "utf8"));
     const originalLogin = changed.prs[0].user.login;
     expect(changed.prs[0].user.id).not.toBe(pending.journal.plan.manifest.actor_id);
@@ -112,15 +100,17 @@ test("the native publication controller acknowledges its recased legacy refresh 
     changed.prs[0].body += "\nOwner edit after the original refresh";
     writeFileSync(service.statePath, JSON.stringify(changed));
     const store = f.target.bindings!.source_verification!.object_store!, settings = captureSnapshot(f.repo, f.source).settings;
-    const transport = transportModule.createNativeTransport({ source_repo: f.repo, artifact_root: f.artifacts, object_store: store,
-      settings, credential: f.options.credential, path: f.options.path });
-    const result = await recovery.acknowledgeDeliveries({ source_repo: f.repo, journal_directory: pending.journal.directory,
+    const result = await f.invoke(run => {
+      const transport = transportModule.createNativeTransport({ source_repo: f.repo, artifact_root: f.artifacts, object_store: store,
+      settings, credential: f.options.credential, path: f.options.path, run });
+      return recovery.acknowledgeDeliveries({ source_repo: f.repo, journal_directory: pending.journal.directory,
       object_store: store, settings, transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [], authorize: async (scope: unknown) => ({
         kind: "owner-delivery-acknowledgement", source: "owner-current-request", scope_sha256: sha256(canonicalJSON(scope)),
         request_sha256: sha256(Buffer.from("Synthetic owner preserves the edited legacy refresh")) }) });
-    expect(result.state, result.reason).toBe("acknowledged"); expect(canonicalJSON(result.journal.plan)).toEqual(originalPlan);
+    });
+    expect(result.state, result.reason ?? undefined).toBe("acknowledged"); expect(canonicalJSON(result.journal.plan)).toEqual(originalPlan);
     const acknowledgement = result.journal.events.find((event: { kind: string }) => event.kind === "acknowledged-delivery");
-    if (!acknowledgement?.payload.lookup) throw Error("missing native refreshed legacy lookup");
+    if (!acknowledgement || !("lookup" in acknowledgement.payload) || !acknowledgement.payload.lookup) throw Error("missing native refreshed legacy lookup");
     const lookup = JSON.parse(readFileSync(acknowledgement.payload.lookup.path, "utf8")).lookup;
     expect(lookup.creator_projection).toEqual({ recorded_login_sha256: sha256(Buffer.from(originalLogin)),
       observed_login_sha256: sha256(Buffer.from(changed.prs[0].user.login)) });

@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { populateRepository, commitAll, git, put } from "./repository-fixture";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { assessSource } from "../../../plugins/vh-adlc/scripts/docs-drift/source-assessment";
@@ -108,28 +108,6 @@ test.each(["missing", "changed", "untracked", "dirty-bytes"])("affirmative corpu
   expect(report.complete).toBe(false); expect(report.authority).toBe("none");
 });
 
-test("the normal report CLI preserves a corpus finding and its caller-assessment boundary", async () => {
-  const f = await fixture("confirmed-drift", { corpus: true, emptyCorpus: true }), assessment = retain(f, f.packet);
-  const before = captureRepositoryState(f.repo);
-  try {
-    const result = Bun.spawnSync([process.execPath, resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"),
-      "report-findings", "--repo", f.repo, "--source", f.source, "--artifact-root", f.artifacts,
-      "--source-verification", f.original.evidence!.path, "--source-verification-sha256", f.original.evidence!.sha256,
-      "--assessment", assessment.path, "--assessment-sha256", assessment.sha256], {
-      env: { PATH: process.env.PATH, HOME: process.env.HOME, LANG: "C", LC_ALL: "C", BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
-      stdout: "pipe", stderr: "pipe", timeout: 30000,
-    });
-    expect(result.exitCode).toBe(0);
-    const report = JSON.parse(result.stdout.toString());
-    expect(report).toMatchObject({ command: "report-findings", outcome: "collected",
-      assessment_report: { complete: true, authority: "none", origin: "caller-assessment" } });
-    expect(report.assessment_report.findings[0].finding.document).toBeNull();
-    expect(report.assessment_report.counts.documents).toBe(0);
-    expect(report.markdown).toContain("Corpus-wide finding");
-    expect(captureRepositoryState(f.repo)).toEqual(before);
-  } catch (error) { preservedRoots.add(f.root); throw error; }
-}, 45000);
-
 test.each(["missing-row", "unknown-id", "duplicate", "changed-source", "changed-proof", "bad-quote", "wrong-document", "missing-evidence", "extra-authority"])("original-source report refuses incomplete or unbound assessment %s", async fault => {
   const { readAssessmentReport } = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
   const f = await fixture(), packet = structuredClone(f.packet);
@@ -161,49 +139,6 @@ test("the report keeps its opening short while retaining every detailed finding"
   expect(opening).toContain("3 additional items");
   for (let index = 0; index < 8; index++) expect(markdown).toContain(`### finding-${index}`);
 });
-
-test.each(["matching", "missing-reference", "wrong-digest", "authority-flag", "caller-artifacts", "near-limit"])("the normal report-findings entry preserves caller state for %s", async fault => {
-  const f = await fixture(fault === "near-limit" ? "confirmed-drift" : "unknown");
-  if (fault === "near-limit") {
-    const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
-    const base = api.readAssessmentReport({ ...f, source_verification: f.original.evidence, assessment: retain(f, f.packet) });
-    const priorBytes = canonicalJSON({ report: base, markdown: api.renderAssessmentReport(base) }).length;
-    f.packet.findings[0].reason = "x".repeat(Math.floor((524288 - priorBytes) / 2) + f.packet.findings[0].reason.length - 2);
-  }
-  const assessment = retain(f, f.packet), verification = f.original.evidence;
-  if (!verification) throw Error("Missing source evidence fixture");
-  const before = captureRepositoryState(f.repo);
-  const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
-  const environment: Record<string, string> = { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "", TMPDIR: tmpdir() };
-  if (process.env.XDG_CACHE_HOME) environment.XDG_CACHE_HOME = process.env.XDG_CACHE_HOME;
-  const argv = [process.execPath,
-    join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), "report-findings", "--repo", f.repo, "--source", f.source,
-    "--artifact-root", f.artifacts, "--source-verification", verification.path, "--source-verification-sha256", verification.sha256,
-    "--assessment", assessment.path, "--assessment-sha256", assessment.sha256];
-  if (fault === "missing-reference") argv.splice(argv.indexOf("--source-verification"), 2);
-  if (fault === "wrong-digest") argv[argv.indexOf("--assessment-sha256") + 1] = "0".repeat(64);
-  if (fault === "authority-flag") argv.push("--approved", "true");
-  if (fault === "caller-artifacts") argv[argv.indexOf("--artifact-root") + 1] = f.repo;
-  const completion = await executeOwnedProcess({ argv, cwd: f.root, env: environment,
-    watched_outputs: [], capture: "memory", timeout_ms: 30000, stdout: join(f.artifacts, "report-stdout"), stderr: join(f.artifacts, "report-stderr"), started: () => {} });
-  const report = JSON.parse(Buffer.from(completion.captured?.stdout ?? []).toString());
-  expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
-  expect(completion.exit_code, JSON.stringify(report.diagnostics)).toBe(fault === "matching" ? 0 : 2);
-  expect(report.command).toBe("report-findings");
-  expect(completion.captured!.stdout.length).toBeLessThanOrEqual(524288);
-  if (fault === "matching") {
-    expect(report.assessment_report).toMatchObject({ complete: true, authority: "none", counts: { unknown: 1 } });
-    expect(report.markdown).toContain("Finding details");
-  } else {
-    expect(report.outcome).toBe("incomplete"); expect(report.diagnostics.length).toBeGreaterThan(0);
-    if (fault === "near-limit") {
-      expect(report.assessment_report).toMatchObject({ details_omitted: true, source_verification: verification, assessment_reference: assessment });
-      expect(report.diagnostics.map((row: { message: string }) => row.message).join("\n")).toContain("exceeds the retained entry bound");
-    }
-  }
-  expect(captureRepositoryState(f.repo)).toEqual(before);
-}, 60000);
-
 
 test("a complete scan with incomplete roots remains an incomplete finding report", async () => {
   const { readAssessmentReport } = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
@@ -337,19 +272,4 @@ test.each(["declared", "omitted", "malformed"] as const)("finding reports load o
   const report = readAssessmentReport({ ...f, assessment, source_verification: f.original.evidence });
   expect(report.complete, report.diagnostics.join("\n")).toBe(localCoverage === "declared");
   expect(report.authority).toBe("none"); expect(captureRepositoryState(f.repo)).toEqual(before);
-  if (localCoverage === "declared") {
-    const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
-    const source = f.original.evidence!;
-    const completion = await executeOwnedProcess({ argv: [process.execPath,
-      join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), "report-findings", "--repo", f.repo, "--source", f.source,
-      "--artifact-root", f.artifacts, "--source-verification", source.path, "--source-verification-sha256", source.sha256,
-      "--assessment", assessment.path, "--assessment-sha256", assessment.sha256], cwd: f.root,
-      env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "", TMPDIR: tmpdir() },
-      watched_outputs: [], capture: "memory", timeout_ms: 30000, stdout: join(f.artifacts, "local-coverage.stdout"),
-      stderr: join(f.artifacts, "local-coverage.stderr"), started: () => {} });
-    expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
-    const emitted = JSON.parse(Buffer.from(completion.captured?.stdout ?? []).toString());
-    expect(completion.exit_code, JSON.stringify(emitted.diagnostics)).toBe(0);
-    expect(emitted.assessment_report.complete).toBe(true); expect(captureRepositoryState(f.repo)).toEqual(before);
-  }
 });

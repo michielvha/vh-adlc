@@ -6,17 +6,18 @@ import type { WorkerCollectionOptions } from "../../../plugins/vh-adlc/scripts/d
 import { readCoordinatedSelection } from "../../../plugins/vh-adlc/scripts/docs-drift/coordination";
 import { verifyCandidate } from "../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
-import { nativeReader, runtimeFixture } from "./runtime-fixture";
+import { nativeReader, runtimeFixture, nativeInvocationFixture, type RuntimePublisher, type RuntimeRole, type RuntimeSource } from "./runtime-fixture";
 import { commitAll, git, put } from "./repository-fixture";
 
 export async function bindingFixture(roots: string[], incompleteInventory: boolean, options: {
-  publisher?: Parameters<typeof runtimeFixture>[6];
-  scannerCase?: "none" | "finding"; sourceGuide?: string; coordinated?: boolean; sourceInsideCandidate?: boolean; sourceCheckNeedsRepair?: boolean; mutableInventory?: boolean; fullComponent?: boolean; legacy_ids?: number[]; role?: Parameters<typeof runtimeFixture>[3];
-  prepareSource?: (fixture: Awaited<ReturnType<typeof runtimeFixture>>) => string;
+  publisher?: RuntimePublisher;
+  scannerCase?: "none" | "finding"; sourceGuide?: string; coordinated?: boolean; sourceInsideCandidate?: boolean; sourceCheckNeedsRepair?: boolean; mutableInventory?: boolean; fullComponent?: boolean; legacy_ids?: number[]; role?: RuntimeRole;
+  configureSource?: (fixture: RuntimeSource) => void;
   beforeCandidate?: (input: { repo: string; source: string; artifacts: string; baseline: Awaited<ReturnType<typeof verifyCandidate>>; selection: unknown; decisions: Uint8Array; worker_options: WorkerCollectionOptions }) => void | Promise<void>;
 } = {}) {
   const { sourceInsideCandidate = false, sourceCheckNeedsRepair = false, beforeCandidate } = options;
-  const f = await runtimeFixture(roots, true, false, options.role, options.fullComponent ?? false, options.legacy_ids, options.publisher), repo = f.repo;
+  const f = await runtimeFixture(roots, { role: options.role, fullComponent: options.fullComponent ?? true,
+    legacy_ids: options.legacy_ids, publisher: options.publisher, configureSource: options.configureSource }), repo = f.repo;
   const scanner = readFileSync(join(import.meta.dir, "fixtures/scanner.js"), "utf8")
     .replace("__FIXTURE_CASE__", JSON.stringify(options.scannerCase ?? "none")).replace("__FIXTURE_ENDPOINT__", JSON.stringify("http://127.0.0.1:1"));
   put(repo, "scripts/scan.js", scanner); put(repo, "docs/suppressions.yaml", "suppressions: []\n");
@@ -29,9 +30,10 @@ export async function bindingFixture(roots: string[], incompleteInventory: boole
       .replace("  - src/\n  - config.yml", "  - docs/guide.md"));
   }
   if (options.sourceGuide !== undefined) put(repo, "docs/guide.md", options.sourceGuide);
-  const source = options.prepareSource?.(f) ?? commitAll(repo), candidate = join(f.root, "binding-candidate"), origin = join(f.root, "binding-origin"), artifacts = sourceInsideCandidate ? f.root : join(f.root, "binding-artifacts");
-  if (!sourceInsideCandidate) mkdirSync(artifacts, { mode: 0o700 });
-  git(f.root, "clone", "--no-local", "--no-checkout", repo, origin); git(origin, "update-ref", "refs/heads/main", source);
+  const source = commitAll(repo), candidate = join(f.root, "binding-candidate"), origin = join(f.root, "binding-origin"), artifacts = sourceInsideCandidate ? f.root : join(f.root, "binding-artifacts");
+  const nativeInvocation = sourceInsideCandidate ? undefined : await nativeInvocationFixture({ repo, source, directory: artifacts,
+    origins: join(f.root, "original-run-origins"), entry: f.selection.entry, component_directory: f.retained.directory });
+  git(f.root, "clone", "--bare", "--no-local", repo, origin); git(origin, "update-ref", "refs/heads/main", source);
   let head = "";
   if (sourceInsideCandidate) {
     git(f.root, "clone", "--no-local", "--no-checkout", repo, candidate); git(candidate, "checkout", "--detach", source);
@@ -75,7 +77,7 @@ const args = process.argv.slice(2), target = args.indexOf("https://github.com/fi
 if (args.includes("push")) process.exit(91);
 if (args.includes("fetch") && args.some(value => value.startsWith("https://")) && target < 0) process.exit(91);
 if (target >= 0) { args[target] = ${JSON.stringify(origin)}; args.splice(args.indexOf("fetch"), 0, "-c", "protocol.file.allow=always"); }
-const result = Bun.spawnSync([${JSON.stringify(executable)}, ...args], { stdout: "inherit", stderr: "inherit" }); process.exit(result.exitCode);
+const result = Bun.spawnSync([${JSON.stringify(executable)}, ...args], { stdin: "inherit", stdout: "inherit", stderr: "inherit" }); process.exit(result.exitCode);
 `, { mode: 0o700 });
   const worker_options: WorkerCollectionOptions = { ...common, repo, source, source_verification: baseline.evidence!,
     decisions: { path: "decisions.json", sha256: sha256(decisionBytes) }, credential: "synthetic-read-token", path: native.environment.PATH,
@@ -92,7 +94,11 @@ const result = Bun.spawnSync([${JSON.stringify(executable)}, ...args], { stdout:
   expect(baseline.complete, JSON.stringify({ stage: "source", diagnostics: baseline.diagnostics, scan: baseline.scan?.process })).toBe(!sourceCheckNeedsRepair);
   expect(verified.complete, JSON.stringify({ stage: "candidate", diagnostics: verified.diagnostics, scan: verified.scan?.process,
     commands: verified.commands.map(command => ({ argv: command.argv, process: command.process })) })).toBe(true);
-  return { ...f, ...common, repo, source, candidate, origin, head, artifacts, selection, baseline, assessment, verified, decisions, native, inventoryFile,
+  function invoke<T>(work: (run: import("../../../plugins/vh-adlc/scripts/docs-drift/run-directory").RunDirectory) => Promise<T>): Promise<T> {
+    if (!nativeInvocation) throw Error("Original run unavailable for this caller-overlap fixture");
+    return nativeInvocation.invoke(work);
+  }
+  return { ...f, invoke, ...common, repo, source, candidate, origin, head, artifacts, selection, baseline, assessment, verified, decisions, native, inventoryFile,
     options: { ...common, repo, source, candidate_repo: candidate, candidate: head, selection,
       source_verification: assessment?.evidence ?? baseline.evidence!, candidate_verification: verified.evidence!, decisions: { path: "decisions.json", sha256: sha256(decisionBytes) },
       credential: "synthetic-read-token", path: native.environment.PATH, cache_directory: f.selection.cache_directory,

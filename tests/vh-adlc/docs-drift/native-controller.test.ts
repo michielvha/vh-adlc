@@ -3,7 +3,6 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { originalPublicationFixture, installOwnedNativeService } from "./original-publication-fixture";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
-import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 
@@ -13,9 +12,9 @@ test("the retained native controller publishes one exact PR and settles its real
     const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
     console.error("Owned native fixture roots", JSON.stringify(roots));
     const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
-    const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
-    const result = await controller.publishPublication(f.publication);
-    expect(result.state, result.reason).toBe("complete");
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const result = await f.invoke(run => controller.publishPublication(f.publication, run));
+    expect(result.state, result.reason ?? undefined).toBe("complete");
     const state = JSON.parse(readFileSync(service.statePath, "utf8"));
     expect(state.prs).toHaveLength(1); expect(state.prs[0]).toMatchObject({ title: "Repair the guide", draft: false, head: { sha: f.head } });
     expect(state.prs[0].labels.map((label: { name: string }) => label.name)).toEqual(["documentation"]);
@@ -27,62 +26,13 @@ test("the retained native controller publishes one exact PR and settles its real
   } catch (error) { console.error("Preserved failed native fixture roots", JSON.stringify(roots)); throw error; }
 }, 365000);
 
-test("the normal retained publish and resume CLI delivers its exact approved batch once without changing caller work", async () => {
-  const roots: string[] = [];
-  try {
-    const { publicationCLIArguments } = await import("./original-publication-fixture");
-    const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
-    const { put } = await import("./repository-fixture");
-    const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
-    console.error("Owned native CLI fixture roots", JSON.stringify(roots));
-    put(f.repo, "docs/guide.md", "Preserve another source draft\n"); put(f.candidate, "docs/guide.md", "Preserve another candidate draft\n");
-    const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
-    const environment = Object.fromEntries(Object.entries(f.native.environment).filter((pair): pair is [string, string] => typeof pair[1] === "string"));
-    async function invoke(command: "publish" | "resume", journal?: string) {
-      const name = "native-cli-" + command;
-      const completion = await executeOwnedProcess({ argv: publicationCLIArguments(f, command, journal), cwd: f.repo, env: environment,
-        capture: "memory", watched_outputs: [], stdout: join(f.artifacts, name + ".stdout"), stderr: join(f.artifacts, name + ".stderr"),
-        timeout_ms: 600000, started: () => {} });
-      const { captured, ...processMetadata } = completion;
-      writeFileSync(join(f.artifacts, name + ".stdout"), captured?.stdout ?? new Uint8Array(), { mode: 0o600 });
-      writeFileSync(join(f.artifacts, name + ".stderr"), captured?.stderr ?? new Uint8Array(), { mode: 0o600 });
-      writeFileSync(join(f.artifacts, name + "-process.json"), canonicalJSON(processMetadata), { mode: 0o600 });
-      expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
-      expect(completion.exit_code, Buffer.from(captured?.stderr ?? []).toString() + Buffer.from(captured?.stdout ?? []).toString().slice(0, 8192)).toBe(0);
-      const report = JSON.parse(Buffer.from(captured?.stdout ?? []).toString());
-      expect(report.command).toBe(command);
-      return report;
-    }
-    const report = await invoke("publish");
-    expect(report.command).toBe("publish"); expect(report.publication_effects.state).toBe("complete");
-    const state = JSON.parse(readFileSync(service.statePath, "utf8")); expect(state.prs).toHaveLength(1);
-    const retainedJournal = readJournal(report.publication_effects.journal.directory, f.repo);
-    const delivered = retainedJournal.plan.manifest.effects.find(effect => effect.kind === "pr-create");
-    if (!delivered) throw Error("Missing original reviewed PR effect");
-    expect(state.prs[0].body).toBe(delivered.payload.body);
-    expect(report.publication_effects.journal.sha256).toBe(retainedJournal.digest);
-    expect(JSON.stringify(report)).not.toContain("Exact synthetic source correction");
-    const resumed = await invoke("resume", retainedJournal.directory);
-    expect(resumed.publication_effects.state).toBe("complete");
-    expect(resumed.publication_effects.journal.directory).toBe(retainedJournal.directory);
-    expect(resumed.publication_effects.journal.sha256).toBe(readJournal(retainedJournal.directory, f.repo).digest);
-    const afterResume = JSON.parse(readFileSync(service.statePath, "utf8"));
-    expect(afterResume.prs).toHaveLength(1);
-    expect(afterResume.prs[0].number).toBe(state.prs[0].number);
-    expect(afterResume.prs[0].body).toBe(delivered.payload.body);
-    expect(readGit(f.origin, "for-each-ref", "--format=%(refname)", "refs/heads/docs-drift-lease").toString()).toBe("");
-    expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
-    for (const root of roots) rmSync(root, { recursive: true, force: true });
-  } catch (error) { console.error("Preserved failed native CLI fixture roots", JSON.stringify(roots)); throw error; }
-}, 1500000);
-
 test("the retained controller resumes a delivered PR after its journal outcome write fails", async () => {
   const roots: string[] = [];
   try {
     const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
     console.error("Owned native recovery fixture roots", JSON.stringify(roots));
     const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
-    const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
     const journal = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts"));
     const original = journal.appendOutcome;
     let injected = false;
@@ -91,14 +41,14 @@ test("the retained controller resumes a delivered PR after its journal outcome w
       return original(current, id, outcome);
     });
     let pending;
-    try { pending = await controller.publishPublication(f.publication); }
+    try { pending = await f.invoke(run => controller.publishPublication(f.publication, run)); }
     finally { fault.mockRestore(); }
     expect(injected).toBe(true); expect(pending.state).toBe("pending");
     expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(1);
     expect(pending.journal.events.some((event: { kind: string; effect_id: string }) => event.kind === "outcome" && event.effect_id === "publication")).toBe(false);
     const roleFiles = [f.worker.path, f.reviewer.path].map(path => readFileSync(join(f.artifacts, path)));
-    const resumed = await controller.resumePublication({ ...f.publication, journal_directory: pending.journal.directory });
-    expect(resumed.state, resumed.reason).toBe("complete");
+    const resumed = await f.invoke(run => controller.resumePublication({ ...f.publication, journal_directory: pending.journal.directory }, run));
+    expect(resumed.state, resumed.reason ?? undefined).toBe("complete");
     const state = JSON.parse(readFileSync(service.statePath, "utf8")); expect(state.prs).toHaveLength(1);
     const calls = readFileSync(service.calls, "utf8").trim().split("\n").map(line => JSON.parse(line));
     expect(calls.filter(call => call.program === "gh" && call.args.includes("POST") && call.args.includes("repos/fixture/docs/pulls"))).toHaveLength(1);
@@ -114,7 +64,7 @@ async function changedBindingCase(kind: string) {
   try {
     const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
     console.error("Owned native invalidation fixture roots", JSON.stringify(roots));
-    const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
     const journal = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts"));
     const authorityPath = join(f.artifacts, f.authority.path), authority = readFileSync(authorityPath);
     const original = journal.appendOutcome;
@@ -134,7 +84,7 @@ async function changedBindingCase(kind: string) {
       return appended;
     });
     let pending;
-    try { pending = await controller.publishPublication(f.publication); }
+    try { pending = await f.invoke(run => controller.publishPublication(f.publication, run)); }
     finally { mutation.mockRestore(); }
     expect(changed).toBe(true); expect(pending.state).toBe("pending");
     expect(pending.journal.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(true);
@@ -152,7 +102,7 @@ async function changedBindingCase(kind: string) {
       }).length;
     };
     const writes = writeCount();
-    const resumed = await controller.resumePublication({ ...f.publication, journal_directory: pending.journal.directory });
+    const resumed = await f.invoke(run => controller.resumePublication({ ...f.publication, journal_directory: pending.journal.directory }, run));
     expect(resumed.state).toBe("pending"); expect(resumed.reason).toBe("reconciliation-only-no-replay");
     expect(resumed.journal.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(true);
     expect(writeCount()).toBe(writes);
@@ -169,7 +119,7 @@ test.each(["authority", "actor"])("resume permanently records a binding change f
   try {
     const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
     console.error("Owned interrupted binding fixture roots", JSON.stringify(roots));
-    const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
     const journal = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts"));
     const original = journal.appendOutcome;
     let interrupted = false;
@@ -178,7 +128,7 @@ test.each(["authority", "actor"])("resume permanently records a binding change f
       return original(current, id, outcome);
     });
     let pending;
-    try { pending = await controller.publishPublication(f.publication); }
+    try { pending = await f.invoke(run => controller.publishPublication(f.publication, run)); }
     finally { fault.mockRestore(); }
     expect(interrupted).toBe(true); expect(pending.state).toBe("pending");
     expect(pending.journal.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(false);
@@ -187,12 +137,12 @@ test.each(["authority", "actor"])("resume permanently records a binding change f
     if (kind === "authority") writeFileSync(authorityPath, Buffer.concat([authority, Buffer.from("\n")]));
     else { state.viewer_id = 21; writeFileSync(service.statePath, JSON.stringify(state)); }
     const options = { ...f.publication, journal_directory: pending.journal.directory };
-    await expect(controller.resumePublication(options)).rejects.toThrow();
+    await expect(f.invoke(run => controller.resumePublication(options, run))).rejects.toThrow();
     const observed = journal.readJournal(options.journal_directory, f.repo);
     expect(observed.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(true);
     if (kind === "authority") writeFileSync(authorityPath, authority);
     else { state.viewer_id = 20; writeFileSync(service.statePath, JSON.stringify(state)); }
-    const resumed = await controller.resumePublication(options);
+    const resumed = await f.invoke(run => controller.resumePublication(options, run));
     expect(resumed.state).toBe("pending"); expect(resumed.reason).toBe("reconciliation-only-no-replay");
     expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(0);
     for (const root of roots) rmSync(root, { recursive: true, force: true });
@@ -204,7 +154,7 @@ test.each(["worker", "reviewer"] as const)("a role capture changing after candid
   try {
     const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
     console.error("Owned original-role race roots", JSON.stringify(roots));
-    const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
     const journal = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts"));
     const reviews = await import(join(f.retained.directory, "scripts/docs-drift/candidate-review.ts"));
     const originalOutcome = journal.appendOutcome, originalReview = reviews.collectCandidateReview;
@@ -224,12 +174,12 @@ test.each(["worker", "reviewer"] as const)("a role capture changing after candid
       return result;
     });
     let pending;
-    try { pending = await controller.publishPublication(f.publication); }
+    try { pending = await f.invoke(run => controller.publishPublication(f.publication, run)); }
     finally { outcome.mockRestore(); race.mockRestore(); }
     expect(changed).toBe(true); expect(pending.state).toBe("pending");
     expect(pending.journal.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(true);
     writeFileSync(path, originalBytes);
-    const resumed = await controller.resumePublication({ ...f.publication, journal_directory: pending.journal.directory });
+    const resumed = await f.invoke(run => controller.resumePublication({ ...f.publication, journal_directory: pending.journal.directory }, run));
     expect(resumed.state).toBe("pending"); expect(resumed.reason).toBe("reconciliation-only-no-replay");
     expect(resumed.journal.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(true);
     expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(0);
@@ -248,7 +198,7 @@ test("native output capacity refusal precedes publication and original resume mu
     const refusal = spyOn(outputs, "publicationEffectsOutput").mockImplementation(options => project({ ...options, limit: 1 }));
     const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
     try {
-      const published = await controller.publishPublication(f.publication);
+      const published = await f.invoke(run => controller.publishPublication(f.publication, run));
       expect(published.state).toBe("pending");
       expect(published.journal.events.some(event => event.kind === "intent" && event.effect_id === "lease")).toBe(true);
       expect(published.journal.events.some(event => event.kind === "handoff" && event.effect_id === "lease")).toBe(true);
@@ -263,7 +213,7 @@ test("native output capacity refusal precedes publication and original resume mu
       };
       assertNoWrites();
       const digest = readJournal(published.journal.directory, f.repo).digest;
-      await expect(controller.resumePublication({ ...f.publication, journal_directory: published.journal.directory }))
+      await expect(f.invoke(run => controller.resumePublication({ ...f.publication, journal_directory: published.journal.directory }, run)))
         .rejects.toThrow("Configured output bound cannot retain the recovery summary");
       assertNoWrites(); expect(readJournal(published.journal.directory, f.repo).digest).toBe(digest);
       expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);

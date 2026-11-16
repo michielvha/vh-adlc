@@ -39,29 +39,35 @@ the owned object store from the verified origin and fixed PR refs. Failed or
 ambiguous resources remain available for recovery. Use ordinary non-forced
 cleanup only for the recorded owned clean resources.
 
-Commands below are argument-vector templates. Replace each placeholder with the
-actual bound value and pass paths as individual arguments, including paths with
-spaces. `<source>` is the full immutable Git object ID. `<artifacts>` is an
-existing canonical owner-only directory outside the checkout and Git directories.
-Keep `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0` in the helper environment. Commands
-need no persistent shell variables. Use `cli.ts --help` for the full grammar.
+Use the installed plugin's `scripts/docs-drift/cli.ts` with one private run
+directory outside every checkout and Git directory. The helper creates and
+owns it. Pass each path as one argument. Keep
+`BUN_RUNTIME_TRANSPILER_CACHE_PATH=0` in the helper environment. Use full immutable
+Git object IDs for `<source>` and the same run directory for later stages.
+
+| Operation | Result |
+| --- | --- |
+| `scan` | Collect the committed documentation inventory and detector output. |
+| `report` | Assess that collection with the configured worker and independent reviewer. |
+| `resolve` | Reassess exact selected audit PRs and account for every original hunk. |
+| `prepare` | Apply selected verified corrections in the run's owned candidate checkout. |
+| `verify` | Check its committed candidate and obtain independent review. |
+| `publish` | Deliver the exact approved manifest under current publication gates. |
+| `resume` | Inspect or continue an original operation, restore observations, or perform separately approved recovery. |
+| `close` | Review a merged replacement and its selected original proposals before approved closure. |
 
 ## Audit
 
-Collect from the committed clean source using the configured scanner.
-
 ```text
 bun <plugin>/scripts/docs-drift/cli.ts scan --repo <repo> --source <source> \
-  --artifact-root <artifacts>
+  --run-dir <run>
+bun <plugin>/scripts/docs-drift/cli.ts report --repo <repo> --run-dir <run>
 ```
 
-For a retained source-verification record and its owned inputs, use the source
-assessment entry. Keep its returned artifact references and digests unchanged.
-
-```text
-bun <plugin>/scripts/docs-drift/cli.ts assess-source --repo <repo> --source <source> \
-  --artifact-root <artifacts>
-```
+`scan` retains source verification in the run. `report` uses its original
+source, configured native roles and complete collection. Read
+`references/docs-drift-review.md` before provider execution. The runtime
+retains the original role captures and exact review targets in the run.
 
 Inspect collection diagnostics, expected document inventories, required detector
 outcomes, suppressed findings and stale suppressions. Missing inputs, unreadable
@@ -81,24 +87,6 @@ its corresponding document requirement.
 Document-bound assessments require evidence from that document.
 Keep intended contracts, dated history and deliberately incomplete matrices.
 Record product defects separately and propose their own repair or issue.
-
-For a caller-authored report, supply the canonical finding-assessment packet
-bound to the returned source record. `assessment-report.ts` validates its exact
-fields, quoted source and accounting. Its `origin: caller-assessment` describes
-that evidence. Independent reviewed results follow the review procedure.
-
-```text
-bun <plugin>/scripts/docs-drift/cli.ts report-findings --repo <repo> --source <source> \
-  --artifact-root <artifacts> --source-verification <source-verification> \
-  --source-verification-sha256 <sha256> --assessment <assessment> \
-  --assessment-sha256 <sha256>
-```
-
-Read `references/docs-drift-review.md` before selected provider execution.
-`run-audit` uses the configured worker and independent reviewer through the
-same native entry for hosted and interactive assessment. It requires the
-original source/decision references and the approved runtime bindings.
-It accepts neither supplied role results nor prompt/model overrides.
 
 Report-only work saves the report in the selected external location and leaves
 consumer documents, feedback, indexes, index and refs untouched. Treat scanner
@@ -137,36 +125,34 @@ scope and detector. Report-only work writes neither feedback store.
 
 Apply the consumer's authorized generators and source/visual checks. Compare
 finding identities and severities by affected class, including new/suppressed
-findings. Regenerate generated indexes through their owning command. Use
-`check-edits` and `prepare` with the original selected decision packet. After
-authorized local checkpointing, use `check-candidate` and `verify-candidate`
-against that exact candidate. A provisional dirty diff retains provisional
-status until its committed verification and review are observed.
+findings. Regenerate generated indexes through their owning command. Use `prepare` with the run's selected decision packet. When authorized,
+checkpoint the returned owned candidate under the project rules, then run
+`verify` against that committed candidate. The run retains the original
+assessment, selection, complete diff, verification and independent review.
+A provisional dirty diff retains provisional status until those checks pass.
+
+```text
+bun <plugin>/scripts/docs-drift/cli.ts prepare --repo <repo> --run-dir <run>
+bun <plugin>/scripts/docs-drift/cli.ts verify --repo <repo> --run-dir <run>
+```
 
 ## Resolve selected proposals
 
 Select exact PR scope, then obtain complete repository/PR identity, body,
 head/base/merge-base objects and full local diffs, including file inventories,
-renames and binary identities. `collect-proposals` inventories configured PRs.
-Use `collect-resolution` to fetch the selected complete PR diffs into the owned
-assessment store. Its canonical selection packet has exactly `schema_version: 1`,
-`source_commit` and the nonempty unique PR-number array `proposals`. Hash its
-original artifact bytes for the selection reference. Optional
-REST patch fields cannot replace those diffs. Incomplete selected inputs remain
-a readiness gap until completed or explicitly reselected.
+renames and binary identities. Start a fresh resolution run with the exact
+selected proposal numbers. Repeat `--proposal` for each selected PR.
 
 ```text
-bun <plugin>/scripts/docs-drift/cli.ts collect-proposals --repo <repo> --source <source>
+bun <plugin>/scripts/docs-drift/cli.ts resolve --repo <repo> --source <source> \
+  --run-dir <resolution-run> --proposal <proposal>
 ```
 
-```text
-bun <plugin>/scripts/docs-drift/cli.ts collect-resolution --repo <repo> --source <source> \
-  --artifact-root <artifacts> --selection <selection> --selection-sha256 <sha256>
-```
-
-Audit's `collect-audit-proposal-inputs` uses the audit source/decision/runtime
-bindings to assess relevant open proposals. Resolve's explicitly selected PR
-batch uses `collect-resolution` above.
+The helper collects complete diffs into its owned object store and rechecks
+native identity. Optional REST patch fields supply no substitute for those
+diffs. Incomplete selected inputs remain a readiness gap until completed or
+explicitly reselected. Audit reports also assess relevant configured open
+proposals against their original source.
 
 Freshly scan the owned current base. Give every selected hunk an apply,
 apply-modified, already-fixed, wrong or defer disposition with current evidence.
@@ -185,36 +171,22 @@ the local proposal and publication handoff.
 
 ## Post-merge closure
 
-Start from the selected consolidation PR ID and current request. Use
-`collect-closure` to read complete PR/merge inputs, exact
-head objects and the added resolve record from the full diff. A PR-body locator
-is a hint. Missing, ambiguous or mismatched records get a recovery handoff.
-The published immutable record enables another host to perform fresh review.
-
-The initial canonical closure selection has exactly `schema_version: 1`,
-`source_commit` and the positive PR number `consolidation`.
+Start a fresh closure run from the selected consolidation PR ID, current
+default source and current request.
 
 ```text
-bun <plugin>/scripts/docs-drift/cli.ts collect-closure --repo <repo> --source <source> \
-  --artifact-root <artifacts> --selection <selection> --selection-sha256 <sha256>
+bun <plugin>/scripts/docs-drift/cli.ts close --repo <repo> --source <source> \
+  --run-dir <closure-run> --proposal <consolidation>
 ```
 
-Next use a canonical target-selection packet containing those three fields
-plus a new `operation_id`, and collect the fresh model target.
-
-```text
-bun <plugin>/scripts/docs-drift/cli.ts collect-closure-target --repo <repo> --source <source> \
-  --artifact-root <artifacts> --selection <selection> --selection-sha256 <sha256>
-```
-
-Keep that target-selection packet and digest for `collect-closure-worker-inputs`
-with the approved cache, entry, launcher and settings arguments. Run the selected
-native worker under its actual execution grant and retain its original capture.
-Then `collect-closure-review-target` adds that worker capture/reference digest
-to the same target-selection/runtime arguments. Run the independent reviewer
-against its exact returned target and retain its original capture.
-`read-closure-review` adds both original role captures and digests. Preserve
-each command's collection diagnostics and returned identities.
+The helper reads complete merge inputs, head objects and the durable resolve
+record from the full diff. A body locator is a hint. Missing, ambiguous or
+mismatched records leave a pending handoff. It retains a fresh worker and
+independent reviewer against the exact explanation and closure payloads.
+The first successful review displays that manifest. After exact approval,
+repeat `close` with the same run directory. An interrupted original closure
+uses `resume` and its original journal. Read the review reference for approval
+and recovery inputs.
 
 Require an observed merge and review every original hunk's disposition,
 delivered feedback and carry-forward. Compare the actual full merged diff and
@@ -228,8 +200,7 @@ postimages require separately selected resolution and keep affected PRs open.
 Run the fresh independent closure review with the actual merged head, current
 default/body and exact proposed explanation/close payloads. After material
 changes obtain fresh review and approval, including a fresh explanation.
-Use `check-closure-publication`, then authorized `publish-closure` or
-`resume-closure` through the common publisher. Recheck bindings under the lease
+Execute the approved `close` batch through the common publisher. Recheck bindings under the lease
 before each effect. Explanation comments and closures each need their selected
 grant. An abandoned or unmerged consolidation leaves originals open.
 
@@ -242,7 +213,8 @@ observed checks and any retained resources below it.
 
 Distinguish collection, caller assessment, independent review, local checkpoint,
 publication and observed merge/closure. The CLI envelope returns `collected`,
-`attention` or `incomplete` with exits 0, 1 and 2 respectively. Read the nested
+`attention`, `pending`, `setup-required` or `incomplete`. `collected` exits 0,
+`attention` and `pending` exit 1, and setup/incomplete outcomes exit 2. Read the nested
 report and diagnostics as well. Report outcomes include `failed`,
 `new-attention`, `published`, `carried-delivery`, `carried-attention` and
 `no-change`. Unchanged unresolved items remain listed and can finish green

@@ -68,27 +68,3 @@ test.each(["issue-create", "pr-create"] as const)("the original reviewer target 
   expect(target.manifest?.bindings.candidate_commit).toBe(f.source);
   expect(target.manifest?.bindings.source_commit).toBe(f.source);
 }, 60000);
-
-test("the normal binding CLI accepts the original source-only assessment without a checkpoint", async () => {
-  const { sourceOnlyFixture } = await import("./source-only-fixture");
-  const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
-  const f = await sourceOnlyFixture(roots, "issue-create");
-  const bytes = canonicalJSON(f.options.selection);
-  writeFileSync(join(f.artifacts, "source-only-selection.json"), bytes, { mode: 0o600 });
-  const completion = await executeOwnedProcess({
-    argv: [process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), "bind-publication",
-      "--repo", f.repo, "--source", f.source, "--candidate-repo", f.repo, "--candidate", f.source,
-      "--artifact-root", f.artifacts, "--selection", "source-only-selection.json", "--selection-sha256", sha256(bytes),
-      "--cache-root", f.options.cache_directory, "--entry", f.options.entry, "--launcher", f.options.launcher_path, "--settings", f.options.settings_path,
-      "--source-verification", f.options.source_verification.path, "--source-verification-sha256", f.options.source_verification.sha256,
-      "--candidate-verification", f.options.candidate_verification.path, "--candidate-verification-sha256", f.options.candidate_verification.sha256,
-      "--decisions", f.options.decisions.path, "--decisions-sha256", f.options.decisions.sha256],
-    cwd: f.root, env: f.native.environment, watched_outputs: [], capture: "memory", timeout_ms: 60000,
-    stdout: join(f.artifacts, "source-only-cli-stdout"), stderr: join(f.artifacts, "source-only-cli-stderr"), started: () => {},
-  });
-  expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
-  const report = JSON.parse(Buffer.from(completion.captured?.stdout ?? []).toString());
-  expect(completion.exit_code, JSON.stringify(report.diagnostics)).toBe(0);
-  expect(report.publication_bindings).toMatchObject({ complete: true, candidate_source_only: true, candidate_verification: null,
-    bindings: { source_commit: f.source, candidate_commit: f.source } });
-}, 125000);

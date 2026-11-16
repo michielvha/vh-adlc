@@ -2,7 +2,10 @@
 import { afterAll, expect, spyOn, test } from "bun:test";
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { source, write, commit, portableRecord, deliverRecord, runtimeIdentity } from "./adoption-fixture";
+import { write, commit, runtimeIdentity } from "./adoption-fixture";
+import { preflightFixture } from "./preflight-fixture";
+import { put } from "./repository-fixture";
+import { verifyProductionPreflight } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
 import { fixture, bindings, hash, role } from "./manifest-fixture";
 import { readGit, writeMetadataObject } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { captureRepositoryState, captureSnapshot, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -13,7 +16,7 @@ import type { CorrectionInput } from "../../../plugins/vh-adlc/scripts/docs-drif
 import { resolutionSource } from "../../../plugins/vh-adlc/scripts/docs-drift/resolve";
 import { publicationMarker, readReviewedProposal, type NativePublicationBinding } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { effectMarker, validateReviewedManifest, type Effect, type Bindings } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
-import { sealPlan, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { sealPlan, writePlanObject, policyBinding } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import type { PullRequestInput } from "../../../plugins/vh-adlc/scripts/github-read";
 import { createGitHubReader, createRepositoryReader } from "../../../plugins/vh-adlc/scripts/github-read";
@@ -87,8 +90,9 @@ console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
 function reseal(f: ReturnType<typeof setup>, mutate: (value: { bindings: Bindings; effects: Effect[]; corrections: CorrectionInput[] }) => void) {
   const data = structuredClone({ bindings: f.plan.manifest.bindings, effects: f.plan.manifest.effects, corrections: f.plan.corrections });
   mutate(data); data.bindings.delivery_sha256 = deliveryDigest(data.corrections, []);
-  const input = fixture(data.bindings, data.effects);
-  return sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, adoption_sha256: f.plan.adoption_sha256,
+  const input = fixture(data.bindings, data.effects, f.plan.manifest.operation_id, { actor: f.plan.manifest.actor,
+    actor_id: f.plan.manifest.actor_id, publisher_entry: f.plan.manifest.publisher_entry });
+  return sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policyBinding(f.plan),
     publication_kind: "advisory", context: "production", transport: "native", corrections: data.corrections, attention: [] });
 }
 
@@ -189,20 +193,22 @@ process.exit(result.exitCode);
 }, 90000);
 
 function setup(fault = "matching", producer?: "hosted" | "copilot" | "claude", publisherOverride?: Parameters<typeof fixture>[3]) {
-  let f = source(roots, { role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source } });
   const accounts = { hosted: { actor: "fixture-bot", actor_id: 20 }, copilot: { actor: "fixture-owner", actor_id: 30 },
     claude: { actor: "fixture-owner", actor_id: 30 } };
-  if (producer) {
-    const configured = { ...f.configured, publication: { ...f.configured.publication,
-      entry_actors: { hosted: "fixture-bot", copilot: "fixture-owner", claude: "fixture-owner" } },
-      pr_discovery: { ...f.configured.pr_discovery, authors: ["fixture-bot", "fixture-owner"] } };
-    f = { ...f, configured };
-    write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(configured));
-  }
-  const publisher = publisherOverride ?? (producer ? { publisher_entry: producer, ...accounts[producer] } : undefined);
-  for (const path of f.configured.feedback_files) write(f.repo, path, "[]\n");
-  f.candidate = commit(f.repo, "synthetic complete feedback inputs");
-  const current = deliverRecord(f, portableRecord(f, producer ? accounts : undefined)), snapshot = captureSnapshot(f.repo, current);
+  const entry = producer ?? "hosted", publisher = publisherOverride ?? { publisher_entry: entry, ...accounts[entry] };
+  const base = preflightFixture(roots, "none", undefined, (repo, configured) => {
+    const profile = configured.execution.entries.interactive;
+    for (const selected of Object.values(configured.execution.entries)) {
+      selected.worker.model = role.requested_model; selected.reviewer.model = role.requested_model;
+    }
+    Object.assign(configured.execution.entries, { copilot: profile, claude: profile });
+    Object.assign(configured.publication, { entry_actors: { hosted: accounts.hosted.actor, interactive: accounts.copilot.actor,
+      copilot: accounts.copilot.actor, claude: accounts.claude.actor } });
+    configured.pr_discovery.authors = [accounts.hosted.actor, accounts.copilot.actor];
+    for (const path of configured.feedback_files) put(repo, path, "[]\n");
+  });
+  const f = { ...base, configured: base.afterSettings, candidate: base.checklist.candidate_commit }, current = f.head(), snapshot = captureSnapshot(f.repo, current);
+  const originalPolicy = verifyProductionPreflight({ repo: f.repo, current_default: current, component: f.component });
   write(f.repo, "docs/guide.md", "Synthetic reviewed correction\n"); const head = commit(f.repo, "synthetic reviewed candidate");
   const store = createOwnedObjectStore({ parent: f.artifacts, evidence_directory: f.artifacts, source_repo: f.repo,
     source_commit: current, repository: f.configured.repository, owner: "synthetic-review", run: "retained-plan" });
@@ -232,16 +238,15 @@ function setup(fault = "matching", producer?: "hosted" | "copilot" | "claude", p
   if (fault === "wrong-settings") selected.settings_sha256 = hash("foreign settings");
   if (fault === "missing-source-object") selected.source_commit = "f".repeat(40);
   if (fault === "wrong-diff") selected.diff_sha256 = hash("foreign complete diff");
-  const adoptionSHA = sha256(readGit(store.root, "show", current + ":" + f.configured.publication.adoption_record));
   const validInput = fixture({ ...selected, settings_sha256: snapshot.settings_sha256, source_commit: current,
     diff_sha256: sha256(readOwnedPatch(store, f.configured.repository, current, head)) }, effects.map(effect => effect.kind === "pr-create"
       ? { ...effect, payload: { ...effect.payload, branch: "docs-drift/one" } } : effect), "operation-1", publisher);
   const validPlan = sealPlan({ reviewed: validateReviewedManifest(validInput), grants: validInput.grants,
-    adoption_sha256: adoptionSHA, publication_kind: "advisory", context: "production", transport: "native", corrections: [correction], attention: [] });
+    schema_version: 2, policy_sha256: originalPolicy.policy_sha256, component: f.component, publication_kind: "advisory", context: "production", transport: "native", corrections: [correction], attention: [] });
   const input = fixture(selected, effects, "operation-1", publisher);
   if (fault === "wrong-requested-role") input.policy.worker = { ...role, requested_model: "claude-opus-5.5" };
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
-    adoption_sha256: fault === "unknown-adoption" ? hash("unknown adoption") : adoptionSHA,
+    schema_version: 2, policy_sha256: fault === "unknown-policy" ? hash("unknown policy") : originalPolicy.policy_sha256, component: f.component,
     publication_kind: "advisory", context: fault === "trial" ? "trial" : "production", transport: fault === "trial" ? "collector" : "native",
     corrections: [correction], attention: [] });
   const repository = { id: 10, full_name: f.configured.repository, default_branch: "main" };
@@ -254,7 +259,7 @@ function setup(fault = "matching", producer?: "hosted" | "copilot" | "claude", p
   return { ...f, current, store, proposal, native, plan, validPlan, correction };
 }
 
-test.each(["matching", "unknown-adoption", "trial", "wrong-settings", "wrong-requested-role", "wrong-branch",
+test.each(["matching", "unknown-policy", "trial", "wrong-settings", "wrong-requested-role", "wrong-branch",
   "foreign-repository", "foreign-actor", "wrong-tree", "changed-body", "foreign-ref", "wrong-diff", "missing-source-object", "malformed-plan"])("native retained-plan verification uses adopted source rather than self approval: %s", async fault => {
   try {
     const { createAdoptedPublicationVerifier, RetainedPublicationIneligible } = await import("../../../plugins/vh-adlc/scripts/docs-drift/reviewed-publication");
@@ -273,15 +278,15 @@ test.each(["matching", "unknown-adoption", "trial", "wrong-settings", "wrong-req
       expect(result).toMatchObject({ repository: f.native.repository, repository_id: 10, actor_id: 20,
         head: f.native.head, tree: f.native.tree, body_sha256: f.native.body_sha256, corrections: [correctionProjection(f.correction)], attention: [] });
       expect(result).not.toHaveProperty("grants"); expect(result).not.toHaveProperty("current_verification");
-    } else if (fault === "missing-source-object") {
+    } else if (["missing-source-object", "unknown-policy", "wrong-requested-role"].includes(fault)) {
       let denied: unknown; try { verify(canonicalJSON(f.plan), f.native); } catch (error) { denied = error; }
       expect(denied).toBeInstanceOf(Error); expect(denied).not.toBeInstanceOf(RetainedPublicationIneligible);
       expect((denied as Error).message).toBe("docs-drift retained publication original evidence unavailable");
     } else {
       const packet = fault === "malformed-plan" ? Buffer.from('{"unreviewed":true}\n') : canonicalJSON(f.plan);
       const reasons: Record<string, string> = {
-        "unknown-adoption": "adoption is outside the approved compatible lineage", trial: "requires production native evidence",
-        "wrong-settings": "original source bindings changed", "wrong-requested-role": "approved role policy changed",
+        trial: "requires production native evidence",
+        "wrong-settings": "original source bindings changed",
         "wrong-branch": "exact reviewed proposal payload unavailable", "wrong-tree": "candidate tree or complete diff changed",
         "wrong-diff": "candidate tree or complete diff changed", "malformed-plan": "invalid retained plan",
       };
@@ -321,21 +326,21 @@ test.each([
 test.each([
   { actor: "fixture-owner", actor_id: 31, publisher_entry: "copilot" as const },
   { actor: "fixture-owner", actor_id: 30, publisher_entry: "hosted" as const },
-])("original producer adoption refuses internally consistent forged attribution $publisher_entry/$actor_id", async forged => {
+])("original producer policy refuses internally consistent forged attribution $publisher_entry/$actor_id", async forged => {
   const { createAdoptedPublicationVerifier, RetainedPublicationIneligible } = await import("../../../plugins/vh-adlc/scripts/docs-drift/reviewed-publication");
   const f = setup("matching", "copilot", forged), before = captureRepositoryState(f.repo);
   expect(f.plan.manifest.actor_id).toBe(f.native.actor_id);
   expect(f.proposal.actor_id).toBe(f.native.actor_id);
   const verify = createAdoptedPublicationVerifier({ store: f.store, current_default: f.current, identity: runtimeIdentity,
     entry: "hosted", proposal: f.proposal });
-  const adoption = await import("../../../plugins/vh-adlc/scripts/docs-drift/adoption"), original = adoption.verifyRuntimeAdoption;
+  const runtime = await import("../../../plugins/vh-adlc/scripts/docs-drift/bootstrap"), original = runtime.readOriginalProductionPolicy;
   const calls: Array<Parameters<typeof original>[0]> = [];
-  const check = spyOn(adoption, "verifyRuntimeAdoption").mockImplementation(input => { calls.push(input); return original(input); });
+  const check = spyOn(runtime, "readOriginalProductionPolicy").mockImplementation(input => { calls.push(input); return original(input); });
   let rejected: unknown;
   try { verify(canonicalJSON(f.plan), f.native); } catch (error) { rejected = error; }
   finally { check.mockRestore(); }
   expect(calls).toHaveLength(1);
-  expect(calls[0]).toMatchObject({ current_default: f.current, entry: forged.publisher_entry,
+  expect(calls[0]).toMatchObject({ plan: { manifest: { publisher_entry: forged.publisher_entry } },
     identity: { actor: forged.actor, actor_id: forged.actor_id } });
   expect(rejected).toBeInstanceOf(Error);
   expect(rejected).not.toBeInstanceOf(RetainedPublicationIneligible);

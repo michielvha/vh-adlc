@@ -3,7 +3,7 @@ import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { argumentsForCommand } from "../../../plugins/vh-adlc/scripts/docs-drift/cli";
+import { parseRunOptions } from "../../../plugins/vh-adlc/scripts/docs-drift/run-cli";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 
@@ -21,7 +21,7 @@ function templates() {
   return references.flatMap(reference => {
     const text = readFileSync(join(plugin, reference), "utf8");
     return [...text.matchAll(/```text\n([\s\S]*?)\n```/gu)]
-      .map(match => match[1].replaceAll(/\\\n\s*/gu, " ").trim().split(/\s+/u))
+      .flatMap(match => match[1].replaceAll(/\\\n\s*/gu, " ").trim().split("\n").map(line => line.trim().split(/\s+/u)))
       .filter(words => words[0] === "bun" && words[1]?.endsWith("/scripts/docs-drift/cli.ts"))
       .map(words => ({ reference, script: words[1], argv: words.slice(2) }));
   });
@@ -29,14 +29,11 @@ function templates() {
 
 function fill(argv: string[], values: Record<string, string> = {}): string[] {
   const placeholders: Record<string, string> = {
-    "<repo>": "/fixture/repository", "<candidate-repo>": "/fixture/candidate",
-    "<source>": "a".repeat(40), "<candidate>": "b".repeat(40), "<artifacts>": "/fixture/artifacts",
-    "<cache>": "/fixture/cache", "<entry>": "copilot", "<launcher>": "/fixture/repository/scripts/docs-drift-entry.ts",
-    "<settings>": "/fixture/repository/.vh-adlc/docs-drift.yaml", "<sha256>": "c".repeat(64),
-    "<source-verification>": "source-verification.json", "<decisions>": "decisions.json",
-    "<assessment>": "assessment.json", "<selection>": "selection.json", "<worker-capture>": "worker.json",
-    "<reviewer-capture>": "reviewer.json", "<candidate-verification>": "verification.json",
-    "<authority>": "authority.json", "<journal>": "/fixture/artifacts/journal", "<operation>": "fixture-operation",
+    "<repo>": resolve(plugin, "../.."), "<source>": "a".repeat(40), "<original-source>": "a".repeat(40),
+    "<run>": "/fixture/run", "<resolution-run>": "/fixture/resolve", "<closure-run>": "/fixture/closure",
+    "<restored-run>": "/fixture/restored", "<new-private-external-directory>": "/fixture/restored-trial",
+    "<proposal>": "41", "<consolidation>": "42", "<operation>": "fixture-operation",
+    "<original-operation>": "fixture-operation", "<definition-sha256>": "c".repeat(64),
     ...values,
   };
   return argv.map(word => {
@@ -59,18 +56,15 @@ test("the content entry exposes its canonical procedure, setup and review refere
 test("documented command templates use the production CLI grammar", () => {
   const commands = templates();
   expect(commands.length).toBeGreaterThan(0);
-  for (const required of ["scan", "collect-resolution", "collect-closure", "collect-closure-target"])
+  for (const required of ["scan", "report", "resolve", "prepare", "verify", "publish", "resume", "close"])
     expect(commands.map(template => template.argv[0])).toContain(required);
   for (const template of commands) {
-    expect(["<plugin>/scripts/docs-drift/cli.ts", "<original-retained-plugin>/scripts/docs-drift/cli.ts",
-      "<approved-retained-plugin>/scripts/docs-drift/cli.ts"]).toContain(template.script);
-    if (["inspect-recovery", "acknowledge-delivery", "reconcile-publication"].includes(template.argv[0]))
-      expect(template.script).toBe("<original-retained-plugin>/scripts/docs-drift/cli.ts");
-    const parsed = argumentsForCommand(fill(template.argv));
-    expect(parsed.command).toBe(template.argv[0]);
-    expect(parsed.repo).toBe("/fixture/repository");
-    expect(parsed.source).toBe("a".repeat(40));
-    if (parsed.entry !== undefined) expect(["hosted", "copilot", "claude"]).toContain(parsed.entry);
+    expect(template.script).toBe("<plugin>/scripts/docs-drift/cli.ts");
+    const parsed = parseRunOptions(fill(template.argv));
+    expect(String(parsed.command)).toBe(template.argv[0]);
+    expect(parsed.repo).toBe(resolve(plugin, "../.."));
+    expect(parsed.directory.startsWith("/fixture/")).toBe(true);
+    if (parsed.source !== undefined) expect(parsed.source).toBe("a".repeat(40));
   }
 });
 
@@ -90,13 +84,13 @@ test("the documented scan hands off missing committed settings and preserves cal
     const trace = join(root, "unexpected-native-access");
     for (const program of ["gh", "copilot", "claude", "codex"]) writeFileSync(join(bin, program),
       "#!" + process.execPath + "\nrequire('node:fs').writeFileSync(" + JSON.stringify(trace) + ", 'Unexpected native access');process.exit(91);\n", { mode: 0o700 });
-    const completion = Bun.spawnSync([process.execPath, entry, ...fill(template.argv, { "<repo>": repo, "<source>": source, "<artifacts>": artifacts })], {
+    const completion = Bun.spawnSync([process.execPath, entry, ...fill(template.argv, { "<repo>": repo, "<source>": source, "<run>": join(root, "run") })], {
       env: { PATH: bin + ":" + (process.env.PATH ?? "/usr/bin:/bin"), LANG: "C", LC_ALL: "C", BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
       stdout: "pipe", stderr: "pipe", timeout: 10000,
     });
     const report = JSON.parse(completion.stdout.toString());
     expect(completion.exitCode).toBe(2);
-    expect(report).toMatchObject({ schema_version: 1, command: "scan", outcome: "incomplete" });
+    expect(report).toMatchObject({ schema_version: 1, command: "scan", outcome: "setup-required" });
     expect(report.diagnostics.length).toBeGreaterThan(0);
     expect(existsSync(trace)).toBe(false);
     expect(captureRepositoryState(repo)).toEqual(before);

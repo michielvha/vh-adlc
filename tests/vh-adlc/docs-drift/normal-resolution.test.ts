@@ -20,8 +20,7 @@ afterAll(() => {
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-test("normal resolve accounts for the complete original hunk and retains its consolidation record", async () => {
-  const closeReplyFault = process.env.VH_ADLC_TEST_CLOSE_REPLY_FAULT === "1";
+test("normal resolve preserves the complete original hunk and recovers a lost close response", async () => {
   const component = ordinaryComponentFixture(roots, true), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable });
   writeFileSync(component.executable, auditClient("prepare", true), { mode: 0o755 });
   const source = f.head(), origin = join(f.root, "origin.git"), directory = join(f.root, "run"), stateRoot = join(f.root, "state");
@@ -32,7 +31,7 @@ test("normal resolve accounts for the complete original hunk and retains its con
   git(origin, "update-ref", "refs/pull/1/head", original);
   const service = installOwnedNativeService({ root: f.root, origin, source, head: original, publisher_identity: { actor: "fixture-owner", actor_id: 30 } });
   const state = JSON.parse(readFileSync(service.statePath, "utf8")), repository = state.repository_identity;
-  state.prs = [{ ...(closeReplyFault ? {} : { id: 101 }), number: 1, state: "open", merged_at: null, title: "Original correction", body: "Original whole change", draft: true, labels: [],
+  state.prs = [{ number: 1, state: "open", merged_at: null, title: "Original correction", body: "Original whole change", draft: true, labels: [],
     user: { login: "fixture-bot", id: 20, type: "Bot" }, base: { ref: "main", sha: source, repo: repository },
     head: { ref: "docs-drift/original", sha: original, repo: repository } }];
   writeFileSync(service.statePath, JSON.stringify(state));
@@ -106,18 +105,16 @@ test("normal resolve accounts for the complete original hunk and retains its con
   const roleCalls = readFileSync(join(selectedDirectory, "synthetic-role-order.jsonl"));
   writeFileSync(join(selectedDirectory, "approval.yaml"), "manifest_sha256: " + closeManifest.sha256 + "\nrequest: Approve this exact synthetic post-merge closure batch\n", { mode: 0o600 });
   let closed = await invoke("close");
-  if (closeReplyFault) {
-    expect(closed.report).toMatchObject({ command: "close", outcome: "pending" }); expect(closed.result.exit_code).toBe(1);
-    const observed = JSON.parse(readFileSync(service.statePath, "utf8"));
-    expect(observed.prs[0].state).toBe("closed"); expect(observed.comments["1"]).toHaveLength(1);
-    closed = await invoke("resume");
-  }
+  expect(closed.report).toMatchObject({ command: "close", outcome: "pending" }); expect(closed.result.exit_code).toBe(1);
+  const observed = JSON.parse(readFileSync(service.statePath, "utf8"));
+  expect(observed.prs[0].state).toBe("closed"); expect(observed.comments["1"]).toHaveLength(1);
+  closed = await invoke("resume");
   if (closed.result.exit_code !== 0) {
     const retained = readRunDirectory(closeLocation).stages.findLast(stage => stage.artifacts.journal)?.artifacts.journal;
     if (retained) console.error("Closure journal progress", JSON.stringify(readJournal(dirname(join(selectedDirectory, retained.path)), f.repo)
       .events.map(event => ({ kind: event.kind, effect_id: event.effect_id }))));
   }
-  expect(closed.report).toMatchObject({ command: closeReplyFault ? "resume" : "close", outcome: "collected", publication_effects: { state: "complete" } });
+  expect(closed.report).toMatchObject({ command: "resume", outcome: "collected", publication_effects: { state: "complete" } });
   expect(closed.result.exit_code).toBe(0);
   const selectedVersion = Bun.spawnSync([process.env.VH_ADLC_TEST_ALTERNATE_BUN ?? process.execPath, "--version"], { stdout: "pipe", stderr: "pipe", timeout: 5000 });
   expect(selectedVersion.exitCode).toBe(0);

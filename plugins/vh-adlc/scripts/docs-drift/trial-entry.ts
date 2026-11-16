@@ -3,7 +3,6 @@ import type { PublisherEntry } from "./identity";
 import { collectTrialRetained } from "./trial-recovery";
 import { assertTrialEffectCapacity, encodeTrialEntryReport, trialEffectFailure, TrialEntryOutputBound } from "./trial-output";
 import { OUTPUT_LIMIT } from "./owned-process";
-import { createTrialAdoptionGate } from "./adoption";
 import { PublicationExecutionError } from "./attempts";
 import { randomUUID } from "node:crypto";
 import { realpathSync, writeSync } from "node:fs";
@@ -22,7 +21,7 @@ import { readTrialTracker } from "./trial-tracker";
 
 function inputs(argv: string[]) {
   const command = argv[0];
-  if (!["inspect", "scan", "collect-proposals", "publish", "resume-effects", "prepare-acknowledgement", "acknowledge-delivery", "prepare-reconciliation", "reconcile-publication", "inspect-retained", "restore-retained", "collect-closure", "verify-adoption"].includes(command)) throw Error("unknown synthetic command");
+  if (!["inspect", "scan", "collect-proposals", "publish", "resume-effects", "prepare-acknowledgement", "acknowledge-delivery", "prepare-reconciliation", "reconcile-publication", "inspect-retained", "restore-retained", "collect-closure"].includes(command)) throw Error("unknown synthetic command");
   const allowed = ["--synthetic-trial", "--context-commit"];
   if (["publish", "resume-effects"].includes(command)) allowed.push("--request");
   if (command === "resume-effects") allowed.push("--journal");
@@ -31,7 +30,6 @@ function inputs(argv: string[]) {
   if (["acknowledge-delivery", "reconcile-publication"].includes(command)) allowed.push("--owner-request");
   if (["inspect-retained", "restore-retained"].includes(command)) allowed.push("--operation-id", "--entry");
   if (command === "collect-closure") allowed.push("--consolidation");
-  if (command === "verify-adoption") allowed.push("--adoption-default", "--entry");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
     const key = argv[index], value = argv[index + 1];
@@ -51,9 +49,7 @@ function inputs(argv: string[]) {
     throw Error("synthetic retained operation and entry required");
   const consolidation = values.get("--consolidation");
   if (command === "collect-closure" && (!consolidation || !/^[1-9][0-9]*$/u.test(consolidation) || !Number.isSafeInteger(Number(consolidation)))) throw Error("synthetic consolidation ID required");
-  const adoptionDefault = values.get("--adoption-default");
-  if (command === "verify-adoption" && (!adoptionDefault || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(adoptionDefault))) throw Error("synthetic adoption requires an immutable default");
-  return { command, root, contextCommit, adoptionDefault, request, journal, selection, ownerRequest, consolidation, operation, entry: entry as PublisherEntry | undefined, interrupt: values.get("--interrupt-after") };
+  return { command, root, contextCommit, request, journal, selection, ownerRequest, consolidation, operation, entry: entry as PublisherEntry | undefined, interrupt: values.get("--interrupt-after") };
 }
 
 /** This executable is confined to explicit setup-owned synthetic contexts by its constructor. */
@@ -118,11 +114,6 @@ export async function main(argv: string[]): Promise<number> {
       data = { state: result.state, reason: result.reason, operation_id: result.journal.plan.manifest.operation_id,
         plan_sha256: result.objects.plan_sha256, journal_directory: result.journal.directory, revision: result.journal.revision,
         request_sha256: requestHash, interruption_effect_id: options.interrupt ?? null };
-    } else if (options.command === "verify-adoption") {
-      if (!options.adoptionDefault) throw Error("synthetic adoption default required");
-      const gate = await createTrialAdoptionGate({ root: options.root, context_commit: options.contextCommit,
-        runtime_directory: resolve(import.meta.dir, "../..") });
-      data = gate.verify({ current_default: options.adoptionDefault, entry: options.entry });
     } else if (options.command === "collect-closure") {
       const closure = await collectTrialClosureInputs(context, Number(options.consolidation));
       complete = closure.complete; data = closure;
@@ -144,7 +135,7 @@ export async function main(argv: string[]): Promise<number> {
       data = { fixture_id: context.fixture_id, tracker_commit: tracker.commit, resource_count: tracker.resources.size };
     }
     const path = join(context.artifacts, "synthetic-entry-" + randomUUID() + ".json");
-    report = { schema_version: 1, kind: "docs-drift-synthetic-entry", evidence_kind: options.command === "verify-adoption" ? "test-only" : "synthetic", transport: "collector",
+    report = { schema_version: 1, kind: "docs-drift-synthetic-entry", evidence_kind: "synthetic", transport: "collector",
       command: options.command, outcome: complete ? "complete" : "incomplete", source_commit: context.source_commit,
       context_commit: context.context_commit, context_sha256: context.context_sha256,
       component_sha256: context.component.component_sha256, entry_sha256: entry.sha256, receipt_path: path, data };

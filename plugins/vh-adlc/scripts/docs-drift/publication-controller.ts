@@ -1,7 +1,7 @@
 import { bindRunJournal, type RunDirectory } from "./run-directory";
-import { requireExecutionBun, runtimePolicyBinding } from "./bootstrap";
+import { runtimePolicyBinding } from "./bootstrap";
 import { policyDigest } from "./journal";
-import { loadCommittedSettings } from "./settings";
+import { loadCommittedSettings, SetupRequired } from "./settings";
 import { publicationEffectsOutput } from "./recovery-output";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { ArtifactChanged } from "./evidence-input";
@@ -36,8 +36,7 @@ function confirmedFactsChanged(facts: PublicationFacts | null | undefined, plan:
     || plan && facts?.runtime && policyDigest(runtimePolicyBinding(facts.runtime)) !== policyDigest(plan));
 }
 
-function requireExecutingRuntime(runtime: Runtime, plan: SealedPlan): void {
-  requireExecutionBun(plan.schema_version);
+function requireExecutingRuntime(runtime: Runtime): void {
   if (realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/publication-controller.ts"))
     throw Error("Retained executing publication controller required");
 }
@@ -105,8 +104,7 @@ async function currentState(options: Options, inventory?: PublicationInventory, 
   const plan = sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy, corrections: bound.corrections, attention: bound.attention,
     candidate_verification_sha256: bound.candidate_verification_sha256! });
   const store = bound.source_verification.object_store;
-  importCandidate(store, facts.store, plan);
-  return { plan, policy, review, runtime, settings, store, proposal_snapshot: bound.proposal_snapshot };
+  return { plan, policy, review, runtime, settings, store, candidate_store: facts.store, proposal_snapshot: bound.proposal_snapshot };
 }
 
 /** Data-only inspection. Original scoped authority is checked but this command sends no effects. */
@@ -117,6 +115,7 @@ export async function checkPublication(input: Options) {
     schema_version: 1, kind: "docs-drift-publication-check", authority: "none", complete: false, diagnostics: [], plan: null, resources: null };
   try {
     const current = await currentState(options);
+    importCandidate(current.store, current.candidate_store, current.plan);
     result.plan = current.plan; result.resources = { object_store: current.store }; result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Publication check unavailable"); }
   return freezeJSON(result);
@@ -138,7 +137,7 @@ function readInvocation(options: Options, plan: SealedPlan) {
 }
 
 function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof currentState>>, original: unknown, run?: RunDirectory): PublishOptions {
-  requireExecutingRuntime(initial.runtime, initial.plan);
+  requireExecutingRuntime(initial.runtime);
   const transport = createNativeTransport({ source_repo: options.repo, artifact_root: options.artifact_root, object_store: initial.store,
     settings: initial.settings, credential: options.credential, path: options.path, run });
   return { source_repo: options.repo, artifact_root: options.artifact_root, object_store: initial.store, settings: initial.settings, plan: initial.plan, transport,
@@ -156,7 +155,7 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
           original, transport, objects, current_proposals: proposals.proposals });
       }
       const current = await currentState(options, inventory, initial.plan);
-      requireExecutingRuntime(current.runtime, current.plan);
+      requireExecutingRuntime(current.runtime);
       if (current.plan.manifest_sha256 !== initial.plan.manifest_sha256) throw new PublicationScopeChanged("Current publication payload changed");
       for (const observation of inventory?.observations ?? []) {
         const effect = initial.plan.manifest.effects.find(effect => effect.id === observation.effect_id)!;
@@ -170,7 +169,8 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
 
 export async function publishPublication(input: Options, run?: RunDirectory) {
   const options = structuredClone(input), current = await currentState(options);
-  requireExecutingRuntime(current.runtime, current.plan);
+  requireExecutingRuntime(current.runtime);
+  importCandidate(current.store, current.candidate_store, current.plan);
   const path = join(options.artifact_root, current.plan.manifest.operation_id + ".controller.json");
   if (!existsSync(path)) publishArtifact(path, canonicalJSON({ schema_version: 1, kind: "docs-drift-publication-controller", plan_sha256: sha256(canonicalJSON(current.plan)),
     inputs_sha256: invocationDigest(options), proposal_snapshot: current.proposal_snapshot }));
@@ -181,11 +181,11 @@ export async function publishPublication(input: Options, run?: RunDirectory) {
 export async function resumePublication(input: Options & { journal_directory: string }, run?: RunDirectory) {
   const options = structuredClone(input);
   if (dirname(realpathSync(options.journal_directory)) !== realpathSync(options.artifact_root)) throw Error("Original publication journal artifact root required");
-  const journal = readJournal(options.journal_directory, options.repo), invocation = readInvocation(options, journal.plan);
-  if (journal.plan.schema_version === 2) {
-    if (!run) throw Error("Original run required for version-two resume");
-    run = bindRunJournal(run, journal);
-  }
+  const journal = readJournal(options.journal_directory, options.repo);
+  if (journal.plan.schema_version !== 2) throw new SetupRequired("Use the original implementation for this operation format.");
+  const invocation = readInvocation(options, journal.plan);
+  if (!run) throw Error("Original run required for version-two resume");
+  run = bindRunJournal(run, journal);
   try {
     const source = readSourceAssessmentArtifacts({ ...options, candidate_repo: options.candidate_repo, reference: options.source_verification });
     const candidate = readPublicationCandidateProof(options, source);
@@ -194,7 +194,7 @@ export async function resumePublication(input: Options & { journal_directory: st
     const facts = await collectPublicationInputs({ ...options, object_store: candidate.inspection?.object_store ?? undefined });
     if (confirmedFactsChanged(facts, journal.plan)) throw new PublicationScopeChanged("Original recovery source actor or runtime changed");
     if (!facts.complete || !facts.runtime || !source.object_store) throw Error("Current publication recovery runtime unavailable");
-    requireExecutingRuntime(facts.runtime, journal.plan);
+    requireExecutingRuntime(facts.runtime);
     const settings = captureSnapshot(options.repo, options.source).settings;
     publicationEffectsOutput({ command: "resume", source: options.source, outcome: "incomplete", capacity_check: true,
       result: { state: "pending", reason: null, journal }, limit: Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes) });
