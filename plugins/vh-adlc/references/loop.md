@@ -134,10 +134,13 @@ End every operation by reporting what changed, what was verified, every binary r
 is left.
 
 Name every issue, pull request, commit, release, workflow run, repository or document hosted online in
-a report, question or summary by its full URL where it is first mentioned, such as
-`https://github.com/OWNER/REPO/pull/8`, never only as a bare `#8`, `OWNER/REPO#8` or `OWNER/REPO`. A
-local file keeps its path. The same holds in documents, commit messages and PR and issue bodies you write. Quoted records stay
-as returned.
+a report, question or summary as a Markdown link with a short readable label where it is first
+mentioned, such as `[OWNER/REPO#8](https://github.com/OWNER/REPO/pull/8)`,
+`[OWNER/REPO](https://github.com/OWNER/REPO)` or, for a commit,
+`[abc1234](https://github.com/OWNER/REPO/commit/abc1234)`. Never give only a bare `#8`, `OWNER/REPO#8`
+or `OWNER/REPO`, and never paste a raw URL as plain text. A local file keeps its path. The same holds in
+documents and PR and issue bodies you write. A commit message, or other text where Markdown does not
+render, gives the full URL instead. Quoted records stay as returned.
 
 When reporting finished spec work to the owner or requesting spec acceptance, including through resume,
 present the owner-facing summary from `skills/vh-adlc-spec/SKILL.md` in the conversation before the

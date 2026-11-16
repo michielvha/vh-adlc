@@ -10,3 +10,5 @@ Read `references/diagram.md` from the installed plugin root before drawing. Use 
 Use the configured local draw.io Desktop renderer and asset inputs. Follow the reference to draft the evidence brief, author one editable page, validate and inspect the export, then deliver the brief, draw.io file and SVG together.
 
 Use the export helper to publish the final directory. If it cannot publish the complete bundle, keep drafts in the working directory and tell the user what failed.
+
+Name hosted items in your report to the owner as `references/loop.md` step 5 says.

@@ -17,6 +17,7 @@ failure handling; article authoring itself needs no software feature document.
 Input is the owner's article brief, existing article, editorial request, or
 `promote <project or article>`. Read the adopter's instructions before writing.
 Publication remains subject to `references/authority.md`.
+Name hosted items in your report to the owner as `references/loop.md` step 5 says.
 
 For an independent prose pass, dispatch the editor at
 `agents/vh-adlc-blog-editor.agent.md` with the original or source notes, candidate,
