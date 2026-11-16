@@ -69,6 +69,12 @@ source, configured native roles and complete collection. Read
 `references/docs-drift-review.md` before provider execution. The runtime
 retains the original role captures and exact review targets in the run.
 
+An observed publication lease leaves the report pending. Its
+`pending_publication` field records the exact lease, available receipt and
+metadata diagnostics. These observations grant no replay authority. A failed
+lease lookup leaves collection incomplete. Pending diagnostics are excluded
+from eligible report history.
+
 Inspect collection diagnostics, expected document inventories, required detector
 outcomes, suppressed findings and stale suppressions. Missing inputs, unreadable
 feedback, changed bindings, repository writes or incomplete detectors leave an

@@ -1,9 +1,11 @@
 /** Seeded metadata and owned Git/API observations only. These fixtures establish no model execution or actual publication history. */
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { collectNativeRetained } from "../../../plugins/vh-adlc/scripts/docs-drift/retained-controller";
+import { collectNativeRetained, observePendingLease } from "../../../plugins/vh-adlc/scripts/docs-drift/retained-controller";
+import { readNativeContext } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
+import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { sealPlan, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
@@ -57,10 +59,40 @@ function seeded(limit = 524288, deep = false, foreign: false | "schema" | "layou
     git(origin, "fetch", "--no-tags", "--no-write-fetch-head", store.root, object);
     git(origin, "update-ref", settings.publication.lease_ref, object);
   }
-  installOwnedNativeService({ root, origin, source, head: source });
-  return { repo, source, origin, artifacts, operation, objects, plan, options: { repo, source, artifact_root: artifacts, operation_id: operation,
+  const service = installOwnedNativeService({ root, origin, source, head: source });
+  return { repo, source, origin, artifacts, operation, objects, plan, settings, service, options: { repo, source, artifact_root: artifacts, operation_id: operation,
     owner: "fixture-owner", run: "observe", credential: "synthetic-read-token", path: join(root, "native-bin") + ":" + process.env.PATH, restore: true as const } };
 }
+
+test.each(["matching", "receipt-absent", "foreign-repository", "receipt-forbidden"])("a pending lease retains available plan and receipt observations: %s", mode => {
+  try {
+    const f = seeded(), lease = f.settings.publication.lease_ref;
+    const receipt = f.settings.publication.receipt_ref_prefix + f.operation;
+    git(f.origin, "update-ref", lease, f.objects.object);
+    if (mode === "receipt-absent") git(f.origin, "update-ref", "-d", receipt, f.objects.object);
+    if (mode === "receipt-forbidden") {
+      const state = JSON.parse(readFileSync(f.service.statePath, "utf8"));
+      state.ref_status = 403; state.ref_status_ref = receipt;
+      writeFileSync(f.service.statePath, JSON.stringify(state));
+    }
+    const before = git(f.origin, "for-each-ref"), native = readFileSync(f.service.statePath);
+    const context = readNativeContext({ hostname: f.settings.hostname, repository: f.settings.repository,
+      credential: f.options.credential, path: f.options.path });
+    const result = observePendingLease(context.repository, parseSettings(f.settings), mode === "foreign-repository" ? 999 : context.identity.repository_id);
+    expect(result).toMatchObject({ authority: "none", replay_authority: false,
+      observed_refs: { lease: { ref: lease, object: f.objects.object } } });
+    if (mode === "foreign-repository") {
+      expect(result?.operation_id).toBeNull(); expect(result?.observed_refs.receipt).toBeNull();
+      expect(result?.diagnostics.join("\n")).toContain("another repository");
+    } else {
+      expect(result?.operation_id).toBe(f.operation); expect(result?.plan_sha256).toBe(f.objects.plan_sha256);
+      if (mode === "receipt-forbidden") {
+        expect(result?.observed_refs.receipt).toBeNull(); expect(result?.diagnostics).toHaveLength(2);
+      } else expect(result?.observed_refs.receipt).toEqual({ ref: receipt, object: mode === "receipt-absent" ? null : f.objects.object });
+    }
+    expect(git(f.origin, "for-each-ref")).toBe(before); expect(readFileSync(f.service.statePath)).toEqual(native);
+  } catch (error) { preserveFailure = true; throw error; }
+}, 120000);
 
 test.each(["schema", "layout"] as const)("native retained recovery compares foreign metadata without parsing or cleaning it: %s", async mode => {
   try {

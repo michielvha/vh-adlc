@@ -8,7 +8,8 @@ import { persistLocalAuditOutput } from "./local-history-output";
 import { canonicalJSON } from "./protocol";
 import { loadCommittedSettings } from "./settings";
 import { artifactDirectoryScope, externalResourceScope } from "./snapshot";
-import { readNativeCredential, withNativeObservation } from "./transport";
+import { readNativeContext, readNativeCredential, withNativeObservation } from "./transport";
+import { observePendingLease } from "./retained-controller";
 import { verifyProductionPreflight } from "./preflight";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { createRunArtifactWriter, originalRunContext, type RunDirectory } from "./run-directory";
@@ -30,17 +31,29 @@ export async function runReport(options: { repo: string; run: RunDirectory; hist
   const retain = createRunArtifactWriter(run, settings.reports.max_entry_bytes, invocation);
   const decisions = retain("report-decisions", bytes);
   const hosted = process.env.GITHUB_ACTIONS === "true";
-  const session = await withNativeObservation({ hostname: settings.hostname, repository: settings.repository, credential, collection: "audit" },
-    observation => runAuditSession({ repo, source, artifact_root: run.directory, owner: run.manifest.id, observation,
-    run: hosted ? process.env.GITHUB_RUN_ID ?? "" : invocation,
-    ...(hosted ? { hosted_run_attempt: Number(process.env.GITHUB_RUN_ATTEMPT) } : {}),
-    source_verification: options.source_verification, decisions, credential, cache_directory: history,
-    entry: run.manifest.entry, launcher_path: join(import.meta.dir, "cli.ts"), settings_path: join(repo, ".vh-adlc/docs-drift.yaml"),
-    environment: process.env }));
+  const assessed = await withNativeObservation({ hostname: settings.hostname, repository: settings.repository, credential, collection: "audit" }, async observation => {
+    const current = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential, observation });
+    let pending = observePendingLease(current.repository, settings, current.identity.repository_id);
+    let session = await runAuditSession({ repo, source, artifact_root: run.directory, owner: run.manifest.id, observation,
+      run: hosted ? process.env.GITHUB_RUN_ID ?? "" : invocation,
+      ...(hosted ? { hosted_run_attempt: Number(process.env.GITHUB_RUN_ATTEMPT) } : {}),
+      source_verification: options.source_verification, decisions, credential, cache_directory: history,
+      entry: run.manifest.entry, launcher_path: join(import.meta.dir, "cli.ts"), settings_path: join(repo, ".vh-adlc/docs-drift.yaml"),
+      environment: process.env, pending_publication: pending });
+    // Absence is an uncached 404. Read it again after roles before saving a green report.
+    if (!pending) {
+      pending = observePendingLease(current.repository, settings, current.identity.repository_id);
+      // A late lease produces an incomplete diagnostic session without completed-report authority.
+      if (pending) session = { ...session, complete: false, report: null, diagnostics: [...session.diagnostics, ...pending.diagnostics] };
+    }
+    return { session, pending };
+  });
+  const { session, pending } = assessed;
   const save = { repo, source, artifact_root: run.directory, session };
   const artifacts = hosted ? persistHostedAuditOutput(save)
     : settings.reports.interactive === "local-attestation" ? persistLocalAuditOutput(save) : persistAuditOutput(save);
   const output = auditSessionOutput(session, Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes), artifacts);
-  return { output, reference: retain("report-output", canonicalJSON(output)), decisions,
+  return { output, pending, pending_reference: pending ? retain("pending-publication", canonicalJSON(pending)) : null,
+    reference: retain("report-output", canonicalJSON(output)), decisions,
     worker: session.worker?.capture ?? null, reviewer: session.reviewer?.capture ?? null };
 }

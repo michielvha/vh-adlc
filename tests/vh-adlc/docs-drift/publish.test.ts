@@ -72,6 +72,22 @@ test("a pending foreign lease prevents every publication and cleanup effect", as
   expect(f.refs.get(f.settings.publication.lease_ref)).toBe("f".repeat(40));
 });
 
+test("a live original publisher stops when its lease is removed between effects", async () => {
+  const f = setup();
+  let removed = false;
+  const result = await publish({ ...options(f), gate: async journal => {
+    if (!removed && journal?.events.some(event => event.kind === "outcome" && event.effect_id === "receipt")) {
+      removed = true;
+      f.refs.delete(f.settings.publication.lease_ref);
+      f.refs.delete(f.settings.publication.receipt_ref_prefix + f.plan.manifest.operation_id);
+    }
+    return f.gate();
+  } });
+  expect(removed).toBe(true); expect(result.state).toBe("pending");
+  expect(result.reason).toBe("publication-lease-lost");
+  expect(f.executed).toEqual(["lease", "receipt"]);
+});
+
 test("missing current authority, changed actor or stale source denies before native effects", async () => {
   for (const change of [
     (f: ReturnType<typeof setup>) => { f.input.grants = f.input.grants.filter(grant => grant.effect_id !== "receipt"); },

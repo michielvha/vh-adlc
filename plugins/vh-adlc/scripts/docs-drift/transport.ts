@@ -16,7 +16,7 @@ import { createGitHubReader, createRepositoryReader, GitHubReadError, type Typed
 import { gitEnvironment } from "../git-read";
 import { canonicalJSON, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { effectMarker } from "./manifests";
-import { publicationMarker } from "./report-history";
+import { publicationMarker, readRetainedMetadata } from "./report-history";
 import { retainAbsence, retainLookup, type AbsenceEvidence } from "./observations";
 import { executeOwnedProcess, ownedClientCompleted, OUTPUT_LIMIT } from "./owned-process";
 import { externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
@@ -30,7 +30,7 @@ type NativeDelivery = { objects: PlanObjects; sent: boolean; reaped: boolean; ef
 export type PublicationIdentity = { repository: string; repository_id: number; default_branch: string; actor: string; actor_id: number };
 
 /** A native Git object was read successfully but has a different metadata layout. */
-export class UnrecognizedRetainedMetadata extends Error {}
+export { UnrecognizedRetainedMetadata } from "./report-history";
 
 /** The production entry constructs its native transport. Only the separate trial entry injects a collector. */
 export interface PublicationTransport {
@@ -763,13 +763,7 @@ export function createNativeTransport(options: {
     identity: nativeIdentity,
     async ref(ref) { return getRef(ref); },
     async readPlanObject(object) {
-      const commit = repository.commit(object);
-      if (commit.parents.length !== 0) throw new UnrecognizedRetainedMetadata("invalid retained operation metadata object");
-      const tree = repository.tree(commit.tree_sha, 2);
-      if (tree.entries.length !== 1 || tree.entries[0].path !== "plan.json"
-        || tree.entries[0].mode !== "100644" || tree.entries[0].type !== "blob") throw new UnrecognizedRetainedMetadata("invalid retained operation metadata object");
-      const blob = tree.entries[0].sha, bytes = repository.blob(blob, settings.reports.max_entry_bytes);
-      return { bytes, objects: { object, tree: commit.tree_sha, blob, plan_sha256: sha256(bytes) } };
+      return readRetainedMetadata(repository, object, settings.reports.max_entry_bytes);
     },
     readDelivery,
     observe,

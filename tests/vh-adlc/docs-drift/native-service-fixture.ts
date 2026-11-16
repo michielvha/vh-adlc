@@ -205,7 +205,7 @@ else if (endpoint === 'repos/fixture/docs/git/blobs/' + state.blob.sha)
     value = state.blob;
 else if (endpoint?.startsWith('repos/fixture/docs/git/ref/')) {
     const ref = 'refs/' + decodeURIComponent(endpoint.slice('repos/fixture/docs/git/ref/'.length));
-    if (state.ref_status) {
+    if (state.ref_status && (!state.ref_status_ref || state.ref_status_ref === ref)) {
         status = state.ref_status;
         value = { message: 'ref unavailable' };
     }

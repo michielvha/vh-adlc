@@ -22,6 +22,7 @@ import { runPublication } from "./run-publication";
 import { runResolution } from "./run-resolution";
 import { runClosure } from "./run-closure";
 import type { AuditOutputArtifacts } from "./report-output";
+import type { PendingLeaseObservation } from "./retained-controller";
 import { captureRepositoryState, matchesRepositoryState } from "./snapshot";
 
 type Outcome = "collected" | "attention" | "pending" | "setup-required" | "incomplete";
@@ -38,6 +39,7 @@ type Report = {
   recovery_effects?: ReturnType<typeof recoveryEffectsOutput>["recovery_effects"];
   publication_effects?: ReturnType<typeof publicationEffectsOutput>["publication_effects"];
   report_artifacts?: AuditOutputArtifacts | null;
+  pending_publication?: PendingLeaseObservation;
 };
 export function parseRunOptions(argv: string[]) {
   const command = RUN_COMMANDS.find(command => command === argv[0]);
@@ -218,13 +220,16 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
         } else {
           const reviewed = await runReport({ repo: options.repo, run,
             history_directory: join(origins, "../reports"), source_verification: reference });
-          report.outcome = reviewed.output.outcome;
+          report.outcome = reviewed.pending && reviewed.output.report_artifacts?.complete ? "pending" : reviewed.output.outcome;
+          if (reviewed.pending) report.pending_publication = reviewed.pending;
           report.report_artifacts = reviewed.output.report_artifacts;
-          report.summary = reviewed.output.outcome === "incomplete" ? "Assessment or independent review remains incomplete. Retained diagnostics identify the failed stage."
+          report.summary = report.outcome === "pending" ? "Publication lease remains pending. Inspect the original operation and retain its unknown outcomes before any separately approved administrative handoff."
+            : reviewed.output.outcome === "incomplete" ? "Assessment or independent review remains incomplete. Retained diagnostics identify the failed stage."
             : "Source-grounded assessment and independent review are retained with the report.";
           report.diagnostics = reviewed.output.diagnostics.map(diagnostic => diagnostic.message);
-          report.stage_artifacts = appendRunStage(run, { command: "report", state: report.outcome === "incomplete" ? "pending" : "complete",
+          report.stage_artifacts = appendRunStage(run, { command: "report", state: report.outcome === "incomplete" || reviewed.pending ? "pending" : "complete",
             artifacts: { report_output: reviewed.reference, report_decisions: reviewed.decisions,
+              ...(reviewed.pending_reference ? { pending_publication: reviewed.pending_reference } : {}),
               ...(reviewed.worker ? { assessment_worker: reviewed.worker } : {}), ...(reviewed.reviewer ? { assessment_reviewer: reviewed.reviewer } : {}) } }).artifacts;
         }
       } else if (run.origin !== "original") {

@@ -16,8 +16,10 @@ import { captureNativeRoleProcess } from "./role-process";
 import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { OUTPUT_LIMIT } from "./owned-process";
 import type { AuditOutputArtifacts } from "./report-output";
+import type { PendingLeaseObservation } from "./retained-controller";
 
-type Options = Parameters<typeof beginAuditReport>[0] & { environment: Record<string, string | undefined>; role_timeout_ms?: number };
+type Options = Parameters<typeof beginAuditReport>[0] & { environment: Record<string, string | undefined>; role_timeout_ms?: number;
+  pending_publication?: PendingLeaseObservation | null };
 type Capture = Awaited<ReturnType<typeof captureNativeRoleProcess>>;
 type Start = Awaited<ReturnType<typeof beginAuditReport>>;
 type AuditReport = Awaited<ReturnType<typeof completeAuditReport>>;
@@ -51,6 +53,7 @@ export async function runAuditSession(input: Options) {
   try {
     if (!Number.isSafeInteger(timeout) || timeout < 1 || timeout > 900000) throw Error("Bounded audit role timeout required");
     const scope = artifactDirectoryScope(options.artifact_root, repo), snapshot = captureSnapshot(repo, options.source);
+    if (options.pending_publication) throw Error(options.pending_publication.diagnostics.join("\n"));
     const decision = parseDecisionPacket(readBoundArtifact({ source_repo: repo, artifact_root: scope.directory, reference: options.decisions }), snapshot);
     if (decision.mode !== "advisory" || decision.selected_proposals.length || decision.decisions.length || decision.coordination)
       throw Error("Read-only audit session requires a report-only decision packet; selected repairs use their separate controller");

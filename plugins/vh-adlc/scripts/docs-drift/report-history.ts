@@ -45,6 +45,7 @@ export class HistoryEligibilityError extends Error {
   constructor(reason: string) { super(`ineligible docs-drift history ${reason}`); }
 }
 export class PublicationEvidenceChanged extends HistoryEligibilityError {}
+export class UnrecognizedRetainedMetadata extends Error {}
 function invalid(reason: string): never { throw new HistoryEligibilityError(reason); }
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) invalid("object");
@@ -424,6 +425,18 @@ export type ReviewedPublication = {
 };
 export type NativePublicationBinding = ReviewedPublication & { ref: string; object: string };
 
+/** Read the existing parentless plan-only Git object without assigning execution authority. */
+export function readRetainedMetadata(reader: RepositoryReader, object: string, maxBytes: number, maxEntries = 2) {
+  const commit = reader.commit(object);
+  if (commit.parents.length !== 0) throw new UnrecognizedRetainedMetadata("invalid retained operation metadata object");
+  const tree = reader.tree(commit.tree_sha, maxEntries);
+  if (tree.entries.length !== 1 || tree.entries[0].path !== "plan.json"
+    || tree.entries[0].mode !== "100644" || tree.entries[0].type !== "blob")
+    throw new UnrecognizedRetainedMetadata("invalid retained operation metadata object");
+  const blob = tree.entries[0].sha, bytes = reader.blob(blob, maxBytes);
+  return { bytes, objects: { object, tree: commit.tree_sha, blob, plan_sha256: sha256(bytes) } };
+}
+
 export function publicationMarker(settings: Settings, operation: string): string {
   if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(operation)) invalid("operation marker");
   return `<!-- vh-adlc-docs-drift operation=${operation} receipt=${settings.publication.receipt_ref_prefix}${operation} -->`;
@@ -447,10 +460,14 @@ export async function readReviewedProposal(options: {
   const operation = /^<!-- vh-adlc-docs-drift operation=([A-Za-z0-9][A-Za-z0-9_-]{0,79}) receipt=([^\s]+) -->$/u.exec(markers[0][0]);
   if (!operation || markers[0][0] !== publicationMarker(settings, operation[1])) invalid("foreign operation ref");
   const ref = settings.publication.receipt_ref_prefix + operation[1];
-  const nativeRef = reader.ref(ref), receiptCommit = reader.commit(nativeRef.sha), tree = reader.tree(receiptCommit.tree_sha, 1);
-  if (receiptCommit.parents.length !== 0 || tree.entries.length !== 1 || tree.entries[0].path !== "plan.json"
-    || tree.entries[0].type !== "blob" || tree.entries[0].mode !== "100644") invalid("metadata-only retained receipt tree");
-  const bytes = reader.blob(tree.entries[0].sha, settings.reports.max_entry_bytes);
+  const nativeRef = reader.ref(ref);
+  let metadata: ReturnType<typeof readRetainedMetadata>;
+  try { metadata = readRetainedMetadata(reader, nativeRef.sha, settings.reports.max_entry_bytes, 1); }
+  catch (error) {
+    if (error instanceof UnrecognizedRetainedMetadata) invalid("metadata-only retained receipt tree");
+    throw error;
+  }
+  const { bytes, objects } = metadata;
   parseCanonical(bytes);
   const candidate = reader.commit(current.head_sha);
   const native = { repository: settings.repository, repository_id: current.base_repository.id, operation_id: operation[1], actor: current.actor, actor_id: current.actor_id,
@@ -476,5 +493,5 @@ export async function readReviewedProposal(options: {
   return { reviewed: { actor: reviewed.actor, head: reviewed.head, body_sha256: reviewed.body_sha256,
     corrections: reviewed.corrections, attention: reviewed.attention },
     receipt: { repository: settings.repository, repository_id: current.base_repository.id, operation_id: operation[1], ref, object: nativeRef.sha,
-      tree: receiptCommit.tree_sha, plan_sha256: sha256(bytes), actor_id: current.actor_id } };
+      tree: objects.tree, plan_sha256: objects.plan_sha256, actor_id: current.actor_id } };
 }

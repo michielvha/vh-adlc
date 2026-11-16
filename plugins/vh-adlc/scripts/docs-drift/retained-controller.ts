@@ -1,10 +1,12 @@
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import { inspectRetainedOperation, restoreRetainedOperation } from "./recovery";
-import { publicationMarker } from "./report-history";
+import { publicationMarker, readRetainedMetadata } from "./report-history";
 import { canonicalDigest, freezeJSON } from "./protocol";
 import { artifactDirectoryScope, captureRepositoryState, createOwnedObjectStore, matchesRepositoryState } from "./snapshot";
-import { loadCommittedSettings } from "./settings";
+import { loadCommittedSettings, type Settings } from "./settings";
+import { readRetainedPlan } from "./journal";
+import { GitHubReadError, type RepositoryReader } from "../github-read";
 import { createNativeTransport } from "./transport";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { readNativeTrialSettings } from "./trial-definition";
@@ -14,6 +16,40 @@ type Options = {
   owner: string; run: string; credential: string; path?: string; restore?: true;
   trial_definition_sha256?: string;
 };
+export type PendingLeaseObservation = {
+  authority: "none"; replay_authority: false; operation_id: string | null; plan_sha256: string | null;
+  observed_refs: { lease: { ref: string; object: string }; receipt: { ref: string; object: string | null } | null };
+  diagnostics: string[];
+};
+
+/** A present lease is pending independently of whether its historical metadata is readable. */
+export function observePendingLease(reader: RepositoryReader, settings: Settings, repositoryID: number): PendingLeaseObservation | null {
+  let lease: ReturnType<RepositoryReader["ref"]>;
+  try { lease = reader.ref(settings.publication.lease_ref); }
+  catch (error) {
+    if (error instanceof GitHubReadError && error.status === 404) return null;
+    throw error;
+  }
+  const result: PendingLeaseObservation = { authority: "none", replay_authority: false, operation_id: null, plan_sha256: null,
+    observed_refs: { lease: { ref: lease.ref, object: lease.sha }, receipt: null },
+    diagnostics: ["Publication operation remains pending at " + lease.ref + " object " + lease.sha + ". Preserve original ownership and unknown outcomes."] };
+  try {
+    const metadata = readRetainedMetadata(reader, lease.sha, settings.reports.max_entry_bytes), plan = readRetainedPlan(metadata.bytes);
+    if (plan.manifest.repository !== settings.repository || plan.manifest.repository_id !== repositoryID)
+      throw Error("Lease metadata belongs to another repository");
+    publicationMarker(settings, plan.manifest.operation_id);
+    result.operation_id = plan.manifest.operation_id; result.plan_sha256 = metadata.objects.plan_sha256;
+    const ref = settings.publication.receipt_ref_prefix + plan.manifest.operation_id;
+    try { result.observed_refs.receipt = { ref, object: reader.ref(ref).sha }; }
+    catch (error) {
+      if (error instanceof GitHubReadError && error.status === 404) result.observed_refs.receipt = { ref, object: null };
+      else throw error;
+    }
+  } catch (error) {
+    result.diagnostics.push(error instanceof Error ? error.message : "Original lease metadata or receipt observation is unavailable");
+  }
+  return freezeJSON(result);
+}
 type Summary = {
   authority: "none"; replay_authority: false; historical_review_verified: false;
   operation_id: string; plan_sha256: string; inspection_directory: string; object_store: string;
