@@ -1,5 +1,5 @@
 import { bindRunJournal, type RunDirectory } from "./run-directory";
-import { runtimePolicyBinding } from "./bootstrap";
+import { requireExecutionBun, runtimePolicyBinding } from "./bootstrap";
 import { policyDigest } from "./journal";
 import { loadCommittedSettings } from "./settings";
 import { publicationEffectsOutput } from "./recovery-output";
@@ -36,8 +36,9 @@ function confirmedFactsChanged(facts: PublicationFacts | null | undefined, plan:
     || plan && facts?.runtime && policyDigest(runtimePolicyBinding(facts.runtime)) !== policyDigest(plan));
 }
 
-function requireExecutingRuntime(runtime: Runtime): void {
-  if (Bun.version !== "1.4.4" || realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/publication-controller.ts"))
+function requireExecutingRuntime(runtime: Runtime, plan: SealedPlan): void {
+  requireExecutionBun(plan.schema_version);
+  if (realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/publication-controller.ts"))
     throw Error("Retained executing publication controller required");
 }
 
@@ -137,7 +138,7 @@ function readInvocation(options: Options, plan: SealedPlan) {
 }
 
 function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof currentState>>, original: unknown, run?: RunDirectory): PublishOptions {
-  requireExecutingRuntime(initial.runtime);
+  requireExecutingRuntime(initial.runtime, initial.plan);
   const transport = createNativeTransport({ source_repo: options.repo, artifact_root: options.artifact_root, object_store: initial.store,
     settings: initial.settings, credential: options.credential, path: options.path, run });
   return { source_repo: options.repo, artifact_root: options.artifact_root, object_store: initial.store, settings: initial.settings, plan: initial.plan, transport,
@@ -155,7 +156,7 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
           original, transport, objects, current_proposals: proposals.proposals });
       }
       const current = await currentState(options, inventory, initial.plan);
-      requireExecutingRuntime(current.runtime);
+      requireExecutingRuntime(current.runtime, current.plan);
       if (current.plan.manifest_sha256 !== initial.plan.manifest_sha256) throw new PublicationScopeChanged("Current publication payload changed");
       for (const observation of inventory?.observations ?? []) {
         const effect = initial.plan.manifest.effects.find(effect => effect.id === observation.effect_id)!;
@@ -169,7 +170,7 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
 
 export async function publishPublication(input: Options, run?: RunDirectory) {
   const options = structuredClone(input), current = await currentState(options);
-  requireExecutingRuntime(current.runtime);
+  requireExecutingRuntime(current.runtime, current.plan);
   const path = join(options.artifact_root, current.plan.manifest.operation_id + ".controller.json");
   if (!existsSync(path)) publishArtifact(path, canonicalJSON({ schema_version: 1, kind: "docs-drift-publication-controller", plan_sha256: sha256(canonicalJSON(current.plan)),
     inputs_sha256: invocationDigest(options), proposal_snapshot: current.proposal_snapshot }));
@@ -193,7 +194,7 @@ export async function resumePublication(input: Options & { journal_directory: st
     const facts = await collectPublicationInputs({ ...options, object_store: candidate.inspection?.object_store ?? undefined });
     if (confirmedFactsChanged(facts, journal.plan)) throw new PublicationScopeChanged("Original recovery source actor or runtime changed");
     if (!facts.complete || !facts.runtime || !source.object_store) throw Error("Current publication recovery runtime unavailable");
-    requireExecutingRuntime(facts.runtime);
+    requireExecutingRuntime(facts.runtime, journal.plan);
     const settings = captureSnapshot(options.repo, options.source).settings;
     publicationEffectsOutput({ command: "resume", source: options.source, outcome: "incomplete", capacity_check: true,
       result: { state: "pending", reason: null, journal }, limit: Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes) });

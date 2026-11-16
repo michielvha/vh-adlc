@@ -39,7 +39,8 @@ test("normal resolve accounts for the complete original hunk and retains its con
   const before = captureRepositoryState(f.repo), nativeBefore = readFileSync(service.statePath);
   let selectedDirectory = directory, closeSource = source;
   async function invoke(command: string) {
-    const result = await executeOwnedProcess({ argv: [process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), command,
+    const runtime = command === "close" || command === "resume" ? process.env.VH_ADLC_TEST_ALTERNATE_BUN ?? process.execPath : process.execPath;
+    const result = await executeOwnedProcess({ argv: [runtime, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), command,
       "--repo", f.repo, "--run-dir", selectedDirectory, ...(command === "resolve" ? ["--source", source, "--proposal", "1"] : []),
       ...(command === "close" ? ["--source", closeSource, "--proposal", "501"] : [])], cwd: f.repo,
       env: { PATH: join(f.root, "native-bin") + ":" + process.env.PATH, HOME: process.env.HOME!, GH_TOKEN: "synthetic-native-token",
@@ -102,6 +103,7 @@ test("normal resolve accounts for the complete original hunk and retains its con
   const closeLocation = { ...location, directory: selectedDirectory };
   const closeManifest = readRunDirectory(closeLocation).stages.at(-1)?.artifacts.reviewed_plan;
   if (!closeManifest) throw Error("Exact independent closure review required");
+  const roleCalls = readFileSync(join(selectedDirectory, "synthetic-role-order.jsonl"));
   writeFileSync(join(selectedDirectory, "approval.yaml"), "manifest_sha256: " + closeManifest.sha256 + "\nrequest: Approve this exact synthetic post-merge closure batch\n", { mode: 0o600 });
   let closed = await invoke("close");
   if (closeReplyFault) {
@@ -117,6 +119,10 @@ test("normal resolve accounts for the complete original hunk and retains its con
   }
   expect(closed.report).toMatchObject({ command: closeReplyFault ? "resume" : "close", outcome: "collected", publication_effects: { state: "complete" } });
   expect(closed.result.exit_code).toBe(0);
+  const selectedVersion = Bun.spawnSync([process.env.VH_ADLC_TEST_ALTERNATE_BUN ?? process.execPath, "--version"], { stdout: "pipe", stderr: "pipe", timeout: 5000 });
+  expect(selectedVersion.exitCode).toBe(0);
+  expect(closed.report).toMatchObject({ bun_version: selectedVersion.stdout.toString().trim() });
+  expect(readFileSync(join(selectedDirectory, "synthetic-role-order.jsonl"))).toEqual(roleCalls);
   const final = JSON.parse(readFileSync(service.statePath, "utf8"));
   expect(final.prs[0].state).toBe("closed"); expect(final.comments["1"]).toHaveLength(1);
   expect(captureRepositoryState(f.repo)).toEqual(closeBefore);

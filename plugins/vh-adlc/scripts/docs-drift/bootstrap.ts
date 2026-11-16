@@ -339,7 +339,6 @@ export async function selectProductionRuntime(input: {
 }) {
   const options = structuredClone(input), settings = loadCommittedSettings(options.repo, options.current_default).settings;
   if (settings.schema_version !== 2 || !settings.component) fail("ordinary settings and released component required");
-  inspectInstalledPayload({ directory: options.directory, expected: settings.component });
   const preflight = verifyProductionPreflight({ ...options, component: settings.component,
     publisher: { entry: options.entry, identity: options.identity } });
   const selected = await selectInstalledRuntime({ ...options, source_commit: options.current_default });
@@ -406,6 +405,11 @@ export async function selectOperationRuntime(input: Omit<Parameters<typeof selec
   const entry = options.entry;
   if (entry !== "hosted" && entry !== "copilot" && entry !== "claude") fail("legacy execution entry required");
   return selectApprovedRuntime({ ...options, entry });
+}
+
+/** Execution compatibility belongs to the original plan format. */
+export function requireExecutionBun(schemaVersion: SealedPlan["schema_version"], version = Bun.version): void {
+  if (schemaVersion === 1 && version !== "1.4.4") throw Error("Original retained execution Bun version required");
 }
 
 export function runtimePolicyBinding(runtime: Awaited<ReturnType<typeof selectOperationRuntime>>): PolicyBinding {

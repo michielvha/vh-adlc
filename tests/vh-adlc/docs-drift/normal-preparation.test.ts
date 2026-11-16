@@ -26,7 +26,8 @@ test("normal prepare retains the original worker selection and edits only its ow
   const service = installOwnedNativeService({ root: f.root, origin, source, head: source, publisher_identity: { actor: "fixture-owner", actor_id: 30 } });
   const before = captureRepositoryState(f.repo), nativeBefore = readFileSync(service.statePath), refs = git(origin, "for-each-ref");
   async function invoke(command: string, selectedDirectory = directory) {
-    const result = await executeOwnedProcess({ argv: [process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), command,
+    const runtime = command === "publish" || command === "resume" ? process.env.VH_ADLC_TEST_ALTERNATE_BUN ?? process.execPath : process.execPath;
+    const result = await executeOwnedProcess({ argv: [runtime, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), command,
       "--repo", f.repo, "--run-dir", selectedDirectory, ...(command === "scan" ? ["--source", source] : [])], cwd: f.repo,
       env: { PATH: join(f.root, "native-bin") + ":" + process.env.PATH, HOME: process.env.HOME!, GH_TOKEN: "synthetic-native-token",
         COPILOT_GITHUB_TOKEN: "synthetic-selected-provider", XDG_STATE_HOME: state, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
@@ -61,7 +62,7 @@ test("normal prepare retains the original worker selection and edits only its ow
   expect(readFileSync(service.statePath)).toEqual(nativeBefore); expect(git(origin, "for-each-ref")).toBe(refs);
   const manifest = final?.artifacts.reviewed_plan;
   if (!manifest) throw Error("Exact reviewed manifest required");
-  const callsBeforeRefusals = readFileSync(service.calls);
+  const callsBeforeRefusals = readFileSync(service.calls), roleCalls = readFileSync(join(directory, "synthetic-role-order.jsonl"));
   const missingApproval = await invoke("publish");
   expect(missingApproval.result.exit_code).toBe(2);
   expect(missingApproval.report).toMatchObject({ outcome: "setup-required" });
@@ -97,8 +98,12 @@ test("normal prepare retains the original worker selection and edits only its ow
   expect(captureRepositoryState(f.repo)).toEqual(before);
   const resumed = await invoke("resume");
   expect(resumed.report).toMatchObject({ command: "resume", outcome: "collected", publication_effects: { state: "complete" } });
+  const selectedVersion = Bun.spawnSync([process.env.VH_ADLC_TEST_ALTERNATE_BUN ?? process.execPath, "--version"], { stdout: "pipe", stderr: "pipe", timeout: 5000 });
+  expect(selectedVersion.exitCode).toBe(0);
+  expect(resumed.report).toMatchObject({ bun_version: selectedVersion.stdout.toString().trim() });
   expect(resumed.result.exit_code).toBe(0);
   expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(1);
   expect(captureRepositoryState(f.repo)).toEqual(before);
+  expect(readFileSync(join(directory, "synthetic-role-order.jsonl"))).toEqual(roleCalls);
   passed = true;
 }, 1200000);

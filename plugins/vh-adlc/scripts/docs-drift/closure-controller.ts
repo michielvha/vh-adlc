@@ -1,6 +1,6 @@
 import { bindRunJournal, type RunDirectory } from "./run-directory";
 import { sameAccount } from "./identity";
-import { runtimePolicyBinding, selectOriginalOperationRuntime } from "./bootstrap";
+import { requireExecutionBun, runtimePolicyBinding, selectOriginalOperationRuntime } from "./bootstrap";
 import { collectNativeClosure } from "./resolution-entry";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -23,8 +23,9 @@ import { loadCommittedSettings } from "./settings";
 import { createNativeTransport, readNativeContext, withNativeObservation, NativeObservationChanged } from "./transport";
 
 type Options = Omit<Parameters<typeof collectClosureReview>[0], "closure_inventory" | "observation"> & { authority: unknown };
-function requireExecutingRuntime(runtime: { component: { directory: string } }): void {
-  if (Bun.version !== "1.4.4" || realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/closure-controller.ts"))
+function requireExecutingRuntime(runtime: { component: { directory: string } }, plan: SealedPlan): void {
+  requireExecutionBun(plan.schema_version);
+  if (realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/closure-controller.ts"))
     throw Error("Retained executing closure controller required");
 }
 
@@ -109,7 +110,7 @@ function readInvocation(options: Options, plan: SealedPlan) {
 }
 
 function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof currentState>>, original: unknown, run?: RunDirectory): PublishOptions {
-  requireExecutingRuntime(initial.runtime);
+  requireExecutingRuntime(initial.runtime, initial.plan);
   const transport = createNativeTransport({ source_repo: options.repo, artifact_root: options.artifact_root, object_store: initial.store,
     settings: initial.settings, credential: options.credential, path: options.path, run });
   return { source_repo: options.repo, artifact_root: options.artifact_root, object_store: initial.store, settings: initial.settings, plan: initial.plan, transport,
@@ -123,7 +124,7 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
           original, transport, objects: writePublicationObjects(initial.store, initial.plan, journal.header), reader: native.repository });
       }
       const current = await currentState(options, inventory, initial.plan);
-      requireExecutingRuntime(current.runtime);
+      requireExecutingRuntime(current.runtime, current.plan);
       for (const proof of inventory?.observations ?? []) {
         const effect = initial.plan.manifest.effects.find(effect => effect.id === proof.effect_id)!;
         const observed = await transport.observe(initial.plan, effect, writePublicationObjects(initial.store, initial.plan, journal!.header));
@@ -136,7 +137,7 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
 
 export async function publishClosure(input: Options, run?: RunDirectory) {
   const options = structuredClone(input), current = await currentState(options);
-  requireExecutingRuntime(current.runtime);
+  requireExecutingRuntime(current.runtime, current.plan);
   const prefix = join(options.artifact_root, current.plan.manifest.operation_id), targetPath = prefix + ".closure-target.json";
   const targetBytes = canonicalJSON(current.original_target), targetReference = { path: current.plan.manifest.operation_id + ".closure-target.json", sha256: sha256(targetBytes) };
   if (targetReference.sha256 !== current.plan.manifest.bindings.assessment_sha256) throw Error("Original closure target bytes changed");
@@ -156,7 +157,7 @@ export async function resumeClosure(input: Options & { journal_directory: string
   const runtime = await selectOriginalOperationRuntime({ repo: options.repo, plan: journal.plan, directory: resolve(import.meta.dir, "../.."),
     identity: { repository: manifest.repository, repository_id: manifest.repository_id, actor: manifest.actor, actor_id: manifest.actor_id, default_branch: settings.default_branch },
     cache_directory: options.cache_directory, entry: options.entry });
-  requireExecutingRuntime(runtime);
+  requireExecutingRuntime(runtime, journal.plan);
   if (journal.plan.schema_version === 2) {
     if (!run) throw Error("Original run required for version-two closure resume");
     run = bindRunJournal(run, journal);
@@ -175,7 +176,7 @@ export async function resumeClosure(input: Options & { journal_directory: string
     const inventory = await captureClosureInventory({ source_repo: options.repo, artifact_root: options.artifact_root, journal_directory: journal.directory,
       original: invocation.original_target, transport, objects: writePublicationObjects(collected.store, journal.plan, journal.header), reader: native.repository });
     const current = await currentState(options, inventory, journal.plan);
-    requireExecutingRuntime(current.runtime);
+    requireExecutingRuntime(current.runtime, current.plan);
     publicationEffectsOutput({ command: "resume-closure", source: options.source, outcome: "incomplete", capacity_check: true,
       result: { state: "pending", reason: null, journal }, limit: Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes) });
     return resumeEffects({ ...publicationOptions(options, current, invocation.original_target, run), journal_directory: options.journal_directory });

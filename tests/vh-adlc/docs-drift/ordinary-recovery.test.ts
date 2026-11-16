@@ -13,7 +13,11 @@ import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/proto
 import { executeOwnedProcess } from "../../../plugins/vh-adlc/scripts/docs-drift/owned-process";
 
 const roots: string[] = [];
-afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+let passed = false;
+afterAll(() => {
+  if (passed) for (const root of roots) rmSync(root, { recursive: true, force: true });
+  else console.error("Preserved failed original recovery fixtures", JSON.stringify(roots));
+});
 
 test("ordinary original-context recovery acknowledges after a schema upgrade, staged rollback and client removal", async () => {
   const f = await ordinaryPublicationFixture(roots), append = journals.appendOutcome;
@@ -29,7 +33,7 @@ test("ordinary original-context recovery acknowledges after a schema upgrade, st
   const observation = join(f.root, "lost-host-observations"), refs = git(f.origin, "for-each-ref");
   const nativeBefore = readFileSync(f.service.statePath);
   async function invoke(action: string, extra: string[] = [], directory = observation) {
-    const result = await executeOwnedProcess({ argv: [process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"),
+    const result = await executeOwnedProcess({ argv: [process.env.VH_ADLC_TEST_ALTERNATE_BUN ?? process.execPath, join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"),
       "resume", "--repo", f.repo, "--run-dir", directory, "--action", action, ...extra], cwd: f.repo,
       env: { PATH: f.options.path!, HOME: process.env.HOME!, GH_TOKEN: f.options.credential,
         XDG_STATE_HOME: join(f.root, directory === f.run.directory ? "original-state" : "observer-state"), BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0" },
@@ -51,6 +55,7 @@ test("ordinary original-context recovery acknowledges after a schema upgrade, st
     successor_only_field: "unknown to the original release" };
   f.write(".vh-adlc/docs-drift.yaml", canonicalJSON(successor)); const current = commit(f.repo, "Synthetic successor rollback");
   git(f.origin, "fetch", "--no-write-fetch-head", f.repo, current); git(f.origin, "update-ref", "refs/heads/main", current);
+  const clientCalls = readFileSync(f.component.calls);
   unlinkSync(f.component.executable);
   const state = JSON.parse(readFileSync(f.service.statePath, "utf8"));
   state.commit = current; state.tree = git(f.repo, "rev-parse", "HEAD^{tree}"); state.prs[0].title = "Later owner title"; state.viewer_login = "Fixture-Owner";
@@ -84,4 +89,6 @@ test("ordinary original-context recovery acknowledges after a schema upgrade, st
     { cwd: f.origin, stdout: "pipe", stderr: "pipe" });
   expect(lease.exitCode).toBe(1);
   expect(lease.stderr.toString()).toBe("");
+  expect(readFileSync(f.component.calls)).toEqual(clientCalls);
+  passed = true;
 }, 600000);

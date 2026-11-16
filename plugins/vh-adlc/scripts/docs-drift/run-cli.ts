@@ -27,6 +27,7 @@ import { captureRepositoryState, matchesRepositoryState } from "./snapshot";
 type Outcome = "collected" | "attention" | "pending" | "setup-required" | "incomplete";
 type Report = {
   schema_version: 1; authority: "none"; command: string; outcome: Outcome; run_directory: string;
+  bun_version: string;
   source_commit?: string; stage?: string; summary?: string; counts?: { findings: number };
   diagnostics: string[];
   prepared_checkout?: string | null;
@@ -119,7 +120,7 @@ function retainPublicationResult(options: { repo: string; run: RunDirectory; loc
 
 /** Public run-directory entry. Domain stages keep their existing review, ownership and authority checks. */
 export async function runDirectoryMain(argv: string[]): Promise<number> {
-  let report: Report = { schema_version: 1, authority: "none", command: argv[0] ?? "", outcome: "incomplete", run_directory: "", diagnostics: [] };
+  let report: Report = { schema_version: 1, authority: "none", command: argv[0] ?? "", outcome: "incomplete", run_directory: "", bun_version: Bun.version, diagnostics: [] };
   let caller: { repo: string; digest: string } | undefined;
   try {
     const options = optionsFor(argv);

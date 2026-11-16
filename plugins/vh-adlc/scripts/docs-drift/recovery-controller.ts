@@ -1,7 +1,7 @@
 import { bindRunJournal, type RunDirectory } from "./run-directory";
 import { realpathSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { selectOriginalOperationRuntime } from "./bootstrap";
+import { requireExecutionBun, selectOriginalOperationRuntime } from "./bootstrap";
 import { fetchCurrentDefault } from "./proposals";
 import { readJournal } from "./journal";
 import { acknowledgeDeliveries, reconcileAbsent, type AcknowledgementScope, type ReconciliationScope } from "./recovery";
@@ -125,7 +125,7 @@ export async function inspectRecovery(input: RecoveryOptions): Promise<RecoveryI
 
 /** Execute only metadata recovery under fresh exact authority using the original retained code. */
 export async function applyRecovery(input: RecoveryOptions & { authority: unknown; purpose: Purpose }, run?: RunDirectory) {
-  if (Bun.version !== "1.4.4") throw Error("Original retained recovery Bun version required");
+  requireExecutionBun(readJournal(input.journal_directory, input.repo).plan.schema_version);
   const options = structuredClone(input), context = await collectContext(options, options.purpose, run), selected = context.selection;
   recoveryEffectsOutput({ command: selected.purpose === "acknowledgement" ? "acknowledge-delivery" : "reconcile-publication",
     source: options.source, outcome: "incomplete", limit: Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes), capacity_check: true,
