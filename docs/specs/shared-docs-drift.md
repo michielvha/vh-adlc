@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revising the approved receipt-retirement correction before a fresh Claude Code Opus 5.5 spec review. Implemented operation evidence is retained. Installed/hosted migration acceptance remains open."
+status: planned
+status_description: "R-100 has no blocking or should-fix findings and the owner-approved receipt-retention correction is accepted. Ready to resume its existing implementation branch. Installed/hosted migration acceptance remains open."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -125,6 +125,8 @@ R-97 qualifies all 83 required fragments. Its metadata finding exposed the R-96 
 R-98 qualifies all 63 required fragments and identifies ambiguity in the completed-receipt manual-cleanup procedure introduced while addressing R-96. That added procedure is removed at its source under the owner-approved retain-receipts direction. Completed and other terminal outcomes, including acknowledged, retired and invalidated operations, retain their immutable receipt refs indefinitely. T127 removes the obsolete general helper-retirement row and documents retention plus the previously accepted exact-owner-approved unresolved-operation abandonment hand-off. No new completed-receipt eligibility, cleanup command, permission format or report schema is introduced. The AC-05 proof checks retained refs after completed publish/closure/acknowledgement and other terminal outcomes, plus the existing unresolved-operation abandonment scenario. The two nits clarify that the forbidden action is the helper command and cite `sealPlan` by symbol for the effect-grants digest. Earlier R-96/R-97 context describes superseded intermediate manual-policy drafts. A fresh review is required before implementation resumes.
 
 R-99 qualifies all 64 required fragments. Its should-fix finding traces to an acknowledgement-summary sentence inserted during the R-96 nit correction. Removing that sentence from the middle of the acknowledgement preconditions restores their explicit subject. Acknowledgement alone requires settlement/full application and appends its terminal journal decision. The lost-origin bot hand-off points to the separate unresolved-operation abandonment paragraph without restating its preconditions. That outside-helper exception supplies no delivery/settlement proof and writes no terminal event into a restored mirror. T138 now names the retained-ref/zero-deletion matrix for completed, acknowledged, retired and invalidated outcomes, addressing the task nit. These factual corrections preserve the approved scope. A fresh clean review remains required.
+
+R-100 qualifies all 62 required fragments at `91c7b5f0aa81b35a07cd573e61ce05df02b0c40a`, with actual Claude Code Opus 5.5, exact target, unchanged lossless inputs and confirmed native-process cleanup. It returns no blocking or should-fix findings. Its remaining terminology nit F-01 is retained under the pinned nit rule. The owner's 2026-11-16 acceptance of the exact retain-receipts/removal recommendation and approved runtime edits covers continuation after this fresh clean review. No new acceptance or installation choice is needed. Full feature, released/native/hosted and migration acceptance remain open.
 
 ### Terms used here
 
@@ -1418,6 +1420,8 @@ None. The owner confirmed ordinary plugin/client installation and the recommende
 | 2026-11-16 | R-97 | spec | `a1a7b070834bb5cc9b1acf50e91e7242d85a02dc` | claude-opus-5-5 | procedural | Two should-fix findings and one nit. All 83 required fragments read with qualified model, target and cleanup. |
 | 2026-11-16 | R-98 | spec | `125b432c6acb7803a00716bd53520e0e11e6764d` | claude-opus-5-5 | procedural | One should-fix finding and two nits. All 63 required fragments read with qualified model, target and cleanup. |
 | 2026-11-16 | R-99 | spec | `9a00ff76a12c1ed0c4374dd771e8465ab4800f35` | claude-opus-5-5 | procedural | One should-fix finding and one nit. All 64 required fragments read with qualified model, target and cleanup. |
+| 2026-11-16 | R-100 | spec | `91c7b5f0aa81b35a07cd573e61ce05df02b0c40a` | claude-opus-5-5 | procedural | No blocking or should-fix findings. One terminology nit retained under the pinned rule. All 62 required fragments read with qualified model, target and cleanup. |
+| 2026-11-16 | R-100 | spec | `91c7b5f0aa81b35a07cd573e61ce05df02b0c40a` | n/a | n/a | accepted by owner |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -2537,6 +2541,15 @@ SEVERITY: nit
 WHERE: Tasks T138 (`:744`) and T127 (`:747`); Test Plan AC-05 row (`:667`, "After completed publish, closure and acknowledgement, compare each original receipt ref/object ... Include acknowledged, retired and invalidated terminal outcomes in retained-ref checks").
 EVIDENCE: The AC-05 row adds retained-ref comparisons after completed, acknowledged, retired (known-absence reconciliation) and invalidated outcomes, with zero receipt-deletion transport calls. T138's done conditions name only unknown-action parsing, refusal of version-two `receipt-retire` and version-one inspection, plus a general "Preserve receipts". T127 covers guides and policy rows. No unchecked task names the new terminal-outcome retained-ref test as its done condition. The standard asks each task to name "a done condition that is a test or check".
 PROPOSAL: Add to T138 (or T137) a done condition that runs the retained-ref comparison across completed publish/closure, acknowledged, retired and invalidated outcomes, with zero receipt-deletion transport calls.
+
+### R-100
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design "One run directory and a smaller helper interface", second paragraph (`shared-docs-drift.md:594`, "Completed and otherwise terminal operations, including acknowledged, retired and invalidated ones, retain their immutable receipt refs indefinitely"); Test Plan AC-05 row (`:669`, "Include acknowledged, retired and invalidated terminal outcomes in retained-ref checks"); Context "Approved follow-up on 2026-11-16", R-98 paragraph (`:125`, "including acknowledged, retired and invalidated operations"); Tasks T138 (`:746`, "known-absence retirement").
+EVIDENCE: At `:594` and `:669` the bare word "retired" stands next to sentences about removing the `retire-receipt` selector and refusing the `receipt-retire` effect, in the same sentence or the one before. A reader can take "retired operations" to mean operations whose receipt was retired, which is the capability this correction removes. In the code the word means something else: `journal.ts` `validateEvent` handles the `retired-absence` event (`Retirement` with `never_dispatched` or `unapplied`), which `reconcile-publication` appends for a business effect proven absent. Only T138 says "known-absence retirement", and R-99 F-02 had to explain "retired (known-absence reconciliation)" in its own evidence. The words come from the R-98 correction. T138's wording settles what is built and tested, so the implementation does not change.
+PROPOSAL: Replace "retired" with "known-absence retired" (or "reconciled as known absent") at `:594`, `:669` and in the R-98 paragraph so the terms match T138 and the `retired-absence` journal event.
 
 ## Sources
 
