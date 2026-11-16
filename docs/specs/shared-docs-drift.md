@@ -1518,7 +1518,6 @@ None. The owner confirmed ordinary plugin/client installation and the recommende
 | 2026-11-16 | R-100 | spec | `91c7b5f0aa81b35a07cd573e61ce05df02b0c40a` | n/a | n/a | accepted by owner |
 | 2026-11-16 | R-101 | spec | `27bb468499d7d9c3fd4310cf3ad2471b58779695` | claude-opus-5-5 | procedural | No blocking or should-fix findings. Three nits retained under the pinned rule. All 61 required fragments read with qualified native model, target, unchanged packet and cleanup. Default-branch-only refresh preserves the accepted normative baseline. |
 | 2026-11-16 | R-102 | spec | `6f86575673a594309e4ee373bbea939014602bc4` | claude-opus-5-5 | procedural | No blocking or should-fix findings. Six nits recorded. All 70 required fragments read with qualified native model, exact target, unchanged packet and confirmed cleanup. Default-branch-only refresh preserves the accepted normative baseline. |
-
 | 2026-11-16 | R-103 | spec | `5a08753bbc185c7e8b5f1ba6a292cfdc941ad15e` | claude-opus-5-5 | procedural | One should-fix authority-table omission and five nits. All 180 required fragments read with qualified native model, exact target, unchanged packet and confirmed zero-survivor cleanup. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
