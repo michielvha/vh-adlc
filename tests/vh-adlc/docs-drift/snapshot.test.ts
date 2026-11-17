@@ -320,7 +320,7 @@ test("nested caller checks reuse only their ordinary invocation while standalone
   withRuntimeValidation(() => {
     const context = currentRuntimeValidation();
     if (!context) throw Error("Runtime verification scope required");
-    context.caller = { repo, state: before };
+    context.caller = { repo, state: before, unchanged: () => matchesRepositoryState(repo, digest) };
     put(repo, "src/app.ts", "Changed caller during invocation\n");
     expect(captureCallerState(repo)).toEqual(before);
     expect(matchesCallerState(repo, digest)).toBe(true);

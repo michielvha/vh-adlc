@@ -7,7 +7,7 @@ import { persistHostedAuditOutput } from "./history-output";
 import { persistLocalAuditOutput } from "./local-history-output";
 import { canonicalJSON } from "./protocol";
 import { loadCommittedSettings } from "./settings";
-import { artifactDirectoryScope, externalResourceScope } from "./snapshot";
+import { assertCallerUnchanged, artifactDirectoryScope, externalResourceScope } from "./snapshot";
 import { readNativeContext, readNativeCredential, withNativeObservation } from "./transport";
 import { observePendingLease } from "./retained-controller";
 import { verifyProductionPreflight } from "./preflight";
@@ -49,6 +49,7 @@ export async function runReport(options: { repo: string; run: RunDirectory; hist
     return { session, pending };
   });
   const { session, pending } = assessed;
+  assertCallerUnchanged();
   const save = { repo, source, artifact_root: run.directory, session };
   const artifacts = hosted ? persistHostedAuditOutput(save)
     : settings.reports.interactive === "local-attestation" ? persistLocalAuditOutput(save) : persistAuditOutput(save);

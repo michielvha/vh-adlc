@@ -5,7 +5,7 @@ import { readBoundArtifact } from "./evidence-input";
 import { numberedRecordFiles, publishArtifact, readArtifact, readJournal, syncDirectory, type Journal } from "./journal";
 import { exactRecord } from "./publication-decisions";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
-import { artifactDirectoryScope, captureSnapshot, externalResourceScope } from "./snapshot";
+import { assertCallerUnchanged, artifactDirectoryScope, captureSnapshot, externalResourceScope } from "./snapshot";
 
 export const RUN_COMMANDS = ["scan", "report", "resolve", "prepare", "verify", "publish", "resume", "close"] as const;
 type Command = typeof RUN_COMMANDS[number];
@@ -202,6 +202,7 @@ export function bindRunJournal(run: RunDirectory, selected: Journal): RunDirecto
 
 /** Append by revision CAS. Existing role/effect journals retain their own dispatch and approval gates. */
 export function appendRunStage(run: RunDirectory, input: Pick<Stage, "command" | "state" | "artifacts">): Stage {
+  if (input.state === "complete") assertCallerUnchanged();
   const { options } = originalRunContext(run);
   const stage = stageRecord({ schema_version: 1, kind: "docs-drift-run-stage", run_id: run.manifest.id,
     revision: run.stages.length + 1, previous_sha256: run.digest, ...input }, run.manifest, run.stages.length + 1, run.digest);

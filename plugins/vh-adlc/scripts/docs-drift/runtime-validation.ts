@@ -7,7 +7,7 @@ const validation = new AsyncLocalStorage<{
   payloads: Map<string, ComponentInspection>;
   clients: Map<string, Promise<ClientProbeResult>>;
   preflights: Map<string, PreflightSnapshot>;
-  caller: { repo: string; state: ReturnType<typeof captureRepositoryState> } | null;
+  caller: { repo: string; state: ReturnType<typeof captureRepositoryState>; unchanged: () => boolean } | null;
 }>();
 
 export function currentRuntimeValidation() { return validation.getStore(); }

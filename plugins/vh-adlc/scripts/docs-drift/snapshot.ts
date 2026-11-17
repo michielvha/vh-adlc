@@ -240,6 +240,12 @@ export function matchesCallerState(directory: string, expected: string, scope: "
   catch { return false; }
 }
 
+/** Complete retained stages and report artifacts only after the invocation's final comparison. */
+export function assertCallerUnchanged(): void {
+  const caller = currentRuntimeValidation()?.caller;
+  if (caller && !caller.unchanged()) throw Error("Caller source, index or repository configuration changed during this operation.");
+}
+
 export type OwnedObjectStore = { root: string; record_path: string; record_sha256: string; source_commit: string };
 export type ObjectStoreOptions = {
   parent: string; evidence_directory: string; repository: string; source_repo: string;

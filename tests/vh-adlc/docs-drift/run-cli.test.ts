@@ -198,3 +198,23 @@ test.each(["absent", "original"])("receipt retirement matches unknown-action par
     expect(existsSync(calls)).toBe(false);
   }
 });
+
+
+test("a caller change during scan cannot leave a reusable complete stage", () => {
+  const f = fixture(), scanner = join(f.repo, "scripts/docs-scan.mjs"), marker = join(f.root, "scanner-executions");
+  const injection = 'import { appendFileSync as recordScan } from "node:fs";\n'
+    + 'recordScan(' + JSON.stringify(marker) + ', "scan\\n");\n'
+    + 'writeFileSync(' + JSON.stringify(join(f.repo, "README.md")) + ', readFileSync(' + JSON.stringify(marker) + '));\n';
+  writeFileSync(scanner, injection + readFileSync(scanner, "utf8"));
+  readGit(f.repo, "add", "--", "scripts/docs-scan.mjs");
+  readGit(f.repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Owned caller mutation scanner");
+  const source = readGit(f.repo, "rev-parse", "HEAD").toString().trim();
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const result = invoke(f, "scan", ["--source", source]);
+    expect(result.status).toBe(2);
+    expect(result.report.outcome).toBe("incomplete");
+    const stages = readdirSync(join(f.directory, "stages")).map(name => JSON.parse(readFileSync(join(f.directory, "stages", name), "utf8")) as { command: string; state: string });
+    expect(stages.some(stage => stage.command === "scan" && stage.state === "complete")).toBe(false);
+    expect(readFileSync(marker, "utf8")).toBe("scan\n".repeat(attempt));
+  }
+});

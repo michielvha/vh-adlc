@@ -129,13 +129,15 @@ function retainPublicationResult(options: { repo: string; run: RunDirectory; loc
 /** Public run-directory entry. Domain stages keep their existing review, ownership and authority checks. */
 export async function runDirectoryMain(argv: string[]): Promise<number> {
   let report: Report = { schema_version: 1, authority: "none", command: argv[0] ?? "", outcome: "incomplete", run_directory: "", bun_version: Bun.version, diagnostics: [] };
-  let caller: { repo: string; digest: string } | undefined;
+  let caller: { unchanged: () => boolean } | undefined;
   const validation = currentRuntimeValidation(), previousCaller = validation?.caller;
   try {
     const options = parseRunOptions(argv);
     const state = captureRepositoryState(options.repo);
-    caller = { repo: options.repo, digest: canonicalDigest(state) };
-    if (validation) validation.caller = { repo: options.repo, state };
+    const digest = canonicalDigest(state);
+    let unchanged: boolean | undefined;
+    caller = { unchanged: () => unchanged ??= matchesRepositoryState(options.repo, digest) };
+    if (validation) validation.caller = { repo: options.repo, state, unchanged: caller.unchanged };
     report.command = options.command; report.run_directory = options.directory;
     const origins = resolve(process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"), "vh-adlc/docs-drift/origins");
     const location = { repo: options.repo, directory: options.directory, origins };
@@ -316,9 +318,9 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
     report.outcome = error instanceof SetupRequired ? "setup-required" : "incomplete";
     report.diagnostics = [error instanceof Error ? error.message : "Run setup or retained input unavailable."];
   }
-  if (caller && !matchesRepositoryState(caller.repo, caller.digest)) {
+  if (caller && !caller.unchanged()) {
     report.outcome = "incomplete";
-    report.diagnostics.push("Caller source, index or repository configuration changed during this operation.");
+    report.diagnostics = [...new Set([...report.diagnostics, "Caller source, index or repository configuration changed during this operation."])];
   }
   if (validation) validation.caller = previousCaller ?? null;
   writeSync(1, JSON.stringify(report) + "\n");

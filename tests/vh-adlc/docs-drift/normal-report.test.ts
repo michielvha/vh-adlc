@@ -1,6 +1,6 @@
 /** Actual normal entry with owned native clients and services. No model/provider acceptance. */
 import { afterAll, expect, test } from "bun:test";
-import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { preflightFixture, ordinaryComponentFixture } from "./preflight-fixture";
 import { auditClient } from "./native-audit-client-fixture";
@@ -88,6 +88,9 @@ let records;`);
   }
   if (fault === "caller-change") {
     expect(captureRepositoryState(f.repo)).not.toEqual(before);
+    const stages = readdirSync(join(directory, "stages")).map(name => JSON.parse(readFileSync(join(directory, "stages", name), "utf8")) as { command: string; state: string });
+    expect(stages.some(stage => stage.command === "report" && stage.state === "complete")).toBe(false);
+    expect(completed.report).not.toHaveProperty("report_artifacts");
     expect(completed.report).toMatchObject({ diagnostics: ["Caller source, index or repository configuration changed during this operation."] });
   } else expect(captureRepositoryState(f.repo)).toEqual(before);
   expect(readFileSync(service.statePath)).toEqual(nativeBefore); expect(git(origin, "for-each-ref")).toBe(refs);
