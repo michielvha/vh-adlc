@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "R-122 accepted; ready to implement the reviewed mixed-plan compatibility correction."
+status: in-progress
+status_description: "Implementing the accepted R-122 mixed-plan compatibility correction and preserving recorded migration checks."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
