@@ -233,21 +233,3 @@ export async function collectClosureReview(input: Options & { worker_capture: un
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);
 }
-
-/** Later CLI handoffs carry exact digests and the manifest without duplicating the original native corpus. */
-export function closureReviewTargetProjection(result: ReviewTarget) {
-  return { schema_version: result.schema_version, kind: result.kind, authority: result.authority, complete: result.complete,
-    scope_changed: result.scope_changed, diagnostics: result.diagnostics,
-    worker_input_sha256: result.worker_inputs?.worker_input_sha256 ?? null,
-    target_sha256: result.worker_inputs?.target?.target_sha256 ?? null, worker: result.worker,
-    verification: result.proposal?.verification ?? [], already_closed: result.proposal?.already_closed ?? [],
-    manifest: result.manifest, manifest_sha256: result.manifest_sha256, reviewer_runtime_sha256: result.reviewer_runtime_sha256 };
-}
-
-export function closureReviewProjection(result: Awaited<ReturnType<typeof collectClosureReview>>) {
-  return { schema_version: result.schema_version, kind: result.kind, authority: result.authority, complete: result.complete,
-    scope_changed: result.scope_changed, diagnostics: result.diagnostics,
-    worker_input_sha256: result.target?.worker_inputs?.worker_input_sha256 ?? null,
-    target_sha256: result.target?.worker_inputs?.target?.target_sha256 ?? null,
-    manifest: result.target?.manifest ?? null, manifest_sha256: result.target?.manifest_sha256 ?? null, review: result.review };
-}

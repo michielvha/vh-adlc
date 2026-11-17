@@ -45,14 +45,9 @@ export function readLookup(options: {
   return { path: evidence.path, sha256: evidence.sha256 };
 }
 
-
 export function retainAbsence(options: Omit<Parameters<typeof retainLookup>[0], "state">): AbsenceEvidence {
   return retainLookup({ ...options, state: "absent" });
 }
-export function readAbsence(options: Omit<Parameters<typeof readLookup>[0], "state">): AbsenceEvidence {
-  return readLookup({ ...options, state: "absent" });
-}
-
 
 /** Request timestamps change on revalidation. The observed facts and request destinations stay bound. */
 export function lookupFactsDigest(path: string): string {

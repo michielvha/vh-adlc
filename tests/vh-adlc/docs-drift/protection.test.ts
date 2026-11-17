@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureRepositoryState, captureSnapshot } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
-import { evaluateProtection, observeFeatureFreshness } from "../../../plugins/vh-adlc/scripts/docs-drift/protection";
+import { evaluateProtection } from "../../../plugins/vh-adlc/scripts/docs-drift/protection";
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
 
 const roots: string[] = [];
@@ -71,6 +71,14 @@ test("mixed roots classify indexes and older plans before standard metadata vali
   expect(result.edits.every(row => row.allowed)).toBe(true);
   expect(result.edits[1].bytes?.toString()).toBe(legacyPlan.replace("done", "shipped"));
   expect(captureRepositoryState(root)).toEqual(before);
+});
+
+test("existing hyphenated YAML metadata stays byte-preserved during an eligible status repair", () => {
+  const root = fixture(), text = legacyPlan.replace("goal:", "superseded-by: docs/replacement.md # retained contract\ngoal:");
+  const result = evaluateProtection(root, mixed(root, text), [localReplacement("plans/older.md", Buffer.from(text), "done", "shipped")]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(true);
+  expect(result.edits[0].bytes?.toString()).toBe(text.replace("done", "shipped"));
 });
 
 test.each([
@@ -422,8 +430,7 @@ test("local plans allow only explicitly classified ranges from the retained proc
   expect(evaluateProtection(root, snapshot, [edit]).edits[0].allowed).toBe(false);
   const start = bytes.indexOf(Buffer.from("Old path."));
   const context = { local_ranges: [{
-    document: "plans/feature.md", document_sha256: sha256(bytes), procedure_sha256: sha256(Buffer.from(procedure)),
-    procedure_quote: { start: 0, end: Buffer.byteLength(procedure), sha256: sha256(Buffer.from(procedure)) },
+    document: "plans/feature.md", document_sha256: sha256(bytes),
     ranges: [{ start, end: start + Buffer.byteLength("Old path.") }],
   }] };
   put(root, "docs/docs-procedure.md", "---\ndocs_drift_protection: " + canonicalJSON({ local_ranges: context.local_ranges.map(({ document, document_sha256, ranges }) => ({ document, document_sha256, ranges })) }).toString() + "\n---\n" + procedure);
@@ -462,10 +469,6 @@ test("documented local coverage preserves its own dialect and terminal status", 
   expect(evaluateProtection(root, snapshot, [edit]).complete).toBe(false);
   const context = {
     document_kinds: [{ document: "docs/guide.md", document_sha256: sha256(bytes), kind: "ordinary" as const }],
-    local_coverage: {
-      dialect: "documentation" as const, terminal_statuses: ["shipped"], procedure_sha256: sha256(Buffer.from(procedure)),
-      procedure_quote: { start: 0, end: Buffer.byteLength(procedure), sha256: sha256(Buffer.from(procedure)) },
-    },
   };
   put(root, "docs/docs-procedure.md", "---\ndocs_drift_protection: " + canonicalJSON({ document_kinds: context.document_kinds }).toString()
     + "\ndocs_drift_local_coverage: " + canonicalJSON({ dialect: "documentation", terminal_statuses: ["shipped"], statuses: null, status_aliases: { shipped: "active" }, required_fields: false, acceptance_headings: 9 }).toString() + "\n---\n" + procedure);
@@ -500,32 +503,6 @@ test("any committed roots gap blocks every edit and dirty policy cannot substitu
   expect(result.edits[0].allowed).toBe(false);
   expect(result.diagnostics.length).toBeGreaterThan(0);
 });
-
-test("actual binary freshness observes the resulting guide change without altering feature status", () => {
-  const root = fixture();
-  const text = feature(root, "draft");
-  const reviewed = commitAll(root);
-  put(root, "plans/feature.md", text + `| 2026-11-06 | R-1 | implementation | \`${reviewed}\` | fixture | procedural | Synthetic review. |\n\n### R-1\n\nCRITERION: AC-01 The first end state, wrapped onto a second line.\nVERDICT: met\nEVIDENCE: synthetic fixture\n\nCRITERION: AC-02 The second end state.\nVERDICT: met\nEVIDENCE: synthetic fixture\n`);
-  commitAll(root);
-  const before = observeFeatureFreshness(root, "plans/feature.md");
-  expect(before.implementation_review.stale, JSON.stringify(before)).toBe(false);
-  put(root, "docs/guide.md", "# Updated guide\n");
-  const dirty = observeFeatureFreshness(root, "plans/feature.md");
-  expect(dirty.feature_tree.clean).toBe(false);
-  expect(dirty.feature_tree.paths).toContain("docs/guide.md");
-  commitAll(root);
-  expect(observeFeatureFreshness(root, "plans/feature.md").implementation_review.stale).toBe(true);
-  expect(readFileSync(join(root, "plans/feature.md"), "utf8")).toContain("status: draft");
-});
-
-test("freshness refuses excluded dirty root policy before invoking its working-tree resolver", () => {
-  const root = fixture();
-  feature(root, "draft");
-  commitAll(root);
-  put(root, "AGENTS.md", "Feature documents: plans/\n# Another writer's uncommitted policy\n");
-  expect(() => observeFeatureFreshness(root, "plans/feature.md")).toThrow();
-});
-
 
 test("explicit ordinary file creation deletion and mode changes retain their exact eligibility", () => {
   const root = fixture(), snapshot = captureSnapshot(root, commitAll(root));

@@ -1,9 +1,7 @@
 import { sourceProtection } from "./protection-source";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { readDocumentMetadata, resolveRoots } from "../docs-impact/collection";
 import { compileCoverage } from "../docs-impact/matching";
-import { collectionReaders, verifiedHelperEnvironment } from "./git";
+import { collectionReaders } from "./git";
 import { canonicalDigest, decodeUTF8, protocolPath, sha256, withinPrefix } from "./protocol";
 import type { Snapshot } from "./snapshot";
 
@@ -141,7 +139,7 @@ function frontmatterFields(bytes: Buffer, metadata: Record<string, unknown>) {
   const range = markdownLayout(bytes).frontmatter;
   if (!range) return null;
   const { start, end } = range, body = decodeUTF8(bytes.subarray(start, end));
-  const keys = [...body.matchAll(/^([A-Za-z_][A-Za-z0-9_]*):/gmu)];
+  const keys = [...body.matchAll(/^([A-Za-z_][A-Za-z0-9_-]*):/gmu)];
   if (keys.length !== Object.keys(metadata).length || keys.some(row => !Object.hasOwn(metadata, row[1]))) return null;
   return { start, end, prefix: body.slice(0, keys[0]?.index ?? body.length),
     fields: keys.map((row, index) => ({ key: row[1], raw: body.slice(row.index, keys[index + 1]?.index ?? body.length) })) };
@@ -369,14 +367,13 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
           selection.source_commit === snapshot.source_commit && /^[a-f0-9]{64}$/u.test(selection.selection_sha256)));
       if (conflict) { decision.reason = "active-feature-overlap"; continue; }
       const writers = context.other_writers?.filter(writer => writer.document === edit.path) ?? [];
-      if (writers.some(writer => writer.document_sha256 !== sha256(bytes) ||
-          !context.coordinated?.some(selection => selection.writer === writer.writer && selection.document === edit.path &&
+      if (writers.some(writer => !context.coordinated?.some(selection => selection.writer === writer.writer && selection.document === edit.path &&
             selection.source_commit === snapshot.source_commit && /^[a-f0-9]{64}$/u.test(selection.selection_sha256)))) {
         decision.reason = "other-current-writer";
         continue;
       }
       const metadata = prose ? readDocumentMetadata(bytes, readers.yaml) : null;
-      const declaredKind = context.document_kinds?.find(item => item.document === edit.path && item.document_sha256 === sha256(bytes))?.kind;
+      const declaredKind = context.document_kinds?.find(item => item.document === edit.path)?.kind;
       const historyKind = ownFeature !== undefined || localDocuments.get(edit.path)?.kind !== "ordinary" && ["plan", "review", "evidence", "report"].includes(String(metadata?.type)) ||
         ["plan", "review", "evidence", "unknown"].includes(declaredKind ?? "");
       const unclassifiedLocal = roots.policy.local_format && (historyKind || (declaredKind !== "ordinary" &&
@@ -421,45 +418,4 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
   result.complete = result.diagnostics.length === 0;
   if (!result.complete) for (const decision of result.edits) { decision.allowed = false; decision.bytes = null; }
   return result;
-}
-
-export type FeatureFreshness = {
-  spec_review: { stale: boolean; reasons: string[] };
-  implementation_review: { stale: boolean; reasons: string[] };
-  feature_tree: { clean: boolean; paths: string[] };
-};
-
-/** Ask the existing verified binary. Coverage matching never supplies a freshness verdict. */
-export function observeFeatureFreshness(repo: string, feature: string): FeatureFreshness {
-  protocolPath(feature);
-  const readers = collectionReaders();
-  const roots = resolveRoots(repo, readers);
-  if (!roots.head || roots.outcome === "incomplete" || roots.diagnostics.length > 0 || roots.policy.excluded_dirty) {
-    throw new Error("freshness requires complete committed root policy");
-  }
-  const installer = Bun.spawnSync(["bash", join(import.meta.dir, "../ensure-vh-adlc.sh"), "--offline"], { env: verifiedHelperEnvironment(), stdout: "pipe", stderr: "pipe" });
-  if (installer.exitCode !== 0) throw new Error("verified freshness binary unavailable");
-  const binary = installer.stdout.toString().trim();
-  const pin = readFileSync(join(import.meta.dir, "../../knowledge.md"), "utf8").match(/\b[a-f0-9]{40}\b/u)?.[0];
-  if (!binary || !pin) throw new Error("verified freshness setup unavailable");
-  const run = Bun.spawnSync([binary, "fresh", feature, "--repo", repo, "--plugin-pin", pin, "--offline"], {
-    env: verifiedHelperEnvironment(), stdout: "pipe", stderr: "pipe",
-  });
-  const value: unknown = JSON.parse(decodeUTF8(run.stdout));
-  if (value === null || typeof value !== "object" || !("command" in value) || value.command !== "fresh" ||
-      !("result" in value) || value.result !== "answered" || run.exitCode !== 0 || !("data" in value)) throw new Error("native freshness observation unavailable");
-  const data = value.data;
-  if (data === null || typeof data !== "object") throw new Error("native freshness data unavailable");
-  const state = (name: string) => {
-    if (!(name in data)) throw new Error("missing freshness state");
-    const item: unknown = data[name as keyof typeof data];
-    if (item === null || typeof item !== "object" || !("stale" in item) || typeof item.stale !== "boolean" ||
-        !("reasons" in item) || !Array.isArray(item.reasons) || item.reasons.some(reason => typeof reason !== "string")) throw new Error("invalid freshness state");
-    return { stale: item.stale, reasons: item.reasons as string[] };
-  };
-  if (!("feature_tree" in data)) throw new Error("missing feature tree");
-  const tree = data.feature_tree;
-  if (tree === null || typeof tree !== "object" || !("clean" in tree) || typeof tree.clean !== "boolean" ||
-      !("paths" in tree) || !Array.isArray(tree.paths) || tree.paths.some(path => typeof path !== "string")) throw new Error("invalid feature tree");
-  return { spec_review: state("spec_review"), implementation_review: state("implementation_review"), feature_tree: { clean: tree.clean, paths: tree.paths as string[] } };
 }
