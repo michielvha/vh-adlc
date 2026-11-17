@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing the accepted hosted executor attribution and atomic administrative procedure, then migration verification."
+status: draft
+status_description: "Revising mixed legacy-plan compatibility after the paired migration review; safe older-plan fixes are approved."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
