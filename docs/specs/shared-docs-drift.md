@@ -888,6 +888,8 @@ The following tasks implement the revised baseline after spec review and owner a
 
   Evidence. Actual CI at pushed `5a08753` fails because `readdirSync` returns the two expected stage files in reverse order. The expected set and bytes are correct. Sorting only that assertion passes all 74 normal CLI tests and 200 assertions in `t145-cli-directory-order.log`. The original CI output is retained as `t129-ci-5a-failed.log`. No product execution or timeout changes.
 
+- [ ] T147 `plugins/vh-adlc/scripts/docs-drift/{runtime-validation,snapshot,run-cli,scan}.ts, existing nested caller guards and tests/vh-adlc/docs-drift/{normal-report,snapshot}.test.ts` - Finish the already accepted single entry/exit caller comparison per ordinary invocation. Retain fresh standalone API checks, owned-copy/full-state checks and live source/permission/resource comparisons. A measured normal scan currently performs six caller captures and normal report performs 88. Fail a normal-entry exact-count regression first, then prove the shared invocation reuses its entry state and still fails on actual caller mutation at exit. (AC-02, AC-03)
+
 - [ ] T146 `scripts/docs-drift/{journal,hosted-executor,publication-controller,closure-controller,run-publication,run-closure}.ts and tests/vh-adlc/docs-drift/{journal,native-controller,native-retained-observations}.test.ts` - Retain the native-validated hosted run ID/attempt in the existing production plan before publication or closure acquires a lease. Reuse the existing GitHub run reader and bounded metadata fields. Reject wrong native context/recorded identity, preserve old bytes without fabricating linkage, retain native-trial behavior and prove the inspected plan can select its exact stopped executor. (AC-05, AC-07)
 
 - [ ] T144 `plugins/vh-adlc/references/{authority,docs-drift-review}.md, tests/vh-adlc/docs-drift/authority.test.ts` - Implement the owner-approved atomic administrative-abandonment contract after fresh spec review and acceptance. Document the stopped-executor and exact present-operation/receipt eligibility checks, one ordinary atomic Git push with exact object preconditions, unchanged refs after a stale precondition, indefinite terminal-receipt retention and the lease-only-deletion limitation. Verify these conditions through the shared authority/procedure guard and retained native-Git rehearsal. Consumer report and recovery outcomes are verified in T128. (AC-05, AC-07)
@@ -1459,7 +1461,21 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 ## Open Questions
 
-None. The owner accepts R-106's recommended recovery clarifications on 2026-11-17. Fresh review and acceptance of this revised baseline remain pending.
+### Q1 Hosted production selector (R-108 F-01)
+
+Decision needed. Define the durable selector and exact native context required for a new hosted production plan.
+
+Recommendation. Reserve the existing `hosted` execution profile for Actions. Require its run ID/attempt and authenticated native match to `reports.workflow_id`, `reports.workflow_path` and the exact assessed source commit. A missing selector or mismatched context blocks acquisition. Other profiles are local and refuse an Actions invocation.
+
+Owner answer pending through the host question tool. Existing custom local profile names remain supported.
+
+### Q2 Native-trial abandonment (R-108 F-02)
+
+Decision needed. Define whether an interrupted native trial can use the same separately approved administrative abandonment.
+
+Recommendation. Use its existing `trial_launch` run ID/attempt for exact stopped-executor evidence and apply the procedure only within that trial's original namespace. Collector-only trials remain ineligible.
+
+Owner answer pending through the host question tool.
 
 ## Review Log
 
@@ -1580,6 +1596,8 @@ None. The owner accepts R-106's recommended recovery clarifications on 2026-11-1
 | 2026-11-16 | R-105 | spec | `00af645dea8ae58e23f5e1d20c3f801b6a0549b3` | claude-opus-5-5 | procedural | No blocking or should-fix findings. Three factual summary/proof nits recorded. All 107 required fragments read with qualified native model/target, unchanged packet and confirmed cleanup. The unchanged normative baseline retains its existing acceptance. |
 | 2026-11-16 | R-106 | spec | `45437a22ab734ce96cecf5a1b03f5876539c2c49` | claude-opus-5-5 | procedural | Four should-fix findings and two nits. All 114 required fragments read with qualified native model/target, unchanged packet and confirmed cleanup. |
 | 2026-11-17 | R-107 | spec | `cfdb666582f068889226e708e7916a73db8b25ac` | claude-opus-5-5 | procedural | One should-fix executor-linkage finding and three nits. All 161 required fragments read with qualified native model/target, unchanged packet and confirmed cleanup. |
+
+| 2026-11-17 | R-108 | spec | `8785808dade2c59471c4edac14174476c9a58366` | claude-opus-5-5 | procedural | Three should-fix findings and one nit. All 173 required fragments read with qualified native model/target, unchanged packet and confirmed cleanup. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -2915,6 +2933,33 @@ SEVERITY: nit
 WHERE: Context "Verification and review on 2026-11-16", second paragraph (`docs/specs/shared-docs-drift.md:97`, "Consumer entry/protocol tests pass 24 cases and 126 assertions with 65 classified caller references"); Tasks T128 checkpoint (after `:885`, "24 protocol/migration cases with 124 assertions" and "59 references")
 EVIDENCE: R-106 F-05 asked the author to "Reconcile 126 with T128's 124". The new paragraph adds a different caller count, which suggests a later run. It names no consumer commit for that run, and the T128 task still records only the 124-assertion result at `d10355a6`. The pinned standard asks for evidence with its target and for the summary to agree with the detailed sections. Nothing an implementer builds or a proof checks changes.
 PROPOSAL: Name the consumer commit for the 24-case, 126-assertion run, for example the owned `5e622c49` snapshot if that is where it ran, and add a matching line to T128's checkpoint.
+
+### R-108
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design "Publication, concurrency and recovery", hosted-executor paragraphs (`docs/specs/shared-docs-drift.md:711`, "created through the normal helper inside GitHub Actions" and "validates the existing authenticated native run observation against the repository, configured workflow, source, supported schedule/manual event and active execution"; `:713`) and stopped-executor paragraph (`:715`); Context "Owner summary", fifth paragraph (`:83`); AC-05 (`:757`); Test Plan AC-05 (`:769`, "Reject missing/invalid selectors, native repository/workflow/source/event mismatch"); Tasks T146 (`:891`)
+EVIDENCE: This revision adds the T146 design. It says plans made "inside GitHub Actions" keep the member, and that the Actions environment only selects the run and attempt. It never says what makes a new production plan hosted, so that the member is required, rather than local, so that it is absent. The Test Plan requires rejecting missing selectors, and that only works if something other than the selectors decides hosted status. Implementer A decides it from the Actions environment. A hosted job whose helper environment lacks those variables then seals a production plan without the member. Under `:713` that operation is never eligible for abandonment, which is the gap R-107 F-01 named. Implementer B decides it from the run's selected execution entry. That entry is already durable as `run.manifest.entry` (`run-publication.ts:45`, `run-closure.ts:35`) and as the per-profile `hosted`/`interactive` choice in `docs-drift-settings.md`, so B refuses. The same paragraph also leaves "configured workflow" and "source" undefined. Settings carry a `reports` workflow identity and optional `execution` workflow paths (the `docs-drift-settings.md` settings table). "Source" could mean that the run `head_sha` equals the manifest `source_commit`, or a weaker check, while the Resolution section allows a disjoint advance of the default branch. The AC-05 proof passes either implementation.
+PROPOSAL: Name the durable selector that marks a new production plan as hosted, such as the selected execution entry. A hosted entry without valid Actions selectors should then refuse before lease acquisition, and a non-hosted entry should never record the member. Name the settings field that gives the expected workflow and the exact source comparison, and add a Test Plan case for a hosted entry whose environment selectors are absent.
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design "Publication, concurrency and recovery" (`docs/specs/shared-docs-drift.md:713`, "reject the member in other contexts" and "The native trial keeps its existing `trial_launch` binding"; `:715`, "For hosted execution, read the executor identity from the inspected retained `plan.json`"; `:699`); Test Plan AC-05 (`:769`, "Keep native trial attribution separate"); Tasks T144 (`:893`)
+EVIDENCE: A native unattended trial is hosted `workflow_dispatch` execution. Its retained plan already records `run_id` and `run_attempt` inside `trial_launch` (`journal.ts:20`, parsed at `journal.ts:86`). This revision rejects `hosted_executor` in trial context, and `:715` says to read the executor identity from `plan.json`. The Test Plan says to keep trial attribution "separate" without saying what that means for abandonment. Implementer A uses the `trial_launch` run and attempt as a lost-origin trial's executor identity and allows the procedure once that run reaches a terminal state. Implementer B treats every lost-origin trial as lacking `hosted_executor` and leaves its fixture-namespace lease pending. Under B the unattended trial that AC-06 requires cannot be repeated. The Administrative abandonment row in the `authority.md` docs-drift table does not limit the procedure to production context.
+PROPOSAL: State whether a lost-origin native trial uses its `trial_launch` run ID and attempt for the stopped-executor check or stays ineligible, and whether a collector trial can ever qualify. Add the matching Test Plan case.
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-05 (`docs/specs/shared-docs-drift.md:769`); Design "Publication, concurrency and recovery" (`:711`, "active execution"; `:713`, "reject the member in other contexts and refuse a recorded identity mismatch during original execution or resume" and "preserved by canonical plan parsing and policy binding"); Tasks T146 (`:891`)
+EVIDENCE: The new AC-05 sentences test only "missing/invalid selectors, native repository/workflow/source/event mismatch and unavailable run observations", plus byte-for-byte reads of old records. No case covers a selector that names a completed run instead of an active one, a trial or collector plan that carries the member, or a resume whose current run or attempt differs from the recorded identity. The verifier re-seals the plan from `policyBinding(gate.policy)` and requires identical canonical bytes (`publish.ts:79` to `:81`), and `readVerifiedPlan` compares `policyBinding` values (`journal.ts:207`). Each of these paths decides whether the member survives or is checked. An implementation that drops the member on re-seal, accepts a finished run or never compares the recorded identity on resume can pass every listed proof.
+PROPOSAL: Add Test Plan cases for a selector naming a completed run, the member in trial and collector plans, a resume under a different run or attempt, and an unchanged re-seal that keeps the member.
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T146 (`docs/specs/shared-docs-drift.md:891`)
+EVIDENCE: T146 names `scripts/docs-drift/{journal,hosted-executor,publication-controller,closure-controller,run-publication,run-closure}.ts`. The files are under `plugins/vh-adlc/scripts/docs-drift/`, which is how T143 and the `covers` list name them. Nothing an implementer builds or a proof checks changes.
+PROPOSAL: Write the path as `plugins/vh-adlc/scripts/docs-drift/{journal,hosted-executor,publication-controller,closure-controller,run-publication,run-closure}.ts`.
 
 ## Sources
 
