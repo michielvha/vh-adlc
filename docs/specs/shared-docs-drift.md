@@ -1554,7 +1554,13 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 ## Open Questions
 
-None. On 2026-11-17 the owner accepts the hosted-profile rule and existing native-trial identity for approved abandonment.
+### Q1 Mixed-plan activation and rollback
+
+Claude Code Opus 5.5 R-117 F-01 identifies the older reader's rejection of the new companion fields. The owner is deciding whether the companion additions first reach the default branch together with the compatible released binding in the reviewed C/D activation, and rollback restores the earlier companion and binding together. Recommend that paired activation and rollback. Test both directions against the exact prior and new payloads before cutover.
+
+### Q2 Mixed-plan classifier scope
+
+Claude Code Opus 5.5 R-117 F-02 identifies unspecified matches outside the standard feature root and in local-format repositories. The owner is deciding whether the new rules classify only documents inside a standard-format feature root, with no effect on other documents or local-format repositories. Recommend that bounded scope, preserving their existing protection paths. Test both no-effect cases.
 
 ## Review Log
 
@@ -1685,6 +1691,7 @@ None. On 2026-11-17 the owner accepts the hosted-profile rule and existing nativ
 | 2026-11-17 | R-114 | spec | `3e2c21579f761080a77b5591f03b013a14d29524` | claude-opus-5-5 | procedural | 2 should-fix. |
 | 2026-11-17 | R-115 | spec | `3661f2ae4372268c156a7a28f97119189c0ed382` | claude-opus-5-5 | procedural | 2 should-fix, 1 nit. |
 | 2026-11-17 | R-116 | spec | `78f324229bc0fdc7905d1c66415b4ec65752a1e9` | claude-opus-5-5 | procedural | 3 should-fix, 1 nit. |
+| 2026-11-17 | R-117 | spec | `d4a6d07a3b8e0943aeeb3f5e907aeff3fd46e0d9` | claude-opus-5-5 | procedural | 2 should-fix, 1 nit. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -3257,6 +3264,30 @@ SEVERITY: nit
 WHERE: Context "Owner summary" second and fourth paragraphs
 EVIDENCE: The pinned standard asks the summary to explain material changes since the last accepted scope, along with important defaults and permissions. Since the accepted R-110 baseline, this revision decides that in mixed roots only an unfenced Review Log table enrolls a shared spec, and that headings alone never do. It also stops accepting caller-supplied kinds, ranges, coverage and writer lists. The summary says only that "Explicit project-local classification must distinguish legacy plans and ordinary index pages" and that "Enrolled vh-adlc specs keep their lifecycle protections", without saying how enrollment is decided or that the caller-policy merge is removed. The Design states both, so nothing built or proved changes.
 PROPOSAL: Add one sentence saying that in a declared mixed root only the unfenced shared Review Log table enrolls a spec, and that protection policy now comes only from the committed procedure.
+
+### R-117
+
+TARGET: d4a6d07a3b8e0943aeeb3f5e907aeff3fd46e0d9
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design "Installation and role execution" (line 691: "Rollback selects the previous published checkout/install and restores the reviewed previous consumer binding through the same path"); Design "Collection, assessment and protected documents", `local_documents` paragraph (line 709) and local-coverage paragraph (line 713: "The existing two-field local-format declaration stays readable when no new rule needs the added fields"); Design "Migration, compatibility and rollout", binding-order paragraph (line 797) and fixed upgrade rows (line 801); Test Plan AC-06 and AC-07 rows (lines 830 and 831); Tasks T154 and T155 (lines 983 and 984)
+EVIDENCE: The new fields go into the consumer's committed companion: `local_documents` inside `docs_drift_protection`, and `statuses`, `status_aliases`, `required_fields` and `acceptance_headings` inside `docs_drift_local_coverage`. Every released helper before T154 rejects those additions. `sourceProtection` accepts only `local_ranges`, `other_writers` and `document_kinds` (`protection-source.ts:28`) and throws "Project protection fields changed" on any other key (`:15`). `evaluateProtection` then records a `project-protection` gap and returns incomplete for every edit (`protection.ts:150`). `sourceLocalCoverage` also requires exactly `dialect,terminal_statuses` (`protection.ts:115`). The Design covers only one direction: the new reader can still read the old two-field data. It never covers an older reader meeting the new companion. Three paths are left open. The first is the Design's rollback to "the previous published checkout/install". The second is any staged run of an earlier component binding after T155 commits the companion. The third is the order between T155's companion commit and adoption of the T154 release. The upgrade rows do not classify a consumer protection-policy change, so it falls under "Unclassified changes remain pending". AC-07 tests that an older release does not parse a successor settings schema, but has no matching case for companion protection fields. AC-06 rehearses rollback to legacy routing only. One implementer would commit the companion fields to Stackweaver's default branch early, which leaves every earlier shared binding incomplete. Another would bundle them into the reviewed C/D activation and revert them on rollback. Both pass the listed proofs. This gap comes from the mixed-plan revision that added these committed fields.
+PROPOSAL: State when the companion may first carry the new fields relative to the T154 release and the C/D activation. Also state what a rollback to an earlier shared release does with them: revert them together with the binding, or keep them and expect a defined incomplete or setup-required result. Add that rollback/upgrade case to the AC-07 row and the T155 rollback checks.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design "Collection, assessment and protected documents", `local_documents` paragraph (line 709: "A mixed feature-root directory may contain enrolled shared specs, older local plans and ordinary index pages", "Its optional `local_documents` list has exact row fields ..."), shared-enrollment paragraph (line 711: "Shared enrollment wins over a matching local declaration", "Outside an explicit local classification, existing standard feature-root classification and protection remain in force") and local-coverage paragraph (line 713: "even when the repository's feature format is standard"); Test Plan AC-03 row (line 827); Tasks T154 (line 983)
+EVIDENCE: The patterns in a `local_documents` row are ordinary documentation-dialect patterns, and the Design never limits where they may match. The current code treats the two locations differently. Feature-root Markdown is classified in the loop at `protection.ts:162`. Outside the feature root, a document whose metadata `type` is `plan` counts as history (`:230`). It is editable only through an exact digest-bound `local_ranges` row (`localEditable`, `:99` to `:105`, applied at `:236`). Under a literal reading, a `plan` row whose pattern also matches `docs/archive/old.md` would newly give that out-of-root document frontmatter and checkbox editable parts. Today it gets only explicit byte ranges. The Design also leaves repositories that declare `Feature document format: local` undefined. There, `unclassifiedLocal` (`:232`) governs classification and the standard status and coverage checks are skipped. "Shared enrollment wins" would bring a shared Review Log table into a repository where, per the pinned standard, "this standard and its tooling then do not apply". The words "even when the repository's feature format is standard" imply that the rows also apply in local-format repositories, without saying how. One implementer would ignore rows outside the feature root and in local-format repositories. A second would apply them everywhere. A third would reject such rows as malformed. Every AC-03 case uses a standard-format feature root, so each choice passes. AC-01 also requires a second adopter with different roots and statuses.
+PROPOSAL: State that `local_documents` rows classify only feature-root documents in a standard-format repository. Also state whether a row that matches outside the feature root, or any row in a local-format repository, is rejected as malformed or ignored. Add one AC-03 refusal or no-effect case for an out-of-root match.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Context "Owner summary" second paragraph (line 77); Context "Claim and legacy-declaration clarification on 2026-11-17"; Design shared-enrollment paragraph (line 711: "a nonterminal local branch keeps the existing whole-document handoff. Its own plan bytes stay report-only even under a coordinated selection") and `local_documents` paragraph (line 709: "They do not become a new pre-metadata classifier in a standard-format feature root"); Open Questions (line 1555)
+EVIDENCE: R-116 F-02 and F-03 were judgement findings. F-02 asked the owner, as an Open Question, whether a coordinated selection could unlock a nonterminal-branch local plan's own editable parts. This revision settles both findings in the Design, and Open Questions still says "None." The revision does keep the earlier accepted restrictions. Both choices still narrow the owner-selected outcome of keeping safe corrections in older local plans. A legacy plan with a nonterminal local branch gets no corrections, even under coordination. An existing digest-bound declaration cannot classify a mixed-root legacy plan, so such plans must move to `local_documents`. The summary now states header-based enrollment, committed-only policy and the missing-terminal-status rule, but leaves out these two defaults. The Design is explicit, so nothing an implementer builds or a proof checks changes.
+PROPOSAL: Before acceptance, add one summary sentence: nonterminal-branch local plans stay wholly report-only even under coordination, and only `local_documents` rows, not existing digest-bound declarations, classify legacy plans in the mixed root.
 
 ## Sources
 
