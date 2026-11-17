@@ -1,29 +1,29 @@
 {
-  "version": "0.32.0",
+  "version": "0.34.0",
   "assets": {
     "darwin_amd64": {
-      "name": "vh-adlc_0.32.0_darwin_amd64.tar.gz",
-      "url": "https://github.com/michielvha/vh-adlc/releases/download/v0.32.0/vh-adlc_0.32.0_darwin_amd64.tar.gz",
-      "asset_sha256": "d056626926a8792b337631e7dd0283c211348ccb60de0936e8cf1da7a7bb46dd",
-      "binary_sha256": "094d88bdb3656d704766600d14555bf2f860dd331cb4617ee724b36ea8e4f1f9"
+      "name": "vh-adlc_0.34.0_darwin_amd64.tar.gz",
+      "url": "https://github.com/michielvha/vh-adlc/releases/download/v0.34.0/vh-adlc_0.34.0_darwin_amd64.tar.gz",
+      "asset_sha256": "4c3599d0c593660838f1369c261c2a81c0f028699fbfa7e401e93b34901520b0",
+      "binary_sha256": "0330db03459dcf419a9089f6d40d844947336995b640df81fc92de73b2bf3bd4"
     },
     "darwin_arm64": {
-      "name": "vh-adlc_0.32.0_darwin_arm64.tar.gz",
-      "url": "https://github.com/michielvha/vh-adlc/releases/download/v0.32.0/vh-adlc_0.32.0_darwin_arm64.tar.gz",
-      "asset_sha256": "c0a0ae64be672b09df54af4d4b2813d122e0c7d15fa9abc3630e331caa2d2caa",
-      "binary_sha256": "d654c7592ab75993edf49a4f9711277026c2436a5cd489265996b0527d47bf2b"
+      "name": "vh-adlc_0.34.0_darwin_arm64.tar.gz",
+      "url": "https://github.com/michielvha/vh-adlc/releases/download/v0.34.0/vh-adlc_0.34.0_darwin_arm64.tar.gz",
+      "asset_sha256": "46384d82102452e30ba3bc56c4e862160dc5f140d79de80013bf6c607a41f717",
+      "binary_sha256": "b301d15d418435a06ca0f57d0b46a53555696d06ce2cf068e6019263c0911480"
     },
     "linux_amd64": {
-      "name": "vh-adlc_0.32.0_linux_amd64.tar.gz",
-      "url": "https://github.com/michielvha/vh-adlc/releases/download/v0.32.0/vh-adlc_0.32.0_linux_amd64.tar.gz",
-      "asset_sha256": "51e27fdbe0cfced8f7301955903ba65c3e27919e716a5d16b4de4d1ff0bf4cdb",
-      "binary_sha256": "57e4c7f161b89e1469b1a7bf52f294880f9d31659a86ba215a23abbe7579d17c"
+      "name": "vh-adlc_0.34.0_linux_amd64.tar.gz",
+      "url": "https://github.com/michielvha/vh-adlc/releases/download/v0.34.0/vh-adlc_0.34.0_linux_amd64.tar.gz",
+      "asset_sha256": "a4c52a2cb77b9d7508c95a5200180ee448f9e0b9b1ac69cf0de3aa0d44cd8761",
+      "binary_sha256": "8b297ad146408ce2a40ac5ae33cf91ddf91d3933b9236653cd1ca333105a02d4"
     },
     "linux_arm64": {
-      "name": "vh-adlc_0.32.0_linux_arm64.tar.gz",
-      "url": "https://github.com/michielvha/vh-adlc/releases/download/v0.32.0/vh-adlc_0.32.0_linux_arm64.tar.gz",
-      "asset_sha256": "ed887caf2d6de2fe6e8828977f9ebb90925272538fda8f551816896fa4f4a37b",
-      "binary_sha256": "1b0e42cddb7934e00db9ffbf668fcee1dc30046983c28cdc73edb204d79888f6"
+      "name": "vh-adlc_0.34.0_linux_arm64.tar.gz",
+      "url": "https://github.com/michielvha/vh-adlc/releases/download/v0.34.0/vh-adlc_0.34.0_linux_arm64.tar.gz",
+      "asset_sha256": "5b6f9c5747f6a92b0c977dfe634b1e52b52b7208a4f1f6c3ecd4c92e2e79da5b",
+      "binary_sha256": "a9cd8317d283967f14e1e823aafefa8beba3c430e6ef6e64f6379bcbf34f4b85"
     }
   }
 }
