@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "The owner-approved recovery clarifications are applied. Fresh Claude Code Opus 5.5 spec review and acceptance remain pending."
+status: planned
+status_description: "The reviewed recovery spec is accepted. Hosted executor attribution and the manual procedure are next."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -80,11 +80,11 @@ The worker and reviewer use separate native contexts. Recorded models, source, c
 
 Recovery uses the surviving original owner and evidence. Terminal receipt refs are retained indefinitely. Both local and scheduled reports check for a publication lease before models run. A present lease produces pending diagnostics and skips both roles. Reports check again after assessment. A failed access check leaves collection incomplete.
 
-Administrative abandonment requires current exact owner approval and confirmation that the original executor has stopped. The durable `hosted` profile requires Actions selectors and exact native workflow/source checks. Other profile names select local execution and refuse Actions production effects. Its production plan retains the run ID and attempt. An interrupted native trial uses its existing launch identity for the same stopped-job check; collector trials are ineligible. Only the present lease and its own operation's validated receipt are eligible. One atomic Git compare-and-swap push removes both, with exact object preconditions. The inspection, native stopped-executor evidence and approval are retained. Unknown accepted requests keep their unknown outcomes. Subsequent work collects current resources and gets fresh review. Unsupported lease-only deletion permits fresh assessment while an orphan receipt remains, because receipts alone contain no durable terminal status.
+Administrative abandonment requires current exact owner approval and confirmation that the original executor has stopped. The durable `hosted` profile requires Actions selectors and exact native workflow/source checks. Other profile names select local execution and refuse Actions production effects. A `hosted` production plan retains the run ID and attempt. An interrupted native trial uses its existing launch identity for the same stopped-job check; collector trials are ineligible. Only the present lease and its own operation's validated receipt are eligible. One atomic Git compare-and-swap push removes both, with exact object preconditions. The inspection, native stopped-executor evidence and approval are retained. Unknown accepted requests keep their unknown outcomes. Subsequent work collects current resources and gets fresh review. Unsupported lease-only deletion permits fresh assessment while an orphan receipt remains, because receipts alone contain no durable terminal status.
 
 Stackweaver adoption requires released marketplace installation, corpus parity, native-model checks, an unattended installed synthetic trial, paired review and rollback rehearsal. Activation uses a reviewed preflight checklist, followed by a separate routing-switch result.
 
-The earlier checkpoint passes 4,031 plugin tests. The current corpus recheck covers 867 documents and twelve units. Caller preservation and executed-effect retention pass their regressions, with qualified Claude Code Opus 5.5 follow-up r19 finding no defects in those corrections. Actual macOS CI passes at `94fdc83a`. Fresh reviewed-baseline acceptance, the final full-source gate/review, released installation and hosted acceptance remain open. GUI and phone checks are deferred.
+The earlier checkpoint passes 4,031 plugin tests. The current corpus recheck covers 867 documents and twelve units. Caller preservation and executed-effect retention pass their regressions, with qualified Claude Code Opus 5.5 follow-up r19 finding no defects in those corrections. Actual macOS CI passes at `94fdc83a`. The final full-source gate/review, released installation and hosted acceptance remain open. GUI and phone checks are deferred.
 
 ### Atomic abandonment decision on 2026-11-16
 
@@ -108,7 +108,11 @@ The owner accepts both recommended clarifications. The exact `hosted` profile is
 
 ### R-109 task correction on 2026-11-17
 
-R-109 qualifies at `193ce03a`, with all 184 required fragments read. Its factual should-fix adds the settings reference, example README and existing public-guide test to T146. Their done condition covers the reserved hosted profile, required Actions selectors, actual configured workflow ID and local-profile refusal. The Owner summary includes that refusal. Scope, Design, Acceptance Criteria, Test Plan and covers remain byte-identical to the reviewed baseline.
+R-109 qualifies at `193ce03a`, with all 184 required fragments read. Its factual should-fix adds the settings reference, example README and existing public-guide test to T146. Their done condition covers the reserved hosted profile, required Actions selectors, actual configured workflow ID and local-profile refusal. The Owner summary includes that refusal. A byte comparison confirms the same normative baseline as the reviewed `193ce03a`.
+
+### Reviewed recovery acceptance on 2026-11-17
+
+Qualified R-110 at `49d5cb84` reads all 114 required fragments and returns no blocking or should-fix findings. The owner's existing conditional acceptance in Confirmed requirements, together with the explicit hosted-profile and native-trial answers on 2026-11-17, accepts this reviewed baseline. The Context-only hosted-plan subject correction follows the pinned standard's outside-baseline correction rule. The normative sections and covers match the reviewed commit. Implementation resumes through the existing claimed branch and deterministic status gates.
 
 ### Simplification basis on 2026-11-15
 
@@ -1606,10 +1610,10 @@ None. On 2026-11-17 the owner accepts the hosted-profile rule and existing nativ
 | 2026-11-16 | R-105 | spec | `00af645dea8ae58e23f5e1d20c3f801b6a0549b3` | claude-opus-5-5 | procedural | No blocking or should-fix findings. Three factual summary/proof nits recorded. All 107 required fragments read with qualified native model/target, unchanged packet and confirmed cleanup. The unchanged normative baseline retains its existing acceptance. |
 | 2026-11-16 | R-106 | spec | `45437a22ab734ce96cecf5a1b03f5876539c2c49` | claude-opus-5-5 | procedural | Four should-fix findings and two nits. All 114 required fragments read with qualified native model/target, unchanged packet and confirmed cleanup. |
 | 2026-11-17 | R-107 | spec | `cfdb666582f068889226e708e7916a73db8b25ac` | claude-opus-5-5 | procedural | One should-fix executor-linkage finding and three nits. All 161 required fragments read with qualified native model/target, unchanged packet and confirmed cleanup. |
-
 | 2026-11-17 | R-108 | spec | `8785808dade2c59471c4edac14174476c9a58366` | claude-opus-5-5 | procedural | Three should-fix findings and one nit. All 173 required fragments read with qualified native model/target, unchanged packet and confirmed cleanup. |
-
 | 2026-11-17 | R-109 | spec | `193ce03ad5acc88cf4fbfa3519944967cc142768` | claude-opus-5-5 | procedural | One factual should-fix task/guide omission and one baseline nit. All 184 required fragments read with qualified native model/target, unchanged packet and confirmed cleanup. |
+| 2026-11-17 | R-110 | spec | `49d5cb84cf697f5ff3251a836af8e530382a558a` | claude-opus-5-5 | procedural | No blocking or should-fix findings. Two factual nits. All 114 required fragments read with qualified native model/target, unchanged packet and confirmed cleanup. |
+| 2026-11-17 | R-110 | spec | `49d5cb84cf697f5ff3251a836af8e530382a558a` | n/a | n/a | accepted by owner |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -2987,6 +2991,21 @@ SEVERITY: nit
 WHERE: Design "Publication, concurrency and recovery", native-trial policy paragraph (`docs/specs/shared-docs-drift.md:703`, "This adds the named checks to the current trial path, whose original definition and history readers do not yet validate them. The definition is separately read through `trial-definition.ts:30` and `:66`"); Context "Executor-linkage correction on 2026-11-17" (`:103`, "R-107's three nits are applied together by ... correcting recovery source anchors")
 EVIDENCE: `trial-definition.ts:30` is the closing brace of `positive`. The definition readers are `selectedDefinition` at `:36` and `installedTrialDefinition` at `:45`. R-107 F-06 already named this citation together with the recovery anchors. This revision corrected `recovery.ts:328` and `:385`, which I confirmed at the target, but it left `trial-definition.ts:30` unchanged. The Context sentence at `:103` describes the R-107 nits as applied. The claim that the trial path does "not yet validate" the named checks is also stale. `nativeTrialPolicy` already rejects a launch whose repository, head, publisher, workflow ID, workflow path or event differs from the definition (`trial-definition.ts:115` to `:119`). `readNativeTrialPolicy` already checks the credential-selected publisher, the `in_progress` status, the `workflow_dispatch` event, the default branch, the repository, the head repository and the path forms (`:129` to `:143`). The behavior exists, so nothing built or proved changes.
 PROPOSAL: Cite `trial-definition.ts:36`, `:45` and `:66`, or cite the functions by symbol. Replace "do not yet validate them" with a statement that the current definition path already validates these launch checks.
+
+### R-110
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Owner summary", fifth paragraph ("The durable `hosted` profile requires Actions selectors and exact native workflow/source checks. Other profile names select local execution and refuse Actions production effects. Its production plan retains the run ID and attempt."); compare Design "Publication, concurrency and recovery", hosted-profile paragraph ("New version-two hosted production plans retain `hosted_executor: { run_id, run_attempt }` ... Local plans omit this member")
+EVIDENCE: The R-109 correction inserted the other-profile sentence between the `hosted` sentence and "Its production plan retains the run ID and attempt" (correction.patch hunk at line 80). "Its" now follows "Other profile names", so the summary can be read as saying local plans keep the run ID and attempt. Design says the opposite: local plans omit the member and `hosted_executor` is rejected in local production plans. This slip comes from the change made in this revision. It sits in Context only, so nothing built or proved changes.
+PROPOSAL: Name the subject again, for example "A `hosted` production plan retains the run ID and attempt", or move the other-profile sentence after that sentence.
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design "Publication, concurrency and recovery", native-trial policy paragraph ("This adds the named checks to the current trial path, whose original definition and history readers do not yet validate them. The definition is separately read through `trial-definition.ts:30` and `:66`"); Context "Executor-linkage correction on 2026-11-17" ("R-107's three nits are applied together by aligning the dated receipt-selection wording, correcting recovery source anchors")
+EVIDENCE: At the target, `trial-definition.ts:30` is the closing brace of `positive`, and `:66` is `const on: unknown = Reflect.get(parsed, "on");` inside the dispatch-trigger check. The definition readers are `selectedDefinition` at `:36` and `installedTrialDefinition` at `:45`. The checks described as "not yet" validated already exist. `nativeTrialPolicy` rejects a changed hostname, repository, repository ID, head, publisher, workflow ID, workflow path or event (`:115` to `:119`). `readNativeTrialPolicy` checks run ID/attempt, `in_progress`, `workflow_dispatch`, default branch, repository and head repository, and the accepted path forms (`:137` to `:143`). This is R-109 F-02 again. Design is byte-identical to `193ce03a` (normative-equality.json), so it is still unapplied. Under the pinned nit rule, a baseline nit alone does not trigger a revision. Nothing built or proved changes.
+PROPOSAL: Cite `selectedDefinition` and `installedTrialDefinition` by symbol, or as `trial-definition.ts:36` and `:45`. In the same later baseline revision, say that the current definition path already validates these launch checks.
 
 ## Sources
 
