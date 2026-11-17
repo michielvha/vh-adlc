@@ -50,26 +50,25 @@ function overlaps(edit: Range, protectedRange: Range): boolean {
   return edit.start < protectedRange.end && edit.end > protectedRange.start;
 }
 
-/** All feature sections include governance or provenance. Only an unclaimed introduction can be edited. */
-function standardLayout(bytes: Buffer): { protected: Range[]; shape: string[]; fence_state: string | null; enrolled: boolean } {
-  const text = decodeUTF8(bytes);
-  const lines: Array<{ text: string; start: number; end: number }> = [];
+type MarkdownLine = Range & { text: string; heading?: { level: number; title: string; atx: boolean } };
+
+/** One byte-based walker supplies enrollment, governed structure and checkbox boundaries. */
+function markdownLayout(bytes: Buffer) {
+  const raw: MarkdownLine[] = [];
   let start = 0;
-  for (const line of text.match(/[^\n]*\n|[^\n]+$/gu) ?? []) {
-    const end = start + Buffer.byteLength(line);
-    lines.push({ text: line.replace(/\r?\n$/u, ""), start, end });
+  for (const text of decodeUTF8(bytes).match(/[^\n]*\n|[^\n]+$/gu) ?? []) {
+    const end = start + Buffer.byteLength(text);
+    raw.push({ text: text.replace(/\r?\n$/u, ""), start, end });
     start = end;
   }
-  let headerEnd = -1;
-  if (/^\uFEFF?---[ \t]*$/u.test(lines[0]?.text ?? "")) {
-    for (const line of lines.slice(1)) if (/^---[ \t]*$/u.test(line.text)) { headerEnd = line.end; break; }
+  let frontmatter: Range | null = null, headerEnd = -1;
+  if (/^\uFEFF?---[ \t]*$/u.test(raw[0]?.text ?? "")) {
+    const close = raw.slice(1).find(line => /^---[ \t]*$/u.test(line.text));
+    if (close) { frontmatter = { start: raw[0].end, end: close.start }; headerEnd = close.end; }
   }
-  const shape: string[] = [];
-  const sections: string[] = [];
-  let firstSection = -1;
+  const lines: MarkdownLine[] = [];
   let fence: string | null = null;
-  let enrolled = false;
-  for (const line of lines) {
+  for (const line of raw) {
     if (line.start < headerEnd) continue;
     const marker = /^ {0,3}(`{3,}|~{3,})/u.exec(line.text)?.[1];
     if (fence) {
@@ -77,22 +76,36 @@ function standardLayout(bytes: Buffer): { protected: Range[]; shape: string[]; f
       continue;
     }
     if (marker) { fence = marker; continue; }
-    if (/^ {0,3}\|/u.test(line.text) && line.text.trim().endsWith("|") &&
-      line.text.trim().slice(1, -1).split("|").map(column => column.trim()).join("|") === "Date|Review|Kind|Commit|Model|Isolation|Outcome") enrolled = true;
-    const heading = /^(#{1,6}) (.*)$/u.exec(line.text);
+    const atx = /^ {0,3}(#{1,6})(?:[ \t]+(.*))?$/u.exec(line.text);
+    if (atx) line.heading = { level: atx[1].length, title: (atx[2] ?? "").replace(/[ \t]+#+[ \t]*$/u, "").trim(), atx: true };
+    const setext = /^ {0,3}(=+|-+)[ \t]*$/u.exec(line.text), previous = lines.at(-1);
+    if (setext && previous?.text.trim() && !previous.heading && previous.end === line.start)
+      previous.heading = { level: setext[1][0] === "=" ? 1 : 2, title: previous.text.trim(), atx: false };
+    lines.push(line);
+  }
+  return { lines, frontmatter, headerEnd, fence_state: fence };
+}
+
+/** All feature sections include governance or provenance. Only an unclaimed introduction can be edited. */
+function standardLayout(bytes: Buffer): { protected: Range[]; shape: string[]; fence_state: string | null; enrolled: boolean } {
+  const layout = markdownLayout(bytes), shape: string[] = [], sections: string[] = [];
+  let firstSection = -1;
+  const enrolled = layout.lines.some(line => /^ {0,3}\|/u.test(line.text) && line.text.trim().endsWith("|") &&
+    line.text.trim().slice(1, -1).split("|").map(column => column.trim()).join("|") === "Date|Review|Kind|Commit|Model|Isolation|Outcome");
+  for (const line of layout.lines) {
+    const heading = line.heading;
     if (!heading) continue;
-    shape.push(heading[1] === "##" ? "## " + heading[2].trim() : heading[1]);
-    if (heading[1] === "##") {
+    shape.push(heading.level === 2 ? "## " + heading.title : "#".repeat(heading.level));
+    if (heading.atx && heading.level === 2) {
       if (firstSection < 0) firstSection = line.start;
-      sections.push(heading[2].trim());
+      sections.push(heading.title);
     }
   }
-  const ambiguous = headerEnd < 0 || firstSection < 0 || fence !== null ||
+  const ambiguous = layout.headerEnd < 0 || firstSection < 0 || layout.fence_state !== null ||
     requiredSections.some(section => sections.filter(value => value === section).length !== 1);
-  return {
-    protected: ambiguous ? [{ start: 0, end: bytes.length }] : [{ start: 0, end: headerEnd }, { start: firstSection, end: bytes.length }],
-    shape, fence_state: fence, enrolled,
-  };
+  return { protected: ambiguous ? [{ start: 0, end: bytes.length }]
+    : [{ start: 0, end: layout.headerEnd }, { start: firstSection, end: bytes.length }],
+    shape, fence_state: layout.fence_state, enrolled };
 }
 
 function procedureEvidence(snapshot: Snapshot, evidence: { procedure_sha256: string; procedure_quote: Quote }): boolean {
@@ -114,25 +127,9 @@ function localEditable(bytes: Buffer, path: string, snapshot: Snapshot, edit: Ra
 
 /** Checkbox offsets are derived from raw bytes. Heading ambiguity never grants an editable range. */
 function localCheckboxes(bytes: Buffer, titles: string[]): number[] {
-  const lines: Array<{ text: string; start: number; heading?: { level: number; title: string } }> = [];
-  const header = /^\uFEFF?---[^\S\r\n]*\r?\n[\s\S]*?^---[^\S\r\n]*(?:\r?\n|$)/mu.exec(decodeUTF8(bytes));
-  const headerEnd = header?.index === 0 ? Buffer.byteLength(header[0]) : 0;
-  let offset = 0, fence: string | null = null;
-  for (const raw of decodeUTF8(bytes).match(/[^\n]*\n|[^\n]+$/gu) ?? []) {
-    const text = raw.replace(/\r?\n$/u, ""), start = offset;
-    offset += Buffer.byteLength(raw);
-    if (start < headerEnd) continue;
-    const marker = /^ {0,3}(`{3,}|~{3,})/u.exec(text)?.[1];
-    if (fence) {
-      if (marker && marker[0] === fence[0] && marker.length >= fence.length && text.trim() === marker) fence = null;
-      continue;
-    }
-    if (marker) { fence = marker; continue; }
-    const heading = /^ {0,3}(#{1,6})[ \t]+(.+?)[ \t]*$/u.exec(text);
-    lines.push({ text, start, ...(heading ? { heading: { level: heading[1].length, title: heading[2].replace(/[ \t]+#+[ \t]*$/u, "").trim() } } : {}) });
-  }
-  if (fence) return [];
-  const sections = lines.filter(line => line.heading && titles.includes(line.heading.title));
+  const { lines, fence_state } = markdownLayout(bytes);
+  if (fence_state) return [];
+  const sections = lines.filter(line => line.heading?.atx && titles.includes(line.heading.title));
   if (sections.length !== 1) return [];
   const section = sections[0], level = section.heading?.level;
   if (level === undefined) return [];
@@ -152,12 +149,12 @@ function localCheckboxes(bytes: Buffer, titles: string[]): number[] {
 }
 
 function frontmatterFields(bytes: Buffer, metadata: Record<string, unknown>) {
-  const match = /^\uFEFF?---[^\S\r\n]*\r?\n([\s\S]*?)^---[^\S\r\n]*(?:\r?\n|$)/mu.exec(decodeUTF8(bytes));
-  if (!match || match.index !== 0) return null;
-  const body = match[1], start = Buffer.byteLength(match[0].slice(0, match[0].indexOf("\n") + 1));
+  const range = markdownLayout(bytes).frontmatter;
+  if (!range) return null;
+  const { start, end } = range, body = decodeUTF8(bytes.subarray(start, end));
   const keys = [...body.matchAll(/^([A-Za-z_][A-Za-z0-9_]*):/gmu)];
   if (keys.length !== Object.keys(metadata).length || keys.some(row => !Object.hasOwn(metadata, row[1]))) return null;
-  return { start, end: start + Buffer.byteLength(body), prefix: body.slice(0, keys[0]?.index ?? body.length),
+  return { start, end, prefix: body.slice(0, keys[0]?.index ?? body.length),
     fields: keys.map((row, index) => ({ key: row[1], raw: body.slice(row.index, keys[index + 1]?.index ?? body.length) })) };
 }
 
@@ -191,14 +188,14 @@ function yamlComments(raw: string): string[] {
 function localPlanEdit(before: Buffer, after: Buffer, edits: ProtectedEdit[], rule: LocalDocument,
   coverage: LocalCoverage | undefined, yaml: (bytes: Uint8Array) => unknown): boolean {
   if (!coverage) return false;
-  const prior = readDocumentMetadata(before, yaml) ?? {}, next = readDocumentMetadata(after, yaml);
-  if (!next) return false;
-  const oldFields = frontmatterFields(before, prior) ?? (Object.keys(prior).length === 0
-    ? { start: 0, end: 0, prefix: "", fields: [] } : null), newFields = frontmatterFields(after, next);
   const checkboxes = rule.editable_parts.includes("acceptance-checkboxes") ? localCheckboxes(before, coverage.acceptance_headings ?? []) : [];
   const frontmatter = edits.filter(edit => !checkboxes.some(at => edit.start === at && edit.end === at + 1 &&
     edit.replacement.length === 1 && [32, 120, 88].includes(edit.replacement[0])));
   if (!frontmatter.length) return true;
+  const prior = readDocumentMetadata(before, yaml) ?? {}, next = readDocumentMetadata(after, yaml);
+  if (!next) return false;
+  const oldFields = frontmatterFields(before, prior) ?? (Object.keys(prior).length === 0
+    ? { start: 0, end: 0, prefix: "", fields: [] } : null), newFields = frontmatterFields(after, next);
   if (!rule.editable_parts.includes("frontmatter") || !oldFields || !newFields
     || frontmatter.some(edit => edit.start < oldFields.start || edit.end > oldFields.end)) return false;
   const oldKeys = oldFields.fields.map(field => field.key);
@@ -212,6 +209,7 @@ function localPlanEdit(before: Buffer, after: Buffer, edits: ProtectedEdit[], ru
   }
   for (const key of Object.keys(next)) {
     if (Object.hasOwn(prior, key) && canonicalDigest(prior[key]) === canonicalDigest(next[key])) continue;
+    if (!Object.hasOwn(prior, key) && !coverage.required_fields?.includes(key)) return false;
     if (key === "status") {
       if (typeof next.status !== "string") return false;
       if (Object.hasOwn(prior, key)) {

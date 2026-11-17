@@ -4,7 +4,9 @@ import { selectProductionRuntime, withRuntimeValidation } from "../../../plugins
 import { readAdoptedRolePolicy, roleRuntimeDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { commit, ordinaryComponentFixture, preflightFixture } from "./preflight-fixture";
+import { captureSnapshot } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { readYAML } from "../../../plugins/vh-adlc/scripts/settings-file";
+import { activateProtectionSuccessor, commit, ordinaryComponentFixture, preflightFixture } from "./preflight-fixture";
 import { installedSettingsFixture } from "./settings-fixture";
 import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -74,16 +76,70 @@ test.each([false, true])("legacy row refresh and writer changes keep their exist
 
 test("an earlier reader accepts original proof and refuses the opted-in envelope", async () => {
   const component = ordinaryComponentFixture(roots, true);
-  const baseline = "8484a00830739bf0f7d32f28d92bb1a0a59da7bf";
-  const path = "plugins/vh-adlc/scripts/docs-drift/preflight.ts";
-  writeFileSync(join(component.root, path), readGit(join(import.meta.dir, "../../.."), "show", baseline + ":" + path));
-  const earlier = await import(pathToFileURL(join(component.root, path)).href);
+  const baseline = join(import.meta.dir, "fixtures/pre-mixed-policy");
+  const manifest = JSON.parse(readFileSync(join(baseline, "manifest.json"), "utf8")) as {
+    source_commit: string; files: Array<{ source_path: string; fixture: string; sha256: string }> };
+  expect(manifest.source_commit).toBe("8484a00830739bf0f7d32f28d92bb1a0a59da7bf");
+  for (const file of manifest.files) {
+    const bytes = readFileSync(join(baseline, file.fixture));
+    expect(sha256(bytes)).toBe(file.sha256);
+    writeFileSync(join(component.root, file.source_path), bytes);
+  }
+  const earlier = await import(pathToFileURL(join(component.root, "plugins/vh-adlc/scripts/docs-drift/preflight.ts")).href);
+  const protection = await import(pathToFileURL(join(component.root, "plugins/vh-adlc/scripts/docs-drift/protection-source.ts")).href);
   const original = preflightFixture(roots);
   expect(earlier.verifyProductionPreflight({ repo: original.repo, current_default: original.head(), component: original.component }).activation_commit).toBe(original.activationCommit);
   const projected = preflightFixture(roots, "none", undefined, repo => writeFileSync(join(repo, "docs/docs-procedure.md"),
     "---\ndocs_drift_protection: {local_documents: []}\n---\n# Companion\n"));
   expect(() => earlier.verifyProductionPreflight({ repo: projected.repo, current_default: projected.head(), component: projected.component })).toThrow("binding");
   expect(verifyProductionPreflight({ repo: projected.repo, current_default: projected.head(), component: projected.component }).activation_commit).toBe(projected.activationCommit);
+  const snapshot = captureSnapshot(projected.repo, projected.head());
+  expect(() => protection.sourceProtection(snapshot, (bytes: Uint8Array) => readYAML(bytes, reason => { throw Error(reason); }, { offline: true })))
+    .toThrow("Project protection fields changed");
+});
+
+test("a new-policy source refuses an internally consistent settings-only checklist", () => {
+  const f = preflightFixture(roots, "settings-only-policy", undefined, repo => writeFileSync(join(repo, "docs/docs-procedure.md"),
+    "---\ndocs_drift_protection: {local_documents: []}\n---\n# Companion\n"));
+  expect(() => verifyProductionPreflight({ repo: f.repo, current_default: f.head(), component: f.component })).toThrow("current policy/checklist binding changed");
+});
+
+test("candidate and activation must retain the same declarations even after a later restoration", () => {
+  const f = preflightFixture(roots, "activation-policy", undefined, repo => writeFileSync(join(repo, "docs/docs-procedure.md"),
+    "---\ndocs_drift_protection: {local_documents: []}\n---\n# Companion\n"));
+  expect(() => verifyProductionPreflight({ repo: f.repo, current_default: f.head(), component: f.component })).toThrow("activation settings changed");
+});
+
+test("a routine workflow-pin successor keeps an opted-in companion byte-identical", () => {
+  const f = preflightFixture(roots, "none", undefined, repo => writeFileSync(join(repo, "docs/docs-procedure.md"),
+    "---\ndocs_drift_protection: {local_documents: []}\n---\n# Companion\n"));
+  const original = readGit(f.repo, "show", f.head() + ":docs/docs-procedure.md");
+  f.write(".github/workflows/docs-drift.yml", Buffer.from("name: Pin-only fixture update\n"));
+  const current = activateProtectionSuccessor(f, original.toString(), "workflow_pin");
+  const result = verifyProductionPreflight({ repo: f.repo, current_default: current, component: f.component });
+  expect(result.checklist.changes).toEqual(["workflow_pin"]);
+  expect(result.checklist.checks.some(check => check.name === "workflow_validation")).toBe(true);
+  expect(readGit(f.repo, "show", current + ":docs/docs-procedure.md")).toEqual(original);
+  expect(result.checklist.native_entries).toEqual(f.checklist.native_entries);
+});
+
+test("a separately configured second adopter uses its own committed companion with the new member", () => {
+  const f = preflightFixture(roots, "none", undefined, (repo, configured) => {
+    configured.repository = "second/docs";
+    configured.publication.repository = "second/docs";
+    configured.pr_discovery.repository = "second/docs";
+    configured.project_procedure = "docs/second-adopter.md";
+    writeFileSync(join(repo, configured.project_procedure), "---\ndocs_drift_protection: {local_documents: []}\n---\n# Second adopter\n");
+  });
+  const result = verifyProductionPreflight({ repo: f.repo, current_default: f.head(), component: f.component });
+  expect(result.checklist.repository).toBe("second/docs");
+  expect(result.checklist.activation.map(file => file.path)).not.toContain("docs/second-adopter.md");
+});
+
+test.each(["source", "companion"])("missing original %s leaves its configuration proof unavailable", missing => {
+  const f = preflightFixture(roots);
+  const original = missing === "source" ? "f".repeat(40) : f.plan.manifest.bindings.source_commit;
+  expect(() => committedConfigurationDigest(f.repo, original, parseSettings(f.afterSettings))).toThrow();
 });
 
 test("immutable preflight results stay scoped to their exact invocation and publisher", () => {

@@ -8,7 +8,7 @@ import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/setti
 import { computeComponentIdentity } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
-import { CORE_PREFLIGHT_CHECKS, committedConfigurationDigest, nativeEntryDigest, preflightReviewTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
+import { CORE_PREFLIGHT_CHECKS, committedConfigurationDigest, normalizedConfigurationDigest, nativeEntryDigest, preflightReviewTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
 import type { PublisherAccount } from "../../../plugins/vh-adlc/scripts/docs-drift/identity";
 
 const proof = "1".repeat(64);
@@ -56,7 +56,7 @@ export function preflightFixture(roots: string[], fault = "none", runtime?: { co
   const activation = [{ path: ".vh-adlc/docs-drift.yaml", before: { mode: "100644" as const, sha256: sha256(before) }, after: { mode: "100644" as const, sha256: sha256(after) } },
     { path: "scripts/entry.txt", before: { mode: "100644" as const, sha256: sha256(Buffer.from("legacy\n")) }, after: { mode: "100644" as const, sha256: sha256(Buffer.from("shared\n")) } }];
   const base = { repository: settings.repository, candidate_commit: candidate, component,
-    configuration_sha256: committedConfigurationDigest(f.repo, candidate, settings), activation };
+    configuration_sha256: fault === "settings-only-policy" ? normalizedConfigurationDigest(settings) : committedConfigurationDigest(f.repo, candidate, settings), activation };
   const checklist = { schema_version: 1, kind: "docs-drift-preflight", ...base, changes: ["initial"],
     review: { target_sha256: preflightReviewTarget(base), evidence_sha256: proof, model: "claude-opus-5.5" },
     checks: CORE_PREFLIGHT_CHECKS.map(name => ({ name, status: "passed", component, consumer_commit: candidate, evidence_sha256: proof,
@@ -77,8 +77,11 @@ export function preflightFixture(roots: string[], fault = "none", runtime?: { co
   if (fault === "forged-original-entry") checklist.native_entries.interactive.consumer_commit = f.plan.manifest.bindings.source_commit;
   if (fault === "intervening") { write("unrelated.txt", Buffer.from("Intervening commit\n")); commit(f.repo, "Intervening before activation"); }
   write(path, canonicalJSON(checklist)); write(".vh-adlc/docs-drift.yaml", after); write("scripts/entry.txt", Buffer.from("shared\n"));
+  const originalProcedure = fault === "activation-policy" ? readFileSync(join(f.repo, settings.project_procedure)) : null;
+  if (fault === "activation-policy") write(settings.project_procedure, Buffer.from("---\ndocs_drift_protection: {local_documents: []}\ndocs_drift_local_coverage: {dialect: feature, terminal_statuses: []}\n---\n# Companion\n"));
   if (fault === "extra-change") write("unapproved.txt", Buffer.from("Unexpected activation change\n"));
   const activationCommit = commit(f.repo, "Synthetic reviewed activation D");
+  if (originalProcedure !== null) { write(settings.project_procedure, originalProcedure); commit(f.repo, "Restore candidate policy after changed D"); }
   if (fault === "later-policy") { write(".vh-adlc/docs-drift.yaml", canonicalJSON({ ...afterSettings, roots: ["other-docs"] })); commit(f.repo, "Unreviewed policy change"); }
   if (fault === "later-activation") { write("scripts/entry.txt", Buffer.from("unreviewed\n")); commit(f.repo, "Unreviewed activation file"); }
   return { ...f, candidate, activationCommit, checklist, component, afterSettings, head: () => readGit(f.repo, "rev-parse", "HEAD").toString().trim(), write };
@@ -98,7 +101,7 @@ export function ordinaryComponentFixture(roots: string[], full = false) {
 }
 
 /** A synthetic reviewed successor exercises current admission alongside original-source history. */
-export function activateProtectionSuccessor(f: Pick<ReturnType<typeof preflightFixture>, "repo" | "write" | "afterSettings" | "checklist" | "component">, procedure: string) {
+export function activateProtectionSuccessor(f: Pick<ReturnType<typeof preflightFixture>, "repo" | "write" | "afterSettings" | "checklist" | "component">, procedure: string, change: "initial" | "workflow_pin" = "initial") {
   const path = ".vh-adlc/docs-drift-policy-successor.yaml";
   const staged = { ...f.afterSettings, publication: { ...f.afterSettings.publication, mode: "staged", checklist_path: path } };
   const adopted = { ...staged, publication: { ...staged.publication, mode: "adopted" } };
@@ -110,9 +113,10 @@ export function activateProtectionSuccessor(f: Pick<ReturnType<typeof preflightF
   const base = { repository: f.checklist.repository, candidate_commit: candidate, component: f.component,
     configuration_sha256: committedConfigurationDigest(f.repo, candidate, parseSettings(staged)), activation };
   const target = preflightReviewTarget(base);
-  const checklist = { ...f.checklist, ...base, changes: ["initial"],
+  const checks = [...CORE_PREFLIGHT_CHECKS, ...(change === "workflow_pin" ? ["workflow_validation"] : [])];
+  const checklist = { ...f.checklist, ...base, changes: [change],
     review: { target_sha256: target, evidence_sha256: proof, model: "claude-opus-5.5" },
-    checks: CORE_PREFLIGHT_CHECKS.map(name => ({ name, status: "passed", component: f.component, consumer_commit: candidate,
+    checks: checks.map(name => ({ name, status: "passed", component: f.component, consumer_commit: candidate,
       evidence_sha256: proof, target_sha256: target, note: "Synthetic current-policy applicability proof." })) };
   f.write(path, canonicalJSON(checklist));
   f.write(".vh-adlc/docs-drift.yaml", canonicalJSON(adopted));

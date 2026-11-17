@@ -17,8 +17,8 @@ afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force
 const workflow = ".github/workflows/docs-drift.yml", worker = ".github/workflows/docs-drift-worker.yml";
 const reader = { repository: "fixture/docs", repository_id: 10, actor: "fixture-owner", actor_id: 30, default_branch: "main" };
 
-function fixture(manual = false, projected = false) {
-  const f = preflightFixture(roots, "none", undefined, (repo, settings) => {
+function fixture(manual = false, projected = false, downgrade = false) {
+  const f = preflightFixture(roots, downgrade ? "settings-only-policy" : "none", undefined, (repo, settings) => {
     Object.assign(settings.execution, { scheduled_workflow: workflow, worker_workflow: worker, claude_command: ".claude/commands/docs-drift.md" });
     settings.reports.interactive = "local-attestation"; settings.reports.local_history_roots = ["history"];
     put(repo, workflow, canonicalJSON({ on: { schedule: [{ cron: "0 9 * * 1" }], ...(manual ? { workflow_dispatch: null } : {}) }, jobs: { drift: { uses: "./" + worker } } }).toString());
@@ -41,8 +41,8 @@ function source(repo: string, head: string, changed = false): ProducerSource {
       .map(([path, bytes]) => [path, bytes === null ? null : sha256(bytes)] as const); } };
 }
 
-test.each(["matching", "manual-dispatch", "changed-native-blob", "foreign-repository", "wrong-workflow", "wrong-event", "staged-source", "legacy-after-successor", "projected-after-successor"])("flat scheduled history verifies its original source and native workflow: %s", fault => {
-  const f = fixture(fault === "manual-dispatch", fault === "projected-after-successor"), head = fault === "staged-source" ? f.candidate : f.current;
+test.each(["matching", "manual-dispatch", "changed-native-blob", "foreign-repository", "wrong-workflow", "wrong-event", "staged-source", "legacy-after-successor", "projected-after-successor", "projected-downgrade"])("flat scheduled history verifies its original source and native workflow: %s", fault => {
+  const f = fixture(fault === "manual-dispatch", fault.startsWith("projected"), fault === "projected-downgrade"), head = fault === "staged-source" ? f.candidate : f.current;
   const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
   const run: WorkflowRunInput = { id: 101, run_attempt: 1, workflow_id: 100, path: workflow, event: "schedule",
     head_branch: "main", head_sha: head, repository, head_repository: repository,
@@ -50,7 +50,7 @@ test.each(["matching", "manual-dispatch", "changed-native-blob", "foreign-reposi
   if (fault === "foreign-repository") run.repository = { ...repository, id: 11 };
   if (fault === "wrong-workflow") run.workflow_id++;
   if (fault === "wrong-event" || fault === "manual-dispatch") run.event = "workflow_dispatch";
-  const current = fault.endsWith("after-successor") ? activateProtectionSuccessor(f,
+  const current = fault.endsWith("after-successor") || fault === "projected-downgrade" ? activateProtectionSuccessor(f,
     "---\ndocs_drift_protection: {local_documents: []}\ndocs_drift_local_coverage: {dialect: feature, terminal_statuses: []}\n---\n# Successor companion\n") : f.current;
   if (current !== f.current) readGit(f.store.root, "fetch", "--no-write-fetch-head", f.repo, current);
   const verify = createAdoptedProducerVerifier({ store: f.store, current_default: current, identity: reader });

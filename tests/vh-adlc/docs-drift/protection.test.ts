@@ -103,6 +103,32 @@ test.each(["planned", "shipped"])("a missing local status accepts only a canonic
   expect(result.edits[0].allowed).toBe(status === "planned");
 });
 
+test.each(["status", "covers", "status_description"])("adding a mechanical field still requires its explicit declaration: %s", key => {
+  const root = fixture(), text = legacyPlan.replace(/^status:.*\n/mu, "").replace(/^covers:.*\n/mu, "");
+  const values = { status: "planned", covers: "[docs/**]", status_description: "Source-verified state" };
+  const coverage = { ...localCoverage, required_fields: localCoverage.required_fields.filter(field => field !== key) };
+  const snapshot = mixed(root, text, localRules, coverage);
+  const edit = localReplacement("plans/older.md", Buffer.from(text), "---\n", "---\n" + key + ": " + values[key as keyof typeof values] + "\n");
+  expect(evaluateProtection(root, snapshot, [edit]).edits[0].allowed).toBe(false);
+});
+
+test.each([
+  ["undeclared addition", "goal: 'Keep this contract'", "goal: 'Keep this contract'\nundeclared: value"],
+  ["contract removal", "goal: 'Keep this contract'\n", ""],
+  ["invalid checkbox byte", "[ ] Verified behavior", "[y] Verified behavior"],
+  ["multiple checkbox bytes", "[ ] Verified behavior", "[xx] Verified behavior"],
+] as const)("local plan boundary refuses %s", (_name, prior, next) => {
+  const root = fixture(), snapshot = mixed(root);
+  expect(evaluateProtection(root, snapshot, [localReplacement("plans/older.md", Buffer.from(legacyPlan), prior, next)]).edits[0].allowed).toBe(false);
+});
+
+test.each(["covers", "status"])("missing fields reject invalid newly inserted %s values", key => {
+  const root = fixture(), text = legacyPlan.replace(/^status:.*\n/mu, "").replace(/^covers:.*\n/mu, "");
+  const next = key === "covers" ? "covers: [../escape/**]\n" : "status: unknown-status\n";
+  const snapshot = mixed(root, text), edit = localReplacement("plans/older.md", Buffer.from(text), "---\n", "---\n" + next);
+  expect(evaluateProtection(root, snapshot, [edit]).edits[0].allowed).toBe(false);
+});
+
 test.each(["active", "done", "unrecognized"])("local branch ownership uses declared aliases and keeps unknown status active: %s", status => {
   const root = fixture(), text = legacyPlan.replace("status: done", "branch: feat/old\nstatus: " + status), snapshot = mixed(root, text);
   const edit = localReplacement("plans/older.md", Buffer.from(text), "[ ] Verified behavior", "[x] Verified behavior");
@@ -126,6 +152,16 @@ test.each(["unfenced", "fenced", "headings-only"])("shared enrollment wins over 
   const result = evaluateProtection(root, snapshot, [edit]);
   expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
   expect(result.edits[0].allowed).toBe(scenario !== "unfenced");
+});
+
+test.each(["frontmatter", "checkbox"])("an ordinary row cannot unlock an unclaimed enrolled shared spec's %s", part => {
+  const root = fixture(), text = featureTemplate;
+  const snapshot = mixed(root, text, [{ patterns: ["plans/**"], exclude_patterns: [], kind: "ordinary", editable_parts: [] }]);
+  const edit = part === "frontmatter" ? localReplacement("plans/older.md", Buffer.from(text), "status: draft", "status: planned")
+    : localReplacement("plans/older.md", Buffer.from(text), "- [ ] AC-01", "- [x] AC-01");
+  const result = evaluateProtection(root, snapshot, [edit]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(false);
 });
 
 test.each(["duplicate heading", "missing heading"])("ambiguous acceptance sections preserve classification and refuse their checkbox: %s", scenario => {
@@ -199,6 +235,42 @@ test("a declared older plan without frontmatter permits only insertion of its mi
   expect(result.complete).toBe(true);
   expect(result.edits[0].allowed).toBe(true);
   expect(result.edits[0].bytes?.toString()).toBe(inserted + text);
+});
+
+test("a frontmatter-less local plan permits an independently verified acceptance checkbox", () => {
+  const root = fixture(), text = "# Older plan\n## Acceptance\n- [ ] Verified behavior\n";
+  const result = evaluateProtection(root, mixed(root, text), [localReplacement("plans/older.md", Buffer.from(text), "[ ]", "[x]")]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(true);
+  expect(result.edits[0].bytes?.toString()).toBe(text.replace("[ ]", "[x]"));
+});
+
+test.each(["Tasks\n-----", "##"])("a following Markdown section boundary protects later completed tasks: %s", boundary => {
+  const root = fixture(), text = legacyPlan.replace("## Tasks", boundary);
+  const result = evaluateProtection(root, mixed(root, text), [localReplacement("plans/older.md", Buffer.from(text), "[x] Delivered work", "[ ] Delivered work")]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(false);
+});
+
+test.each([false, true])("ignored rules preserve old range and coverage behavior in a local-format root %s", local => {
+  const root = fixture(local), path = local ? "plans/older.md" : "docs/older.md";
+  const text = "---\nstatus: shipped\ncovers: [docs/guide.md]\n---\n# Older plan\nOld current claim\n";
+  put(root, path, text);
+  const bytes = Buffer.from(text), start = bytes.indexOf("Old current claim");
+  const policy = { document_kinds: [{ document: path, document_sha256: sha256(bytes), kind: "plan" }],
+    local_ranges: [{ document: path, document_sha256: sha256(bytes), ranges: [{ start, end: start + 17 }] }] };
+  const coverage = { dialect: "documentation", terminal_statuses: ["shipped"] };
+  const edit = localReplacement(path, bytes, "Old current claim", "Current verified claim");
+  const write = (protection: unknown, localCoverage: unknown) => put(root, "docs/docs-procedure.md", "---\ndocs_drift_protection: "
+    + canonicalJSON(protection).toString() + "\ndocs_drift_local_coverage: " + canonicalJSON(localCoverage).toString() + "\n---\n# Procedure\n");
+  write(policy, coverage);
+  const original = evaluateProtection(root, captureSnapshot(root, commitAll(root)), [edit]);
+  write({ ...policy, local_documents: [{ patterns: [path], exclude_patterns: [], kind: "plan", editable_parts: ["frontmatter", "acceptance-checkboxes"] }] },
+    { ...coverage, statuses: ["shipped", "active"], status_aliases: { shipped: "active" }, required_fields: ["status"], acceptance_headings: ["Acceptance"] });
+  const current = evaluateProtection(root, captureSnapshot(root, commitAll(root)), [edit]);
+  expect(original.complete).toBe(true);
+  expect(original.edits[0].allowed).toBe(true);
+  expect(current).toEqual(original);
 });
 
 test("acceptance-looking text inside a frontmatter block scalar grants no checkbox edit", () => {
