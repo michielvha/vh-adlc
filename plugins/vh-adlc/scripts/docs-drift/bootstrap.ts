@@ -286,8 +286,7 @@ export function readOriginalProductionPolicy(options: {
   const preflight = verifyProductionPreflight({ repo: options.repo, current_default: source, component: plan.component,
     publisher: { entry, identity: options.identity } });
   const selected = settings.execution.entries[entry], models = preflight.checklist.native_entries[entry];
-  const policy = { schema_version: 2 as const, policy_sha256: preflight.policy_sha256, component: plan.component,
-    ...(plan.hosted_executor === undefined ? {} : { hosted_executor: plan.hosted_executor }),
+  const policy = { ...policyBinding(plan), schema_version: 2 as const, policy_sha256: preflight.policy_sha256, component: plan.component,
     context: plan.context, transport: plan.transport, publication_kind: plan.publication_kind, publisher_entry: entry,
     pr_draft: settings.publication.pr_state[plan.publication_kind] === "draft",
     worker: { requested_model: selected.worker.model, adopted_model: models.worker_model, identity_source: selected.worker.identity_source },
