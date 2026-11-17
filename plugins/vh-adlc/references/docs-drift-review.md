@@ -133,6 +133,10 @@ through the existing run artifact writer and appends their pending run stage.
 Use `resume --action acknowledge` or `resume --action reconcile` on that
 original run. Those actions recheck the original selection and authority before
 execution. Keep source policy, launchers and other writers' work intact.
+Production recovery uses the selected execution profile and its original executor
+attribution. Hosted acknowledgement and reconciliation require the same recorded
+Actions run and attempt, with native active-run validation before effects.
+Read-only inspection is available through any harness.
 The selected recovery purpose and current lookup remain separate from the
 ordinary publication approval. The controller and run APIs define those retained
 records. [Recovery controller](../scripts/docs-drift/recovery-controller.ts),

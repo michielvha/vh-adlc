@@ -4,7 +4,8 @@ import { dirname, join, resolve } from "node:path";
 import { selectOriginalOperationRuntime } from "./bootstrap";
 import { readNativeTrialSettings } from "./trial-definition";
 import { fetchCurrentDefault } from "./proposals";
-import { readJournal } from "./journal";
+import { readJournal, type HostedExecutor } from "./journal";
+import { readHostedExecutor } from "./hosted-executor";
 import { acknowledgeDeliveries, reconcileAbsent, type AcknowledgementScope, type ReconciliationScope } from "./recovery";
 import { recoveryEffectsOutput } from "./recovery-output";
 import { readRecoveryAuthority } from "./recovery-authority";
@@ -126,10 +127,16 @@ export async function inspectRecovery(input: RecoveryOptions): Promise<RecoveryI
 }
 
 /** Execute only metadata recovery under fresh exact authority using the original retained code. */
-export async function applyRecovery(input: RecoveryOptions & { authority: unknown; purpose: Purpose }, run?: RunDirectory) {
-  if (readJournal(input.journal_directory, input.repo).plan.schema_version !== 2)
+export async function applyRecovery(input: RecoveryOptions & { authority: unknown; purpose: Purpose; hosted_executor?: HostedExecutor }, run?: RunDirectory) {
+  const original = readJournal(input.journal_directory, input.repo).plan;
+  if (original.schema_version !== 2)
     throw new SetupRequired("Use the original implementation for this operation format.");
+  if (original.context === "production" && original.manifest.publisher_entry === "hosted"
+    && (!input.hosted_executor || canonicalDigest(input.hosted_executor) !== canonicalDigest(original.hosted_executor ?? null)))
+    throw new SetupRequired("Hosted recovery executor identity required");
   const options = structuredClone(input), context = await collectContext(options, options.purpose, run), selected = context.selection;
+  if (options.hosted_executor) readHostedExecutor({ entry: options.entry, executor: options.hosted_executor,
+    settings: context.settings, source: options.source, identity: context.observed.identity, reader: context.observed.repository });
   recoveryEffectsOutput({ command: selected.purpose === "acknowledgement" ? "acknowledge-delivery" : "reconcile-publication",
     source: options.source, outcome: "incomplete", limit: Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes), capacity_check: true,
     result: { state: "pending", reason: null, journal: readJournal(options.journal_directory, options.repo) } });

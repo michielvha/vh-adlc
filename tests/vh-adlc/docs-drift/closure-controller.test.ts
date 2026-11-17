@@ -1,6 +1,6 @@
 /** Synthetic exact permissions and native API, with owned local Git only. No live effect. */
 import { afterAll, expect, test } from "bun:test";
-import { readFileSync, rmSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { checkClosurePublication, publishClosure } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-controller";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -53,10 +53,22 @@ test("retained original closure controller publishes only its exact approved exp
   } catch (error) { preserveFailedRoots = true; throw error; }
 }, 365000);
 
-test("retained closure resumes an applied close after its local outcome write fails without repeating its explanation", async () => {
+test.each(["local", "hosted"])("retained closure resumes an applied close after its local outcome write fails without repeating its explanation: %s", async entry => {
   try {
     const { spyOn } = await import("bun:test");
-    const f = await originalClosureFixture(roots), before = captureRepositoryState(f.repo);
+    const identities = Object.fromEntries(["hosted", "copilot", "claude", "interactive"].map(name => [name, { actor: "fixture-bot", actor_id: 20 }]));
+    const f = await originalClosureFixture(roots, entry === "hosted" ? { entry: "hosted", identities } : undefined);
+    const before = captureRepositoryState(f.repo);
+    if (entry === "hosted") {
+      const state = JSON.parse(readFileSync(f.service.statePath, "utf8"));
+      const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
+      state.workflow_runs = [{ id: 501, run_attempt: 2, workflow_id: f.snapshot.settings.reports.workflow_id,
+        path: f.snapshot.settings.reports.workflow_path, event: "schedule", status: "in_progress", conclusion: null,
+        head_sha: f.source, head_branch: "main", repository, head_repository: repository,
+        created_at: "2000-01-01T00:00:00Z", updated_at: "2000-01-01T00:00:00Z" }];
+      writeFileSync(f.service.statePath, JSON.stringify(state));
+    }
+    const publication = { ...f.publication, ...(entry === "hosted" ? { hosted_executor: { run_id: 501, run_attempt: 2 } } : {}) };
     const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/closure-controller") = await import(join(f.adopted.retained.directory, "scripts/docs-drift/closure-controller.ts"));
     const journal = await import(join(f.adopted.retained.directory, "scripts/docs-drift/journal.ts"));
     const original = journal.appendOutcome;
@@ -66,19 +78,22 @@ test("retained closure resumes an applied close after its local outcome write fa
       return original(current, id, outcome);
     });
     let pending;
-    try { pending = await f.invoke(run => controller.publishClosure(f.publication, run)); }
+    try { pending = await f.invoke(run => controller.publishClosure(publication, run)); }
     finally { fault.mockRestore(); }
     expect(injected).toBe(true); expect(pending.state).toBe("pending");
+    const receiptRef = f.snapshot.settings.publication.receipt_ref_prefix + pending.journal.plan.manifest.operation_id;
+    const receiptObject = git(f.origin, "rev-parse", receiptRef);
     const delivered = JSON.parse(readFileSync(f.service.statePath, "utf8"));
     expect(delivered.prs[0].state).toBe("closed"); expect(delivered.comments["1"]).toHaveLength(1);
-    const resumed = await f.invoke(run => controller.resumeClosure({ ...f.publication, journal_directory: pending.journal.directory }, run));
+    const resumed = await f.invoke(run => controller.resumeClosure({ ...publication, journal_directory: pending.journal.directory }, run));
     expect(resumed.state, JSON.stringify({ reason: resumed.reason })).toBe("complete");
-    const repeated = await f.invoke(run => controller.resumeClosure({ ...f.publication, journal_directory: pending.journal.directory }, run));
+    const repeated = await f.invoke(run => controller.resumeClosure({ ...publication, journal_directory: pending.journal.directory }, run));
     expect(repeated.state).toBe("complete");
     expect(JSON.parse(readFileSync(f.service.statePath, "utf8")).comments["1"]).toHaveLength(1);
     const calls = readFileSync(f.service.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
     expect(calls.filter(call => call.program === "gh" && call.args.includes("PATCH") && call.args.includes("repos/fixture/docs/pulls/1"))).toHaveLength(1);
     expect(git(f.origin, "for-each-ref", "--format=%(refname)", "refs/heads/docs-drift-lease")).toBe("");
+    expect(git(f.origin, "rev-parse", receiptRef)).toBe(receiptObject);
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveFailedRoots = true; throw error; }
 }, 600000);

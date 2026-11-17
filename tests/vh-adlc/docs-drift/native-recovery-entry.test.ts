@@ -6,10 +6,24 @@ import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/proto
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 
-test("original retained recovery inspects and acknowledges a changed delivered PR under fresh owner approval", async () => {
+function hostedAttribution(f: Awaited<ReturnType<typeof originalPublicationFixture>>, service: ReturnType<typeof installOwnedNativeService>) {
+  if (f.options.entry !== "hosted") return {};
+  const state = JSON.parse(readFileSync(service.statePath, "utf8"));
+  const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
+  state.workflow_runs = [{ id: 501, run_attempt: 2, workflow_id: f.configured.reports.workflow_id,
+    path: f.configured.reports.workflow_path, event: "schedule", status: "in_progress", conclusion: null,
+    head_sha: f.source, head_branch: "main", repository, head_repository: repository,
+    created_at: "2000-01-01T00:00:00Z", updated_at: "2000-01-01T00:00:00Z" }];
+  writeFileSync(service.statePath, JSON.stringify(state));
+  return { hosted_executor: { run_id: 501, run_attempt: 2 } };
+}
+
+test.each(["copilot", "hosted"] as const)("original retained recovery inspects and acknowledges a changed delivered PR under fresh owner approval: %s", async entry => {
   const roots: string[] = [];
   try {
-    const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
+    const identities = Object.fromEntries(["hosted", "copilot", "claude", "interactive"].map(name => [name, { actor: "fixture-bot", actor_id: 20 }]));
+    const f = await originalPublicationFixture(roots, { entry, identities }), service = installOwnedNativeService(f);
+    const attribution = hostedAttribution(f, service), publication = { ...f.publication, ...attribution };
     const publisher: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
     const journals: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/journal") = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts")), append = journals.appendOutcome;
     const fault = spyOn(journals, "appendOutcome").mockImplementation((journal, id, outcome) => {
@@ -17,7 +31,7 @@ test("original retained recovery inspects and acknowledges a changed delivered P
       return append(journal, id, outcome);
     });
     let pending;
-    try { pending = await f.invoke(run => publisher.publishPublication(f.publication, run)); } finally { fault.mockRestore(); }
+    try { pending = await f.invoke(run => publisher.publishPublication(publication, run)); } finally { fault.mockRestore(); }
     expect(pending.state, pending.reason ?? undefined).toBe("pending");
     const state = JSON.parse(readFileSync(service.statePath, "utf8")) as { prs: Array<Record<string, unknown>> };
     state.prs[0].title = "Later owner title"; writeFileSync(service.statePath, JSON.stringify(state), { mode: 0o600 });
@@ -28,11 +42,11 @@ test("original retained recovery inspects and acknowledges a changed delivered P
       source_commit: f.source, operation_id: pending.journal.plan.manifest.operation_id, purpose: "acknowledgement",
       acknowledge_effect_ids: ["publication"], retire_effect_ids: [], retirement_lookups: {} }));
     const common = { repo: f.repo, source: f.source, artifact_root: f.artifacts, journal_directory: pending.journal.directory,
-      cache_directory: f.options.cache_directory, entry: "copilot", owner: "fixture-owner", run: "fixture-recovery-inspection",
+      cache_directory: f.options.cache_directory, entry, ...attribution, owner: "fixture-owner", run: "fixture-recovery-inspection",
       credential: f.options.credential, path: f.options.path, selection: JSON.parse(readFileSync(join(f.artifacts, selection.path), "utf8")) };
     const hostRecovery = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-controller");
     const artifactsBeforeRefusal = readdirSync(f.artifacts).sort();
-    await expect(hostRecovery.applyRecovery({ ...common, entry: "copilot", purpose: "acknowledgement", authority: {} }))
+    await expect(hostRecovery.applyRecovery({ ...common, purpose: "acknowledgement", authority: {} }))
       .rejects.toThrow("Original run required for version-two recovery");
     expect(readdirSync(f.artifacts).sort()).toEqual(artifactsBeforeRefusal);
     const recovery: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-controller") = await import(join(f.retained.directory, "scripts/docs-drift/recovery-controller.ts"));
@@ -66,7 +80,7 @@ test("original retained recovery inspects and acknowledges a changed delivered P
     writeFileSync(join(f.repo, ".vh-adlc/docs-drift.yaml"), readGit(f.repo, "show", f.source + ":.vh-adlc/docs-drift.yaml"));
     writeFileSync(f.options.launcher_path, readGit(f.repo, "show", f.source + ":" + f.options.launcher_path.slice(f.repo.length + 1)));
     const resumeBefore = captureRepositoryState(f.repo);
-    const resumed = await f.invoke(run => publisher.resumePublication({ ...f.publication, journal_directory: pending.journal.directory }, run));
+    const resumed = await f.invoke(run => publisher.resumePublication({ ...publication, journal_directory: pending.journal.directory }, run));
     expect(resumed.state, resumed.reason ?? undefined).toBe("acknowledged");
     expect(captureRepositoryState(f.repo)).toEqual(resumeBefore);
     const final = JSON.parse(readFileSync(service.statePath, "utf8")) as { prs: Array<Record<string, unknown>> };
@@ -80,10 +94,12 @@ test("original retained recovery inspects and acknowledges a changed delivered P
   } catch (error) { console.error("Preserved failed native recovery roots", JSON.stringify(roots)); throw error; }
 }, 365000);
 
-test("original retained reconciliation retires absent writes and settles only the original owned lease", async () => {
+test.each(["copilot", "hosted"] as const)("original retained reconciliation retires absent writes and settles only the original owned lease: %s", async entry => {
   const roots: string[] = [];
   try {
-    const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
+    const identities = Object.fromEntries(["hosted", "copilot", "claude", "interactive"].map(name => [name, { actor: "fixture-bot", actor_id: 20 }]));
+    const f = await originalPublicationFixture(roots, { entry, identities }), service = installOwnedNativeService(f);
+    const attribution = hostedAttribution(f, service), publication = { ...f.publication, ...attribution };
     const publisher: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
     const journals: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/journal") = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts"));
     const append = journals.appendOutcome, fault = spyOn(journals, "appendOutcome").mockImplementation((journal, id, outcome) => {
@@ -91,7 +107,7 @@ test("original retained reconciliation retires absent writes and settles only th
       return append(journal, id, outcome);
     });
     let pending;
-    try { pending = await f.invoke(run => publisher.publishPublication(f.publication, run)); } finally { fault.mockRestore(); }
+    try { pending = await f.invoke(run => publisher.publishPublication(publication, run)); } finally { fault.mockRestore(); }
     expect(pending.state, pending.reason ?? undefined).toBe("pending");
     const currentSettings = JSON.parse(readGit(f.repo, "show", f.source + ":.vh-adlc/docs-drift.yaml").toString());
     const currentProcedure = "docs/recovery-procedure.md";
@@ -113,7 +129,7 @@ test("original retained reconciliation retires absent writes and settles only th
       acknowledge_effect_ids: [], retire_effect_ids: ["candidate", "publication"], retirement_lookups: {} }));
     const recovery: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-controller") = await import(join(f.retained.directory, "scripts/docs-drift/recovery-controller.ts"));
     const common = { repo: f.repo, source: f.source, artifact_root: f.artifacts, journal_directory: pending.journal.directory,
-      cache_directory: f.options.cache_directory, entry: "copilot", owner: "fixture-owner", run: "fixture-reconciliation",
+      cache_directory: f.options.cache_directory, entry, ...attribution, owner: "fixture-owner", run: "fixture-reconciliation",
       credential: f.options.credential, path: f.options.path, selection: JSON.parse(readFileSync(join(f.artifacts, selection.path), "utf8")) };
     const inspection = await recovery.inspectRecovery(common);
     expect(inspection.complete, inspection.diagnostics.join("\n")).toBe(true);

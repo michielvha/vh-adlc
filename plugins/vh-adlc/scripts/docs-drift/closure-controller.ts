@@ -82,7 +82,7 @@ async function currentState(options: Options, inventory?: ClosureInventory, expe
   let hostedExecutor = options.hosted_executor;
   if (hostedExecutor && verifyExecutor) {
     if (!("policy_sha256" in binding)) throw new SetupRequired("Hosted attribution requires the version-two production runtime");
-    const native = readNativeContext(scope);
+    const native = readNativeContext({ ...scope, comparison_identity: facts.identity });
     hostedExecutor = readHostedExecutor({ entry: options.entry, executor: hostedExecutor,
       settings, source: options.source, identity: native.identity, reader: native.repository });
   }

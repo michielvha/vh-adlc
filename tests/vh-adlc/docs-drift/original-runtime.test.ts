@@ -1,8 +1,9 @@
 import { afterAll, expect, spyOn, test } from "bun:test";
 import { existsSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readOriginalRuntime } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
-import { sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { readOriginalRuntime, selectOriginalOperationRuntime } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
+import { createJournal, readJournal, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { applyRecovery } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery-controller";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { loadCommittedSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -12,20 +13,46 @@ import { commit, ordinaryComponentFixture, preflightFixture } from "./preflight-
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-function original(recorded?: { actor?: string; actor_id?: number; settings_sha256?: string }) {
+function original(recorded?: { actor?: string; actor_id?: number; settings_sha256?: string; hosted?: boolean }) {
   const component = ordinaryComponentFixture(roots), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable });
   const source = f.head(), loaded = loadCommittedSettings(f.repo, source);
-  const identity = { repository: "fixture/docs", repository_id: 10, default_branch: "main", actor: "fixture-owner", actor_id: 30 };
+  const entry = recorded?.hosted ? "hosted" : "interactive";
+  const identity = { repository: "fixture/docs", repository_id: 10, default_branch: "main",
+    actor: recorded?.hosted ? "fixture-bot" : "fixture-owner", actor_id: recorded?.hosted ? 20 : 30 };
   const input = fixture({ ...bindings, source_commit: source, settings_sha256: recorded?.settings_sha256 ?? loaded.settings_sha256 }, [], "original-operation",
-    { actor: recorded?.actor ?? identity.actor, actor_id: recorded?.actor_id ?? identity.actor_id, publisher_entry: "interactive" });
-  const selectedRole = { ...role, requested_model: loaded.settings.execution.entries.interactive.worker.model };
+    { actor: recorded?.actor ?? identity.actor, actor_id: recorded?.actor_id ?? identity.actor_id, publisher_entry: entry });
+  const selectedRole = { ...role, requested_model: loaded.settings.execution.entries[entry].worker.model };
   input.policy = { worker: selectedRole, reviewer: selectedRole };
   const policy = verifyProductionPreflight({ repo: f.repo, current_default: source, component: f.component });
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
     schema_version: 2, policy_sha256: policy.policy_sha256, component: f.component,
+    ...(recorded?.hosted ? { hosted_executor: { run_id: 501, run_attempt: 2 } } : {}),
     context: "production", transport: "native", publication_kind: "advisory", corrections: [], attention: [] });
   return { ...f, ...component, source, identity, plan };
 }
+
+test("original hosted policy retains its executor when selecting the original recovery runtime", async () => {
+  const f = original({ hosted: true }), bytes = canonicalJSON(f.plan);
+  const runtime = await selectOriginalOperationRuntime({ repo: f.repo, directory: f.directory,
+    plan: f.plan, identity: f.identity, entry: "hosted" });
+  expect(runtime.policy).toMatchObject({ hosted_executor: { run_id: 501, run_attempt: 2 } });
+  expect(runtime.authority).toBe("none");
+  expect(existsSync(f.calls)).toBe(false);
+  expect(canonicalJSON(f.plan)).toEqual(bytes);
+});
+
+test.each(["acknowledgement", "reconciliation"] as const)("hosted %s refuses missing or different executor attribution before recovery input reads", async purpose => {
+  const f = original({ hosted: true });
+  const journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  for (const executor of [undefined, { run_id: 502, run_attempt: 2 }]) {
+    await expect(applyRecovery({ repo: f.repo, source: f.source, artifact_root: f.artifacts,
+      journal_directory: journal.directory, cache_directory: f.artifacts, entry: "hosted", owner: "fixture", run: "fixture",
+      credential: "synthetic-unused", selection: {}, authority: {}, purpose,
+      ...(executor === undefined ? {} : { hosted_executor: executor }) })).rejects.toThrow("Hosted recovery executor identity required");
+    expect(readJournal(journal.directory, f.repo).digest).toBe(journal.digest);
+    expect(existsSync(f.calls)).toBe(false);
+  }
+});
 
 test.each(["matching", "recased", "successor-schema", "rollback-staged", "missing-client"] as const)("original runtime metadata reopens its recorded policy without a native probe after %s", scenario => {
   const f = original(), bytes = canonicalJSON(f.plan);

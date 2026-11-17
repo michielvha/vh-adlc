@@ -22,6 +22,7 @@ import { runVerification } from "./run-verification";
 import { runPublication } from "./run-publication";
 import { runResolution } from "./run-resolution";
 import { runClosure } from "./run-closure";
+import { selectHostedExecutor } from "./hosted-executor";
 import type { AuditOutputArtifacts } from "./report-output";
 import type { PendingLeaseObservation } from "./retained-controller";
 import { captureRepositoryState, matchesRepositoryState } from "./snapshot";
@@ -194,9 +195,12 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
       const directory = retainedDirectory, selection = latestArtifact(run, "recovery_selection"), authority = latestArtifact(run, "approval");
       if (!directory || !selection || !authority) throw Error("Retain the exact recovery selection and current approval before executing recovery.");
       if (run.origin !== "original") throw Error("Original host ownership required for recovery effects.");
+      const original = inspectJournal(directory, options.repo).plan;
+      const executor = original.context === "production" ? selectHostedExecutor(run.manifest.entry, process.env) : undefined;
       const settings = loadCommittedSettings(options.repo, run.manifest.source_commit).settings;
       const credential = await readNativeCredential({ hostname: settings.hostname, cwd: options.repo });
       const result = await applyRecovery({ repo: options.repo, source: run.manifest.source_commit, artifact_root: run.directory,
+        ...(executor === undefined ? {} : { hosted_executor: executor }),
         journal_directory: directory, cache_directory: run.directory, entry: run.manifest.entry, owner: run.manifest.id, run: randomUUID(), credential,
         selection: JSON.parse(decodeUTF8(readBoundArtifact({ source_repo: options.repo, artifact_root: run.directory, reference: selection }))),
         authority, purpose: options.action === "acknowledge" ? "acknowledgement" : "reconciliation" }, run);
