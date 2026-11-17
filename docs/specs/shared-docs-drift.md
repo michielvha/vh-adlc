@@ -94,9 +94,9 @@ R-118 identifies two missing enforcement details in the owner-selected no-effect
 
 The owner-selected paired settings/release requirement applies to the actual editing configuration. Remove the draft's whole-companion activation requirement and its forced instruction changes. Reuse `configuration_sha256` to bind the two committed policy declarations alongside the normalized settings. This retains automatic detection of policy changes while preserving normal prose edits, unchanged second-adopter companions and unrelated-component upgrades. The proof covers old/new digest readers and original-record preservation. An active plan row is defined by actual in-root classification in the selected snapshot. The out-of-root proof uses a plan row with no added coverage fields. Public guides and their existing test join T154.
 
-### Current upstream and tool versions on 2026-11-17
+### Tool versions at the c76a9065 integration
 
-The feature's [upstream integration](https://github.com/michielvha/vh-adlc/commit/ea1f83a2) includes [c76a9065](https://github.com/michielvha/vh-adlc/commit/c76a9065a4756093b668bc6de0d4d90a0e3d36c5). That fetched default tree declares plugin 0.24.6 and locks binary 0.34.0. The installed and running plugin both report 0.24.6. Current checks explicitly use the verified 0.34.0 binary. Both feature-candidate manifests remain 0.25.0, above the default's plugin version. Earlier 0.32.0 and 0.24.4 observations keep their historical targets.
+The feature's [upstream integration](https://github.com/michielvha/vh-adlc/commit/ea1f83a2) includes [c76a9065](https://github.com/michielvha/vh-adlc/commit/c76a9065a4756093b668bc6de0d4d90a0e3d36c5). That default tree declares plugin 0.24.6 and locks binary 0.34.0. The native installation observed at that checkpoint reports 0.24.6. Its checks explicitly use the verified 0.34.0 binary. Both feature-candidate manifests at that checkpoint declare 0.25.0, above the default's plugin version. Earlier 0.32.0 and 0.24.4 observations keep their historical targets.
 
 ### Legacy policy and history compatibility after R-120
 
@@ -112,7 +112,13 @@ Qualified Claude Code Opus 5.5 bounded review `mixed-plan-claude-r1` targets `a4
 
 The corrected focused run passes 22 cases with 42 assertions, and the pinned strict compiler exits zero in `t154-review-r1-current-types.log`. The earlier loaded-host attempt retains its timeout and cleanup failures. The frozen `a4e84e66` trial passes complete mixed-plan preparation, verification, synthetic publication and same-run recovery, then its report case reaches the 180-second deadline. That mixed trial supplies one passing and one failing case, with 71 assertions. The earlier separate working-source mixed report case passes. Current full verification and the next independent review remain open.
 
-The default branch advances to `b3e65115`, adding the capacity preflight and plugin 0.25.0. The running Codex package and native Codex install both report 0.25.0 with verified binary 0.34.0. The loop helper's separate 0.24.6 observation comes from Claude's install record, which its source reads regardless of harness. The Codex observation directly establishes this session's installed version. The feature candidate advances to 0.26.0 above the new default package during integration. R-122's accepted normative baseline is retained while the covered upstream drift receives a fresh review.
+The [default branch at b3e65115](https://github.com/michielvha/vh-adlc/commit/b3e65115a7f2a6fc9160ffc7524c8936f09b2a6d) adds the capacity preflight and plugin 0.25.0, integrated by [53801dab](https://github.com/michielvha/vh-adlc/commit/53801dab). The running Codex package and native Codex install both report 0.25.0 with verified binary 0.34.0. The loop helper's separate 0.24.6 observation comes from Claude's install record, which its source reads regardless of harness. The native Codex listing establishes the installed Codex version. The feature candidate advances to 0.26.0 above the new default package during integration. R-122's accepted normative baseline is retained while the covered upstream drift receives a fresh review. Interactive docs-drift runs the loop capacity check before launching native roles or creating an assessment worktree. Hosted execution retains its existing runner path.
+
+### Compatibility follow-up verification
+
+Qualified Claude Code Opus 5.5 follow-up `mixed-plan-claude-r2` targets `579f9f22` and reads all 143 required fragments with unchanged packet bytes and confirmed process cleanup. Its three should-fix findings cover frontmatter-delimiter injection, an insensitive alias fixture and the missing cross-format exclusion case. The correction binds the resulting header boundary to the exact frontmatter edit length, tests both existing and absent headers, verifies alias sensitivity through a deliberately incorrect implementation, and compares excluded old declarations with their original outcomes. Two nits are addressed by removing redundant committed-source evidence checks and asserting the missing-companion error. The earlier-reader fixture has a 30-second test budget for its three temporary component/source repositories; production deadlines are unchanged.
+
+The pinned Bun 1.4.4 affected suite passes 220 cases with 672 assertions across five files in `t154-r2-pinned-final.log`. Strict TypeScript compilation and the frozen ZIP bundle check pass. A first shell invocation selected Bun 1.4.3 and was refused by the declared-toolchain checks; its logs remain diagnostic evidence. R-123 reads all 213 required fragments and returns two context/setup nits, now corrected without changing the accepted normative baseline. Its stored records match the original return. Stackweaver's companion checkpoint `445d1fb8` passes its six normal commit checks. Final native, full-feature and migration acceptance remains open.
 
 ### Accepted compatibility implementation on 2026-11-17
 
@@ -1734,6 +1740,7 @@ None. On 2026-11-17 the owner accepts the R-117 compatibility recommendations. T
 | 2026-11-17 | R-121 | spec | `dbb524ef7194f2e6a2d5c5c87d8cd028c4a04c1e` | claude-opus-5-5 | procedural | 2 should-fix, 2 nit. |
 | 2026-11-17 | R-122 | spec | `f649b7aa4f7514436c710f4e845e5f11e1526e99` | claude-opus-5-5 | procedural | No findings. |
 | 2026-11-17 | R-122 | spec | `f649b7aa4f7514436c710f4e845e5f11e1526e99` | n/a | n/a | accepted by owner |
+| 2026-11-17 | R-123 | spec | `579f9f22211ca6806cd44162236c3d9d6feca9a8` | claude-opus-5-5 | procedural | 2 nit. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -3453,6 +3460,22 @@ PROPOSAL: Reword them as "the same source-selected digest rule", "a projected `l
 ### R-122
 
 NO FINDINGS
+
+### R-123
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Current upstream and tool versions on 2026-11-17" (docs/specs/shared-docs-drift.md:97-99); Context "Compatibility implementation review and corrections", third paragraph (:115)
+EVIDENCE: Line 99 still says "That fetched default tree declares plugin 0.24.6", "The installed and running plugin both report 0.24.6" and "Both feature-candidate manifests remain 0.25.0, above the default's plugin version". At this target, both manifests declare 0.26.0 (plugins/vh-adlc/plugin.json:4, plugins/vh-adlc/.claude-plugin/plugin.json:3), and upstream.patch moves main's manifests from 0.24.6 to 0.25.0. This revision adds the paragraph at :115, which records b3e65115, the running 0.25.0 Codex install and the 0.26.0 candidate. It leaves the older section, still headed "Current", with conflicting values from the same day. Line 115 also says "this session's installed version", which describes the conversation rather than the state. It names `b3e65115` without the commit link the older section uses and without naming the integration merge. Nothing an implementer builds or a proof checks changes.
+PROPOSAL: Retitle the older section as the c76a9065 integration reading, or move it into history. Keep one dated current record that links b3e65115 and its integration merge and states default plugin 0.25.0, candidate 0.26.0 and binary 0.34.0, without the session wording.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Context "Compatibility implementation review and corrections", third paragraph (docs/specs/shared-docs-drift.md:115); covered plugins/vh-adlc/skills/vh-adlc-docs-drift/SKILL.md:13 and plugins/vh-adlc/references/docs-drift.md "Setup and ownership"
+EVIDENCE: The integrated upstream adds the loop.md section "Check host capacity before any fan-out" (upstream.patch). It requires running scripts/host/capacity.sh before you "start another session or sub-agent, or launch parallel or long local work (independent reviews, test suites, cluster runs)", and it says to start nothing on `capacity: blocked`. The docs-drift `report`, `verify` and `close` operations launch separate native worker and reviewer processes (Design "Installation and role execution": "Worker and reviewer run in separate contexts"; docs-drift.md table and "Post-merge closure"). The assessment role may also create a detached worktree (authority.md "Scoped docs-drift locations and effects"). SKILL.md:13 cites loop.md only for "ordinary verified-binary setup and pinned knowledge", and docs-drift.md "Setup and ownership" names only the installer. The drift record at :115 notes that the default adds "the capacity preflight", but no section says whether interactive docs-drift operations run it. Scheduled hosted runs have no agent loop, so the question applies only to the interactive skill.
+PROPOSAL: Record in Context that interactive docs-drift operations run the loop capacity check before an operation launches native roles or creates an assessment worktree, and that the hosted path is unaffected. Carry that into the skill's setup line as documentation impact of the integrated drift.
 
 ## Sources
 

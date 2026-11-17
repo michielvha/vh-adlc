@@ -11,6 +11,9 @@ All `references/` and `scripts/` paths start there. For generic requests, use
 
 Read `references/docs-drift.md` for audit, resolve and post-merge closure.
 Use ordinary verified-binary setup and pinned knowledge from `references/loop.md`.
+For interactive work, run its host-capacity check before launching native roles
+or creating an assessment worktree; on a blocked result, stop before either.
+Scheduled hosted runs retain their existing runner setup.
 Read `references/docs-drift-settings.md` for missing settings, staged adoption,
 ordinary native-client selection and retained artifacts. Read `references/docs-drift-review.md`
 before independent assessment, candidate review, publication or recovery.

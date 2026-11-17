@@ -190,6 +190,20 @@ test.each(["local_ranges", "document_kinds"])("active mixed-root rules refuse ov
   expect(result.diagnostics[0].code).toBe("project-protection");
 });
 
+test.each(["local_ranges", "document_kinds"])("excluding an in-root document preserves its old %s meaning", field => {
+  const root = fixture(), document = "plans/older.md", text = legacyPlan.replace("status: done", "status: planned");
+  const document_sha256 = sha256(Buffer.from(text)), start = Buffer.from(text).indexOf("Verified behavior");
+  const row = field === "local_ranges" ? { document, document_sha256, ranges: [{ start, end: start + 17 }] }
+    : { document, document_sha256, kind: "plan" };
+  const edits = [localReplacement(document, Buffer.from(text), "Verified behavior", "Different behavior")];
+  const original = evaluateProtection(root, mixed(root, text, [localRules[0]], localCoverage, { [field]: [row] }), edits);
+  const excluded = [{ ...localRules[1], exclude_patterns: [...localRules[1].exclude_patterns, document] }, localRules[0]];
+  const current = evaluateProtection(root, mixed(root, text, excluded, localCoverage, { [field]: [row] }), edits);
+  expect(original.complete).toBe(true);
+  expect(original.edits[0].reason).toBe("protected-feature-range");
+  expect(current).toEqual(original);
+});
+
 test("dormant and out-of-root rules do not require new coverage or conflict with old declarations", () => {
   const root = fixture(), document = "docs/guide.md", document_sha256 = sha256(readFileSync(join(root, document)));
   const rules = [{ patterns: ["elsewhere/**", "docs/**"], exclude_patterns: [], kind: "plan", editable_parts: ["frontmatter"] }, localRules[0]];
@@ -245,6 +259,18 @@ test("a frontmatter-less local plan permits an independently verified acceptance
   expect(result.edits[0].bytes?.toString()).toBe(text.replace("[ ]", "[x]"));
 });
 
+test.each([false, true])("frontmatter additions cannot inject body prose: existing header %s", existing => {
+  const root = fixture(), text = existing ? legacyPlan : "# Older plan\n## Acceptance\n- [ ] Verified behavior\n";
+  const snapshot = mixed(root, text), bytes = Buffer.from(text);
+  const start = existing ? bytes.indexOf("---\n", 4) : 0;
+  const insertion = existing ? "status_description: Verified\n---\nInjected prose\n\n"
+    : "---\nstatus: planned\n---\nInjected prose\n\n";
+  const result = evaluateProtection(root, snapshot, [{ path: "plans/older.md", start, end: start,
+    before_sha256: sha256(bytes), replacement: Buffer.from(insertion) }]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(false);
+});
+
 test.each(["Tasks\n-----", "##"])("a following Markdown section boundary protects later completed tasks: %s", boundary => {
   const root = fixture(), text = legacyPlan.replace("## Tasks", boundary);
   const result = evaluateProtection(root, mixed(root, text), [localReplacement("plans/older.md", Buffer.from(text), "[x] Delivered work", "[ ] Delivered work")]);
@@ -254,22 +280,27 @@ test.each(["Tasks\n-----", "##"])("a following Markdown section boundary protect
 
 test.each([false, true])("ignored rules preserve old range and coverage behavior in a local-format root %s", local => {
   const root = fixture(local), path = local ? "plans/older.md" : "docs/older.md";
-  const text = "---\nstatus: shipped\ncovers: [docs/guide.md]\n---\n# Older plan\nOld current claim\n";
+  const text = "---\nstatus: shipped\nbranch: feat/older\ncovers: [docs/guide.md]\n---\n# Older plan\nOld current claim\n";
   put(root, path, text);
   const bytes = Buffer.from(text), start = bytes.indexOf("Old current claim");
-  const policy = { document_kinds: [{ document: path, document_sha256: sha256(bytes), kind: "plan" }],
+  const guide = "docs/guide.md", guideBytes = readFileSync(join(root, guide));
+  const policy = { document_kinds: [{ document: path, document_sha256: sha256(bytes), kind: "plan" },
+    { document: guide, document_sha256: sha256(guideBytes), kind: "ordinary" }],
     local_ranges: [{ document: path, document_sha256: sha256(bytes), ranges: [{ start, end: start + 17 }] }] };
   const coverage = { dialect: "documentation", terminal_statuses: ["shipped"] };
   const edit = localReplacement(path, bytes, "Old current claim", "Current verified claim");
+  const edits = [edit, localReplacement(guide, guideBytes, "Guide", "Verified guide")];
   const write = (protection: unknown, localCoverage: unknown) => put(root, "docs/docs-procedure.md", "---\ndocs_drift_protection: "
     + canonicalJSON(protection).toString() + "\ndocs_drift_local_coverage: " + canonicalJSON(localCoverage).toString() + "\n---\n# Procedure\n");
   write(policy, coverage);
-  const original = evaluateProtection(root, captureSnapshot(root, commitAll(root)), [edit]);
+  const original = evaluateProtection(root, captureSnapshot(root, commitAll(root)), edits);
   write({ ...policy, local_documents: [{ patterns: [path], exclude_patterns: [], kind: "plan", editable_parts: ["frontmatter", "acceptance-checkboxes"] }] },
     { ...coverage, statuses: ["shipped", "active"], status_aliases: { shipped: "active" }, required_fields: ["status"], acceptance_headings: ["Acceptance"] });
-  const current = evaluateProtection(root, captureSnapshot(root, commitAll(root)), [edit]);
+  const current = evaluateProtection(root, captureSnapshot(root, commitAll(root)), edits);
   expect(original.complete).toBe(true);
-  expect(original.edits[0].allowed).toBe(true);
+  expect(original.edits[0].allowed).toBe(!local);
+  expect(original.edits[1].allowed).toBe(true);
+  expect(original.edits[1].affected_features).toEqual(local ? [{ path, claimed: true, historical: true }] : []);
   expect(current).toEqual(original);
 });
 
@@ -294,14 +325,19 @@ test.each([
 });
 
 test("local-format roots ignore new rule matches and added aliases while retaining old declarations", () => {
-  const root = fixture(true), document = "plans/older.md", document_sha256 = sha256(Buffer.from(legacyPlan));
-  mixed(root, legacyPlan, localRules, { ...localCoverage, terminal_statuses: ["done"], status_aliases: { done: "active" } },
-    { document_kinds: [{ document, document_sha256, kind: "plan" }] });
+  const root = fixture(true), document = "plans/older.md", text = legacyPlan.replace("goal:", "branch: feat/older\ngoal:");
+  const guide = "docs/guide.md", guideBytes = readFileSync(join(root, guide));
+  mixed(root, text, localRules, { ...localCoverage, terminal_statuses: ["done"], status_aliases: { done: "active" } },
+    { document_kinds: [{ document, document_sha256: sha256(Buffer.from(text)), kind: "plan" },
+      { document: guide, document_sha256: sha256(guideBytes), kind: "ordinary" }] });
   put(root, "plans/README.md", "---\ntype: guide\n---\n# Existing local index\n");
   const snapshot = captureSnapshot(root, commitAll(root));
-  const result = evaluateProtection(root, snapshot, [localReplacement(document, Buffer.from(legacyPlan), "done", "active")]);
+  const result = evaluateProtection(root, snapshot, [localReplacement(document, Buffer.from(text), "done", "active"),
+    localReplacement(guide, guideBytes, "Guide", "Verified guide")]);
   expect(result.complete).toBe(true);
   expect(result.edits[0].allowed).toBe(false);
+  expect(result.edits[1].allowed).toBe(true);
+  expect(result.edits[1].affected_features).toEqual([{ path: document, claimed: true, historical: true }]);
 });
 
 test("standard normative content, metadata and historical proof remain byte-preserved", () => {

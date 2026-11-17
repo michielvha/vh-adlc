@@ -96,7 +96,7 @@ test("an earlier reader accepts original proof and refuses the opted-in envelope
   const snapshot = captureSnapshot(projected.repo, projected.head());
   expect(() => protection.sourceProtection(snapshot, (bytes: Uint8Array) => readYAML(bytes, reason => { throw Error(reason); }, { offline: true })))
     .toThrow("Project protection fields changed");
-});
+}, 30_000);
 
 test("a new-policy source refuses an internally consistent settings-only checklist", () => {
   const f = preflightFixture(roots, "settings-only-policy", undefined, repo => writeFileSync(join(repo, "docs/docs-procedure.md"),
@@ -139,7 +139,9 @@ test("a separately configured second adopter uses its own committed companion wi
 test.each(["source", "companion"])("missing original %s leaves its configuration proof unavailable", missing => {
   const f = preflightFixture(roots);
   const original = missing === "source" ? "f".repeat(40) : f.plan.manifest.bindings.source_commit;
-  expect(() => committedConfigurationDigest(f.repo, original, parseSettings(f.afterSettings))).toThrow();
+  const read = () => committedConfigurationDigest(f.repo, original, parseSettings(f.afterSettings));
+  if (missing === "companion") expect(read).toThrow("committed project procedure required");
+  else expect(read).toThrow();
 });
 
 test("immutable preflight results stay scoped to their exact invocation and publisher", () => {

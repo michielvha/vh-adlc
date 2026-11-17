@@ -27,8 +27,6 @@ export function sourceProtection(snapshot: Snapshot, yaml: (bytes: Uint8Array) =
     return { path, blob };
   }
   const policy = record(declared, ["local_ranges", "other_writers", "document_kinds", "local_documents"], true), context: ProtectionContext = {};
-  const digest = sha256(procedure.bytes), procedureEvidence = { procedure_sha256: digest,
-    procedure_quote: { start: 0, end: procedure.bytes.length, sha256: digest } };
   if (Object.hasOwn(policy, "local_ranges")) context.local_ranges = rows(policy.local_ranges).map(value => {
     const row = record(value, ["document", "document_sha256", "ranges"]), { path, blob } = document(row);
     const ranges = rows(row.ranges).map(value => {
@@ -38,7 +36,7 @@ export function sourceProtection(snapshot: Snapshot, yaml: (bytes: Uint8Array) =
       return { start, end };
     });
     if (new Set(ranges.map(canonicalDigest)).size !== ranges.length) throw Error("Duplicate project protection byte range");
-    return { document: path, document_sha256: sha256(blob.bytes), ranges, ...procedureEvidence };
+    return { document: path, document_sha256: sha256(blob.bytes), ranges };
   });
   if (Object.hasOwn(policy, "other_writers")) context.other_writers = rows(policy.other_writers).map(value => {
     const row = record(value, ["writer", "document", "document_sha256"]), { path, blob } = document(row);

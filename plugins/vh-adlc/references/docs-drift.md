@@ -16,6 +16,10 @@ before scanning or writing. Settings presence supplies configuration only.
 
 ## Setup and ownership
 
+For interactive work, run the host-capacity check from `references/loop.md` before
+launching native roles or creating an assessment worktree. A blocked result stops
+that work. Scheduled hosted runs use their existing runner setup.
+
 Read local instructions, then acquire the locked binary through Bash using
 `scripts/ensure-vh-adlc.sh` as `references/loop.md` describes. Read the committed
 consumer settings through the strict reader described in the setup reference.

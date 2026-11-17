@@ -10,13 +10,12 @@ import type { Snapshot } from "./snapshot";
 type Range = { start: number; end: number };
 export type ProtectedEdit = Range & { path: string; replacement: Uint8Array; before_sha256: string | null;
   action?: "replace" | "create" | "delete" | "chmod"; after_mode?: "100644" | "100755" | null };
-type Quote = Range & { sha256: string };
 type LocalRange = {
-  document: string; document_sha256: string; procedure_sha256: string; procedure_quote: Quote; ranges: Range[];
+  document: string; document_sha256: string; ranges: Range[];
 };
 type Coordinated = { feature?: string; writer?: string; document: string; source_commit: string; selection_sha256: string };
 type LocalCoverage = {
-  dialect: "feature" | "documentation"; terminal_statuses: string[]; procedure_sha256: string; procedure_quote: Quote;
+  dialect: "feature" | "documentation"; terminal_statuses: string[];
   statuses?: string[]; status_aliases?: Record<string, string>; required_fields?: string[]; acceptance_headings?: string[];
 };
 type LocalDocument = { patterns: string[]; exclude_patterns: string[]; kind: "ordinary" | "plan";
@@ -108,20 +107,10 @@ function standardLayout(bytes: Buffer): { protected: Range[]; shape: string[]; f
     shape, fence_state: layout.fence_state, enrolled };
 }
 
-function procedureEvidence(snapshot: Snapshot, evidence: { procedure_sha256: string; procedure_quote: Quote }): boolean {
-  const procedure = snapshot.blobs.find(blob => blob.path === snapshot.settings.project_procedure);
-  const quote = evidence.procedure_quote;
-  return procedure !== undefined && evidence.procedure_sha256 === sha256(procedure.bytes) &&
-    validRange(quote, procedure.bytes.length) && quote.start < quote.end &&
-    sha256(procedure.bytes.subarray(quote.start, quote.end)) === quote.sha256;
-}
-
-function localEditable(bytes: Buffer, path: string, snapshot: Snapshot, edit: Range, context: ProtectionContext): boolean {
+function localEditable(path: string, edit: Range, context: ProtectionContext): boolean {
   const matching = context.local_ranges?.filter(rule => rule.document === path) ?? [];
   if (matching.length !== 1) return false;
   const rule = matching[0];
-  if (rule.document_sha256 !== sha256(bytes) || !procedureEvidence(snapshot, rule)) return false;
-  if (!Array.isArray(rule.ranges) || rule.ranges.some(range => !validRange(range, bytes.length))) return false;
   return rule.ranges.some(range => edit.start >= range.start && edit.end <= range.end);
 }
 
@@ -198,6 +187,9 @@ function localPlanEdit(before: Buffer, after: Buffer, edits: ProtectedEdit[], ru
     ? { start: 0, end: 0, prefix: "", fields: [] } : null), newFields = frontmatterFields(after, next);
   if (!rule.editable_parts.includes("frontmatter") || !oldFields || !newFields
     || frontmatter.some(edit => edit.start < oldFields.start || edit.end > oldFields.end)) return false;
+  // Header edits cannot move any inserted bytes past the resulting closing delimiter.
+  const headerDelta = frontmatter.reduce((length, edit) => length + edit.replacement.length - (edit.end - edit.start), 0);
+  if (markdownLayout(after).headerEnd !== Math.max(0, markdownLayout(before).headerEnd) + headerDelta) return false;
   const oldKeys = oldFields.fields.map(field => field.key);
   if (canonicalDigest(newFields.fields.filter(field => Object.hasOwn(prior, field.key)).map(field => field.key)) !== canonicalDigest(oldKeys)
     || oldFields.prefix !== newFields.prefix) return false;
@@ -258,9 +250,7 @@ function sourceLocalCoverage(snapshot: Snapshot, yaml: (bytes: Uint8Array) => un
     }
     if (policy.terminal_statuses.some(status => !additional.statuses?.includes(status))) throw Error("Mixed-plan terminal status must be canonical");
   }
-  const digest = sha256(procedure.bytes);
-  return { dialect: policy.dialect, terminal_statuses: policy.terminal_statuses, ...additional, procedure_sha256: digest,
-    procedure_quote: { start: 0, end: procedure.bytes.length, sha256: digest } };
+  return { dialect: policy.dialect, terminal_statuses: policy.terminal_statuses, ...additional };
 }
 
 /** This checks proposal eligibility. Exact execution selection and independent review remain separate. */
@@ -329,9 +319,7 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
       const covers = metadata.covers ?? [];
       if (!Array.isArray(covers) || covers.some(value => typeof value !== "string")) throw new Error("feature coverage malformed");
       const local = context.local_coverage;
-      if (localFormat && covers.length > 0 && (!local || !procedureEvidence(snapshot, local))) throw new Error("local coverage requires its retained project matcher");
-      if (local && (!["feature", "documentation"].includes(local.dialect) || !Array.isArray(local.terminal_statuses) ||
-          local.terminal_statuses.some(status => typeof status !== "string" || !status))) throw new Error("local coverage malformed");
+      if (localFormat && covers.length > 0 && !local) throw new Error("local coverage requires its retained project matcher");
       const closed = localFormat ? local?.terminal_statuses ?? [] : terminal;
       const dialect = localFormat ? local?.dialect ?? "feature" : "feature";
       const status = localPlan && typeof metadata.status === "string" ? local?.status_aliases?.[metadata.status] ?? metadata.status : metadata.status;
@@ -395,7 +383,7 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
         !["guide", "guideline", "architecture", "principle", "standard", "decision"].includes(String(metadata?.type))));
       if ((ownFeature || historyKind || unclassifiedLocal) && action !== "replace") { decision.reason = "governed-file-transition"; continue; }
       if (unclassifiedLocal || (!ownFeature && historyKind)) {
-        if (!localEditable(bytes, edit.path, snapshot, edit, context)) { decision.reason = "unclassified-local-range"; continue; }
+        if (!localEditable(edit.path, edit, context)) { decision.reason = "unclassified-local-range"; continue; }
       } else if (ownFeature && !ownFeature.local) {
         if (standardLayout(bytes).protected.some(range => overlaps(edit, range))) { decision.reason = "protected-feature-range"; continue; }
       }
