@@ -117,12 +117,13 @@ function retainPublicationResult(options: { repo: string; run: RunDirectory; loc
   command: typeof RUN_COMMANDS[number]; result: Awaited<ReturnType<typeof runPublication>>; artifact: "publication_result" | "closure_result" }) {
   const { repo, run, result, command } = options, settings = loadCommittedSettings(repo, run.manifest.source_commit).settings;
   const complete = result.state === "complete";
+  const finalized = complete && (currentRuntimeValidation()?.caller?.unchanged() ?? true);
   const output = publicationEffectsOutput({ command, source: run.manifest.source_commit, outcome: complete ? "collected" : "attention",
     result, limit: Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes) });
   const current = readRunDirectory(options.location), retain = createRunArtifactWriter(current, settings.reports.max_entry_bytes);
-  const stage = appendRunStage(current, { command, state: complete ? "complete" : "pending",
+  const stage = appendRunStage(current, { command, state: finalized ? "complete" : "pending",
     artifacts: { [options.artifact]: retain(options.artifact, canonicalJSON(output)) } });
-  return { publication_effects: output.publication_effects, outcome: complete ? "collected" as const : "pending" as const,
+  return { publication_effects: output.publication_effects, outcome: finalized ? "collected" as const : "pending" as const,
     stage: command, diagnostics: output.diagnostics.map(diagnostic => diagnostic.message), stage_artifacts: stage.artifacts };
 }
 

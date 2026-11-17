@@ -18,7 +18,7 @@ afterAll(() => {
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-test("normal prepare retains the original worker selection and edits only its owned candidate", async () => {
+test.each(["matching", "caller-change"])("normal prepare retains the original worker selection and edits only its owned candidate: %s", async fault => {
   const component = ordinaryComponentFixture(roots, true), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable });
   writeFileSync(component.executable, auditClient("prepare", true), { mode: 0o755 });
   const source = f.head(), origin = join(f.root, "origin.git"), directory = join(f.root, "run"), state = join(f.root, "state");
@@ -90,12 +90,31 @@ test("normal prepare retains the original worker selection and edits only its ow
   git(origin, "fetch", "--no-write-fetch-head", preparation.prepared.checkout, head);
   const native = JSON.parse(readFileSync(service.statePath, "utf8")); native.publication_commit = head;
   writeFileSync(service.statePath, JSON.stringify(native), { mode: 0o600 });
+  if (fault === "caller-change") {
+    const executable = join(f.root, "native-service/git");
+    const injection = 'if (process.argv[1].endsWith("/git") && args.includes('
+      + JSON.stringify(":" + f.afterSettings.publication.lease_ref) + ')) writeFileSync('
+      + JSON.stringify(join(f.repo, "README.md")) + ', "Changed caller during final publication effect\\n");\n';
+    const program = readFileSync(executable, "utf8");
+    if (!program.includes("const nativeEnvironment =")) throw Error("Owned native effect injection point required");
+    writeFileSync(executable, program.replace("const nativeEnvironment =", injection + "const nativeEnvironment ="));
+  }
   const published = await invoke("publish");
-  expect(published.report).toMatchObject({ command: "publish", outcome: "collected", publication_effects: { state: "complete" } });
-  expect(published.result.exit_code).toBe(0);
+  if (fault === "caller-change") expect(readFileSync(join(f.repo, "README.md"), "utf8")).toBe("Changed caller during final publication effect\n");
+  expect(published.report).toMatchObject({ command: "publish", outcome: fault === "matching" ? "collected" : "incomplete", publication_effects: { state: "complete" } });
+  expect(published.result.exit_code).toBe(fault === "matching" ? 0 : 2);
+  const deliveredRun = readRunDirectory({ repo: f.repo, directory, origins: join(state, "vh-adlc/docs-drift/origins") });
+  const deliveredStage = deliveredRun.stages.at(-1);
+  expect(deliveredStage?.command).toBe("publish");
+  expect(deliveredStage?.state).toBe(fault === "matching" ? "complete" : "pending");
+  const deliveredReference = deliveredStage?.artifacts.publication_result;
+  if (!deliveredReference) throw Error("Already executed publication evidence must remain referenced");
+  expect(JSON.parse(readBoundArtifact({ source_repo: f.repo, artifact_root: directory, reference: deliveredReference }).toString()))
+    .toMatchObject({ publication_effects: { state: "complete" } });
   const completed = JSON.parse(readFileSync(service.statePath, "utf8"));
   expect(completed.prs).toHaveLength(1); expect(completed.prs[0].title).toBe("Repair the guide");
-  expect(captureRepositoryState(f.repo)).toEqual(before);
+  if (fault === "matching") expect(captureRepositoryState(f.repo)).toEqual(before);
+  else expect(captureRepositoryState(f.repo)).not.toEqual(before);
   const resumed = await invoke("resume");
   expect(resumed.report).toMatchObject({ command: "resume", outcome: "collected", publication_effects: { state: "complete" } });
   const selectedVersion = Bun.spawnSync([process.env.VH_ADLC_TEST_ALTERNATE_BUN ?? process.execPath, "--version"], { stdout: "pipe", stderr: "pipe", timeout: 5000 });
@@ -103,7 +122,8 @@ test("normal prepare retains the original worker selection and edits only its ow
   expect(resumed.report).toMatchObject({ bun_version: selectedVersion.stdout.toString().trim() });
   expect(resumed.result.exit_code).toBe(0);
   expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(1);
-  expect(captureRepositoryState(f.repo)).toEqual(before);
+  if (fault === "matching") expect(captureRepositoryState(f.repo)).toEqual(before);
+  else expect(captureRepositoryState(f.repo)).not.toEqual(before);
   expect(readFileSync(join(directory, "synthetic-role-order.jsonl"))).toEqual(roleCalls);
   passed = true;
 }, 1200000);
