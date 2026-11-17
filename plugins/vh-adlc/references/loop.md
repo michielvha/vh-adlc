@@ -9,6 +9,23 @@ uses the verified binary and knowledge. Clean calls `vh-adlc` from `PATH` withou
 its allow rule matches, and it skips `knowledge`, because `clean` and `env` read no conventions. The
 binary it runs is therefore not checked against the lock.
 
+## Check host capacity before any fan-out
+
+Before you create a worktree, start another session or sub-agent, or launch parallel or long local
+work (independent reviews, test suites, cluster runs), run the capacity check on the checkout and the
+temp directory and read its last line:
+
+```sh
+bash "<plugin directory>/scripts/host/capacity.sh" "<checkout>" "${TMPDIR:-/tmp}"
+```
+
+On `capacity: blocked`, start nothing new. Report each blocked line to the owner and wait for them to
+free space or load. Do not delete shared host data to make room, and do not retry on another path of
+the same filesystem. Run the check again before every later wave of fan-out, and as soon as a command
+stalls or fails with no space left on device. Count what you are about to add: several sessions that
+each check out the repository and build images need far more room than one. A btrfs host can report
+free space while its metadata is full, which the check catches and `df` alone does not.
+
 ## 1. Get the binary
 
 Audit entry overrides this section's online bootstrap, including when selected through lifecycle
@@ -145,3 +162,20 @@ render, gives the full URL instead. Quoted records stay as returned.
 When reporting finished spec work to the owner or requesting spec acceptance, including through resume,
 present the owner-facing summary from `skills/vh-adlc-spec/SKILL.md` in the conversation before the
 acceptance question. Keep the full document and review status available as supporting detail.
+
+## Clean up when the session's work is done
+
+Clean up once, when the work this session was started for is finished and the session is about to be
+archived or handed back: a feature merged and its branch removed, a maintenance or audit batch delivered,
+an investigation or review reported with nothing left to run. Do not clean up between operations of the
+same work, because the next step would have to check out, build and download everything again.
+
+1. Remove what this session created and no longer needs: scratch directories, temporary worktrees and
+   their branches, worktree slots, Compose projects and clusters it started for itself, and background
+   processes it launched. Keep what open work still depends on, and never touch what another session
+   created.
+2. Run `vh-adlc clean --dry-run --compose --kind` from the repository. When it answers with no failing
+   finding, run `vh-adlc clean --compose --kind`. The binary removes only what its built-in rules and
+   the repository's cleanup manifest declare, and only Compose projects and clusters whose runs have
+   ended, so this needs no separate permission. Follow `references/clean.md` for its findings.
+3. Name what you removed and the space it freed in the final report, and list anything you kept.
