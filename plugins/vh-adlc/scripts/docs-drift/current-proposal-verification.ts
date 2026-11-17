@@ -14,7 +14,7 @@ import { canonicalDigest, canonicalJSON, compareUTF8, freezeJSON, protocolPath, 
 import { joinReportSentences, type CorrectionInput } from "./report";
 import type { Edit, ResolutionChange } from "./resolve";
 import { readResolutionProposal, type ResolutionProposal } from "./resolve-inputs";
-import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState, type Snapshot } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, captureSnapshot, matchesCallerState, type Snapshot } from "./snapshot";
 import { readCandidateVerificationArtifacts } from "./verification-evidence";
 
 type Reference = { path: string; sha256: string };
@@ -157,7 +157,7 @@ export async function verifyCurrentProposals(input: {
   try {
     const context = readCollectedAuditProposalContext(options.proposals);
     repo = realpathSync(options.repo);
-    before = canonicalDigest(captureRepositoryState(repo));
+    before = canonicalDigest(captureCallerState(repo));
     root = artifactDirectoryScope(options.artifact_root, repo).directory;
     if (context.repo !== repo || context.source_commit !== options.source || context.artifact_root !== root)
       throw new ArtifactChanged("Original current proposal verification scope changed");
@@ -238,7 +238,7 @@ export async function verifyCurrentProposals(input: {
     result.scope_changed ||= error instanceof ArtifactChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Current proposal verification unavailable");
   }
-  if (repo !== null && before !== null && !matchesRepositoryState(repo, before)) {
+  if (repo !== null && before !== null && !matchesCallerState(repo, before)) {
     result.scope_changed = true;
     result.complete = false;
     result.diagnostics.push("Caller changed during current proposal verification");

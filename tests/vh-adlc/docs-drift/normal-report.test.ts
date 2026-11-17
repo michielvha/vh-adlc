@@ -13,12 +13,23 @@ import { exactRecord } from "../../../plugins/vh-adlc/scripts/docs-drift/publica
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 
-test.each(["matching", "source-change", "request-change", "copied-run", "hosted-spoof"])("normal report runs separate native assessment and review contexts: %s", async fault => {
+test.each(["matching", "source-change", "request-change", "copied-run", "hosted-spoof", "caller-change"])("normal report runs separate native assessment and review contexts: %s", async fault => {
   const component = ordinaryComponentFixture(roots, true), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable });
-  writeFileSync(component.executable, auditClient(fault, true), { mode: 0o755 });
+  let client = auditClient(fault, true);
+  if (fault === "caller-change") client = client.replace("let records;", `
+if (request.kind === "docs-drift-audit-review-request") writeFileSync(${JSON.stringify(join(f.repo, "README.md"))}, "Changed original caller\\n");
+let records;`);
+  writeFileSync(component.executable, client, { mode: 0o755 });
   const source = f.head(), origin = join(f.root, "origin.git"), directory = join(f.root, "run");
   git(f.root, "clone", "--bare", "--no-local", f.repo, origin);
   const service = installOwnedNativeService({ root: f.root, origin, source, head: source, publisher_identity: { actor: "fixture-owner", actor_id: 30 } });
+  const trace = join(f.root, "caller-captures.jsonl");
+  if (fault === "matching") {
+    const executable = join(f.root, "native-bin/git");
+    const record = 'import { appendFileSync as recordCaller } from "node:fs"; recordCaller(' + JSON.stringify(trace)
+      + ', JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)}) + "\\n");\n';
+    writeFileSync(executable, readFileSync(executable, "utf8").replace(/^(.*\n)/, "$1" + record));
+  }
   const before = captureRepositoryState(f.repo), nativeBefore = readFileSync(service.statePath), refs = git(origin, "for-each-ref");
   let selectedDirectory = directory;
   async function invoke(command: string) {
@@ -34,6 +45,7 @@ test.each(["matching", "source-change", "request-change", "copied-run", "hosted-
     return { result, report };
   }
   expect((await invoke("scan")).result.exit_code).toBe(0);
+  const scanTrace = fault === "matching" ? readFileSync(trace, "utf8").length : 0;
   if (fault === "copied-run") {
     selectedDirectory = join(f.root, "copied-run"); cpSync(directory, selectedDirectory, { recursive: true });
   }
@@ -51,6 +63,16 @@ test.each(["matching", "source-change", "request-change", "copied-run", "hosted-
       return call.program === "gh" && call.args.includes("query=query { viewer { login databaseId } }");
     });
     expect(viewers).toHaveLength(3);
+    function callerCaptures(text: string): number {
+      return text.trim().split("\n").filter(Boolean).filter(line => {
+        const row = exactRecord(JSON.parse(line) as unknown, ["cwd", "args"], "Invalid owned caller trace");
+        if (!Array.isArray(row.args)) throw Error("Invalid owned caller arguments");
+        return row.cwd === f.repo && row.args.includes("ls-files") && row.args.includes("--stage") && row.args.includes("-v");
+      }).length;
+    }
+    const callsByStage = readFileSync(trace, "utf8");
+    expect(callerCaptures(callsByStage.slice(0, scanTrace))).toBe(2);
+    expect(callerCaptures(callsByStage.slice(scanTrace))).toBe(2);
   } else if (fault === "copied-run") {
     expect(completed.result.exit_code).toBe(1);
     expect(completed.report).toMatchObject({ outcome: "pending" });
@@ -64,7 +86,10 @@ test.each(["matching", "source-change", "request-change", "copied-run", "hosted-
     expect(completed.report).toMatchObject({ command: "report", outcome: "incomplete" });
     expect(existsSync(join(directory, "synthetic-role-order.jsonl"))).toBe(true);
   }
-  expect(captureRepositoryState(f.repo)).toEqual(before);
+  if (fault === "caller-change") {
+    expect(captureRepositoryState(f.repo)).not.toEqual(before);
+    expect(completed.report).toMatchObject({ diagnostics: ["Caller source, index or repository configuration changed during this operation."] });
+  } else expect(captureRepositoryState(f.repo)).toEqual(before);
   expect(readFileSync(service.statePath)).toEqual(nativeBefore); expect(git(origin, "for-each-ref")).toBe(refs);
 }, 600000);
 

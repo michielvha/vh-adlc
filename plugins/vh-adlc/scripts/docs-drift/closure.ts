@@ -1,5 +1,5 @@
 import { PublicationScopeChanged } from "./publish";
-import { captureRepositoryState } from "./snapshot";
+import { captureCallerState } from "./snapshot";
 import { canonicalDigest, canonicalJSON, freezeJSON } from "./protocol";
 import { publicationMarker } from "./report-history";
 import { effectMarker, type Effect } from "./manifests";
@@ -50,7 +50,7 @@ export function collectClosureTarget(options: Omit<ClosureOptions, "observe_veri
   const result: ClosureTarget = { kind: "docs-drift-closure-target", authority: "none", verification_ready: false,
     complete: false, diagnostics: [], effects: [], already_closed: [], closure: freezeJSON(structuredClone(options.inputs)),
     verification_scopes: [], inputs_sha256: "" };
-  const before = canonicalDigest(captureRepositoryState(options.collection.source_repo)), operationId = options.operation_id;
+  const before = canonicalDigest(captureCallerState(options.collection.source_repo)), operationId = options.operation_id;
   try {
     const inputs: ClosureInputs = freezeJSON(structuredClone(options.inputs));
     const initial = recheckClosureInputs(inputs, options.collection);
@@ -87,7 +87,7 @@ export function collectClosureTarget(options: Omit<ClosureOptions, "observe_veri
     }
     const fresh = recheckClosureInputs(inputs, options.collection);
     if (fresh.scope_changed) throw new PublicationScopeChanged("Closure inputs changed during target collection");
-    if (!fresh.fresh || canonicalDigest(captureRepositoryState(options.collection.source_repo)) !== before) fail("native inputs changed during closure target collection");
+    if (!fresh.fresh || canonicalDigest(captureCallerState(options.collection.source_repo)) !== before) fail("native inputs changed during closure target collection");
     result.inputs_sha256 = canonicalDigest({ closure: inputs.inputs_sha256, operation_id: operationId, effects: result.effects });
     result.complete = true;
   } catch (error) {
@@ -101,7 +101,7 @@ export function collectClosureTarget(options: Omit<ClosureOptions, "observe_veri
 /** Produce exact review inputs. The publisher separately checks actual authority and native role proof. */
 export async function prepareClosure(options: ClosureOptions): Promise<ClosureProposal> {
   const result: ClosureProposal = { state: "proposal", complete: false, diagnostics: [], effects: [], already_closed: [], verification: [], inputs_sha256: "" };
-  const before = canonicalDigest(captureRepositoryState(options.collection.source_repo));
+  const before = canonicalDigest(captureCallerState(options.collection.source_repo));
   try {
     const target = collectClosureTarget(options);
     result.already_closed = [...target.already_closed];
@@ -124,7 +124,7 @@ export async function prepareClosure(options: ClosureOptions): Promise<ClosurePr
     }
     const fresh = recheckClosureInputs(inputs, options.collection);
     if (fresh.scope_changed) throw new PublicationScopeChanged("Closure inputs changed during semantic verification");
-    if (!fresh.fresh || canonicalDigest(captureRepositoryState(options.collection.source_repo)) !== before) fail("native inputs changed during closure verification");
+    if (!fresh.fresh || canonicalDigest(captureCallerState(options.collection.source_repo)) !== before) fail("native inputs changed during closure verification");
     result.verification = verifications; result.effects = target.effects; result.inputs_sha256 = target.inputs_sha256;
     result.complete = true;
   } catch (error) {

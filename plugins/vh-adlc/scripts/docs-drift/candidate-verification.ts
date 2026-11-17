@@ -7,7 +7,7 @@ import { executeOwnedProcess, ownedClientCompleted, type OwnedProcess } from "./
 import { canonicalDigest, canonicalJSON, sha256 } from "./protocol";
 import { scanArtifactReferences } from "./scan-evidence";
 import { runScan, scannerEnvironment, type ScanRun } from "./scan";
-import { captureRepositoryState, captureSnapshot, externalArtifactDirectory, matchesRepositoryState } from "./snapshot";
+import { captureCallerState, captureSnapshot, externalArtifactDirectory, matchesCallerState } from "./snapshot";
 
 type Reference = { path: string; sha256: string };
 type CommandResult = { start: Reference | null; argv: string[]; process: OwnedProcess | null; stdout: Reference; stderr: Reference; completion: Reference | null };
@@ -24,7 +24,7 @@ export async function verifyCandidate(input: Parameters<typeof inspectCandidate>
   const result: CandidateVerification = { schema_version: 2, kind: "docs-drift-candidate-verification", authority: "none",
     source_commit: options.source, candidate_commit: options.candidate, complete: false, diagnostics: [], inspection: null, scan: null, scan_artifacts: null, checkout_state_sha256: null, commands: [], record_path: null, evidence: null };
   const repo = realpathSync(options.repo), candidateRepo = realpathSync(options.candidate_repo);
-  const before = canonicalDigest(captureRepositoryState(repo)), candidateBefore = canonicalDigest(captureRepositoryState(candidateRepo));
+  const before = canonicalDigest(captureCallerState(repo)), candidateBefore = canonicalDigest(captureCallerState(candidateRepo));
   const root = externalArtifactDirectory(options.artifact_root, repo);
   externalArtifactDirectory(root, candidateRepo);
   const reference = (path: string): Reference => ({ path: relative(root, path), sha256: sha256(readArtifact(path)) });
@@ -35,7 +35,7 @@ export async function verifyCandidate(input: Parameters<typeof inspectCandidate>
     result.scan = await runScan(snapshot, { artifact_root: root, owner: options.owner, run: options.run, timeout_ms: options.timeout_ms });
     if (!result.scan.complete) { result.diagnostics.push(...result.scan.diagnostics.map(item => item.message)); throw Error("Candidate scan incomplete"); }
     result.scan_artifacts = scanArtifactReferences(result.scan, root);
-    result.checkout_state_sha256 = canonicalDigest(captureRepositoryState(result.scan.checkout, "full"));
+    result.checkout_state_sha256 = canonicalDigest(captureCallerState(result.scan.checkout, "full"));
     const checkout = result.scan.checkout, directory = join(root, "candidate-checks-" + randomUUID());
     mkdirSync(directory, { mode: 0o700 });
     const temporary = join(directory, "temporary"); mkdirSync(temporary, { mode: 0o700 });
@@ -53,21 +53,21 @@ export async function verifyCandidate(input: Parameters<typeof inspectCandidate>
       for (const path of [stdout, stderr]) writeFileSync(path, "", { flag: "wx", mode: 0o600 });
       const command: CommandResult = { start: null, argv: [...argv], process: null, stdout: reference(stdout), stderr: reference(stderr), completion: null };
       result.commands.push(command);
-      const state = canonicalDigest(captureRepositoryState(checkout, "full"));
+      const state = canonicalDigest(captureCallerState(checkout, "full"));
       command.process = await executeOwnedProcess({ argv: [executable, ...argv.slice(1)], cwd: checkout,
         env: scannerEnvironment(executable, git, temporary), stdout, stderr, watched_outputs: [], timeout_ms: timeout,
         started: pid => writeFileSync(join(directory, index + "-start.json"), canonicalJSON({ pid, argv, source_commit: options.candidate }), { flag: "wx", mode: 0o600 }) });
       writeFileSync(completion, canonicalJSON(command.process), { flag: "wx", mode: 0o600 });
       command.start = reference(join(directory, index + "-start.json"));
       command.stdout = reference(stdout); command.stderr = reference(stderr); command.completion = reference(completion);
-      if (!matchesRepositoryState(checkout, state, "full")) throw Error(`Configured candidate ${purpose} changed its source or Git state`);
+      if (!matchesCallerState(checkout, state, "full")) throw Error(`Configured candidate ${purpose} changed its source or Git state`);
       const process = command.process;
       if (!ownedClientCompleted(process))
         throw Error(`Configured candidate ${purpose} failed`);
     }
     result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Candidate verification unavailable"); }
-  if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidateRepo, candidateBefore)) {
+  if (!matchesCallerState(repo, before) || !matchesCallerState(candidateRepo, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during candidate verification");
   }
   result.diagnostics = [...new Set(result.diagnostics)];

@@ -10,7 +10,7 @@ import { executeOwnedProcess, ownedClientCompleted, type OwnedProcess } from "./
 import { canonicalDigest, canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { buildNativeRoleInvocation } from "./role-launch";
-import { artifactDirectoryScope, captureRepositoryState, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, matchesCallerState } from "./snapshot";
 
 type Reference = { path: string; sha256: string };
 type Artifacts = Record<"invocation" | "launch" | "native" | "stderr" | "process" | "returned", Reference | null>;
@@ -44,8 +44,8 @@ export async function captureNativeRoleProcess(input: Options) {
   };
   let before: string | null = null, repo: string | null = null, candidateBefore: string | null = null, candidate: string | null = null;
   function unchanged() {
-    if (repo === null || before === null || !matchesRepositoryState(repo, before)
-      || candidate !== null && candidateBefore !== null && !matchesRepositoryState(candidate, candidateBefore, "full"))
+    if (repo === null || before === null || !matchesCallerState(repo, before)
+      || candidate !== null && candidateBefore !== null && !matchesCallerState(candidate, candidateBefore, "full"))
       throw new ArtifactChanged("Caller changed during native role execution");
   }
   try {
@@ -56,11 +56,11 @@ export async function captureNativeRoleProcess(input: Options) {
       || !options.argv.length || !options.argv.every(value => typeof value === "string" && !value.includes("\0"))
       || !isAbsolute(options.argv[0]) || !isAbsolute(options.cwd) || !Number.isSafeInteger(options.timeout_ms) || options.timeout_ms < 1)
       throw Error("Bounded original native role invocation required");
-    repo = realpathSync(options.source_repo); before = canonicalDigest(captureRepositoryState(repo));
+    repo = realpathSync(options.source_repo); before = canonicalDigest(captureCallerState(repo));
     if (readGit(repo, "rev-parse", "--verify", "--end-of-options", options.source_commit + "^{commit}").toString().trim() !== options.source_commit)
       throw Error("Original native role source required");
     if (options.candidate_repo) {
-      candidate = realpathSync(options.candidate_repo); candidateBefore = canonicalDigest(captureRepositoryState(candidate, "full"));
+      candidate = realpathSync(options.candidate_repo); candidateBefore = canonicalDigest(captureCallerState(candidate, "full"));
     }
     const scope = artifactDirectoryScope(options.artifact_root, repo);
     if (candidate) artifactDirectoryScope(scope.directory, candidate);

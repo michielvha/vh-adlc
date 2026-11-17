@@ -5,7 +5,7 @@ import { readProposalDiff, requireOwnedStore } from "./proposals";
 import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, sha256, withinPrefix } from "./protocol";
 import { readResolutionRecord, resolutionSource, type ResolutionRecord } from "./resolve";
 import { readResolutionProposal } from "./resolve-inputs";
-import { captureBareSnapshot, captureRepositoryState, readCommittedTree, type OwnedObjectStore, type RequiredInput, type Snapshot } from "./snapshot";
+import { captureBareSnapshot, captureCallerState, readCommittedTree, type OwnedObjectStore, type RequiredInput, type Snapshot } from "./snapshot";
 import { loadCommittedSettings, type Settings } from "./settings";
 import { sameAccount } from "./identity";
 import { verifyProductionPreflight } from "./preflight";
@@ -103,7 +103,7 @@ function locateRecord(options: ClosureCollection, proposal: PullRequestInput, re
 export function collectClosureInputs(options: ClosureCollection): ClosureInputs {
   const result: ClosureInputs = { complete: false, diagnostics: [], repository: options.settings.repository, repository_id: null,
     current_default: null, consolidation: null, record: null, originals: [], interval: null, inputs_sha256: "" };
-  const before = canonicalDigest(captureRepositoryState(options.source_repo));
+  const before = canonicalDigest(captureCallerState(options.source_repo));
   try {
     requireOwnedStore(options.store, options.settings.repository);
     const repository = options.reader.repository();
@@ -155,7 +155,7 @@ export function collectClosureInputs(options: ClosureCollection): ClosureInputs 
     if (error instanceof PublicationScopeChanged) result.scope_changed = true;
     result.diagnostics.push(error instanceof Error ? error.message : "Required closure inputs unavailable");
   }
-  if (canonicalDigest(captureRepositoryState(options.source_repo)) !== before) {
+  if (canonicalDigest(captureCallerState(options.source_repo)) !== before) {
     result.complete = false; result.diagnostics.push("Caller repository changed during closure collection");
   }
   result.inputs_sha256 = canonicalDigest(result);

@@ -11,7 +11,7 @@ import { inspectPreparation } from "./preparation";
 import { canonicalDigest, freezeJSON, protocolPath } from "./protocol";
 import type { Edit } from "./resolve";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
-import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, captureSnapshot, matchesCallerState } from "./snapshot";
 import { verifyRoleIdentity } from "./manifests";
 
 type Preparation = {
@@ -28,7 +28,7 @@ type Preparation = {
 /** Preserve the original worker's bounded output as preparation data under current source/runtime checks. */
 export async function collectWorkerPreparation(input: WorkerCollectionOptions & { worker_capture: unknown; candidate_repo?: string }): Promise<Preparation> {
   const options = { ...input, source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), worker_capture: structuredClone(input.worker_capture) };
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   const result: Preparation = { schema_version: 1, kind: "docs-drift-worker-preparation", authority: "none", complete: false, scope_changed: false, diagnostics: [],
     worker_inputs: null, worker: null, selection: null, assessment: null, proposal_assessment_reference: null, resolution_verifications: null, publication: null, inspection: null };
   try {
@@ -74,7 +74,7 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
     result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.worker_inputs?.scope_changed);
     result.diagnostics.push(error instanceof Error ? error.message : "Original worker preparation unavailable");
   }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during worker handoff collection"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during worker handoff collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);
 }

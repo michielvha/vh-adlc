@@ -8,7 +8,7 @@ import { requireOwnedStore } from "./proposals";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { runScan, type ScanRun } from "./scan";
 import { readOriginalScan, scanArtifactReferences, type ScanArtifacts } from "./scan-evidence";
-import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, createOwnedObjectStore, matchesRepositoryState, type OwnedObjectStore } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, captureSnapshot, createOwnedObjectStore, matchesCallerState, type OwnedObjectStore } from "./snapshot";
 import { readCandidateVerificationArtifacts } from "./verification-evidence";
 
 type Reference = { path: string; sha256: string };
@@ -22,7 +22,7 @@ type SourceAssessment = {
 /** Collect complete baseline inputs even when a documentation check needs the proposed repair. */
 export async function assessSource(input: Options): Promise<SourceAssessment> {
   const options = { ...input }, repo = realpathSync(options.repo), scope = artifactDirectoryScope(options.artifact_root, repo);
-  const before = canonicalDigest(captureRepositoryState(repo));
+  const before = canonicalDigest(captureCallerState(repo));
   const result: SourceAssessment = { schema_version: 1, kind: "docs-drift-source-assessment", authority: "none", source_commit: options.source,
     complete: false, diagnostics: [], scan: null, scan_artifacts: null, object_store: null, record_path: null, evidence: null };
   try {
@@ -34,7 +34,7 @@ export async function assessSource(input: Options): Promise<SourceAssessment> {
     result.scan_artifacts = scanArtifactReferences(result.scan, scope.directory);
     result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Source assessment unavailable"); }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during source assessment"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during source assessment"); }
   result.record_path = join(scope.directory, "source-assessment-" + randomUUID() + ".json");
   try {
     const { evidence: _evidence, ...payload } = result, bytes = canonicalJSON(payload);

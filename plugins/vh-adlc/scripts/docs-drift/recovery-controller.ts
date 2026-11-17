@@ -10,7 +10,7 @@ import { recoveryEffectsOutput } from "./recovery-output";
 import { readRecoveryAuthority } from "./recovery-authority";
 import { exactRecord } from "./publication-decisions";
 import { canonicalDigest, freezeJSON } from "./protocol";
-import { artifactDirectoryScope, captureRepositoryState, createOwnedObjectStore, matchesRepositoryState, type OwnedObjectStore } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, createOwnedObjectStore, matchesCallerState, type OwnedObjectStore } from "./snapshot";
 import { loadCommittedSettings, SetupRequired } from "./settings";
 import { createNativeTransport, readNativeContext } from "./transport";
 import { OUTPUT_LIMIT } from "./owned-process";
@@ -45,7 +45,7 @@ function readSelection(value: unknown, source: string, operation: string) {
 }
 
 async function collectContext(input: RecoveryOptions, execution?: Purpose, run?: RunDirectory) {
-  const options = structuredClone(input), repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const options = structuredClone(input), repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   const root = artifactDirectoryScope(options.artifact_root, repo).directory;
   if (dirname(realpathSync(options.journal_directory)) !== root) throw Error("Original recovery journal artifact root required");
   const journal = readJournal(options.journal_directory, repo), plan = journal.plan;
@@ -80,7 +80,7 @@ async function collectContext(input: RecoveryOptions, execution?: Purpose, run?:
   const fresh = native();
   if (canonicalDigest(fresh.identity) !== canonicalDigest(observed.identity) || fresh.default_commit !== observed.default_commit)
     throw Error("Recovery identity or permission source changed during collection");
-  if (!matchesRepositoryState(repo, before)) throw Error("Caller changed during recovery collection");
+  if (!matchesCallerState(repo, before)) throw Error("Caller changed during recovery collection");
   const transport = createNativeTransport({ source_repo: repo, artifact_root: root, object_store: store, settings, credential: options.credential, path: options.path, run: originalRun });
   const common = { source_repo: repo, journal_directory: journal.directory, object_store: store, settings, transport };
   return { options, repo, before, settings, runtime, native, observed, store, selection, common, plan };
@@ -116,7 +116,7 @@ export async function inspectRecovery(input: RecoveryOptions): Promise<RecoveryI
     }
     result.complete = result.diagnostics.length === 0 && (result.scopes.length > 0 || result.state !== "pending");
     result.scope_sha256s = result.scopes.map(canonicalDigest);
-    if (!matchesRepositoryState(context.repo, context.before)) { result.complete = false; result.diagnostics.push("Caller changed during recovery inspection"); }
+    if (!matchesCallerState(context.repo, context.before)) { result.complete = false; result.diagnostics.push("Caller changed during recovery inspection"); }
     if (Buffer.byteLength(JSON.stringify(recoveryInspectionOutput(result, context.options.source)) + "\n") > Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes)) throw Error("Recovery scope exceeds the configured retained entry bound");
   } catch (error) {
     result.complete = false; result.scopes = []; result.scope_sha256s = [];

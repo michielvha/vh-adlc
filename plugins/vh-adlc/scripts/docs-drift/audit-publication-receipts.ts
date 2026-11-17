@@ -10,7 +10,7 @@ import { PublicationScopeChanged } from "./publish";
 import { HistoryEligibilityError, PublicationEvidenceChanged, readReviewedProposal } from "./report-history";
 import { createAdoptedPublicationVerifier, RetainedPublicationIneligible } from "./reviewed-publication";
 import { loadCommittedSettings } from "./settings";
-import { artifactDirectoryScope, captureRepositoryState, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, matchesCallerState } from "./snapshot";
 import { readNativeContext, type NativeObservation } from "./transport";
 
 type NativeReceipt = Awaited<ReturnType<typeof readReviewedProposal>>;
@@ -30,7 +30,7 @@ export async function collectAuditPublicationReceipts(input: { repo: string; sou
   let repo: string | null = null, before: string | null = null, limit = OUTPUT_LIMIT;
   try {
     const context = readCollectedAuditProposalContext(options.proposals);
-    repo = realpathSync(options.repo); const sourceRepo = repo; before = canonicalDigest(captureRepositoryState(repo));
+    repo = realpathSync(options.repo); const sourceRepo = repo; before = canonicalDigest(captureCallerState(repo));
     const scope = artifactDirectoryScope(options.artifact_root, repo), settings = loadCommittedSettings(repo, options.source).settings;
     limit = Math.min(limit, settings.reports.max_entry_bytes);
     if (context.repo !== repo || context.source_commit !== options.source || context.artifact_root !== scope.directory)
@@ -103,7 +103,7 @@ export async function collectAuditPublicationReceipts(input: { repo: string; sou
     result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Native audit receipt collection unavailable");
   }
-  if (repo !== null && before !== null && !matchesRepositoryState(repo, before)) {
+  if (repo !== null && before !== null && !matchesCallerState(repo, before)) {
     result.complete = false; result.scope_changed = true; result.diagnostics.push("Caller changed during audit receipt collection");
   }
   if (!result.complete) {

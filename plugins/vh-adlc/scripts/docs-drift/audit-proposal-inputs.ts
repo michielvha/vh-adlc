@@ -11,7 +11,7 @@ import { collectPublicationProposals } from "./proposals";
 import { PublicationScopeChanged } from "./publish";
 import type { ResolutionProposal } from "./resolve-inputs";
 import { loadCommittedSettings } from "./settings";
-import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState, type OwnedObjectStore } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, captureSnapshot, matchesCallerState, type OwnedObjectStore } from "./snapshot";
 import { readNativeContext, type PublicationIdentity } from "./transport";
 
 type Result = {
@@ -36,7 +36,7 @@ export function auditProposalInputsOutput(result: Result) {
 /** Collect every discovered original from complete native Git objects before asking for semantic support. */
 export async function collectAuditProposalInputs(input: WorkerCollectionOptions): Promise<Result> {
   const options = { ...input, path: input.path ?? process.env.PATH, source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions) };
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   const result: Result = { schema_version: 1, kind: "docs-drift-audit-proposal-inputs", authority: "none", source_commit: options.source,
     complete: false, scope_changed: false, details_omitted: false, diagnostics: [], worker_input_sha256: null, inputs_sha256: null, object_store: null,
     required_proposals: null, collected_proposals: 0, proposals: [] };
@@ -115,7 +115,7 @@ export async function collectAuditProposalInputs(input: WorkerCollectionOptions)
     result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Native audit proposal inputs unavailable");
   }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during audit proposal collection"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during audit proposal collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   if (Buffer.byteLength(JSON.stringify(auditProposalInputsOutput(result)) + "\n") > limit) {
     result.complete = false; result.details_omitted = true; result.proposals = [];

@@ -5,7 +5,7 @@ import { readCollectedAuditProposals, type collectAuditProposalInputs } from "./
 import { exactRecord } from "./publication-decisions";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
 import { matchesSourceQuote, parseSourceQuote } from "./resolve";
-import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, captureSnapshot, matchesCallerState } from "./snapshot";
 import { escapeReportText } from "./report";
 import { OUTPUT_LIMIT } from "./owned-process";
 
@@ -38,8 +38,8 @@ export function readProposalAssessment(options: {
   repo: string; source: string; artifact_root: string; inputs: Awaited<ReturnType<typeof collectAuditProposalInputs>>;
   reference: unknown; candidate_repo?: string;
 }): ProposalAssessment {
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo)), candidate = options.candidate_repo ? realpathSync(options.candidate_repo) : repo;
-  const candidateBefore = candidate === repo ? before : canonicalDigest(captureRepositoryState(candidate));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo)), candidate = options.candidate_repo ? realpathSync(options.candidate_repo) : repo;
+  const candidateBefore = candidate === repo ? before : canonicalDigest(captureCallerState(candidate));
   const result: ProposalAssessment = { schema_version: 1, kind: "docs-drift-proposal-assessment-report", authority: "none", origin: "caller-assessment",
     source_commit: options.source, inputs_sha256: null, assessment_reference: null, complete: false, collection_complete: false, details_omitted: false, diagnostics: [],
     counts: { required_proposals: null, assessed_proposals: null, unassessed_proposals: null, required_hunks: null, assessed_hunks: null, unknown_hunks: null, unassessed_hunks: null }, proposals: [] };
@@ -87,8 +87,8 @@ export function readProposalAssessment(options: {
     if (proposed.size !== originals.length) throw Error("Some complete original proposals have no recorded assessment");
     result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Current proposal assessment unavailable"); }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during proposal assessment"); }
-  if (candidate !== repo && !matchesRepositoryState(candidate, candidateBefore)) { result.complete = false; result.diagnostics.push("Candidate changed during proposal assessment"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during proposal assessment"); }
+  if (candidate !== repo && !matchesCallerState(candidate, candidateBefore)) { result.complete = false; result.diagnostics.push("Candidate changed during proposal assessment"); }
   if (result.collection_complete) {
     const hunks = result.proposals.flatMap(proposal => proposal.hunks);
     result.counts = { required_proposals: result.proposals.length, assessed_proposals: result.proposals.filter(proposal => proposal.assessed).length,

@@ -6,7 +6,7 @@ import { publicationMarker } from "./report-history";
 import { loadCommittedSettings } from "./settings";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { realpathSync } from "node:fs";
-import { captureRepositoryState, captureSnapshot, createOwnedObjectStore, externalArtifactDirectory, matchesRepositoryState, type OwnedObjectStore } from "./snapshot";
+import { captureCallerState, captureSnapshot, createOwnedObjectStore, externalArtifactDirectory, matchesCallerState, type OwnedObjectStore } from "./snapshot";
 import { collectClosureInputs, recheckClosureInputs, type ClosureInputs } from "./closure-inputs";
 import { collectResolutionInputs, readResolutionProposal, recheckResolutionInputs, type ResolutionInputs, type ResolutionProposal } from "./resolve-inputs";
 import { fetchProposalObjects } from "./proposals";
@@ -38,7 +38,7 @@ export async function collectNativeResolution(input: NativeCollectionOptions): P
   const options = { ...input, path: input.path ?? process.env.PATH }, selected = selectedProposals(structuredClone(input.selection), input.source);
   const result: ResolutionCollectionResult = { scope_changed: false, complete: false, diagnostics: [], store: null, inputs: null };
   const snapshot = captureSnapshot(options.repo, options.source), settings = snapshot.settings;
-  const before = canonicalDigest(captureRepositoryState(snapshot.repo));
+  const before = canonicalDigest(captureCallerState(snapshot.repo));
   const environment = { PATH: options.path ?? process.env.PATH,
     ...(settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com")
       ? { GH_TOKEN: options.credential } : { GH_ENTERPRISE_TOKEN: options.credential }) };
@@ -74,7 +74,7 @@ export async function collectNativeResolution(input: NativeCollectionOptions): P
       { result.scope_changed = true; result.diagnostics.push("Native source or actor changed during resolution collection"); }
     result.complete = result.inputs.complete && fresh.fresh && result.diagnostics.length === 0;
   } catch (error) { result.scope_changed ||= error instanceof PublicationScopeChanged; result.diagnostics.push(error instanceof Error ? error.message : "Native resolution collection unavailable"); }
-  if (!matchesRepositoryState(snapshot.repo, before)) {
+  if (!matchesCallerState(snapshot.repo, before)) {
     result.diagnostics.push("Caller changed or became unavailable during resolution collection"); result.complete = false;
   }
   result.diagnostics = [...new Set(result.diagnostics)];
@@ -102,7 +102,7 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
       consolidation, repository: settings.repository, repository_id: native.identity.repository_id });
   }
   const result: ClosureCollectionResult = { scope_changed: false, complete: false, diagnostics: [], store: null, inputs: null };
-  const before = canonicalDigest(captureRepositoryState(options.repo));
+  const before = canonicalDigest(captureCallerState(options.repo));
   try {
     const initial = await collectNativeResolution({ ...options, selection: { schema_version: 1, source_commit: options.source, proposals: [consolidation] } });
     result.store = initial.store; result.scope_changed = initial.scope_changed;
@@ -147,7 +147,7 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
       { result.scope_changed = true; result.diagnostics.push("Native source or actor changed during closure collection"); }
     result.complete = result.inputs.complete && fresh.fresh && result.diagnostics.length === 0;
   } catch (error) { result.scope_changed ||= error instanceof PublicationScopeChanged; result.diagnostics.push(error instanceof Error ? error.message : "Native closure collection unavailable"); }
-  if (!matchesRepositoryState(options.repo, before)) {
+  if (!matchesCallerState(options.repo, before)) {
     result.diagnostics.push("Caller changed or became unavailable during closure collection"); result.complete = false;
   }
   result.diagnostics = [...new Set(result.diagnostics)];
@@ -174,7 +174,7 @@ export async function collectNativeClosureTarget(input: NativeCollectionOptions)
   const { settings } = loadCommittedSettings(options.repo, options.source);
   publicationMarker(settings, selected.operation_id);
   const result: ClosureTargetCollection = { authority: "none", scope_changed: false, complete: false, diagnostics: [], store: null, identity: null, target: null, target_sha256: null };
-  const before = canonicalDigest(captureRepositoryState(options.repo)), limit = Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes);
+  const before = canonicalDigest(captureCallerState(options.repo)), limit = Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes);
   try {
     const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, observation: options.observation });
     const context = native(); result.identity = context.identity;
@@ -195,7 +195,7 @@ export async function collectNativeClosureTarget(input: NativeCollectionOptions)
     const fresh = native();
     if (fresh.default_commit !== options.source || canonicalDigest(fresh.identity) !== canonicalDigest(context.identity))
       throw new PublicationScopeChanged("Closure target source or actor changed during collection");
-    if (!matchesRepositoryState(options.repo, before)) throw Error("Caller changed during closure target collection");
+    if (!matchesCallerState(options.repo, before)) throw Error("Caller changed during closure target collection");
     result.target_sha256 = canonicalDigest({ source_commit: options.source, identity: context.identity, target: result.target });
     result.complete = true;
     if (Buffer.byteLength(JSON.stringify(closureTargetOutput(result, options.source)) + "\n") > limit) throw Error("Closure model target exceeds the configured output bound");

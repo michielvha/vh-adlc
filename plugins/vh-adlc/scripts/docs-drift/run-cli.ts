@@ -1,3 +1,4 @@
+import { currentRuntimeValidation } from "./runtime-validation";
 import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, realpathSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
@@ -129,9 +130,12 @@ function retainPublicationResult(options: { repo: string; run: RunDirectory; loc
 export async function runDirectoryMain(argv: string[]): Promise<number> {
   let report: Report = { schema_version: 1, authority: "none", command: argv[0] ?? "", outcome: "incomplete", run_directory: "", bun_version: Bun.version, diagnostics: [] };
   let caller: { repo: string; digest: string } | undefined;
+  const validation = currentRuntimeValidation(), previousCaller = validation?.caller;
   try {
     const options = parseRunOptions(argv);
-    caller = { repo: options.repo, digest: canonicalDigest(captureRepositoryState(options.repo)) };
+    const state = captureRepositoryState(options.repo);
+    caller = { repo: options.repo, digest: canonicalDigest(state) };
+    if (validation) validation.caller = { repo: options.repo, state };
     report.command = options.command; report.run_directory = options.directory;
     const origins = resolve(process.env.XDG_STATE_HOME ?? join(homedir(), ".local/state"), "vh-adlc/docs-drift/origins");
     const location = { repo: options.repo, directory: options.directory, origins };
@@ -316,6 +320,7 @@ export async function runDirectoryMain(argv: string[]): Promise<number> {
     report.outcome = "incomplete";
     report.diagnostics.push("Caller source, index or repository configuration changed during this operation.");
   }
+  if (validation) validation.caller = previousCaller ?? null;
   writeSync(1, JSON.stringify(report) + "\n");
   return report.outcome === "collected" ? 0 : report.outcome === "pending" || report.outcome === "attention" ? 1 : 2;
 }

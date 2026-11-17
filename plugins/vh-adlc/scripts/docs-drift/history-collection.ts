@@ -10,7 +10,7 @@ import { collectWorkerInputs, type WorkerCollectionOptions } from "./publication
 import { collectActionsHistory, collectLocalHistory, createActionsEnvelope, createProducerSource, type HistoryContext, type OwnedInvocation } from "./report-history";
 import type { HistorySnapshot } from "./report";
 import { loadCommittedSettings } from "./settings";
-import { captureRepositoryState, matchesRepositoryState } from "./snapshot";
+import { captureCallerState, matchesCallerState } from "./snapshot";
 import { readNativeContext } from "./transport";
 import { readAdoptionInput } from "./git";
 import { readHistoryWorkflowEvents } from "./history-workflow";
@@ -52,7 +52,7 @@ export function historyCollectionOutput(result: Result) {
 export async function collectNativeReportHistory(input: Options): Promise<Result> {
   const options = { ...input, path: input.path ?? process.env.PATH, source_verification: structuredClone(input.source_verification),
     decisions: structuredClone(input.decisions), owned_local_invocations: structuredClone(input.owned_local_invocations) };
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo)), captured_at = new Date().toISOString();
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo)), captured_at = new Date().toISOString();
   const result: Result = { schema_version: 1, kind: "docs-drift-history-collection", authority: "none", source_commit: options.source,
     complete: false, scope_changed: false, mode: null, captured_at, context: null, hosted_run_attempt: null, worker_input_sha256: null, current_default: null,
     history: [], receipts: [], diagnostics: [], details_omitted: false };
@@ -121,7 +121,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
       || (run && runBinding(readNativeRun(final.repository, run.id, run.run_attempt)) !== runBinding(run)))
       throw new PublicationScopeChanged("Native history source, actor or invocation changed during collection");
     if (run) envelope = bytes => {
-      const beforeOutput = canonicalDigest(captureRepositoryState(repo)), observed = freshNative();
+      const beforeOutput = canonicalDigest(captureCallerState(repo)), observed = freshNative();
       if (observed.default_commit !== currentDefault || canonicalDigest(observed.identity) !== canonicalDigest(identity))
         throw new PublicationScopeChanged("Native history source or actor changed before output");
       const currentRun = readNativeRun(observed.repository, run.id, run.run_attempt);
@@ -137,7 +137,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
       if (after.default_commit !== currentDefault || canonicalDigest(after.identity) !== canonicalDigest(identity)
         || runBinding(readNativeRun(after.repository, run.id, run.run_attempt)) !== runBinding(run))
         throw new PublicationScopeChanged("Native history source, actor or invocation changed during output");
-      if (!matchesRepositoryState(repo, beforeOutput)) throw new PublicationScopeChanged("Caller changed during hosted history output");
+      if (!matchesCallerState(repo, beforeOutput)) throw new PublicationScopeChanged("Caller changed during hosted history output");
       return output;
     };
     result.history = snapshot.records.map(({ bytes: _bytes, ...record }) => record);
@@ -146,7 +146,7 @@ export async function collectNativeReportHistory(input: Options): Promise<Result
     result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Original native report history unavailable");
   }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during report history collection"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during report history collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   if (Buffer.byteLength(JSON.stringify(historyCollectionOutput(result)) + "\n") > limit) {
     result.complete = false; result.details_omitted = true; result.history = []; result.receipts = [];

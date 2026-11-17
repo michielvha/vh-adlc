@@ -1,3 +1,4 @@
+import { currentRuntimeValidation } from "./runtime-validation";
 import { snapshot as logicalSnapshot, repositoryConfigurationDigest } from "../loop/review-route";
 import { readFeatureClassification } from "../docs-impact/collection";
 import { randomUUID } from "node:crypto";
@@ -224,6 +225,19 @@ export function matchesRepositoryState(directory: string, expected: string, scop
   try {
     return realpathSync(directory) === directory && canonicalDigest(captureRepositoryState(directory, scope)) === expected;
   } catch { return false; }
+}
+
+/** Nested caller guards share the public invocation's entry state and final comparison. */
+export function captureCallerState(directory: string, scope: "owning" | "full" = "owning"): ReturnType<typeof captureRepositoryState> {
+  const caller = currentRuntimeValidation()?.caller;
+  return scope === "owning" && caller && realpathSync(directory) === caller.repo
+    ? caller.state : captureRepositoryState(directory, scope);
+}
+
+/** Standalone APIs and owned copies retain their immediate comparisons. */
+export function matchesCallerState(directory: string, expected: string, scope: "owning" | "full" = "owning"): boolean {
+  try { return realpathSync(directory) === directory && canonicalDigest(captureCallerState(directory, scope)) === expected; }
+  catch { return false; }
 }
 
 export type OwnedObjectStore = { root: string; record_path: string; record_sha256: string; source_commit: string };

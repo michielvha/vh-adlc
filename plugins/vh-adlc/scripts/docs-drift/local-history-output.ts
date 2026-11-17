@@ -9,7 +9,7 @@ import { canonicalDigest, canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { PublicationScopeChanged } from "./publish";
 import { createLocalEnvelope, type OwnedInvocation } from "./report-history";
 import { persistAuditOutput } from "./report-output";
-import { artifactDirectoryScope, captureRepositoryState, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, matchesCallerState } from "./snapshot";
 
 /** Retain an original local report and its owner attestation. Saving into adopted roots uses report-write authority. */
 export function persistLocalAuditOutput(options: Parameters<typeof persistAuditOutput>[0]) {
@@ -18,7 +18,7 @@ export function persistLocalAuditOutput(options: Parameters<typeof persistAuditO
   const result = structuredClone(saved); result.files.provenance_json = null;
   let repo: string | null = null, before: string | null = null;
   try {
-    repo = realpathSync(options.repo); before = canonicalDigest(captureRepositoryState(repo));
+    repo = realpathSync(options.repo); before = canonicalDigest(captureCallerState(repo));
     const callerBefore = before;
     const scope = artifactDirectoryScope(options.artifact_root, repo);
     if (!options.session.report || !result.directory || !result.files.report_json || !result.files.markdown
@@ -33,7 +33,7 @@ export function persistLocalAuditOutput(options: Parameters<typeof persistAuditO
     const reopen = () => {
       for (const reference of [...Object.values(result.files), ...Object.values(options.session.requests)])
         if (reference) readBoundArtifact({ source_repo: context.repo, artifact_root: scope.directory, reference });
-      if (!matchesRepositoryState(context.repo, callerBefore)) throw new PublicationScopeChanged("Caller changed during local report retention");
+      if (!matchesCallerState(context.repo, callerBefore)) throw new PublicationScopeChanged("Caller changed during local report retention");
     };
     reopen();
     const original = { origin: "local-attestation" as const, context: "production" as const, repository: report.repository,
@@ -57,7 +57,7 @@ export function persistLocalAuditOutput(options: Parameters<typeof persistAuditO
     delete result.local_invocation;
     result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Local report attestation unavailable");
-    if (repo !== null && before !== null && !matchesRepositoryState(repo, before)) {
+    if (repo !== null && before !== null && !matchesCallerState(repo, before)) {
       result.scope_changed = true; result.diagnostics.push("Caller changed during local report retention");
     }
     if (result.directory && existsSync(join(result.directory, "provenance.json"))) {

@@ -18,7 +18,7 @@ import { canonicalDigest, canonicalJSON, freezeJSON, protocolPath, sha256 } from
 import { deliveryDigest, type AttentionProjection, type CorrectionInput } from "./report";
 import { readResolutionRecord, resolutionSource } from "./resolve";
 import { recheckResolutionInputs, type ResolutionCollection, type ResolutionInputs } from "./resolve-inputs";
-import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, captureSnapshot, matchesCallerState } from "./snapshot";
 import { readNativeContext } from "./transport";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
 import type { readCandidateVerificationArtifacts } from "./verification-evidence";
@@ -47,7 +47,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
   const result: Result = { schema_version: 1, kind: "docs-drift-publication-bindings", authority: "none", complete: false, scope_changed: false, diagnostics: [], mode: null, candidate_verification_sha256: null, candidate_source_only: false,
     proposal_snapshot: null, proposal_snapshot_path: null, worker_input_sha256: null, bindings: null, corrections: [], attention: [], source_verification: null, candidate_verification: null, facts: null, proposals: null, resolution: null };
   const repo = realpathSync(options.repo), candidateRepo = realpathSync(options.candidate_repo);
-  const before = canonicalDigest(captureRepositoryState(repo)), candidateBefore = canonicalDigest(captureRepositoryState(candidateRepo));
+  const before = canonicalDigest(captureCallerState(repo)), candidateBefore = canonicalDigest(captureCallerState(candidateRepo));
   try {
     const secondary = artifactDirectoryScope(options.artifact_root, candidateRepo), snapshot = captureSnapshot(repo, options.source);
     const reference = options.decisions as { path?: unknown } | null;
@@ -135,7 +135,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
     result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || result.facts?.scope_changed === true;
     result.diagnostics.push(error instanceof Error ? error.message : "Publication binding collection unavailable");
   }
-  if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidateRepo, candidateBefore)) {
+  if (!matchesCallerState(repo, before) || !matchesCallerState(candidateRepo, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during publication binding collection");
   }
   result.diagnostics = [...new Set(result.diagnostics)];

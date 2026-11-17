@@ -6,7 +6,7 @@ import { PublicationScopeChanged } from "./publish";
 import { verifyIndependentRoleReview, workerInputsDigest, type WorkerInputs } from "./manifests";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { canonicalDigest, canonicalJSON, freezeJSON } from "./protocol";
-import { captureRepositoryState, matchesRepositoryState } from "./snapshot";
+import { captureCallerState, matchesCallerState } from "./snapshot";
 import { loadCommittedSettings } from "./settings";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { collectWorkerPreparation } from "./worker-preparation";
@@ -70,7 +70,7 @@ function copiedOptions(input: Options): Options {
 }
 
 async function currentTarget(options: Options): Promise<{ result: Result; context: Context | null; limit: number }> {
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   const result: Result = { schema_version: 1, kind: "docs-drift-assessment-review-target", authority: "none", source_commit: options.source,
     complete: false, scope_changed: false, diagnostics: [], diagnostics_omitted: 0, details_omitted: false,
     manifest: null, target_sha256: null, reviewer_runtime_sha256: null, review: null };
@@ -122,7 +122,7 @@ async function currentTarget(options: Options): Promise<{ result: Result; contex
     result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged || Boolean(preparation?.scope_changed);
     result.diagnostics.push(error instanceof Error ? error.message : "Original assessment review target unavailable");
   }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during assessment target collection"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during assessment target collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   const projection = bounded(result, "collect-assessment-review-target", limit);
   return { result: projection, context: projection.complete ? context : null, limit };
@@ -136,7 +136,7 @@ export async function collectAssessmentReviewTarget(input: Options): Promise<Res
 /** Reopen the exact original native roles at a fresh assessment target. No effect plan is produced. */
 export async function collectAssessmentReview(input: Options & { reviewer_capture: unknown }): Promise<Result> {
   const options = copiedOptions(input), reference = structuredClone(input.reviewer_capture), repo = realpathSync(options.repo);
-  const before = canonicalDigest(captureRepositoryState(repo)), current = await currentTarget(options);
+  const before = canonicalDigest(captureCallerState(repo)), current = await currentTarget(options);
   const result: Result = { ...current.result, kind: "docs-drift-assessment-review", complete: false,
     diagnostics: [...current.result.diagnostics], review: null };
   try {
@@ -161,7 +161,7 @@ export async function collectAssessmentReview(input: Options & { reviewer_captur
     result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Original independent assessment review unavailable");
   }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during assessment review collection"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during assessment review collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return bounded(result, "read-assessment-review", current.limit);
 }

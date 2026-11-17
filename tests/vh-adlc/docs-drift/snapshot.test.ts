@@ -2,8 +2,9 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { captureBareSnapshot, captureRepositoryState, captureSnapshot, checkFreshness, createOwnedObjectStore, readCommittedTree } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
-import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { captureBareSnapshot, captureRepositoryState, captureCallerState, matchesCallerState, matchesRepositoryState, captureSnapshot, checkFreshness, createOwnedObjectStore, readCommittedTree } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { currentRuntimeValidation, withRuntimeValidation } from "../../../plugins/vh-adlc/scripts/docs-drift/runtime-validation";
+import { canonicalDigest, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
 
 const roots: string[] = [];
@@ -310,4 +311,23 @@ test("the mutation guard includes empty directories, Git config and shallow meta
   const configured = captureRepositoryState(repo);
   put(repo, ".git/shallow", commit + "\n");
   expect(captureRepositoryState(repo)).not.toEqual(configured);
+});
+
+
+test("nested caller checks reuse only their ordinary invocation while standalone and owned checks stay live", () => {
+  const { repo } = fixture(), before = captureRepositoryState(repo), fullBefore = captureRepositoryState(repo, "full");
+  const digest = canonicalDigest(before);
+  withRuntimeValidation(() => {
+    const context = currentRuntimeValidation();
+    if (!context) throw Error("Runtime verification scope required");
+    context.caller = { repo, state: before };
+    put(repo, "src/app.ts", "Changed caller during invocation\n");
+    expect(captureCallerState(repo)).toEqual(before);
+    expect(matchesCallerState(repo, digest)).toBe(true);
+    expect(matchesRepositoryState(repo, digest)).toBe(false);
+    expect(captureCallerState(repo, "full")).not.toEqual(fullBefore);
+  });
+  expect(captureCallerState(repo)).not.toEqual(before);
+  expect(matchesCallerState(repo, digest)).toBe(false);
+  withRuntimeValidation(() => expect(matchesCallerState(repo, digest)).toBe(false));
 });

@@ -14,7 +14,7 @@ import { deliveryDigest } from "./report";
 import { collectNativeClosureTarget } from "./resolution-entry";
 import { matchesSourceQuote, parseSourceQuote, resolutionSource, type Verification } from "./resolve";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
-import { captureRepositoryState, captureSnapshot, matchesRepositoryState, type Snapshot } from "./snapshot";
+import { captureCallerState, captureSnapshot, matchesCallerState, type Snapshot } from "./snapshot";
 import { readNativeContext } from "./transport";
 
 type Options = Parameters<typeof collectNativeClosureTarget>[0] & {
@@ -30,7 +30,7 @@ type Inputs = {
 /** Capture current closure facts before the fresh worker runs. This records no semantic verdict. */
 export async function collectClosureWorkerInputs(input: Options): Promise<Inputs> {
   const options = { ...input, selection: structuredClone(input.selection), path: input.path ?? process.env.PATH };
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   const result: Inputs = { schema_version: 1, kind: "docs-drift-closure-worker-inputs", authority: "none", complete: false,
     scope_changed: false, diagnostics: [], target: null, runtime: null, inputs: null, worker_input_sha256: null, worker_runtime_sha256: null };
   try {
@@ -67,7 +67,7 @@ export async function collectClosureWorkerInputs(input: Options): Promise<Inputs
     result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.target?.scope_changed);
     result.diagnostics.push(error instanceof Error ? error.message : "Closure worker input collection unavailable");
   }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during closure worker input collection"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during closure worker input collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);
 }
@@ -138,7 +138,7 @@ type ReviewTarget = {
 /** Reload the original fresh worker, then bind its assessment and every proposed comment and closure. */
 export async function collectClosureReviewTarget(input: Options & { worker_capture: unknown }): Promise<ReviewTarget> {
   const options = { ...input, selection: structuredClone(input.selection), worker_capture: structuredClone(input.worker_capture), path: input.path ?? process.env.PATH };
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   const result: ReviewTarget = { schema_version: 1, kind: "docs-drift-closure-review-target", authority: "none", complete: false,
     scope_changed: false, diagnostics: [], worker_inputs: null, worker: null, proposal: null, manifest: null, manifest_sha256: null, reviewer_runtime_sha256: null };
   try {
@@ -194,7 +194,7 @@ export async function collectClosureReviewTarget(input: Options & { worker_captu
     result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.worker_inputs?.scope_changed);
     result.diagnostics.push(error instanceof Error ? error.message : "Closure review target unavailable");
   }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during closure review target collection"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during closure review target collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);
 }
@@ -205,7 +205,7 @@ export async function collectClosureReview(input: Options & { worker_capture: un
   const result = { schema_version: 1 as const, kind: "docs-drift-closure-review" as const, authority: "none" as const,
     complete: false, scope_changed: false, diagnostics: [] as string[], target: null as ReviewTarget | null,
     review: null as { manifest_sha256: string; worker: ReturnType<typeof readNativeRoleCapture>["binding"]; reviewer: ReturnType<typeof readNativeRoleCapture>["binding"] } | null };
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   try {
     const target = await collectClosureReviewTarget(options); result.target = target;
     const current = target.worker_inputs, facts = current?.target;
@@ -229,7 +229,7 @@ export async function collectClosureReview(input: Options & { worker_capture: un
     result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.target?.scope_changed);
     result.diagnostics.push(error instanceof Error ? error.message : "Original independent closure review unavailable");
   }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during closure role collection"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during closure role collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);
 }

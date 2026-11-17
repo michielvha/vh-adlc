@@ -1,6 +1,6 @@
 import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath, sha256, withinPrefix } from "./protocol";
 import { collectionReaders } from "./git";
-import { captureRepositoryState, type Snapshot } from "./snapshot";
+import { captureCallerState, type Snapshot } from "./snapshot";
 import { evaluateProtection, type ProtectionContext } from "./protection";
 import { recheckResolutionInputs, type ResolutionCollection, type ResolutionHunk, type ResolutionInputs } from "./resolve-inputs";
 import type { ScanAssessment } from "./scan";
@@ -214,7 +214,7 @@ export async function buildResolution(options: ResolutionOptions): Promise<Resol
   const path = protocolPath(snapshot.settings.publication.resolution_root + "/" + options.resolution_id + ".yaml");
   const result: ResolutionDraft = { state: "proposal", complete: false, diagnostics: [], changes: [], record: null,
     record_path: path, record_bytes: null, record_sha256: null };
-  const before = canonicalDigest(captureRepositoryState(snapshot.repo));
+  const before = canonicalDigest(captureCallerState(snapshot.repo));
   try {
     const immutableInputs = canonicalDigest({ inputs: options.inputs, scan: options.scan,
       settings: snapshot.settings, bindings: snapshot.protocol.bindings, read_set: snapshot.read_set, entries: snapshot.entries,
@@ -278,7 +278,7 @@ export async function buildResolution(options: ResolutionOptions): Promise<Resol
     if (immutableInputs !== canonicalDigest({ inputs: options.inputs, scan: options.scan,
       settings: snapshot.settings, bindings: snapshot.protocol.bindings, read_set: snapshot.read_set, entries: snapshot.entries,
       absent: snapshot.absent, read_set_sha256: snapshot.read_set_sha256, history_sha256: snapshot.history_sha256, required_inputs: snapshot.required_inputs })
-      || !recheckResolutionInputs(options.inputs, options.collection).fresh || canonicalDigest(captureRepositoryState(snapshot.repo)) !== before) fail("source changed during verification");
+      || !recheckResolutionInputs(options.inputs, options.collection).fresh || canonicalDigest(captureCallerState(snapshot.repo)) !== before) fail("source changed during verification");
     const originals = options.inputs.proposals.map(proposal => ({ ...proposal, hunks: proposal.hunks.map(({ before_base64, after_base64, ...hunk }) => hunk) }));
     if (options.inputs.repository_id === null) fail("repository identity");
     const record: ResolutionRecord = { schema_version: 1, id: options.resolution_id, repository: options.inputs.repository,

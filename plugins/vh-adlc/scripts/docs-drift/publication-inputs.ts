@@ -6,7 +6,7 @@ import { selectOperationRuntime } from "./bootstrap";
 import { inspectCandidate } from "./preparation";
 import { fetchCurrentDefault } from "./proposals";
 import { canonicalDigest } from "./protocol";
-import { captureBareSnapshot, captureRepositoryState, checkFreshness, externalArtifactDirectory, matchesRepositoryState, type OwnedObjectStore } from "./snapshot";
+import { captureBareSnapshot, captureCallerState, checkFreshness, externalArtifactDirectory, matchesCallerState, type OwnedObjectStore } from "./snapshot";
 import { loadCommittedSettings } from "./settings";
 import { readNativeContext, type NativeObservation, type PublicationIdentity } from "./transport";
 
@@ -28,7 +28,7 @@ export async function collectPublicationInputs(input: {
   const result: PublicationInputs = { schema_version: 1, kind: "docs-drift-publication-inputs", authority: "none", complete: false, scope_changed: false, diagnostics: [],
     source_commit: options.source, current_default: null, identity: null, store: null, candidate: null, freshness: null, runtime: null };
   const repo = realpathSync(options.repo), candidateRepo = realpathSync(options.candidate_repo);
-  const before = canonicalDigest(captureRepositoryState(repo)), candidateBefore = canonicalDigest(captureRepositoryState(candidateRepo));
+  const before = canonicalDigest(captureCallerState(repo)), candidateBefore = canonicalDigest(captureCallerState(candidateRepo));
   try {
     const root = externalArtifactDirectory(options.artifact_root, repo);
     externalArtifactDirectory(root, candidateRepo);
@@ -69,7 +69,7 @@ export async function collectPublicationInputs(input: {
     result.scope_changed ||= error instanceof PublicationScopeChanged || error instanceof ArtifactChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Publication input collection unavailable");
   }
-  if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidateRepo, candidateBefore)) {
+  if (!matchesCallerState(repo, before) || !matchesCallerState(candidateRepo, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during publication input collection");
   }
   result.diagnostics = [...new Set(result.diagnostics)];

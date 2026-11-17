@@ -1,5 +1,5 @@
 import { dirname, join, relative } from "node:path";
-import { artifactDirectoryScope, captureSnapshot, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureSnapshot, matchesCallerState } from "./snapshot";
 import { inspectCandidate } from "./preparation";
 import { readOriginalScan, requireSuccessfulProcess } from "./scan-evidence";
 import { readBoundArtifact } from "./evidence-input";
@@ -46,7 +46,7 @@ export function readCandidateVerificationArtifacts(options: Parameters<typeof in
   if (join(scope.directory, checkoutPath) !== scan.checkout) fail("canonical owned verification source required");
   scope.assertExternal(scan.checkout);
   artifactDirectoryScope(scope.directory, options.repo).assertExternal(scan.checkout);
-  if (!matchesRepositoryState(scan.checkout, value.checkout_state_sha256, "full")) fail("owned verification source changed or unavailable");
+  if (!matchesCallerState(scan.checkout, value.checkout_state_sha256, "full")) fail("owned verification source changed or unavailable");
   const snapshot = captureSnapshot(options.candidate_repo, options.candidate);
   readOriginalScan(snapshot, scan, originals, scope.directory, read);
   const configured = [...snapshot.settings.generation_commands, ...snapshot.settings.verification_commands];

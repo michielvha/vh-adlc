@@ -15,7 +15,7 @@ import { buildReport, renderReport, escapeReportText, joinReportSentences, type 
 import { renderProposalAssessment, type ProposalAssessment } from "./proposal-assessment";
 import { renderAssessmentReport, type AssessmentReport } from "./assessment-report";
 import { resolutionSource } from "./resolve";
-import { captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
+import { captureCallerState, captureSnapshot, matchesCallerState } from "./snapshot";
 
 type Options = Parameters<typeof collectNativeReportHistory>[0];
 type Reference = { path: string; sha256: string };
@@ -54,7 +54,7 @@ export function proposalAttentionDisposition(assessment: ProposalAssessment["pro
 /** The execution controller calls this before its model roles. JSON metadata cannot recreate the run. */
 export async function beginAuditReport(input: Options): Promise<Start> {
   const { observation, ...serializable } = input, options = { ...structuredClone(serializable), observation };
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   const result: Start = { schema_version: 1, kind: "docs-drift-audit-report-run", authority: "none", source_commit: options.source,
     run_id: options.run, started_at: null, complete: false, scope_changed: false, diagnostics: [], worker_input_sha256: null, proposal_inputs_sha256: null };
   let context: Context | null = null;
@@ -77,7 +77,7 @@ export async function beginAuditReport(input: Options): Promise<Start> {
     context = { options, before, limit: Math.min(OUTPUT_LIMIT, snapshot.settings.reports.max_entry_bytes), history, proposals };
   } catch (error) { result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Original audit report start unavailable"); }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during audit report start"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during audit report start"); }
   const completed = freezeJSON(result);
   if (completed.complete && context) runs.set(completed, context);
   return completed;
@@ -112,7 +112,7 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
   let editAttention: AttentionInput[] = [];
   let assessment: AssessmentReport | null = null, proposalAssessment: ProposalAssessment | null = null, collectionComplete = false;
   try {
-    if (!matchesRepositoryState(repo, original.before)) throw new AuditReportFailure("audit-caller-changed", "Caller changed since the audit report started");
+    if (!matchesCallerState(repo, original.before)) throw new AuditReportFailure("audit-caller-changed", "Caller changed since the audit report started");
     const current = await collectAuditProposalInputs(options);
     result.scope_changed ||= current.scope_changed;
     if (current.complete && (current.inputs_sha256 !== start.proposal_inputs_sha256 || current.worker_input_sha256 !== start.worker_input_sha256))
@@ -225,7 +225,7 @@ async function assembleAuditReport(start: Start, original: Context, roles: { wor
   } catch (error) { result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
     addFailure(error instanceof AuditReportFailure ? error.code : error instanceof ArtifactChanged || error instanceof PublicationScopeChanged ? "audit-scope-changed" : "audit-report-incomplete",
       error instanceof Error ? error.message : "Final audit report unavailable"); }
-  if (!matchesRepositoryState(repo, original.before)) {
+  if (!matchesCallerState(repo, original.before)) {
     result.complete = false; collectionComplete = false; addFailure("audit-caller-changed", "Caller changed during audit report completion");
   }
   if (!result.complete) {

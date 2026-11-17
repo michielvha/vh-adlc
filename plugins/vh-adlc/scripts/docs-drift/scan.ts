@@ -7,7 +7,7 @@ import { gitEnvironment } from "../git-read";
 import { readGitWithEnvironment } from "./git";
 import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, protocolPath, sha256, verifyProtocolBindings } from "./protocol";
 import type { PathDigest } from "./protocol";
-import { captureRepositoryState, externalArtifactDirectory, readCommittedTree } from "./snapshot";
+import { captureCallerState, externalArtifactDirectory, readCommittedTree } from "./snapshot";
 import type { Snapshot } from "./snapshot";
 
 type Diagnostic = { code: string; message: string };
@@ -190,8 +190,8 @@ export async function runScan(snapshot: Snapshot, options: ScanOptions): Promise
     checkout: "", output_path: "", record_path: "", process: null,
   };
   const gap = (code: string, message: string) => result.diagnostics.push({ code, message });
-  let original: ReturnType<typeof captureRepositoryState> | undefined;
-  let before: ReturnType<typeof captureRepositoryState> | undefined;
+  let original: ReturnType<typeof captureCallerState> | undefined;
+  let before: ReturnType<typeof captureCallerState> | undefined;
   try {
     const parent = externalArtifactDirectory(options.artifact_root, snapshot.repo);
     const executable = snapshot.settings.scanner.argv[0];
@@ -224,7 +224,7 @@ export async function runScan(snapshot: Snapshot, options: ScanOptions): Promise
     const ownedGit = (...args: string[]) => readGitWithEnvironment(checkout, [
       "-c", "core.hooksPath=/dev/null", "-c", "credential.helper=", "-c", "http.extraHeader=", ...args,
     ], env);
-    original = captureRepositoryState(snapshot.repo);
+    original = captureCallerState(snapshot.repo);
     const format = readGitWithEnvironment(snapshot.repo, ["rev-parse", "--show-object-format"], env).toString().trim();
     if (!["sha1", "sha256"].includes(format)) throw new Error("unknown Git format");
     ownedGit("init", "--template=", "--object-format=" + format);
@@ -248,7 +248,7 @@ export async function runScan(snapshot: Snapshot, options: ScanOptions): Promise
       isAbsolute(runtime) ? runtime : join(checkout, runtime), ...snapshot.settings.scanner.argv.slice(1),
       "--protocol-bindings", bindingsPath, "--protocol-json", output,
     ];
-    before = captureRepositoryState(checkout, "full");
+    before = captureCallerState(checkout, "full");
     result.process = await executeOwnedProcess({ argv: args, cwd: checkout, env, watched_outputs: [output], stdout, stderr, timeout_ms: timeout, started: pid => {
       writeFileSync(join(root, "process-start.json"), canonicalJSON({ pid, argv: args, source_commit: snapshot.source_commit }), { flag: "wx", mode: 0o600 });
     } });
@@ -269,8 +269,8 @@ export async function runScan(snapshot: Snapshot, options: ScanOptions): Promise
     gap("scanner-incomplete", "Scanner setup, execution, output or retained bindings could not be verified.");
   } finally {
     try {
-      if (before && !same(captureRepositoryState(result.checkout, "full"), before)) gap("scanner-mutation", "The scanner changed its committed source, files or Git state.");
-      if (original && !same(captureRepositoryState(snapshot.repo), original)) gap("caller-changed", "The original caller state changed during collection.");
+      if (before && !same(captureCallerState(result.checkout, "full"), before)) gap("scanner-mutation", "The scanner changed its committed source, files or Git state.");
+      if (original && !same(captureCallerState(snapshot.repo), original)) gap("caller-changed", "The original caller state changed during collection.");
     } catch { gap("scanner-state-unavailable", "The final source mutation check is unavailable."); }
     result.complete = result.diagnostics.length === 0;
   }

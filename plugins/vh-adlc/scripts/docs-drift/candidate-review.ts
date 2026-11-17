@@ -5,7 +5,7 @@ import { collectReviewTarget } from "./review-target";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { verifyReviewEvidence } from "./manifests";
 import { canonicalDigest, freezeJSON } from "./protocol";
-import { captureRepositoryState, matchesRepositoryState } from "./snapshot";
+import { captureCallerState, matchesCallerState } from "./snapshot";
 
 type Options = Parameters<typeof collectReviewTarget>[0] & { reviewer_capture: unknown };
 type CandidateReview = {
@@ -18,7 +18,7 @@ type CandidateReview = {
 export async function collectCandidateReview(input: Options): Promise<CandidateReview> {
   const options = { ...input, worker_capture: structuredClone(input.worker_capture), reviewer_capture: structuredClone(input.reviewer_capture) };
   const repo = realpathSync(options.repo), candidate = realpathSync(options.candidate_repo);
-  const before = canonicalDigest(captureRepositoryState(repo)), candidateBefore = canonicalDigest(captureRepositoryState(candidate));
+  const before = canonicalDigest(captureCallerState(repo)), candidateBefore = canonicalDigest(captureCallerState(candidate));
   const result: CandidateReview = { schema_version: 1, kind: "docs-drift-candidate-review", authority: "none", complete: false, scope_changed: false, diagnostics: [], target: null, review: null };
   try {
     result.target = await collectReviewTarget(options);
@@ -40,7 +40,7 @@ export async function collectCandidateReview(input: Options): Promise<CandidateR
     result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.target?.scope_changed);
     result.diagnostics.push(error instanceof Error ? error.message : "Original candidate review unavailable");
   }
-  if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidate, candidateBefore)) {
+  if (!matchesCallerState(repo, before) || !matchesCallerState(candidate, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during original review collection");
   }
   result.diagnostics = [...new Set(result.diagnostics)];

@@ -8,7 +8,7 @@ import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath } 
 import { escapeReportText } from "./report";
 import { matchesSourceQuote, parseSourceQuote } from "./resolve";
 import type { Finding, ScanRun } from "./scan";
-import { artifactDirectoryScope, captureBareSnapshot, captureRepositoryState, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureBareSnapshot, captureCallerState, matchesCallerState } from "./snapshot";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
 
 type Options = Omit<Parameters<typeof readSourceAssessmentArtifacts>[0], "reference" | "candidate_repo"> & {
@@ -39,9 +39,9 @@ function text(value: unknown): string {
 export function readAssessmentReport(input: Options): AssessmentReport {
   const options = { ...input, source_verification: structuredClone(input.source_verification), assessment: structuredClone(input.assessment),
     protection_context: structuredClone(input.protection_context) };
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   const candidateRepo = options.candidate_repo ? realpathSync(options.candidate_repo) : repo;
-  const candidateBefore = candidateRepo === repo ? before : canonicalDigest(captureRepositoryState(candidateRepo));
+  const candidateBefore = candidateRepo === repo ? before : canonicalDigest(captureCallerState(candidateRepo));
   const result: AssessmentReport = { schema_version: 1, kind: "docs-drift-assessment-report", authority: "none", origin: "caller-assessment",
     complete: false, collection_complete: false, source_commit: options.source, diagnostics: [], source_verification: null,
     assessment_reference: null, details_omitted: false, diagnostics_omitted: 0, findings: [], suppressed_findings: [], stale_suppressions: [],
@@ -99,8 +99,8 @@ export function readAssessmentReport(input: Options): AssessmentReport {
     if (decisions.size !== scan.findings.length) throw Error("Some collected findings have no recorded assessment");
     result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Finding assessment unavailable"); }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during report collection"); }
-  if (candidateRepo !== repo && !matchesRepositoryState(candidateRepo, candidateBefore)) {
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during report collection"); }
+  if (candidateRepo !== repo && !matchesCallerState(candidateRepo, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Candidate changed or became unavailable during report collection");
   }
   result.counts = {

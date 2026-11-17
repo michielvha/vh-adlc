@@ -13,7 +13,7 @@ import { canonicalDigest, canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { buildNativeRoleInvocation } from "./role-launch";
 import { captureNativeRoleProcess } from "./role-process";
-import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, captureSnapshot, matchesCallerState } from "./snapshot";
 import { OUTPUT_LIMIT } from "./owned-process";
 import type { AuditOutputArtifacts } from "./report-output";
 import type { PendingLeaseObservation } from "./retained-controller";
@@ -39,7 +39,7 @@ export async function runAuditSession(input: Options) {
   const { observation, ...serializable } = input;
   const { environment, role_timeout_ms: timeout = 900000, ...copied } = structuredClone(serializable);
   const options = { ...copied, observation };
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   let outputScope: OutputScope | null = null;
   const result: { schema_version: 1; kind: "docs-drift-audit-session"; authority: "none"; source_commit: string;
     complete: boolean; scope_changed: boolean; diagnostics: string[]; start: Start | null;
@@ -150,7 +150,7 @@ export async function runAuditSession(input: Options) {
     result.complete = false; result.report = null; result.scope_changed ||= error instanceof ArtifactChanged;
     result.diagnostics.push("Original audit request artifact changed or became unavailable");
   }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.report = null; result.scope_changed = true; result.diagnostics.push("Caller changed during the audit session"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.report = null; result.scope_changed = true; result.diagnostics.push("Caller changed during the audit session"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   if (result.complete && outputScope) outputScopes.set(result, outputScope);
   return freezeJSON(result);

@@ -11,7 +11,7 @@ import { effectMarker, manifestDigest, parseActionManifest, type ActionManifest,
 import { validatePublicationShape } from "./publish";
 import { publicationMarker } from "./report-history";
 import { canonicalDigest, canonicalJSON, freezeJSON, sha256 } from "./protocol";
-import { captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
+import { captureCallerState, captureSnapshot, matchesCallerState } from "./snapshot";
 
 type Options = Parameters<typeof collectPublicationBindings>[0] & { worker_capture: unknown };
 type ReviewTarget = {
@@ -25,7 +25,7 @@ type ReviewTarget = {
 export async function collectReviewTarget(input: Options): Promise<ReviewTarget> {
   const options = { ...input, worker_capture: structuredClone(input.worker_capture), selection: structuredClone(input.selection) };
   const repo = realpathSync(options.repo), candidate = realpathSync(options.candidate_repo);
-  const before = canonicalDigest(captureRepositoryState(repo)), candidateBefore = canonicalDigest(captureRepositoryState(candidate));
+  const before = canonicalDigest(captureCallerState(repo)), candidateBefore = canonicalDigest(captureCallerState(candidate));
   const result: ReviewTarget = { schema_version: 1, kind: "docs-drift-review-target", authority: "none", complete: false, scope_changed: false, diagnostics: [],
     manifest: null, manifest_sha256: null, reviewer_runtime_sha256: null, bindings: null, preparation: null };
   try {
@@ -85,7 +85,7 @@ export async function collectReviewTarget(input: Options): Promise<ReviewTarget>
     result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.preparation?.scope_changed || result.bindings?.scope_changed);
     result.diagnostics.push(error instanceof Error ? error.message : "Candidate review target unavailable");
   }
-  if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidate, candidateBefore)) {
+  if (!matchesCallerState(repo, before) || !matchesCallerState(candidate, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during review target collection");
   }
   result.diagnostics = [...new Set(result.diagnostics)];

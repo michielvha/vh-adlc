@@ -9,7 +9,7 @@ import { readLookup, lookupFactsDigest } from "./observations";
 import { readRejection } from "./rejections";
 import { exactRecord } from "./publication-decisions";
 import { canonicalJSON, sha256 } from "./protocol";
-import { captureRepositoryState, externalArtifactDirectory } from "./snapshot";
+import { captureCallerState, externalArtifactDirectory } from "./snapshot";
 import type { Settings } from "./settings";
 import type { PublicationTransport, PlanObjects, EffectObservation } from "./transport";
 import type { PublishOptions, PublishResult } from "./publish";
@@ -182,7 +182,7 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
       refresh();
       const scope: AcknowledgementScope = { kind: "docs-drift-delivery-acknowledgement", repository: identity.repository, repository_id: identity.repository_id,
         actor: identity.actor, actor_id: identity.actor_id, operation_id: plan.manifest.operation_id, run_id: journal.header.run_id, plan_sha256: journal.header.plan_sha256,
-        context: plan.context, transport: plan.transport, source_state_sha256: sha256(canonicalJSON(captureRepositoryState(options.source_repo))),
+        context: plan.context, transport: plan.transport, source_state_sha256: sha256(canonicalJSON(captureCallerState(options.source_repo))),
         settings_sha256: sha256(canonicalJSON(options.settings)),
         settlement_sha256: sha256(canonicalJSON({ business: settled(options, journal, objects), release: releaseSettlement(options, journal, objects) })),
         lease_ref: String(acquire.payload.ref), lease_object: objects.lease_object!, receipt_ref: String(receipt.payload.ref), receipt_object: objects.receipt_object!,

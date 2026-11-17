@@ -7,7 +7,7 @@ import { publishArtifact } from "./journal";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "./protocol";
 import { loadCommittedSettings } from "./settings";
-import { artifactDirectoryScope, captureRepositoryState, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, matchesCallerState } from "./snapshot";
 
 type Reference = { path: string; sha256: string };
 type Session = Awaited<ReturnType<typeof runAuditSession>>;
@@ -31,7 +31,7 @@ export function persistAuditOutput(options: { repo: string; source: string; arti
       : null;
     if (options.session.source_commit !== options.source || original && original.source_commit !== options.source)
       throw new ArtifactChanged("Audit output source changed");
-    repo = realpathSync(options.repo); before = canonicalDigest(captureRepositoryState(repo));
+    repo = realpathSync(options.repo); before = canonicalDigest(captureCallerState(repo));
     const scope = artifactDirectoryScope(options.artifact_root, repo), settings = loadCommittedSettings(repo, options.source).settings;
     const limit = Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes);
     if (original && original.repository !== settings.repository) throw new ArtifactChanged("Audit output repository changed");
@@ -93,7 +93,7 @@ export function persistAuditOutput(options: { repo: string; source: string; arti
     result.scope_changed ||= error instanceof ArtifactChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Audit output retention unavailable");
   }
-  if (repo !== null && before !== null && !matchesRepositoryState(repo, before)) {
+  if (repo !== null && before !== null && !matchesCallerState(repo, before)) {
     result.complete = false; result.scope_changed = true; result.diagnostics.push("Caller changed during audit output retention");
   }
   return freezeJSON(result);

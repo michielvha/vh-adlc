@@ -17,7 +17,7 @@ import { collectPublicationInputs } from "./publication-inputs";
 import { workerInputsDigest, type WorkerInputs } from "./manifests";
 import { canonicalDigest, canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { resolutionSource } from "./resolve";
-import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState, type Snapshot } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, captureSnapshot, matchesCallerState, type Snapshot } from "./snapshot";
 
 /** Stable committed-source fields shared by new execution and retained-publication verification. */
 export function deriveSourceWorkerInputs(snapshot: Snapshot) {
@@ -69,7 +69,7 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
   const result: WorkerCollection = { schema_version: 1, kind: "docs-drift-worker-inputs", authority: "none", complete: false, scope_changed: false, diagnostics: [],
     inputs: null, worker_input_sha256: null, worker_runtime_sha256: null, attention: [], proposal_snapshot: null, proposal_snapshot_path: null,
     source_verification: null, facts: null, proposals: null, resolution: null };
-  const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   try {
     const scope = artifactDirectoryScope(options.artifact_root, repo), snapshot = captureSnapshot(repo, options.source);
     const bytes = readBoundArtifact({ source_repo: repo, artifact_root: scope.directory, reference: options.decisions }), packet = parseDecisionPacket(bytes, snapshot);
@@ -126,7 +126,7 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
     result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || result.facts?.scope_changed === true;
     result.diagnostics.push(error instanceof Error ? error.message : "Worker input collection unavailable");
   }
-  if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during worker input collection"); }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during worker input collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);
 }

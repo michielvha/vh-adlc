@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { inspectRetainedOperation, restoreRetainedOperation } from "./recovery";
 import { publicationMarker, readRetainedMetadata } from "./report-history";
 import { canonicalDigest, freezeJSON } from "./protocol";
-import { artifactDirectoryScope, captureRepositoryState, createOwnedObjectStore, matchesRepositoryState } from "./snapshot";
+import { artifactDirectoryScope, captureCallerState, createOwnedObjectStore, matchesCallerState } from "./snapshot";
 import { loadCommittedSettings, type Settings } from "./settings";
 import { readRetainedPlan } from "./journal";
 import { GitHubReadError, type RepositoryReader } from "../github-read";
@@ -73,7 +73,7 @@ function output(summary: Summary, source: string, restore: boolean, complete: bo
 
 /** Current native metadata can restore observations. Missing original approval/model proof supplies no replay. */
 export async function collectNativeRetained(input: Options) {
-  const options = structuredClone(input), repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
+  const options = structuredClone(input), repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo));
   const root = artifactDirectoryScope(options.artifact_root, repo).directory;
   const loaded = loadCommittedSettings(repo, options.source), settingsHash = loaded.settings_sha256;
   const settings = options.trial_definition_sha256 === undefined ? loaded.settings
@@ -113,6 +113,6 @@ export async function collectNativeRetained(input: Options) {
     return output({ ...summary, state: result.state, reason: result.reason,
       journal_directory: result.journal.directory, revision: result.journal.revision }, options.source, true, result.state === "complete", limit);
   } finally {
-    if (!matchesRepositoryState(repo, before)) throw Error("Caller changed during retained native observation");
+    if (!matchesCallerState(repo, before)) throw Error("Caller changed during retained native observation");
   }
 }
