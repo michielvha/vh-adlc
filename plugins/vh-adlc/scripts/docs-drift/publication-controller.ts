@@ -55,7 +55,8 @@ function importCandidate(source: OwnedObjectStore, candidate: OwnedObjectStore, 
     throw Error("Publication imported candidate tree changed");
 }
 
-async function currentState(options: Options, inventory?: PublicationInventory, expected?: SealedPlan) {
+async function currentState(options: Options, inventory?: PublicationInventory, expected?: SealedPlan, verifyExecutor = true) {
+  if (options.entry === "hosted" && !options.hosted_executor) throw new SetupRequired("Hosted executor identity required");
   if (readGit(options.repo, "rev-parse", "HEAD").toString().trim() !== options.source
     || readGit(options.candidate_repo, "rev-parse", "HEAD").toString().trim() !== options.candidate) throw new PublicationScopeChanged("Publication assessment or candidate HEAD changed");
   const { settings: selectedSettings } = loadCommittedSettings(options.repo, options.source);
@@ -100,12 +101,12 @@ async function currentState(options: Options, inventory?: PublicationInventory, 
   const review: PublicationGate["review"] = { manifest: target.manifest, current: target.manifest, worker: worker.evidence, reviewer: reviewer.evidence,
     policy: { worker: workerPolicy, reviewer: reviewerPolicy }, grants: authority.grants };
   const binding = runtimePolicyBinding(runtime);
-  let hostedExecutor: HostedExecutor | undefined;
-  if (options.hosted_executor) {
+  let hostedExecutor = options.hosted_executor;
+  if (hostedExecutor && verifyExecutor) {
     if (!("policy_sha256" in binding)) throw new SetupRequired("Hosted attribution requires the version-two production runtime");
     const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential,
       path: options.path, comparison_identity: facts.identity });
-    hostedExecutor = readHostedExecutor({ entry: options.entry, executor: options.hosted_executor, settings, source: options.source,
+    hostedExecutor = readHostedExecutor({ entry: options.entry, executor: hostedExecutor, settings, source: options.source,
       identity: native.identity, reader: native.repository });
   }
   const policy: PlanPolicy = { ...binding, ...(hostedExecutor === undefined ? {} : { hosted_executor: hostedExecutor }),
@@ -166,7 +167,7 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
         inventory = await capturePublicationInventory({ source_repo: options.repo, artifact_root: options.artifact_root, journal_directory: journal.directory,
           original, transport, objects, current_proposals: proposals.proposals });
       }
-      const current = await currentState(options, inventory, initial.plan);
+      const current = await currentState(options, inventory, initial.plan, false);
       requireExecutingRuntime(current.runtime);
       if (current.plan.manifest_sha256 !== initial.plan.manifest_sha256) throw new PublicationScopeChanged("Current publication payload changed");
       for (const observation of inventory?.observations ?? []) {

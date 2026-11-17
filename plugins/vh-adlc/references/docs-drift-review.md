@@ -141,7 +141,8 @@ records. [Recovery controller](../scripts/docs-drift/recovery-controller.ts),
 ## Lost hosted origin and administrative abandonment
 
 This is an outside-helper administrative procedure after original ownership
-is lost. Preserve ordinary inspect/restore output as
+is lost. Choose an owner-private external case directory outside scheduled
+inputs. Preserve ordinary inspect/restore output there as
 `abandonment-inspection.json`. An administrator must confirm that the original
 executor has stopped before deleting refs, including any request already in
 flight. Native job completion establishes executor quiescence. It supplies no
@@ -149,8 +150,16 @@ delivery or settlement proof for accepted requests whose outcomes remain unknown
 
 For production, inspect the retained version-two native `plan.json` and its
 `hosted_executor.run_id` and `hosted_executor.run_attempt`. Read that exact
-attempt through the authenticated native workflow-run reader. Retain its
-terminal execution-status observation with the inspection. Check repository
+attempt through the authenticated native workflow-run reader. An administrator
+can retain that observation with the ordinary GitHub CLI, using the inspected
+repository, hostname and exact run selectors.
+
+```sh
+gh api --hostname "$hostname" "repos/$repository/actions/runs/$run_id/attempts/$run_attempt" > "$case_directory/stopped-executor.json"
+```
+
+Require native `status` equal to `completed`. Retain its terminal execution-status
+observation with the inspection. Check repository
 name and ID, head repository, configured default branch, `reports.workflow_id`,
 `reports.workflow_path`, supported schedule/manual event and exact `head_sha`
 against the plan's assessed source commit. A missing identity in an older plan,
@@ -164,10 +173,17 @@ original trial namespace. Collector-only trials are ineligible. These checks
 reuse the inspected plan and native reader. They add no takeover or replay
 permission.
 
+For local production execution, retain the original owned process completion
+and observed absence of owned survivors. Link the original process identity and
+completion records to this run and operation. Missing or unverifiable completion
+or survivor evidence is ineligible. Hosted and native-trial checks keep their
+native run identities.
+
 Select exactly the present lease and its same operation's single validated
 receipt. Verify the lease and receipt metadata contain the same immutable plan,
-operation, repository and expected refs. Keep the observed object IDs. A
-foreign, terminal, extra or receipt-only selection is ineligible. Completed and
+operation, repository and expected refs. Current version-two atomic acquisition
+writes the same commit to both refs, so require equal observed object IDs for
+that selection. Keep both observed object IDs. A foreign, terminal, extra or receipt-only selection is ineligible. Completed and
 other terminal receipts retain their refs indefinitely. The administrator must
 retain evidence linking the stopped executor to this selected operation.
 

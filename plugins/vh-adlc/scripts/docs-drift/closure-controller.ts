@@ -20,7 +20,7 @@ import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "
 import { resumeEffects } from "./recovery";
 import { publicationEffectsOutput } from "./recovery-output";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
-import { loadCommittedSettings } from "./settings";
+import { loadCommittedSettings, SetupRequired } from "./settings";
 import { createNativeTransport, readNativeContext, withNativeObservation, NativeObservationChanged } from "./transport";
 
 type Options = Omit<Parameters<typeof collectClosureReview>[0], "closure_inventory" | "observation"> & { authority: unknown; hosted_executor?: HostedExecutor };
@@ -29,16 +29,16 @@ function requireExecutingRuntime(runtime: { component: { directory: string } }):
     throw Error("Retained executing closure controller required");
 }
 
-async function currentState(options: Options, inventory?: ClosureInventory, expected?: SealedPlan) {
+async function currentState(options: Options, inventory?: ClosureInventory, expected?: SealedPlan, verifyExecutor = true) {
+  if (options.entry === "hosted" && !options.hosted_executor) throw new SetupRequired("Hosted executor identity required");
   if (readGit(options.repo, "rev-parse", "HEAD").toString().trim() !== options.source) throw new PublicationScopeChanged("Closure assessment HEAD changed");
   const { settings } = loadCommittedSettings(options.repo, options.source);
   const scope = { hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path,
     comparison_identity: expected ? { repository: expected.manifest.repository, repository_id: expected.manifest.repository_id,
       actor: expected.manifest.actor, actor_id: expected.manifest.actor_id, default_branch: settings.default_branch } : undefined };
   let checked: Awaited<ReturnType<typeof collectClosureReview>>;
-  let hostedExecutor: HostedExecutor | undefined;
   try {
-    checked = await withNativeObservation({ ...scope, collection: options.hosted_executor ? "audit" : undefined }, async observation => {
+    checked = await withNativeObservation(scope, async observation => {
       const native = readNativeContext({ ...scope, observation });
       if (native.default_commit !== options.source || expected && (native.identity.repository_id !== expected.manifest.repository_id
         || !sameAccount(native.identity, expected.manifest)))
@@ -50,8 +50,6 @@ async function currentState(options: Options, inventory?: ClosureInventory, expe
           throw new PublicationScopeChanged("Original closure worker or native inputs changed");
         throw Error(result.diagnostics.join("\n") || "Current closure review unavailable");
       }
-      if (options.hosted_executor) hostedExecutor = readHostedExecutor({ entry: options.entry, executor: options.hosted_executor,
-        settings, source: options.source, identity: native.identity, reader: native.repository });
       return result;
     });
   } catch (error) {
@@ -81,7 +79,13 @@ async function currentState(options: Options, inventory?: ClosureInventory, expe
   const review: PublicationGate["review"] = { manifest, current: manifest, worker: worker.evidence, reviewer: reviewer.evidence,
     policy: { worker: workerPolicy, reviewer: reviewerPolicy }, grants: authority.grants };
   const binding = runtimePolicyBinding(runtime);
-  if (hostedExecutor && !("policy_sha256" in binding)) throw Error("Hosted attribution requires the version-two production runtime");
+  let hostedExecutor = options.hosted_executor;
+  if (hostedExecutor && verifyExecutor) {
+    if (!("policy_sha256" in binding)) throw new SetupRequired("Hosted attribution requires the version-two production runtime");
+    const native = readNativeContext(scope);
+    hostedExecutor = readHostedExecutor({ entry: options.entry, executor: hostedExecutor,
+      settings, source: options.source, identity: native.identity, reader: native.repository });
+  }
   const policy: PlanPolicy = { ...binding, ...(hostedExecutor === undefined ? {} : { hosted_executor: hostedExecutor }),
     context: "production", transport: "native", publication_kind: "resolve",
     pr_draft: settings.publication.pr_state.resolve === "draft",
@@ -130,7 +134,7 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
         inventory = await captureClosureInventory({ source_repo: options.repo, artifact_root: options.artifact_root, journal_directory: journal.directory,
           original, transport, objects: writePublicationObjects(initial.store, initial.plan, journal.header), reader: native.repository });
       }
-      const current = await currentState(options, inventory, initial.plan);
+      const current = await currentState(options, inventory, initial.plan, false);
       requireExecutingRuntime(current.runtime);
       for (const proof of inventory?.observations ?? []) {
         const effect = initial.plan.manifest.effects.find(effect => effect.id === proof.effect_id)!;

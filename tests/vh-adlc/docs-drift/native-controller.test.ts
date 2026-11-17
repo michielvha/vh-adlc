@@ -231,6 +231,10 @@ test("hosted publication retains native executor IDs for inspection and refuses 
   try {
     const identities = Object.fromEntries(["hosted", "copilot", "claude", "interactive"].map(entry => [entry, { actor: "fixture-bot", actor_id: 20 }]));
     const f = await originalPublicationFixture(roots, { entry: "hosted", identities }), service = installOwnedNativeService(f);
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const missingExecutor = await controller.checkPublication(f.publication);
+    expect(missingExecutor.complete).toBe(false);
+    expect(missingExecutor.diagnostics.join("\n")).toContain("Hosted executor identity required");
     const state = JSON.parse(readFileSync(service.statePath, "utf8"));
     const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
     state.workflow_runs = [{ id: 501, run_attempt: 2, workflow_id: f.configured.reports.workflow_id,
@@ -238,7 +242,6 @@ test("hosted publication retains native executor IDs for inspection and refuses 
       head_sha: f.source, head_branch: "main", repository, head_repository: repository,
       created_at: "2000-01-01T00:00:00Z", updated_at: "2000-01-01T00:00:00Z" }];
     writeFileSync(service.statePath, JSON.stringify(state));
-    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
     const publication = { ...f.publication, hosted_executor: { run_id: 501, run_attempt: 2 } };
     state.workflow_runs[0].status = "completed";
     writeFileSync(service.statePath, JSON.stringify(state));
@@ -248,8 +251,10 @@ test("hosted publication retains native executor IDs for inspection and refuses 
     expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(0);
     state.workflow_runs[0].status = "in_progress";
     writeFileSync(service.statePath, JSON.stringify(state));
+    const runReadsBefore = readFileSync(service.calls, "utf8").split("\n").filter(line => line.includes("/actions/runs/501/attempts/2")).length;
     const result = await f.invoke(run => controller.publishPublication(publication, run));
     expect(result.state, result.reason ?? undefined).toBe("complete");
+    expect(readFileSync(service.calls, "utf8").split("\n").filter(line => line.includes("/actions/runs/501/attempts/2")).length - runReadsBefore).toBe(1);
     expect(result.journal.plan).toMatchObject({ hosted_executor: publication.hosted_executor });
     const before = readFileSync(service.statePath), refs = readGit(f.origin, "for-each-ref");
     for (const executor of [{ run_id: 502, run_attempt: 2 }, { run_id: 501, run_attempt: 3 }])
@@ -275,6 +280,9 @@ test("hosted closure seals native executor identity before acquiring its lease",
   try {
     const identities = Object.fromEntries(["hosted", "copilot", "claude", "interactive"].map(entry => [entry, { actor: "fixture-bot", actor_id: 20 }]));
     const f = await originalClosureFixture(roots, { entry: "hosted", identities });
+    const missingExecutor = await checkClosurePublication(f.publication);
+    expect(missingExecutor.complete).toBe(false);
+    expect(missingExecutor.diagnostics.join("\n")).toContain("Hosted executor identity required");
     const settings = f.snapshot.settings, state = JSON.parse(readFileSync(f.service.statePath, "utf8"));
     const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
     state.workflow_runs = [{ id: 501, run_attempt: 2, workflow_id: settings.reports.workflow_id, path: settings.reports.workflow_path,
@@ -289,8 +297,10 @@ test("hosted closure seals native executor identity before acquiring its lease",
     state.workflow_runs[0].status = "in_progress";
     writeFileSync(f.service.statePath, JSON.stringify(state));
     const before = readFileSync(f.service.statePath), refs = readGit(f.origin, "for-each-ref");
+    const runReadsBefore = readFileSync(f.service.calls, "utf8").split("\n").filter(line => line.includes("/actions/runs/501/attempts/2")).length;
     const result = await checkClosurePublication({ ...f.publication, hosted_executor: { run_id: 501, run_attempt: 2 } });
     expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+    expect(readFileSync(f.service.calls, "utf8").split("\n").filter(line => line.includes("/actions/runs/501/attempts/2")).length - runReadsBefore).toBe(1);
     expect(result.plan).toMatchObject({ hosted_executor: { run_id: 501, run_attempt: 2 }, context: "production", publication_kind: "resolve" });
     expect(readFileSync(f.service.statePath)).toEqual(before); expect(readGit(f.origin, "for-each-ref")).toEqual(refs);
     const calls = readFileSync(f.service.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
@@ -298,4 +308,41 @@ test("hosted closure seals native executor identity before acquiring its lease",
       && ["PATCH", "DELETE", "PUT", "POST"].some(method => call.args.includes(method)) && !call.args.includes("graphql"))).toBe(false);
     for (const root of roots) rmSync(root, { recursive: true, force: true });
   } catch (error) { console.error("Preserved hosted closure fixture roots", JSON.stringify(roots)); throw error; }
+}, 600000);
+
+test("a transient hosted review gap preserves pending recovery without permanent binding invalidation", async () => {
+  const roots: string[] = [];
+  try {
+    const identities = Object.fromEntries(["hosted", "copilot", "claude", "interactive"].map(entry => [entry, { actor: "fixture-bot", actor_id: 20 }]));
+    const f = await originalPublicationFixture(roots, { entry: "hosted", identities }), service = installOwnedNativeService(f);
+    const state = JSON.parse(readFileSync(service.statePath, "utf8"));
+    const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
+    state.workflow_runs = [{ id: 501, run_attempt: 2, workflow_id: f.configured.reports.workflow_id,
+      path: f.configured.reports.workflow_path, event: "schedule", status: "in_progress", conclusion: null,
+      head_sha: f.source, head_branch: "main", repository, head_repository: repository,
+      created_at: "2000-01-01T00:00:00Z", updated_at: "2000-01-01T00:00:00Z" }];
+    writeFileSync(service.statePath, JSON.stringify(state));
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const journal = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts"));
+    const reviews = await import(join(f.retained.directory, "scripts/docs-drift/candidate-review.ts"));
+    const originalOutcome = journal.appendOutcome, originalReview = reviews.collectCandidateReview;
+    let acquired = false;
+    const outcomeSpy = spyOn(journal, "appendOutcome").mockImplementation((current: unknown, id: string, outcome: unknown) => {
+      const result = originalOutcome(current, id, outcome);
+      if (id === "lease") acquired = true;
+      return result;
+    });
+    const reviewSpy = spyOn(reviews, "collectCandidateReview").mockImplementation(async (...args: unknown[]) => {
+      const result = await originalReview(...args);
+      return acquired ? { ...result, complete: false, diagnostics: ["Synthetic transient review gap"] } : result;
+    });
+    let pending;
+    try { pending = await f.invoke(run => controller.publishPublication({ ...f.publication, hosted_executor: { run_id: 501, run_attempt: 2 } }, run)); }
+    finally { outcomeSpy.mockRestore(); reviewSpy.mockRestore(); }
+    expect(acquired).toBe(true);
+    expect(pending.state).toBe("pending");
+    expect(pending.journal.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(false);
+    expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(0);
+    for (const root of roots) rmSync(root, { recursive: true, force: true });
+  } catch (error) { console.error("Preserved transient hosted recovery fixture", JSON.stringify(roots)); throw error; }
 }, 600000);

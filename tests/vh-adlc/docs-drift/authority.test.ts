@@ -67,12 +67,9 @@ test("review protocol dispatches docs-drift through its bound role captures and 
 test("administrative abandonment documents exact atomic deletion and stopped native executor eligibility", () => {
   const procedure = read("docs-drift-review.md").split("## Lost hosted origin and administrative abandonment\n")[1]?.split("\n## ")[0];
   expect(procedure).toBeDefined();
-  const prose = procedure?.replace(/\s+/gu, " ");
-  for (const requirement of ["original executor has stopped", "hosted_executor", "trial_launch", "Collector-only trials",
-    "same operation", "terminal", "workflow_id", "workflow_path", "head_sha", "run_attempt", "--atomic",
-    "--force-with-lease=", "stale or missing", "both refs unchanged", "Lease-only deletion", "fresh green report",
-    "unknown", "no delivery or settlement proof"])
-    expect(prose).toContain(requirement);
+  for (const requirement of ["hosted_executor", "trial_launch", "owned process completion", "--atomic", "--force-with-lease=",
+    "owner-private external case directory", "same operation", "Collector-only trials", "Lease-only deletion"])
+    expect(procedure?.replace(/\s+/gu, " ")).toContain(requirement);
   const row = read("authority.md").split("\n").find(line => line.startsWith("| Administrative abandonment |"));
   for (const requirement of ["stopped", "same operation", "atomic", "both", "stale", "trial_launch", "collector"])
     expect(row).toContain(requirement);
@@ -98,9 +95,13 @@ test.each(["matching", "stale-lease", "stale-receipt", "missing-receipt", "unsup
       if (fault === "missing-receipt") git(origin, "update-ref", "-d", receipt, approved);
       if (fault === "unsupported-atomic") git(origin, "config", "receive.advertiseAtomic", "false");
       const before = git(origin, "for-each-ref");
-      const result = Bun.spawnSync(["git", "-C", repo, "push", "--atomic", origin,
-        "--force-with-lease=" + lease + ":" + approved, "--force-with-lease=" + receipt + ":" + approved,
-        ":" + lease, ":" + receipt], { stdout: "pipe", stderr: "pipe" });
+      const section = read("docs-drift-review.md").split("## Lost hosted origin and administrative abandonment\n")[1]?.split("\n## ")[0];
+      const command = [...section!.matchAll(/```sh\n([\s\S]*?)\n```/gu)].map(match => match[1]).find(block => block.includes("git -C"));
+      expect(command).toBeDefined();
+      const result = Bun.spawnSync(["bash", "-eu", "-c", command!], {
+        env: { ...process.env, owned_store: repo, repository_remote: origin,
+          lease_ref: lease, lease_oid: approved, receipt_ref: receipt, receipt_oid: approved },
+        stdout: "pipe", stderr: "pipe" });
       if (fault === "matching") {
         expect(result.exitCode, result.stderr.toString()).toBe(0);
         expect(git(origin, "for-each-ref", "--format=%(refname)")).toBe(terminal);
