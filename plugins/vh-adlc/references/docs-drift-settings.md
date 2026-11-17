@@ -48,9 +48,16 @@ execution-change procedure and trial.
 
 ## Native profiles and installed identity
 
-Choose profile names for the project, such as `interactive` and `hosted`,
-independently of the orchestrating harness. Each role selects a client ID,
-model and allowed arguments. Copilot and Claude are the supported native role
+Choose local profile names such as `interactive` independently of the agent harness.
+The reserved `hosted` profile selects GitHub Actions production publication,
+effect-executing closure and their original resume paths. It requires
+`GITHUB_ACTIONS=true`, `GITHUB_RUN_ID` and `GITHUB_RUN_ATTEMPT`. Configure the
+actual non-null `reports.workflow_id` and `reports.workflow_path` before hosted
+production effects. The native run must match that workflow, the assessed source
+commit, repository and attempt, with an active schedule or manual execution.
+Other profiles are local and refuse Actions production effects.
+
+Each role selects a client ID, model and allowed arguments. Copilot and Claude are the supported native role
 backends. Their original native streams must establish the actual full model,
 fresh context and successful final reply. Missing tools, capabilities or model
 identity leave setup/review pending.

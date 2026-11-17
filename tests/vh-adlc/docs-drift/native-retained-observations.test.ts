@@ -14,7 +14,12 @@ import { validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/
 import { fixture, bindings, hash } from "./manifest-fixture";
 import { installOwnedNativeService } from "./original-publication-fixture";
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
-import { settingsFixture } from "./settings-fixture";
+import { settingsFixture, installedSettingsFixture } from "./settings-fixture";
+import type { WorkflowRunInput } from "../../../plugins/vh-adlc/scripts/github-read";
+import { preflightFixture } from "./preflight-fixture";
+import { createRunDirectory, createRunArtifactWriter, appendRunStage, readRunDirectory } from "../../../plugins/vh-adlc/scripts/docs-drift/run-directory";
+import { runPublication } from "../../../plugins/vh-adlc/scripts/docs-drift/run-publication";
+import { runClosure } from "../../../plugins/vh-adlc/scripts/docs-drift/run-closure";
 
 const roots: string[] = [];
 let preserveFailure = false;
@@ -128,3 +133,74 @@ test("committed native report bounds omit details and refuse an unretainable jou
     expect(readdirSync(tooSmall.artifacts)).not.toContain("docs-drift-" + tooSmall.operation);
   } catch (error) { preserveFailure = true; throw error; }
 }, 240000);
+
+
+test.each(["publish", "close"])("normal hosted %s refuses missing Actions selectors before publication inputs", async command => {
+  const f = preflightFixture(roots), directory = join(f.root, "hosted-entry"), origins = join(f.root, "entry-origins");
+  const location = { repo: f.repo, directory, origins };
+  let run = createRunDirectory({ ...location, source: f.head(), entry: "hosted", mode: command === "close" ? "close" : "audit",
+    proposals: command === "close" ? [501] : [] });
+  if (command === "close") {
+    const retain = createRunArtifactWriter(run, f.afterSettings.reports.max_entry_bytes);
+    appendRunStage(run, { command: "close", state: "pending", artifacts: { closure_review: retain("closure-review", canonicalJSON({ fixture: true })) } });
+    run = readRunDirectory(location);
+  }
+  const keys = ["GITHUB_ACTIONS", "GITHUB_RUN_ID", "GITHUB_RUN_ATTEMPT", "GH_TOKEN"];
+  const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
+  try {
+    for (const key of keys) delete process.env[key];
+    process.env.GH_TOKEN = "synthetic-no-network-token";
+    const operation = command === "close" ? runClosure : runPublication;
+    await expect(operation({ repo: f.repo, run })).rejects.toThrow("Hosted production requires GitHub Actions run selectors");
+  } finally {
+    for (const key of keys) {
+      if (before[key] === undefined) delete process.env[key];
+      else process.env[key] = before[key];
+    }
+  }
+});
+
+
+test("hosted run attribution checks every native execution binding", async () => {
+  const { selectHostedExecutor, readHostedExecutor } = await import("../../../plugins/vh-adlc/scripts/docs-drift/hosted-executor");
+  const environment = { GITHUB_ACTIONS: "true", GITHUB_RUN_ID: "501", GITHUB_RUN_ATTEMPT: "2" };
+  const executor = { run_id: 501, run_attempt: 2 };
+  expect(selectHostedExecutor("hosted", environment)).toEqual(executor);
+  for (const entry of ["interactive", "custom-job"]) {
+    expect(selectHostedExecutor(entry, {})).toBeUndefined();
+    expect(() => selectHostedExecutor(entry, environment)).toThrow("hosted profile");
+  }
+  for (const invalid of [{}, { ...environment, GITHUB_ACTIONS: undefined }, { ...environment, GITHUB_ACTIONS: "false" },
+    ...["", "0", "-1", "1.5", "abc", String(Number.MAX_SAFE_INTEGER + 1)].flatMap(value =>
+      [{ ...environment, GITHUB_RUN_ID: value }, { ...environment, GITHUB_RUN_ATTEMPT: value }])])
+    expect(() => selectHostedExecutor("hosted", invalid)).toThrow("run selectors");
+  const raw = installedSettingsFixture();
+  const settings = parseSettings({ ...raw, reports: { ...raw.reports, workflow_id: 101 } }), source = "a".repeat(40);
+  const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
+  const run: WorkflowRunInput = { id: 501, run_attempt: 2, workflow_id: 101, path: settings.reports.workflow_path,
+    event: "schedule", status: "in_progress", conclusion: null, head_sha: source, head_branch: "main",
+    repository, head_repository: repository, created_at: "2000-01-01T00:00:00Z", updated_at: "2000-01-01T00:00:00Z" };
+  const identity = { repository: "fixture/docs", repository_id: 10, default_branch: "main", actor: "fixture-bot", actor_id: 20 };
+  const calls: number[][] = [];
+  let observed = run;
+  const options = { entry: "hosted", executor, settings, source, identity,
+    reader: { run(id: number, attempt: number) { calls.push([id, attempt]); return observed; } } };
+  for (const event of ["schedule", "workflow_dispatch"]) for (const suffix of ["", "@main", "@refs/heads/main", "@" + source]) {
+    observed = { ...run, event, path: settings.reports.workflow_path + suffix };
+    expect(readHostedExecutor(options)).toEqual(executor);
+  }
+  expect(calls.every(value => value[0] === 501 && value[1] === 2)).toBe(true);
+  const invalidRuns: WorkflowRunInput[] = [
+    { ...run, id: 502 }, { ...run, run_attempt: 3 }, { ...run, workflow_id: 102 }, { ...run, path: ".github/workflows/another.yml" },
+    { ...run, event: "push" }, { ...run, status: "completed", conclusion: "success" }, { ...run, status: "queued" },
+    { ...run, head_sha: "b".repeat(40) }, { ...run, head_branch: "other" }, { ...run, repository: { ...repository, id: 11 } },
+    { ...run, repository: { ...repository, full_name: "foreign/docs" } }, { ...run, head_repository: null },
+    { ...run, head_repository: { ...repository, id: 11 } }, { ...run, head_repository: { ...repository, full_name: "foreign/docs" } },
+  ];
+  for (const invalid of invalidRuns) { observed = invalid; expect(() => readHostedExecutor(options)).toThrow("native run"); }
+  observed = run;
+  expect(() => readHostedExecutor({ ...options, entry: "interactive" })).toThrow("hosted profile");
+  expect(() => readHostedExecutor({ ...options, identity: { ...identity, repository_id: 11 } })).toThrow("native run");
+  expect(() => readHostedExecutor({ ...options, settings: { ...settings, reports: { ...settings.reports, workflow_id: null } } })).toThrow("reports.workflow_id");
+  expect(() => readHostedExecutor({ ...options, reader: { run() { throw Error("Synthetic unavailable native run"); } } })).toThrow("unavailable native run");
+});

@@ -5,6 +5,9 @@ import { originalPublicationFixture, installOwnedNativeService } from "./origina
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
+import { collectNativeRetained } from "../../../plugins/vh-adlc/scripts/docs-drift/retained-controller";
+import { originalClosureFixture } from "./original-closure-fixture";
+import { checkClosurePublication } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-controller";
 
 test("the retained native controller publishes one exact PR and settles its real owned Git lease", async () => {
   const roots: string[] = [];
@@ -221,3 +224,78 @@ test("native output capacity refusal precedes publication and original resume mu
     for (const root of roots) rmSync(root, { recursive: true, force: true });
   } catch (error) { console.error("Preserved failed native capacity roots", JSON.stringify(roots)); throw error; }
 }, 365000);
+
+
+test("hosted publication retains native executor IDs for inspection and refuses a different resumed job", async () => {
+  const roots: string[] = [];
+  try {
+    const identities = Object.fromEntries(["hosted", "copilot", "claude", "interactive"].map(entry => [entry, { actor: "fixture-bot", actor_id: 20 }]));
+    const f = await originalPublicationFixture(roots, { entry: "hosted", identities }), service = installOwnedNativeService(f);
+    const state = JSON.parse(readFileSync(service.statePath, "utf8"));
+    const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
+    state.workflow_runs = [{ id: 501, run_attempt: 2, workflow_id: f.configured.reports.workflow_id,
+      path: f.configured.reports.workflow_path, event: "schedule", status: "in_progress", conclusion: null,
+      head_sha: f.source, head_branch: "main", repository, head_repository: repository,
+      created_at: "2000-01-01T00:00:00Z", updated_at: "2000-01-01T00:00:00Z" }];
+    writeFileSync(service.statePath, JSON.stringify(state));
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const publication = { ...f.publication, hosted_executor: { run_id: 501, run_attempt: 2 } };
+    state.workflow_runs[0].status = "completed";
+    writeFileSync(service.statePath, JSON.stringify(state));
+    const refused = await controller.checkPublication(publication);
+    expect(refused.complete).toBe(false); expect(refused.diagnostics.join("\n")).toContain("native run");
+    expect(readGit(f.origin, "for-each-ref", "--format=%(refname)", f.configured.publication.lease_ref).toString()).toBe("");
+    expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(0);
+    state.workflow_runs[0].status = "in_progress";
+    writeFileSync(service.statePath, JSON.stringify(state));
+    const result = await f.invoke(run => controller.publishPublication(publication, run));
+    expect(result.state, result.reason ?? undefined).toBe("complete");
+    expect(result.journal.plan).toMatchObject({ hosted_executor: publication.hosted_executor });
+    const before = readFileSync(service.statePath), refs = readGit(f.origin, "for-each-ref");
+    for (const executor of [{ run_id: 502, run_attempt: 2 }, { run_id: 501, run_attempt: 3 }])
+      await expect(f.invoke(run => controller.resumePublication({ ...publication, hosted_executor: executor,
+        journal_directory: result.journal.directory }, run))).rejects.toThrow("controller inputs changed");
+    expect(readFileSync(service.statePath)).toEqual(before); expect(readGit(f.origin, "for-each-ref")).toEqual(refs);
+    const inspected = await collectNativeRetained({ repo: f.repo, source: f.source, artifact_root: f.artifacts,
+      operation_id: result.journal.plan.manifest.operation_id, owner: "inspection-owner", run: "inspect-hosted",
+      credential: f.publication.credential, path: f.publication.path });
+    expect(inspected.outcome, JSON.stringify(inspected.diagnostics)).toBe("collected");
+    if (!inspected.retained_operation) throw Error("Retained operation inspection required");
+    const plan = JSON.parse(readFileSync(join(inspected.retained_operation.inspection_directory, "plan.json"), "utf8"));
+    expect(plan.hosted_executor).toEqual(publication.hosted_executor);
+    expect(readFileSync(service.statePath)).toEqual(before); expect(readGit(f.origin, "for-each-ref")).toEqual(refs);
+    expect(JSON.parse(before.toString()).prs).toHaveLength(1);
+    for (const root of roots) rmSync(root, { recursive: true, force: true });
+  } catch (error) { console.error("Preserved hosted native publication fixture roots", JSON.stringify(roots)); throw error; }
+}, 600000);
+
+
+test("hosted closure seals native executor identity before acquiring its lease", async () => {
+  const roots: string[] = [];
+  try {
+    const identities = Object.fromEntries(["hosted", "copilot", "claude", "interactive"].map(entry => [entry, { actor: "fixture-bot", actor_id: 20 }]));
+    const f = await originalClosureFixture(roots, { entry: "hosted", identities });
+    const settings = f.snapshot.settings, state = JSON.parse(readFileSync(f.service.statePath, "utf8"));
+    const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
+    state.workflow_runs = [{ id: 501, run_attempt: 2, workflow_id: settings.reports.workflow_id, path: settings.reports.workflow_path,
+      event: "workflow_dispatch", status: "in_progress", conclusion: null, head_sha: f.source, head_branch: "main",
+      repository, head_repository: repository, created_at: "2000-01-01T00:00:00Z", updated_at: "2000-01-01T00:00:00Z" }];
+    writeFileSync(f.service.statePath, JSON.stringify(state));
+    state.workflow_runs[0].status = "completed";
+    writeFileSync(f.service.statePath, JSON.stringify(state));
+    const refused = await checkClosurePublication({ ...f.publication, hosted_executor: { run_id: 501, run_attempt: 2 } });
+    expect(refused.complete).toBe(false); expect(refused.diagnostics.join("\n")).toContain("native run");
+    expect(readGit(f.origin, "for-each-ref", "--format=%(refname)", settings.publication.lease_ref).toString()).toBe("");
+    state.workflow_runs[0].status = "in_progress";
+    writeFileSync(f.service.statePath, JSON.stringify(state));
+    const before = readFileSync(f.service.statePath), refs = readGit(f.origin, "for-each-ref");
+    const result = await checkClosurePublication({ ...f.publication, hosted_executor: { run_id: 501, run_attempt: 2 } });
+    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+    expect(result.plan).toMatchObject({ hosted_executor: { run_id: 501, run_attempt: 2 }, context: "production", publication_kind: "resolve" });
+    expect(readFileSync(f.service.statePath)).toEqual(before); expect(readGit(f.origin, "for-each-ref")).toEqual(refs);
+    const calls = readFileSync(f.service.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
+    expect(calls.some(call => call.program === "git" && call.args.includes("push") || call.program === "gh"
+      && ["PATCH", "DELETE", "PUT", "POST"].some(method => call.args.includes(method)) && !call.args.includes("graphql"))).toBe(false);
+    for (const root of roots) rmSync(root, { recursive: true, force: true });
+  } catch (error) { console.error("Preserved hosted closure fixture roots", JSON.stringify(roots)); throw error; }
+}, 600000);

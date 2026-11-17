@@ -1,3 +1,4 @@
+import { readHostedExecutor } from "./hosted-executor";
 import { bindRunJournal, type RunDirectory } from "./run-directory";
 import { runtimePolicyBinding } from "./bootstrap";
 import { policyDigest } from "./journal";
@@ -12,7 +13,7 @@ import { readPublicationAuthority } from "./publication-authority";
 import { capturePublicationInventory, type PublicationInventory } from "./publication-inventory";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { manifestDigest, validateReviewedManifest, workerInputDigest } from "./manifests";
-import { appendIntent, appendInvalidation, publishArtifact, readArtifact, readJournal, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+import { appendIntent, appendInvalidation, publishArtifact, readArtifact, readJournal, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan, type HostedExecutor } from "./journal";
 import { publish, PublicationScopeChanged, type PublicationGate, type PublishOptions } from "./publish";
 import { resumeEffects } from "./recovery";
 import { collectPublicationInputs } from "./publication-inputs";
@@ -25,7 +26,7 @@ import { exactRecord } from "./publication-decisions";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "./protocol";
 import { captureSnapshot, type OwnedObjectStore } from "./snapshot";
 
-type Options = Parameters<typeof collectCandidateReview>[0] & { authority: unknown };
+type Options = Parameters<typeof collectCandidateReview>[0] & { authority: unknown; hosted_executor?: HostedExecutor };
 type Runtime = NonNullable<Awaited<ReturnType<typeof collectPublicationInputs>>["runtime"]>;
 type PublicationFacts = Awaited<ReturnType<typeof collectPublicationInputs>>;
 
@@ -98,7 +99,17 @@ async function currentState(options: Options, inventory?: PublicationInventory, 
   }
   const review: PublicationGate["review"] = { manifest: target.manifest, current: target.manifest, worker: worker.evidence, reviewer: reviewer.evidence,
     policy: { worker: workerPolicy, reviewer: reviewerPolicy }, grants: authority.grants };
-  const policy: PlanPolicy = { ...runtimePolicyBinding(runtime), context: "production", transport: "native", publication_kind: bound.mode!,
+  const binding = runtimePolicyBinding(runtime);
+  let hostedExecutor: HostedExecutor | undefined;
+  if (options.hosted_executor) {
+    if (!("policy_sha256" in binding)) throw new SetupRequired("Hosted attribution requires the version-two production runtime");
+    const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential,
+      path: options.path, comparison_identity: facts.identity });
+    hostedExecutor = readHostedExecutor({ entry: options.entry, executor: options.hosted_executor, settings, source: options.source,
+      identity: native.identity, reader: native.repository });
+  }
+  const policy: PlanPolicy = { ...binding, ...(hostedExecutor === undefined ? {} : { hosted_executor: hostedExecutor }),
+    context: "production", transport: "native", publication_kind: bound.mode!,
     pr_draft: settings.publication.pr_state[bound.mode!] === "draft",
     ...(settings.schema_version === 2 || settings.publication.entry_actors ? { publisher_entry: options.entry } : {}), worker: workerPolicy, reviewer: reviewerPolicy };
   const plan = sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy, corrections: bound.corrections, attention: bound.attention,
@@ -126,7 +137,8 @@ function invocationDigest(options: Options): string {
     artifact_root: realpathSync(options.artifact_root), cache: realpathSync(options.cache_directory), entry: options.entry,
     launcher: realpathSync(options.launcher_path), settings: realpathSync(options.settings_path), selection: options.selection,
     source_verification: options.source_verification, candidate_verification: options.candidate_verification, decisions: options.decisions,
-    worker_capture: options.worker_capture, reviewer_capture: options.reviewer_capture, authority: options.authority, resolution_record: options.resolution_record ?? null });
+    worker_capture: options.worker_capture, reviewer_capture: options.reviewer_capture, authority: options.authority, resolution_record: options.resolution_record ?? null,
+    ...(options.hosted_executor === undefined ? {} : { hosted_executor: options.hosted_executor }) });
 }
 function readInvocation(options: Options, plan: SealedPlan) {
   const bytes = readArtifact(join(options.artifact_root, plan.manifest.operation_id + ".controller.json"));

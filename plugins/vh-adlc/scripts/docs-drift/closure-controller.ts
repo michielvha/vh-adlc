@@ -1,3 +1,4 @@
+import { readHostedExecutor } from "./hosted-executor";
 import { bindRunJournal, type RunDirectory } from "./run-directory";
 import { sameAccount } from "./identity";
 import { runtimePolicyBinding, selectOriginalOperationRuntime } from "./bootstrap";
@@ -9,7 +10,7 @@ import { collectClosureReview } from "./closure-worker";
 import { ArtifactChanged } from "./evidence-input";
 import { readGit } from "./git";
 import { appendIntent, appendInvalidation, publishArtifact, readArtifact, readJournal, sealPlan, writePublicationObjects,
-  type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+  type Journal, type PlanPolicy, type SealedPlan, type HostedExecutor } from "./journal";
 import { manifestDigest, validateReviewedManifest, workerInputDigest } from "./manifests";
 import { OUTPUT_LIMIT } from "./owned-process";
 import { readPublicationAuthority } from "./publication-authority";
@@ -22,7 +23,7 @@ import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from 
 import { loadCommittedSettings } from "./settings";
 import { createNativeTransport, readNativeContext, withNativeObservation, NativeObservationChanged } from "./transport";
 
-type Options = Omit<Parameters<typeof collectClosureReview>[0], "closure_inventory" | "observation"> & { authority: unknown };
+type Options = Omit<Parameters<typeof collectClosureReview>[0], "closure_inventory" | "observation"> & { authority: unknown; hosted_executor?: HostedExecutor };
 function requireExecutingRuntime(runtime: { component: { directory: string } }): void {
   if (realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/closure-controller.ts"))
     throw Error("Retained executing closure controller required");
@@ -35,8 +36,9 @@ async function currentState(options: Options, inventory?: ClosureInventory, expe
     comparison_identity: expected ? { repository: expected.manifest.repository, repository_id: expected.manifest.repository_id,
       actor: expected.manifest.actor, actor_id: expected.manifest.actor_id, default_branch: settings.default_branch } : undefined };
   let checked: Awaited<ReturnType<typeof collectClosureReview>>;
+  let hostedExecutor: HostedExecutor | undefined;
   try {
-    checked = await withNativeObservation(scope, async observation => {
+    checked = await withNativeObservation({ ...scope, collection: options.hosted_executor ? "audit" : undefined }, async observation => {
       const native = readNativeContext({ ...scope, observation });
       if (native.default_commit !== options.source || expected && (native.identity.repository_id !== expected.manifest.repository_id
         || !sameAccount(native.identity, expected.manifest)))
@@ -48,6 +50,8 @@ async function currentState(options: Options, inventory?: ClosureInventory, expe
           throw new PublicationScopeChanged("Original closure worker or native inputs changed");
         throw Error(result.diagnostics.join("\n") || "Current closure review unavailable");
       }
+      if (options.hosted_executor) hostedExecutor = readHostedExecutor({ entry: options.entry, executor: options.hosted_executor,
+        settings, source: options.source, identity: native.identity, reader: native.repository });
       return result;
     });
   } catch (error) {
@@ -76,7 +80,10 @@ async function currentState(options: Options, inventory?: ClosureInventory, expe
   }
   const review: PublicationGate["review"] = { manifest, current: manifest, worker: worker.evidence, reviewer: reviewer.evidence,
     policy: { worker: workerPolicy, reviewer: reviewerPolicy }, grants: authority.grants };
-  const policy: PlanPolicy = { ...runtimePolicyBinding(runtime), context: "production", transport: "native", publication_kind: "resolve",
+  const binding = runtimePolicyBinding(runtime);
+  if (hostedExecutor && !("policy_sha256" in binding)) throw Error("Hosted attribution requires the version-two production runtime");
+  const policy: PlanPolicy = { ...binding, ...(hostedExecutor === undefined ? {} : { hosted_executor: hostedExecutor }),
+    context: "production", transport: "native", publication_kind: "resolve",
     pr_draft: settings.publication.pr_state.resolve === "draft",
     ...(settings.schema_version === 2 || settings.publication.entry_actors ? { publisher_entry: options.entry } : {}), worker: workerPolicy, reviewer: reviewerPolicy };
   const plan = sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy, corrections: [], attention: [] });
@@ -97,7 +104,8 @@ export async function checkClosurePublication(input: Options) {
 function invocationDigest(options: Options): string {
   return canonicalDigest({ repo: realpathSync(options.repo), source: options.source, artifact_root: realpathSync(options.artifact_root),
     cache: realpathSync(options.cache_directory), entry: options.entry, launcher: realpathSync(options.launcher_path), settings: realpathSync(options.settings_path),
-    selection: options.selection, worker_capture: options.worker_capture, reviewer_capture: options.reviewer_capture, authority: options.authority });
+    selection: options.selection, worker_capture: options.worker_capture, reviewer_capture: options.reviewer_capture, authority: options.authority,
+    ...(options.hosted_executor === undefined ? {} : { hosted_executor: options.hosted_executor }) });
 }
 function readInvocation(options: Options, plan: SealedPlan) {
   const bytes = readArtifact(join(options.artifact_root, plan.manifest.operation_id + ".closure-controller.json"));

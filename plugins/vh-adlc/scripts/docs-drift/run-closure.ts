@@ -13,6 +13,7 @@ import { publishClosure, resumeClosure } from "./closure-controller";
 import { readResolutionProposal } from "./resolve-inputs";
 import { captureConfiguredRole } from "./role-process";
 import { readAdoptedRolePolicy } from "./role-capture";
+import { selectHostedExecutor } from "./hosted-executor";
 
 type ClosureResult = { kind: "publication"; result: Awaited<ReturnType<typeof publishClosure>> }
   | { kind: "complete" | "review"; artifacts: Record<string, { path: string; sha256: string }> };
@@ -35,9 +36,11 @@ export async function runClosure(options: { repo: string; run: RunDirectory }): 
     credential, cache_directory: run.directory, entry: run.manifest.entry,
     launcher_path: join(import.meta.dir, "cli.ts"), settings_path: join(repo, ".vh-adlc/docs-drift.yaml") };
   if (latestRunArtifact(run, "closure_review")) {
+    const hostedExecutor = selectHostedExecutor(run.manifest.entry, process.env);
     const manifest = parseActionManifest(JSON.parse(decodeUTF8(read("reviewed_plan").bytes)));
     run = recordRunApproval({ repo, run, manifest, command: "close" });
-    const inputs = { ...common, selection: JSON.parse(decodeUTF8(read("closure_selection").bytes)) as unknown,
+    const inputs = { ...common, ...(hostedExecutor === undefined ? {} : { hosted_executor: hostedExecutor }),
+      selection: JSON.parse(decodeUTF8(read("closure_selection").bytes)) as unknown,
       worker_capture: read("worker_capture").reference, reviewer_capture: read("reviewer_capture").reference, authority: read("approval").reference };
     const journal = latestRunArtifact(run, "journal");
     const result = journal ? await resumeClosure({ ...inputs, journal_directory: dirname(join(run.directory, journal.path)) }, run)

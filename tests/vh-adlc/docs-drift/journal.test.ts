@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { appendIntent, appendAttempt, appendAttemptEnd, appendRetirement, appendOutcome, createJournal, readJournal, readRetainedPlan, readVerifiedPlan, sealPlan, writePlanObject, writePublicationObjects, publicationObjectIDs } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendIntent, appendAttempt, appendAttemptEnd, appendRetirement, appendOutcome, createJournal, readJournal, readRetainedPlan, readVerifiedPlan, sealPlan, policyBinding, writePlanObject, writePublicationObjects, publicationObjectIDs } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { createOwnedObjectStore, captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -388,4 +388,35 @@ test.each(["production-native", "trial-native", "trial-collector"] as const)("ve
     for (const changed of [{ ...launch, head_commit: "f".repeat(40) }, { ...launch, actor_id: 21 }, { ...launch, repository_id: 11 }])
       expect(() => readRetainedPlan(canonicalJSON({ ...plan, trial_launch: changed }))).toThrow("native trial launch manifest changed");
   }
+});
+
+
+test("hosted production plans retain native executor identity through policy checks and re-sealing", () => {
+  const input = fixture(bindings, undefined, "hosted-operation", { actor: "fixture-bot", actor_id: 20, publisher_entry: "hosted" });
+  const reviewed = validateReviewedManifest(input);
+  const policy = { schema_version: 2 as const, policy_sha256: hash("original production checklist"),
+    component: { plugin_version: "0.25.0", source_commit: "d".repeat(40), component_sha256: hash("component") },
+    context: "production" as const, transport: "native" as const, publication_kind: "advisory" as const,
+    publisher_entry: "hosted", pr_draft: true, worker: role, reviewer: role };
+  const options = { reviewed, grants: input.grants, corrections: [], attention: [] };
+  const old = sealPlan({ ...options, ...policy }), oldBytes = canonicalJSON(old);
+  expect(canonicalJSON(readRetainedPlan(oldBytes))).toEqual(oldBytes);
+  expect(Object.hasOwn(old, "hosted_executor")).toBe(false);
+  const selected = { ...policy, hosted_executor: { run_id: 501, run_attempt: 2 } };
+  const plan = sealPlan({ ...options, ...selected });
+  expect(plan).toMatchObject({ hosted_executor: selected.hosted_executor });
+  expect(policyBinding(plan)).toMatchObject({ hosted_executor: selected.hosted_executor });
+  expect(readVerifiedPlan(canonicalJSON(plan), () => selected)).toEqual(plan);
+  expect(sealPlan({ ...options, ...selected, ...policyBinding(plan) })).toEqual(plan);
+  expect(() => readVerifiedPlan(canonicalJSON(plan), () => ({ ...selected, hosted_executor: { run_id: 502, run_attempt: 2 } }))).toThrow("policy");
+  expect(() => readVerifiedPlan(canonicalJSON(plan), () => ({ ...selected, hosted_executor: { run_id: 501, run_attempt: 3 } }))).toThrow("policy");
+  for (const executor of [{ run_id: 0, run_attempt: 2 }, { run_id: 501, run_attempt: -1 }, { run_id: 1.5, run_attempt: 1 },
+    { run_id: Number.MAX_SAFE_INTEGER + 1, run_attempt: 1 }, { run_id: 501 }, { run_id: 501, run_attempt: 2, other: true }])
+    expect(() => readRetainedPlan(canonicalJSON({ ...plan, hosted_executor: executor }))).toThrow();
+  for (const transport of ["native", "collector"])
+    expect(() => readRetainedPlan(canonicalJSON({ ...plan, context: "trial", transport }))).toThrow();
+  const localInput = fixture(), localPlan = sealPlan({ ...options, reviewed: validateReviewedManifest(localInput), grants: localInput.grants, ...policy });
+  expect(() => readRetainedPlan(canonicalJSON({ ...localPlan, hosted_executor: selected.hosted_executor }))).toThrow();
+  const { plan: versionOne } = setup();
+  expect(() => readRetainedPlan(canonicalJSON({ ...versionOne, hosted_executor: selected.hosted_executor }))).toThrow();
 });

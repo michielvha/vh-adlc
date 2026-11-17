@@ -38,9 +38,17 @@ Choose the consumer's publisher accounts during setup. The example's scalar
 `publication.actor` works with a common publisher. A consumer using a hosted
 bot and an interactive owner can add the complete `publication.entry_actors`
 map for its configured execution profiles, along with matching
-`pr_discovery.authors` and branch coverage. The example's `interactive` and
-`hosted` profiles can be invoked from any supported harness. Preserve each
-publisher's native numeric account identity in the retained operation evidence.
+`pr_discovery.authors` and branch coverage. Use `interactive` from a local agent
+harness. Reserve `hosted` for GitHub Actions production effects, with
+`GITHUB_ACTIONS=true`, `GITHUB_RUN_ID` and `GITHUB_RUN_ATTEMPT` supplied by the job.
+Other profiles are local and refuse Actions production effects.
+
+The staged example starts with `reports.workflow_id` set to `null`. After creating
+your repository's workflow, obtain its actual numeric ID through GitHub and set
+that field, together with its `reports.workflow_path`. Hosted publication and
+closure require the native run to match this workflow and the exact assessed
+source commit. Preserve each publisher's native numeric account identity in the
+retained operation evidence.
 The committed preflight checklist records the consumer's setup and trial results.
 
 The included dispatch-only workflow is a staged collection diagnostic. Before

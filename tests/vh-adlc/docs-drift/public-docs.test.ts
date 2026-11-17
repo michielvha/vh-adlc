@@ -33,3 +33,13 @@ test("public docs-drift setup templates pass the real argument parser", () => {
     expect(parsed.source).toBe("a".repeat(40));
   }
 });
+
+
+test.each(["plugins/vh-adlc/references/docs-drift-settings.md", "plugins/vh-adlc/examples/docs-drift/README.md"])(
+  "%s explains reserved hosted production execution", path => {
+    const text = readFileSync(resolve(root, path), "utf8").replace(/\s+/gu, " ");
+    for (const token of ["`hosted`", "`GITHUB_ACTIONS=true`", "`GITHUB_RUN_ID`", "`GITHUB_RUN_ATTEMPT`", "`reports.workflow_id`"]) expect(text).toContain(token);
+    expect(text).toContain("Other profiles are local and refuse Actions production effects.");
+    expect(text).not.toContain("`hosted` profiles can be invoked from any supported harness");
+  },
+);

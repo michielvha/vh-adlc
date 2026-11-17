@@ -19,7 +19,11 @@ export type NativeTrialLaunch = {
   hostname: string; repository: string; repository_id: number; actor: string; actor_id: number;
   workflow_id: number; workflow_path: string; event: "workflow_dispatch"; head_commit: string; run_id: number; run_attempt: number;
 };
-type CurrentPolicyBinding = { schema_version: 2; policy_sha256: string; component: InstalledComponentBinding; trial_launch?: NativeTrialLaunch };
+export type HostedExecutor = { run_id: number; run_attempt: number };
+type CurrentPolicyBinding = {
+  schema_version: 2; policy_sha256: string; component: InstalledComponentBinding;
+  trial_launch?: NativeTrialLaunch; hosted_executor?: HostedExecutor;
+};
 export type PolicyBinding = LegacyPolicyBinding | CurrentPolicyBinding;
 type PlanContents = {
   manifest: ActionManifest; manifest_sha256: string; approval_sha256: string; context: "production" | "trial"; transport: "native" | "collector";
@@ -38,7 +42,8 @@ export type PlanPolicy = PolicyBinding & {
 export function policyBinding(value: PolicyBinding): PolicyBinding {
   return "policy_sha256" in value
     ? { schema_version: 2, policy_sha256: value.policy_sha256, component: structuredClone(value.component),
-      ...(value.trial_launch === undefined ? {} : { trial_launch: structuredClone(value.trial_launch) }) }
+      ...(value.trial_launch === undefined ? {} : { trial_launch: structuredClone(value.trial_launch) }),
+      ...(value.hosted_executor === undefined ? {} : { hosted_executor: structuredClone(value.hosted_executor) }) }
     : { adoption_sha256: value.adoption_sha256 };
 }
 export function policyDigest(value: PolicyBinding): string {
@@ -83,6 +88,12 @@ function identifier(value: unknown): string {
   if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/u.test(value)) fail("invalid identifier");
   return value;
 }
+export function parseHostedExecutor(value: unknown): HostedExecutor {
+  const executor = exact(value, ["run_id", "run_attempt"]);
+  if (![executor.run_id, executor.run_attempt].every(value => typeof value === "number" && Number.isSafeInteger(value) && value > 0))
+    fail("invalid hosted executor");
+  return freezeJSON(executor as HostedExecutor);
+}
 export function parseTrialLaunch(value: unknown): NativeTrialLaunch {
   const launch = exact(value, ["hostname", "repository", "repository_id", "actor", "actor_id", "workflow_id", "workflow_path", "event", "head_commit", "run_id", "run_attempt"]);
   if (![launch.hostname, launch.repository, launch.actor, launch.workflow_path, launch.head_commit].every(value =>
@@ -116,9 +127,11 @@ function parsePlan(value: unknown): SealedPlan {
   const version = value !== null && typeof value === "object" ? Reflect.get(value, "schema_version") : undefined;
   const nativeTrial = version === 2 && Reflect.get(value as object, "context") === "trial" && Reflect.get(value as object, "transport") === "native";
   const hasLaunch = value !== null && typeof value === "object" && Object.hasOwn(value, "trial_launch");
+  const nativeProduction = version === 2 && Reflect.get(value as object, "context") === "production" && Reflect.get(value as object, "transport") === "native";
+  const hasExecutor = value !== null && typeof value === "object" && Object.hasOwn(value, "hosted_executor");
   const input = exact(value, ["schema_version", "manifest", "manifest_sha256", ...(version === 2 ? ["approval_sha256", "policy_sha256", "component"] : ["approval_sha256", "adoption_sha256"]),
     "context", "transport", "publication_kind", "review_verdict", "roles", "corrections", "attention", ...(hasProof ? ["candidate_verification_sha256"] : []),
-    ...(nativeTrial && hasLaunch ? ["trial_launch"] : [])]);
+    ...(nativeTrial && hasLaunch ? ["trial_launch"] : []), ...(nativeProduction && hasExecutor ? ["hosted_executor"] : [])]);
   const proof = hasProof ? hash(input.candidate_verification_sha256) : undefined;
   if ((input.schema_version !== 1 && input.schema_version !== 2) || input.review_verdict !== "clean" || !["production", "trial"].includes(String(input.context))
     || !["native", "collector"].includes(String(input.transport)) || (input.context === "production" && input.transport !== "native")) fail("plan context or verdict");
@@ -127,6 +140,10 @@ function parsePlan(value: unknown): SealedPlan {
     hash(input.approval_sha256); hash(input.policy_sha256); parseComponentBinding(input.component);
   } else { hash(input.approval_sha256); hash(input.adoption_sha256); }
   const manifest = parseActionManifest(input.manifest);
+  if (hasExecutor) {
+    parseHostedExecutor(input.hosted_executor);
+    if (manifest.publisher_entry !== "hosted") fail("hosted executor requires the hosted profile");
+  }
   if (nativeTrial && hasLaunch) {
     const launch = parseTrialLaunch(input.trial_launch);
     if (launch.head_commit !== manifest.bindings.source_commit || launch.repository.toLowerCase() !== manifest.repository.toLowerCase()
@@ -175,6 +192,8 @@ export function sealPlan(options: SealOptions & CurrentPolicyBinding): CurrentSe
 export function sealPlan(options: SealOptions & PolicyBinding): SealedPlan;
 export function sealPlan(options: SealOptions & PolicyBinding): SealedPlan {
   requireReviewedManifest(options.reviewed);
+  if ("hosted_executor" in options && options.hosted_executor !== undefined && !("policy_sha256" in options))
+    fail("hosted executor requires a version-two production plan");
   if ("policy_sha256" in options && options.context === "trial" && options.transport === "native" && options.trial_launch === undefined)
     fail("native trial launch required for a new plan");
   const { manifest, manifest_sha256, worker, reviewer } = options.reviewed;
@@ -184,7 +203,8 @@ export function sealPlan(options: SealOptions & PolicyBinding): SealedPlan {
   return parsePlan({
     ...("policy_sha256" in options
       ? { schema_version: 2, approval_sha256: sha256(canonicalJSON(options.grants)), policy_sha256: options.policy_sha256, component: options.component,
-        ...(options.trial_launch === undefined ? {} : { trial_launch: options.trial_launch }) }
+        ...(options.trial_launch === undefined ? {} : { trial_launch: options.trial_launch }),
+        ...(options.hosted_executor === undefined ? {} : { hosted_executor: options.hosted_executor }) }
       : { schema_version: 1, approval_sha256: sha256(canonicalJSON(options.grants)), adoption_sha256: options.adoption_sha256 }),
     manifest, manifest_sha256, context: options.context, transport: options.transport,
     publication_kind: options.publication_kind, review_verdict: "clean", roles: { worker: workerBinding, reviewer: reviewerBinding },
