@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revising mixed legacy-plan compatibility after the paired migration review; safe older-plan fixes are approved."
+status: planned
+status_description: "R-122 accepted; ready to implement the reviewed mixed-plan compatibility correction."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -1718,6 +1718,8 @@ None. On 2026-11-17 the owner accepts the R-117 compatibility recommendations. T
 | 2026-11-17 | R-119 | spec | `b649fdba41a8da090c5bd67934d3401113661291` | claude-opus-5-5 | procedural | 3 should-fix, 2 nit. |
 | 2026-11-17 | R-120 | spec | `bf34f8ac8e50540b9702d15a405117275c08b9fc` | claude-opus-5-5 | procedural | 2 should-fix, 2 nit. |
 | 2026-11-17 | R-121 | spec | `dbb524ef7194f2e6a2d5c5c87d8cd028c4a04c1e` | claude-opus-5-5 | procedural | 2 should-fix, 2 nit. |
+| 2026-11-17 | R-122 | spec | `f649b7aa4f7514436c710f4e845e5f11e1526e99` | claude-opus-5-5 | procedural | No findings. |
+| 2026-11-17 | R-122 | spec | `f649b7aa4f7514436c710f4e845e5f11e1526e99` | n/a | n/a | accepted by owner |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -3433,6 +3435,10 @@ SEVERITY: nit
 WHERE: Design "Migration, compatibility and rollout" binding-order paragraph (line 821, "Every adopter and every successor uses the same editing-policy digest"); Test Plan AC-07 row (line 855, "Refuse a declaration change after adoption without a reviewed successor checklist even while settings and component remain identical"); Tasks T155 ("Bind its declaration values through the shared configuration digest")
 EVIDENCE: These sentences come from R-119's single envelope, which bound every declaration. This revision has two source-selected forms and binds only the `local_documents` projection and coverage. Legacy digest-bound row changes now explicitly need no successor checklist ("Their established document-digest refresh and writer-coordination procedures apply without a successor checklist"; AC-07 "Editing a digest-declared document and refreshing its row, and adding/removing an old writer row, retain their existing eligibility"). Read alone, "the same editing-policy digest", "a declaration change" and "its declaration values" still describe the old whole-declaration binding. The surrounding sentences resolve the meaning, so nothing built or proved changes.
 PROPOSAL: Reword them as "the same source-selected digest rule", "a projected `local_documents` or local-coverage change" and "its projected `local_documents` and coverage values".
+
+### R-122
+
+NO FINDINGS
 
 ## Sources
 
