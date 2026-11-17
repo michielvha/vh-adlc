@@ -1,4 +1,4 @@
-import{test,expect}from"bun:test";
+import{test,expect,spyOn}from"bun:test";
 import{existsSync,mkdtempSync,readFileSync,rmSync}from"node:fs";
 import{join}from"node:path";
 import{runOwnedClient}from"../../../plugins/vh-adlc/scripts/triage/owned-process";
@@ -98,5 +98,28 @@ test("completion requires the expected exit and complete cleanup observations", 
   for (const changed of [{ exit_code: 1 }, { reaped: false }, { timed_out: true }, { cancelled: "SIGINT" },
     { output_limit: true }, { confirmed: false }, { group_absent: false }, { survivors: [123] }, { boundary: "unknown" }]) {
     expect(ownedClientCompleted({ ...complete, ...changed })).toBe(false);
+  }
+});
+
+
+test.each(["gone", "unknown"] as const)("cleanup uses the final group observation after a denied signal: %s", async state => {
+  const root = mkdtempSync("/tmp/triage-owned-denied-exit-");
+  const originalKill = process.kill;
+  let ownedPid = 0;
+  const kill = spyOn(process, "kill").mockImplementation((pid, signal) => {
+    if (pid === -ownedPid && (signal === "SIGTERM" || state === "unknown" && signal === 0))
+      throw Object.assign(Error("Synthetic denied owned-group signal"), { code: "EPERM" });
+    return originalKill.call(process, pid, signal);
+  });
+  try {
+    const result = await runOwnedClient([process.execPath, "-e", "process.exit(0)"],
+      { cwd: root, env: { PATH: process.env.PATH ?? "/usr/bin" }, stdout: join(root, "stdout"), stderr: join(root, "stderr"),
+        started: pid => { ownedPid = pid; } },
+      { timeout_ms: 2000, grace_ms: 50, reap_ms: 1000 });
+    expect(result.signals).toContainEqual({ signal: "SIGTERM", accepted: false, error: "EPERM" });
+    expect(result).toMatchObject({ exit_code: 0, reaped: true, survivors: [], group_absent: state === "gone", confirmed: state === "gone" });
+  } finally {
+    kill.mockRestore();
+    rmSync(root, { recursive: true, force: true });
   }
 });

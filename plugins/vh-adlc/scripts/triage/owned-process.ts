@@ -188,11 +188,10 @@ export async function runOwnedClient(argv: string[], options: OwnedOptions,
     checkOutputs();
     const captured = capturedResult ? await capturedResult : null;
     if (startupFailure) throw startupFailure.error;
-    const failedSignal = signals.some(record => !record.accepted && record.error !== "ESRCH");
     return { pid: child.pid, exit_code: final?.exit ?? -1, timed_out: timedOut, reaped: final !== null, signals,
       cancelled, output_limit: outputLimit,
       ...(captured?.value ? { captured: { stdout: captured.value[0], stderr: captured.value[1] } } : {}),
-      group_absent: groupAbsent, survivors, confirmed: final !== null && groupGone && survivors.length === 0 && !failedSignal, boundary };
+      group_absent: groupAbsent, survivors, confirmed: final !== null && groupGone && survivors.length === 0, boundary };
   } finally {
     clearTimeout(timeout); clearInterval(monitor); clearTimeout(captureDeadline);
     options.signal?.removeEventListener("abort", abort);
