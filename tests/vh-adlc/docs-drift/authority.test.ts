@@ -1,8 +1,10 @@
 /** Static entry/policy integration. Native effect enforcement is exercised in publication/recovery authority suites. */
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { docsDriftIntakeCases } from "../lifecycle/docs-drift-intake-cases";
+import { commitAll, git } from "./repository-fixture";
 
 const plugin = resolve(import.meta.dir, "../../../plugins/vh-adlc");
 const read = (path: string) => readFileSync(resolve(plugin, "references", path), "utf8");
@@ -61,3 +63,55 @@ test("review protocol dispatches docs-drift through its bound role captures and 
     expect(section).toContain(requirement);
   for (const original of ["--operation \"spec review\"", "--operation review", "exact commit", "Self-review"]) expect(text).toContain(original);
 });
+
+test("administrative abandonment documents exact atomic deletion and stopped native executor eligibility", () => {
+  const procedure = read("docs-drift-review.md").split("## Lost hosted origin and administrative abandonment\n")[1]?.split("\n## ")[0];
+  expect(procedure).toBeDefined();
+  const prose = procedure?.replace(/\s+/gu, " ");
+  for (const requirement of ["original executor has stopped", "hosted_executor", "trial_launch", "Collector-only trials",
+    "same operation", "terminal", "workflow_id", "workflow_path", "head_sha", "run_attempt", "--atomic",
+    "--force-with-lease=", "stale or missing", "both refs unchanged", "Lease-only deletion", "fresh green report",
+    "unknown", "no delivery or settlement proof"])
+    expect(prose).toContain(requirement);
+  const row = read("authority.md").split("\n").find(line => line.startsWith("| Administrative abandonment |"));
+  for (const requirement of ["stopped", "same operation", "atomic", "both", "stale", "trial_launch", "collector"])
+    expect(row).toContain(requirement);
+});
+
+test.each(["matching", "stale-lease", "stale-receipt", "missing-receipt", "unsupported-atomic"])(
+  "ordinary Git abandonment deletes both approved refs or preserves the entire selection: %s", fault => {
+    const root = mkdtempSync(join(tmpdir(), "vh-drift-abandonment-"));
+    try {
+      const repo = join(root, "owned-store"), origin = join(root, "origin.git");
+      mkdirSync(repo);
+      git(repo, "init", "-q", "-b", "main");
+      writeFileSync(join(repo, "plan.json"), "Synthetic original plan\n");
+      const approved = commitAll(repo);
+      writeFileSync(join(repo, "plan.json"), "Synthetic changed plan\n");
+      const changed = commitAll(repo);
+      git(repo, "init", "--bare", origin);
+      const lease = "refs/heads/docs-drift-lease", receipt = "refs/heads/docs-drift-receipts/selected";
+      const terminal = "refs/heads/docs-drift-receipts/terminal";
+      git(repo, "push", origin, approved + ":" + lease, approved + ":" + receipt, changed + ":" + terminal);
+      if (fault === "stale-lease") git(origin, "update-ref", lease, changed, approved);
+      if (fault === "stale-receipt") git(origin, "update-ref", receipt, changed, approved);
+      if (fault === "missing-receipt") git(origin, "update-ref", "-d", receipt, approved);
+      if (fault === "unsupported-atomic") git(origin, "config", "receive.advertiseAtomic", "false");
+      const before = git(origin, "for-each-ref");
+      const result = Bun.spawnSync(["git", "-C", repo, "push", "--atomic", origin,
+        "--force-with-lease=" + lease + ":" + approved, "--force-with-lease=" + receipt + ":" + approved,
+        ":" + lease, ":" + receipt], { stdout: "pipe", stderr: "pipe" });
+      if (fault === "matching") {
+        expect(result.exitCode, result.stderr.toString()).toBe(0);
+        expect(git(origin, "for-each-ref", "--format=%(refname)")).toBe(terminal);
+      } else {
+        expect(result.exitCode).not.toBe(0);
+        expect(git(origin, "for-each-ref")).toBe(before);
+      }
+      expect(git(origin, "rev-parse", terminal)).toBe(changed);
+      rmSync(root, { recursive: true, force: true });
+    } catch (error) {
+      console.error("Preserved atomic abandonment fixture", root);
+      throw error;
+    }
+  });

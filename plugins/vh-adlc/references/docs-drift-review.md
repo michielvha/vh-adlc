@@ -140,24 +140,63 @@ records. [Recovery controller](../scripts/docs-drift/recovery-controller.ts),
 
 ## Lost hosted origin and administrative abandonment
 
-For an unresolved operation whose original hosted runner and ownership are
-lost, preserve the ordinary inspect/restore output as
-`abandonment-inspection.json`. Retain the exact current owner approval beside
-it in `approval.txt`. Name the repository, operation, selected lease/receipt
-refs and each observed object ID. Record unknown native outcomes as unknown.
+This is an outside-helper administrative procedure after original ownership
+is lost. Preserve ordinary inspect/restore output as
+`abandonment-inspection.json`. An administrator must confirm that the original
+executor has stopped before deleting refs, including any request already in
+flight. Native job completion establishes executor quiescence. It supplies no
+delivery or settlement proof for accepted requests whose outcomes remain unknown.
 
-The owner-approved administrator can use ordinary Git compare-and-swap against
-only those exact ref/object pairs. Reobserve changed refs and obtain new exact
-approval. Lease-only cleanup can leave an unresolved receipt, so the next
-scheduled worker must keep its pending report until that evidence is resolved
-or separately abandoned. Completed and otherwise terminal receipts retain their
-refs indefinitely.
+For production, inspect the retained version-two native `plan.json` and its
+`hosted_executor.run_id` and `hosted_executor.run_attempt`. Read that exact
+attempt through the authenticated native workflow-run reader. Retain its
+terminal execution-status observation with the inspection. Check repository
+name and ID, head repository, configured default branch, `reports.workflow_id`,
+`reports.workflow_path`, supported schedule/manual event and exact `head_sha`
+against the plan's assessed source commit. A missing identity in an older plan,
+a missing/mismatched native attempt or an active job is ineligible. Preserve
+the original-implementation handoff for version-one evidence.
+
+For an interrupted native test trial, use its existing `trial_launch` run ID
+and `run_attempt`. Match the terminal native observation against that launch's
+repository, head commit, workflow ID/path and manual event. Keep the exact
+original trial namespace. Collector-only trials are ineligible. These checks
+reuse the inspected plan and native reader. They add no takeover or replay
+permission.
+
+Select exactly the present lease and its same operation's single validated
+receipt. Verify the lease and receipt metadata contain the same immutable plan,
+operation, repository and expected refs. Keep the observed object IDs. A
+foreign, terminal, extra or receipt-only selection is ineligible. Completed and
+other terminal receipts retain their refs indefinitely. The administrator must
+retain evidence linking the stopped executor to this selected operation.
+
+Obtain the owner's actual current approval in `approval.txt`, naming the
+repository, operation, both refs, both observed object IDs and the exact atomic
+deletions. Standing procedures and general cleanup permission supply no such
+approval. Use ordinary Git compare-and-swap in one atomic push from the owned
+object store, with the approved repository remote and all four approved values.
+
+```sh
+git -C "$owned_store" push --atomic "$repository_remote" \
+  "--force-with-lease=$lease_ref:$lease_oid" \
+  "--force-with-lease=$receipt_ref:$receipt_oid" \
+  ":$lease_ref" ":$receipt_ref"
+```
+
+A stale or missing approved ref rejects the entire push with both refs unchanged.
+A server without atomic-push support must also reject the attempt. Retain the
+result and fresh native ref observations. Reobserve any changed scope and obtain
+new exact approval before retrying. Keep the inspection, stopped-executor
+evidence, approval and original records available for reconciliation.
 
 Administrative abandonment supplies no delivery or settlement proof and adds
-no terminal event to an observation-only journal. After the exact approved refs
-are removed, the next job must collect current source and proposal state and
-obtain fresh review and approval. Keep the inspection, approval and original
-evidence available for the operator's reconciliation.
+no terminal event to an observation-only journal. After deletion, subsequent
+work collects current source and proposal state and obtains fresh review and
+approval. It cannot replay the lost operation. Lease-only deletion is unsupported
+and can allow a fresh green report while an orphan receipt remains. Receipts
+alone hold the immutable plan, without durable completion status. A fresh report
+supplies no settlement claim for that orphan or its unknown effects.
 
 ## Delivery acknowledgement
 
