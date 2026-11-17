@@ -81,9 +81,13 @@ obligations when adapting this staged example.
 ## Flat preflight checklist
 
 After the required tests and paired review, create one checklist from the staged
-consumer commit C. `normalizedConfigurationDigest` in `scripts/docs-drift/preflight.ts`
-binds the parsed configuration, omitting `publication.mode` and
-`publication.checklist_path`. `preflightReviewTarget` binds C, that configuration,
+consumer commit C. `committedConfigurationDigest` in `scripts/docs-drift/preflight.ts`
+reads that commit's companion and binds the parsed configuration, omitting
+`publication.mode` and `publication.checklist_path`. A companion without
+`local_documents` keeps the settings-only digest. Its presence binds the declared
+new rows and complete parsed local-coverage value in the documented envelope.
+Use the settings reference for optional mixed-root plan editing rules.
+`preflightReviewTarget` binds C, that configuration,
 the component and the exact proposed activation files, including their modes and
 before/after hashes. These values are available before activation.
 

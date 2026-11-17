@@ -86,6 +86,42 @@ recovery. The selected client, worker and reviewer retain separate original
 invocations and targets. Runtime hashes and checklists carry owner attestations
 and retained-byte integrity.
 
+## Mixed-root plan editing settings
+
+Put these optional declarations in the frontmatter of `project_procedure`.
+Each `local_documents` row has exactly the four fields shown. Use documentation
+patterns and explicit exclusions to keep classifications disjoint.
+
+```yaml
+docs_drift_protection:
+  local_documents:
+    - patterns: [docs/plans/README.md]
+      exclude_patterns: []
+      kind: ordinary
+      editable_parts: []
+    - patterns: [docs/plans/**]
+      exclude_patterns: [docs/plans/README.md]
+      kind: plan
+      editable_parts: [frontmatter, acceptance-checkboxes]
+docs_drift_local_coverage:
+  dialect: documentation
+  terminal_statuses: [complete, archived]
+  statuses: [planned, in-progress, complete, archived]
+  status_aliases: {done: complete}
+  required_fields: [status, status_description, goal, covers]
+  acceptance_headings: [Acceptance Criteria]
+```
+
+These new rules classify only documents inside a standard-format feature root.
+An active plan rule requires all six coverage fields. Aliases and terminal
+values name canonical statuses. Unknown document statuses stay nonterminal.
+A local-format repository recognizes the four added coverage fields and ignores
+them while preserving its existing dialect and terminal meanings. Rule shapes
+are validated globally, including rules whose matches are currently ignored.
+Existing `local_ranges`, `document_kinds` and `other_writers` keep their original
+document-digest refresh and coordination behavior. Active new classifications
+must exclude documents governed by the first two declarations.
+
 ## Reports and history
 
 Eligible hosted history uses native repository, workflow, run, attempt, jobs
@@ -127,6 +163,31 @@ paired review and rollback evidence. Every configured native profile needs
 its actual observed models and publisher identity. The reviewed activation D
 is C's direct child and changes only its declared activation files plus the
 checklist. Production requires the adopted settings and a matching checklist.
+
+Compute `configuration_sha256` from the exact committed companion and settings
+using `committedConfigurationDigest` in `scripts/docs-drift/preflight.ts`.
+Without a `local_documents` member, the original settings-only digest applies.
+Its presence, including an empty list, selects a canonical envelope containing
+normalized settings, that declared list and the directly parsed
+`docs_drift_local_coverage` value or null. Every declared coverage value enters
+the digest, including optional fields ignored for local-format classification.
+Only publication mode and checklist path are omitted from normalized settings.
+Object ordering is canonical and list order is preserved.
+
+Changes to those projected rules or coverage values require refreshed checks
+and a reviewed successor checklist. Old digest-bound rows, writer declarations,
+other companion metadata and ordinary prose keep their established paths.
+Actual files in the approved activation diff retain their whole-file hash
+checks. A companion activation entry is optional. An unrelated component upgrade
+needs no artificial companion edit. Historical reports, closure evidence and
+interrupted operations use the form selected at their original source commit.
+A source with the new member requires the envelope without a settings-only
+fallback. Keep missing historical source or companion evidence unverified.
+
+Prepare new companion fields with a compatible released component binding.
+Activate both through the reviewed candidate and activation pair. An earlier
+reader rollback restores the old companion and binding together and preserves
+pending operations with their original-release handoff.
 
 Read original evidence during adoption. The portable checklist records those
 observed targets as owner attestations. Each remote effect retains its separate

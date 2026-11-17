@@ -2,7 +2,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { preflightFixture, ordinaryComponentFixture } from "./preflight-fixture";
+import { configureMixedPlanFixture, preflightFixture, ordinaryComponentFixture } from "./preflight-fixture";
 import { auditClient } from "./native-audit-client-fixture";
 import { installOwnedNativeService } from "./original-publication-fixture";
 import { git } from "./repository-fixture";
@@ -13,8 +13,8 @@ import { exactRecord } from "../../../plugins/vh-adlc/scripts/docs-drift/publica
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 
-test.each(["matching", "source-change", "request-change", "copied-run", "hosted-spoof", "caller-change"])("normal report runs separate native assessment and review contexts: %s", async fault => {
-  const component = ordinaryComponentFixture(roots, true), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable });
+test.each(["matching", "source-change", "request-change", "copied-run", "hosted-spoof", "caller-change", "mixed-plans"])("normal report runs separate native assessment and review contexts: %s", async fault => {
+  const component = ordinaryComponentFixture(roots, true), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable }, fault === "mixed-plans" ? configureMixedPlanFixture : undefined);
   let client = auditClient(fault, true);
   if (fault === "caller-change") client = client.replace("let records;", `
 if (request.kind === "docs-drift-audit-review-request") writeFileSync(${JSON.stringify(join(f.repo, "README.md"))}, "Changed original caller\\n");
@@ -24,7 +24,7 @@ let records;`);
   git(f.root, "clone", "--bare", "--no-local", f.repo, origin);
   const service = installOwnedNativeService({ root: f.root, origin, source, head: source, publisher_identity: { actor: "fixture-owner", actor_id: 30 } });
   const trace = join(f.root, "caller-captures.jsonl");
-  if (fault === "matching") {
+  if ((fault === "matching" || fault === "mixed-plans")) {
     const executable = join(f.root, "native-bin/git");
     const record = 'import { appendFileSync as recordCaller } from "node:fs"; recordCaller(' + JSON.stringify(trace)
       + ', JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)}) + "\\n");\n';
@@ -45,12 +45,12 @@ let records;`);
     return { result, report };
   }
   expect((await invoke("scan")).result.exit_code).toBe(0);
-  const scanTrace = fault === "matching" ? readFileSync(trace, "utf8").length : 0;
+  const scanTrace = (fault === "matching" || fault === "mixed-plans") ? readFileSync(trace, "utf8").length : 0;
   if (fault === "copied-run") {
     selectedDirectory = join(f.root, "copied-run"); cpSync(directory, selectedDirectory, { recursive: true });
   }
   const completed = await invoke("report");
-  if (fault === "matching") {
+  if ((fault === "matching" || fault === "mixed-plans")) {
     expect(completed.report).toMatchObject({ command: "report", outcome: "collected", report_artifacts: { complete: true, content: "report" } });
     expect(completed.result.exit_code).toBe(0);
     const order = readFileSync(join(directory, "synthetic-role-order.jsonl"), "utf8").trim().split("\n");

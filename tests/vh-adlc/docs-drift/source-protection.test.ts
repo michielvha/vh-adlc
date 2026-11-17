@@ -33,7 +33,8 @@ test("ordinary edit inspection loads source-bound current writers without an inj
   for (const protection_context of [undefined, { other_writers: [] }]) {
     const result = inspectPreparation({ ...input, protection_context });
     expect(result.complete).toBe(false);
-    expect(result.protection?.edits[0].reason).toBe("other-current-writer");
+    if (protection_context === undefined) expect(result.protection?.edits[0].reason).toBe("other-current-writer");
+    else expect(result.protection?.diagnostics[0].message).toBe("Caller protection policy is not accepted");
   }
   put(repo, "docs/docs-procedure.md", "# Dirty procedure with the writer removed\n");
   expect(inspectPreparation(input).protection?.edits[0].reason).toBe("other-current-writer");
@@ -102,17 +103,20 @@ test.each(["plan", "review", "evidence", "unknown"] as const)("committed ordinar
   const source = commitAll(repo), before = captureRepositoryState(repo);
   const result = inspectPreparation({ ...selected(repo, source), protection_context: { document_kinds: [{ document, document_sha256, kind }] } });
   expect(result.complete).toBe(false);
-  expect(result.protection?.diagnostics).toContainEqual({ code: "project-protection", path: "docs/docs-procedure.md", message: "Conflicting project protection document kinds" });
+  expect(result.protection?.diagnostics).toContainEqual({ code: "project-protection", path: "docs/docs-procedure.md", message: "Caller protection policy is not accepted" });
   expect(captureRepositoryState(repo)).toEqual(before);
 });
 
-test("identical document classifications agree while a committed restriction cannot be erased", () => {
+test("repeated committed classification preserves ordinary eligibility and plan restrictions", () => {
   for (const kind of ["ordinary", "plan"] as const) {
     const repo = fixture(true), document = "docs/guide.md", document_sha256 = sha256(readFileSync(join(repo, document)));
     procedure(repo, { document_kinds: [{ document, document_sha256, kind }] });
-    const source = commitAll(repo), result = inspectPreparation({ ...selected(repo, source),
-      protection_context: { document_kinds: [{ document, document_sha256, kind: "ordinary" }] } });
-    expect(result.complete).toBe(kind === "ordinary");
-    if (kind === "plan") expect(result.protection?.diagnostics[0].message).toBe("Conflicting project protection document kinds");
+    const source = commitAll(repo), before = captureRepositoryState(repo);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const result = inspectPreparation(selected(repo, source));
+      expect(result.complete).toBe(kind === "ordinary");
+      if (kind === "plan") expect(result.protection?.edits[0].reason).toBe("unclassified-local-range");
+    }
+    expect(captureRepositoryState(repo)).toEqual(before);
   }
 });

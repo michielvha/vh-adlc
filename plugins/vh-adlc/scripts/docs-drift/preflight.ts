@@ -11,6 +11,7 @@ import { readYAML } from "../settings-file";
 import { OUTPUT_LIMIT } from "./owned-process";
 import type { PublicationIdentity } from "./transport";
 import { nativeCredentialReferences } from "./role-launch";
+import { readDocumentMetadata } from "../docs-impact/collection";
 
 export const CORE_PREFLIGHT_CHECKS = ["published_install", "installed_routing", "scanner_parity", "native_trials", "paired_review", "rollback_rehearsal"] as const;
 const checkNames = [...CORE_PREFLIGHT_CHECKS, "documents_package", "effects_recovery", "workflow_validation"] as const;
@@ -62,9 +63,26 @@ function evidence(value: Record<string, unknown>): Evidence {
 function same(left: unknown, right: unknown) { return canonicalDigest(left) === canonicalDigest(right); }
 
 /** These two activation fields are the only omissions from the committed semantic policy. */
-export function normalizedConfigurationDigest(settings: InstalledSettings): string {
+export function normalizedConfigurationDigest(settings: InstalledSettings, procedure?: Uint8Array): string {
   const { mode: _mode, checklist_path: _path, ...publication } = settings.publication;
-  return canonicalDigest({ ...settings, publication });
+  const normalized = { ...settings, publication };
+  if (procedure === undefined) return canonicalDigest(normalized);
+  const metadata = readDocumentMetadata(procedure, bytes => readYAML(bytes, reason => fail(reason),
+    { offline: true, environment: verifiedHelperEnvironment() }));
+  const policy = metadata?.docs_drift_protection;
+  if (policy === undefined) return canonicalDigest(normalized);
+  if (policy === null || typeof policy !== "object" || Array.isArray(policy)) fail("project protection mapping required");
+  if (!Object.hasOwn(policy, "local_documents")) return canonicalDigest(normalized);
+  return canonicalDigest({ settings: normalized,
+    docs_drift_protection: { local_documents: (policy as Record<string, unknown>).local_documents },
+    docs_drift_local_coverage: metadata?.docs_drift_local_coverage ?? null });
+}
+
+/** Historical and current readers select exactly one form from their own immutable source. */
+export function committedConfigurationDigest(repo: string, source: string, settings: InstalledSettings): string {
+  const procedure = readAdoptionInput(repo, source, settings.project_procedure);
+  if (!procedure) fail("committed project procedure required");
+  return normalizedConfigurationDigest(settings, procedure.bytes);
 }
 
 /** Bind native trial observations to their entry configuration independently of unrelated policy changes. */
@@ -184,9 +202,9 @@ function readProductionPreflight(options: Omit<PreflightOptions, "publisher">) {
   const checklist = parsePreflightChecklist(readYAML(blob.bytes, reason => fail(reason), { offline: true, environment: verifiedHelperEnvironment() }));
   const candidate = checklist.candidate_commit;
   if (checklist.repository !== current.repository || !same(checklist.component, current.component)
-    || checklist.configuration_sha256 !== normalizedConfigurationDigest(current) || !isGitAncestor(options.repo, candidate, options.current_default)) fail("current policy/checklist binding changed");
+    || checklist.configuration_sha256 !== committedConfigurationDigest(options.repo, options.current_default, current) || !isGitAncestor(options.repo, candidate, options.current_default)) fail("current policy/checklist binding changed");
   const staged = loadCommittedSettings(options.repo, candidate).settings;
-  if (staged.schema_version !== 2 || staged.publication.mode !== "staged" || normalizedConfigurationDigest(staged) !== checklist.configuration_sha256
+  if (staged.schema_version !== 2 || staged.publication.mode !== "staged" || committedConfigurationDigest(options.repo, candidate, staged) !== checklist.configuration_sha256
     || readAdoptionInput(options.repo, candidate, path) !== null || checklist.activation.some(file => file.path === path)) fail("staged C and fresh immutable checklist required");
   const added = readGit(options.repo, "log", "--full-history", "--format=%H", "--diff-filter=A", options.current_default, "--", path).toString().trim().split("\n");
   const activation = added.find(commit => {
@@ -196,7 +214,7 @@ function readProductionPreflight(options: Omit<PreflightOptions, "publisher">) {
   if (!activation) fail("reviewed activation D must be C's direct child");
   const activated = loadCommittedSettings(options.repo, activation).settings;
   if (activated.schema_version !== 2 || activated.publication.mode !== "adopted" || activated.publication.checklist_path !== path
-    || normalizedConfigurationDigest(activated) !== checklist.configuration_sha256) fail("activation settings changed");
+    || committedConfigurationDigest(options.repo, activation, activated) !== checklist.configuration_sha256) fail("activation settings changed");
   const changed = readGit(options.repo, "diff-tree", "--no-commit-id", "--no-renames", "--name-only", "-r", "-z", candidate, activation).toString().split("\0").filter(Boolean).sort();
   const allowed = [...checklist.activation.map(file => file.path), path].sort();
   if (!same(changed, allowed)) fail("unapproved activation paths changed");

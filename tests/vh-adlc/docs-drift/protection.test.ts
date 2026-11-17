@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureRepositoryState, captureSnapshot } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
-import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { evaluateProtection, observeFeatureFreshness } from "../../../plugins/vh-adlc/scripts/docs-drift/protection";
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
 
@@ -36,6 +36,201 @@ function replacement(path: string, bytes: Buffer, old: string, next: string) {
   if (start < 0) throw new Error("missing fixture replacement");
   return { path, start, end: start + Buffer.byteLength(old), replacement: Buffer.from(next), before_sha256: sha256(bytes) };
 }
+
+const localCoverage = { dialect: "documentation", terminal_statuses: ["shipped"], statuses: ["planned", "active", "shipped"],
+  status_aliases: { done: "shipped", working: "active" }, required_fields: ["status", "status_description", "covers", "goal"],
+  acceptance_headings: ["Acceptance", "Acceptance Criteria"] };
+const localRules = [
+  { patterns: ["plans/README.md"], exclude_patterns: [], kind: "ordinary", editable_parts: [] },
+  { patterns: ["plans/**"], exclude_patterns: ["plans/README.md"], kind: "plan", editable_parts: ["frontmatter", "acceptance-checkboxes"] },
+];
+const legacyPlan = "---\nstatus: done # original spelling\ngoal: 'Keep this contract'\ncovers: [docs/**]\n---\n# Older plan\n\n## Acceptance\n- [ ] Verified behavior\n### Details\n1. [ ] Nested criterion\n### Evidence\n- [ ] Historical evidence\n### More criteria\n* [X] Existing result\n```md\n- [ ] Example\n```\n## Tasks\n- [x] Delivered work\n";
+
+function mixed(root: string, text = legacyPlan, rules: unknown = localRules, coverage: unknown = localCoverage, extra = {}) {
+  put(root, "plans/README.md", "# Plans index\nOld link\n");
+  put(root, "plans/older.md", text);
+  put(root, "docs/docs-procedure.md", "---\ndocs_drift_protection: " + canonicalJSON({ local_documents: rules, ...extra }).toString()
+    + "\ndocs_drift_local_coverage: " + canonicalJSON(coverage).toString() + "\n---\n# Project procedure\n");
+  return captureSnapshot(root, commitAll(root));
+}
+
+function localReplacement(path: string, bytes: Buffer, prior: string, next: string) {
+  const edit = replacement(path, bytes, prior, next);
+  let prefix = 0, suffix = 0;
+  while (prefix < prior.length && prefix < next.length && prior[prefix] === next[prefix]) prefix++;
+  while (suffix < prior.length - prefix && suffix < next.length - prefix && prior[prior.length - 1 - suffix] === next[next.length - 1 - suffix]) suffix++;
+  return { ...edit, start: edit.start + Buffer.byteLength(prior.slice(0, prefix)),
+    end: edit.end - Buffer.byteLength(prior.slice(prior.length - suffix)), replacement: Buffer.from(next.slice(prefix, next.length - suffix)) };
+}
+
+test("mixed roots classify indexes and older plans before standard metadata validation", () => {
+  const root = fixture(), snapshot = mixed(root), before = captureRepositoryState(root);
+  const result = evaluateProtection(root, snapshot, [replacement("plans/README.md", readFileSync(join(root, "plans/README.md")), "Old link", "Current link"),
+    replacement("plans/older.md", Buffer.from(legacyPlan), "done", "shipped")]);
+  expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+  expect(result.edits.every(row => row.allowed)).toBe(true);
+  expect(result.edits[1].bytes?.toString()).toBe(legacyPlan.replace("done", "shipped"));
+  expect(captureRepositoryState(root)).toEqual(before);
+});
+
+test.each([
+  ["alias", "done", "shipped", true],
+  ["unsupported status", "done", "active", false],
+  ["description", "status: done # original spelling", "status: done # original spelling\nstatus_description: Verified current source", true],
+  ["missing required field", "covers: [docs/**]", "covers: [docs/**]\nstatus_description: Current state", true],
+  ["existing contract", "Keep this contract", "Change the contract", false],
+  ["coverage repair", "docs/**", "docs/new/**", true],
+  ["invalid coverage", "docs/**", "../escape/**", false],
+  ["checkbox", "- [ ] Verified behavior", "- [x] Verified behavior", true],
+  ["ordered nested checkbox", "1. [ ] Nested criterion", "1. [X] Nested criterion", true],
+  ["criterion text", "Verified behavior", "Different criterion", false],
+  ["nested evidence", "- [ ] Historical evidence", "- [x] Historical evidence", false],
+  ["fenced checkbox", "- [ ] Example", "- [x] Example", false],
+  ["completed task", "- [x] Delivered work", "- [ ] Delivered work", false],
+  ["format churn", "goal: 'Keep this contract'", 'goal: "Keep this contract"', false],
+  ["comment churn", "# original spelling", "# replacement comment", false],
+] as const)("mixed legacy-plan edit boundary: %s", (_scenario, prior, next, allowed) => {
+  const root = fixture(), snapshot = mixed(root);
+  const result = evaluateProtection(root, snapshot, [localReplacement("plans/older.md", Buffer.from(legacyPlan), prior, next)]);
+  expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+  expect(result.edits[0].allowed).toBe(allowed);
+});
+
+test.each(["planned", "shipped"])("a missing local status accepts only a canonical nonterminal addition: %s", status => {
+  const root = fixture(), text = legacyPlan.replace("status: done # original spelling\n", ""), snapshot = mixed(root, text);
+  const result = evaluateProtection(root, snapshot, [localReplacement("plans/older.md", Buffer.from(text), "---\n", "---\nstatus: " + status + "\n")]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(status === "planned");
+});
+
+test.each(["active", "done", "unrecognized"])("local branch ownership uses declared aliases and keeps unknown status active: %s", status => {
+  const root = fixture(), text = legacyPlan.replace("status: done", "branch: feat/old\nstatus: " + status), snapshot = mixed(root, text);
+  const edit = localReplacement("plans/older.md", Buffer.from(text), "[ ] Verified behavior", "[x] Verified behavior");
+  const coordination = { coordinated: [{ feature: "plans/older.md", document: "plans/older.md", source_commit: snapshot.source_commit, selection_sha256: "a".repeat(64) },
+    { feature: "plans/older.md", document: "docs/guide.md", source_commit: snapshot.source_commit, selection_sha256: "a".repeat(64) }] };
+  const result = evaluateProtection(root, snapshot, [edit], coordination);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(status === "done");
+  const guide = replacement("docs/guide.md", readFileSync(join(root, "docs/guide.md")), "Guide", "Current guide");
+  expect(evaluateProtection(root, snapshot, [guide], coordination).edits[0].allowed).toBe(true);
+  expect(evaluateProtection(root, snapshot, [guide]).edits[0].allowed).toBe(status === "done");
+});
+
+test.each(["unfenced", "fenced", "headings-only"])("shared enrollment wins over local declarations only for its unfenced canonical review header: %s", scenario => {
+  const root = fixture();
+  const header = "| Date | Review | Kind | Commit | Model | Isolation | Outcome |\n";
+  const text = featureTemplate.replace("status: draft", "status: planned").replace("  - src/\n  - config.yml", "  - docs/guide.md").replace(header, "");
+  const plan = text + (scenario === "fenced" ? "\n```md\n" + header + "```\n" : scenario === "unfenced" ? "\n" + header : "");
+  const snapshot = mixed(root, plan);
+  const edit = localReplacement("plans/older.md", Buffer.from(plan), "- [ ] AC-01", "- [x] AC-01");
+  const result = evaluateProtection(root, snapshot, [edit]);
+  expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+  expect(result.edits[0].allowed).toBe(scenario !== "unfenced");
+});
+
+test.each(["duplicate heading", "missing heading"])("ambiguous acceptance sections preserve classification and refuse their checkbox: %s", scenario => {
+  const root = fixture(), text = legacyPlan + (scenario === "duplicate heading" ? "\n## Acceptance\n" : "");
+  const actual = scenario === "missing heading" ? text.replace("## Acceptance", "## Other") : text;
+  const snapshot = mixed(root, actual), result = evaluateProtection(root, snapshot,
+    [replacement("plans/older.md", Buffer.from(actual), "[ ] Verified behavior", "[x] Verified behavior")]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(false);
+});
+
+test("one unclassified in-root document blocks every otherwise eligible edit", () => {
+  const root = fixture(); mixed(root);
+  put(root, "plans/unknown.md", "# Unknown file\n");
+  put(root, "docs/docs-procedure.md", readFileSync(join(root, "docs/docs-procedure.md"), "utf8").replace('"exclude_patterns":["plans/README.md"]', '"exclude_patterns":["plans/README.md","plans/unknown.md"]'));
+  const result = evaluateProtection(root, captureSnapshot(root, commitAll(root)), []);
+  expect(result.complete).toBe(false);
+  expect(result.diagnostics.some(row => row.path === "plans/unknown.md")).toBe(true);
+});
+
+test.each(["local_ranges", "document_kinds"])("active mixed-root rules refuse overlap with old digest-bound %s declarations", field => {
+  const root = fixture(), document = "plans/older.md", document_sha256 = sha256(Buffer.from(legacyPlan));
+  const row = field === "local_ranges" ? { document, document_sha256, ranges: [] } : { document, document_sha256, kind: "plan" };
+  const result = evaluateProtection(root, mixed(root, legacyPlan, localRules, localCoverage, { [field]: [row] }), []);
+  expect(result.complete).toBe(false);
+  expect(result.diagnostics[0].code).toBe("project-protection");
+});
+
+test("dormant and out-of-root rules do not require new coverage or conflict with old declarations", () => {
+  const root = fixture(), document = "docs/guide.md", document_sha256 = sha256(readFileSync(join(root, document)));
+  const rules = [{ patterns: ["elsewhere/**", "docs/**"], exclude_patterns: [], kind: "plan", editable_parts: ["frontmatter"] }, localRules[0]];
+  const snapshot = mixed(root, featureTemplate, rules, { dialect: "documentation", terminal_statuses: ["shipped"] },
+    { document_kinds: [{ document, document_sha256, kind: "ordinary" }] });
+  expect(evaluateProtection(root, snapshot, []).complete).toBe(true);
+  put(root, "plans/elsewhere/new.md", legacyPlan);
+  put(root, "docs/docs-procedure.md", readFileSync(join(root, "docs/docs-procedure.md"), "utf8").replace('"elsewhere/**"', '"plans/elsewhere/**"'));
+  expect(evaluateProtection(root, captureSnapshot(root, commitAll(root)), []).complete).toBe(false);
+});
+
+test.each(["local_ranges", "local_coverage", "document_kinds", "other_writers", "local_documents"])("caller policy is refused even when empty: %s", key => {
+  const root = fixture(), snapshot = captureSnapshot(root, commitAll(root));
+  const result = evaluateProtection(root, snapshot, [], { [key]: [] });
+  expect(result.complete).toBe(false);
+  expect(result.diagnostics[0].code).toBe("project-protection");
+});
+
+test.each(["missing-field", "extra-field", "ordinary-parts", "invalid-pattern", "invalid-part", "overlap"])("new rule validation rejects malformed or conflicting declarations: %s", scenario => {
+  const root = fixture(), valid = localRules[1];
+  const rules: Record<string, unknown> = {
+    "missing-field": [{ patterns: ["elsewhere/**"], kind: "ordinary", editable_parts: [] }],
+    "extra-field": [{ ...valid, unsupported: true }], "ordinary-parts": [{ ...valid, kind: "ordinary" }],
+    "invalid-pattern": [{ ...valid, patterns: ["../escape"] }], "invalid-part": [{ ...valid, editable_parts: ["all"] }],
+    overlap: [...localRules, { ...valid, kind: "ordinary", editable_parts: [] }],
+  };
+  const result = evaluateProtection(root, mixed(root, legacyPlan, rules[scenario]), []);
+  expect(result.complete).toBe(false);
+  expect(result.diagnostics[0].code).toBe("project-protection");
+});
+
+test("old digest-bound kinds do not opt an older plan into mixed-root metadata classification", () => {
+  const root = fixture(), document = "plans/older.md", document_sha256 = sha256(Buffer.from(legacyPlan));
+  const snapshot = mixed(root, legacyPlan, [localRules[0]], localCoverage, { document_kinds: [{ document, document_sha256, kind: "plan" }] });
+  expect(evaluateProtection(root, snapshot, []).complete).toBe(false);
+});
+
+test("a declared older plan without frontmatter permits only insertion of its missing mechanical fields", () => {
+  const root = fixture(), text = "# Older plan\n## Acceptance\n- [ ] Verified behavior\n", snapshot = mixed(root, text);
+  const inserted = "---\nstatus: planned\ngoal: Recorded intended behavior\ncovers: [docs/**]\n---\n";
+  const edit = { path: "plans/older.md", start: 0, end: 0, before_sha256: sha256(Buffer.from(text)), replacement: Buffer.from(inserted) };
+  const result = evaluateProtection(root, snapshot, [edit]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(true);
+  expect(result.edits[0].bytes?.toString()).toBe(inserted + text);
+});
+
+test("acceptance-looking text inside a frontmatter block scalar grants no checkbox edit", () => {
+  const root = fixture(), text = legacyPlan.replace("goal: 'Keep this contract'", "goal: |\n  ## Acceptance\n  - [ ] Contract example");
+  const snapshot = mixed(root, text), result = evaluateProtection(root, snapshot,
+    [localReplacement("plans/older.md", Buffer.from(text), "[ ] Contract example", "[x] Contract example")]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(false);
+});
+
+test.each([
+  ["plain apostrophe", "Don't publish old behavior # retain this comment", "Don't publish verified behavior # retain this comment", true],
+  ["plain comment removal", "Don't publish old behavior # retain this comment", "Don't publish verified behavior", false],
+  ["quoted hash", '"Old behavior #1" # retain this comment', '"Verified behavior #2" # retain this comment', true],
+  ["block scalar", "|\n  # Old behavior\n  More detail", "|\n  # Verified behavior\n  More detail", true],
+] as const)("selected description edits distinguish values and preserved YAML comments: %s", (_name, prior, next, allowed) => {
+  const root = fixture(), text = legacyPlan.replace("goal:", "status_description: " + prior + "\ngoal:");
+  const result = evaluateProtection(root, mixed(root, text), [localReplacement("plans/older.md", Buffer.from(text), prior, next)]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(allowed);
+});
+
+test("local-format roots ignore new rule matches and added aliases while retaining old declarations", () => {
+  const root = fixture(true), document = "plans/older.md", document_sha256 = sha256(Buffer.from(legacyPlan));
+  mixed(root, legacyPlan, localRules, { ...localCoverage, terminal_statuses: ["done"], status_aliases: { done: "active" } },
+    { document_kinds: [{ document, document_sha256, kind: "plan" }] });
+  put(root, "plans/README.md", "---\ntype: guide\n---\n# Existing local index\n");
+  const snapshot = captureSnapshot(root, commitAll(root));
+  const result = evaluateProtection(root, snapshot, [localReplacement(document, Buffer.from(legacyPlan), "done", "active")]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(false);
+});
 
 test("standard normative content, metadata and historical proof remain byte-preserved", () => {
   const root = fixture();
@@ -123,11 +318,13 @@ test("local plans allow only explicitly classified ranges from the retained proc
     procedure_quote: { start: 0, end: Buffer.byteLength(procedure), sha256: sha256(Buffer.from(procedure)) },
     ranges: [{ start, end: start + Buffer.byteLength("Old path.") }],
   }] };
-  expect(evaluateProtection(root, snapshot, [edit], context).edits[0].allowed).toBe(true);
+  put(root, "docs/docs-procedure.md", "---\ndocs_drift_protection: " + canonicalJSON({ local_ranges: context.local_ranges.map(({ document, document_sha256, ranges }) => ({ document, document_sha256, ranges })) }).toString() + "\n---\n" + procedure);
+  const committed = captureSnapshot(root, commitAll(root));
+  expect(evaluateProtection(root, committed, [edit]).edits[0].allowed).toBe(true);
   const structural = { ...edit, replacement: Buffer.from("Current path.\n\n## Recorded proof\nShadow proof.") };
-  expect(evaluateProtection(root, snapshot, [structural], context).edits[0].allowed).toBe(false);
+  expect(evaluateProtection(root, committed, [structural]).edits[0].allowed).toBe(false);
   const historical = replacement("plans/feature.md", bytes, "old/proof.ts", "new/proof.ts");
-  expect(evaluateProtection(root, snapshot, [historical], context).edits[0].allowed).toBe(false);
+  expect(evaluateProtection(root, committed, [historical]).edits[0].allowed).toBe(false);
 });
 
 test("unclaimed introductions remain eligible while malformed byte ranges block the selected batch", () => {
@@ -162,7 +359,9 @@ test("documented local coverage preserves its own dialect and terminal status", 
       procedure_quote: { start: 0, end: Buffer.byteLength(procedure), sha256: sha256(Buffer.from(procedure)) },
     },
   };
-  const result = evaluateProtection(root, snapshot, [edit], context);
+  put(root, "docs/docs-procedure.md", "---\ndocs_drift_protection: " + canonicalJSON({ document_kinds: context.document_kinds }).toString()
+    + "\ndocs_drift_local_coverage: " + canonicalJSON({ dialect: "documentation", terminal_statuses: ["shipped"], statuses: null, status_aliases: { shipped: "active" }, required_fields: false, acceptance_headings: 9 }).toString() + "\n---\n" + procedure);
+  const result = evaluateProtection(root, captureSnapshot(root, commitAll(root)), [edit]);
   expect(result.complete).toBe(true);
   expect(result.edits[0].allowed).toBe(true);
   expect(result.edits[0].affected_features[0].historical).toBe(true);
@@ -170,12 +369,13 @@ test("documented local coverage preserves its own dialect and terminal status", 
 
 test("another current writer retains the proposal until exact coordinated selection", () => {
   const root = fixture();
-  const snapshot = captureSnapshot(root, commitAll(root));
   const bytes = readFileSync(join(root, "docs/guide.md"));
   const edit = replacement("docs/guide.md", bytes, "Guide", "Updated guide");
   const other_writers = [{ writer: "docs-agent", document: "docs/guide.md", document_sha256: sha256(bytes) }];
-  expect(evaluateProtection(root, snapshot, [edit], { other_writers }).edits[0].allowed).toBe(false);
-  const result = evaluateProtection(root, snapshot, [edit], { other_writers, coordinated: [{
+  put(root, "docs/docs-procedure.md", "---\ndocs_drift_protection: " + canonicalJSON({ other_writers }).toString() + "\n---\n# Procedure\n");
+  const snapshot = captureSnapshot(root, commitAll(root));
+  expect(evaluateProtection(root, snapshot, [edit]).edits[0].allowed).toBe(false);
+  const result = evaluateProtection(root, snapshot, [edit], { coordinated: [{
     writer: "docs-agent", document: "docs/guide.md", source_commit: snapshot.source_commit, selection_sha256: "b".repeat(64),
   }] });
   expect(result.edits[0].allowed).toBe(true);

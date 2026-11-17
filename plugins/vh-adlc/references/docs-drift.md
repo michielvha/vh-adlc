@@ -116,6 +116,37 @@ Keep returned review records and historical command evidence byte-identical.
 Local-format plan/review/evidence edits require the project procedure to name
 the editable ranges. Otherwise retain the proposed correction in the report.
 
+For a standard feature root containing older local plans and index pages,
+declare `docs_drift_protection.local_documents` in the committed project
+procedure. Its rows select documentation patterns, exclusions, `ordinary` or
+`plan`, and editable parts. Classification applies within that standard root.
+Out-of-root matches and local-format repositories retain their existing rules.
+An unfenced canonical Review Log header enrolls a shared spec even when a local
+rule matches it. Shared claims and lifecycle protections apply there.
+
+An active local plan rule needs the companion's `docs_drift_local_coverage`
+declaration, including its canonical statuses, exact aliases, required fields
+and acceptance headings. A dormant rule needs no additional coverage fields
+until an in-root plan matches. A terminal local plan's old branch is historical.
+An active branch keeps its own plan report-only, including under coordination.
+Coordination can still permit corrections to its covered ordinary documents.
+
+The `frontmatter` editable part permits declared missing fields, exact status
+aliases, source-verified status descriptions and valid coverage repairs.
+Adding a missing status requires a declared nonterminal value. Preserve existing
+contract fields and the original bytes of untouched metadata. The
+`acceptance-checkboxes` part permits one space, `x` or `X` byte within an eligible
+list checkbox under one exact declared acceptance heading. Preserve criterion
+text, fenced examples, nested evidence/residual/review/task sections and all
+historical proof. Independent review verifies the truth of proposed corrections.
+Ambiguous checkbox sections grant no checkbox edits. An unclassified document
+or conflicting policy makes the whole assessment incomplete.
+
+Keep new rules disjoint from existing digest-bound document kinds and explicit
+byte ranges through their exclusions. Overlap makes the assessment incomplete.
+All policy comes from the committed companion. Caller context accepts only the
+existing independently verified coordination selection.
+
 Report ordinary documents covered by other features and resulting review
 staleness. Active claimed work needs that writer's handoff or the owner's
 explicit coordinated selection before an overlapping edit. Historical closed

@@ -8,10 +8,20 @@ import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/setti
 import { computeComponentIdentity } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
-import { CORE_PREFLIGHT_CHECKS, normalizedConfigurationDigest, nativeEntryDigest, preflightReviewTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
+import { CORE_PREFLIGHT_CHECKS, committedConfigurationDigest, nativeEntryDigest, preflightReviewTarget } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
 import type { PublisherAccount } from "../../../plugins/vh-adlc/scripts/docs-drift/identity";
 
 const proof = "1".repeat(64);
+export function configureMixedPlanFixture(repo: string) {
+  put(repo, "AGENTS.md", "Feature documents: docs/plans/\n");
+  put(repo, "docs/plans/README.md", "# Plan index\nOld link\n");
+  put(repo, "docs/plans/legacy.md", "---\nstatus: done\ngoal: Preserve this contract\ncovers: [docs/guide.md]\n---\n# Older plan\n## Acceptance\n- [ ] Verified behavior\n## Evidence\nOriginal retained evidence\n");
+  put(repo, "docs/docs-procedure.md", "---\ndocs_drift_protection:\n  local_documents:\n"
+    + "    - {patterns: [docs/plans/README.md], exclude_patterns: [], kind: ordinary, editable_parts: []}\n"
+    + "    - {patterns: [docs/plans/**], exclude_patterns: [docs/plans/README.md], kind: plan, editable_parts: [frontmatter, acceptance-checkboxes]}\n"
+    + "docs_drift_local_coverage:\n  dialect: documentation\n  terminal_statuses: [complete]\n  statuses: [planned, active, complete]\n"
+    + "  status_aliases: {done: complete}\n  required_fields: [status, status_description, covers, goal]\n  acceptance_headings: [Acceptance]\n---\n# Project procedure\n");
+}
 type ConfiguredFixture = Omit<ReturnType<typeof installedSettingsFixture>, "reports"> & {
   reports: Omit<ReturnType<typeof installedSettingsFixture>["reports"], "workflow_id"> & { workflow_id: number };
 };
@@ -46,7 +56,7 @@ export function preflightFixture(roots: string[], fault = "none", runtime?: { co
   const activation = [{ path: ".vh-adlc/docs-drift.yaml", before: { mode: "100644" as const, sha256: sha256(before) }, after: { mode: "100644" as const, sha256: sha256(after) } },
     { path: "scripts/entry.txt", before: { mode: "100644" as const, sha256: sha256(Buffer.from("legacy\n")) }, after: { mode: "100644" as const, sha256: sha256(Buffer.from("shared\n")) } }];
   const base = { repository: settings.repository, candidate_commit: candidate, component,
-    configuration_sha256: normalizedConfigurationDigest(settings), activation };
+    configuration_sha256: committedConfigurationDigest(f.repo, candidate, settings), activation };
   const checklist = { schema_version: 1, kind: "docs-drift-preflight", ...base, changes: ["initial"],
     review: { target_sha256: preflightReviewTarget(base), evidence_sha256: proof, model: "claude-opus-5.5" },
     checks: CORE_PREFLIGHT_CHECKS.map(name => ({ name, status: "passed", component, consumer_commit: candidate, evidence_sha256: proof,
@@ -85,4 +95,26 @@ export function ordinaryComponentFixture(roots: string[], full = false) {
   const flags = "--plugin-dir --model --session-id --output-format --available-tools --no-custom-instructions --disable-builtin-mcps";
   writeFileSync(executable, "#!/bin/sh\nprintf '%s\\n' \"$*\" >> 'CALLS'\nif [ \"$1\" = '--no-auto-update' ]; then shift; fi\nif [ \"$1\" = '--version' ]; then echo 'GitHub Copilot CLI 1.0.112.'; else echo 'FLAGS'; fi\n".replace("CALLS", calls).replace("FLAGS", flags), { mode: 0o755 });
   return { root, directory, executable, calls, identity };
+}
+
+/** A synthetic reviewed successor exercises current admission alongside original-source history. */
+export function activateProtectionSuccessor(f: Pick<ReturnType<typeof preflightFixture>, "repo" | "write" | "afterSettings" | "checklist" | "component">, procedure: string) {
+  const path = ".vh-adlc/docs-drift-policy-successor.yaml";
+  const staged = { ...f.afterSettings, publication: { ...f.afterSettings.publication, mode: "staged", checklist_path: path } };
+  const adopted = { ...staged, publication: { ...staged.publication, mode: "adopted" } };
+  f.write("docs/docs-procedure.md", Buffer.from(procedure));
+  f.write(".vh-adlc/docs-drift.yaml", canonicalJSON(staged));
+  const candidate = commit(f.repo, "Synthetic editing-policy successor C");
+  const activation = [{ path: ".vh-adlc/docs-drift.yaml", before: { mode: "100644" as const, sha256: sha256(canonicalJSON(staged)) },
+    after: { mode: "100644" as const, sha256: sha256(canonicalJSON(adopted)) } }];
+  const base = { repository: f.checklist.repository, candidate_commit: candidate, component: f.component,
+    configuration_sha256: committedConfigurationDigest(f.repo, candidate, parseSettings(staged)), activation };
+  const target = preflightReviewTarget(base);
+  const checklist = { ...f.checklist, ...base, changes: ["initial"],
+    review: { target_sha256: target, evidence_sha256: proof, model: "claude-opus-5.5" },
+    checks: CORE_PREFLIGHT_CHECKS.map(name => ({ name, status: "passed", component: f.component, consumer_commit: candidate,
+      evidence_sha256: proof, target_sha256: target, note: "Synthetic current-policy applicability proof." })) };
+  f.write(path, canonicalJSON(checklist));
+  f.write(".vh-adlc/docs-drift.yaml", canonicalJSON(adopted));
+  return commit(f.repo, "Synthetic editing-policy activation D");
 }

@@ -3,16 +3,88 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { selectProductionRuntime, withRuntimeValidation } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { readAdoptedRolePolicy, roleRuntimeDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { commit, ordinaryComponentFixture, preflightFixture } from "./preflight-fixture";
 import { installedSettingsFixture } from "./settings-fixture";
 import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
-import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
-import { normalizedConfigurationDigest, nativeEntryDigest, preflightReviewTarget, upgradeChecks, verifyProductionPreflight } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
+import { committedConfigurationDigest, normalizedConfigurationDigest, nativeEntryDigest, preflightReviewTarget, upgradeChecks, verifyProductionPreflight } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 const proof = "1".repeat(64);
+
+test("configuration digest opts in only through the original committed local-document member", () => {
+  const settings = parseSettings(installedSettingsFixture());
+  const legacy = normalizedConfigurationDigest(settings);
+  const bytes = (metadata: unknown) => Buffer.from("---\n" + canonicalJSON(metadata).toString() + "\n---\n# Companion\n");
+  const rows = [{ patterns: ["plans/**"], exclude_patterns: [], kind: "plan", editable_parts: ["frontmatter"] }];
+  const coverage = { dialect: "feature", terminal_statuses: ["done"], optional_future_value: ["a", "b"] };
+  const metadata = { docs_drift_protection: { local_documents: rows, other_writers: [] }, docs_drift_local_coverage: coverage };
+  const { mode: _mode, checklist_path: _path, ...publication } = settings.publication;
+  const projected = canonicalDigest({ settings: { ...settings, publication }, docs_drift_protection: { local_documents: rows }, docs_drift_local_coverage: coverage });
+  expect(normalizedConfigurationDigest(settings, bytes(metadata))).toBe(projected);
+  expect(projected).not.toBe(legacy);
+  expect(normalizedConfigurationDigest(settings, bytes({ docs_drift_protection: { other_writers: [] }, docs_drift_local_coverage: coverage }))).toBe(legacy);
+  expect(normalizedConfigurationDigest(settings, bytes({ docs_drift_protection: { local_documents: [] } }))).not.toBe(legacy);
+  expect(normalizedConfigurationDigest(settings, Buffer.concat([bytes(metadata), Buffer.from("Additional prose\n")]))).toBe(projected);
+  expect(normalizedConfigurationDigest(settings, bytes({ ...metadata, docs_drift_protection: { ...metadata.docs_drift_protection,
+    other_writers: [{ writer: "current", document: "docs/guide.md", document_sha256: "f".repeat(64) }] } }))).toBe(projected);
+  expect(normalizedConfigurationDigest(settings, bytes({ ...metadata, docs_drift_local_coverage: { ...coverage, optional_future_value: ["b", "a"] } }))).not.toBe(projected);
+});
+
+test.each(["unchanged", "prose", "optional-value", "remove-marker", "add-marker"])("production checks derive the policy form from each exact source: %s", scenario => {
+  const hasMarker = scenario !== "add-marker";
+  const original = "---\ndocs_drift_protection: " + JSON.stringify(hasMarker ? { local_documents: [] } : {})
+    + "\ndocs_drift_local_coverage: {dialect: feature, terminal_statuses: []}\n---\n# Companion\n";
+  const f = preflightFixture(roots, "none", undefined, repo => writeFileSync(join(repo, "docs/docs-procedure.md"), original));
+  expect(() => verifyProductionPreflight({ repo: f.repo, current_default: f.head(), component: f.component })).not.toThrow();
+  const before = readFileSync(join(f.repo, "docs/docs-procedure.md"));
+  let next = original;
+  if (scenario === "prose") next += "Ordinary documentation change\n";
+  if (scenario === "optional-value") next = next.replace("terminal_statuses: []", "terminal_statuses: [], statuses: [planned]");
+  if (scenario === "remove-marker") next = next.replace('{"local_documents":[]}', "{}");
+  if (scenario === "add-marker") next = next.replace("docs_drift_protection: {}", 'docs_drift_protection: {"local_documents":[]}');
+  if (next !== original) { f.write("docs/docs-procedure.md", Buffer.from(next)); commit(f.repo, "Selected companion change"); }
+  const check = () => verifyProductionPreflight({ repo: f.repo, current_default: f.head(), component: f.component });
+  if (["unchanged", "prose"].includes(scenario)) expect(check).not.toThrow();
+  else expect(check).toThrow("binding");
+  expect(readGit(f.repo, "show", f.candidate + ":docs/docs-procedure.md")).toEqual(before);
+  expect(() => verifyProductionPreflight({ repo: f.repo, current_default: f.activationCommit, component: f.component })).not.toThrow();
+});
+
+test.each([false, true])("legacy row refresh and writer changes keep their existing path with new-policy marker %s", marker => {
+  const f = preflightFixture(roots, "none", undefined, repo => {
+    const policy = { ...(marker ? { local_documents: [] } : {}),
+      document_kinds: [{ document: "docs/guide.md", document_sha256: sha256(readFileSync(join(repo, "docs/guide.md"))), kind: "ordinary" }] };
+    writeFileSync(join(repo, "docs/docs-procedure.md"), "---\ndocs_drift_protection: " + canonicalJSON(policy).toString() + "\n---\n# Companion\n");
+  });
+  const original = readGit(f.repo, "show", f.activationCommit + ":docs/docs-procedure.md");
+  const current = "# Current guide\n";
+  f.write("docs/guide.md", Buffer.from(current));
+  const policy = { ...(marker ? { local_documents: [] } : {}),
+    document_kinds: [{ document: "docs/guide.md", document_sha256: sha256(Buffer.from(current)), kind: "ordinary" }],
+    other_writers: [{ writer: "current-session", document: "docs/guide.md", document_sha256: sha256(Buffer.from(current)) }] };
+  f.write("docs/docs-procedure.md", Buffer.from("---\ndocs_drift_protection: " + canonicalJSON(policy).toString() + "\n---\n# Changed companion prose\n"));
+  commit(f.repo, "Refresh existing document digest and current writer");
+  expect(verifyProductionPreflight({ repo: f.repo, current_default: f.head(), component: f.component }).activation_commit).toBe(f.activationCommit);
+  expect(readGit(f.repo, "show", f.activationCommit + ":docs/docs-procedure.md")).toEqual(original);
+});
+
+test("an earlier reader accepts original proof and refuses the opted-in envelope", async () => {
+  const component = ordinaryComponentFixture(roots, true);
+  const baseline = "8484a00830739bf0f7d32f28d92bb1a0a59da7bf";
+  const path = "plugins/vh-adlc/scripts/docs-drift/preflight.ts";
+  writeFileSync(join(component.root, path), readGit(join(import.meta.dir, "../../.."), "show", baseline + ":" + path));
+  const earlier = await import(pathToFileURL(join(component.root, path)).href);
+  const original = preflightFixture(roots);
+  expect(earlier.verifyProductionPreflight({ repo: original.repo, current_default: original.head(), component: original.component }).activation_commit).toBe(original.activationCommit);
+  const projected = preflightFixture(roots, "none", undefined, repo => writeFileSync(join(repo, "docs/docs-procedure.md"),
+    "---\ndocs_drift_protection: {local_documents: []}\n---\n# Companion\n"));
+  expect(() => earlier.verifyProductionPreflight({ repo: projected.repo, current_default: projected.head(), component: projected.component })).toThrow("binding");
+  expect(verifyProductionPreflight({ repo: projected.repo, current_default: projected.head(), component: projected.component }).activation_commit).toBe(projected.activationCommit);
+});
 
 test("immutable preflight results stay scoped to their exact invocation and publisher", () => {
   const f = preflightFixture(roots), options = { repo: f.repo, current_default: f.head(), component: f.component,
@@ -78,8 +150,9 @@ test("upgrade checks repeat the selected fixed rows and take the union for mixed
   expect(() => upgradeChecks(["initial", "workflow_pin"])).toThrow();
 });
 
-test("a flat unrelated-component successor retains original native attribution and pending ownership", () => {
-  const f = preflightFixture(roots), path = ".vh-adlc/docs-drift-preflight-successor.yaml";
+test.each([false, true])("a flat unrelated-component successor retains original native attribution and pending ownership, new-policy marker %s", marker => {
+  const f = preflightFixture(roots, "none", undefined, marker ? repo => writeFileSync(join(repo, "docs/docs-procedure.md"),
+    "---\ndocs_drift_protection: {local_documents: []}\n---\n# Companion\n") : undefined), path = ".vh-adlc/docs-drift-preflight-successor.yaml";
   const component = { plugin_version: "0.25.1", source_commit: "c".repeat(40), component_sha256: "d".repeat(64) };
   const staged = { ...f.afterSettings, component, publication: { ...f.afterSettings.publication, mode: "staged", checklist_path: path } };
   const adopted = { ...staged, publication: { ...staged.publication, mode: "adopted" } };
@@ -88,7 +161,7 @@ test("a flat unrelated-component successor retains original native attribution a
   const activation = [{ path: ".vh-adlc/docs-drift.yaml", before: { mode: "100644" as const, sha256: sha256(canonicalJSON(staged)) },
     after: { mode: "100644" as const, sha256: sha256(canonicalJSON(adopted)) } }];
   const base = { repository: f.checklist.repository, candidate_commit: candidate, component,
-    configuration_sha256: normalizedConfigurationDigest(parseSettings(staged)), activation };
+    configuration_sha256: committedConfigurationDigest(f.repo, candidate, parseSettings(staged)), activation };
   const target = preflightReviewTarget(base);
   const checklist = { ...f.checklist, ...base, changes: ["component_unrelated"],
     review: { target_sha256: target, evidence_sha256: "2".repeat(64), model: "claude-opus-5.5" },

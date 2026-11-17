@@ -9,12 +9,13 @@ import { loadCommittedSettings } from "../../../plugins/vh-adlc/scripts/docs-dri
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { verifyProductionPreflight } from "../../../plugins/vh-adlc/scripts/docs-drift/preflight";
 import { bindings, fixture, role } from "./manifest-fixture";
-import { commit, ordinaryComponentFixture, preflightFixture } from "./preflight-fixture";
+import { activateProtectionSuccessor, commit, ordinaryComponentFixture, preflightFixture } from "./preflight-fixture";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-function original(recorded?: { actor?: string; actor_id?: number; settings_sha256?: string; hosted?: boolean }) {
-  const component = ordinaryComponentFixture(roots), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable });
+function original(recorded?: { actor?: string; actor_id?: number; settings_sha256?: string; hosted?: boolean; projected?: boolean }) {
+  const component = ordinaryComponentFixture(roots), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable },
+    recorded?.projected ? repo => writeFileSync(join(repo, "docs/docs-procedure.md"), "---\ndocs_drift_protection: {local_documents: []}\n---\n# Companion\n") : undefined);
   const source = f.head(), loaded = loadCommittedSettings(f.repo, source);
   const entry = recorded?.hosted ? "hosted" : "interactive";
   const identity = { repository: "fixture/docs", repository_id: 10, default_branch: "main",
@@ -30,6 +31,16 @@ function original(recorded?: { actor?: string; actor_id?: number; settings_sha25
     context: "production", transport: "native", publication_kind: "advisory", corrections: [], attention: [] });
   return { ...f, ...component, source, identity, plan };
 }
+
+test.each([false, true])("original recovery retains its exact policy after a projected successor, original projected %s", projected => {
+  const f = original({ projected }), bytes = canonicalJSON(f.plan);
+  activateProtectionSuccessor(f, "---\ndocs_drift_protection: {local_documents: []}\ndocs_drift_local_coverage: {dialect: documentation, terminal_statuses: []}\n---\n# Successor companion\n");
+  const selected = readOriginalRuntime({ repo: f.repo, directory: f.directory, plan: f.plan, identity: f.identity });
+  expect(selected.source_commit).toBe(f.source);
+  expect(selected.policy.policy_sha256).toBe(f.plan.policy_sha256);
+  expect(canonicalJSON(f.plan)).toEqual(bytes);
+  expect(existsSync(f.calls)).toBe(false);
+});
 
 test("original hosted policy retains its executor when selecting the original recovery runtime", async () => {
   const f = original({ hosted: true }), bytes = canonicalJSON(f.plan);

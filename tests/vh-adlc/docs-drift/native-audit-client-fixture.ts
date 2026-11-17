@@ -35,6 +35,17 @@ if (request.kind === "docs-drift-closure-worker-request") {
       state: "passed", method: "Synthetic current source check", evidence, asset_checks: [] })) } : {}),
     publication: { operation_id: "normal-operation", proposal: { kind: "pr-create", payload: { base: "main", branch: "docs-drift/normal-operation",
       title: "Repair the guide", body: "Exact selected source correction\\n", labels: ["documentation"], draft: false } } } }) + "\\n";
+  if (${JSON.stringify(fault)} === "mixed-plans") {
+    const selected = JSON.parse(records);
+    for (const [id, path, prior, next] of [["index-fix", "docs/plans/README.md", "Old link", "Current link"],
+      ["status-fix", "docs/plans/legacy.md", "done", "complete"], ["checkbox-fix", "docs/plans/legacy.md", "[ ] Verified behavior", "[x] Verified behavior"]]) {
+      const bytes = readFileSync(join(request.source_checkout, path)), base = bytes.indexOf(prior);
+      const start = base + (id === "checkbox-fix" ? 1 : 0), end = id === "checkbox-fix" ? start + 1 : base + Buffer.byteLength(prior);
+      selected.edits.push({ id, path, action: "replace", start, end, before_sha256: digest(bytes),
+        replacement_base64: Buffer.from(id === "checkbox-fix" ? "x" : next).toString("base64"), after_mode: "100644" });
+    }
+    records = JSON.stringify(selected) + "\\n";
+  }
   if (${JSON.stringify(fault)} === "decision-mismatch") records = records.replace('"guide-fix"', '"unselected-fix"');
 } else if (request.kind === "docs-drift-audit-worker-request") {
   const baseline = JSON.parse(readFileSync(join(request.artifact_root, request.source_verification.path)));

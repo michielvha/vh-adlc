@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { preflightFixture } from "./preflight-fixture";
+import { activateProtectionSuccessor, preflightFixture } from "./preflight-fixture";
 import { put } from "./repository-fixture";
 import { createAdoptedProducerVerifier } from "../../../plugins/vh-adlc/scripts/docs-drift/history-producer";
 import { createLocalInvocationReader, stageLocalInvocation } from "../../../plugins/vh-adlc/scripts/docs-drift/local-history";
@@ -17,7 +17,7 @@ afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force
 const workflow = ".github/workflows/docs-drift.yml", worker = ".github/workflows/docs-drift-worker.yml";
 const reader = { repository: "fixture/docs", repository_id: 10, actor: "fixture-owner", actor_id: 30, default_branch: "main" };
 
-function fixture(manual = false) {
+function fixture(manual = false, projected = false) {
   const f = preflightFixture(roots, "none", undefined, (repo, settings) => {
     Object.assign(settings.execution, { scheduled_workflow: workflow, worker_workflow: worker, claude_command: ".claude/commands/docs-drift.md" });
     settings.reports.interactive = "local-attestation"; settings.reports.local_history_roots = ["history"];
@@ -25,6 +25,7 @@ function fixture(manual = false) {
     put(repo, worker, canonicalJSON({ on: { workflow_call: null }, jobs: { report: { "runs-on": "ubuntu-latest",
       steps: ["collect", "review", "report", "upload", "attention"].map(id => ({ id: "docs-drift-" + id, name: "Drift " + id, run: "synthetic-only" })) } } }).toString());
     put(repo, ".claude/commands/docs-drift.md", "Synthetic command\n");
+    if (projected) put(repo, "docs/docs-procedure.md", "---\ndocs_drift_protection: {local_documents: []}\n---\n# Project procedure\n");
   });
   const current = f.head(), store = createOwnedObjectStore({ parent: f.artifacts, evidence_directory: f.artifacts,
     source_repo: f.repo, source_commit: current, repository: "fixture/docs", owner: "flat-history", run: "source" });
@@ -40,8 +41,8 @@ function source(repo: string, head: string, changed = false): ProducerSource {
       .map(([path, bytes]) => [path, bytes === null ? null : sha256(bytes)] as const); } };
 }
 
-test.each(["matching", "manual-dispatch", "changed-native-blob", "foreign-repository", "wrong-workflow", "wrong-event", "staged-source"])("flat scheduled history verifies its original source and native workflow: %s", fault => {
-  const f = fixture(fault === "manual-dispatch"), head = fault === "staged-source" ? f.candidate : f.current;
+test.each(["matching", "manual-dispatch", "changed-native-blob", "foreign-repository", "wrong-workflow", "wrong-event", "staged-source", "legacy-after-successor", "projected-after-successor"])("flat scheduled history verifies its original source and native workflow: %s", fault => {
+  const f = fixture(fault === "manual-dispatch", fault === "projected-after-successor"), head = fault === "staged-source" ? f.candidate : f.current;
   const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
   const run: WorkflowRunInput = { id: 101, run_attempt: 1, workflow_id: 100, path: workflow, event: "schedule",
     head_branch: "main", head_sha: head, repository, head_repository: repository,
@@ -49,8 +50,11 @@ test.each(["matching", "manual-dispatch", "changed-native-blob", "foreign-reposi
   if (fault === "foreign-repository") run.repository = { ...repository, id: 11 };
   if (fault === "wrong-workflow") run.workflow_id++;
   if (fault === "wrong-event" || fault === "manual-dispatch") run.event = "workflow_dispatch";
-  const verify = createAdoptedProducerVerifier({ store: f.store, current_default: f.current, identity: reader });
-  if (fault === "matching" || fault === "manual-dispatch") {
+  const current = fault.endsWith("after-successor") ? activateProtectionSuccessor(f,
+    "---\ndocs_drift_protection: {local_documents: []}\ndocs_drift_local_coverage: {dialect: feature, terminal_statuses: []}\n---\n# Successor companion\n") : f.current;
+  if (current !== f.current) readGit(f.store.root, "fetch", "--no-write-fetch-head", f.repo, current);
+  const verify = createAdoptedProducerVerifier({ store: f.store, current_default: current, identity: reader });
+  if (fault === "matching" || fault === "manual-dispatch" || fault.endsWith("after-successor")) {
     const result = verify(source(f.repo, head), run);
     expect(result?.source_commit).toBe(head); expect(result?.component_sha256).toBe(f.component.component_sha256);
     expect(result?.job_name).toBe("drift / report");
@@ -58,8 +62,8 @@ test.each(["matching", "manual-dispatch", "changed-native-blob", "foreign-reposi
   else expect(() => verify(source(f.repo, head, fault === "changed-native-blob"), run)).toThrow("history producer");
 });
 
-test.each(["matching", "native-casing", "foreign-account", "changed-component"])("flat local history reopens the original checklist: %s", fault => {
-  const f = fixture(), cache = join(f.root, "local-history"); mkdirSync(cache, { mode: 0o700 });
+test.each(["matching", "native-casing", "foreign-account", "changed-component", "legacy-after-successor", "projected-after-successor"])("flat local history reopens the original checklist: %s", fault => {
+  const f = fixture(false, fault === "projected-after-successor"), cache = join(f.root, "local-history"); mkdirSync(cache, { mode: 0o700 });
   const payload = { origin: "local-attestation" as const, context: "production" as const, repository: "fixture/docs", id: "earlier-run",
     source_commit: f.current, component_sha256: f.component.component_sha256,
     request_sha256: sha256(Buffer.from("request")), scope_sha256: sha256(Buffer.from("scope")), report_sha256: sha256(Buffer.from("report")),
@@ -75,8 +79,14 @@ test.each(["matching", "native-casing", "foreign-account", "changed-component"])
     component_sha256: payload.component_sha256, run_id: payload.id, scope_sha256: payload.scope_sha256,
     started_at: new Date().toISOString(), recheck: () => {} };
   const staged = stageLocalInvocation(context, invocation); staged.activate(() => {});
+  if (fault.endsWith("after-successor")) {
+    const current = activateProtectionSuccessor(f, "---\ndocs_drift_protection: {local_documents: []}\ndocs_drift_local_coverage: {dialect: feature, terminal_statuses: []}\n---\n# Successor\n");
+    readGit(f.store.root, "fetch", "--no-write-fetch-head", f.repo, current);
+    context.current_default = current; context.source = current;
+    context.settings = loadCommittedSettings(f.repo, current).settings;
+  }
   const history = createLocalInvocationReader(context);
   const read = history.read(invocation);
-  if (fault === "matching" || fault === "native-casing") expect(read, history.diagnostics.join("\n")).toEqual(invocation);
+  if (fault === "matching" || fault === "native-casing" || fault.endsWith("after-successor")) expect(read, history.diagnostics.join("\n")).toEqual(invocation);
   else expect(read).toBeNull();
 });

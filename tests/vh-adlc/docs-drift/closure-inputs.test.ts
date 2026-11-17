@@ -3,16 +3,34 @@ import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { collectClosureInputs, recheckClosureInputs } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-inputs";
 import { canonicalDigest, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
-import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
+import { loadCommittedSettings, parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { settingsFixture } from "./settings-fixture";
 import { closureFixture } from "./closure-fixture";
 import { commitAll, git, put } from "./repository-fixture";
+import { activateProtectionSuccessor, preflightFixture } from "./preflight-fixture";
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 
 const setup = (method: "merge" | "squash" | "rebase" = "merge", advance = false) => closureFixture(roots, method, advance);
+
+test.each([false, true])("merged consolidation reopens its original policy after a projected successor, original projected %s", async projected => {
+  const adopted = preflightFixture(roots, "none", undefined, (repo, configured) => {
+    configured.feedback_files.push("docs/corrections.yaml");
+    put(repo, "docs/corrections.yaml", "corrections: []\n");
+    if (projected) put(repo, "docs/docs-procedure.md", "---\ndocs_drift_protection: {local_documents: []}\n---\n# Companion\n");
+  });
+  const f = await closureFixture(roots, "merge", false, undefined, adopted.repo), original = Buffer.from(f.recordBytes);
+  expect(collectClosureInputs(f.collection).complete).toBe(true);
+  f.state.current = activateProtectionSuccessor(adopted, "---\ndocs_drift_protection: {local_documents: []}\ndocs_drift_local_coverage: {dialect: feature, terminal_statuses: []}\n---\n# Successor\n");
+  git(f.collection.store.root, "fetch", "--no-write-fetch-head", f.repo, f.state.current);
+  f.collection.settings = loadCommittedSettings(f.repo, f.state.current).settings;
+  const result = collectClosureInputs(f.collection);
+  expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+  expect(result.record?.sha256).toBe(sha256(original));
+  expect(f.recordBytes).toEqual(original);
+});
 
 for (const method of ["merge", "squash", "rebase"] as const) {
   test(`fresh-session ${method} collection locates the raw durable record without private historical artifacts`, async () => {

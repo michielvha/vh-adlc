@@ -2,7 +2,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { cpSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ordinaryComponentFixture, preflightFixture } from "./preflight-fixture";
+import { configureMixedPlanFixture, ordinaryComponentFixture, preflightFixture } from "./preflight-fixture";
 import { auditClient } from "./native-audit-client-fixture";
 import { installOwnedNativeService } from "./original-publication-fixture";
 import { git } from "./repository-fixture";
@@ -18,9 +18,10 @@ afterAll(() => {
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-test.each(["matching", "caller-change"])("normal prepare retains the original worker selection and edits only its owned candidate: %s", async fault => {
-  const component = ordinaryComponentFixture(roots, true), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable });
-  writeFileSync(component.executable, auditClient("prepare", true), { mode: 0o755 });
+test.each(["matching", "caller-change", "mixed-plans"])("normal prepare retains the original worker selection and edits only its owned candidate: %s", async fault => {
+  const component = ordinaryComponentFixture(roots, true), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable },
+    fault === "mixed-plans" ? configureMixedPlanFixture : undefined);
+  writeFileSync(component.executable, auditClient(fault === "mixed-plans" ? fault : "prepare", true), { mode: 0o755 });
   const source = f.head(), origin = join(f.root, "origin.git"), directory = join(f.root, "run"), state = join(f.root, "state");
   git(f.root, "clone", "--bare", "--no-local", f.repo, origin);
   const service = installOwnedNativeService({ root: f.root, origin, source, head: source, publisher_identity: { actor: "fixture-owner", actor_id: 30 } });
@@ -37,7 +38,8 @@ test.each(["matching", "caller-change"])("normal prepare retains the original wo
     return { result, report: JSON.parse(Buffer.from(result.captured?.stdout ?? []).toString()) as unknown };
   }
   expect((await invoke("scan")).result.exit_code).toBe(0);
-  writeFileSync(join(directory, "prepare.yaml"), "decisions:\n  - id: guide-fix\n    reason: Correct the selected guide\nattention: []\n", { mode: 0o600 });
+  const ids = fault === "mixed-plans" ? ["guide-fix", "index-fix", "status-fix", "checkbox-fix"] : ["guide-fix"];
+  writeFileSync(join(directory, "prepare.yaml"), "decisions:\n" + ids.map(id => "  - id: " + id + "\n    reason: Correct this selected synthetic source\n").join("") + "attention: []\n", { mode: 0o600 });
   const prepared = await invoke("prepare");
   expect(prepared.report).toMatchObject({ command: "prepare", outcome: "collected" });
   expect(prepared.result.exit_code).toBe(0);
@@ -49,8 +51,15 @@ test.each(["matching", "caller-change"])("normal prepare retains the original wo
   const preparation = JSON.parse(readBoundArtifact({ source_repo: f.repo, artifact_root: directory, reference }).toString());
   expect(preparation.prepared.state).toBe("prepared-uncommitted");
   expect(readFileSync(join(preparation.prepared.checkout, "docs/guide.md"), "utf8")).toBe("# Corrected guide\n");
+  if (fault === "mixed-plans") {
+    expect(readFileSync(join(preparation.prepared.checkout, "docs/plans/README.md"), "utf8")).toContain("Current link");
+    expect(readFileSync(join(preparation.prepared.checkout, "docs/plans/legacy.md"), "utf8"))
+      .toContain("status: complete\ngoal: Preserve this contract");
+    expect(readFileSync(join(preparation.prepared.checkout, "docs/plans/legacy.md"), "utf8"))
+      .toContain("- [x] Verified behavior\n## Evidence\nOriginal retained evidence");
+  }
   expect(stage?.artifacts.worker_capture).toBeDefined(); expect(stage?.artifacts.selection).toBeDefined();
-  git(preparation.prepared.checkout, "add", "docs/guide.md");
+  git(preparation.prepared.checkout, "add", "docs/guide.md", ...(fault === "mixed-plans" ? ["docs/plans"] : []));
   git(preparation.prepared.checkout, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "Selected guide correction");
   const verified = await invoke("verify");
   expect(verified.report).toMatchObject({ command: "verify", outcome: "collected" }); expect(verified.result.exit_code).toBe(0);
@@ -101,19 +110,19 @@ test.each(["matching", "caller-change"])("normal prepare retains the original wo
   }
   const published = await invoke("publish");
   if (fault === "caller-change") expect(readFileSync(join(f.repo, "README.md"), "utf8")).toBe("Changed caller during final publication effect\n");
-  expect(published.report).toMatchObject({ command: "publish", outcome: fault === "matching" ? "collected" : "incomplete", publication_effects: { state: "complete" } });
-  expect(published.result.exit_code).toBe(fault === "matching" ? 0 : 2);
+  expect(published.report).toMatchObject({ command: "publish", outcome: fault === "caller-change" ? "incomplete" : "collected", publication_effects: { state: "complete" } });
+  expect(published.result.exit_code).toBe(fault === "caller-change" ? 2 : 0);
   const deliveredRun = readRunDirectory({ repo: f.repo, directory, origins: join(state, "vh-adlc/docs-drift/origins") });
   const deliveredStage = deliveredRun.stages.at(-1);
   expect(deliveredStage?.command).toBe("publish");
-  expect(deliveredStage?.state).toBe(fault === "matching" ? "complete" : "pending");
+  expect(deliveredStage?.state).toBe(fault === "caller-change" ? "pending" : "complete");
   const deliveredReference = deliveredStage?.artifacts.publication_result;
   if (!deliveredReference) throw Error("Already executed publication evidence must remain referenced");
   expect(JSON.parse(readBoundArtifact({ source_repo: f.repo, artifact_root: directory, reference: deliveredReference }).toString()))
     .toMatchObject({ publication_effects: { state: "complete" } });
   const completed = JSON.parse(readFileSync(service.statePath, "utf8"));
   expect(completed.prs).toHaveLength(1); expect(completed.prs[0].title).toBe("Repair the guide");
-  if (fault === "matching") expect(captureRepositoryState(f.repo)).toEqual(before);
+  if (fault !== "caller-change") expect(captureRepositoryState(f.repo)).toEqual(before);
   else expect(captureRepositoryState(f.repo)).not.toEqual(before);
   const resumed = await invoke("resume");
   expect(resumed.report).toMatchObject({ command: "resume", outcome: "collected", publication_effects: { state: "complete" } });
@@ -122,7 +131,7 @@ test.each(["matching", "caller-change"])("normal prepare retains the original wo
   expect(resumed.report).toMatchObject({ bun_version: selectedVersion.stdout.toString().trim() });
   expect(resumed.result.exit_code).toBe(0);
   expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(1);
-  if (fault === "matching") expect(captureRepositoryState(f.repo)).toEqual(before);
+  if (fault !== "caller-change") expect(captureRepositoryState(f.repo)).toEqual(before);
   else expect(captureRepositoryState(f.repo)).not.toEqual(before);
   expect(readFileSync(join(directory, "synthetic-role-order.jsonl"))).toEqual(roleCalls);
   passed = true;

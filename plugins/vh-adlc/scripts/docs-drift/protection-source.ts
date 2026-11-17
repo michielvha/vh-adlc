@@ -1,4 +1,5 @@
 import { readDocumentMetadata } from "../docs-impact/collection";
+import { compileCoverage } from "../docs-impact/matching";
 import type { ProtectionContext } from "./protection";
 import { canonicalDigest, protocolPath, sha256 } from "./protocol";
 import type { Snapshot } from "./snapshot";
@@ -25,7 +26,7 @@ export function sourceProtection(snapshot: Snapshot, yaml: (bytes: Uint8Array) =
       throw Error("Project protection document differs from its committed bytes");
     return { path, blob };
   }
-  const policy = record(declared, ["local_ranges", "other_writers", "document_kinds"], true), context: ProtectionContext = {};
+  const policy = record(declared, ["local_ranges", "other_writers", "document_kinds", "local_documents"], true), context: ProtectionContext = {};
   const digest = sha256(procedure.bytes), procedureEvidence = { procedure_sha256: digest,
     procedure_quote: { start: 0, end: procedure.bytes.length, sha256: digest } };
   if (Object.hasOwn(policy, "local_ranges")) context.local_ranges = rows(policy.local_ranges).map(value => {
@@ -54,5 +55,20 @@ export function sourceProtection(snapshot: Snapshot, yaml: (bytes: Uint8Array) =
     const keys = items?.map(item => canonicalDigest([item.document, "writer" in item ? item.writer : null])) ?? [];
     if (new Set(keys).size !== keys.length) throw Error("Duplicate project protection declaration");
   }
+  if (Object.hasOwn(policy, "local_documents")) context.local_documents = rows(policy.local_documents).map(value => {
+    const row = record(value, ["patterns", "exclude_patterns", "kind", "editable_parts"]);
+    const patterns = (value: unknown) => rows(value).map(pattern => {
+      if (typeof pattern !== "string") throw Error("Project local-document pattern required");
+      compileCoverage(pattern, "documentation");
+      return pattern;
+    });
+    const include = patterns(row.patterns), exclude = patterns(row.exclude_patterns);
+    if (!include.length || !["ordinary", "plan"].includes(String(row.kind))) throw Error("Project local-document kind and patterns required");
+    const parts = rows(row.editable_parts);
+    if (parts.some(part => part !== "frontmatter" && part !== "acceptance-checkboxes") || new Set(parts).size !== parts.length
+      || row.kind === "ordinary" && parts.length) throw Error("Project local-document editable parts invalid");
+    return { patterns: include, exclude_patterns: exclude, kind: row.kind as "ordinary" | "plan",
+      editable_parts: parts as Array<"frontmatter" | "acceptance-checkboxes"> };
+  });
   return context;
 }

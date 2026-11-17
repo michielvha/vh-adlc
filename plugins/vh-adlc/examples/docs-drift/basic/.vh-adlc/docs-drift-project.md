@@ -16,3 +16,8 @@ No generated files or feedback stores are configured here. Add actual project
 checks and separate suppression/correction-history procedures during authorized
 consumer setup. Preserve standard feature-document proof and other writers'
 claimed work through the shared protection procedure.
+
+This example uses the original settings-only preflight digest. A consumer with
+mixed shared specs, older plans and index pages can adopt `local_documents`
+and local-coverage fields as documented in the settings reference. Ship those
+declarations with a compatible released binding and restore both on rollback.

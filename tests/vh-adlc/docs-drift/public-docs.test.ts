@@ -8,6 +8,20 @@ const root = resolve(import.meta.dir, "../../..");
 const guides = ["README.md", "docs/user-guides/workflows.md", "docs/reference/compatibility.md",
   "docs/reference/marketplace.md", "docs/get-started/installation.md"];
 
+test("mixed-root guides describe committed editing policy and its original-source binding", () => {
+  const settings = readFileSync(resolve(root, "plugins/vh-adlc/references/docs-drift-settings.md"), "utf8");
+  for (const field of ["local_documents", "exclude_patterns", "editable_parts", "status_aliases", "required_fields", "acceptance_headings", "committedConfigurationDigest"])
+    expect(settings).toContain(field);
+  expect(settings).toContain("including an empty list");
+  expect(settings).toContain("original source commit");
+  expect(settings).toContain("without a settings-only");
+  const procedure = readFileSync(resolve(root, "plugins/vh-adlc/references/docs-drift.md"), "utf8");
+  expect(procedure).toContain("Caller context accepts only");
+  expect(procedure).toContain("exact declared acceptance heading");
+  const example = readFileSync(resolve(root, "plugins/vh-adlc/examples/docs-drift/basic/.vh-adlc/docs-drift-project.md"), "utf8");
+  expect(example).toContain("settings-only preflight digest");
+});
+
 test.each(guides)("%s exposes docs-drift and resolves its local documentation links", path => {
   const text = readFileSync(resolve(root, path), "utf8");
   expect(text).toContain("vh-adlc-docs-drift");
