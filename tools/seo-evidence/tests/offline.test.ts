@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { mkdtemp, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
-import { cli, example, resultSchema } from "./cli.test";
+import { cli, example, resultSchema } from "./helpers/cli";
 import { sha } from "./helpers/bundle";
 
 test("real commands run without network or child execution and preserve other features", async () => {

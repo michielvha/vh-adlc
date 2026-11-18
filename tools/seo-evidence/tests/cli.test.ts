@@ -1,20 +1,12 @@
 import { expect, test } from "bun:test";
 import { mkdtemp, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { z } from "zod";
 import { readArtifact } from "../src/storage";
 import { site } from "./helpers/site";
 import { sha } from "./helpers/bundle";
 
-export const cli = resolve(import.meta.dir, "../cli.ts");
-export const example = resolve(import.meta.dir, "../examples/basic/bundle.yaml");
-export const resultSchema = z.object({ analysis_status: z.string(), policy_status: z.string(), exit_code: z.number().int() });
-export async function run(args: string[], env: Record<string, string | undefined> = {}) {
-  const p = Bun.spawn([process.execPath, cli, ...args], { stdout: "pipe", stderr: "pipe", env: { ...process.env, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", ...env } });
-  const [stdout, stderr, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
-  return { code, stdout, stderr };
-}
+import { example, resultSchema, run } from "./helpers/cli";
 test("real snapshot/inspect/compare flow verifies outputs without changing input", async () => {
   const root = await mkdtemp(join(tmpdir(), "seo-cli-test-")); const before = sha(await Bun.file(example).bytes());
   const s = await run(["snapshot", "--input", example, "--output", join(root, "snapshot"), "--json"]);
