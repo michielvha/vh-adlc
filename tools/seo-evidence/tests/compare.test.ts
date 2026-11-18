@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { compare } from "../src/compare";
 import { site } from "./helpers/site";
+import { applyPolicy } from "../src/policy";
 const html = (head: string, body = "<h1>Heading</h1>") => `<head>${head}</head><main>${body}</main>`;
 
 test("real technical regressions retain old and new evidence", async () => {
@@ -55,4 +56,19 @@ test("final URL changes and JSON-LD changes remain observations", async () => {
   const b = await site([{ path: "/", final: "/new", html: html("") }]);
   const r = compare(a.snapshot, b.snapshot);
   expect(r.findings.map(f => f.rule)).toEqual(expect.arrayContaining(["final_url_changed", "jsonld_changed"]));
+});
+test("partial reasons must agree with actual capture evidence", async () => {
+  const f = await site([{ path: "/" }, { path: "/later", outcome: "not_collected" }]);
+  for (const partial_reasons of [[], ["invented reason"]]) expect(() => compare(f.snapshot, { ...f.snapshot, partial_reasons })).toThrow(/inconsistent/i);
+  expect(applyPolicy(compare(f.snapshot, f.snapshot)).exit_code).toBe(2);
+});
+test("malformed HTTP canonical parameters remain unavailable without selected regression failures", async () => {
+  const a = await site([{ path: "/", headers: { Link: ['</old>; rel="canonical"'] } }]);
+  for (const value of ['</new> rel="canonical"', '</new>;; rel="canonical"', '</new>; rel="canonical";', '</new>; rel="canonical" title="missing separator"']) {
+    const b = await site([{ path: "/", headers: { Link: [value] } }]);
+    const r = applyPolicy(compare(a.snapshot, b.snapshot), { schema_version: 1, fail_rules: ["canonical_changed", "canonical_removed"] });
+    expect(r.findings.some(f => f.rule === "comparison_unavailable")).toBe(true);
+    expect(r.findings.some(f => ["canonical_changed", "canonical_removed"].includes(f.rule))).toBe(false);
+    expect(r.exit_code).toBe(0);
+  }
 });

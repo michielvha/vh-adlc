@@ -53,3 +53,17 @@ test("recorded hops and capture modes remain separate", async () => {
   expect(g.links.find(l => l.href === "/child#ok")?.fragment_status).toBe("valid");
   expect(g.links.find(l => l.href === "/unknown")?.status).toBe("unobserved");
 });
+test("incoming content discovery follows aliases but excludes transitions and effective self-links", async () => {
+  const f = await site([
+    { path: "/root", html: '<main><a href="/linked-alias">Linked</a></main>' },
+    { path: "/old", final: "/new", html: '<main><a href="/old">Self alias</a></main>' },
+    { path: "/linked-alias", final: "/linked" },
+  ], { roots: ["/root"] });
+  const g = analyzeGraph(f.snapshot);
+  expect(g.nodes.find(n => n.url === origin + "/new")?.incoming).toBe(0);
+  expect(g.findings.some(f => f.rule === "zero_incoming" && f.url === origin + "/new")).toBe(true);
+  expect(g.nodes.find(n => n.url === origin + "/linked")?.incoming).toBe(1);
+  expect(g.nodes.find(n => n.url === origin + "/linked")?.depth).toBe(1);
+  const rooted = await site([{ path: "/old", final: "/new" }], { roots: ["/old"] });
+  expect(analyzeGraph(rooted.snapshot).findings.some(f => f.rule === "zero_incoming")).toBe(false);
+});

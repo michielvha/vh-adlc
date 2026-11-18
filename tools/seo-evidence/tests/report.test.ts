@@ -31,3 +31,15 @@ test("terminal modes remain labelled and machine output stays undecorated", () =
   for (const noColor of [undefined, "", "0"]) expect(renderStatus(base, { tty: false, ascii: false, noColor })).not.toMatch(/\x1b/);
   expect(renderStatus({ ...base, exit_code: 3, policy_status: "failed" }, { tty: true, ascii: false })).toContain("✗ Failed");
 });
+test("rendered source punctuation remains literal rather than creating links or images", async () => {
+  const url = "https://example.test/![click](https://outside.test/tracker)";
+  const f = await site([{ path: "/" }]); const r = applyPolicy(inspect(f.snapshot));
+  const payload = '![click](https://outside.test/tracker) [label](https://outside.test/link) \\ *emphasis* # heading';
+  r.findings = [{ id: "test", rule: "source", url, mode: "initial", detail: payload, evidence: [], values: {} }];
+  r.partial_reasons = [payload];
+  const rendered = Bun.markdown.html(renderFiles(r)["report.md"] ?? "");
+  expect(rendered).not.toMatch(/<(?:img|a|em)\b/);
+  expect(rendered).toContain(url);
+  expect(rendered).toContain("![click](https://outside.test/tracker)");
+  expect(rendered).toContain("*emphasis*");
+});

@@ -2,7 +2,8 @@ import { expect, test } from "bun:test";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { readArtifact } from "../src/storage";
+import { readArtifact, writeArtifact } from "../src/storage";
+import { stable } from "../src/bundle";
 import { site } from "./helpers/site";
 import { sha } from "./helpers/bundle";
 
@@ -36,5 +37,17 @@ test("CLI policies preserve partial precedence, mode and machine status", async 
   for (const noColor of ["", "0", "1"]) {
     const r = await run(["inspect", "--snapshot", join(root, "snapshot/snapshot.json"), "--policy", policy, "--output", join(root, "report" + noColor), "--json"], { NO_COLOR: noColor });
     expect(r.code).toBe(2); expect(resultSchema.parse(JSON.parse(r.stdout) as unknown)).toMatchObject({ analysis_status: "partial", policy_status: "failed" }); expect(r.stdout).not.toMatch(/\x1b/);
+  }
+});
+test("manifest-valid partial snapshots cannot hide their missing evidence reasons", async () => {
+  const f = await site([{ path: "/" }, { path: "/later", outcome: "not_collected" }]);
+  const root = await mkdtemp(join(tmpdir(), "seo-cli-inconsistent-"));
+  await writeArtifact(join(root, "bad"), { "snapshot.json": stable({ ...f.snapshot, partial_reasons: [] }) });
+  const input = join(root, "bad/snapshot.json");
+  for (const [name, args] of [["inspect", ["inspect", "--snapshot", input]], ["compare", ["compare", "--baseline", input, "--current", input]]] as const) {
+    const r = await run([...args, "--output", join(root, name), "--json"]);
+    expect(r.code).toBe(2);
+    expect(resultSchema.parse(JSON.parse(r.stdout) as unknown).analysis_status).toBe("invalid");
+    expect(await Bun.file(join(root, name, "complete.json")).exists()).toBe(false);
   }
 });

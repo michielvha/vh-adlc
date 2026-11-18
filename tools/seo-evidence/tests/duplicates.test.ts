@@ -42,3 +42,11 @@ test("shared navigation alone cannot create a duplicate main-content group", asy
   const f = await site([{ path: "/", html: "<nav>Shell</nav><article>A</article>" }, { path: "/other", html: "<nav>Shell</nav><article>B</article>" }], { selector: "article" });
   expect(inspect(f.snapshot).findings.some(f => f.rule === "duplicate_main")).toBe(false);
 });
+test("every observed duplicate member contributes its finding to its template group", async () => {
+  const html = (body: string) => `<head><title>Same</title></head><main>${body}</main>`;
+  const f = await site([{ path: "/a", html: html("A") }, { path: "/b", html: html("B") }, { path: "/alias", final: "/b", html: html("B") }], { groups: { a: ["/a"], b: ["/b"], alias: ["/alias"], unseen: ["/uncaptured"] } });
+  const r = inspect(f.snapshot); const id = r.findings.find(f => f.rule === "duplicate_title")?.id;
+  expect(id).toBeDefined();
+  for (const group of ["a", "b", "alias"]) expect(r.coverage.groups[group]?.findings).toContain(id);
+  expect(r.coverage.groups.unseen?.findings).not.toContain(id);
+});
