@@ -80,7 +80,7 @@ The matching tool and project settings ship together and roll back together. The
 
 Recovery retains the original operation's ownership and evidence. A publication lease keeps new audits pending before models run. Administrative abandonment requires exact approval and a stopped original executor, then removes its lease and matching receipt atomically. Terminal receipts persist. Unsupported deletion of only a lease can permit a fresh assessment while its receipt remains.
 
-The owner accepted clean Claude Code Opus 5.5 R-122. Local scanner parity, companion rules and native synthetic workflow checks pass at their recorded revisions. Whole-feature review R-125 returns two cleanup nits, now corrected, with every composite completion criterion still unverified. The final corrections restore local command behavior and scheduled safe-fix wording, preserve older metadata and remove unused helpers. Released marketplace installs, actual provider/hosted trials, final release-bound paired review, cutover and activated rollback remain open. GUI and phone tests are deferred. Merge, release and cutover retain their separate approval stages.
+The owner accepted clean Claude Code Opus 5.5 R-122. Local scanner parity, companion rules and native synthetic workflow checks pass at their recorded revisions. Whole-feature review R-126 confirms the prior cleanup and identifies an unknown-assessment test gap plus one remaining test-only runtime module. Every composite completion criterion remains unverified. The final corrections restore local command behavior and scheduled safe-fix wording, preserve older metadata and remove unused helpers. Released marketplace installs, actual provider/hosted trials, final release-bound paired review, cutover and activated rollback remain open. GUI and phone tests are deferred. Merge, release and cutover retain their separate approval stages.
 
 ### Current committed review on 2026-11-18
 
@@ -117,6 +117,32 @@ All 61 neighboring settings, publication and proposal-assessment cases pass with
 278 assertions, and strict TypeScript passes. Selected source hashes stay unchanged
 through each check and owned-process cleanup is confirmed. The full gate remains
 on its separate frozen `f5cf1897` source; these focused results cover the cleanup.
+
+### Complete source checkpoint and R-126
+
+The frozen `f5cf1897` full gate passes all ten stages, including 4,169 plugin tests
+with 19,318 assertions across 263 files. Every frozen-snapshot check is unchanged
+and owned-process cleanup is confirmed. The owning feature branch advances through
+review records and cleanup while that final stage runs; its owner-head comparison
+therefore becomes false. This is complete proof for the frozen checkpoint, not a
+claim that the later cleanup or a released payload ran that same full suite.
+
+Claude Code Opus 5.5 R-126 independently reviews exact `61ca3443`, with unchanged
+source trees/refs and confirmed owned-process cleanup. Its 128 focused cases pass
+with 787 assertions. A separate deliberate mutation drops only the assessed
+unverifiable-proposal arm; 56 cases still pass. The earlier added assertion covers
+only a missing judgment. Add actual report-output coverage for a wholly unknown
+assessment. The other finding moves the concrete example-workflow validator out
+of the runtime payload and corrects its Context description. All composite criteria
+remain unverified. The accepted baseline stays unchanged.
+
+A read-only check of the active Codex marketplace installation matches all 157
+files, modes and hashes to published `0.25.0` source `b3e65115`. This establishes
+that current installation's inventory; it is not a fresh/upgrade `0.26.0` trial.
+The shared repository's signing secret and release-app secret/variable are present,
+verified by names only. Release/install, native/hosted acceptance, final paired C/D
+review and actual migration/rollback remain open. The Copilot hosted secret is still
+missing; an owner setup request is pending. GUI and phone checks remain deferred.
 
 ### Mixed-plan compatibility decision on 2026-11-17
 
@@ -905,19 +931,19 @@ The owner confirmed ordinary installed clients and the capability-preserving che
 ## Acceptance Criteria
 
 - [ ] AC-01: An adopting repository can audit documentation and resolve stale audit proposals through one discoverable harness-agnostic workflow, retaining its scanner, detector policy and existing change-scoped docs-impact behavior.
-      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
+      Evidence: R-126 returns not verified at 61ca3443; see its exact observations and limitations in the Review Log.
 - [ ] AC-02: Complete assessments independently match scanner document/per-unit inventories and raw-byte digests to the selected Git tree and committed selectors. Failed, skipped, partial, stale or unreadable required input remains visible and prevents a clean claim. Confirmed findings and proposed fixes carry document/source evidence.
-      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
+      Evidence: R-126 returns not verified at 61ca3443; see its exact observations and limitations in the Review Log.
 - [ ] AC-03: Authorized preparation preserves unrelated work, intended contracts, historical evidence and local feature-review rules while producing only selected verified corrections. Mixed plan directories preserve safe locally authorized mechanical corrections and ordinary-document preparation without weakening enrolled shared-spec gates. Caller repositories and foreign resources retain their original state.
-      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
+      Evidence: R-126 returns not verified at 61ca3443; see its exact observations and limitations in the Review Log.
 - [ ] AC-04: Resolution retains the correct detector-versus-interpretation feedback and current disposition for every original hunk. A selected original closes only after its merged consolidation and every carried or terminal disposition are freshly verified.
-      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
+      Evidence: R-126 returns not verified at 61ca3443; see its exact observations and limitations in the Review Log.
 - [ ] AC-05: Concise reports, independent exact-target review and declared permissions govern local and remote effects. Scheduled and interactive publisher accounts remain distinct and correctly bound. Complete unchanged carried attention can finish green. Original-operation recovery observes before replay, preserves partial/unknown outcomes as pending, supports evidence-backed owner acknowledgement and never repeats a completed write or transfers ownership. A present lease keeps both local and scheduled audits pending before model execution. Exact owner-approved administrative abandonment requires a stopped original executor and atomically removes only the present lease and its validated operation receipt. Normal hosted production execution uses the durable `hosted` profile and retains native-validated original run/attempt identity before lease acquisition, with exact configured workflow and assessed-source checks. Stopped-job evidence must match the production member or a native trial's existing launch binding. Collector trials are ineligible for administrative abandonment. Stale object preconditions reject all deletions. With no lease, reports assess current findings independently while retaining receipt-only evidence.
-      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
+      Evidence: R-126 returns not verified at 61ca3443; see its exact observations and limitations in the Review Log.
 - [ ] AC-06: Stackweaver adopts the published installed workflow after scanner parity, independent paired review, installed/native operation checks and a successful unattended shared trial, with its local rules, credentials, commands, schedule and notifications preserved and a verified rollback path.
-      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
+      Evidence: R-126 returns not verified at 61ca3443; see its exact observations and limitations in the Review Log.
 - [ ] AC-07: Recorded repository, package and portable-host checks pass for the exact released/installed payload. Native model/entry trials establish their actual supported surfaces. GUI, phone and unperformed surfaces remain explicitly deferred or unclaimed. The selected component binding gates provider execution and remote effects, with explicit read-only mismatch reporting. Simpler installation, run/recovery and migration interfaces replace the private client installer and historical adoption/runtime record machinery under the accepted tradeoffs, while retaining the test-only installed synthetic harness and durable operation recovery records.
-      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
+      Evidence: R-126 returns not verified at 61ca3443; see its exact observations and limitations in the Review Log.
 
 ## Test Plan
 
@@ -1796,6 +1822,7 @@ None. On 2026-11-17 the owner accepts the R-117 compatibility recommendations. T
 | 2026-11-17 | R-123 | spec | `579f9f22211ca6806cd44162236c3d9d6feca9a8` | claude-opus-5-5 | procedural | 2 nit. |
 | 2026-11-17 | R-124 | implementation | `d4744a518b45752ea81e04fdb857e3f171e764ce` | claude-opus-5-5 | procedural | Seven criteria not verified; three nits. |
 | 2026-11-18 | R-125 | implementation | `f5cf1897d90d0a2192037115b2a034ffc3b3aeed` | claude-opus-5-5 | procedural | Seven criteria not verified; two cleanup nits. |
+| 2026-11-18 | R-126 | implementation | `61ca344352664ae1529ff9b66a8be8f475f991bd` | claude-opus-5-5 | procedural | Seven criteria not verified; one test-coverage correction and one cleanup nit. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -3609,6 +3636,42 @@ SEVERITY: nit
 WHERE: plugins/vh-adlc/scripts/docs-drift/settings.ts:499-515 (ClassifiedLeaf, classifySettingsLeaves); plugins/vh-adlc/scripts/docs-drift/publish.ts:106-109 (verifyPublicationGate); tests/vh-adlc/docs-drift/settings.test.ts:7, :17, :39; tests/vh-adlc/docs-drift/publish.test.ts:6, :30-31; Design "One run directory and a smaller helper interface"
 EVIDENCE: Following R-124 F-03's method over production plugin .ts, .md and .sh files, these two exports have no caller outside their defining module, and their own modules do not use them. `git show d0fc73d0` removes their last production callers: the upgrade leaf comparison (`new Map(classifySettingsLeaves(settings)`) and two `await verifyPublicationGate(...)` calls. Scope replaces upgrade classification. verifyPublicationGate is a one-line wrapper over createPublicationVerifier. The Design asks that a reusable abstraction have a concrete caller and a retained user-visible need. checkPublication and checkClosurePublication also lack production callers, but they run the real currentState stage and fit the Design's allowance for private stage functions kept for tests.
 PROPOSAL: Remove classifySettingsLeaves, ClassifiedLeaf and their two settings.test.ts assertions, keeping the settingsProjections checks that history-producer.ts still relies on. Replace verifyPublicationGate in publish.test.ts with a direct createPublicationVerifier(options)(null) call, or drop the export.
+
+### R-126
+
+CRITERION: AC-01 An adopting repository can audit documentation and resolve stale audit proposals through one discoverable harness-agnostic workflow, retaining its scanner, detector policy and existing change-scoped docs-impact behavior.
+VERDICT: not verified
+EVIDENCE: TMPDIR=/tmp/c4r bun test --timeout 60000 (Bun 1.4.4) over tests/vh-adlc/docs-drift/{settings,publish,proposal-assessment,audit-report,manifests,examples,report}.test.ts at 61ca3443 in the clean review clone observed 128 pass, 0 fail, 787 assertions in 768.33s. Afterwards git status was empty and HEAD was unchanged. examples.test.ts loads the shipped example through the strict reader. SKILL.md routes audit, resolve and post-merge closure through references/docs-drift.md, keeps docs-impact separate and names the eight helper operations. run-cli.ts dispatches scan, resolve and close with explicit proposal selection. Limitations: I did not observe the Test Plan's canonical-skill run against Stackweaver's bounded fixture and a second adopter. The full plugin suite on the separate frozen f5cf1897 source was still running at 01:28, with 856 pass lines, no fail lines and active stage all-plugin-tests. No adopting repository uses the shared workflow yet, because T154, T155, T128, T129 and T130 are open.
+CRITERION: AC-02 Complete assessments independently match scanner document/per-unit inventories and raw-byte digests to the selected Git tree and committed selectors. Failed, skipped, partial, stale or unreadable required input remains visible and prevents a clean claim. Confirmed findings and proposed fixes carry document/source evidence.
+VERDICT: not verified
+EVIDENCE: At 61ca3443 the strict settings and manifest tests passed in the 128-case run above. git diff f5cf1897 HEAD changes no scan, snapshot, protocol, archive or Git-reader source; the only runtime diffs remove three uncalled exports. Limitations: I did not rerun the scan, snapshot, protocol, hardened Git control, source-assessment or worker-assessment files at this target. They are only in the unfinished frozen f5cf1897 full suite. Real-corpus scanner and inventory parity on the consumer was out of scope and not observed. No native provider assessment ran.
+CRITERION: AC-03 Authorized preparation preserves unrelated work, intended contracts, historical evidence and local feature-review rules while producing only selected verified corrections. Mixed plan directories preserve safe locally authorized mechanical corrections and ordinary-document preparation without weakening enrolled shared-spec gates. Caller repositories and foreign resources retain their original state.
+VERDICT: not verified
+EVIDENCE: git diff f5cf1897 HEAD changes no protection, protection-source, preparation, snapshot or preservation source. In the 128-case run, audit-report.test.ts compared captureRepositoryState before and after for each report case and passed. Limitations: I did not rerun the protection, source-protection, normal-preparation or mixed-root report/prepare/revalidation cases at this target. The actual Stackweaver protection-inventory replay and corpus parity (T155, T128) were not observed. The frozen f5cf1897 full suite had not finished.
+CRITERION: AC-04 Resolution retains the correct detector-versus-interpretation feedback and current disposition for every original hunk. A selected original closes only after its merged consolidation and every carried or terminal disposition are freshly verified.
+VERDICT: not verified
+EVIDENCE: In the 128-case run, proposal-assessment.test.ts passed. Its seven-row matrix covers supported, fixed-differently, unsupported, both mixed forms, all-unknown (unverifiable) and supported+unknown (mixed), each with zero unassessed hunks. audit-report.test.ts:222-245 passed and asserts a mixed proposal's produced disposition needs-resolution and every hunk recommendation in the markdown. Limitations: the production attention rule for an assessed all-unknown proposal is untested (see F-01). I did not run resolve, closure, closure-inputs, closure-worker, closure-entry or trial-closure at this target. No live proposals or merged consolidations were exercised.
+CRITERION: AC-05 Concise reports, independent exact-target review and declared permissions govern local and remote effects. Scheduled and interactive publisher accounts remain distinct and correctly bound. Complete unchanged carried attention can finish green. Original-operation recovery observes before replay, preserves partial/unknown outcomes as pending, supports evidence-backed owner acknowledgement and never repeats a completed write or transfers ownership. A present lease keeps both local and scheduled audits pending before model execution. Exact owner-approved administrative abandonment requires a stopped original executor and atomically removes only the present lease and its validated operation receipt. Normal hosted production execution uses the durable `hosted` profile and retains native-validated original run/attempt identity before lease acquisition, with exact configured workflow and assessed-source checks. Stopped-job evidence must match the production member or a native trial's existing launch binding. Collector trials are ineligible for administrative abandonment. Stale object preconditions reject all deletions. With no lease, reports assess current findings independently while retaining receipt-only evidence.
+VERDICT: not verified
+EVIDENCE: In the 128-case run, publish.test.ts passed. It now calls the real createPublicationVerifier(selected)(null) twice and observes three committed-settings reads, so each direct check opens a fresh validation scope. report.test.ts passed. references/docs-drift-review.md:191-211 and authority.md:231 document the manual git push --atomic with two exact --force-with-lease refspecs, and the helper has no abandonment command. git grep finds no remaining reference to verifyPublicationGate. Limitations: I did not rerun authority, journal, native-controller, closure-controller, native-recovery-entry, original-runtime, normal-report lease paths or the hosted fresh-runner cases at this target. These are synthetic local services. The actual scheduled-worker route after lost ownership (T128) and any real hosted run are pending.
+CRITERION: AC-06 Stackweaver adopts the published installed workflow after scanner parity, independent paired review, installed/native operation checks and a successful unattended shared trial, with its local rules, credentials, commands, schedule and notifications preserved and a verified rollback path.
+VERDICT: not verified
+EVIDENCE: I inspected Tasks at 61ca3443. T154, T155, T128, T129 and T130 are unticked. plugins/vh-adlc/plugin.json and .claude-plugin/plugin.json declare 0.26.0, which the dispatch reports as unpublished; vh-adlc.lock.json pins binary 0.34.0. Limitations: no release, marketplace install, final paired review against a released binding, unattended trial, routing switch or rollback was executed or observed. Consumer files were out of scope. The procedure exists but has not been run, so the end state is not established.
+CRITERION: AC-07 Recorded repository, package and portable-host checks pass for the exact released/installed payload. Native model/entry trials establish their actual supported surfaces. GUI, phone and unperformed surfaces remain explicitly deferred or unclaimed. The selected component binding gates provider execution and remote effects, with explicit read-only mismatch reporting. Simpler installation, run/recovery and migration interfaces replace the private client installer and historical adoption/runtime record machinery under the accepted tradeoffs, while retaining the test-only installed synthetic harness and durable operation recovery records.
+VERDICT: not verified
+EVIDENCE: At 61ca3443 the verified binary gives lint pass, spec review R-123 fresh, and implementation review R-125 stale on covered-changed for the seven changed files. gate in-progress passes. gate complete fails on all_met, impl_review_fresh and impl_review_clean. b3e65115 is an ancestor of HEAD. git grep finds no reference to proposalAttentionDisposition, classifySettingsLeaves, ClassifiedLeaf or verifyPublicationGate. bootstrap.ts:57-139 checks installed payloads without the private-cache uid/0700/nlink policy and fails on symlinked entries below the root. Limitations: I did not run strict TypeScript at this target, because typecheck.sh needs a bun install. The full plugin suite and Linux/macOS CI were not observed to completion, and the frozen f5cf1897 gate is an earlier source. No released or installed payload, marketplace install or upgrade, or native Copilot/Claude operation was performed (T130). worker-callers.ts remains a production module with only a test caller (F-02).
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/docs-drift/audit-proposal-report.ts:33; tests/vh-adlc/docs-drift/audit-report.test.ts:222-245; tests/vh-adlc/docs-drift/proposal-assessment.test.ts:60-90; Context "R-125 cleanup verification"
+EVIDENCE: The production rule is `disposition: judgment?.assessment === "unverifiable" || !judgment ? "unknown" : "needs-resolution"`. After 61ca3443 deleted proposalAttentionDisposition and its routed matrix assertions, no test checks the produced disposition for an assessed all-unknown (unverifiable) proposal. The new assertion at audit-report.test.ts:88 covers only the missing-judgment arm. The mixed case at :240 covers only needs-resolution. report.test.ts:239-273 builds proposal attention directly and bypasses auditProposalReportInputs. In a scratch clone at /tmp/c4m I mutated the expression to `!judgment ? "unknown" : "needs-resolution"`. audit-report, proposal-assessment, report, normal-report and audit-session then still passed: 56 pass, 0 fail, 727 assertions in 1192.70s. A wholly unknown proposal could therefore be reported as needs-resolution, which goes against the Design rule to preserve unknown items, with every test green. The recorded first-red mutation exercises only the missing-judgment arm.
+PROPOSAL: Parametrize the existing mixed-proposal integration test over `proposalVerdicts: ["supported", "fixed-differently"]` expecting needs-resolution and `proposalVerdicts: ["unknown"]` expecting unknown with reason containing "assessment is unverifiable". assessmentReviewFixture already supports the unknown verdict (assessment-review-fixture.ts:15, :44-46). Then rerun the wrong-disposition mutation against that row.
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: plugins/vh-adlc/scripts/docs-drift/worker-callers.ts:1-53; tests/vh-adlc/docs-drift/examples.test.ts:11, :123; docs/specs/shared-docs-drift.md:325 (Context, T127 checkpoint); Design "One run directory and a smaller helper interface"
+EVIDENCE: git grep shows that the only caller of verifyConfiguredWorkerCaller, the module's only export, is examples.test.ts:123. No production module, example script or workflow calls it. git show d0fc73d0 removed its last production callers in adoption.ts, along with verifyWorkerCallers. settings.execution.permissions and secret_mappings are parsed into the protected projection but are compared with a workflow only by this test-used function. docs-drift-settings.md:146 leaves runner, permissions and secret mapping in the consumer workflow. Context line 325 says "The collection example calls `verifyConfiguredWorkerCaller`", but only the example test does. This is the same class as R-125 F-02. It is test-only validation shipped in the plugin payload, not a retained runtime validation stage. checkPublication and checkClosurePublication differ: they run the real controller stages and fit the Design's private-stage allowance.
+PROPOSAL: Move worker-callers.ts under tests/vh-adlc/docs-drift/ as a test helper, or inline it in examples.test.ts, so the shipped payload drops it. Correct Context line 325 to say the example test calls it.
 
 ## Sources
 
