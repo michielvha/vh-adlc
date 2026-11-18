@@ -1,6 +1,6 @@
 ---
 status: planned
-status_description: "Accepted after independent review; preparing tasks for isolated implementation."
+status_description: "Accepted and task-planned; ready for isolated implementation."
 issue: null
 goal: "A person or agent can turn saved public-site evidence into repeatable cross-page findings and technical regression checks without depending on the unfinished SEO features."
 covers:
@@ -145,7 +145,28 @@ No existing output requires migration. Unsupported future input versions fail vi
 
 ## Tasks
 
-None yet; written once the reviewed document is accepted and planned. No dependency on either existing SEO feature is required before claiming this feature's separate branch.
+Implementation starts on this feature's own branch and needs neither existing SEO feature to land. Each task is one commit; test tasks record the intended failing result before the following implementation task. All tasks are unchecked because implementation has not started.
+
+On T1 through T17, companion paths following a `tools/seo-evidence/` path are relative to that directory. The explicitly named `.github/workflows/seo-evidence.yml` remains repository-relative, as does the feature document on T18.
+
+- [ ] T1 `tools/seo-evidence/package.json`, `bun.lock`, `tsconfig.json`, `tests/bundle.test.ts`, `tests/fixtures/bundles/`, `examples/basic/` - establish the isolated Bun/strict-TypeScript package and native example, then add the AC-02 valid/invalid bundle cases; the frozen install succeeds and bundle tests fail because validation/extraction behavior is absent (AC-01, AC-02, AC-08)
+- [ ] T2 `tools/seo-evidence/src/bundle.ts`, `src/types.ts`, `schema/`, `tests/bundle.test.ts` - implement versioned bundle validation, allowed metadata, known final URLs, file containment/hashes, UTF-8 and input limits; T1's boundary cases pass, including captured HTTP errors versus unknown transport outcomes, and the package typecheck passes (AC-02)
+- [ ] T3 `tools/seo-evidence/tests/extract.test.ts`, `tests/fixtures/html/`, `tests/fixtures/headers/` - add actual HTML/header extraction fixtures for base/fragment alternatives, canonical sources, generic versus scoped directives, equivalent negatives and content-root selection; the tests fail on the missing extractor behavior (AC-03, AC-04, AC-05)
+- [ ] T4 `tools/seo-evidence/src/extract.ts`, `src/url.ts`, `src/controls.ts`, `src/snapshot.ts` - extract normalized observations with source evidence and conservative URL identity; T3 passes for first-base fallback, raw/decoded/named/top fragment data, repeated/conflicting header/HTML controls and main-content hashes without executing HTML (AC-02, AC-03, AC-04, AC-05)
+- [ ] T5 `tools/seo-evidence/tests/graph.test.ts`, `tests/fixtures/graphs/` - add rooted and isolated graphs, observed/unobserved error targets, redirected roots, unknown intermediate hops, self-links, agreeing/conflicting final captures and capture-mode separation; tests fail on missing graph/reconciliation behavior (AC-03)
+- [ ] T6 `tools/seo-evidence/src/graph.ts`, `src/snapshot.ts` - attach documents to final URLs, retain all observations, type explicit transitions, preserve conflicts as partial/unverified, and compute supported incoming links, observed anchor depth and fragment outcomes; T5 passes with no invented chain or target success (AC-02, AC-03)
+- [ ] T7 `tools/seo-evidence/tests/duplicates.test.ts`, `tests/fixtures/duplicates/` - add exact metadata/main-content groups, language/mode partitions, shared navigation, missing/multiple roots, canonical variants and partial template-group coverage; tests fail on absent group analysis (AC-04)
+- [ ] T8 `tools/seo-evidence/src/duplicates.ts`, `src/coverage.ts`, `src/inspect.ts` - implement exact supported duplicate groups and observed template coverage, compose graph findings and retain unavailable extraction; T7 passes without whole-site, thin-content or keyword-cannibalization verdicts (AC-03, AC-04)
+- [ ] T9 `tools/seo-evidence/tests/compare.test.ts`, `tests/fixtures/comparisons/` - add each accepted field/regression pair plus header-only/equivalent/conflicting controls, final-URL changes, failures, inventory changes and incompatible snapshots; the tests fail on missing comparison predicates (AC-05)
+- [ ] T10 `tools/seo-evidence/src/compare.ts`, `src/rules.ts` - implement explicit-snapshot matching and regression/change findings with old/new evidence and availability limits; T9 passes and all inspect/compare rule IDs are documented in the local rule catalog (AC-05, AC-06)
+- [ ] T11 `tools/seo-evidence/tests/policy.test.ts`, `tests/report.test.ts`, `tests/fixtures/report-values/` - add report-only/selected-rule status cases and JSON/CSV/Markdown/human-output cases, including unavailable/partial precedence, source escaping, stable ordering and terminal modes; tests fail on missing policy/report behavior (AC-06, AC-07)
+- [ ] T12 `tools/seo-evidence/src/policy.ts`, `src/report.ts`, `schema/` - implement strict policy applicability, stable finding identities, report serialization, human/plain/JSON renderers and agreed exit statuses; T11 passes with no ANSI in machine/plain output and no false selected-rule failures for equivalent or unverified controls (AC-06, AC-07)
+- [ ] T13 `tools/seo-evidence/tests/storage.test.ts`, `tests/fixtures/output-state/` - add byte-identical replay, verified marker/manifest consumption, interrupted writes, same-output creation races and independent concurrent outputs; tests fail on absent output-promotion behavior (AC-07)
+- [ ] T14 `tools/seo-evidence/src/storage.ts`, `src/snapshot.ts`, `src/report.ts` - implement exclusive new outputs, temporary writes, hashes and incomplete/complete markers, retaining partial capture status independently of artifact completion; T13 passes without replacing an input or completed output (AC-02, AC-07)
+- [ ] T15 `tools/seo-evidence/tests/cli.test.ts`, `tests/offline.test.ts`, `tests/helpers/` - execute the real three-command flow against the complete example and saved edge-case bundles, including network-denied Linux execution and input/feature-state snapshots; tests fail because the command entrypoint is not yet wired (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07)
+- [ ] T16 `tools/seo-evidence/cli.ts`, `package.json`, `src/` - wire noninteractive arguments, help, all three operations and result/error streams into the tested modules; T15 passes with usable outputs, no network/browser/subprocess attempt, unchanged input/other-feature state and matching CLI/file statuses (AC-01, AC-06, AC-07)
+- [ ] T17 `tools/seo-evidence/README.md`, `examples/`, `tests/examples.test.ts`, `.github/workflows/seo-evidence.yml` - document native bundle mapping, limits, rule catalog, output/exit contract and complete commands, and add the isolated path-filtered verification workflow using verified pinned actions; example execution, workflow validation, typecheck and tool tests pass without editing existing workflows/manifests or invoking a live site (AC-08)
+- [ ] T18 `docs/specs/seo-evidence-workbench.md` - run the final frozen install, strict typecheck, complete tool suite and example flow from a fresh checkout without either SEO feature, then record exact source/results and remaining hosted-CI limits; all locally required checks pass and the implementation diff contains only the declared implementation paths plus this document before independent implementation review (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08)
 
 ## Open Questions
 
