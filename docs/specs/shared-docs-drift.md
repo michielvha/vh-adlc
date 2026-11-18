@@ -134,6 +134,37 @@ the required shared-source environment value; its failed setup output remains
 retained. Integration/E2E and filesystem vulnerability checks are outside that
 ordinary local gate and are not claimed.
 
+### Isolated marker prototype checkpoint on 2026-11-18
+
+The claimed feature tree still has no implementation change. An owned public-source
+diagnostic clone contains proposed candidate `8c5506bdd877d7e64bf282f2d9e2e22d395f6748`:
+the inspector, its tests, the two 0.26.1 candidate manifests and setup guidance.
+It is not published or accepted migration proof.
+
+The corrected first-red fixture demonstrates the original valid-marker refusal.
+The exact same test bytes pass after the inspector change. Later typing and
+lexical-test corrections retain their own source attribution. At `91165d20`, all
+66 bootstrap/runtime cases pass 228 assertions and strict project TypeScript
+passes. The guide-only successor `464925c0` preserves the runtime and test blobs;
+its original-runtime, preflight, public-doc and package neighbors pass 142 cases
+and 484 assertions, with confirmed cleanup and unchanged clean source.
+
+A test-quality mutation exposes a missing path-form counter: an intentionally
+unbounded `readFileSync(path)` passed the earlier two boundary tests. Counting
+both the descriptor and path makes that unchanged mutant fail twice with an
+unbounded-read count of one. Restoring the real 257-byte reader makes both pass.
+Only that strengthened test changes in `8c5506bd`; its strict project types pass.
+The original implementation is restored exactly, and all mutation inputs and
+false-green/red/green outputs stay in the local diagnostic archive.
+
+The proposed inspector also verifies the real ordinary Codex and active Claude
+0.26.0 caches against their original 291-file fingerprint, preserving the live
+native marker bytes and modes. This read-only diagnostic invokes no provider and
+writes no remote state. It does not install or prove the corrected published
+runtime. A fresh actual Claude Code Opus 5.5 code diagnostic is running against
+the exact candidate and proposed details. Q2 remains pending; no promotion,
+release, feature completion or remote routing switch is inferred from this work.
+
 ### Final adoption preparation on 2026-11-18
 
 Final staged C is `22b820109792dbd59df216640f39c96dd1483f5f`. Its complete
