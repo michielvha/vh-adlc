@@ -12,7 +12,8 @@ export async function snapshot(input: string): Promise<Snapshot> {
     const manifest = bundle.files.find(f => f.path === page.body_file);
     if (!manifest) throw new Error("Missing body manifest");
     const body = bodies.get(page.body_file);
-    return { page, evidence: { path: manifest.path, sha256: manifest.sha256 }, facts: body === undefined ? null : extract(body, page, selector) };
+    const html = page.content_type.split(";")[0]?.trim().toLowerCase() === "text/html";
+    return { page, evidence: { path: manifest.path, sha256: manifest.sha256 }, facts: !html || body === undefined ? null : extract(body, page, selector) };
   });
   const partial = bundle.pages.filter(p => p.outcome !== "captured").map(p => `${p.mode}:${p.requested_url}:${p.outcome}`);
   partial.push(...reconcile(observations).filter(n => n.conflicting).map(n => `${n.mode}:${n.url}:final_conflict`));

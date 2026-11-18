@@ -71,5 +71,5 @@ test("HTTP Link anchor applies its context before contributing a document canoni
     expect(parse('<head><link rel="canonical" href="/old"></head>', { Link: [header] }).controls).toMatchObject({ canonical_state: "valid", canonical: "https://example.test/old" });
   }
   for (const anchor of ["/", "https://example.test/", ""]) expect(parse("", { Link: [`</new>; rel="canonical"; anchor="${anchor}"`] }).controls.canonical).toBe("https://example.test/new");
-  for (const suffix of ['anchor="http://["', 'anchor="/"; anchor="/other"']) expect(parse("", { Link: [`</new>; rel="canonical"; ${suffix}`] }).controls.canonical_state).toBe("unavailable");
+  for (const suffix of ['anchor="http://["', 'anchor="/"; anchor="/other"', 'anchor="https://example.test/ "']) expect(parse("", { Link: [`</new>; rel="canonical"; ${suffix}`] }).controls.canonical_state).toBe("unavailable");
 });

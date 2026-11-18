@@ -20,6 +20,7 @@ function split(value: string, separator: string): string[] {
   if (quote || bracket) throw new Error("Unterminated HTTP Link value");
   parts.push(value.slice(start)); return parts;
 }
+const validReference = (value: string): boolean => /^[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]*$/.test(value) && !/%(?![a-f\d]{2})/i.test(value);
 function linkCanonicals(value: string, finalUrl: string): Canonical[] {
   const result: Canonical[] = [];
   for (const item of split(value, ",")) {
@@ -27,13 +28,19 @@ function linkCanonicals(value: string, finalUrl: string): Canonical[] {
     if (!match) throw new Error("Malformed HTTP Link value");
     const target = match[1]; const tail = match[2];
     if (target === undefined || tail === undefined) throw new Error("Malformed HTTP Link value");
-    if (!/^[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]*$/.test(target) || /%(?![a-f\d]{2})/i.test(target)) throw new Error("Malformed HTTP Link URI reference");
-    let canonical = false; let relationSeen = false;
+    if (!validReference(target)) throw new Error("Malformed HTTP Link URI reference");
+    let canonical = false; let relationSeen = false; let context: string | null = null;
     const parts = split(tail, ";");
     if (parts.shift()?.trim()) throw new Error("Missing HTTP Link parameter separator");
     for (const part of parts) {
       const parameter = /^[\t ]*([!#$%&'*+.^_`|~\w-]+)[\t ]*(?:=[\t ]*("(?:[^"\\\r\n]|\\[^\r\n])*"|[!#$%&'*+.^_`|~\w-]+))?[\t ]*$/.exec(part);
       if (!parameter) throw new Error("Malformed HTTP Link parameter");
+      if (parameter[1]?.toLowerCase() === "anchor") {
+        if (context !== null || parameter[2] === undefined) throw new Error("Invalid HTTP Link anchor context");
+        const reference = parameter[2].replace(/^"|"$/g, "").replace(/\\(.)/g, "$1");
+        if (!validReference(reference)) throw new Error("Malformed HTTP Link anchor reference");
+        context = new URL(reference, finalUrl).href;
+      }
       if (parameter[1]?.toLowerCase() === "rel") {
         if (parameter[2] === undefined) throw new Error("HTTP Link relation is missing its value");
         // RFC 8288: subsequent rel parameters in one link-value are ignored.
@@ -43,11 +50,11 @@ function linkCanonicals(value: string, finalUrl: string): Canonical[] {
         canonical ||= rel?.toLowerCase().split(/\s+/).includes("canonical") ?? false;
       }
     }
-    if (canonical) result.push({ source: "header", raw: item.trim(), target: resolveLink(target, finalUrl).target });
+    if (canonical && (context === null || context === new URL(finalUrl).href)) result.push({ source: "header", raw: item.trim(), target: resolveLink(target, finalUrl).target });
   }
   return result;
 }
-export function controls(page: CapturedPage, meta: MetaControl[], htmlCanonicals: string[], base: string): Controls {
+export function controls(page: CapturedPage, meta: MetaControl[], htmlCanonicals: (string | null)[], base: string): Controls {
   const result: Controls = { generic_tokens: [], generic_blocked: false, sources: [], canonical_sources: [], canonical_state: "absent", canonical: null, issues: [] };
   let unknown = false;
   const tokens = new Set<string>();
@@ -81,7 +88,10 @@ export function controls(page: CapturedPage, meta: MetaControl[], htmlCanonicals
       catch { result.canonical_sources.push({ source: "header", raw, target: null }); result.issues.push({ rule: "canonical_syntax", detail: "Malformed HTTP Link canonical evidence" }); }
     }
   }
-  for (const raw of htmlCanonicals) result.canonical_sources.push({ source: "html", raw, target: resolveLink(raw, base).target });
+  for (const raw of htmlCanonicals) {
+    result.canonical_sources.push({ source: "html", raw: raw ?? "", target: raw === null ? null : resolveLink(raw, base).target });
+    if (raw === null) result.issues.push({ rule: "canonical_syntax", detail: "HTML canonical element has no href attribute" });
+  }
   result.generic_tokens = [...tokens].sort();
   result.generic_blocked = tokens.has("noindex") ? true : unknown ? null : false;
   if (unknown) result.issues.push({ rule: "robots_syntax", detail: "Unverified generic page-control syntax" });

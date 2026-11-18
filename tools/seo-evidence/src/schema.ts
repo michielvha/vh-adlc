@@ -30,6 +30,7 @@ export function parseSnapshot(input: unknown): Snapshot {
     if (p.outcome === "captured" && (!o.evidence || o.evidence.path !== p.body_file)) throw new Error("Missing snapshot evidence");
     if (p.outcome !== "captured" && (o.evidence !== null || o.facts !== null)) throw new Error("Absent capture cannot supply facts");
     if (p.outcome === "captured" && p.content_type.split(";")[0]?.trim().toLowerCase() === "text/html" && o.facts === null) throw new Error("Captured HTML facts are missing");
+    if (p.outcome === "captured" && p.content_type.split(";")[0]?.trim().toLowerCase() !== "text/html" && o.facts !== null) throw new Error("Non-HTML response cannot supply HTML facts");
   }
   const reasons = s.observations.filter(o => o.page.outcome !== "captured").map(o => `${o.page.mode}:${o.page.requested_url}:${o.page.outcome}`);
   reasons.push(...reconcile(s.observations).filter(n => n.conflicting).map(n => `${n.mode}:${n.url}:final_conflict`));

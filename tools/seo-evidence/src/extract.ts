@@ -14,7 +14,7 @@ export function extract(html: string, page: CapturedPage, selector = "main"): Fa
     const name = $(el).attr("name") ?? ""; const content = $(el).attr("content") ?? "";
     if (name.toLowerCase() === "robots" || /bot|slurp/i.test(name) || /\b(noindex|nofollow|none|nosnippet)\b/i.test(content)) meta.push({ name, content });
   });
-  const canonical = $("head link[rel]").filter((_, el) => ($(el).attr("rel") ?? "").toLowerCase().split(/\s+/).includes("canonical")).map((_, el) => $(el).attr("href") ?? "").get();
+  const canonical = $("head link[rel]").filter((_, el) => ($(el).attr("rel") ?? "").toLowerCase().split(/\s+/).includes("canonical")).toArray().map(el => $(el).attr("href") ?? null);
   const anchors = $("a[href]").map((index, el) => {
     const href = $(el).attr("href") ?? "";
     return { href, ...resolveLink(href, base), index, main: root !== null && $(el).closest(selector).is(root) };

@@ -77,7 +77,7 @@ test("real comparisons do not enforce invented missing-href or other-context can
   const root = await mkdtemp(join(tmpdir(), "seo-cli-canonical-context-"));
   await run(["snapshot", "--input", before.input, "--output", join(root, "baseline"), "--json"]);
   const policy = join(root, "policy.yaml"); await writeFile(policy, "schema_version: 1\nfail_rules: [canonical_changed, canonical_removed]\n");
-  const inputs = [
+  const inputs: { html: string; headers: Record<string, string[]> }[] = [
     { html: '<head><link rel="canonical"></head><main>Body</main>', headers: {} },
     { html: old, headers: { Link: ['</new>; rel="canonical"; anchor="/unrelated"'] } },
     { html: old, headers: { Link: ['</new>; rel="canonical"; anchor="#part"'] } },
