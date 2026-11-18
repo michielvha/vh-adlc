@@ -47,7 +47,12 @@ function linkCanonicals(value: string, finalUrl: string): Canonical[] {
         if (relationSeen) continue;
         relationSeen = true;
         const rel = parameter[2]?.replace(/^"|"$/g, "").replace(/\\(.)/g, "$1");
-        canonical ||= rel?.toLowerCase().split(/\s+/).includes("canonical") ?? false;
+        const relations = (rel ?? "").split(/ +/).filter(Boolean);
+        if (!relations.length || relations.some(value => {
+          if (/^[a-z][a-z\d.-]*$/i.test(value)) return false;
+          try { return !validReference(value) || !new URL(value).protocol; } catch { return true; }
+        })) throw new Error("Malformed HTTP Link relation type");
+        canonical ||= relations.some(value => value.toLowerCase() === "canonical");
       }
     }
     if (canonical && (context === null || context === new URL(finalUrl).href)) result.push({ source: "header", raw: item.trim(), target: resolveLink(target, finalUrl).target });

@@ -26,6 +26,7 @@ function write(fd: number, text: string): void {
   const buffer = Buffer.from(text); let offset = 0;
   while (offset < buffer.length) { const written = writeSync(fd, buffer, offset); if (written === 0) throw new Error("Output stream made no progress"); offset += written; }
 }
+const diagnostic = (message: string): string => message.replace(/[\u0000-\u001f\u007f-\u009f]/g, value => "\\u" + value.charCodeAt(0).toString(16).padStart(4, "0"));
 export async function main(args: string[]): Promise<number> {
   const json = args.includes("--json"); const controller = new AbortController();
   const cancel = () => controller.abort(new Error("Cancelled"));
@@ -59,7 +60,7 @@ export async function main(args: string[]): Promise<number> {
   } catch (error: unknown) {
     const result = { schema_version: 1, operation: args[0] ?? "unknown", analysis_status: "invalid", policy_status: "not_evaluated", exit_code: 2 };
     if (json) write(1, stable(result));
-    write(2, "FAIL Failed: " + (error instanceof Error ? error.message : "Unknown error") + "\n");
+    write(2, "FAIL Failed: " + diagnostic(error instanceof Error ? error.message : "Unknown error") + "\n");
     return 2;
   } finally { process.removeListener("SIGINT", cancel); process.removeListener("SIGTERM", cancel); }
 }
