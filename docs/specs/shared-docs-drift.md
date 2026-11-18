@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Native correction verified; refreshing review before publication."
+status_description: "Claude review clean; diagnosing actual unattended verification failure."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -83,6 +83,18 @@ Recovery retains the original operation's ownership and evidence. A publication 
 The owner accepted clean Claude Code Opus 5.5 R-122. Local scanner parity, companion rules and native synthetic workflow checks pass at their recorded revisions. Whole-feature Claude Code Opus 5.5 review R-127 has no findings at its recorded source. Claude Code Opus 5.5 R-129 reviews the final native reply-format clarification with no findings. Every composite completion criterion remains unverified pending its full release/adoption proof. The final corrections restore local command behavior and scheduled safe-fix wording, preserve older metadata and remove unused helpers. Released marketplace installs, actual provider/hosted trials, final release-bound paired review, cutover and activated rollback remain open. GUI and phone tests are deferred. The owner authorized the shared merge after exact-head CI, its configured release, ordinary marketplace install/upgrade tests and gated Stackweaver migration. Cutover waits for its required evidence.
 
 ### Native correction review follow-up
+
+The owner-approved unattended consumer trial exposes a fresh-runner dependency
+order gap before credentials: the verified YAML reader is absent when the
+offline settings check runs. The consumer's dormant worker now provisions that
+locked reader before checking the complete component. Its 37 affected hosted,
+bootstrap and recovery cases pass with 317 assertions. A subsequent actual run
+passes setup and preparation, then fails verification. Its success-only export
+loses the failure detail after runner disposal. An instrumented synthetic rerun
+retains bounded helper diagnostics and credential-redacted native toy streams.
+The original failures are retained. The automatic merge controller is stopped
+while the cause is investigated; no shared release or consumer cutover occurs.
+The current exact-head public CI continues independently at `3d7b8807`.
 
 Claude Code Opus 5.5 R-129 at `ddc97c87` returns no findings. Its additional
 normal resolution test passes 47 assertions through consolidation, publication,
