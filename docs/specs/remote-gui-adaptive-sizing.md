@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: complete
 branch: feat/remote-gui-adaptive-sizing
-status_description: "All seven criteria passed fresh independent review; source publication and installation remain pending."
+status_description: "Implemented and independently reviewed locally; source publication and installation remain pending."
 issue: null
 goal: "The shared browser fills the active viewer at a readable size and adapts automatically when that viewer changes size."
 covers:
