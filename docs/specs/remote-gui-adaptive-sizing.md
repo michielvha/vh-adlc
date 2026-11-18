@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted after R-3; ready for task planning and implementation."
+status: in-progress
+branch: feat/remote-gui-adaptive-sizing
+status_description: "Claimed for test-first implementation in the owning managed worktree."
 issue: null
 goal: "The shared browser fills the active viewer at a readable size and adapts automatically when that viewer changes size."
 covers:
