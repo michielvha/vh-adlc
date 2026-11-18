@@ -1,5 +1,5 @@
-import { collectionReaders } from "./git";
-import { canonicalJSON, protocolPath } from "./protocol";
+import { collectionReaders } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
+import { canonicalJSON, protocolPath } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
 function fail(reason: string): never { throw Error("incomplete docs-drift worker caller " + reason); }
 function record(value: unknown): Record<string, unknown> {

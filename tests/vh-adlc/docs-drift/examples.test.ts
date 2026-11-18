@@ -8,7 +8,7 @@ import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/setti
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { computeComponentIdentity } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
-import { verifyConfiguredWorkerCaller } from "../../../plugins/vh-adlc/scripts/docs-drift/worker-callers";
+import { verifyConfiguredWorkerCaller } from "./worker-callers-fixture";
 import { readRunDirectory, latestRunArtifact } from "../../../plugins/vh-adlc/scripts/docs-drift/run-directory";
 import { readBoundArtifact } from "../../../plugins/vh-adlc/scripts/docs-drift/evidence-input";
 

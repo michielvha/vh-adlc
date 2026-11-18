@@ -221,23 +221,26 @@ process.exit(result.exitCode);
 }, 245000);
 
 
-test("an independently reviewed mixed proposal routes to resolution and retains every hunk recommendation", async () => {
+test.each([
+  ["mixed", ["supported", "fixed-differently"], "needs-resolution"],
+  ["unverifiable", ["unknown"], "unknown"],
+] as const)("an independently reviewed %s proposal retains its assessed disposition and every hunk recommendation", async (assessment, verdicts, disposition) => {
   try {
     const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/audit-report");
     const f = await assessmentReviewFixture(roots, { proposals: true, proposalAssessments: true, extraProposalHunk: true,
-      proposalVerdicts: ["supported", "fixed-differently"] }), before = captureRepositoryState(f.repo);
+      proposalVerdicts: [...verdicts] }), before = captureRepositoryState(f.repo);
     const begun = await api.beginAuditReport(f.options); expect(begun.complete, JSON.stringify(begun.diagnostics)).toBe(true);
     const target = await collectAssessmentReviewTarget({ ...f.options, worker_capture: f.worker });
     expect(target.complete, JSON.stringify(target.diagnostics)).toBe(true);
-    const judgment = target.manifest?.proposal_assessment?.proposals[0]; expect(judgment?.assessment).toBe("mixed");
-    if (!judgment) throw Error("Missing original mixed proposal assessment fixture");
+    const judgment = target.manifest?.proposal_assessment?.proposals[0]; expect(judgment?.assessment).toBe(assessment);
+    if (!judgment) throw Error("Missing original proposal assessment fixture");
     expect(judgment.hunks.length).toBeGreaterThanOrEqual(2);
     const reviewer = captureSyntheticRole(f.artifacts, f.source, "reviewer", target.reviewer_runtime_sha256!,
-      evidence("mixed-proposal-report-reviewer", target.target_sha256!, "NO FINDINGS\n"));
+      evidence(assessment + "-proposal-report-reviewer", target.target_sha256!, "NO FINDINGS\n"));
     const result = await api.completeAuditReport(begun, { worker_capture: f.worker, reviewer_capture: reviewer });
     expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
     const item = result.report?.attention.find(entry => entry.item.identity === "proposal:11")?.item;
-    expect(item?.disposition).toBe("needs-resolution"); expect(item?.reason).toContain("assessment is mixed");
+    expect(item?.disposition).toBe(disposition); expect(item?.reason).toContain("assessment is " + assessment);
     expect(item?.owner_action).toContain("every hunk recommendation");
     for (const hunk of judgment.hunks) expect(result.markdown).toContain(hunk.recommendation);
     expect(result.counts).toMatchObject({ assessed_proposals: 1, unassessed_proposals: 0, unverified_proposals: 1 });
