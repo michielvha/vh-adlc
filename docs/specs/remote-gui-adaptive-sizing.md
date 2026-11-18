@@ -112,7 +112,12 @@ Validate the package through its existing helper from a temporary install-shaped
 
 ## Tasks
 
-None yet; written after owner acceptance.
+- [ ] T1 `plugins/remote-gui/internal/proxy/viewport*.go`, `internal/session/session.go`, `tests/remote-gui/viewport.e2e.test.ts` - watch the real viewer fail to adapt and proxy contract tests fail before implementing the typed route, request validation and bounded control ordering; proxy race tests pass (AC-01, AC-03, AC-05).
+- [ ] T2 `plugins/remote-gui/internal/xclip/viewport*.go` - observe native geometry tests fail, then implement owned normal/transient window sizing, work-area hints, snapshots and change detection; native X11 tests pass (AC-01, AC-05, AC-06).
+- [ ] T3 `plugins/remote-gui/internal/browser/viewport*.go`, `browser.go`, `phase.go`, `internal/session/daemon.go` - observe transactional resize, failure/rollback, handoff and stop tests fail, then implement the bounded native/VNC operation and new-window reconciliation; browser race tests pass (AC-01, AC-02, AC-04, AC-06).
+- [ ] T4 `plugins/remote-gui/internal/proxy/viewer.go`, `tests/remote-gui/viewer-page.e2e.test.ts` - observe viewer request/focus/retry tests fail, then implement debounced CSS geometry, focus claims, proportional fallback and accessible failure state; Chromium/Firefox viewer tests pass (AC-01, AC-03, AC-04, AC-06).
+- [ ] T5 `tests/remote-gui/viewport.e2e.test.ts`, `fixtures/`, `README.md`, `.github/workflows/ci.yml` - extend the failing real viewer fixture through the accepted viewport matrix, input/state preservation, two viewers, handoffs, failures, new windows and menus; both browser engines and inspected synthetic captures establish the accepted proofs (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06).
+- [ ] T6 `plugins/remote-gui/plugin.json`, `.claude-plugin/plugin.json`, `README.md`, `skills/remote-gui/SKILL.md`, `tests/remote-gui/package.test.ts` - observe version/installation compatibility checks fail, update both manifests to 0.4.0 and document sizing, then run module/package checks and the install-shaped build; old record/supervisor compatibility passes (AC-07).
 
 ## Open Questions
 
