@@ -184,6 +184,28 @@ the real bot publication, final C/D, cutover or rollback gates.
 The checkpoint notes below retain historical observations; their pending language
 is superseded by the current owner summary and released-observation record.
 
+### Actual publisher fixture refusal and correction on 2026-11-18
+
+Staged Stackweaver support merges through PR #1149 as `22242b15`; its existing
+command, agents and weekly workflow remain active. Actual native run
+`44337071097` attempt 1 stops before any publication. The original Opus 5.5
+reviewer finds that the supplied assessment identifies the credential bot but
+omits the owner who dispatched the workflow. Secret Scan succeeds independently.
+The test namespace remains empty, and all 21 exported original evidence files
+match their inventory digests. This is a useful refusal, not a successful live
+publisher test.
+
+The bounded consumer acceptance controller now reads the exact native run
+attempt and binds owner/triggering-account evidence separately from the publisher
+bot. The reproduced finding and both wrong-account early-refusal controls fail
+before the correction, then all 13 focused cases pass with 217 assertions.
+Strict types and actionlint pass. No shared policy, parser or release byte changes.
+The hosted fixture now selects an ordinary marketplace installation in an
+isolated profile; its locked Claude Code 2.1.325 CLI also passes that installation
+locally. Full local verification, fresh bounded paired review and the actual
+hosted rerun remain pending before activation. Existing behavior preservation
+and final C/D/rollback obligations remain unchanged.
+
 ### Native correction review follow-up
 
 The instrumented hosted run retains its actual worker/reviewer streams and
