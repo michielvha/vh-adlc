@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Owner decisions are incorporated; the revised specification awaits independent review and acceptance."
+status: planned
+status_description: "Accepted after R-3; ready for task planning and implementation."
 issue: null
 goal: "The shared browser fills the active viewer at a readable size and adapts automatically when that viewer changes size."
 covers:
@@ -23,7 +23,7 @@ On 2026-11-18, the owner selected automatic focus-based control, CSS pixels and 
 
 The work includes request validation, ordering concurrent updates, bounded dimensions, recovery when resizing fails, clipboard focus protection, browser tests and plugin documentation. Private transport, owner authorization and human/agent handoff rules remain in force. There are no host dependency installations or changes to existing sessions. New sessions receive the implementation after the plugin is updated. An older supervisor continues with its original fixed sizing.
 
-Scratch probes established that the installed x11vnc can change its exported dimensions and Chromium accepts narrow native window sizes. Complete viewer behavior remains unverified. The first independent review found one blocking and four should-fix findings, preserved in R-1. The next review found one missing scenario for a newly opened normal Chromium window, preserved in R-2. This revision corrects that proof alongside the earlier geometry, ordering, recovery and boundary findings; it needs a fresh review. Planned verification covers real noVNC, Chromium and Firefox viewers, responsive geometry, input, concurrent viewers, failure recovery and both handoff directions. Acceptance after a clean independent spec review authorizes task planning and local implementation. Merge, release, installation and changes to live sessions require separate authority.
+Scratch probes established that the installed x11vnc can change its exported dimensions and Chromium accepts narrow native window sizes. Complete viewer behavior remains unverified. The first independent review found one blocking and four should-fix findings, preserved in R-1. The next review found one missing scenario for a newly opened normal Chromium window, preserved in R-2. R-3 independently reviewed the corrected specification with no findings. The owner accepted it on 2026-11-18 and authorized implementation, vh-adlc 0.26.0 for this run and documentation-only pushes to the default branch. The version check now reports matching installed and running versions. Planned verification covers real noVNC, Chromium and Firefox viewers, responsive geometry, input, concurrent viewers, failure recovery and both handoff directions. Acceptance after a clean independent spec review authorizes task planning and local implementation. Merge, release, installation and changes to live sessions require separate authority.
 
 ### Background
 
@@ -124,6 +124,8 @@ None. The owner answered the viewer-control, pixel-density and backend questions
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-18 | R-1 | spec | `f34bca89edc788db96a301a2eccbf87c88d8fd33` | unknown | procedural | One blocking and four should-fix findings; model identity not attested. |
 | 2026-11-18 | R-2 | spec | `68f5cb391fab4f5df710f10c525029930641ef6b` | unknown | procedural | One should-fix finding about new-window verification; model identity not attested. |
+| 2026-11-18 | R-3 | spec | `4d7f8238ecabde6cd8693c5d16f3214f1fb142c6` | unknown | procedural | No findings; model identity not attested. |
+| 2026-11-18 | R-3 | spec | `4d7f8238ecabde6cd8693c5d16f3214f1fb142c6` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -170,6 +172,10 @@ SEVERITY: should-fix
 WHERE: Design: Native browser and framebuffer sizing (docs/specs/remote-gui-adaptive-sizing.md:63, :65); Acceptance Criteria: AC-05 and AC-06 (:97-98); Test Plan: AC-04, AC-05 and AC-06 (:108-110)
 EVIDENCE: This revision adds automatic sizing of newly created normal windows and invalidation of cached geometry confirmation when the window set changes (:65). The proposed proofs cover duplicate measurements, existing owned and unrelated windows, a native menu and a page dialog. None explicitly creates a normal Chromium window after a successful resize, leaves the viewer dimensions unchanged and verifies that the new window adopts the current geometry. An implementation that adjusts windows only during viewport requests can pass those checks while a newly opened browser popup remains partly outside the exported clip on the larger backing display.
 PROPOSAL: Add a real browser scenario that confirms a portrait size, opens an owned normal window without another viewer measurement and verifies its geometry and reachable controls through noVNC. Add native tests showing that window creation and destruction invalidate the duplicate shortcut while unrelated windows remain unchanged.
+
+### R-3
+
+NO FINDINGS
 
 ## Sources
 
