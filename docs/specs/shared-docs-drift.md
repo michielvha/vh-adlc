@@ -2099,6 +2099,7 @@ None. On 2026-11-17 the owner accepts the R-117 compatibility recommendations. T
 | 2026-11-18 | R-129 | implementation | `ddc97c873416c337ea86ccb945086fc980bb90ee` | claude-opus-5-5 | procedural | No findings; seven composite criteria remain not verified pending release and adoption. |
 | 2026-11-18 | R-130 | implementation | `bda802b57236949a7c18092de0e59ef246affb2c` | claude-opus-5-5 | procedural | No blocking or should-fix findings; one owner-summary nit corrected; seven criteria not verified. |
 | 2026-11-18 | R-131 | spec | `5491b6770f7efa719810c1dead028bf0528d2b1c` | claude-opus-5-5 | procedural | One selected-backend clarification and three documentation nits; unchanged accepted baseline. |
+| 2026-11-18 | R-132 | spec | `d06daa36296e60c20b98f1be08bc908511495b57` | claude-opus-5-5 | procedural | No blocking or should-fix findings; five documentation nits; selected-backend ambiguity resolved. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -4148,3 +4149,41 @@ SEVERITY: nit
 WHERE: Context "Owner summary", fourth paragraph (docs/specs/shared-docs-drift.md:97-99) and "Published payload and migration checkpoint on 2026-11-18" (:113-121); covered docs/reference/compatibility.md:229-239, docs/reference/marketplace.md:117 and docs/user-guides/workflows.md:30, :58, :389
 EVIDENCE: The document says PR #98 merged as `18388bde` and that plugin 0.26.0 "passes ordinary Codex and Claude fresh-install and upgrade checks". Both manifests at the target declare 0.26.0 (plugins/vh-adlc/plugin.json:4, plugins/vh-adlc/.claude-plugin/plugin.json:3). The covered compatibility page still says "The local candidate packages `vh-adlc-docs-drift`" (:229) and "Independent source/procedure review is in progress" (:238), although R-130 has returned (Review Log :2064). It also lists "Actual Codex, Claude and Copilot marketplace fresh installs/upgrades | Pending for the docs-drift payload" (:239). marketplace.md:117 calls the skill part of the "candidate package", and workflows.md calls it the "candidate docs-drift operation". The AC-01 proof checks public guides against what the operation actually provides. The released payload is outside the document itself, so this is documentation impact, and nothing an implementer builds changes.
 PROPOSAL: Update the compatibility rows to record the observed Codex and Claude 0.26.0 fresh installs and upgrades and the returned R-130 review, keeping the Copilot, native-operation and adoption rows pending. Describe docs-drift in the three covered guides as released but not yet adopted, not as a local candidate.
+
+### R-132
+
+TARGET: d06daa36296e60c20b98f1be08bc908511495b57
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: covered plugins/vh-adlc/references/docs-drift-settings.md:60; Context "Selected-backend acceptance and released observations on 2026-11-18" (docs/specs/shared-docs-drift.md:227-237, sentence at :234); covered docs/reference/compatibility.md, Shared documentation drift section ("The setup reference lists implemented native client adapters") and Support matrix definition of "Supported"; Test Plan AC-07 row (:1229, "authorized Copilot/Claude operations using the installed payload")
+EVIDENCE: The new Context section fixes the T130 reading. T130 runs only the owner-authorized Claude backend. The `copilot` intake profile is not native Copilot evidence. Native Copilot execution and Copilot marketplace installation are unclaimed for 0.26.0. The compatibility page says the same, so R-131 F-01's ambiguity about what T130 must observe is gone. One wording conflict remains. The shipped setup reference still says "Copilot and Claude are the supported native role backends". The compatibility page defines "Supported means the scenario run in `tests/vh-adlc/evidence/` passed on that host". Context says the setup reference's backend names "enumerate implemented configuration adapters", but the shipped sentence uses the word "supported". This comes from the R-131 F-01 correction: it updated compatibility.md and left docs-drift-settings.md unchanged, which keeps the 291-file fingerprint. The Context reading and the compatibility row decide what T130 does, so implementers build the same thing.
+PROPOSAL: The next time a release changes docs-drift-settings.md, reword line 60 to "implemented native role adapters" and point readers to the compatibility record for observed support. Until then, keep the Context note as the stated reading.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Owner summary", fifth paragraph (docs/specs/shared-docs-drift.md:104-111, sentence at :107-109); Context "Selected-backend acceptance and released observations on 2026-11-18" (:227-264, trials at :255-264); covered docs/reference/compatibility.md row "Actual Claude native worker/reviewer identities"
+EVIDENCE: The summary says "The bounded actual bot-publisher fixture, released native-profile observations, final paired C/D review, cutover and rollback remain required." The detailed section at :255 onward records that real native `claude` and `copilot` intake-profile trials passed against ordinarily installed 0.26.0 payloads. The compatibility row records the same passing trials and leaves only forwarded-command activation pending. The summary also leaves out the owner's selection of Claude Code or Codex, and it leaves out that native Copilot execution and Copilot marketplace installation are unclaimed for 0.26.0. That decision is the material change since R-131, and it limits what AC-07 can claim. The pinned standard says the summary must agree with the detailed sections, explain material changes and state owner decisions. This is in Context only, so nothing built or proved changes.
+PROPOSAL: Replace "released native-profile observations" in the summary with what actually remains, such as forwarded-command activation and the hosted context. Add one sentence on the Claude-only backend selection and the unclaimed Copilot surfaces.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Owner summary", third paragraph (docs/specs/shared-docs-drift.md:98-103); Context "Published payload and migration checkpoint on 2026-11-18" (:113-131)
+EVIDENCE: The summary states three things the detailed sections do not cite: "after all six exact-head CI jobs pass", "the default-branch version pipeline is still running" and "A concurrent main merge adds only unrelated SEO specifications and changes neither this accepted baseline nor the installed payload". The checkpoint section names CI run `44305790900` but gives neither its head commit nor its job count. No section names the main merge commit, its changed paths or the version-pipeline run. The standard says Context cites its claims with a file:line, or a command and its output. Freshness is still decided by `vh-adlc fresh`, so nothing an implementer builds changes.
+PROPOSAL: In the checkpoint section, add the head commit of run 44305790900, the main merge commit with a diff command and output showing it touches no covered path, and the version-pipeline run ID. Otherwise, drop those clauses from the summary.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: covered docs/get-started/installation.md:212 (heading "Standalone documentation drift candidate") and its "What the plugin installs" paragraph ("The candidate package's seventeen skills ... `vh-adlc-docs-drift`"); covered docs/user-guides/workflows.md:15 ("The candidate package combines this entry")
+EVIDENCE: R-131 F-04 asked the covered guides to describe docs-drift as released but not yet adopted, not as a candidate. README, the workflows Documentation drift section and marketplace.md now say "released" or "from plugin version 0.26.0". installation.md still titles its docs-drift section "Standalone documentation drift candidate", and the install inventory still calls the package containing docs-drift a candidate. A search finds no link to `#standalone-documentation-drift-candidate`. The only retained old anchor is compatibility.md:227. The AC-01 proof checks public guides against what the operation provides. These files are covered documentation outside the document, so nothing built changes.
+PROPOSAL: Rename the installation heading to "Standalone documentation drift". Since no inbound link uses its anchor, nothing else needs to change. When those package sentences are next edited, drop "candidate" from them too.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Context disclaimer (docs/specs/shared-docs-drift.md:133-134); Context "Selected-backend acceptance and released observations on 2026-11-18" (:227); Context "Claude-only consumer configuration on 2026-11-18" (:266)
+EVIDENCE: The merged disclaimer reads "The checkpoint notes below retain historical observations; their pending language is superseded by the current owner summary and released-observation record." The released-observation record at :227 sits below that line. So does the Claude-only configuration at :266, which the record relies on. The sentence therefore labels the current record as a historical note superseded by itself. This placement came from the R-131 F-03 merge together with the newly inserted section. The meaning can still be recovered from the summary, so nothing an implementer builds changes.
+PROPOSAL: Move the two 2026-11-18 sections above the disclaimer, next to the published payload checkpoint. Otherwise, name in the disclaimer the sections that remain current.
