@@ -1,0 +1,15 @@
+{
+  "source_commit": "8484a00830739bf0f7d32f28d92bb1a0a59da7bf",
+  "files": [
+    {
+      "source_path": "plugins/vh-adlc/scripts/docs-drift/preflight.ts",
+      "fixture": "preflight.ts.txt",
+      "sha256": "f69bf4311c4e2dd071b1216278f5b2dbc209d915725f1c31d5889907ba872ace"
+    },
+    {
+      "source_path": "plugins/vh-adlc/scripts/docs-drift/protection-source.ts",
+      "fixture": "protection-source.ts.txt",
+      "sha256": "02ea2e0ed003477d27fce6f10b80c42fc0a7de173ec1a144b6d4e04147b19534"
+    }
+  ]
+}

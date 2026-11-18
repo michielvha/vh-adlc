@@ -12,8 +12,9 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
-repository and selects a procedure. The package has fifteen skills: this entry,
-eleven engineering operations, two content operations and one host-cleanup operation. Check
+repository and selects a procedure. The candidate package combines this entry,
+eleven engineering operations, four content operations and one host-cleanup
+operation, giving seventeen skills. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -26,6 +27,7 @@ on your host.
 | Persistent codebase audit | Keep stable findings in a ledger, distinguish historical status from current verification, and select repairs under local policy. |
 | Diagnosis | Investigate and report. A report-only request does not authorize a fix. |
 | Documentation | Edit the requested document and check it. A prose edit does not need a feature spec. |
+| Accumulated documentation drift | Assess the configured corpus and selected stale documentation-audit proposals through the candidate docs-drift operation. |
 | Article or social draft | Read the project's evidence and the site's voice rules, draft or revise the requested prose, and obtain a source-comparing editorial pass. Publication is separate. |
 | Small maintenance | Preserve the public contract, keep a short task record, run appropriate checks, and obtain an independent review. |
 | A new feature or a wider change | Use a feature document with acceptance, tests, reviews, and binary status gates. |
@@ -51,7 +53,9 @@ see [installation](../get-started/installation.md).
 | Review | `vh-adlc-review` | Dispatch an independent implementation review of an exact commit. |
 | Ship | `vh-adlc-ship` | On an explicit request, push the branch, open or update the PR, and update the issue. Never merges. |
 | Resume | `vh-adlc-resume` | Reconstruct the state and continue the next safe step. |
+| Architecture diagram | `vh-adlc-diagram` | Create and verify repository-grounded draw.io architecture diagrams. |
 | Documentation impact | `vh-adlc-docs-impact` | Find and review docs affected by selected code changes. |
+| Documentation drift candidate | `vh-adlc-docs-drift` | Audit the configured corpus, resolve selected stale docs-audit PRs and freshly review selected post-merge closures. |
 | Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
 | Clean | `vh-adlc-clean` | Plan and remove what killed runs left in `/tmp` and the project's temp root; Compose projects and kind clusters only on request. |
 
@@ -379,6 +383,71 @@ from source paths. Ordinary mapping upkeep stays here; standard feature-spec
 coverage revisions go through the spec operation. Project generators and visual
 checks remain local. See the [procedure](../../plugins/vh-adlc/references/docs-impact.md)
 and [complete runnable example](../../plugins/vh-adlc/examples/docs-impact/README.md).
+
+## Documentation drift
+
+The candidate `vh-adlc-docs-drift` operation handles accumulated documentation
+problems and selected stale documentation-audit proposals. Select the intended
+work explicitly, for example with one of these requests.
+
+```text
+Use vh-adlc-docs-drift to audit our configured documentation corpus; report only.
+Use vh-adlc-docs-drift to recheck docs-audit PRs #11 and #12 and propose a consolidation.
+Use vh-adlc-docs-drift to review the remaining original-PR closures for merged consolidation #13; report first.
+```
+
+The local scanner accounts for document reads and required detectors. The
+workflow then checks candidates against the documents and supporting source,
+recording confirmed drift, still accurate or unknown with recommendations.
+The report starts with a short summary and decisions. Collection counts and
+finding counts retain their technical meaning. Accuracy and missing verification
+remain explicit in the assessment.
+
+Create the consumer's own settings, scanner protocol and companion procedure
+from its actual source and rules. Keep detector exceptions, feedback history,
+generators, schedules and delivery policy local. The shared operation uses
+ordinary verified-binary setup and pinned knowledge. Missing configuration
+gets a setup handoff. Start with the [settings reference](../../plugins/vh-adlc/references/docs-drift-settings.md)
+and [complete collection example](../../plugins/vh-adlc/examples/docs-drift/README.md).
+
+Report-only work saves its output at the selected private external location.
+Selected corrections use an owned preparation branch, project checks and
+independent review. Standard feature-document requirements and historical proof
+stay protected. Claimed documents and overlapping active work receive their
+writer handoff or an explicitly coordinated owner selection. Commits, pushes,
+issue/PR publication and merge retain their actual current or adopted consumer
+permissions. Each publication effect has its own scope.
+
+Resolve reads the complete selected original PR diffs and gives every hunk a
+current disposition. A reviewed consolidation includes its immutable resolution
+record, corrections, delivered feedback and carried decisions. Originals stay
+open through consolidation review. After observed merge, fresh full-diff and
+per-hunk review establishes the proposed explanation and closure batch.
+Explanation comments and closures each require their selected authority.
+The canonical [procedure](../../plugins/vh-adlc/references/docs-drift.md) describes
+zero-correction resolution and the fresh post-merge entry.
+
+Interrupted publication resumes through the original operation's exact approved
+retained controller, journal, artifacts and selected authority. Metadata recovery
+uses the original retained plugin across upgrades. Missing original proof or
+ownership, unknown requests and partial application stay pending. A fully
+applied delivery that was later edited can receive non-success acknowledgement
+only after native evidence and the owner's current approval of the exact lookup
+and evidence digests. Retain its immutable receipt and explain the remaining
+work. Follow the [review and recovery guide](../../plugins/vh-adlc/references/docs-drift-review.md).
+
+Unchanged unresolved attention can finish green when eligible prior evidence
+matches. A complete first-discovery report marked `new-attention` can be carried
+from its verified red run. Incomplete scans, failed reviews and blocked delivery
+retain failure status. Local completed and interrupted history metadata stays in
+the selected private cache until explicit owned cleanup. Age/count limits bound
+eligibility and inspection.
+
+Consumer migration needs published marketplace installation checks, installed
+role/forwarding tests, paired review, hosted advisory/history observations and
+verified cutover/rollback. The example's staged collection diagnostic preserves
+those later obligations. Current [acceptance and deferred surfaces](../reference/compatibility.md#shared-documentation-drift-candidate)
+remain visible until their own tests pass.
 
 ## Architecture diagrams
 

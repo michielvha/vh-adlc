@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { createYAMLReader } from "../settings-file";
+import { readGit } from "../git-read";
 import { compileCoverage } from "./matching";
 
 type Diagnostic = { code: string; path?: string; message: string };
@@ -21,15 +22,9 @@ export type ImpactReport = {
   candidates: Candidate[]; unmatched_sources: string[]; diagnostics: Diagnostic[];
 };
 export type CheckOptions = { repo: string; roots?: string[]; base?: string; paths?: string[]; metadataPaths?: string[] };
+export type CollectionReaders = { git?: typeof readGit; yaml?: (bytes: Uint8Array) => unknown };
 const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 function fail(message: string): never { throw new Error(message); }
-function gitEnvironment(): Record<string, string | undefined> {
-  const env: Record<string, string | undefined> = { ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1", GIT_NO_REPLACE_OBJECTS: "1" };
-  // Git exports these when calling hooks; --repo always selects this command's own checkout.
-  for (const key of ["GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE", "GIT_INDEX_FILE", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_SHALLOW_FILE", "GIT_COMMON_DIR", "GIT_NAMESPACE"]) delete env[key];
-  for (const key of Object.keys(env)) if (/^GIT_CONFIG_(?:KEY|VALUE)_/u.test(key)) delete env[key];
-  return env;
-}
 const sorted = (values: Iterable<string>) => [...new Set(values)].sort();
 const within = (path: string, root: string) => root === "." || path === root || path.startsWith(root + "/");
 const decode = (bytes: Uint8Array) => new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
@@ -60,7 +55,7 @@ class Snapshot {
   dirty: string[] = [];
   undecodable: Array<{ bytes: Buffer; view: "HEAD" | "dirty" | "committed" }> = [];
   reader: ((bytes: Uint8Array) => unknown) | null | undefined;
-  constructor(readonly repo: string) {
+  constructor(readonly repo: string, readonly readers: CollectionReaders = {}) {
     try {
       const top = this.git("rev-parse", "--show-toplevel").toString().trim();
       if (realpathSync(repo) !== realpathSync(top)) fail("the repository input must be its Git root");
@@ -84,11 +79,7 @@ class Snapshot {
     }
   }
   git(...args: string[]): Buffer {
-    const result = Bun.spawnSync(["git", "--no-pager", "--literal-pathspecs", "-c", "core.fsmonitor=false", ...args], {
-      cwd: this.repo, env: gitEnvironment(), stdout: "pipe", stderr: "pipe",
-    });
-    if (result.exitCode !== 0) fail("Git collection failed");
-    return result.stdout;
+    return (this.readers.git ?? readGit)(this.repo, ...args);
   }
   changed(...revisions: string[]): string[] {
     const fields = nulFields(this.git("diff", "--no-ext-diff", "--no-textconv", "--name-status", "-z", "--find-renames", ...revisions, "--"));
@@ -103,7 +94,7 @@ class Snapshot {
   ensureReader(): (bytes: Uint8Array) => unknown {
     if (this.reader === null) throw new ReaderUnavailable();
     if (this.reader === undefined) {
-      try { this.reader = createYAMLReader(fail, { offline: true }); }
+      try { this.reader = this.readers.yaml ?? createYAMLReader(fail, { offline: true }); }
       catch { this.reader = null; throw new ReaderUnavailable(); }
     }
     return this.reader;
@@ -131,22 +122,32 @@ class Snapshot {
   }
 }
 
+/** Resolve feature ownership from the same committed policy bytes in every consumer. */
+export function readFeatureClassification(bytes: Uint8Array | null): Pick<Policy, "feature_root" | "local_format"> {
+  const result = { feature_root: "docs/internal/plans", local_format: false };
+  let featureDeclared = false;
+  for (const line of bytes === null ? [] : decode(bytes).split(/\r?\n/u)) {
+    // Preserve the existing feature resolver's grammar, including declarations in fences.
+    const feature = line.match(/^Feature documents: `?([^`\s]+)`?$/u);
+    if (feature && !featureDeclared) { result.feature_root = repositoryPath(feature[1]); featureDeclared = true; }
+    if (line === "Feature document format: local") result.local_format = true;
+  }
+  return result;
+}
+
 function policy(snapshot: Snapshot): RootsReport {
   const report: RootsReport = {
     schema_version: 1, protocol: 1, command: "roots", head: snapshot.head, outcome: "absent", roots: [],
-    policy: { view: "HEAD", sha256: null, excluded_dirty: snapshot.dirty.includes("AGENTS.md"), feature_root: "docs/internal/plans", local_format: false }, diagnostics: snapshot.diagnostics,
+    policy: { view: "HEAD", sha256: null, excluded_dirty: snapshot.dirty.includes("AGENTS.md"), ...readFeatureClassification(null) }, diagnostics: snapshot.diagnostics,
   };
   if (!snapshot.head) { report.outcome = "incomplete"; return report; }
   if (!snapshot.tree.has("AGENTS.md")) return report;
   try {
     const bytes = snapshot.headBytes("AGENTS.md"); report.policy.sha256 = hash(bytes);
-    let fence: string | undefined, featureDeclared = false;
+    Object.assign(report.policy, readFeatureClassification(bytes));
+    let fence: string | undefined;
     const declarations: string[] = [];
     for (const line of decode(bytes).split(/\r?\n/u)) {
-      // Match the existing feature resolver exactly; roots have their own fence-aware grammar.
-      const feature = line.match(/^Feature documents: `?([^`\s]+)`?$/u);
-      if (feature && !featureDeclared) { report.policy.feature_root = repositoryPath(feature[1]); featureDeclared = true; }
-      if (line === "Feature document format: local") report.policy.local_format = true;
       const fenced = line.match(/^ {0,3}(`{3,}|~{3,})/u);
       if (fence) { if (fenced && fenced[1][0] === fence[0] && fenced[1].length >= fence.length && new RegExp(`^ {0,3}${fenced[1]}\\s*$`, "u").test(line)) fence = undefined; continue; }
       if (fenced) { fence = fenced[1]; continue; }
@@ -177,21 +178,28 @@ function policy(snapshot: Snapshot): RootsReport {
   return report;
 }
 
-export function resolveRoots(repo: string): RootsReport { return policy(new Snapshot(repo)); }
+export function resolveRoots(repo: string, readers: CollectionReaders = {}): RootsReport { return policy(new Snapshot(repo, readers)); }
 
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }
 
-function patterns(snapshot: Snapshot, bytes: Buffer): string[] {
+/** Parse metadata strictly without assigning operation-specific meaning to its fields. */
+export function readDocumentMetadata(bytes: Uint8Array, reader?: (bytes: Uint8Array) => unknown): Record<string, unknown> | null {
   const text = decode(bytes).replace(/^\uFEFF/u, "");
-  if (!/^---[ \t]*(?:\r?\n|$)/u.test(text)) return [];
+  if (!/^---[ \t]*(?:\r?\n|$)/u.test(text)) return null;
   const close = /^---[ \t]*\r?$/gmu; close.lastIndex = text.indexOf("\n") + 1;
   const end = close.exec(text);
   if (!end) fail("unterminated frontmatter");
-  const value = snapshot.yaml(Buffer.from(text.slice(text.indexOf("\n") + 1, end.index))), object = record(value);
+  const parse = reader ?? createYAMLReader(fail, { offline: true });
+  const object = record(parse(Buffer.from(text.slice(text.indexOf("\n") + 1, end.index))));
   if (!object) fail("frontmatter must be a mapping");
-  if (!Object.hasOwn(object, "covers")) return [];
+  return object;
+}
+
+function patterns(snapshot: Snapshot, bytes: Buffer): string[] {
+  const object = readDocumentMetadata(bytes, value => snapshot.yaml(value));
+  if (!object || !Object.hasOwn(object, "covers")) return [];
   if (!Array.isArray(object.covers) || object.covers.some(pattern => typeof pattern !== "string")) fail("covers must be a list of patterns");
   return object.covers.map(pattern => { compileCoverage(pattern); return pattern; });
 }

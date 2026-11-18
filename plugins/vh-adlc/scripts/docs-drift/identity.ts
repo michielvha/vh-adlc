@@ -1,0 +1,43 @@
+import type { Settings } from "./settings";
+import type { PublicationIdentity } from "./transport";
+
+export const PUBLISHER_ENTRIES = ["hosted", "copilot", "claude"] as const;
+export type LegacyPublisherEntry = typeof PUBLISHER_ENTRIES[number];
+export type PublisherEntry = string;
+export type PublisherAccount = Pick<PublicationIdentity, "actor" | "actor_id">;
+export type EntryIdentities = Record<PublisherEntry, PublisherAccount>;
+
+export function sameLogin(left: string, right: string): boolean {
+  return left.toLowerCase() === right.toLowerCase();
+}
+
+export function sameAccount(left: PublisherAccount, right: PublisherAccount): boolean {
+  return sameLogin(left.actor, right.actor) && left.actor_id === right.actor_id;
+}
+
+/** Restore a matched account's spelling for the caller's complete bound-value comparison. */
+export function projectRecordedAccount<Current extends PublisherAccount>(current: Current, recorded: PublisherAccount): Current {
+  return sameAccount(current, recorded) ? { ...current, actor: recorded.actor } : current;
+}
+
+export function samePublicationIdentity(left: PublicationIdentity, right: PublicationIdentity): boolean {
+  return left.repository.toLowerCase() === right.repository.toLowerCase()
+    && left.repository_id === right.repository_id && left.default_branch === right.default_branch
+    && sameAccount(left, right);
+}
+
+export function publisherActor(settings: Settings, entry?: string): string {
+  if (settings.schema_version === 2 && (entry === undefined || !Object.hasOwn(settings.execution.entries, entry)))
+    throw Error("docs-drift publisher entry required");
+  const actors = settings.publication.entry_actors;
+  if (actors === undefined) return settings.publication.actor;
+  if (entry === undefined || !Object.hasOwn(actors, entry)) throw Error("docs-drift publisher entry required");
+  return actors[entry];
+}
+
+
+/** Discovery eligibility only. The original adoption and native numeric account still verify the producer. */
+export function isPublisherLogin(settings: Settings, actor: string): boolean {
+  const configured = settings.publication.entry_actors ?? { hosted: settings.publication.actor };
+  return Object.values(configured).some(login => sameLogin(login, actor));
+}

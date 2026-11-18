@@ -83,6 +83,25 @@ must match exactly, and `MODEL: unknown` never matches a requested model.
   identity and the available models in the handoff. An unknown identity never satisfies a named-model
   requirement.
 
+## Documentation drift role review
+
+Docs-drift's runtime worker and reviewer use the selected consumer entry's
+bound client and full model identities and their original native captures.
+Follow `references/docs-drift-review.md` for assessment, candidate and fresh
+post-merge closure targets. A separate independent reviewer context inspects
+the entire immutable target. Validate native identity, exact artifact digests,
+source/payload freshness and returned records through the production collectors.
+Unavailable or mismatched identity/capability leaves `review pending`.
+
+This operation's preflight checklist and scoped authority record owner/reviewer
+attestations.
+Its ordinary cache/journal hashes establish retained-byte integrity and linkage.
+Keep those limits visible. A docs-drift role review supplies its selected
+operation evidence. The formal feature implementation review still uses the
+exact committed feature target, canonical criterion records and lifecycle
+gates described in this protocol. A source diagnostic retains its narrower
+scope and cannot complete an untested migration criterion.
+
 ## Isolation
 
 Record isolation as `structural`, `procedural` or `unknown` on every review row. A tool allow-list counts as

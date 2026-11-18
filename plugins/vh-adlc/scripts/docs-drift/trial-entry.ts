@@ -1,0 +1,161 @@
+#!/usr/bin/env bun
+import type { PublisherEntry } from "./identity";
+import { collectTrialRetained } from "./trial-recovery";
+import { assertTrialEffectCapacity, encodeTrialEntryReport, trialEffectFailure, TrialEntryOutputBound } from "./trial-output";
+import { OUTPUT_LIMIT } from "./owned-process";
+import { PublicationExecutionError } from "./attempts";
+import { randomUUID } from "node:crypto";
+import { realpathSync, writeSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { publishArtifact, readJournal, type Journal } from "./journal";
+import { canonicalJSON } from "./protocol";
+import { publish } from "./publish";
+import { resumeEffects } from "./recovery";
+import { readTrialPublication, runTrialAcknowledgement, runTrialReconciliation } from "./trial-publication";
+import { collectProposals } from "./proposals";
+import { runScan } from "./scan";
+import { captureSnapshot } from "./snapshot";
+import { loadTrialContext } from "./trial-context";
+import { collectTrialClosureInputs, createTrialReader, fetchTrialProposalObjects } from "./trial-reader";
+import { readTrialTracker } from "./trial-tracker";
+
+function inputs(argv: string[]) {
+  const command = argv[0];
+  if (!["inspect", "scan", "collect-proposals", "publish", "resume-effects", "prepare-acknowledgement", "acknowledge-delivery", "prepare-reconciliation", "reconcile-publication", "inspect-retained", "restore-retained", "collect-closure"].includes(command)) throw Error("unknown synthetic command");
+  const allowed = ["--synthetic-trial", "--context-commit"];
+  if (["publish", "resume-effects"].includes(command)) allowed.push("--request");
+  if (command === "resume-effects") allowed.push("--journal");
+  if (command === "publish") allowed.push("--interrupt-after");
+  if (["prepare-acknowledgement", "acknowledge-delivery", "prepare-reconciliation", "reconcile-publication"].includes(command)) allowed.push("--selection");
+  if (["acknowledge-delivery", "reconcile-publication"].includes(command)) allowed.push("--owner-request");
+  if (["inspect-retained", "restore-retained"].includes(command)) allowed.push("--operation-id", "--entry");
+  if (command === "collect-closure") allowed.push("--consolidation");
+  const values = new Map<string, string>();
+  for (let index = 1; index < argv.length; index += 2) {
+    const key = argv[index], value = argv[index + 1];
+    if (!allowed.includes(key) || values.has(key) || !value || value.startsWith("--")) throw Error("invalid synthetic options");
+    values.set(key, value);
+  }
+  const root = values.get("--synthetic-trial"), contextCommit = values.get("--context-commit");
+  if (!root || !contextCommit) throw Error("synthetic context and immutable commit required");
+  const request = values.get("--request"), journal = values.get("--journal");
+  if (["publish", "resume-effects"].includes(command) && !request || command === "resume-effects" && !journal) throw Error("synthetic publication request or journal required");
+  const selection = values.get("--selection"), ownerRequest = values.get("--owner-request");
+  if (["prepare-acknowledgement", "acknowledge-delivery", "prepare-reconciliation", "reconcile-publication"].includes(command) && !selection
+    || ["acknowledge-delivery", "reconcile-publication"].includes(command) && !ownerRequest) throw Error("synthetic recovery selection or owner request required");
+  const operation = values.get("--operation-id"), entry = values.get("--entry");
+  if (entry !== undefined && entry !== "hosted" && entry !== "copilot" && entry !== "claude") throw Error("synthetic publisher entry unavailable");
+  if (["inspect-retained", "restore-retained"].includes(command) && (!operation || entry !== "copilot" && entry !== "claude"))
+    throw Error("synthetic retained operation and entry required");
+  const consolidation = values.get("--consolidation");
+  if (command === "collect-closure" && (!consolidation || !/^[1-9][0-9]*$/u.test(consolidation) || !Number.isSafeInteger(Number(consolidation)))) throw Error("synthetic consolidation ID required");
+  return { command, root, contextCommit, request, journal, selection, ownerRequest, consolidation, operation, entry: entry as PublisherEntry | undefined, interrupt: values.get("--interrupt-after") };
+}
+
+/** This executable is confined to explicit setup-owned synthetic contexts by its constructor. */
+export async function main(argv: string[]): Promise<number> {
+  let report: Record<string, unknown>;
+  let encoded: Buffer;
+  let effectReport: Record<string, unknown> | null = null;
+  let outputLimit = OUTPUT_LIMIT;
+  try {
+    const options = inputs(argv);
+    const context = loadTrialContext({ root: options.root, context_commit: options.contextCommit, runtime_directory: resolve(import.meta.dir, "../..") });
+    const entry = context.component.files.find(file => file.path === "scripts/docs-drift/trial-entry.ts");
+    if (!entry) throw Error("synthetic entry absent from retained payload");
+    outputLimit = Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes);
+    const preflight = (journal: Journal) => assertTrialEffectCapacity({ command: options.command,
+      operation_id: journal.plan.manifest.operation_id, journal_directory: journal.directory, limit: outputLimit });
+    let data: unknown, complete = true;
+    if (["inspect-retained", "restore-retained"].includes(options.command)) {
+      if (!options.operation || options.entry !== "copilot" && options.entry !== "claude") throw Error("synthetic retained operation and entry required");
+      const retained = await collectTrialRetained(context, { operation_id: options.operation, entry: options.entry,
+        ...(options.command === "restore-retained" ? { restore: true as const } : {}) });
+      data = retained; complete = retained.complete;
+    } else if (["prepare-reconciliation", "reconcile-publication"].includes(options.command)) {
+      if (!options.selection) throw Error("synthetic reconciliation selection required");
+      const recovered = await runTrialReconciliation(context, options.selection, options.ownerRequest, preflight), { result } = recovered;
+      complete = false;
+      data = { state: result.state, reason: result.reason, operation_id: result.journal.plan.manifest.operation_id,
+        journal_directory: result.journal.directory, revision: result.journal.revision,
+        scopes: recovered.scopes, scope_sha256s: recovered.scope_sha256s };
+    } else if (["prepare-acknowledgement", "acknowledge-delivery"].includes(options.command)) {
+      if (!options.selection) throw Error("synthetic acknowledgement selection required");
+      const acknowledgement = await runTrialAcknowledgement(context, options.selection, options.ownerRequest, preflight);
+      const { result } = acknowledgement;
+      complete = false;
+      data = { state: result.state, reason: result.reason, operation_id: result.journal.plan.manifest.operation_id,
+        journal_directory: result.journal.directory, revision: result.journal.revision,
+        scope: acknowledgement.scope, scope_sha256: acknowledgement.scope_sha256 };
+    } else if (["publish", "resume-effects"].includes(options.command)) {
+      if (!options.request) throw Error("synthetic publication request required");
+      const publication = readTrialPublication(context, options.request, preflight);
+      const requestHash = publication.request_sha256;
+      if (options.command === "publish") assertTrialEffectCapacity({ command: options.command,
+        operation_id: publication.plan.manifest.operation_id,
+        journal_directory: join(context.artifacts, "docs-drift-" + publication.plan.manifest.operation_id), limit: outputLimit });
+      if (options.interrupt) {
+        if (!publication.plan.manifest.effects.some(effect => effect.id === options.interrupt)) throw Error("synthetic interruption effect unavailable");
+        const execute = publication.transport.execute;
+        publication.transport.execute = async (...args) => {
+          const captured = await execute(...args);
+          if (args[1].id === options.interrupt) throw new PublicationExecutionError(true, true, undefined, captured ?? undefined);
+          return captured;
+        };
+      }
+      let result;
+      if (options.command === "resume-effects") {
+        if (!options.journal || dirname(resolve(options.journal)) !== context.artifacts
+          || realpathSync(options.journal) !== resolve(options.journal)) throw Error("synthetic journal outside owned artifacts");
+        preflight(readJournal(options.journal, context.source));
+        result = await resumeEffects({ ...publication, journal_directory: options.journal });
+      } else result = await publish(publication);
+      complete = result.state === "complete";
+      data = { state: result.state, reason: result.reason, operation_id: result.journal.plan.manifest.operation_id,
+        plan_sha256: result.objects.plan_sha256, journal_directory: result.journal.directory, revision: result.journal.revision,
+        request_sha256: requestHash, interruption_effect_id: options.interrupt ?? null };
+    } else if (options.command === "collect-closure") {
+      const closure = await collectTrialClosureInputs(context, Number(options.consolidation));
+      complete = closure.complete; data = closure;
+    } else if (options.command === "scan") {
+      const assessment = await runScan(captureSnapshot(context.source, context.source_commit), {
+        artifact_root: context.artifacts, owner: "synthetic", run: randomUUID(),
+      });
+      data = assessment; complete = assessment.complete;
+    } else if (options.command === "collect-proposals") {
+      const reader = createTrialReader(context), collected = collectProposals(reader, context.settings);
+      const fetched = await Promise.all(collected.proposals.map(proposal => fetchTrialProposalObjects(context, proposal)));
+      complete = collected.complete && fetched.every(item => item.complete);
+      const objects = fetched.map(item => ({ complete: item.complete, diagnostics: item.diagnostics,
+        base_sha: item.base_sha, head_sha: item.head_sha, merge_base: item.merge_base,
+        patch_sha256: item.patch_sha256, inputs_sha256: item.inputs_sha256 }));
+      data = { ...collected, objects, complete };
+    } else {
+      const tracker = readTrialTracker(context);
+      data = { fixture_id: context.fixture_id, tracker_commit: tracker.commit, resource_count: tracker.resources.size };
+    }
+    const path = join(context.artifacts, "synthetic-entry-" + randomUUID() + ".json");
+    report = { schema_version: 1, kind: "docs-drift-synthetic-entry", evidence_kind: "synthetic", transport: "collector",
+      command: options.command, outcome: complete ? "complete" : "incomplete", source_commit: context.source_commit,
+      context_commit: context.context_commit, context_sha256: context.context_sha256,
+      component_sha256: context.component.component_sha256, entry_sha256: entry.sha256, receipt_path: path, data };
+    if (["publish", "resume-effects", "acknowledge-delivery", "reconcile-publication", "restore-retained"].includes(options.command)) effectReport = report;
+    encoded = encodeTrialEntryReport(report, outputLimit);
+    publishArtifact(path, canonicalJSON(report));
+  } catch (error) {
+    if (effectReport) {
+      const failed = trialEffectFailure(effectReport,
+        error instanceof TrialEntryOutputBound ? "synthetic-output-bound-after-effects" : "synthetic-report-after-effects", outputLimit);
+      report = failed.report; encoded = failed.encoded;
+    } else {
+      report = { schema_version: 1, kind: "docs-drift-synthetic-entry", evidence_kind: "synthetic", transport: "collector",
+        command: argv[0] ?? "", outcome: "refused", diagnostics: [{ code: "synthetic-setup-or-input",
+          message: error instanceof Error ? error.message : "synthetic setup unavailable" }] };
+      // Setup refusals use the global error bound when the configured ordinary report cannot fit.
+      encoded = encodeTrialEntryReport(report, OUTPUT_LIMIT);
+    }
+  }
+  writeSync(1, encoded);
+  return report.outcome === "complete" ? 0 : 2;
+}
+if (import.meta.main) process.exitCode = await main(process.argv.slice(2));

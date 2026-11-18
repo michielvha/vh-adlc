@@ -112,6 +112,22 @@ sessions start. Point it to the actual installed plugin directory and refresh it
 when the installer changes the location. A local source copy is not marketplace
 installation evidence.
 
+## Documentation drift candidate
+
+`vh-adlc-docs-drift` is part of the shared vh-adlc candidate package. Install or
+upgrade **vh-adlc** through the client you use, then verify that installation's
+source/version, skill discovery and packaged helpers before adoption. Its
+[greenfield example](../../plugins/vh-adlc/examples/docs-drift/README.md) creates a
+new staged consumer with actual credential-free local collection.
+
+Keep scanner policy, documentation rules, feedback, generators, schedules and
+publication permissions in the consumer. A staged collection result supplies
+its observed local evidence. Published marketplace installation, installed
+worker/reviewer/forwarded entry, hosted advisory/history, paired migration and
+cutover/rollback results remain separate acceptance steps. Follow the
+[setup reference](../../plugins/vh-adlc/references/docs-drift-settings.md) and
+[current capability record](compatibility.md#shared-documentation-drift-candidate).
+
 ## Architecture diagram skill
 
-The shared `vh-adlc` package introduces `vh-adlc-diagram` in plugin version 0.23.0. The skill becomes available from the marketplace when that package is published. The [workflow](../user-guides/workflows.md#architecture-diagrams) lists the local renderer and asset prerequisites.
+`vh-adlc-diagram` is included in the shared marketplace package from plugin version 0.23.0. The [workflow](../user-guides/workflows.md#architecture-diagrams) lists the local renderer and asset prerequisites.
