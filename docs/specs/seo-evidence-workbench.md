@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Research-backed draft for independent implementation; awaiting spec review and owner acceptance."
+status_description: "Independent review has no blocking or should-fix findings; awaiting owner acceptance."
 issue: null
 goal: "A person or agent can turn saved public-site evidence into repeatable cross-page findings and technical regression checks without depending on the unfinished SEO features."
 covers:
@@ -156,6 +156,7 @@ None. On 18 November 2026 the owner chose saved-evidence analysis before live co
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-18 | R-1 | spec | `a96d118449bc25dca438f527036cc217cb5222ff` | unknown | procedural | Three blocking and two should-fix findings; model identity not attested. |
+| 2026-11-18 | R-2 | spec | `0394a5f8aa6b72d63179843e13bca6e27eb1faeb` | unknown | procedural | One nit, no blocking or should-fix findings; model identity not attested. |
 
 ### R-1
 
@@ -193,6 +194,15 @@ SEVERITY: should-fix
 WHERE: Context / Owner summary, line 23; Design / Evidence bundle and coverage, line 66; Design / URL identity, parsing and graph, line 76; Design / Technical comparisons and failure policy, lines 94-98; AC-05 and AC-06; Test Plan / AC-05 and AC-06
 EVIDENCE: The bundle retains repeated X-Robots-Tag and Link headers, but extraction explicitly names generic robots meta and leaves header interpretation undefined. The comparison promises generic index-directive and canonical regressions without stating whether header-only controls participate, how header and HTML observations combine, or how crawler-scoped headers are excluded from generic results. Official documentation supports both unscoped and crawler-scoped X-Robots-Tag values and HTTP Link canonicals: https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag and https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls. Careful implementations could consequently disagree on a header-only noindex or canonical removal. The rule also leaves ambiguous whether changing an existing none directive to noindex is a new blocking state or merely a representation change.
 PROPOSAL: Define the supported header and HTML sources, scope handling, combination rules and normalized regression predicates, treating none and noindex consistently. Add header-only, repeated/conflicting-source, crawler-scoped and equivalent-directive fixtures with explicit expected findings and policy outcomes.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design / Evidence bundle and coverage, lines 64-72; Design / URL identity, parsing and graph, lines 80-86; Design / Technical comparisons and failure policy, line 108; Design / Output, retry and verification delivery, lines 112-114; Acceptance Criteria / AC-02 and AC-06
+EVIDENCE: The pinned conventions/feature-documents.md requires introduced user-facing terms to appear in a glossary row and be held to their meanings by a criterion. The document defines bundle, snapshot, capture outcomes, target classifications, partial analysis and artifact completion in prose, but contains no glossary rows. The existing definitions distinguish artifact completion from capture completeness, so this is a presentation omission rather than an undefined behavior.
+PROPOSAL: Add a compact glossary table using the existing definitions and reference its terminology from AC-02 and AC-06 without changing their behavior.
 
 ## Sources
 
