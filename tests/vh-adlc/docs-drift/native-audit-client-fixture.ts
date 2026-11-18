@@ -74,9 +74,8 @@ if (request.kind === "docs-drift-closure-worker-request") {
 }
 if (${JSON.stringify(fault)} === "invalid-worker" && request.kind.endsWith("worker-request")) records = "Not a worker handoff\\n";
 if (${JSON.stringify(fault)} === "request-change") writeFileSync(ref.path, "Preserve this changed synthetic request\\n", { mode: 0o600 });
-// The real native preparation trial added a human summary before its otherwise
-// valid MODEL/JSON reply. Reproduce that response when the machine-only contract
-// is missing from the actual prompt delivered to this owned process.
+// Reproduce the reply-prefix failure through the shared decoder using this owned
+// Copilot envelope. The real Claude before/after trial is recorded separately.
 const prefix = ${JSON.stringify(fault)} === "prepare-protocol" && request.kind === "docs-drift-prepare-worker-request"
   && !prompt.includes("The MODEL header must be the first line") ? "I prepared the selected edit.\\n\\n" : "";
 if (isClaude) {

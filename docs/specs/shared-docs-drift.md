@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Native candidate checks found a reply-format issue; correcting it before publication."
+status_description: "Native correction verified; refreshing review before publication."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -81,6 +81,28 @@ The matching tool and project settings ship together and roll back together. The
 Recovery retains the original operation's ownership and evidence. A publication lease keeps new audits pending before models run. Administrative abandonment requires exact approval and a stopped original executor, then removes its lease and matching receipt atomically. Terminal receipts persist. Unsupported deletion of only a lease can permit a fresh assessment while its receipt remains.
 
 The owner accepted clean Claude Code Opus 5.5 R-122. Local scanner parity, companion rules and native synthetic workflow checks pass at their recorded revisions. Whole-feature Claude Code Opus 5.5 review R-127 has no findings at its recorded source. The subsequent native reply-format clarification needs a fresh implementation review. Every composite completion criterion remains unverified pending its full release/adoption proof. The final corrections restore local command behavior and scheduled safe-fix wording, preserve older metadata and remove unused helpers. Released marketplace installs, actual provider/hosted trials, final release-bound paired review, cutover and activated rollback remain open. GUI and phone tests are deferred. Merge, release and cutover retain their separate approval stages.
+
+### Native correction review follow-up
+
+Claude Code Opus 5.5 R-128 returns no blocking or should-fix issue at `94e40a7a`.
+Its independent runs pass four preparation cases with 256 assertions, five closure
+neighbors with 83 assertions and eight audit-session cases with 160 assertions.
+Its exact source/index/refs stay unchanged and owned cleanup is confirmed.
+The reviewed proof directory was populated after an initial extraction failure;
+R-128 reads the fixed native projection. The original failed extraction is retained.
+Its detached clone's origin/HEAD selects the feature branch, explaining its
+spec-drift/default-branch diagnostics; the owning worktree selects actual main and
+keeps R-123 fresh. No returned record is edited to hide those limitations.
+
+The automatic prefix regression uses an owned Copilot envelope through the common
+strict decoder. The real Claude 2.1.325 failure and successful corrected Claude
+preparation/verification are separate native observations. The fixture comment is
+clarified accordingly. The closure worker clarification has inspection and passing
+neighbor coverage, with no separate prefix regression or actual native closure
+trial yet. Add the same no-fences/footer/alternate-protocol clause to its reviewer
+prompt. This is wording under the existing machine handoff contract; no parser or
+behavioral contract changes, and no redundant new behavioral test is added for it.
+Released installs, unattended execution and final adoption proof remain pending.
 
 ### Native preparation protocol correction on 2026-11-18
 
@@ -1053,19 +1075,19 @@ The owner confirmed ordinary installed clients and the capability-preserving che
 ## Acceptance Criteria
 
 - [ ] AC-01: An adopting repository can audit documentation and resolve stale audit proposals through one discoverable harness-agnostic workflow, retaining its scanner, detector policy and existing change-scoped docs-impact behavior.
-      Evidence: R-127 returns not verified at 9335c8ec; see its exact observations and limitations in the Review Log.
+      Evidence: R-128 returns not verified at 94e40a7a; see its exact observations and limitations in the Review Log.
 - [ ] AC-02: Complete assessments independently match scanner document/per-unit inventories and raw-byte digests to the selected Git tree and committed selectors. Failed, skipped, partial, stale or unreadable required input remains visible and prevents a clean claim. Confirmed findings and proposed fixes carry document/source evidence.
-      Evidence: R-127 returns not verified at 9335c8ec; see its exact observations and limitations in the Review Log.
+      Evidence: R-128 returns not verified at 94e40a7a; see its exact observations and limitations in the Review Log.
 - [ ] AC-03: Authorized preparation preserves unrelated work, intended contracts, historical evidence and local feature-review rules while producing only selected verified corrections. Mixed plan directories preserve safe locally authorized mechanical corrections and ordinary-document preparation without weakening enrolled shared-spec gates. Caller repositories and foreign resources retain their original state.
-      Evidence: R-127 returns not verified at 9335c8ec; see its exact observations and limitations in the Review Log.
+      Evidence: R-128 returns not verified at 94e40a7a; see its exact observations and limitations in the Review Log.
 - [ ] AC-04: Resolution retains the correct detector-versus-interpretation feedback and current disposition for every original hunk. A selected original closes only after its merged consolidation and every carried or terminal disposition are freshly verified.
-      Evidence: R-127 returns not verified at 9335c8ec; see its exact observations and limitations in the Review Log.
+      Evidence: R-128 returns not verified at 94e40a7a; see its exact observations and limitations in the Review Log.
 - [ ] AC-05: Concise reports, independent exact-target review and declared permissions govern local and remote effects. Scheduled and interactive publisher accounts remain distinct and correctly bound. Complete unchanged carried attention can finish green. Original-operation recovery observes before replay, preserves partial/unknown outcomes as pending, supports evidence-backed owner acknowledgement and never repeats a completed write or transfers ownership. A present lease keeps both local and scheduled audits pending before model execution. Exact owner-approved administrative abandonment requires a stopped original executor and atomically removes only the present lease and its validated operation receipt. Normal hosted production execution uses the durable `hosted` profile and retains native-validated original run/attempt identity before lease acquisition, with exact configured workflow and assessed-source checks. Stopped-job evidence must match the production member or a native trial's existing launch binding. Collector trials are ineligible for administrative abandonment. Stale object preconditions reject all deletions. With no lease, reports assess current findings independently while retaining receipt-only evidence.
-      Evidence: R-127 returns not verified at 9335c8ec; see its exact observations and limitations in the Review Log.
+      Evidence: R-128 returns not verified at 94e40a7a; see its exact observations and limitations in the Review Log.
 - [ ] AC-06: Stackweaver adopts the published installed workflow after scanner parity, independent paired review, installed/native operation checks and a successful unattended shared trial, with its local rules, credentials, commands, schedule and notifications preserved and a verified rollback path.
-      Evidence: R-127 returns not verified at 9335c8ec; see its exact observations and limitations in the Review Log.
+      Evidence: R-128 returns not verified at 94e40a7a; see its exact observations and limitations in the Review Log.
 - [ ] AC-07: Recorded repository, package and portable-host checks pass for the exact released/installed payload. Native model/entry trials establish their actual supported surfaces. GUI, phone and unperformed surfaces remain explicitly deferred or unclaimed. The selected component binding gates provider execution and remote effects, with explicit read-only mismatch reporting. Simpler installation, run/recovery and migration interfaces replace the private client installer and historical adoption/runtime record machinery under the accepted tradeoffs, while retaining the test-only installed synthetic harness and durable operation recovery records.
-      Evidence: R-127 returns not verified at 9335c8ec; see its exact observations and limitations in the Review Log.
+      Evidence: R-128 returns not verified at 94e40a7a; see its exact observations and limitations in the Review Log.
 
 ## Test Plan
 
@@ -1946,6 +1968,7 @@ None. On 2026-11-17 the owner accepts the R-117 compatibility recommendations. T
 | 2026-11-18 | R-125 | implementation | `f5cf1897d90d0a2192037115b2a034ffc3b3aeed` | claude-opus-5-5 | procedural | Seven criteria not verified; two cleanup nits. |
 | 2026-11-18 | R-126 | implementation | `61ca344352664ae1529ff9b66a8be8f475f991bd` | claude-opus-5-5 | procedural | Seven criteria not verified; one test-coverage correction and one cleanup nit. |
 | 2026-11-18 | R-127 | implementation | `9335c8eca92062f5864ee86a97107c01ba7b4bc3` | claude-opus-5-5 | procedural | No findings; seven composite criteria remain not verified pending release and adoption. |
+| 2026-11-18 | R-128 | implementation | `94e40a7a15ce8e7f2cfef34cc62f4392ee2de2ff` | claude-opus-5-5 | procedural | No blocking or should-fix findings; three nits; seven composite criteria remain not verified. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -3864,3 +3887,46 @@ Non-executing client upgrade signals use the documented provider npm package nam
 
 - The earlier T40 integration selected `d8f07c9dd69038375a535af8ad586086688f85ab` for its recorded checkpoints. [Engineering entry point](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/AGENTS.md), [terminal output](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/conventions/terminal-output.md), [delivery rules](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/conventions/delivery.md).
 - T106 selects the current engineering pin `1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff`. [Current engineering entry point](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/AGENTS.md), [feature-document standard](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/conventions/feature-documents.md).
+
+### R-128
+
+TARGET: 94e40a7a15ce8e7f2cfef34cc62f4392ee2de2ff
+CRITERION: AC-01 An adopting repository can audit documentation and resolve stale audit proposals through one discoverable harness-agnostic workflow, retaining its scanner, detector policy and existing change-scoped docs-impact behavior.
+VERDICT: not verified
+EVIDENCE: At 94e40a7a in the clean public clone, git diff a47bcb4a HEAD changes run-preparation.ts:54, run-closure.ts:77, native-audit-client-fixture.ts, one test.each parameter in normal-preparation.test.ts and the spec's Context and status_description. git diff 9335c8ec a47bcb4a touches only the spec. SKILL.md, references, cli.ts and the eight-operation routing are therefore byte-identical to the R-127 target. With TMPDIR=/tmp/c6r, Bun 1.4.4 and unshare -rn, these real cli.ts entries passed through owned native fixtures: normal-preparation.test.ts (4 cases, 256 assertions), normal-resolution.test.ts plus normal-preparation-failures.test.ts (5 cases, 83 assertions) and audit-session.test.ts (8 cases, 160 assertions). The selected projection fixed-native-repair.json reports plugin_loaded and skill_discovered true for both real Claude roles at component source_commit 94e40a7a. Limitations: I did not observe the Test Plan's canonical-skill run against Stackweaver's bounded fixture and a second adopter. No adopting repository uses the shared workflow yet; T155, T128, T129 and T130 are unticked. The native projection covers one public synthetic source.
+CRITERION: AC-02 Complete assessments independently match scanner document/per-unit inventories and raw-byte digests to the selected Git tree and committed selectors. Failed, skipped, partial, stale or unreadable required input remains visible and prevents a clean claim. Confirmed findings and proposed fixes carry document/source evidence.
+VERDICT: not verified
+EVIDENCE: At 94e40a7a the diff touches no scan, snapshot, protocol, inventory or source-assessment code. scan exited 0 as the first step in all four normal-preparation cases, and audit-session passed its incomplete and refusal cases. R-127's suite observations at 9335c8ec apply to unchanged code, but I did not repeat them. Limitations: I did not rerun the protection, scan, snapshot, protocol, hardened Git/filter/promisor or canary-scanner files at this target. Real-corpus scanner and inventory parity on the consumer was out of scope and not observed.
+CRITERION: AC-03 Authorized preparation preserves unrelated work, intended contracts, historical evidence and local feature-review rules while producing only selected verified corrections. Mixed plan directories preserve safe locally authorized mechanical corrections and ordinary-document preparation without weakening enrolled shared-spec gates. Caller repositories and foreign resources retain their original state.
+VERDICT: not verified
+EVIDENCE: At 94e40a7a normal-preparation.test.ts passed all four cases (matching, caller-change, mixed-plans, prepare-protocol). Each asserts captureRepositoryState equality and unchanged fake-service state and origin refs at lines 69-70. In a scratch clone at /tmp/c6r/m I restored a47bcb4a's run-preparation.ts alone. prepare-protocol then failed at normal-preparation.test.ts:44 with outcome incomplete and diagnostic "Native role final canonical reply required" (0 pass, 1 fail, 6 assertions), the same diagnostic as the selected red log. With HEAD's file restored, the case passed alone with 63 assertions in 152s, matching the selected green log. The scratch clone was then removed. The proof manifest.json digests match all five files. original-prefixed-reply.txt is a markdown summary followed by a well-formed MODEL line and JSON. The decoder refuses it at native-role-output.ts:65, an anchored /^MODEL: .../ without the m flag, and at manifests.ts:271. Neither decoder changed. fixed-native-repair.json reports caller, fixture, tracker and refs preserved and remote_writes false. My recorded clone state (HEAD, porcelain v2 with ignored files, every ref and the index digest) was identical before and after all checks. Limitations: the native projection is a controller-written summary. I did not observe the native run, its prepared edit or its prepare and verify outcomes, and the projection does not record those outcomes. The prepare-protocol fault takes the fixture's Copilot event branch, while the real failure came from Claude's result event; both reach the same check at native-role-output.ts:65. I did not rerun worker-assessment or the full mixed-root protection files. No Stackweaver protection-inventory replay or corpus parity was observed.
+CRITERION: AC-04 Resolution retains the correct detector-versus-interpretation feedback and current disposition for every original hunk. A selected original closes only after its merged consolidation and every carried or terminal disposition are freshly verified.
+VERDICT: not verified
+EVIDENCE: At 94e40a7a run-closure.ts:77 changes only the worker's reply-format wording. The request fields, schema, policy, review step and effect gates at run-closure.ts:69-100 are unchanged. normal-resolution.test.ts passed. It drives resolve, prepare, verify and close through the owned fixture's closure-worker reply, exact independent closure review, approval and lost close-response recovery. Limitations: no test or fixture reads the new closure prompt text (F-01). I did not rerun closure-worker, closure-entry, closure-controller or trial-closure. No native closure run, live proposals or merged consolidations were exercised.
+CRITERION: AC-05 Concise reports, independent exact-target review and declared permissions govern local and remote effects. Scheduled and interactive publisher accounts remain distinct and correctly bound. Complete unchanged carried attention can finish green. Original-operation recovery observes before replay, preserves partial/unknown outcomes as pending, supports evidence-backed owner acknowledgement and never repeats a completed write or transfers ownership. A present lease keeps both local and scheduled audits pending before model execution. Exact owner-approved administrative abandonment requires a stopped original executor and atomically removes only the present lease and its validated operation receipt. Normal hosted production execution uses the durable `hosted` profile and retains native-validated original run/attempt identity before lease acquisition, with exact configured workflow and assessed-source checks. Stopped-job evidence must match the production member or a native trial's existing launch binding. Collector trials are ineligible for administrative abandonment. Stale object preconditions reject all deletions. With no lease, reports assess current findings independently while retaining receipt-only evidence.
+VERDICT: not verified
+EVIDENCE: At 94e40a7a the diff touches no journal, authority, recovery, lease, hosted-executor or transport code. The passing normal-preparation cases cover publish without approval (exit 2, setup-required), refusal of a copied prepared run, owned fake-service publication and resume. fixed-native-repair.json declares production_publisher_proven false, production_hosted_context_proven false and remote_writes false. Limitations: I did not rerun recovery, native-controller, closure-controller, native-retained-observations or the hosted fresh-runner cases at this target. R-127's observations cover unchanged code at 9335c8ec but are not mine. These are synthetic local services. No real hosted run and no actual scheduled-worker recovery (T128) was observed.
+CRITERION: AC-06 Stackweaver adopts the published installed workflow after scanner parity, independent paired review, installed/native operation checks and a successful unattended shared trial, with its local rules, credentials, commands, schedule and notifications preserved and a verified rollback path.
+VERDICT: not verified
+EVIDENCE: At 94e40a7a, Tasks T155, T128, T129 and T130 are unticked. plugins/vh-adlc/plugin.json and .claude-plugin/plugin.json declare the unpublished candidate 0.26.0. Limitations: no release, released marketplace install or upgrade, final paired C/D review against a released binding, unattended shared trial, routing switch or rollback was executed or observed. Consumer files were out of scope.
+CRITERION: AC-07 Recorded repository, package and portable-host checks pass for the exact released/installed payload. Native model/entry trials establish their actual supported surfaces. GUI, phone and unperformed surfaces remain explicitly deferred or unclaimed. The selected component binding gates provider execution and remote effects, with explicit read-only mismatch reporting. Simpler installation, run/recovery and migration interfaces replace the private client installer and historical adoption/runtime record machinery under the accepted tradeoffs, while retaining the test-only installed synthetic harness and durable operation recovery records.
+VERDICT: not verified
+EVIDENCE: At 94e40a7a typecheck.sh exited 0 offline under unshare -rn with Bun 1.4.4, installing from the existing cache. With the verified binary and pin 1ccf8f31, lint passes, and fresh reports R-127 stale on covered-changed for exactly the four changed covered paths. fresh also reports R-123 stale on covered-drift, because this clone's origin/HEAD points at feat/shared-docs-drift. b3e65115 is an ancestor of HEAD and does not contain 579f9f22. The normative baseline extract (covers plus Scope through Test Plan, with ticks, Evidence and Residual lines removed) has the same sha256 at f649b7aa, 579f9f22, 9335c8ec, a47bcb4a and HEAD. gate complete fails all_met, impl_review_fresh and impl_review_clean. It also fails spec_review_fresh and on_feature_branch_if_set in this detached clone. fixed-native-repair.json records Claude 2.1.325 for both roles at component source_commit 94e40a7a with 291 files. Both report model claude-opus-5-5, with different context IDs, plugin_loaded and skill_discovered true, exit_code 0, reaped, group_absent and no survivors. The worker requested the alias opus and the reviewer requested claude-opus-5-5. Limitations: this is a candidate install, not the released payload. I did not run Go tests/vet/lint, the full plugin suite or Linux/macOS CI at this target; the f5cf1897 gate is an earlier source and CI 44277857544 is for a47bcb4a. No released marketplace install or upgrade, and no native Copilot or hosted operation, was observed. GUI and phone remain owner-deferred.
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/docs-drift/native-audit-client-fixture.ts:80-81; plugins/vh-adlc/scripts/docs-drift/run-closure.ts:77; Context "Native preparation protocol correction on 2026-11-18"
+EVIDENCE: The fixture adds the summary prefix only when request.kind === "docs-drift-prepare-worker-request". git grep for "MODEL header must be the first line" and "strict parser consumes" finds no test or fixture that reads the closure line. Reverting run-closure.ts:77 alone would leave every test unchanged. I observed the matching red/green behavior only for preparation. The closure clarification is supported by inspection, and failure stays closed through the shared decoder.
+PROPOSAL: Extend the prepare-protocol prefix condition to docs-drift-closure-worker-request and select it in the normal-resolution close path. Otherwise state in Context that the closure clarification has no separate regression.
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: plugins/vh-adlc/scripts/docs-drift/run-closure.ts:94
+EVIDENCE: The closure reviewer prompt says only "Return exactly MODEL: ..., then canonical FINDING/... records or exactly NO FINDINGS." The analogous reviewer prompts at run-verification.ts:71 and audit-session.ts:131 add "No fences, footer or alternate protocol." All roles pass through decodeNativeRoleOutput (native-role-output.ts:65) and manifests.ts:271, which refuse a prefixed reply. No native closure review has run, so the closure reviewer is the remaining handoff line without an explicit no-prose clause.
+PROPOSAL: Add the same "No fences, footer or alternate protocol." clause to run-closure.ts:94 in a later touch, or record why the closure reviewer is left as is.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/docs-drift/native-audit-client-fixture.ts:7, 77-89
+EVIDENCE: isClaude is true only for fault "claude-normal-cli", so prepare-protocol runs the Copilot assistant.message branch, and only that branch applies the prefix. The fixture comment and the Context say the regression reproduces the real native trial, but the observed failure came from Claude 2.1.325's result event. Both shapes reach the same final check at native-role-output.ts:65, so the guard is still proven for the shared decoder.
+PROPOSAL: Apply the prefix to the Claude result and assistant text as well, or reword the fixture comment to say it reproduces the reply shape through the shared decoder.
