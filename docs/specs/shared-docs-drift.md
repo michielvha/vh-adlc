@@ -206,6 +206,29 @@ locally. Full local verification, fresh bounded paired review and the actual
 hosted rerun remain pending before activation. Existing behavior preservation
 and final C/D/rollback obligations remain unchanged.
 
+### Bounded consumer review follow-up on 2026-11-18
+
+Actual Claude Code Opus 5.5 paired r13 reviews shared `93a7c50c` and consumer
+`b3e1f74e`. All 69 required fragments are successfully read; packet bytes remain
+unchanged and owned-process cleanup is confirmed. Original return and provenance
+remain in `docs-drift-paired-claude-r13/`. It confirms preservation and
+proportionality, and identifies one should-fix plus three nits.
+
+The working correction verifies the installed cache through the existing
+inspector imported from the independently pinned checkout, before selecting or
+importing installed code. A proposed recursive directory diff rejects ordinary
+empty Claude installer metadata; its failure is retained. The existing inspector
+preserves that shipped contract while rejecting changed files, extra files and
+links. Owned physical Bash controls prove that those refusals precede selection
+and that altered installed code never executes. Removing this verification
+reproduces the refusals' regression. Numeric trigger-account checking and actual
+installed-root provenance also have failing-first controls. All 18 focused cases
+pass with 250 assertions; strict types and actionlint pass. Bounded refusal
+metadata and the ordinary-manual-CI exception description address the remaining
+notes. The earlier full local gate passes 48 checks without skips, and the full
+consumer suite passes 85 tests with 709 assertions. Fresh exact-source review and
+the actual publisher rerun remain required. The accepted baseline is unchanged.
+
 ### Native correction review follow-up
 
 The instrumented hosted run retains its actual worker/reviewer streams and
