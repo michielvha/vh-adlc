@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "number",
+      "const": 1
+    },
+    "fail_rules": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "broken_link",
+          "broken_fragment",
+          "duplicate_title",
+          "duplicate_description",
+          "duplicate_main",
+          "unreachable",
+          "http_regression",
+          "title_removed",
+          "h1_removed",
+          "noindex_added",
+          "canonical_removed",
+          "canonical_changed"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "fail_rules"
+  ],
+  "additionalProperties": false
+}
