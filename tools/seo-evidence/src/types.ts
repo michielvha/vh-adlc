@@ -48,3 +48,14 @@ export type Finding = {
   id: string; rule: string; url: string; mode: Mode; detail: string;
   evidence: Evidence[]; values: unknown;
 };
+export type Counts = { declared: number; captured: number; failed: number; not_collected: number };
+export type Coverage = Counts & {
+  modes: Record<Mode, Counts>;
+  groups: Record<string, Counts & { urls: string[]; unobserved_urls: string[]; findings: string[]; modes: Record<Mode, Counts> }>;
+};
+export type Analysis = {
+  schema_version: 1; tool_version: string; extraction_version: string; operation: "inspect" | "compare";
+  input_digests: string[]; captured_at: string[]; origins: string[]; extraction: { main_selector: string };
+  analysis_status: AnalysisStatus; partial_reasons: string[]; findings: Finding[]; coverage: Coverage;
+  details: unknown;
+};
