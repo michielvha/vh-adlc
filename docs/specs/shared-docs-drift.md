@@ -188,6 +188,26 @@ marketplace installation and upgrade. T130 retains native/hosted trial, final
 paired migration review and actual adoption/rollback. The isolated consumer stays
 staged, with legacy routes active. No migration-complete claim is made.
 
+### Ordinary marketplace upgrade baselines
+
+On 2026-11-18, the native Codex and Claude clients each start with an empty isolated
+profile and install `vh-adlc@vhco-tools` through the public GitHub marketplace on
+`main`, using their ordinary marketplace/add/install commands. Both report enabled
+plugin `0.25.0`. Their installed 157-file inventories, raw hashes and executable
+modes match published [b3e65115](https://github.com/michielvha/vh-adlc/commit/b3e65115a7f2a6fc9160ffc7524c8936f09b2a6d).
+The Codex-exported source directory matches too. The old baseline lacks the new
+docs-drift skill as expected. Retain those actual native profiles for the upgrade
+trial; no catalog or installation receipt is synthesized.
+
+The host filesystem is read-only outside the owned test root while each command
+runs. No provider credentials are copied, no model operation is invoked, and each
+owned-process cleanup is confirmed. The Codex profile reports not logged in.
+Evidence is retained in `t130-marketplace-baselines-20261118/baseline.json`, the
+per-step native logs and `results.json`. These are actual `0.25.0` installation
+baselines, not `0.26.0` fresh/upgrade or native/hosted acceptance. Publication is
+still required before those tests. Recording this result moves the final CI head
+with documentation only; the reviewed implementation remains `9335c8ec`.
+
 ### Mixed-plan compatibility decision on 2026-11-17
 
 The owner accepts both R-117 recommendations after the editing-rule distinction is explained. The isolated consumer branch may prepare the new companion fields. Their default-branch activation follows publication and verification of the matching shared payload through the reviewed C/D pair. An earlier-reader rollback restores its companion and binding together. New local-document classification applies only within a standard-format feature root. Out-of-root matches and local-format repositories keep their existing protection paths. This adds neither a new upgrade class nor a new operation.
