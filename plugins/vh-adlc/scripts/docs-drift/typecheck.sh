@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Keep build dependencies outside the installed plugin payload.
+set -euo pipefail
+component_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+bun_bin=${BUN_BIN:-bun}
+if [[ $("$bun_bin" --version) != 1.4.4 ]]; then
+  printf '%s\n' 'Use the declared Bun 1.4.4 toolchain' >&2
+  exit 1
+fi
+compiler_work=$(mktemp -d "${TMPDIR:-/tmp}/vh-docs-drift-types.XXXXXX")
+trap 'rm -rf "$compiler_work"' EXIT
+cp "$component_dir/package.json" "$component_dir/bun.lock" "$compiler_work/"
+"$bun_bin" install --frozen-lockfile --ignore-scripts --cwd "$compiler_work"
+"$compiler_work/node_modules/.bin/tsc" --noEmit --project "$component_dir/tsconfig.json" \
+  --typeRoots "$compiler_work/node_modules/@types"

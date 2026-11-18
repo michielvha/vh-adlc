@@ -104,9 +104,10 @@ expected to work there. See [compatibility](../reference/compatibility.md#suppor
 
 ## What the plugin installs
 
-The package contains fifteen skills: the generic `vh-adlc` entry, eleven engineering
-operations, `vh-adlc-blog` for article and promotion drafts, `vh-adlc-docs-impact` for
-documentation review and `vh-adlc-clean` for host cleanup. It includes
+The candidate package's seventeen skills include the generic `vh-adlc` entry, eleven engineering
+operations, `vh-adlc-blog` for article and promotion drafts, `vh-adlc-diagram` for architecture diagrams, `vh-adlc-docs-impact` for
+selected-change documentation review, `vh-adlc-docs-drift` for corpus drift and
+stale audit proposals, and `vh-adlc-clean` for host cleanup. It includes
 separate feature-reviewer and prose-editor definitions. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
@@ -207,3 +208,38 @@ there is no cache-path guessing. Existing callers retain their path/stdin argume
 
 Projects coordination also uses Bun, Git and your authenticated GitHub CLI. It needs separate Projects
 scope and an explicit board/repository configuration; see the [Projects reference](../../plugins/vh-adlc/references/projects.md).
+
+## Standalone documentation drift candidate
+
+Verify that the selected installed payload contains `vh-adlc-docs-drift` and
+its packaged helpers. Resolve its actual plugin directory and check the
+[current acceptance record](../reference/compatibility.md#shared-documentation-drift-candidate)
+before migration. The shared procedure works from consumer-owned settings and
+source. Create those new files through the [greenfield example](../../plugins/vh-adlc/examples/docs-drift/README.md)
+and [settings reference](../../plugins/vh-adlc/references/docs-drift-settings.md).
+
+Use Bun 1.4.4, Git and Bash, plus the configured scanner's runtime. The included
+example scanner requires Node. Prepare the locked verified binary through the
+installed plugin's `scripts/ensure-vh-adlc.sh`, resolve the required knowledge
+pages, and select a clean committed source. Choose a fresh external run
+directory outside all checkouts and Git directories. The helper creates and owns it.
+
+```text
+bun <installed-plugin>/scripts/docs-drift/cli.ts scan --repo <project> \
+  --source <full-commit> --run-dir <new-private-external-directory>
+```
+
+`scan` returns its collection result. Findings still need source-based assessment.
+Missing prerequisites or incomplete collection return `incomplete` and exit 2.
+Full audit and resolution use the shared skill and their independently reviewed
+bound inputs. Configure ordinary installed client commands, full worker/reviewer models and
+observed native identities during authorized runtime setup. Keep
+credentials in the consumer's normal provisioning system.
+
+Keep the original run directory and its recorded evidence through pending delivery.
+Recovery effects use an explicitly selected ordinary install or released-source
+checkout matching the original component binding. After an upgrade, the current
+helper can inspect the pending record and report its original-release handoff.
+Follow [recovery](../../plugins/vh-adlc/references/docs-drift-review.md) for exact
+resume, acknowledgement and lease rules. Each host needs its own installation
+and required native checks before replacing its legacy publishing route.

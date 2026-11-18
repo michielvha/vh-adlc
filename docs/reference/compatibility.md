@@ -223,3 +223,30 @@ inventory, rollback and paired review before merge, plus post-merge route checks
 Claude docs-impact model execution, GUI/phone entry and live Stackweaver screenshot
 capture remain unclaimed. Other operations' compatibility rows do not establish
 those capabilities.
+
+## Shared documentation drift candidate
+
+The local candidate packages `vh-adlc-docs-drift`, strict consumer settings,
+source-accounted collection, selected correction/resolution preparation and
+native publication/recovery helpers. Its evidence remains scoped to the tested
+source and fixture. The [feature document](../specs/shared-docs-drift.md) tracks
+current checks, source targets, retained failures and remaining adoption gates.
+
+| Surface or capability | Current evidence |
+| --- | --- |
+| Local shared source and owned Git/API fixtures | Focused checks cover collection, protection, exact payloads, lost-response recovery, resume and bounded closure request cost. Shared discovery, documented command grammar and staged collection examples pass local checks. |
+| Claude Code Opus 5.5 source review | Independent source/procedure review is in progress. Source review and actual installed workflow execution retain separate results. |
+| Actual Codex, Claude and Copilot marketplace fresh installs/upgrades | Pending for the docs-drift payload. Earlier operations' install results retain their original scope. |
+| Installed Copilot worker/reviewer and synthetic resolve/closure/issue entry | Pending. Local toy-client and collector results remain labelled synthetic. |
+| Actual Claude forwarded command and selected role identities | Pending. The actual forwarding bytes and native result must match the migration candidate before cutover. |
+| Actual unattended hosted advisory and subsequent read-only history check | Pending. Staged collection diagnostics supply no advisory/history-trial result. |
+| Stackweaver paired source/scanner parity, operator originals, cutover and rollback | Pending. Legacy publishing routes remain active through the required replacement evidence and selected cutover. |
+| Codex desktop, VS Code Local and other GUI/phone entry | Deferred for this operation. Required CLI and hosted checks stay open. |
+
+Runtime selection checks the ordinary installed payload against the consumer's
+released component binding and flat preflight checklist. The checklist records
+operator/reviewer evidence for the staged candidate and its reviewed activation.
+Before cutover, the operator verifies original installed/native/review artifacts
+and their exact targets, models and outcomes. Missing or stale originals leave
+adoption pending. Follow the [setup and adoption reference](../../plugins/vh-adlc/references/docs-drift-settings.md)
+and [publication/recovery limits](../../plugins/vh-adlc/references/docs-drift-review.md).

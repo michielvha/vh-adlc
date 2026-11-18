@@ -67,11 +67,12 @@ describe("an offline reader session", () => {
     writeFileSync(join(probe, "plugin", "vh-adlc.lock.json"), JSON.stringify(lock, null, 2) + "\n");
     writeFileSync(join(bin, "curl"), '#!/bin/bash\nprintf "unexpected download\\n" > "$VH_DOCS_NETWORK_SENTINEL"\nexit 90\n');
     chmodSync(join(bin, "curl"), 0o700);
+    // Disable Bun's import cache to isolate verified-binary cache behavior.
     const source = `import { createYAMLReader } from ${JSON.stringify(join(scripts, "settings-file.ts"))};
       try { createYAMLReader(reason => { throw Error(reason); }, { offline: true }); process.exit(3); }
       catch (error) { console.error(String(error)); process.exit(2); }`;
     const run = Bun.spawnSync([process.execPath, "-e", source], {
-      env: { ...process.env, XDG_CACHE_HOME: join(probe, "cache"), PATH: `${bin}${delimiter}/usr/bin${delimiter}/bin`, VH_DOCS_NETWORK_SENTINEL: network },
+      env: { ...process.env, XDG_CACHE_HOME: join(probe, "cache"), BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", PATH: `${bin}${delimiter}/usr/bin${delimiter}/bin`, VH_DOCS_NETWORK_SENTINEL: network },
       stdout: "pipe", stderr: "pipe", timeout: 30_000,
     });
     expect(run.exitCode).toBe(2);

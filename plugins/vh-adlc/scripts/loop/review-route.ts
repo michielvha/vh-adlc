@@ -5,11 +5,12 @@
 // unchanged afterwards outside the declared scratch directories. Every outcome that is not `ready`
 // is `pending`: nothing is stored.
 import { createHash } from "node:crypto";
-import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { runOwnedClient } from "../triage/owned-process";
 import { nulRecords, statusEntries } from "./git-paths";
+import { gitEnvironment, gitReadArguments, readGitWithEnvironment } from "../git-read";
 
 export type ReviewKind = "spec" | "implementation";
 export type ReviewOutcome =
@@ -36,8 +37,12 @@ function git(root: string, args: string[], input?: Uint8Array): Buffer {
 }
 const digest = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
 
-function underScratch(path: string, scratch: string[]) {
-  return scratch.some(dir => path === dir || path.startsWith(`${dir.replace(/\/+$/, "")}/`));
+function underScratch(path: string | Buffer, scratch: string[]) {
+  return scratch.some(dir => {
+    if (typeof path === "string") return path === dir || path.startsWith(`${dir.replace(/\/+$/, "")}/`);
+    const prefix = Buffer.from(dir.replace(/\/+$/u, ""));
+    return path.equals(prefix) || path.subarray(0, prefix.length + 1).equals(Buffer.concat([prefix, Buffer.from("/")]));
+  });
 }
 
 /** A manifest of an ignored directory tree: each file's path and content hash. */
@@ -65,12 +70,109 @@ function fileDigest(root: string, path: string): string {
   } catch { return "absent"; }
 }
 
+function logicalEnvironment() {
+  return { PATH: process.env.PATH, HOME: process.env.HOME, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME, LANG: "C", LC_ALL: "C",
+    GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM: process.env.GIT_CONFIG_SYSTEM,
+    GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM };
+}
+function logicalGit(root: string, args: string[]): Buffer { return readGitWithEnvironment(root, args, logicalEnvironment()); }
+function byteRecords(bytes: Buffer): Buffer[] {
+  const records: Buffer[] = [];
+  for (let start = 0; start < bytes.length;) {
+    const end = bytes.indexOf(0, start);
+    if (end < 0) throw Error("Incomplete logical Git snapshot records");
+    records.push(bytes.subarray(start, end)); start = end + 1;
+  }
+  return records;
+}
+
+/** Hash resolved repository/worktree-local values in memory, preserving each key's multi-value order. */
+export function repositoryConfigurationDigest(root: string): string {
+  const records = byteRecords(logicalGit(root, ["config", "--includes", "--null", "--list", "--show-scope"]));
+  if (records.length % 2 !== 0) throw Error("Incomplete repository configuration snapshot");
+  const values = new Map<string, string[]>();
+  for (let index = 0; index < records.length; index += 2) {
+    const scope = records[index].toString("ascii");
+    if (scope !== "local" && scope !== "worktree") continue;
+    const pair = records[index + 1], separator = pair.indexOf(10);
+    const key = (separator < 0 ? pair : pair.subarray(0, separator)).toString("hex");
+    const value = digest(separator < 0 ? Buffer.alloc(0) : pair.subarray(separator + 1));
+    values.set(key, [...(values.get(key) ?? []), value]);
+  }
+  const exclude = logicalGit(root, ["rev-parse", "--path-format=absolute", "--git-path", "info/exclude"]).toString().replace(/\n$/u, "");
+  const ignore = existsSync(exclude) ? digest(readFileSync(exclude)) : "absent";
+  return digest(JSON.stringify({ values: [...values].sort(([left], [right]) => Buffer.compare(Buffer.from(left, "hex"), Buffer.from(right, "hex"))), ignore }));
+}
+
+function logicalContents(root: string, paths: Buffer[], ignoredPaths: Buffer[], directoryPaths: Buffer[], gitlinks: Set<string>, scope: "full" | "owning", scratch: string[]): string[] {
+  const normalized = (path: Buffer) => path.at(-1) === 47 ? path.subarray(0, -1) : path;
+  const kept = new Set(paths.map(path => normalized(path).toString("hex")));
+  const ignored = new Set(ignoredPaths.map(path => normalized(path).toString("hex")));
+  const directories = new Set(directoryPaths.map(path => normalized(path).toString("hex")));
+  const ancestors = new Set<string>();
+  for (const raw of [...paths, ...directoryPaths]) {
+    const path = normalized(raw);
+    ancestors.add(path.toString("hex"));
+    for (let separator = path.indexOf(47); separator >= 0; separator = path.indexOf(47, separator + 1))
+      ancestors.add(path.subarray(0, separator).toString("hex"));
+  }
+  const rows: string[] = [];
+  function visit(path: Buffer, inheritedIgnore = false): void {
+    if (path.length && underScratch(path, scratch)) return;
+    const identity = path.toString("hex"), full = Buffer.concat([Buffer.from(root + "/"), path]);
+    const excluded = !directories.has(identity) && (inheritedIgnore || ignored.has(identity));
+    if (excluded && !ancestors.has(identity)) return;
+    try {
+      const stat = lstatSync(full);
+      if (stat.isSymbolicLink()) {
+        if (kept.has(identity)) rows.push(`${identity}\tlink\t${readlinkSync(full, { encoding: "buffer" }).toString("hex")}`);
+      } else if (stat.isFile()) {
+        if (kept.has(identity)) rows.push(`${identity}\tfile\t${stat.mode}\t${digest(readFileSync(full))}`);
+      } else if (stat.isDirectory()) {
+        rows.push(`${identity}\tdirectory\t${stat.mode}`);
+        if (path.length && (gitlinks.has(identity) || kept.has(identity)) && existsSync(Buffer.concat([full, Buffer.from("/.git")]))) {
+          const nested = new TextDecoder("utf-8", { fatal: true }).decode(full);
+          if (realpathSync(logicalGit(nested, ["rev-parse", "--show-toplevel"]).toString().replace(/\n$/u, "")) !== realpathSync(nested))
+            throw Error("Nested Git snapshot root differs from its worktree");
+          rows.push(`${identity}\tgitlink\t${digest(JSON.stringify(snapshot(nested, [], scope, { ignored: "exclude" })))}\t${repositoryConfigurationDigest(nested)}`);
+        } else for (const name of readdirSync(full, { encoding: "buffer" }).sort(Buffer.compare)) {
+          if (name.equals(Buffer.from(".git"))) continue;
+          visit(path.length ? Buffer.concat([path, Buffer.from("/"), name]) : name, excluded);
+        }
+      } else if (kept.has(identity)) throw Error("Unsupported logical snapshot file type");
+    } catch (error) {
+      if (error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")) rows.push(`${identity}\tabsent`);
+      else throw error;
+    }
+  }
+  visit(Buffer.alloc(0));
+  return rows;
+}
+
 /**
  * Everything a reviewer could change in the owning worktree: HEAD, every ref, index entries with their
  * flags, status, the ignored-file list and the contents of every tracked, untracked and ignored file.
  * Scratch directories are left out.
  */
-export function snapshot(root: string, scratch: string[], scope: "full" | "owning" = "full"): Record<string, string> {
+export function snapshot(root: string, scratch: string[], scope: "full" | "owning" = "full", options: { ignored?: "include" | "exclude" } = {}): Record<string, string> {
+  if (options.ignored === "exclude") {
+    const index = logicalGit(root, ["ls-files", "--stage", "-v", "-z"]);
+    const paths = byteRecords(logicalGit(root, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"]));
+    const kept = paths.filter(path => !underScratch(path, scratch));
+    const ignoredPaths = byteRecords(logicalGit(root, ["ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z"]));
+    const directoryPaths = byteRecords(logicalGit(root, ["ls-files", "--others", "--exclude-standard", "--directory", "-z"])).filter(path => path.at(-1) === 47);
+    const gitlinks = new Set(byteRecords(index).filter(row => /^[A-Za-z?] 160000 /u.test(row.toString("ascii")))
+      .map(row => row.subarray(row.indexOf(9) + 1).toString("hex")));
+    const symbolic = Bun.spawnSync(gitReadArguments(["symbolic-ref", "-q", "HEAD"]), { cwd: root,
+      stdout: "pipe", stderr: "pipe", env: gitEnvironment(logicalEnvironment()) });
+    if (symbolic.exitCode !== 0 && symbolic.exitCode !== 1) throw Error("Logical snapshot branch unavailable");
+    const branch = symbolic.exitCode === 0 ? symbolic.stdout.toString().trim() : "detached";
+    return { head: logicalGit(root, ["rev-parse", "HEAD"]).toString().trim(), head_ref: branch,
+      refs: scope === "full" ? digest(logicalGit(root, ["for-each-ref", "--format=%(refname) %(objectname)"]))
+        : digest(branch === "detached" ? "detached" : branch + " " + logicalGit(root, ["rev-parse", branch]).toString().trim()),
+      index: digest(index), status: digest(kept.map(path => path.toString("hex")).sort().join("\n")),
+      ignored: digest(""), contents: digest(logicalContents(root, kept, ignoredPaths, directoryPaths, gitlinks, scope, scratch).sort().join("\n")) };
+  }
   const keep = (path: string) => !underScratch(path, scratch);
   const entries = statusEntries(root, ["--untracked-files=all", "--ignored=no"]).filter(entry => keep(entry.path));
   const status = entries.map(entry => `${entry.xy}\0${entry.path}\0${entry.from ?? ""}`);

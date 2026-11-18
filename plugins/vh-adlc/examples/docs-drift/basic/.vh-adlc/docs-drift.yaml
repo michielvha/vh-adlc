@@ -1,0 +1,120 @@
+schema_version: 2
+protocol_version: 1
+repository: example/docs
+hostname: github.com
+default_branch: main
+roots:
+- docs
+exclusions: []
+suffixes:
+- .md
+required_detectors:
+- local-links
+detector_inputs:
+  local-links:
+    all_inventory: true
+detector_options:
+  local-links: {}
+feedback_files: []
+scanner:
+  argv:
+  - node
+  - scripts/docs-scan.mjs
+  script: scripts/docs-scan.mjs
+  adapter: null
+  timeout_seconds: 30
+project_procedure: .vh-adlc/docs-drift-project.md
+verification_commands: []
+generation_commands: []
+read_set:
+  source_roots: null
+  reference_roots: null
+component: null
+credential_references: []
+pr_discovery:
+  repository: example/docs
+  base: main
+  authors:
+  - example-bot
+  branch_prefixes:
+  - docs-drift/
+publication:
+  repository: example/docs
+  base: main
+  actor: example-bot
+  branch_prefix: docs-drift/
+  mode: staged
+  checklist_path: .vh-adlc/docs-drift-preflight.yaml
+  pr_state:
+    advisory: ready
+    resolve: ready
+  lease_ref: refs/heads/docs-drift-lease
+  receipt_ref_prefix: refs/heads/docs-drift-receipts/
+  resolution_root: .vh-adlc/docs-drift/resolutions
+  closure: after-merge
+  merge_methods:
+  - merge
+  - squash
+  - rebase
+reports:
+  hosted: actions
+  interactive: none
+  workflow_path: .github/workflows/docs-drift.yml
+  workflow_id: null
+  artifact_name_template: docs-drift-{run_id}-{run_attempt}
+  max_age_seconds: 604800
+  max_runs: 30
+  max_archive_bytes: 1048576
+  max_entry_bytes: 524288
+  local_history_roots: []
+  schema_version: 1
+  attention_version: 1
+clients:
+  copilot:
+    provider: copilot
+    executable: copilot
+execution:
+  worker_workflow: .github/workflows/docs-drift-worker.yml
+  scheduled_workflow: .github/workflows/docs-drift.yml
+  claude_command: .claude/commands/docs-drift.md
+  runner: ubuntu-latest
+  permissions:
+    contents: read
+    actions: read
+  secret_mappings: {}
+  entries:
+    hosted:
+      worker:
+        client: copilot
+        model: example-model-1
+        argv: []
+      reviewer:
+        client: copilot
+        model: example-model-1
+        argv: []
+      publisher:
+        argv:
+        - bun
+        - scripts/docs-drift-entry.ts
+        - publish
+    interactive:
+      worker:
+        client: copilot
+        model: example-model-1
+        argv: []
+      reviewer:
+        client: copilot
+        model: example-model-1
+        argv: []
+      publisher:
+        argv:
+        - bun
+        - scripts/docs-drift-entry.ts
+        - publish
+legacy_proposals:
+  authors:
+  - legacy-bot
+  branch_prefixes:
+  - docs-audit/
+  ids: []
+knowledge_pages: []

@@ -52,6 +52,10 @@ jobs:
       - name: Typecheck documentation impact
         run: |
           bun run --cwd plugins/vh-adlc/scripts/docs-impact typecheck
+      - name: Check documentation drift tooling
+        run: |
+          bun run --cwd plugins/vh-adlc/scripts/docs-drift typecheck
+          bun plugins/vh-adlc/scripts/docs-drift/build-zip.ts --check
       - name: Build GNU mv with atomic no-replace support
         working-directory: ${{ runner.temp }}
         run: |
@@ -87,6 +91,10 @@ jobs:
       - name: Typecheck portable documentation impact
         run: |
           bun run --cwd plugins/vh-adlc/scripts/docs-impact typecheck
+      - name: Check portable documentation drift tooling
+        run: |
+          bun run --cwd plugins/vh-adlc/scripts/docs-drift typecheck
+          bun plugins/vh-adlc/scripts/docs-drift/build-zip.ts --check
       - name: Check portable vh-adlc behavior
         run: >-
           bun test tests/vh-adlc/*.test.ts

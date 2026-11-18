@@ -1,3 +1,4 @@
+import { runOwnedClient } from "../../plugins/vh-adlc/scripts/triage/owned-process";
 // Tests for plugins/vh-adlc/scripts/ensure-vh-adlc.sh (scenario S15). Each case
 // copies the real installer into a throwaway plugin directory with its own lock,
 // so no production flag or URL override exists to bypass verification.
@@ -12,6 +13,7 @@ const ROOT = resolve(import.meta.dir, "..", "..");
 const INSTALLER = join(ROOT, "plugins", "vh-adlc", "scripts", "ensure-vh-adlc.sh");
 const REAL_LOCK = join(ROOT, "plugins", "vh-adlc", "vh-adlc.lock.json");
 const VERSION = "9.9.9";
+const DOWNLOAD_BOUNDS = { connection: 5, archive: 25, metadata: 10, retries: 0 };
 const PLATFORMS = ["darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"];
 
 // Every throwaway directory a case makes, removed when the file's tests end.
@@ -311,3 +313,200 @@ test("installs the released binary from the real lock", () => {
   expect({ exit: read.exitCode, result: report.result, value: report.data?.value })
     .toEqual({ exit: 0, result: "answered", value: { schema_version: 1, source_roots: ["src"] } });
 }, 120_000);
+
+function apiFallbackFixture(mode: "valid" | "bounded" | "retry-after" | "missing-download" | "empty-primary" | "wrong-primary" | "missing-metadata" | "empty-metadata" | "missing-api-archive" | "empty-api-archive" | "partial-primary-missing-api" | "wrong-host" | "wrong-browser" | "duplicate" | "wrong-archive" | "wrong-binary", canonicalProxy?: string) {
+  const f = fixture(mode === "wrong-binary" ? { binarySha: "0".repeat(64) } : {});
+  const assets = f.lock.assets as Record<string, Record<string, string>>;
+  const selected = assets[platform()];
+  selected.url = `https://github.com/michielvha/vh-adlc/releases/download/v${VERSION}/${selected.name}`;
+  writeFileSync(join(f.plugin, "vh-adlc.lock.json"), `${JSON.stringify(f.lock, null, 2)}\n`);
+  const endpoint = "https://api.github.com/repos/michielvha/vh-adlc/releases/assets/42";
+  const asset = { id: 42, name: selected.name, browser_download_url: mode === "wrong-browser" ? "https://other.invalid/file" : selected.url,
+    url: mode === "wrong-host" ? "https://other.invalid/42" : endpoint };
+  const release = { tag_name: "v" + VERSION, assets: mode === "duplicate" ? [asset, asset] : [asset] };
+  const bin = join(f.dir, "download-bin"), calls = join(f.dir, "downloads.log"); mkdirSync(bin);
+  writeFileSync(join(bin, "curl"), `#!${process.execPath}
+import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+const args = process.argv.slice(2), url = args.at(-1), output = args[args.indexOf('-o') + 1];
+appendFileSync(${JSON.stringify(calls)}, url + '\\n');
+if (${JSON.stringify(mode)} === 'bounded') {
+  const connect = Number(args[args.indexOf('--connect-timeout') + 1]);
+  const total = Number(args[args.indexOf('--max-time') + 1]);
+  const retries = Number(args[args.indexOf('--retry') + 1]);
+  const bounds = ${JSON.stringify(DOWNLOAD_BOUNDS)};
+  const metadata = url === ${JSON.stringify("https://api.github.com/repos/michielvha/vh-adlc/releases/tags/v" + VERSION)};
+  if (!args.includes('--connect-timeout') || !args.includes('--max-time') || !args.includes('--retry') || args[0] !== '-q' || args.includes('--retry-max-time')
+    || connect !== bounds.connection || total !== (metadata ? bounds.metadata : bounds.archive)
+    || !Number.isInteger(retries) || retries !== bounds.retries) process.exit(91);
+}
+if (url === ${JSON.stringify(selected.url)} && ${JSON.stringify(canonicalProxy ?? null)} !== null) {
+  const result = Bun.spawnSync([${JSON.stringify(Bun.which("curl", { PATH: "/usr/local/bin:/usr/bin:/bin" }))}, ...args.slice(0, -1), ${JSON.stringify(canonicalProxy ?? "")}], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+  process.stdout.write(result.stdout); process.stderr.write(result.stderr);
+  process.exit(result.exitCode ?? 1);
+}
+if (url === ${JSON.stringify(selected.url)}) {
+  if (${JSON.stringify(mode)} === 'empty-primary') { writeFileSync(output, ''); process.exit(0); }
+  if (${JSON.stringify(mode)} === 'wrong-primary') { writeFileSync(output, 'nonempty wrong primary bytes'); process.exit(0); }
+  if (${JSON.stringify(mode)} === 'partial-primary-missing-api') writeFileSync(output, 'partial primary bytes');
+  process.exit(${mode === "missing-download" ? 0 : 22});
+}
+if (url === ${JSON.stringify("https://api.github.com/repos/michielvha/vh-adlc/releases/tags/v" + VERSION)}) {
+  if (${JSON.stringify(mode)} === 'missing-metadata') process.exit(0);
+  writeFileSync(output, ${mode === "empty-metadata" ? "''" : "JSON.stringify(" + JSON.stringify(release) + ")"});
+} else if (url === ${JSON.stringify(endpoint)} && args.includes('Accept: application/octet-stream')) {
+  if (${JSON.stringify(mode)} === 'missing-api-archive' || ${JSON.stringify(mode)} === 'partial-primary-missing-api') process.exit(0);
+  writeFileSync(output, ${mode === "empty-api-archive" ? "Buffer.alloc(0)" : mode === "wrong-archive" ? "Buffer.from('unverified archive')" : "readFileSync(" + JSON.stringify(f.asset) + ")"});
+} else process.exit(90);
+`, { mode: 0o755 });
+  return { f, bin, calls };
+}
+
+test("a failed canonical download can use the same locked public asset through the GitHub API", () => {
+  const { f, bin, calls } = apiFallbackFixture("valid"), r = run(f, [], [bin]);
+  expect(r.code).toBe(0);
+  expect(r.out).toBe(cached(f));
+  expect(sha256(readFileSync(cached(f)))).toBe(sha256(f.binary));
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+});
+
+for (const mode of ["wrong-host", "wrong-browser", "duplicate", "wrong-archive", "wrong-binary"] as const) {
+  test(`public asset API fallback rejects ${mode} without executing or caching it`, () => {
+    const { f, bin, calls } = apiFallbackFixture(mode), r = run(f, [], [bin]);
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(mode === "wrong-archive" || mode === "wrong-binary" ? 3 : 2);
+    expect(r.code).toBe(1);
+    expect(existsSync(cached(f))).toBe(false);
+    expect(existsSync(f.marker)).toBe(false);
+  });
+}
+
+test("release metadata parsing cannot import code from the caller's checkout", () => {
+  const { f, bin } = apiFallbackFixture("valid"), marker = join(f.dir, "unverified-import-ran");
+  writeFileSync(join(f.dir, "json.py"), `open(${JSON.stringify(marker)}, "w").write("unverified checkout code ran")\nraise RuntimeError("shadowed json")\n`);
+  const r = run(f, [], [bin]);
+  expect(r.code).toBe(0);
+  expect(existsSync(marker)).toBe(false);
+});
+
+test("every download has bounded connection, transfer and retry attempts", () => {
+  const maximumTransferTime = 2 * DOWNLOAD_BOUNDS.archive + DOWNLOAD_BOUNDS.metadata;
+  expect(maximumTransferTime).toBeLessThan(120);
+  const { f, bin, calls } = apiFallbackFixture("bounded");
+  const result = run(f, [], [bin]);
+  expect(result.code).toBe(0);
+  expect(result.out).toBe(cached(f));
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+});
+
+test.each([false, true])("native curl bounds Retry-After and excludes user config unless the disable flag is removed (%s)", async removeDisable => {
+  let requests = 0, configuredHeaders = 0;
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch(request) {
+    if (request.headers.has("X-Fixture-Curlrc")) configuredHeaders += 1;
+    requests++; return new Response("synthetic temporary outage", { status: 503, headers: { "Retry-After": "120" } });
+  } });
+  try {
+    const { f, bin, calls } = apiFallbackFixture("retry-after", server.url.toString());
+    writeFileSync(join(f.home, ".curlrc"), 'header = "X-Fixture-Curlrc: 1"\n');
+    if (removeDisable) {
+      const installer = join(f.plugin, "scripts", "ensure-vh-adlc.sh");
+      writeFileSync(installer, readFileSync(installer, "utf8").replaceAll("curl -q -fsSL", "curl -fsSL"));
+    }
+    let processGroup = 0;
+    const outcome = await runOwnedClient(["bash", join(f.plugin, "scripts", "ensure-vh-adlc.sh")], {
+      started: pid => { processGroup = pid; },
+      cwd: f.dir, env: { HOME: f.home, XDG_CACHE_HOME: join(f.home, "cache"),
+        PATH: [bin, "/usr/local/bin", "/usr/bin", "/bin"].join(":"), LC_ALL: "C", NO_PROXY: "127.0.0.1" },
+      stdout: join(f.dir, "installer.stdout"), stderr: join(f.dir, "installer.stderr"),
+    }, { timeout_ms: 8000, grace_ms: 100, reap_ms: 2000 });
+    expect(outcome.timed_out).toBe(false);
+    expect(outcome.reaped).toBe(true);
+    expect(outcome.signals[0]).toEqual({ signal: "SIGTERM", accepted: false, error: "ESRCH" });
+    expect(outcome.confirmed).toBe(true);
+    expect(outcome.survivors).toEqual([]);
+    expect(processGroup).toBeGreaterThan(0);
+    let groupEmpty = false;
+    try { process.kill(-processGroup, 0); }
+    catch (error) { groupEmpty = error instanceof Error && "code" in error && error.code === "ESRCH"; }
+    expect(groupEmpty).toBe(true);
+    if (outcome.exit_code !== 0) throw new Error(readFileSync(join(f.dir, "installer.stderr"), "utf8"));
+    expect(readFileSync(join(f.dir, "installer.stdout"), "utf8").trim()).toBe(cached(f));
+    expect(requests).toBeGreaterThan(0);
+    expect(requests).toBe(1);
+    expect(configuredHeaders).toBe(removeDisable ? requests : 0);
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+  } finally { await server.stop(true); }
+}, 15000);
+
+test("a successful curl exit without an archive still takes the verified fallback", () => {
+  const { f, bin, calls } = apiFallbackFixture("missing-download");
+  const result = run(f, [], [bin]);
+  expect(result.code).toBe(0);
+  expect(result.out).toBe(cached(f));
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+});
+
+test("an empty primary archive takes the locked fallback", () => {
+  const { f, bin, calls } = apiFallbackFixture("empty-primary"), result = run(f, [], [bin]);
+  expect(result.code).toBe(0);
+  expect(result.out).toBe(cached(f));
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+});
+
+test("nonempty wrong primary bytes fail integrity without contacting the API", () => {
+  const { f, bin, calls } = apiFallbackFixture("wrong-primary"), result = run(f, [], [bin]);
+  expect(result.code).toBe(1);
+  expect(result.err).toContain("digest does not match the lock");
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(1);
+  expect(existsSync(cached(f))).toBe(false);
+  expect(existsSync(f.marker)).toBe(false);
+});
+
+for (const mode of ["missing-metadata", "empty-metadata", "missing-api-archive", "empty-api-archive", "partial-primary-missing-api"] as const) {
+  test(`missing download data reports unavailable for ${mode}`, () => {
+    const { f, bin, calls } = apiFallbackFixture(mode), result = run(f, [], [bin]);
+    const metadata = mode === "missing-metadata" || mode === "empty-metadata";
+    expect(result.code).toBe(1);
+    expect(result.err).toContain(metadata ? "binary unavailable: reading the locked release metadata failed"
+      : "binary unavailable: downloading the locked API asset failed");
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(metadata ? 2 : 3);
+    expect(existsSync(cached(f))).toBe(false);
+    expect(existsSync(f.marker)).toBe(false);
+  });
+}
+
+
+test("the owned-process signal record detects a helper left alive after leader exit", async () => {
+  const f = fixture();
+  const outcome = await runOwnedClient(["sh", "-c", "sleep 30 </dev/null >/dev/null 2>&1 &"], {
+    cwd: f.dir, env: { PATH: "/usr/bin:/bin" }, stdout: join(f.dir, "straggler.stdout"), stderr: join(f.dir, "straggler.stderr"),
+  }, { timeout_ms: 2000, grace_ms: 100, reap_ms: 2000 });
+  expect(outcome.exit_code).toBe(0);
+  expect(outcome.signals[0]).toEqual({ signal: "SIGTERM", accepted: true });
+});
+
+test("a native partial transfer times out and falls back to the verified archive", async () => {
+  let requests = 0;
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, idleTimeout: 60, fetch() {
+    requests += 1;
+    return new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("partial archive")); } }),
+      { headers: { "Content-Length": "1000000" } });
+  } });
+  try {
+    const { f, bin, calls } = apiFallbackFixture("retry-after", server.url.toString());
+    writeFileSync(join(f.home, ".curlrc"), "retry = 99\nretry-all-errors\nretry-delay = 120\n");
+    const outcome = await runOwnedClient(["bash", join(f.plugin, "scripts", "ensure-vh-adlc.sh")], {
+      cwd: f.dir, env: { HOME: f.home, XDG_CACHE_HOME: join(f.home, "cache"),
+        PATH: [bin, "/usr/local/bin", "/usr/bin", "/bin"].join(":"), LC_ALL: "C", NO_PROXY: "127.0.0.1" },
+      stdout: join(f.dir, "partial.stdout"), stderr: join(f.dir, "partial.stderr"),
+    }, { timeout_ms: 35000, grace_ms: 100, reap_ms: 2000 });
+    expect(outcome.timed_out).toBe(false);
+    expect(outcome.exit_code).toBe(0);
+    expect(outcome.signals[0]).toEqual({ signal: "SIGTERM", accepted: false, error: "ESRCH" });
+    expect(outcome.confirmed).toBe(true);
+    expect(outcome.group_absent).toBe(true);
+    expect(outcome.survivors).toEqual([]);
+    expect(readFileSync(join(f.dir, "partial.stdout"), "utf8").trim()).toBe(cached(f));
+    expect(readFileSync(join(f.dir, "partial.stderr"), "utf8")).toContain("curl: (28)");
+    expect(requests).toBe(1);
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+  } finally { await server.stop(true); }
+}, 40000);
