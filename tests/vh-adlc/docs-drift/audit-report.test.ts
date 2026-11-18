@@ -85,6 +85,7 @@ test("an existing full native proposal stays unassessed and blocks final-report 
     expect(result.complete).toBe(false); expect(result.report).toMatchObject({ outcome: "failed", success: false, collection_complete: true });
     expect(result.counts).toMatchObject({ required_proposals: 1, collected_proposals: 1, unassessed_proposals: 1 });
     expect(result.report?.attention.some(item => item.item.identity === "proposal:11")).toBe(true);
+    expect(result.report?.attention.find(item => item.item.identity === "proposal:11")?.item.disposition).toBe("unknown");
     expect(result.diagnostics.join("\n")).toContain("Existing audit proposals require complete current semantic assessment");
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } catch (error) { preserveRoots = true; throw error; }

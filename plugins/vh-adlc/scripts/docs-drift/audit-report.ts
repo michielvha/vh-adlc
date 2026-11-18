@@ -46,11 +46,6 @@ class AuditReportFailure extends Error {
   constructor(readonly code: string, message: string) { super(message); }
 }
 
-/** A fully assessed mixture needs resolution; missing or wholly unknown support stays unknown. */
-export function proposalAttentionDisposition(assessment: ProposalAssessment["proposals"][number]["assessment"]): AttentionInput["disposition"] {
-  return assessment === "unverifiable" ? "unknown" : "needs-resolution";
-}
-
 /** The execution controller calls this before its model roles. JSON metadata cannot recreate the run. */
 export async function beginAuditReport(input: Options): Promise<Start> {
   const { observation, ...serializable } = input, options = { ...structuredClone(serializable), observation };

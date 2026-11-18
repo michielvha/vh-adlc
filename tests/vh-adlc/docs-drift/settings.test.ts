@@ -4,26 +4,12 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifySettingsLeaves, loadCommittedSettings, parseSettings, settingsProjections } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
+import { loadCommittedSettings, parseSettings, settingsProjections } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { installedSettingsFixture, settingsFixture } from "./settings-fixture";
 
 const repositories: string[] = [];
 afterAll(() => {
   for (const repo of repositories) rmSync(repo, { recursive: true, force: true });
-});
-
-test("strict settings preserve ordinary data and classify every recognized leaf once", () => {
-  const settings = parseSettings(settingsFixture());
-  const leaves = classifySettingsLeaves(settings);
-  expect(leaves.length).toBeGreaterThan(70);
-  expect(new Set(leaves.map(leaf => JSON.stringify(leaf.path))).size).toBe(leaves.length);
-  expect(leaves.every(leaf => ["ordinary", "protected", "trial-setup"].includes(leaf.classification))).toBe(true);
-  for (const root of ["roots", "exclusions", "suffixes", "required_detectors", "detector_inputs", "detector_options", "feedback_files"]) {
-    expect(leaves.filter(leaf => leaf.path[0] === root).every(leaf => leaf.classification === "ordinary")).toBe(true);
-  }
-  for (const root of ["scanner", "read_set", "publication", "reports", "execution", "runtime_loader", "clients"]) {
-    expect(leaves.filter(leaf => leaf.path[0] === root).every(leaf => leaf.classification === "protected")).toBe(true);
-  }
 });
 
 test("ordinary options and dormant trial setup cannot alter the protected projection", () => {
@@ -36,7 +22,6 @@ test("ordinary options and dormant trial setup cannot alter the protected projec
   expect(after.protected).toEqual(before.protected);
   expect(after.ordinary).not.toEqual(before.ordinary);
   expect(after.trial_setup).not.toEqual(before.trial_setup);
-  expect(classifySettingsLeaves(parsed).filter(leaf => leaf.path[0] === "trial").every(leaf => leaf.classification === "trial-setup")).toBe(true);
   const executionChange = settingsFixture();
   executionChange.scanner.argv.push("--different-execution");
   expect(settingsProjections(parseSettings(executionChange)).protected).not.toEqual(before.protected);

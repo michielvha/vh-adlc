@@ -60,22 +60,20 @@ test("proposal assessments account for every original full hunk and quote curren
 test("fully assessed proposal mixtures stay distinct from unknown judgments", async () => {
   try {
     const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposal-assessment");
-    const report = await import("../../../plugins/vh-adlc/scripts/docs-drift/audit-report");
     const f = await auditProposalInputsFixture(roots, "multiple", { multiHunks: true }), inputs = await collectAuditProposalInputs(f.options);
     expect(inputs.complete, JSON.stringify(inputs.diagnostics)).toBe(true);
     const originals = readCollectedAuditProposals(inputs), source = readFileSync(join(f.repo, "docs/guide.md"));
     expect(originals[0].hunks.length).toBeGreaterThanOrEqual(2);
     const quote = { path: "docs/guide.md", sha256: sha256(source), start: 0, end: source.length, quote_sha256: sha256(source) };
     const cases = [
-      { verdicts: ["supported", "supported"], assessment: "supported", disposition: "needs-resolution" },
-      { verdicts: ["fixed-differently", "fixed-differently"], assessment: "fixed-differently", disposition: "needs-resolution" },
-      { verdicts: ["unsupported", "unsupported"], assessment: "unsupported", disposition: "needs-resolution" },
-      { verdicts: ["supported", "fixed-differently"], assessment: "mixed", disposition: "needs-resolution" },
-      { verdicts: ["supported", "unsupported"], assessment: "mixed", disposition: "needs-resolution" },
-      { verdicts: ["unknown", "unknown"], assessment: "unverifiable", disposition: "unknown" },
-      { verdicts: ["supported", "unknown"], assessment: "mixed", disposition: "needs-resolution" },
+      { verdicts: ["supported", "supported"], assessment: "supported" },
+      { verdicts: ["fixed-differently", "fixed-differently"], assessment: "fixed-differently" },
+      { verdicts: ["unsupported", "unsupported"], assessment: "unsupported" },
+      { verdicts: ["supported", "fixed-differently"], assessment: "mixed" },
+      { verdicts: ["supported", "unsupported"], assessment: "mixed" },
+      { verdicts: ["unknown", "unknown"], assessment: "unverifiable" },
+      { verdicts: ["supported", "unknown"], assessment: "mixed" },
     ] as const;
-    const routed: Array<{ judgment: Parameters<typeof report.proposalAttentionDisposition>[0]; expected: ReturnType<typeof report.proposalAttentionDisposition> }> = [];
     for (const selected of cases) {
       const packet = { schema_version: 1, kind: "docs-drift-proposal-assessment", source_commit: f.source, inputs_sha256: inputs.inputs_sha256,
         proposals: originals.map(proposal => ({ number: proposal.number, binding_sha256: proposal.binding_sha256,
@@ -87,8 +85,6 @@ test("fully assessed proposal mixtures stay distinct from unknown judgments", as
       expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
       expect(result.proposals[0].assessment, selected.verdicts.join("+")).toBe(selected.assessment);
       expect(result.counts.unassessed_hunks).toBe(0);
-      routed.push({ judgment: result.proposals[0].assessment, expected: selected.disposition });
     }
-    for (const row of routed) expect(report.proposalAttentionDisposition(row.judgment)).toBe(row.expected);
   } catch (error) { preserveRoots = true; throw error; }
 }, 125000);

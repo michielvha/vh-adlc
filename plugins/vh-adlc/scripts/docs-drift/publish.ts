@@ -103,11 +103,6 @@ export function createPublicationVerifier(options: PublishOptions): (journal: Jo
   };
 }
 
-/** A direct check always opens a fresh source-validation scope. */
-export async function verifyPublicationGate(options: PublishOptions, journal: Journal | null): Promise<void> {
-  await createPublicationVerifier(options)(journal);
-}
-
 function pending(journal: Journal, effect: Effect, reason: string, objects: PlanObjects, invalidate = false, recoveryOnly = false): PublishResult {
   if (!journal.events.some(event => event.effect_id === effect.id && event.kind === "intent")) journal = appendIntent(journal, effect.id);
   if (recoveryOnly) journal = appendRecoveryOnly(journal, effect.id, reason);

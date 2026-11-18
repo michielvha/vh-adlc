@@ -496,24 +496,6 @@ const classifications = {
   trial: "trial-setup",
 } satisfies Record<SettingsField, SettingClassification>;
 
-export type ClassifiedLeaf = { path: Array<string | number>; classification: SettingClassification; value: unknown };
-
-/** Dynamic detector-option keys are typed data. They inherit their declared ordinary position. */
-export function classifySettingsLeaves(settings: Settings): ClassifiedLeaf[] {
-  const leaves: ClassifiedLeaf[] = [];
-  function visit(value: unknown, path: Array<string | number>, classification: SettingClassification): void {
-    const entries = value !== null && typeof value === "object" ? Object.entries(value) : [];
-    if (entries.length === 0) {
-      leaves.push({ path, classification, value });
-      return;
-    }
-    for (const [key, item] of entries) visit(item, [...path, Array.isArray(value) ? Number(key) : key], classification);
-  }
-  const values: Record<string, unknown> = settings;
-  for (const key of settings.schema_version === 1 ? fields : installedFields) visit(values[key], [key], classifications[key]);
-  return leaves;
-}
-
 export function settingsProjections(settings: Settings): { ordinary: Record<string, unknown>; protected: Record<string, unknown>; trial_setup: Record<string, unknown> } {
   const values: Record<string, unknown> = settings;
   const selectedFields = settings.schema_version === 1 ? fields : installedFields;

@@ -80,7 +80,7 @@ The matching tool and project settings ship together and roll back together. The
 
 Recovery retains the original operation's ownership and evidence. A publication lease keeps new audits pending before models run. Administrative abandonment requires exact approval and a stopped original executor, then removes its lease and matching receipt atomically. Terminal receipts persist. Unsupported deletion of only a lease can permit a fresh assessment while its receipt remains.
 
-The owner accepted clean Claude Code Opus 5.5 R-122. Local scanner parity, companion rules and native synthetic workflow checks pass at their recorded revisions. Whole-feature review R-125 returns two cleanup nits, with every composite completion criterion still unverified. The final corrections restore local command behavior and scheduled safe-fix wording, preserve older metadata and remove unused helpers. Released marketplace installs, actual provider/hosted trials, final release-bound paired review, cutover and activated rollback remain open. GUI and phone tests are deferred. Merge, release and cutover retain their separate approval stages.
+The owner accepted clean Claude Code Opus 5.5 R-122. Local scanner parity, companion rules and native synthetic workflow checks pass at their recorded revisions. Whole-feature review R-125 returns two cleanup nits, now corrected, with every composite completion criterion still unverified. The final corrections restore local command behavior and scheduled safe-fix wording, preserve older metadata and remove unused helpers. Released marketplace installs, actual provider/hosted trials, final release-bound paired review, cutover and activated rollback remain open. GUI and phone tests are deferred. Merge, release and cutover retain their separate approval stages.
 
 ### Current committed review on 2026-11-18
 
@@ -99,9 +99,24 @@ The isolated consumer at `c6b77c42`, paired with shared `f5cf1897`, passes all n
 actual scheduled-entry bootstrap and lost-run controls with 161 assertions. Both
 source trees stay unchanged and process cleanup is confirmed. These native-service
 fixtures do not claim real hosted acceptance. The subsequent consumer documentation
-commit records that proof without changing the runtime. The complete consumer gate
-is running separately. The actual hosted trial still requires its configured Copilot
+commit records that proof without changing the runtime. The complete consumer `make verify` gate at `16791b81` passes all 48 checks with
+zero failed or skipped suites; its source pair stays unchanged and process cleanup
+is confirmed. Its ordinary Go commands reuse cached unchanged-product results;
+these are not fresh uncached Go-test observations. The actual hosted trial still requires its configured Copilot
 Actions secret; the existing Claude OAuth secret is present.
+
+### R-125 cleanup verification
+
+Delete the unused proposal-attention copy and assert the actual produced report,
+keeping the independently reviewed mixed-proposal integration case. A deliberate
+wrong production disposition first fails the new unknown-attention assertion; the
+mutation controller restores the exact original bytes. The two report cases then
+pass with 29 assertions. Remove the obsolete leaf classifier and thin publication
+wrapper, keeping projection tests and direct calls to the production verifier.
+All 61 neighboring settings, publication and proposal-assessment cases pass with
+278 assertions, and strict TypeScript passes. Selected source hashes stay unchanged
+through each check and owned-process cleanup is confirmed. The full gate remains
+on its separate frozen `f5cf1897` source; these focused results cover the cleanup.
 
 ### Mixed-plan compatibility decision on 2026-11-17
 
@@ -890,19 +905,19 @@ The owner confirmed ordinary installed clients and the capability-preserving che
 ## Acceptance Criteria
 
 - [ ] AC-01: An adopting repository can audit documentation and resolve stale audit proposals through one discoverable harness-agnostic workflow, retaining its scanner, detector policy and existing change-scoped docs-impact behavior.
-      Evidence: R-124 returns not verified at d4744a51; see its exact observations and limitations in the Review Log.
+      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
 - [ ] AC-02: Complete assessments independently match scanner document/per-unit inventories and raw-byte digests to the selected Git tree and committed selectors. Failed, skipped, partial, stale or unreadable required input remains visible and prevents a clean claim. Confirmed findings and proposed fixes carry document/source evidence.
-      Evidence: R-124 returns not verified at d4744a51; see its exact observations and limitations in the Review Log.
+      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
 - [ ] AC-03: Authorized preparation preserves unrelated work, intended contracts, historical evidence and local feature-review rules while producing only selected verified corrections. Mixed plan directories preserve safe locally authorized mechanical corrections and ordinary-document preparation without weakening enrolled shared-spec gates. Caller repositories and foreign resources retain their original state.
-      Evidence: R-124 returns not verified at d4744a51; see its exact observations and limitations in the Review Log.
+      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
 - [ ] AC-04: Resolution retains the correct detector-versus-interpretation feedback and current disposition for every original hunk. A selected original closes only after its merged consolidation and every carried or terminal disposition are freshly verified.
-      Evidence: R-124 returns not verified at d4744a51; see its exact observations and limitations in the Review Log.
+      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
 - [ ] AC-05: Concise reports, independent exact-target review and declared permissions govern local and remote effects. Scheduled and interactive publisher accounts remain distinct and correctly bound. Complete unchanged carried attention can finish green. Original-operation recovery observes before replay, preserves partial/unknown outcomes as pending, supports evidence-backed owner acknowledgement and never repeats a completed write or transfers ownership. A present lease keeps both local and scheduled audits pending before model execution. Exact owner-approved administrative abandonment requires a stopped original executor and atomically removes only the present lease and its validated operation receipt. Normal hosted production execution uses the durable `hosted` profile and retains native-validated original run/attempt identity before lease acquisition, with exact configured workflow and assessed-source checks. Stopped-job evidence must match the production member or a native trial's existing launch binding. Collector trials are ineligible for administrative abandonment. Stale object preconditions reject all deletions. With no lease, reports assess current findings independently while retaining receipt-only evidence.
-      Evidence: R-124 returns not verified at d4744a51; see its exact observations and limitations in the Review Log.
+      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
 - [ ] AC-06: Stackweaver adopts the published installed workflow after scanner parity, independent paired review, installed/native operation checks and a successful unattended shared trial, with its local rules, credentials, commands, schedule and notifications preserved and a verified rollback path.
-      Evidence: R-124 returns not verified at d4744a51; see its exact observations and limitations in the Review Log.
+      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
 - [ ] AC-07: Recorded repository, package and portable-host checks pass for the exact released/installed payload. Native model/entry trials establish their actual supported surfaces. GUI, phone and unperformed surfaces remain explicitly deferred or unclaimed. The selected component binding gates provider execution and remote effects, with explicit read-only mismatch reporting. Simpler installation, run/recovery and migration interfaces replace the private client installer and historical adoption/runtime record machinery under the accepted tradeoffs, while retaining the test-only installed synthetic harness and durable operation recovery records.
-      Evidence: R-124 returns not verified at d4744a51; see its exact observations and limitations in the Review Log.
+      Evidence: R-125 returns not verified at f5cf1897; see its exact observations and limitations in the Review Log.
 
 ## Test Plan
 

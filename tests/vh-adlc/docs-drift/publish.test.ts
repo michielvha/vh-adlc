@@ -3,7 +3,7 @@ import { afterAll, expect, spyOn, test } from "bun:test";
 import * as settingsModule from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { publish, validatePublicationShape, verifyPublicationGate } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
+import { createPublicationVerifier, publish, validatePublicationShape } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { appendInvalidation, createJournal, writePublicationObjects, sealPlan, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
@@ -27,8 +27,8 @@ test("publication reads immutable source settings once while reopening every liv
     expect(read).toHaveBeenCalledTimes(1);
     expect(gates).toBe(f.plan.manifest.effects.length + 1);
     expect(identities).toBeGreaterThanOrEqual(gates);
-    await verifyPublicationGate(selected, null);
-    await verifyPublicationGate(selected, null);
+    await createPublicationVerifier(selected)(null);
+    await createPublicationVerifier(selected)(null);
     expect(read).toHaveBeenCalledTimes(3);
   } finally { read.mockRestore(); }
 });
