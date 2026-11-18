@@ -252,6 +252,26 @@ plugin remains the independently verified 0.26.0 payload and uses its existing
 locked verified runtime 0.34.0. Later unrelated main edits are documentation-only.
 Actual native publisher success, final C/D review and cutover remain pending.
 
+### Reviewed publisher prerequisite at `a1aba631`
+
+Actual Claude Code Opus 5.5 paired r15 at shared `5b6713ef` and consumer
+`a1aba631` reads all 29 required fragments without errors. Packet bytes stay
+unchanged and process cleanup is confirmed. It returns no blocking or should-fix
+findings. The remaining nit concerns an unused top-level source field in an
+offline fixture; its consumed component binding is correct. The workflow and
+controller remain those cleared by r14.
+
+The final exact consumer commit passes all 90 migration cases with 742 assertions.
+The full repository gate passes 48 checks with no skips, unchanged source and a
+clean tree. A first gate is interrupted by SIGTERM during frontend lint and has
+no success record. Its original output is retained; a bounded detached rerun
+records exit zero, no surviving owned processes and the complete 48-check result.
+Evidence is `t136-a1aba631-*` in the private operational archive. Integration,
+product E2E and filesystem-vulnerability suites retain their separate environment
+limits; this prerequisite changes internal workflow/test code rather than product
+runtime. Publication now proceeds to the approved staged prerequisite, followed
+by its actual single-document native publisher test. Final migration remains gated.
+
 ### Native correction review follow-up
 
 The instrumented hosted run retains its actual worker/reviewer streams and
