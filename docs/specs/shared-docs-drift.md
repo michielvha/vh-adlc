@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: Owner-approved native process marker correction is being reviewed before implementation
+status_description: Narrow marker revision awaits compatibility-detail approval and fresh review
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -116,9 +116,9 @@ The observed process name is not a new native-client version attestation. This
 observation establishes the Fedora 43 marker shape only. Other platforms, client
 versions and marker shapes remain unclaimed until T130 observes them; unsupported
 shapes stay setup-required. The corrected release must also pass with its own
-actually observed native CLI session. R-133's format, retry, caller and rollback
-clarifications below implement the owner's existing narrow-exception selection;
-they add no effect permission, new automatic retry or recovery mechanism.
+actually observed native CLI session. R-133's format, retry, caller and rollback clarifications are proposed below.
+R-134 requires explicit owner answers under the pinned spec procedure; Q2 bundles
+those recommendations. They propose no new effect permission or recovery mechanism.
 
 
 This prevents claiming ordinary active Claude execution ready. The owner now approves the narrow validated metadata exception. This revision specifies that bounded correction; T156 implements and tests it; all other changes stay
@@ -2212,10 +2212,33 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 ## Open Questions
 
-None. On 2026-11-18 the owner approves the narrow Claude process-marker exception
-and authorizes revising the spec, actual Claude Code Opus 5.5 review, the minimal
-fix and active ordinary-install testing before cutover. Other shipped-file and
-mode checks stay strict; running Claude sessions and their metadata stay intact.
+### Q2: May the proposed compatibility details and bounded clarification authority be accepted together?
+
+**Recommendation:** A. Accept this bundle and let the implementation settle further
+conservative details within the approved marker-only scope after clean review.
+
+1. Accept either JSON field order and JSON ASCII whitespace; reject duplicate or
+   escaped keys/values and noncanonical numbers. Refuse marker hard links and any
+   execute bit; preserve installed shipped-file hard-link support.
+2. Keep the existing fail-closed outcome and explicit caller rerun, without
+   automatic retry.
+3. Apply metadata validation uniformly to installed-runtime inspection, including
+   current/hosted/original inspection. Preserve all effect/recovery permissions,
+   original helper/component attribution and recorded evidence.
+4. Keep old releases unchanged. Migration rollback restores legacy Stackweaver
+   routing. Original shared-operation recovery uses an existing matching
+   metadata-free installation; unsupported old Claude-role paths stay setup-required.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Accept and delegate bounded details** | This bundle and routine conservative clarifications can proceed through clean review without repeated parsing questions | The agent selects those details within the stated marker-only boundary; new authority or wider exclusions still need owner approval |
+| **B. Accept this bundle only** | These four recommendations are approved | Further judgement findings return to the owner |
+
+**Why this is yours:** R-134 F-04 applies the pinned spec procedure's explicit-owner
+rule to R-133's technical alternatives. The existing owner grant approves the
+narrow marker exception, review, minimal fix and active-install tests. This
+question records the specific recommendations and any delegated clarification
+scope. It grants no new remote effect or credential permission.
 
 ## Review Log
 
@@ -2364,6 +2387,7 @@ mode checks stay strict; running Claude sessions and their metadata stay intact.
 | 2026-11-18 | R-131 | spec | `5491b6770f7efa719810c1dead028bf0528d2b1c` | claude-opus-5-5 | procedural | One selected-backend clarification and three documentation nits; unchanged accepted baseline. |
 | 2026-11-18 | R-132 | spec | `d06daa36296e60c20b98f1be08bc908511495b57` | claude-opus-5-5 | procedural | No blocking or should-fix findings; five documentation nits; selected-backend ambiguity resolved. |
 | 2026-11-18 | R-133 | spec | `623472e84df587232785670f36bee5b8f1160e74` | claude-opus-5-5 | procedural | 7 should-fix, 2 nit. |
+| 2026-11-18 | R-134 | spec | `0c70b647cd21fa6d4df4ee7965f33e5fa3e32322` | claude-opus-5-5 | procedural | 4 should-fix, 1 nit. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -4304,6 +4328,45 @@ SEVERITY: nit
 WHERE: Tasks, T156 (:1416-1418)
 EVIDENCE: T156 names "plugin manifests and setup guidance" rather than the files it touches. The convention says each task "names the file it touches". T156 also sits above the sentence "The following tasks implement the revised baseline after spec review and owner acceptance", which introduces the open tasks, so it falls outside that grouping.
 PROPOSAL: Name the exact files, for example `plugins/vh-adlc/.claude-plugin/plugin.json`, `plugins/vh-adlc/plugin.json`, the marketplace files and the specific setup guide, and move T156 below the introductory sentence.
+
+### R-134
+
+TARGET: 0c70b647cd21fa6d4df4ee7965f33e5fa3e32322
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Owner summary ("other extra files and all links remain refused", docs/specs/shared-docs-drift.md:83); Design, Installation and role execution, marker paragraphs ("one hard link (`nlink == 1`)", :1277; "All other extra, missing, changed, linked or nonregular inputs remain refused", :1298); Design, Installation and role execution ("Its existing private-cache ownership/0700/nlink policy is inapplicable to marketplace installation", :1270); Acceptance Criteria, AC-07 ("other extra, changed, linked or nonregular inputs remain refused", :1446); Test Plan, Active native install proof (AC-07) ("hard links", :1460 onward)
+EVIDENCE: The installed policy accepts hard-linked shipped files. bootstrap.ts applies `stat.nlink !== 1` only when `policy === "retained"` (plugins/vh-adlc/scripts/docs-drift/bootstrap.ts, inspectRetainedFiles walk). The test "ordinary installed payloads keep their existing modes and support a canonical root alias" replaces guide.md with `linkSync(...)` and expects inspection to succeed (tests/vh-adlc/docs-drift/bootstrap.test.ts, fragment 0002 lines 21-35). This revision adds a hard-link refusal for markers only. The generic word "linked" in Design :1298 and in the AC-07 criterion text now reads as covering hard links too, and the Owner summary says outright that "all links remain refused", which is false for shipped files. R-133 F-02(3) raised this same ambiguity about "linked markers". The revision resolved it for markers but left the criterion and summary wording, so an implementer could impose nlink == 1 on every installed file, and an implementation reviewer checking AC-07's exact text could fail a correct implementation that keeps the existing test passing. This traces to this revision.
+PROPOSAL: Replace "linked" with "symlinked" in Design :1298 and AC-07, and in the Owner summary say "all symlinks remain refused". Add one sentence saying that hard-linked shipped files stay accepted under the installed policy and that only marker files require nlink == 1.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Active ordinary Claude cache finding on 2026-11-18 (:97-121); Design, Installation and role execution, pre-correction rollback paragraph ("use an existing matching metadata-free install, such as the verified Codex installation, an empty-profile installation or a published hosted checkout", :1309-1316); Design, Installation and role execution, owned-process reuse ("Cancellation/timeout must clean the owned process tree"); Test Plan, Active native install proof (AC-07), rollback bullet (:1483-1486)
+EVIDENCE: The probe output at :112 records the marker's shape, mode and link count. The spec never says which Claude process writes `.in_use/<pid>` or into which directory: only an installed cache, or any plugin directory a Claude process loads. The helper starts Claude roles with `loader: { ..., argv: ["--plugin-dir", inspected.directory] }` (bootstrap.ts, selectInstalledRuntime return value). The spec accepts "Valid stale markers", so markers can outlive their process. Owned-process timeout cleanup kills the role's process tree, which can leave such a marker behind. If a Claude role marks its `--plugin-dir`, a pre-correction 0.26.0 helper running Claude roles against an empty-profile install or hosted checkout stops being "metadata-free". Its next invocation (resume, original-release recovery or rollback rehearsal) then refuses its own install, and the rollback path this revision defines fails for Claude-role entries. The design leaves this rollback path undefined. This traces to this revision's F-05 response.
+PROPOSAL: Record in Context, or require T130 to observe, whether a Claude role launched with `--plugin-dir` writes `.in_use` into that directory and whether killed roles leave it behind. If it does, say how pre-correction rollback and recovery with Claude roles stay usable (for example a fresh disposable install per invocation, or Codex-only roles), or that they stay setup-required. Add that case to the rollback bullet of the AC-07 proof.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Installation and role execution, marker grammar ("The UTF-8 bytes must encode exactly the literal keys ... escaped keys ... are refused. `procStart` is a quoted nonempty decimal string of at most 32 digits", :1278-1285); Test Plan, Active native install proof (AC-07) ("Refuse duplicate/missing/unknown or escaped keys ... invalid start values", :1460 onward)
+EVIDENCE: The grammar requires literal key bytes and refuses escaped keys, but it does not say whether the `procStart` value must be literal ASCII digits between quotes. A JSON escape such as `"\u0031\u0032"` decodes to the digit string "12". An implementer who uses `JSON.parse` and then checks `/^\d{1,32}$/` accepts it. An implementer who follows the "literal byte grammar" described for keys refuses it. "At most 32 digits" is likewise unclear about whether it counts decoded characters or raw bytes. The proof lists only "invalid start values", so the matrix has no expected outcome here, and two careful implementers would accept different files. This traces to this revision's F-02 response.
+PROPOSAL: State that `procStart` is a quote byte, 1 to 32 ASCII bytes `0`-`9`, and a quote byte, with no escapes. Add an escaped-digit value to the refusal list of the AC-07 proof.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions ("None. On 2026-11-18 the owner approves the narrow Claude process-marker exception ...", :2213-2218); Context, Active ordinary Claude cache finding ("R-133's format, retry, caller and rollback clarifications below implement the owner's existing narrow-exception selection", :119-121); Design, Installation and role execution, marker paragraphs (:1273-1316)
+EVIDENCE: R-133 F-02 to F-07 were judgement findings, and each offered alternatives. Examples are automatic bounded retry versus setup-required (F-03), applying the exception to original-release recovery versus splitting the policy (F-04), the rollback surface for pre-correction releases (F-05), and strict canonical serialization versus either key order with whitespace (F-02). This revision decides each one itself and records the decisions as already within the owner's earlier approval. The convention says "Every trade-off the document settles is an open question, including one the author would answer the same way the owner would". The review protocol says to "turn judgement findings into Open Questions for the owner without answering them". The recorded owner approval covers the narrow exception and authorizes revising the spec. It does not name these choices.
+PROPOSAL: Raise the retry, recovery-caller, rollback-surface and accepted-serialization choices as Open Questions with recommendations, or record the owner's explicit in-session answers to each one in the document, before asking for acceptance.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, Active native install proof (AC-07) (:1460-1486); Design, Installation and role execution, marker paragraphs (:1278-1279, :1300-1302)
+EVIDENCE: Design requires a `pid` "greater than zero" and names "an incomplete read" as a fail-closed case. The proof matrix lists "noncanonical or unsafe PID values" and growth during read, but it does not list a zero PID (`0` is canonical and safe) or a marker that shrinks between the size observation and the read. Both cases are covered by the Design text, so an implementer builds the same thing either way.
+PROPOSAL: Add a zero PID with filename `0`, and a marker that shrinks between the size observation and the read, to the refusal bullets.
 
 ## Sources
 
