@@ -1,8 +1,10 @@
 package xclip
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"slices"
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/viewport"
 )
@@ -76,6 +78,10 @@ func (h *Helper) Windows(ctx context.Context, pid int) ([]Window, error) {
 		return nil, err
 	}
 	defer done()
+	return h.windows(ctx, c, pid)
+}
+
+func (h *Helper) windows(ctx context.Context, c *conn, pid int) ([]Window, error) {
 	tree, err := c.call(ctx, windowRequest(opQueryTree, c.root))
 	if err != nil {
 		return nil, err
@@ -132,6 +138,7 @@ func (h *Helper) Windows(ctx context.Context, pid int) ([]Window, error) {
 		}
 		windows = append(windows, w)
 	}
+	slices.SortFunc(windows, func(a, b Window) int { return cmp.Compare(a.ID, b.ID) })
 	return windows, nil
 }
 

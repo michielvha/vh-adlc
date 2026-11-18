@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/viewport"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/xclip"
 )
@@ -13,10 +14,12 @@ import (
 type geometryFake struct {
 	windows []xclip.Window
 	configs int
+	seenPID int
 	fail    bool
 }
 
-func (f *geometryFake) Windows(context.Context, int) ([]xclip.Window, error) {
+func (f *geometryFake) Windows(_ context.Context, pid int) ([]xclip.Window, error) {
+	f.seenPID = pid
 	return slices.Clone(f.windows), nil
 }
 func (f *geometryFake) Configure(ctx context.Context, _ int, w []xclip.Window) error {
@@ -156,5 +159,36 @@ func TestViewportRollbackCannotConfirmPreviouslyMixedState(t *testing.T) {
 	}
 	if c.confirmed {
 		t.Fatal("rollback confirmed a pre-existing mismatch")
+	}
+}
+
+func TestViewportRuntimeFollowsHandoffBrowserPID(t *testing.T) {
+	c, f, _, _ := geometryFixture()
+	c.pid = 41
+	r := &runtime{geometry: c, chrome: &child{identity: state.Identity{PID: 99}}}
+	if _, err := r.resize(context.Background(), viewport.Initial); err != nil {
+		t.Fatal(err)
+	}
+	if f.seenPID != 99 {
+		t.Fatalf("queried previous browser PID %d", f.seenPID)
+	}
+}
+
+type focusGeometryFake struct {
+	geometryFake
+	focusCalls int
+}
+
+func (f *focusGeometryFake) RestoreFocus(context.Context, int, []xclip.Window) (bool, error) {
+	f.focusCalls++
+	return true, nil
+}
+
+func TestViewportFocusRejectsStaleRuntimeOwnership(t *testing.T) {
+	f := &focusGeometryFake{}
+	r := &runtime{geometry: &geometryController{helper: f, pid: 99}, chrome: &child{identity: state.Identity{PID: 99}}, modeReady: true}
+	r.restoreGeometryFocus(context.Background(), []xclip.Window{{ID: 1, Normal: true}})
+	if f.focusCalls != 0 {
+		t.Fatal("focus changed without a currently owned display and browser identity")
 	}
 }

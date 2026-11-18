@@ -1,38 +1,105 @@
 import {test} from 'bun:test';
-import {mkdtempSync,rmSync} from 'node:fs';
+import {existsSync,mkdirSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createRequire} from 'node:module';
+import {startViewportPage,type Box,type ViewportMetrics} from './fixtures/viewport-page';
+import {startViewerDisplay} from './fixtures/viewer-display';
 
 const enabled=process.env.REMOTE_GUI_VIEWER_E2E==='1';
-// Playwright is an existing runtime-supplied dependency, as in the neighbouring browser fixtures.
-type Runtime = typeof import('playwright-core');
-const check=(condition:unknown,message:string):asserts condition=>{if(!condition)throw Error(message)};
+// The runtime supplies the existing matching Playwright dependency, as in adjacent fixtures.
+type Runtime=typeof import('playwright-core');
+type Page=import('playwright-core').Page;
+type NativeWindow={ID:number;X:number;Y:number;Width:number;Height:number;Normal:boolean};
+type Native={pid:number;start:string;focused:boolean;windows:NativeWindow[]};
+function check(condition:unknown,message:string):asserts condition {if(!condition)throw Error(message)}
+// Chromium may report a minimum window.outerWidth of 500 even when X11 and
+// the content viewport are narrower. Native geometry is measured separately.
+async function until(proof:()=>boolean|Promise<boolean>,message:string,timeout=15000){const end=Date.now()+timeout;while(Date.now()<end){if(await proof())return;await Bun.sleep(80)}throw Error(message)}
 
+const matrix=[{width:320,height:568},{width:390,height:667},{width:390,height:844},{width:844,height:390},{width:768,height:1024},{width:1024,height:768},{width:900,height:1000},{width:1280,height:720},{width:1440,height:900},{width:320,height:272},{width:4096,height:4128},{width:4096,height:752},{width:720,height:4128}];
 for(const family of ['chromium','firefox'] as const)test.skipIf(!enabled||(family==='firefox'&&!process.env.REMOTE_GUI_FIREFOX))(`adaptive real noVNC viewport: ${family}`,async()=>{
  const runtime=createRequire(import.meta.url)(process.env.REMOTE_GUI_PLAYWRIGHT_MODULE!) as Runtime;
  const root=mkdtempSync(join(tmpdir(),'rg-viewport-'));
+ const artifacts=process.env.REMOTE_GUI_ARTIFACT_DIR||join(tmpdir(),'rg-adaptive-evidence');mkdirSync(artifacts,{recursive:true});
+ const fixture=startViewportPage();const otherFixture=startViewportPage();const evidence:Record<string,unknown>[]=[];const sessions:{id:string}[]=[];
  const cli=(...args:string[])=>{
   const result=Bun.spawnSync([process.env.REMOTE_GUI_TEST_BINARY!,...args,'--home',root,'--transport','loopback'],{env:process.env});
-  const value=JSON.parse(result.stdout.toString());
-  check(result.exitCode===0,'CLI '+args[0]+' failed: '+String(value.diagnostic||value.state));return value;
+  const value=JSON.parse(result.stdout.toString());check(result.exitCode===0,'CLI '+args[0]+' failed: '+String(value.diagnostic||value.state));return value;
  };
- let session:ReturnType<typeof cli>|undefined;let browser:Awaited<ReturnType<Runtime['chromium']['launch']>>|undefined;
+ const nativeBinary=join(root,'native-probe');
+ const build=Bun.spawnSync([process.env.REMOTE_GUI_GO||'go','test','-c','-o',nativeBinary,'./internal/browser'],{cwd:join(import.meta.dir,'../../plugins/remote-gui'),env:process.env});
+ check(build.exitCode===0,'native probe build failed');
+ const native=(id:string):Native=>{const run=Bun.spawnSync([nativeBinary,'-test.run=^TestNativeViewportProbe$'],{env:{...process.env,RG_VIEWPORT_PROBE_HOME:root,RG_VIEWPORT_PROBE_ID:id}});const line=run.stdout.toString().split('\n').find(s=>s.startsWith('native-geometry:'));check(run.exitCode===0&&line,'native geometry probe failed');const value=JSON.parse(line.slice('native-geometry:'.length)) as Native;check(Number.isInteger(value.pid)&&Array.isArray(value.windows),'invalid native proof');return value};
+ let browser:Awaited<ReturnType<Runtime['chromium']['launch']>>|undefined;
+ let agent:Awaited<ReturnType<Runtime['chromium']['connectOverCDP']>>|undefined;
+ let zoomBrowser:typeof browser;let display:Awaited<ReturnType<typeof startViewerDisplay>>|undefined;let activePage:Page|undefined;
+ let disconnected=0;
+ const errors:string[]=[];
  try{
-  session=cli('start','--ttl','8m');const access=cli('access',session.id,'--reveal');
+  const session=cli('start','--ttl','8m');sessions.push(session);
+  agent=await runtime.chromium.connectOverCDP(session.local_cdp);
+  const a=await agent.contexts()[0].newPage();await a.goto(fixture.url+'?tab=a');await a.getByLabel('Saved text').fill('kept-a');
+  const b=await agent.contexts()[0].newPage();await b.goto(fixture.url+'?tab=b');await b.getByLabel('Saved text').fill('kept-b');await a.bringToFront();
+  await until(()=>fixture.metrics.get('a')?.value==='kept-a'&&fixture.metrics.get('b')?.value==='kept-b','fixture did not seed form state');
+  await agent.close();agent=undefined;
+  const human=cli('handoff',session.id,'--browser-mode','human');check(human.state==='ready'&&human.browser_mode==='human'&&!human.local_cdp,'human phase exposed debugging');
   browser=await runtime[family].launch(family==='chromium'?{executablePath:process.env.REMOTE_GUI_CHROMIUM,headless:true,chromiumSandbox:true,args:['--disable-gpu']}:{executablePath:process.env.REMOTE_GUI_FIREFOX,headless:true});
+  const access=cli('access',session.id,'--reveal');
   const context=await browser.newContext({viewport:{width:900,height:1000},httpCredentials:{username:'viewer',password:access.access_code,origin:new URL(session.url).origin}});
-  const page=await context.newPage();await page.goto(session.url);await page.getByRole('link',{name:'Open session'}).click();
-  await page.locator('#status').filter({hasText:'Shared browser connected'}).waitFor({timeout:15000});
-  if(process.env.REMOTE_GUI_VIEWPORT_BACKEND_PROBE==='1') {
-   const response=await page.evaluate(async()=>{const viewer_id=crypto.randomUUID().replaceAll('-','');for(let sequence=1;sequence<=5;sequence++){const reply=await fetch('/__remote_gui/viewport',{method:'POST',headers:{'Content-Type':'application/json','X-Remote-Gui-Viewport':'1'},body:JSON.stringify({viewer_id,sequence,claim:sequence===1,width:900,height:968})});if(reply.status!==409)return {status:reply.status,data:await reply.json()};await new Promise(resolve=>setTimeout(resolve,500))}return {status:409,data:{error:'busy'}}});
-   check(response.status===200,'native resize API failed: '+JSON.stringify(response));
+  // Playwright otherwise forces every viewer to report focus. This CDP session
+  // configures only the test viewer, never the remote human browser. Keep the
+  // channel attached until browser cleanup; detach restores the focus override.
+  const naturalFocus=async(viewer:Page)=>{if(family==='chromium'){const channel=await viewer.context().newCDPSession(viewer);await channel.send('Emulation.setFocusEmulationEnabled',{enabled:false})}};
+  const page=await context.newPage();await naturalFocus(page);activePage=page;page.on('pageerror',e=>errors.push(e.message));page.on('websocket',socket=>socket.on('close',()=>disconnected++));
+  await page.goto(session.url);await page.getByRole('link',{name:'Open session'}).click();await page.locator('#status').filter({hasText:'Shared browser connected'}).waitFor({timeout:20000});await page.bringToFront();
+  const waitGeometry=async(viewer:Page,width:number,height:number,fill=true,id=session.id)=>{
+   await viewer.waitForFunction(({width,height})=>{const canvas=document.querySelector('canvas');return canvas?.width===width&&canvas.height===height},{width,height},{timeout:20000});
+   const layout=await viewer.locator('canvas').evaluate(node=>{const c=node.getBoundingClientRect(),s=document.getElementById('screen')!.getBoundingClientRect();return {cw:c.width,ch:c.height,top:c.top-s.top,left:c.left-s.left,sw:s.width,sh:s.height,overflow:document.documentElement.scrollWidth>innerWidth}});
+   check(!layout.overflow,'viewer horizontally overflowed');if(fill)check(Math.abs(layout.cw-layout.sw)<=2&&Math.abs(layout.ch-layout.sh)<=2&&Math.abs(layout.top)<=2&&Math.abs(layout.left)<=2,'canvas left empty bands: '+JSON.stringify(layout));
+   let actual=native(id);await until(()=>{actual=native(id);const normal=actual.windows.filter(w=>w.Normal);return normal.length>0&&normal.every(w=>w.Width===width&&w.Height===height&&w.X===0&&w.Y===0)},'native browser does not match framebuffer');return actual;
+  };
+  await waitGeometry(page,900,968);
+  // Firefox's automation keeps every headless target focused. Both engines
+  // exercise focus handlers in viewer-page; natural multi-tab focus runs here
+  // in Chromium, where its focus emulation can be disabled.
+  if(family==='chromium'){
+  const page2=await context.newPage();await naturalFocus(page2);await page2.setViewportSize({width:768,height:1024});await page2.goto(session.url);await page2.locator('#status').filter({hasText:'Shared browser connected'}).waitFor();await naturalFocus(page);await naturalFocus(page2);await page2.bringToFront();await until(async()=>await page2.evaluate(()=>document.hasFocus())&&!await page.evaluate(()=>document.hasFocus()),'focus did not move to second viewer');await waitGeometry(page2,768,992);await page.bringToFront();await until(async()=>await page.evaluate(()=>document.hasFocus())&&!await page2.evaluate(()=>document.hasFocus()),'focus did not return to first viewer');await waitGeometry(page,900,968);await page2.bringToFront();await until(async()=>await page2.evaluate(()=>document.hasFocus())&&!await page.evaluate(()=>document.hasFocus()),'focus did not move to second viewer');await waitGeometry(page2,768,992);await page2.close();await page.bringToFront();await waitGeometry(page,900,968);
   }
-  await page.waitForFunction(()=>{const c=document.querySelector('canvas');return c?.width===900&&c.height===968},null,{timeout:7000});
-  check(cli('status',session.id).state==='ready','sizing broke browser session');
- }finally{
-  if(browser)await browser.close();let safe=true;
-  if(session){try{let stopped=cli('stop',session.id);for(let i=0;i<100&&['stopping','cleanup-pending'].includes(stopped.state);i++){await Bun.sleep(100);stopped=cli('status',session.id)}safe=['stopped','failed'].includes(stopped.state)}catch{safe=false}}
+  await page.locator('canvas').focus();await page.keyboard.press('Control+2');await until(()=>fixture.metrics.get('a')?.visible===true,'fixture tab was not selected through noVNC');
+  const click=async(viewer:Page,metrics:ViewportMetrics,box:Box)=>{const canvas=await viewer.locator('canvas').boundingBox();check(canvas&&box.width>0&&box.height>0,'fixture control unavailable');const frame=await viewer.locator('canvas').evaluate(node=>({width:node.width,height:node.height}));const sx=canvas.width/frame.width,sy=canvas.height/frame.height;await viewer.mouse.click(canvas.x+(box.x+box.width/2)*sx,canvas.y+(frame.height-metrics.height+box.y+box.height/2)*sy)};
+  // Seed the form through noVNC after entering human mode. Handoff relaunches
+  // Chromium; this criterion checks that resizing itself preserves form state.
+  await until(()=>fixture.metrics.get('a')?.width===900,'human fixture did not load');
+  await click(page,fixture.metrics.get('a')!,fixture.metrics.get('a')!.field);await page.keyboard.press('Control+a');await page.keyboard.type('kept-human-a',{delay:40});await until(()=>fixture.metrics.get('a')?.value==='kept-human-a','human fixture input did not reach exact browser');const humanNonce=fixture.metrics.get('a')!.nonce;
+  const other=cli('start','--ttl','8m');sessions.push(other);agent=await runtime.chromium.connectOverCDP(other.local_cdp);const otherApp=await agent.contexts()[0].newPage();await otherApp.goto(otherFixture.url+'?tab=a');await otherApp.getByLabel('Saved text').fill('kept-other');await agent.close();agent=undefined;
+  const otherAccess=cli('access',other.id,'--reveal');const otherContext=await browser.newContext({viewport:{width:640,height:700},httpCredentials:{username:'viewer',password:otherAccess.access_code,origin:new URL(other.url).origin}});const otherPage=await otherContext.newPage();await otherPage.goto(other.url);await otherPage.getByRole('link',{name:'Open session'}).click();await otherPage.bringToFront();const otherNative=await waitGeometry(otherPage,640,668,true,other.id);await page.bringToFront();
+  const initial=native(session.id);
+  for(const size of matrix){await page.setViewportSize(size);const actual=await waitGeometry(page,size.width,size.height-32);check(actual.pid===initial.pid&&actual.start===initial.start,'resize restarted human browser');await until(()=>{const m=fixture.metrics.get('a');return !!m&&m.width===size.width&&m.outerHeight===size.height-32&&m.height>0&&m.height<size.height-32&&!m.overflow},'responsive fixture dimensions did not follow native geometry');await page.waitForFunction(()=>{const canvas=document.querySelector('canvas');if(!canvas)return false;const pixel=canvas.getContext('2d')?.getImageData(8,canvas.height-16,1,1).data;return pixel&&Math.abs(pixel[0]-244)<=2&&Math.abs(pixel[1]-247)<=2&&Math.abs(pixel[2]-252)<=2},{},{timeout:10000});const m=fixture.metrics.get('a')!;check(m.value==='kept-human-a'&&m.nonce===humanNonce,'resize lost human form/tab state');check(m.columns===(m.width>=600?2:1),'fixture did not reflow');evidence.push({phase:'human',viewer:size,native:actual,content:m});if([390,900,1440].includes(size.width)&&[844,1000,900].includes(size.height))await page.screenshot({path:join(artifacts,'viewport-'+family+'-'+size.width+'x'+size.height+'.png')})}
+  const stillOther=await waitGeometry(otherPage,640,668,true,other.id);check(stillOther.pid===otherNative.pid&&stillOther.start===otherNative.start&&otherFixture.metrics.get('a')?.value==='kept-other','another session changed during resizing');await otherPage.bringToFront();await click(otherPage,otherFixture.metrics.get('a')!,otherFixture.metrics.get('a')!.ack);await until(()=>otherFixture.metrics.get('a')?.acknowledged===true,'another session lost input');await otherContext.close();await page.bringToFront();
+  check(disconnected===0,'resizing disconnected noVNC');check(!cli('status',session.id).local_cdp,'human resizing enabled debugging');
+  await page.setViewportSize({width:390,height:844});await waitGeometry(page,390,812);
+
+  await until(()=>fixture.metrics.get('a')?.outerHeight===812,'portrait app did not settle');
+  await click(page,fixture.metrics.get('a')!,fixture.metrics.get('a')!.showDialog);await until(()=>fixture.metrics.get('a')?.dialog===true,'dialog did not open through noVNC');const dialog=fixture.metrics.get('a')!;check(dialog.closeDialog.x>=0&&dialog.closeDialog.y>=0&&dialog.closeDialog.x+dialog.closeDialog.width<=dialog.width&&dialog.closeDialog.y+dialog.closeDialog.height<=dialog.height,'dialog action outside content');await click(page,dialog,dialog.closeDialog);await until(()=>fixture.metrics.get('a')?.dialog===false,'dialog did not close');
+  const openNormal=async()=>{const previousInstance=fixture.metrics.get('popup')?.instance;const m=fixture.metrics.get('a')!;await click(page,m,m.open);await until(()=>native(session.id).windows.filter(w=>w.Normal).length===2,'new normal browser window absent');await waitGeometry(page,390,812);await until(()=>fixture.metrics.get('popup')?.width===390&&fixture.metrics.get('popup')?.instance!==previousInstance,'new normal window did not adopt portrait size');let shape='',stableSince=Date.now();await until(()=>{const m=fixture.metrics.get('popup')!,next=[m.instance,m.width,m.height,m.outerHeight].join(':');if(next!==shape){shape=next;stableSince=Date.now()}return Date.now()-stableSince>600&&m.at>stableSince},'new window content did not settle');const popup=fixture.metrics.get('popup')!;await page.screenshot({path:join(artifacts,'viewport-'+family+'-popup.png')});await click(page,popup,popup.ack);await until(()=>fixture.metrics.get('popup')?.acknowledged===true,'new-window input did not reach browser');await click(page,fixture.metrics.get('popup')!,fixture.metrics.get('popup')!.closeWindow);await until(()=>native(session.id).windows.filter(w=>w.Normal).length===1,'owned popup did not close');await until(()=>native(session.id).focused,'native focus did not return after popup closure')};
+  await openNormal();
+  const menuCanvas=await page.locator('canvas').boundingBox();check(menuCanvas,'menu canvas unavailable');await page.mouse.click(menuCanvas.x+menuCanvas.width-18,menuCanvas.y+menuCanvas.height-18,{button:'right'});await until(()=>native(session.id).windows.some(w=>!w.Normal),'native Chromium menu did not open');const menu=native(session.id).windows.filter(w=>!w.Normal);check(menu.every(w=>w.X>=0&&w.Y>=0&&w.X+w.Width<=390&&w.Y+w.Height<=812),'native menu outside streamed area');await page.waitForFunction(rects=>{const canvas=document.querySelector('canvas'),ctx=canvas?.getContext('2d');return !!canvas&&!!ctx&&rects.every(r=>{const pixels=ctx.getImageData(r.X+8,r.Y+8,r.Width-16,r.Height-16).data;let dark=0,light=0;for(let i=0;i<pixels.length;i+=4){if(pixels[i]<100&&pixels[i+1]<100&&pixels[i+2]<100)dark++;if(pixels[i]>170&&pixels[i+1]>170&&pixels[i+2]>170)light++}return dark>40&&light>40})},menu,{timeout:10000});await page.screenshot({path:join(artifacts,'viewport-'+family+'-menu.png')});await page.keyboard.press('Escape');await until(()=>native(session.id).windows.every(w=>w.Normal),'native menu did not dismiss through noVNC');
+  const phase=cli('handoff',session.id,'--browser-mode','agent');check(phase.state==='ready'&&phase.local_cdp,'agent handoff incomplete');await waitGeometry(page,390,812);agent=await runtime.chromium.connectOverCDP(phase.local_cdp);const restored=agent.contexts()[0].pages();const restoredA=restored.find(p=>p.url().includes('tab=a')),restoredB=restored.find(p=>p.url().includes('tab=b'));check(restoredA&&restoredB,'handoff lost tabs');await restoredA.getByLabel('Saved text').fill('kept-agent-a');await restoredB.getByLabel('Saved text').fill('kept-agent-b');const agentNonce=await restoredA.evaluate(()=>sessionStorage.getItem('fixture-nonce'));await restoredA.bringToFront();await agent.close();agent=undefined;await until(()=>fixture.metrics.get('a')?.visible===true&&fixture.metrics.get('a')?.value==='kept-agent-a','restored agent fixture did not load');
+  await openNormal();const agentNative=native(session.id);const cdp=phase.local_cdp;await page.setViewportSize({width:1024,height:768});await waitGeometry(page,1024,736);await until(()=>fixture.metrics.get('a')?.width===1024&&fixture.metrics.get('a')?.value==='kept-agent-a'&&fixture.metrics.get('a')?.nonce===agentNonce,'agent resize lost form/tab state');check(native(session.id).pid===agentNative.pid&&cli('status',session.id).local_cdp===cdp,'agent resize changed browser/CDP');
+  let refuse=true;await page.route('**/__remote_gui/viewport',async route=>{if(refuse){refuse=false;await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'viewport-unavailable'})})}else await route.continue()});await page.setViewportSize({width:900,height:1000});await page.getByText('Automatic sizing unavailable; fitting the shared browser.',{exact:true}).waitFor();await click(page,fixture.metrics.get('a')!,fixture.metrics.get('a')!.ack);await until(()=>fixture.metrics.get('a')?.acknowledged===true,'sizing failure broke input');await page.setViewportSize({width:901,height:1000});await waitGeometry(page,901,968);await page.locator('#viewport-status').waitFor({state:'hidden'});await page.unroute('**/__remote_gui/viewport');
+  await page.setViewportSize({width:8192,height:2032});await waitGeometry(page,4096,1000);await page.setViewportSize({width:390,height:844});await waitGeometry(page,390,812);const back=cli('handoff',session.id,'--browser-mode','human');check(back.state==='ready'&&!back.local_cdp,'human hand-back incomplete');await waitGeometry(page,390,812);
+  // Headless browser accelerators do not implement UI zoom. Use native keyboard
+  // input on a separate private viewer display and measure actual CSS/DPR changes.
+  display=await startViewerDisplay(root);zoomBrowser=await runtime[family].launch({executablePath:family==='chromium'?process.env.REMOTE_GUI_CHROMIUM:process.env.REMOTE_GUI_FIREFOX,headless:false,env:display.env,...(family==='chromium'?{chromiumSandbox:true,args:['--disable-gpu']}:{})});const access3=cli('access',session.id,'--reveal');const zcontext=await zoomBrowser.newContext({viewport:null,httpCredentials:{username:'viewer',password:access3.access_code,origin:new URL(session.url).origin},reducedMotion:'reduce'});const zpage=await zcontext.newPage();activePage=zpage;await zpage.goto(session.url);await zpage.getByRole('link',{name:'Open session'}).click();await zpage.bringToFront();const unzoomed=await zpage.evaluate(()=>{const r=document.getElementById('screen')!.getBoundingClientRect();return {width:Math.floor(r.width),height:Math.floor(r.height)}});await waitGeometry(zpage,unzoomed.width,unzoomed.height);const baseDpr=await zpage.evaluate(()=>devicePixelRatio);let zoom=baseDpr;
+  await zpage.locator('#clipboard-toggle').click();await zpage.locator('#clipboard-send').focus();
+  for(let i=0;i<16&&Math.abs(zoom/baseDpr-2)>0.03;i++){const key=Bun.spawnSync(['python3',join(import.meta.dir,'fixtures/native-zoom.py'),'in'],{env:display.env});check(key.exitCode===0,'native viewer zoom accelerator failed');await Bun.sleep(150);zoom=await zpage.evaluate(()=>devicePixelRatio)}
+  check(Math.abs(zoom/baseDpr-2)<=0.03,'actual 200 percent browser zoom unavailable: '+JSON.stringify({baseDpr,zoom}));const effective=await zpage.evaluate(()=>{const r=document.getElementById('screen')!.getBoundingClientRect();return {width:Math.floor(r.width),height:Math.floor(r.height),dpr:devicePixelRatio}});await waitGeometry(zpage,effective.width,effective.height);await zpage.keyboard.press('Escape');await zpage.locator('#clipboard').waitFor({state:'hidden'});evidence.push({zoomMethod:'native XTEST Ctrl+Equal',zoom:zoom/baseDpr,unzoomed,effective});await zpage.screenshot({path:join(artifacts,'viewport-'+family+'-zoom200.png')});
+  check(errors.length===0,'viewer console errors: '+errors.join(','));check(disconnected===0,'viewer WebSocket disconnected during resizing');writeFileSync(join(artifacts,'viewport-'+family+'-'+Date.now()+'.json'),JSON.stringify(evidence,null,2));
+ }catch(error){const last=[...fixture.metrics.values()];console.error('fixture geometry',JSON.stringify(last.map(m=>({tab:m.tab,width:m.width,height:m.height,outerWidth:m.outerWidth,outerHeight:m.outerHeight,overflow:m.overflow,visible:m.visible}))));writeFileSync(join(artifacts,'first-failure-'+family+'-'+Date.now()+'.json'),JSON.stringify({evidence,last},null,2));if(activePage)await activePage.locator('#clipboard').evaluate(node=>{(node as HTMLElement).hidden=true}).catch(()=>{});if(activePage)await activePage.screenshot({path:join(artifacts,'first-failure-'+family+'-'+Date.now()+'.png')}).catch(()=>{});throw error}
+ finally{
+  if(agent)await agent.close();if(zoomBrowser)await zoomBrowser.close();if(display)await display.stop();if(browser)await browser.close();fixture.close();otherFixture.close();let safe=true;
+  for(const session of sessions){try{let stopped=cli('stop',session.id);for(let i=0;i<100&&['stopping','cleanup-pending'].includes(stopped.state);i++){await Bun.sleep(100);stopped=cli('status',session.id)}safe=safe&&['stopped','failed'].includes(stopped.state)}catch{safe=false}}
   if(safe)rmSync(root,{recursive:true,force:true});else throw Error('owned viewport fixture cleanup pending; records retained');
  }
-},120000);
+},420000);

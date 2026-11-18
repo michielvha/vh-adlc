@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -164,11 +167,20 @@ func TestViewportSessionBoundary(t *testing.T) {
 	if code == 200 || len(*calls) != 0 {
 		t.Fatal("unauthenticated resize")
 	}
-	p.Revoke()
-	s.Client().CloseIdleConnections()
+	p.mu.Lock()
+	p.deadline = time.Now().Add(-time.Second)
+	p.mu.Unlock()
 	code, _ = sendViewport(t, s, c, viewportBody("a", 1, true), nil)
 	if code != 410 {
 		t.Fatal(code)
+	}
+	p.Revoke()
+	revoked := httptest.NewRequest(http.MethodPost, s.URL+viewportPath, strings.NewReader(viewportBody("a", 2, true)))
+	revoked.Header.Set("Origin", s.URL)
+	response := httptest.NewRecorder()
+	p.ServeHTTP(response, revoked)
+	if response.Code != 410 || len(*calls) != 0 {
+		t.Fatal("revoked session accepted sizing")
 	}
 	_, share, cc := func() (*Proxy, *httptest.Server, *testCredential) {
 		p, s := fixture(t, "http://127.0.0.1:1")
@@ -209,5 +221,65 @@ func TestViewportConcurrentClaims(t *testing.T) {
 	_, result := sendViewport(t, s, c, viewportBody("a", 2, false), nil)
 	if result != "inactive" || calls != 2 {
 		t.Fatal("queued claims were not serialized")
+	}
+}
+
+func TestViewportRouteNeedsOwnerIdentity(t *testing.T) {
+	socket := filepath.Join(t.TempDir(), "p.sock")
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seed, err := net.Dial("unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := listener.Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	peer, err := state.ReadPeer(seed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = seed.Close()
+	_ = back.Close()
+	calls := 0
+	p, err := New(Options{ID: "0123456789abcdef0123456789abcdef", Origin: "https://owner.test:12000", Target: "http://127.0.0.1:1", Deadline: time.Now().Add(time.Minute), OwnerLogin: "owner@example.test", ServePeer: peer, ViewerAssets: viewerAssets(t), ViewerPassword: "synthetic", Resize: func(context.Context, viewport.Size) (bool, error) { calls++; return false, nil }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer p.Revoke()
+	server := &http.Server{Handler: p, ConnContext: p.ConnContext, ConnState: p.ConnState, ReadHeaderTimeout: time.Second}
+	go func() { _ = server.Serve(listener) }()
+	defer func() { _ = server.Close() }()
+	transport := &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "unix", socket)
+	}}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, Timeout: time.Second}
+	for _, owner := range []string{"", "someone-else@example.test", "owner@example.test"} {
+		request, err := http.NewRequest(http.MethodPost, "http://localhost/__remote_gui/viewport", strings.NewReader(viewportBody("a", 1, true)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for key, value := range map[string]string{"Origin": "https://owner.test:12000", "X-Forwarded-Host": "owner.test:12000", "X-Forwarded-Proto": "https", "Sec-Fetch-Site": "same-origin", "Content-Type": "application/json", "X-Remote-Gui-Viewport": "1"} {
+			request.Header.Set(key, value)
+		}
+		if owner != "" {
+			request.Header.Set("Tailscale-User-Login", owner)
+		}
+		response, err := client.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = response.Body.Close()
+		if owner == "owner@example.test" {
+			if response.StatusCode != 200 || calls != 1 {
+				t.Fatalf("owner refused: %d, calls %d", response.StatusCode, calls)
+			}
+		} else if response.StatusCode == 200 || calls != 0 {
+			t.Fatal("foreign identity reached native sizing")
+		}
 	}
 }

@@ -19,6 +19,12 @@ REMOTE_GUI_VIEWER_E2E=1 bun test tests/remote-gui
 
 The human-phase fixture starts the actual CLI with debugging disabled, types through noVNC and signs into a loopback test app. Its nonpersistent HttpOnly cookie and original tab's sessionStorage must survive human/agent/human transitions. Fresh uncached requests establish authentication after each transition. Additional tabs must restore, while JavaScript-only memory is observed lost. A revoked provider session must return 401 even with healthy host transport. The viewer URL and expiry must remain fixed, human status must omit CDP, and stop must delete the profile. This synthetic sign-in is separate from owner-performed Google/Tailscale acceptance.
 
+`viewport.e2e.test.ts` runs real noVNC sizing in Chromium and Firefox with an inert responsive page. It covers the phone/tablet/desktop matrix and exported boundaries, native geometry, form state, human and agent phases, multiple viewers, new windows, menus and a refused sizing request. The one refused request is a controlled HTTP failure; native rollback failures are covered by the Go transaction tests. A test-only native probe reads only this fixture's disposable session home to establish X11 geometry in human mode without CDP.
+
+Real tab focus switching runs in Chromium with Playwright's forced focus disabled on the viewer pages. Firefox automation keeps its headless targets focused; both engines exercise focus and visibility handlers in the controlled viewer-page tests. A second real remote session keeps its size, form value and input while the first session runs through the matrix.
+
+For actual 200 percent zoom, the fixture starts a separate private Xvfb display for its viewer, then sends native XTEST browser shortcuts. Headless keyboard shortcuts did not change browser zoom in local probes. This path needs the existing Python 3, X11 and XTEST libraries as well as the tools listed above. It never shares the remote browser's display or profile. `REMOTE_GUI_ARTIFACT_DIR` selects an external artifact directory; the default is `/tmp/rg-adaptive-evidence`. It retains synthetic viewport captures, zoom measurements and first-failure artifacts. Browser tracing, HAR and recordings remain disabled.
+
 Run the GUI component crash and expiry checks from the plugin module with the same existing GUI tool paths:
 
 ```sh

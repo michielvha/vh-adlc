@@ -158,6 +158,11 @@ func (r *runtime) resize(ctx context.Context, size viewport.Size) (bool, error) 
 	if r.stopped || r.geometry == nil {
 		return false, errViewportUnavailable
 	}
+	if r.chrome != nil && r.geometry.pid != r.chrome.identity.PID {
+		r.geometry.pid = r.chrome.identity.PID
+		r.geometry.confirmed = false
+		r.geometry.windows = nil
+	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	if r.geometryCtx != nil {
@@ -193,10 +198,24 @@ func (r *runtime) startGeometry() {
 						g.observed = windows
 						_, _ = g.apply(ctx, g.size)
 					}
+					if err == nil {
+						r.restoreGeometryFocus(ctx, windows)
+					}
 					cancel()
 				}
 				r.mu.Unlock()
 			}
 		}
 	}()
+}
+
+func (r *runtime) restoreGeometryFocus(ctx context.Context, windows []xclip.Window) {
+	if !r.viewportOwned() || ctx.Err() != nil {
+		return
+	}
+	if focus, ok := r.geometry.helper.(interface {
+		RestoreFocus(context.Context, int, []xclip.Window) (bool, error)
+	}); ok {
+		_, _ = focus.RestoreFocus(ctx, r.geometry.pid, windows)
+	}
 }
