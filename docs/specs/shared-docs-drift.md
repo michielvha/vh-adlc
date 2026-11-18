@@ -229,6 +229,29 @@ notes. The earlier full local gate passes 48 checks without skips, and the full
 consumer suite passes 85 tests with 709 assertions. Fresh exact-source review and
 the actual publisher rerun remain required. The accepted baseline is unchanged.
 
+### Test-only follow-up after paired r14
+
+Actual Claude Code Opus 5.5 paired r14 at shared `a8a454e7` and consumer
+`7f703dc5` reads all 73 required fragments successfully, with no read errors,
+unchanged packet bytes and confirmed cleanup. It clears the workflow, controller,
+validation order, preserved behavior and proportionality. Its remaining
+should-fix and nit concern the test fixture only.
+
+The earlier canary lacks a named export, so a self-importing broken workflow
+passes all four old guard cases without evaluating that module. This false green
+is reproduced. The corrected valid export then catches the broken self-check:
+its retained observation records exit zero, selection and actual canary execution.
+The pinned-source workflow refuses that same payload and all 18 focused cases
+pass with 250 assertions. The guard now uses the hosted three-field binding and
+preserves failed fixtures. A narrowly scoped fresh review covers this test-only
+change; published shared bytes and consumer runtime/controller stay unchanged.
+
+The configured shared merge pipeline `44326173531` completes successfully at
+`18388bde`, and runtime release `v0.35.0` is published. The ordinarily installed
+plugin remains the independently verified 0.26.0 payload and uses its existing
+locked verified runtime 0.34.0. Later unrelated main edits are documentation-only.
+Actual native publisher success, final C/D review and cutover remain pending.
+
 ### Native correction review follow-up
 
 The instrumented hosted run retains its actual worker/reviewer streams and
