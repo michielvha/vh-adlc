@@ -82,6 +82,32 @@ Recovery retains the original operation's ownership and evidence. A publication 
 
 The owner accepted clean Claude Code Opus 5.5 R-122. Local scanner parity, companion rules and native synthetic workflow checks pass at their recorded revisions. Whole-feature Claude Code Opus 5.5 review R-127 has no findings after independently verifying those corrections. Every composite completion criterion remains unverified pending its full release/adoption proof. The final corrections restore local command behavior and scheduled safe-fix wording, preserve older metadata and remove unused helpers. Released marketplace installs, actual provider/hosted trials, final release-bound paired review, cutover and activated rollback remain open. GUI and phone tests are deferred. Merge, release and cutover retain their separate approval stages.
 
+### Claude-only consumer configuration on 2026-11-18
+
+The owner selects Claude Code or Codex instead of requiring another Copilot
+credential. Stackweaver now selects Claude Code for both native roles in separate
+sessions, retaining its worker's `opus` selector and using `claude-opus-5-5` for
+independent review. Its existing OAuth secret mapping serves both roles. The
+Copilot intake profile remains available without requiring a Copilot backend,
+package or hosted secret. This is consumer configuration; the shared operation
+remains provider-neutral and its accepted Design and Test Plan are unchanged.
+
+Bounded Claude Code Opus 5.5 consumer follow-up r10 finds no blocking or should-fix
+issue and one test-coverage nit. Its 42 required fragments remain unchanged and
+owned-process cleanup is confirmed. The strengthened existing contract catches
+six deliberately reintroduced regressions. All 62 protocol/migration/hosted
+configuration cases pass with 329 assertions. Consumer commit `76c00464` passes
+all six normal scoped commit checks with no failures or skips. Actionlint, all six protected local
+input hashes and a clean pinned Claude 2.1.325 install pass. These are local setup
+and configuration checks, not actual provider or hosted acceptance. The private
+consumer migration note and secret inventory remove the obsolete Copilot setup
+prerequisite. Final release-bound paired review remains open.
+
+Shared source `8c64ffdc` passes every job in CI run `44218419975`. R-127 still has
+no findings, with both canonical reviews fresh. Publication, actual 0.26.0
+marketplace fresh installs/upgrades, native/hosted trials and migration/rollback
+retain their existing gates; no composite criterion is ticked by these checks.
+
 ### Current committed review on 2026-11-18
 
 Claude Code Opus 5.5 R-125 independently reviews exact shared commit `f5cf1897`.
@@ -141,8 +167,8 @@ files, modes and hashes to published `0.25.0` source `b3e65115`. This establishe
 that current installation's inventory; it is not a fresh/upgrade `0.26.0` trial.
 The shared repository's signing secret and release-app secret/variable are present,
 verified by names only. Release/install, native/hosted acceptance, final paired C/D
-review and actual migration/rollback remain open. The Copilot hosted secret is still
-missing; an owner setup request is pending. GUI and phone checks remain deferred.
+review and actual migration/rollback remain open. The earlier Copilot hosted-secret setup request is superseded by the Claude-only
+consumer configuration above. GUI and phone checks remain deferred.
 
 ### R-126 correction verification
 
