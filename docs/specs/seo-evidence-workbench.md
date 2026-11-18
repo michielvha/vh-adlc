@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Independent review R-6 met all eight criteria; awaiting the completion gate."
+status: complete
+status_description: "Standalone toolkit complete and independently reviewed locally; not pushed; hosted CI unverified."
 branch: feat/seo-evidence-workbench
 issue: null
 goal: "A person or agent can turn saved public-site evidence into repeatable cross-page findings and technical regression checks without depending on the unfinished SEO features."
@@ -26,6 +26,10 @@ The owner selected saved-evidence analysis first, with live collection deferred.
 The owner also selected report-only behavior by default, with CI failure enabled only for named rules in a repository policy, and final-document graph nodes with explicit recorded redirects. Captured responses need a known final URL; conflicting observations remain unverified. Invalid or incomplete inputs still return an unsuccessful execution status. There is no aggregate SEO score, keyword-density target or promise of better rankings. The first version makes no network requests, runs no browser and changes no site files, accounts or search-engine settings.
 
 Implementation source owns only `tools/seo-evidence/` and a new `.github/workflows/seo-evidence.yml`; this feature document also receives its required lifecycle updates. It needs neither existing SEO feature to land and does not edit their agent, skill, manifests, tests, adapters or current workflow. A person or agent can invoke the documented command directly from a checkout. Automatic skill integration remains separate. Acceptance authorizes building this isolated toolkit; it grants no site repair, publication, monitoring or live collection. The toolkit now has local regression tests and repairs for all eleven defects established by independent reviews R-3 through R-5. A fresh checkout passes the frozen install, strict typecheck, workflow validation and all 60 tests with 350 assertions. Independent review R-6 returned all eight criteria met with no established findings. Its model identity was not attested and isolation was procedural. Hosted CI remains unverified until authorized shipping.
+
+### Observed use
+
+At source commit `7c66d5fce5ccedfafc86f2af415c0e82586b3e2b`, the documented snapshot and inspect commands processed the saved Stackweaver capture after verifying all 111 original file digests and mapping its 100 ordinary initial-HTTP page responses by exact request URL and body filename. The native bundle used actual final URLs, timestamps, status and allowed headers. Raw HTML was reparsed; prior summary title/link values were not imported as facts. Output at `/tmp/seo-evidence-stackweaver-20261118-9c5baea9/inspect-r6/` contains one duplicate-title group with the three troubleshooting pages and three unavailable main-content roots. The original evidence and site source stayed unchanged. This was an offline saved-evidence run, not a new crawl or ranking/citation measurement.
 
 ### Research and current gap
 
