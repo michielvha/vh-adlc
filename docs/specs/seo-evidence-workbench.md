@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "All tasks locally verified; awaiting fresh independent implementation review after R-3 repairs."
+status_description: "Repairing three parsing defects established by independent review R-4."
 branch: feat/seo-evidence-workbench
 issue: null
 goal: "A person or agent can turn saved public-site evidence into repeatable cross-page findings and technical regression checks without depending on the unfinished SEO features."
@@ -25,7 +25,7 @@ The owner selected saved-evidence analysis first, with live collection deferred.
 
 The owner also selected report-only behavior by default, with CI failure enabled only for named rules in a repository policy, and final-document graph nodes with explicit recorded redirects. Captured responses need a known final URL; conflicting observations remain unverified. Invalid or incomplete inputs still return an unsuccessful execution status. There is no aggregate SEO score, keyword-density target or promise of better rankings. The first version makes no network requests, runs no browser and changes no site files, accounts or search-engine settings.
 
-Implementation source owns only `tools/seo-evidence/` and a new `.github/workflows/seo-evidence.yml`; this feature document also receives its required lifecycle updates. It needs neither existing SEO feature to land and does not edit their agent, skill, manifests, tests, adapters or current workflow. A person or agent can invoke the documented command directly from a checkout. Automatic skill integration remains separate. Acceptance authorizes building this isolated toolkit; it grants no site repair, publication, monitoring or live collection. Independent review R-3 found five defects after the initial suite passed. All five now have regression tests and local repairs; a fresh checkout passes 50 tests and 284 assertions. A fresh independent implementation review is pending. Hosted CI remains unverified.
+Implementation source owns only `tools/seo-evidence/` and a new `.github/workflows/seo-evidence.yml`; this feature document also receives its required lifecycle updates. It needs neither existing SEO feature to land and does not edit their agent, skill, manifests, tests, adapters or current workflow. A person or agent can invoke the documented command directly from a checkout. Automatic skill integration remains separate. Acceptance authorizes building this isolated toolkit; it grants no site repair, publication, monitoring or live collection. Independent review R-3 found five defects after the initial suite passed. All five now have regression tests and local repairs; a fresh checkout passes 50 tests and 284 assertions. Independent review R-4 established three additional parsing defects, leaving AC-03 through AC-06 unmet. Hosted CI remains unverified.
 
 ### Research and current gap
 
@@ -128,19 +128,23 @@ No existing output requires migration. Unsupported future input versions fail vi
       Evidence: T19 reproduced the R-3 defects before repair; T20 repaired them. Frozen install, strict typecheck, actionlint and all 50 tests (284 assertions) passed at 68b6d9ce77a3c9dbf14079d2e3a3b8e17a843f95 in fresh clone /tmp/seo-evidence-final-20261118-r4; full output /tmp/seo-evidence-T21-full.log. Fresh independent review pending; earlier R-3 verdict remains history.
       Evidence: R-3 returned not met; its executed repro contradicts completion. Retain earlier passing subset as history; repair and independent re-review required.
       Evidence: Bundle, CLI, extraction and storage tests; malformed, tampered and over-limit evidence failed visibly, and incomplete captures remained partial. Observed against 4492760aaf175b5e82a9a5ad71eadedb958ad3c3 in /tmp/seo-evidence-final-20261118-4492760a; complete suite: 43 pass, 235 assertions, /tmp/seo-evidence-T18-full.log. Independent review pending.
-- [x] AC-03: Graph findings distinguish observed broken links/fragments, zero-incoming and unreachable candidates from uncaptured destinations, and preserve meaningful URL distinctions and observed path evidence.
+- [ ] AC-03: Graph findings distinguish observed broken links/fragments, zero-incoming and unreachable candidates from uncaptured destinations, and preserve meaningful URL distinctions and observed path evidence.
+      Evidence: R-4 returned not met; shared-body media types and canonical parsing require repairs and fresh independent proof.
       Evidence: T19 reproduced the R-3 defects before repair; T20 repaired them. Frozen install, strict typecheck, actionlint and all 50 tests (284 assertions) passed at 68b6d9ce77a3c9dbf14079d2e3a3b8e17a843f95 in fresh clone /tmp/seo-evidence-final-20261118-r4; full output /tmp/seo-evidence-T21-full.log. Fresh independent review pending; earlier R-3 verdict remains history.
       Evidence: R-3 returned not met; its executed repro contradicts completion. Retain earlier passing subset as history; repair and independent re-review required.
       Evidence: Extraction and graph tests; URL, base, fragment, redirect, conflict and capture-mode cases passed. Observed against 4492760aaf175b5e82a9a5ad71eadedb958ad3c3 in /tmp/seo-evidence-final-20261118-4492760a; complete suite: 43 pass, 235 assertions, /tmp/seo-evidence-T18-full.log. Independent review pending.
-- [x] AC-04: Exact metadata/main-content duplicate groups and template coverage identify the actual observed pages without grouping shared navigation, missing content roots or unobserved samples into a false whole-site verdict.
+- [ ] AC-04: Exact metadata/main-content duplicate groups and template coverage identify the actual observed pages without grouping shared navigation, missing content roots or unobserved samples into a false whole-site verdict.
+      Evidence: R-4 returned not met; shared-body media types and canonical parsing require repairs and fresh independent proof.
       Evidence: T19 reproduced the R-3 defects before repair; T20 repaired them. Frozen install, strict typecheck, actionlint and all 50 tests (284 assertions) passed at 68b6d9ce77a3c9dbf14079d2e3a3b8e17a843f95 in fresh clone /tmp/seo-evidence-final-20261118-r4; full output /tmp/seo-evidence-T21-full.log. Fresh independent review pending; earlier R-3 verdict remains history.
       Evidence: R-3 returned not met; its executed repro contradicts completion. Retain earlier passing subset as history; repair and independent re-review required.
       Evidence: Duplicate and template-coverage tests; exact observed groups excluded shared navigation and unavailable main content. Observed against 4492760aaf175b5e82a9a5ad71eadedb958ad3c3 in /tmp/seo-evidence-final-20261118-4492760a; complete suite: 43 pass, 235 assertions, /tmp/seo-evidence-T18-full.log. Independent review pending.
-- [x] AC-05: Technical snapshot comparisons identify supported changes and regressions while keeping incompatible snapshots, different capture modes and missing evidence out of false before/after claims.
+- [ ] AC-05: Technical snapshot comparisons identify supported changes and regressions while keeping incompatible snapshots, different capture modes and missing evidence out of false before/after claims.
+      Evidence: R-4 returned not met; shared-body media types and canonical parsing require repairs and fresh independent proof.
       Evidence: T19 reproduced the R-3 defects before repair; T20 repaired them. Frozen install, strict typecheck, actionlint and all 50 tests (284 assertions) passed at 68b6d9ce77a3c9dbf14079d2e3a3b8e17a843f95 in fresh clone /tmp/seo-evidence-final-20261118-r4; full output /tmp/seo-evidence-T21-full.log. Fresh independent review pending; earlier R-3 verdict remains history.
       Evidence: R-3 returned not met; its executed repro contradicts completion. Retain earlier passing subset as history; repair and independent re-review required.
       Evidence: Comparison tests; supported technical changes retained old/new evidence, while incompatible and unavailable cases stayed separate. Observed against 4492760aaf175b5e82a9a5ad71eadedb958ad3c3 in /tmp/seo-evidence-final-20261118-4492760a; complete suite: 43 pass, 235 assertions, /tmp/seo-evidence-T18-full.log. Independent review pending.
-- [x] AC-06: The default command reports findings without enforcing them, explicit known rule selections control failure, and invalid/partial execution has distinct stable exit and machine-output semantics.
+- [ ] AC-06: The default command reports findings without enforcing them, explicit known rule selections control failure, and invalid/partial execution has distinct stable exit and machine-output semantics.
+      Evidence: R-4 returned not met; shared-body media types and canonical parsing require repairs and fresh independent proof.
       Evidence: T19 reproduced the R-3 defects before repair; T20 repaired them. Frozen install, strict typecheck, actionlint and all 50 tests (284 assertions) passed at 68b6d9ce77a3c9dbf14079d2e3a3b8e17a843f95 in fresh clone /tmp/seo-evidence-final-20261118-r4; full output /tmp/seo-evidence-T21-full.log. Fresh independent review pending; earlier R-3 verdict remains history.
       Evidence: R-3 returned not met; its executed repro contradicts completion. Retain earlier passing subset as history; repair and independent re-review required.
       Evidence: Policy, CLI and terminal report tests; report-only default and explicit-rule exits passed with partial precedence and undecorated machine output. Observed against 4492760aaf175b5e82a9a5ad71eadedb958ad3c3 in /tmp/seo-evidence-final-20261118-4492760a; complete suite: 43 pass, 235 assertions, /tmp/seo-evidence-T18-full.log. Independent review pending.
@@ -226,6 +230,7 @@ None. On 18 November 2026 the owner chose saved-evidence analysis before live co
 | 2026-11-18 | R-2 | spec | `0394a5f8aa6b72d63179843e13bca6e27eb1faeb` | unknown | procedural | One nit, no blocking or should-fix findings; model identity not attested. |
 | 2026-11-18 | R-2 | spec | `0394a5f8aa6b72d63179843e13bca6e27eb1faeb` | n/a | n/a | accepted by owner |
 | 2026-11-18 | R-3 | implementation | `9c5baea99b6f32d483f31a9b42d641a59dbb56a8` | unknown | procedural | Two blocking and three should-fix defects; AC-01 and AC-08 met, six criteria not met. Model identity not attested. |
+| 2026-11-18 | R-4 | implementation | `d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6` | unknown | procedural | Three blocking parsing defects; four criteria met and four not met. Model identity not attested. |
 
 ### R-1
 
@@ -341,6 +346,61 @@ SEVERITY: should-fix
 WHERE: tools/seo-evidence/src/report.ts:8,12; AC-07; Design / Output, retry and verification delivery
 EVIDENCE: At 9c5baea99b6f32d483f31a9b42d641a59dbb56a8, a valid saved URL `https://example.test/![click](https://outside.test/tracker)` passes native validation and appears unescaped in report.md. The executed Bun.markdown.html check retained in /tmp/seo-review-r3-9c5baea9/canonical-repro.log renders the URL cell as text followed by <img src="https://outside.test/tracker" alt="click" />. The renderer escapes HTML, pipes, backticks and line breaks, but leaves Markdown link/image syntax active, so source data can become a remote resource in the rendered report.
 PROPOSAL: Escape Markdown syntax for every source-derived table cell and list item, including brackets, backslashes and image/link punctuation, or render source values through a representation that preserves them as literal data. Verify the rendered HTML contains the original literal text and no source-created links or images.
+
+### R-4
+
+CRITERION: AC-01 A person or agent can run the documented commands from the isolated source directory against a valid saved bundle, with no network/browser/account dependency or change to either active SEO feature.
+VERDICT: met
+EVIDENCE: Independently archived d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6 to /tmp/seo-review-r4-GqQlZ0 and ran the frozen install and complete real CLI/README suite. The escalated bun test --timeout 30000 run passed 50 tests and 284 assertions, including all three commands under a network-denied bubblewrap namespace with strace checking network and child execution. The feature diff against its merge base with origin/main contains only the two owning implementation paths and this document. Protected feature files and the source repository stayed unchanged. The initial outer-sandbox run could not create the required namespace; it did not establish the offline proof.
+
+CRITERION: AC-02 Invalid, tampered, over-limit or incomplete evidence cannot be reported as a complete clean analysis, and every reported value retains its capture mode, scope and source provenance.
+VERDICT: met
+EVIDENCE: At d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6, independently executed the bundle, CLI, extraction, comparison and storage cases covering hashes, strict YAML, versions, scope, missing files, containment, limits and partial/conflicting captures. The repaired artifact-consuming CLI rejects inconsistent partial reasons with exit 2 and no completion artifact. An additional native bundle with correctly hashed invalid UTF-8 bytes also returned invalid/exit 2. Inspected retained observation modes, origin scope, input digests and file references. Full suite output is /tmp/seo-review-r4-GqQlZ0/full-tests.log; the additional UTF-8 proof is boundary-repro.log.
+
+CRITERION: AC-03 Graph findings distinguish observed broken links/fragments, zero-incoming and unreachable candidates from uncaptured destinations, and preserve meaningful URL distinctions and observed path evidence.
+VERDICT: not met
+EVIDENCE: At d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6, the graph, URL, base, fragment, redirect, conflict and capture-mode tests passed, including the repaired incoming-discovery case. However, /tmp/seo-review-r4-GqQlZ0/repro.ts supplies valid text/html and text/plain observations sharing one body file. The text/plain document receives HTML anchors and a broken_link finding for /bad even though its response is plain text. F-01 records the unsupported graph evidence.
+
+CRITERION: AC-04 Exact metadata/main-content duplicate groups and template coverage identify the actual observed pages without grouping shared navigation, missing content roots or unobserved samples into a false whole-site verdict.
+VERDICT: not met
+EVIDENCE: At d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6, duplicate partitions, missing/multiple roots, navigation exclusion and applicable template findings passed, including nonrepresentative and redirected duplicate members. The additional shared-body native bundle nevertheless groups a text/plain response with a text/html response as duplicate_title and duplicate_main. The actual inspect CLI with only duplicate_title selected exits 3. F-01 records the false groups; repro.log and cli-repro.log retain the executed results.
+
+CRITERION: AC-05 Technical snapshot comparisons identify supported changes and regressions while keeping incompatible snapshots, different capture modes and missing evidence out of false before/after claims.
+VERDICT: not met
+EVIDENCE: At d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6, the supported regression, compatibility, missing-evidence, mode, generic-control and malformed-separator fixtures passed. Additional native-bundle proofs found two invented canonical changes: a link element without href becomes a self canonical, and a Link relation with anchor="/unrelated" becomes a canonical of the response document. The actual compare CLI emits canonical_changed in both cases. F-02 and F-03 record these defects; /tmp/seo-review-r4-GqQlZ0/cli-repro.log preserves the results.
+
+CRITERION: AC-06 The default command reports findings without enforcing them, explicit known rule selections control failure, and invalid/partial execution has distinct stable exit and machine-output semantics.
+VERDICT: not met
+EVIDENCE: At d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6, report-only defaults, explicit known rules, command applicability, partial precedence and undecorated machine statuses passed. Additional actual CLI executions returned complete/policy failed/exit 3 for an unsupported text/plain duplicate and both invented canonical_changed findings. Thus selected rules can still fail on unsupported evidence despite the repaired partial-status and separator boundaries. F-01 through F-03 provide the established cases.
+
+CRITERION: AC-07 Equivalent inputs produce stable evidence-linked outputs, interrupted or concurrent runs cannot overwrite inputs or completed results, and rendered reports preserve source text safely.
+VERDICT: met
+EVIDENCE: At d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6, independently ran replay-byte/hash, exclusive-output, interrupted-producer, same-output race, separate-output and verified-consumption tests. CSV/Markdown source escaping and actual Bun.markdown.html rendering passed, including the repaired literal link/image punctuation case. Inspected the exclusive directory creation, INCOMPLETE marker, verified manifest and completion publication sequence. The source repository remained clean at the reviewed target; hosted execution is not claimed.
+
+CRITERION: AC-08 The toolkit's complete examples, type checks, tests and dedicated CI exercise the actual deliverable independently of the unfinished SEO features and existing plugin release paths.
+VERDICT: met
+EVIDENCE: From the independent exact-commit archive of d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6, bun install --frozen-lockfile, bun run typecheck, actionlint ../../.github/workflows/seo-evidence.yml and the complete bun test --timeout 30000 suite passed. The suite ran the actual README commands and offline CLI proof, with 50 tests and 284 assertions. Inspected the isolated path-filtered, SHA-pinned workflow and unchanged existing workflows/plugin release files. Hosted exact-head CI remains unverified, as the accepted Test Plan defers that observation until authorized shipping. Passing local verification does not establish the failed criteria above.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: tools/seo-evidence/src/bundle.ts:75-76; tools/seo-evidence/src/snapshot.ts:14-15; tools/seo-evidence/src/schema.ts:30-32; Design / URL identity, parsing and graph; Design / Duplicate groups and coverage by template; AC-03; AC-04; AC-06
+EVIDENCE: At d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6, /tmp/seo-review-r4-GqQlZ0/repro.ts constructs a valid native bundle whose /html and /plain observations share the same hashed body file, with content_type text/html and text/plain respectively. loadBundle decodes the file because one observation is HTML, then snapshot extracts HTML facts for every captured observation using that file without checking its own media type. The resulting plain-text response contributes anchors, a broken_link, duplicate_title and duplicate_main. The actual snapshot CLI accepts the input with complete/exit 0, and inspect with only duplicate_title selected returns complete/policy failed/exit 3. The verified outputs and command results are retained under shared-cli-snapshot, shared-cli-inspect and cli-repro.log in that scratch directory.
+PROPOSAL: Decide HTML extraction per observation's media type, retaining null HTML facts for unsupported bodies even when another observation shares the file. Enforce the same invariant at snapshot consumption and add actual CLI cases for shared files served under different media types.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: tools/seo-evidence/src/extract.ts:17; tools/seo-evidence/src/controls.ts:84,88-90; Design / Technical comparisons and failure policy; AC-05; AC-06
+EVIDENCE: At d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6, /tmp/seo-review-r4-GqQlZ0/repro.ts extracts <head><link rel="canonical"></head> from a valid native saved response. extract replaces its absent href with an empty string, which controls resolves to https://example.test/ and declares valid. Comparing a previous canonical /old against this input through the actual CLI with only canonical_changed selected returns complete/policy failed/exit 3 and an invented change to the document URL. The HTML Standard, https://html.spec.whatwg.org/multipage/semantics.html#the-link-element, states that a link element without href or imagesrcset does not define a link. cli-repro.log and missing-href-cli/findings.json retain the observed failure.
+PROPOSAL: Preserve absence of href and treat the malformed canonical element as unavailable rather than resolving an invented empty value. Add a native-bundle comparison proving that a missing canonical href cannot create a valid self target or canonical_changed policy failure.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: tools/seo-evidence/src/controls.ts:34-46; Design / Technical comparisons and failure policy; AC-05; AC-06
+EVIDENCE: At d6c78fcfc65e4a7d5c4095e19558701f0afdf4c6, /tmp/seo-review-r4-GqQlZ0/repro.ts supplies Link: </new>; rel="canonical"; anchor="/unrelated" for https://example.test/. The parser validates but ignores the anchor parameter and records /new as this response document's valid canonical. The actual compare CLI against a previous /old canonical, with only canonical_changed selected, returns complete/policy failed/exit 3. RFC 8288 section 3.2, https://www.rfc-editor.org/rfc/rfc8288.html#section-3.2, makes anchor override the link context and forbids processing such a relation without applying its anchor; a consumer may instead ignore the entire anchored relation. cli-repro.log and anchor-context-cli/findings.json retain the false regression.
+PROPOSAL: Apply the resolved Link context before assigning a canonical to the response document, or retain unsupported anchored relations as unavailable evidence without treating their targets as this page's canonical. Cover another-resource and fragment contexts alongside an unchanged valid document canonical.
 
 ## Sources
 
