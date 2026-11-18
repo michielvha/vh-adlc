@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Claude review clean; diagnosing actual unattended verification failure."
+status_description: "Reviewer protocol corrected; native acceptance and refreshed review pending."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -83,6 +83,23 @@ Recovery retains the original operation's ownership and evidence. A publication 
 The owner accepted clean Claude Code Opus 5.5 R-122. Local scanner parity, companion rules and native synthetic workflow checks pass at their recorded revisions. Whole-feature Claude Code Opus 5.5 review R-127 has no findings at its recorded source. Claude Code Opus 5.5 R-129 reviews the final native reply-format clarification with no findings. Every composite completion criterion remains unverified pending its full release/adoption proof. The final corrections restore local command behavior and scheduled safe-fix wording, preserve older metadata and remove unused helpers. Released marketplace installs, actual provider/hosted trials, final release-bound paired review, cutover and activated rollback remain open. GUI and phone tests are deferred. The owner authorized the shared merge after exact-head CI, its configured release, ordinary marketplace install/upgrade tests and gated Stackweaver migration. Cutover waits for its required evidence.
 
 ### Native correction review follow-up
+
+The instrumented hosted run retains its actual worker/reviewer streams and
+process records. Replaying their original, unchanged protocol bytes reproduces
+`invalid docs-drift manifest review records`: its nit uses `KIND: inaccurate-claim`,
+while the existing grammar accepts `factual` or `judgement`. The reviewer prompts
+named fields without their allowed values. All three native review stages now
+share an explicit reply grammar, including the existing kind/severity values.
+The parser, permissions and refusal policy remain unchanged. The actual prefix
+regression also reproduces this unsupported-kind failure at verification, then
+passes 63 assertions through the real normal entry after the prompt correction.
+Pinned production/test TypeScript and the ZIP check pass. Fresh independent
+review and actual native rerun are required before the release hold clears.
+
+The isolated consumer fixture now carries Stackweaver's existing no-attribution
+publication rule and asserts its proposal body. The generic shared workflow
+continues to read each consumer's own policy. This supplies a real consumer rule
+missing from the earlier toy procedure; it introduces no shared style policy.
 
 The owner-approved unattended consumer trial exposes a fresh-runner dependency
 order gap before credentials: the verified YAML reader is absent when the
