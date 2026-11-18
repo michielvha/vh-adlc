@@ -165,6 +165,7 @@ func TestViewportSessionBoundary(t *testing.T) {
 		t.Fatal("unauthenticated resize")
 	}
 	p.Revoke()
+	s.Client().CloseIdleConnections()
 	code, _ = sendViewport(t, s, c, viewportBody("a", 1, true), nil)
 	if code != 410 {
 		t.Fatal(code)

@@ -69,6 +69,7 @@ func (r *runtime) snapshot() session.BrowserHandle {
 	}
 	handle.Stop, handle.Handoff, handle.Alive = r.stop, r.handoff, r.healthy
 	handle.Clipboard = r.clipboard()
+	handle.Resize = r.resize
 	return handle
 }
 

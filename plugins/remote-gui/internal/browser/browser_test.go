@@ -124,7 +124,7 @@ func TestBrowserPhaseArguments(t *testing.T) {
 }
 
 func TestVNCArgumentsLeaveSelectionsToTheHelper(t *testing.T) {
-	want := []string{"-display", ":123", "-localhost", "-rfbport", "5901", "-rfbauth", "/owned/session/vnc.passwd", "-forever", "-shared", "-noxdamage", "-nosel", "-quiet"}
+	want := []string{"-display", ":123", "-localhost", "-rfbport", "5901", "-rfbauth", "/owned/session/vnc.passwd", "-forever", "-shared", "-noxdamage", "-nosel", "-quiet", "-clip", "1440x900+0+0"}
 	if got := vncArgs(":123", "5901", "/owned/session/vnc.passwd"); !slices.Equal(got, want) {
 		t.Fatalf("x11vnc arguments: %q", got)
 	}
