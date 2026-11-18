@@ -137,7 +137,7 @@ func (p *Proxy) serveViewport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	entry, exists := p.viewportEntries[req.ViewerID]
-	if (exists && req.Sequence <= entry.sequence) || (!req.Claim && p.viewportActive != req.ViewerID) {
+	if (exists && req.Sequence <= entry.sequence) || (!exists && !req.Claim) {
 		viewportReply(w, 200, "inactive", viewport.Size{}, "")
 		return
 	}

@@ -299,3 +299,47 @@ func TestViewportRouteNeedsOwnerIdentity(t *testing.T) {
 		}
 	}
 }
+
+func TestViewportInactiveSequencePreventsOlderClaim(t *testing.T) {
+	_, s, c, calls := viewportFixture(t)
+	for _, step := range []struct {
+		id       string
+		sequence int
+		claim    bool
+		result   string
+		calls    int
+	}{
+		{"b", 1, true, "applied", 1},
+		{"a", 1, true, "applied", 2},
+		{"b", 3, false, "inactive", 2},
+		{"b", 2, true, "inactive", 2},
+		{"b", 3, true, "inactive", 2},
+		{"a", 2, false, "applied", 3},
+		{"b", 4, true, "applied", 4},
+	} {
+		code, result := sendViewport(t, s, c, viewportBody(step.id, step.sequence, step.claim), nil)
+		if code != 200 || result != step.result || len(*calls) != step.calls {
+			t.Fatalf("viewer %s sequence %d claim %v: status=%d result=%s backend calls=%d; want %s and %d calls", step.id, step.sequence, step.claim, code, result, len(*calls), step.result, step.calls)
+		}
+	}
+}
+
+func TestViewportUnknownUpdatesDoNotReserveEntries(t *testing.T) {
+	p, s, c, calls := viewportFixture(t)
+	for i := range 17 {
+		code, result := sendViewport(t, s, c, viewportBody(fmt.Sprintf("%x", i), 9, false), nil)
+		if code != 200 || result != "inactive" {
+			t.Fatalf("unknown non-claim: %d %s", code, result)
+		}
+	}
+	p.viewportMu.Lock()
+	entries := len(p.viewportEntries)
+	p.viewportMu.Unlock()
+	if entries != 0 || len(*calls) != 0 {
+		t.Fatal("unregistered measurements reserved viewer entries or resized")
+	}
+	code, result := sendViewport(t, s, c, viewportBody("a", 1, true), nil)
+	if code != 200 || result != "applied" || len(*calls) != 1 {
+		t.Fatal("unknown updates blocked a subsequent first claim")
+	}
+}
