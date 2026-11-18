@@ -8,7 +8,7 @@ export const origin = "https://example.test";
 export const capturedAt = "2026-11-18T10:00:00Z";
 export const sha = (value: string | Uint8Array) => createHash("sha256").update(value).digest("hex");
 export function captured(path = "/", body_file = "page.html") {
-  return { requested_url: origin + path, final_url: origin + path, outcome: "captured", mode: "initial", observed_at: capturedAt, status: 200, content_type: "text/html", headers: {}, body_file };
+  return { requested_url: origin + path, final_url: origin + path, outcome: "captured" as const, mode: "initial" as const, observed_at: capturedAt, status: 200, content_type: "text/html", headers: {}, body_file };
 }
 export async function fixture(html = "<html lang='en'><title>Example</title><main><h1>Hello</h1></main></html>") {
   const dir = await mkdtemp(join(tmpdir(), "seo-evidence-test-"));
