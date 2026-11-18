@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/remote-gui-adaptive-sizing
-status_description: "The independently reproduced sequence replay is repaired and locally verified; fresh implementation review remains."
+status_description: "All seven criteria passed fresh independent review; source publication and installation remain pending."
 issue: null
 goal: "The shared browser fills the active viewer at a readable size and adapts automatically when that viewer changes size."
 covers:
@@ -96,7 +96,7 @@ Validate the package through its existing helper from a temporary install-shaped
 - [x] AC-02: A size change preserves the browser process, open tabs, fixture form values, viewer connection and exact-browser input in both human and agent phases, and human status continues to omit a CDP endpoint.
       Evidence: The real viewport fixture preserves human and agent browser PID/start identity, tab/form state and noVNC connection across resizing, confirms exact-browser input, and observes no human CDP endpoint.
 - [x] AC-03: With two viewers, focus or connection claims take control in server acceptance order; inactive non-claim updates, duplicate or lower per-viewer sequences and busy retries cannot reacquire control. Hidden viewers send no new sizing requests, and viewer bookkeeping stays bounded.
-      Evidence: R-4 found the replay defect at d6fa94b0; its records remain unchanged. T7 observed the same regression fail, then pass after retaining registered viewers' higher inactive sequences. Lower and duplicate claims stay inactive without backend calls; a newer claim still applies. Unknown non-claims reserve no entries. The complete proxy race suite and both engines' controlled and real viewer scenarios pass. Fresh independent review remains.
+      Evidence: T7 observed the inactive-sequence replay fail and then pass. R-5 independently verified AC-03 as met at e2ac2d757750d3495a1167dfd5ea29674ad68ca1, including higher inactive sequence retention, lower/equal claim refusal without backend calls, legitimate newer control, unknown-viewer admission, bounds/expiry, busy retries, visibility suppression and real Chromium focus transfer. R-4 remains preserved as the failed review.
 - [x] AC-04: Repeated or rapidly changing measurements converge on the latest eligible size with bounded work; unsupported sizes and backend failures retain a usable proportional view, show the defined failure notice when appropriate, and permit recovery on a later eligible event.
       Evidence: Both controlled viewer engines pass debounce, coalescing, one-in-flight, bounds, busy exhaustion and notice recovery. Transaction race tests establish mixed-state rollback recovery. Real viewers recover from one HTTP refusal while input remains usable, preserve aspect above the maximum and reach native 200 percent zoom.
 - [x] AC-05: Geometry requests require the existing session owner and same-origin protections, accept only the bounded typed payload, and cannot mutate an app share, another browser session or an unowned window.
@@ -149,6 +149,7 @@ None. The owner answered the viewer-control, pixel-density and backend questions
 | 2026-11-18 | R-3 | spec | `4d7f8238ecabde6cd8693c5d16f3214f1fb142c6` | unknown | procedural | No findings; model identity not attested. |
 | 2026-11-18 | R-3 | spec | `4d7f8238ecabde6cd8693c5d16f3214f1fb142c6` | n/a | n/a | accepted by owner |
 | 2026-11-18 | R-4 | implementation | `d6fa94b0dfdeb6cbebf99257739db252295a366f` | unknown | procedural | Six criteria met; AC-03 not met with blocking F-01. Model identity not attested. |
+| 2026-11-18 | R-5 | implementation | `e2ac2d757750d3495a1167dfd5ea29674ad68ca1` | unknown | procedural | All seven criteria met; no findings. Model identity not attested. |
 
 ### R-1
 
@@ -236,6 +237,36 @@ SEVERITY: blocking
 WHERE: plugins/remote-gui/internal/proxy/viewport.go:139-148; Design / Authenticated geometry requests and viewer control; Acceptance Criteria / AC-03; Test Plan / AC-03
 EVIDENCE: The new serveViewport returns inactive at lines 140-142 before recording the validated request's sequence at line 148. In an external archive copy of d6fa94b0dfdeb6cbebf99257739db252295a366f, TestReviewerInactiveHigherSequencePreventsOlderClaim observed B1 claim applied, A1 claim applied, B3 non-claim inactive, then B2 claim applied with a third backend call. The delayed lower claim reacquired control. Existing ordering tests do not cover a higher inactive measurement preceding an older claim.
 PROPOSAL: Advance a retained viewer's sequence for every valid higher request before refusing it for inactivity, while continuing to require unknown viewers to claim. Add the reproduced ordering case and verify that the delayed lower claim returns inactive without invoking the backend.
+
+### R-5
+
+CRITERION: AC-01 On initial connection and after window resizing or orientation changes, the browser fills the active viewer's available area at CSS-pixel dimensions within two pixels on each axis, throughout the supported size range, without stretched content or persistent empty bands.
+VERDICT: met
+EVIDENCE: bun test tests/remote-gui/browser.e2e.test.ts tests/remote-gui/viewer-page.e2e.test.ts tests/remote-gui/viewport.e2e.test.ts tests/remote-gui/legacy.e2e.test.ts, e2ac2d757750d3495a1167dfd5ea29674ad68ca1, all 13 scenarios passed against a fresh archive built independently through scripts/remote-gui.sh. Both engines passed all 13 supported matrix/boundary sizes with native window/framebuffer agreement, canvas bounds, responsive reflow and painted edges. I inspected fresh phone, 900x1000 and desktop captures from both engines and found readable content without distortion or viewer bands. Native XTEST zoom reached 200 percent in both engines. Evidence is retained in /tmp/rg-review-r5-ebH9Ea; these were synthetic loopback sessions, not owner or second-device acceptance.
+
+CRITERION: AC-02 A size change preserves the browser process, open tabs, fixture form values, viewer connection and exact-browser input in both human and agent phases, and human status continues to omit a CDP endpoint.
+VERDICT: met
+EVIDENCE: The four-file real browser suite and source inspection, e2ac2d757750d3495a1167dfd5ea29674ad68ca1, established stable browser PID/start identity, retained tabs and fixture form/session state, exact-browser noVNC input and an uninterrupted viewer WebSocket while resizing in human and agent phases. Agent CDP remained unchanged, and human status omitted local_cdp. The implementation uses native X11 and x11vnc for sizing. Synthetic phase transitions and input were observed; provider authentication was not tested.
+
+CRITERION: AC-03 With two viewers, focus or connection claims take control in server acceptance order; inactive non-claim updates, duplicate or lower per-viewer sequences and busy retries cannot reacquire control. Hidden viewers send no new sizing requests, and viewer bookkeeping stays bounded.
+VERDICT: met
+EVIDENCE: go test -race ./... -count=1 in the independent archive, plus both controlled viewer engines and the real viewer suite, e2ac2d757750d3495a1167dfd5ea29674ad68ca1, passed. TestViewportInactiveSequencePreventsOlderClaim observed B1 claim, A1 claim, inactive B3 measurement, then rejected B2 and B3 claims without backend calls; A2 remained eligible and B4 legitimately reclaimed control. TestViewportUnknownUpdatesDoNotReserveEntries passed. Source inspection confirmed higher validated sequences are retained before inactive refusal. Concurrent acceptance order, busy retry refusal, the 16-entry bound, expiry, blur/visibility suppression and Chromium natural multi-tab focus passed. Firefox natural focus remains constrained by headless automation; its controlled focus/visibility tests passed.
+
+CRITERION: AC-04 Repeated or rapidly changing measurements converge on the latest eligible size with bounded work; unsupported sizes and backend failures retain a usable proportional view, show the defined failure notice when appropriate, and permit recovery on a later eligible event.
+VERDICT: met
+EVIDENCE: The module race suite, both controlled sizing scenarios and both real viewport scenarios, e2ac2d757750d3495a1167dfd5ea29674ad68ca1, passed debounce/coalescing, one in-flight request, latest pending dimensions, duplicate/zero/small/infeasible sizes, proportional maximum fitting and bounded busy retries. Transaction tests passed confirmed rollback, uncertain rollback and later same-size reconciliation from mixed geometry. Both real viewer engines kept input usable after one controlled HTTP refusal, showed the defined notice and cleared it after a confirmed eligible resize. Native failure injection was exercised by Go transaction tests; real backend processes were not killed for this proof.
+
+CRITERION: AC-05 Geometry requests require the existing session owner and same-origin protections, accept only the bounded typed payload, and cannot mutate an app share, another browser session or an unowned window.
+VERDICT: met
+EVIDENCE: go test -race ./... -count=1 and REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/xclip -run ^TestViewport -count=1 -v, e2ac2d757750d3495a1167dfd5ea29674ad68ca1, passed. Proxy tests rejected unauthenticated/wrong-owner, origin/header, malformed/oversized/unknown/duplicate field, unsafe sequence and out-of-range requests without backend calls, and app shares exposed no sizing route. All five native tests passed, including forged-PID foreign-client refusal and unchanged foreign focus/windows. Source inspection confirmed X-Resource ownership checks before native mutation and runtime display/browser/VNC identity validation. The real second session retained geometry, form state and input.
+
+CRITERION: AC-06 Handoff preserves the last applied size in both directions, concurrent handoff or stop cannot leave a successful partial resize, clipboard typing retains focus across size changes, and Chromium menus and fixture dialogs remain visible and usable.
+VERDICT: met
+EVIDENCE: The real browser suite, module race suite and five native viewport/focus race tests, e2ac2d757750d3495a1167dfd5ea29674ad68ca1, passed both handoff directions at the applied portrait size, newly opened normal-window sizing/input without another viewer measurement, visible native menus with dismissal, and reachable fixture dialog controls. Both controlled viewer engines preserved clipboard field focus during resizing. Runtime tests established busy locking, stop cancellation, no later stopped-runtime mutation and failure rather than partial success; source inspection confirmed resize, handoff and stop share the runtime mutex. Native cancellation released the server grab and foreign focus remained unchanged.
+
+CRITERION: AC-07 The independently packaged plugin and both manifests agree on the new version, its documented sizing terms match the viewer, its verification runs through the existing CI path, and existing supervisors and records continue to work without migration.
+VERDICT: met
+EVIDENCE: At e2ac2d757750d3495a1167dfd5ea29674ad68ca1, both manifests report 0.4.0. An independently archived install-shaped package built a static Linux binary through scripts/remote-gui.sh without vh-adlc; that candidate passed all 13 real browser scenarios. Package checks passed 11 tests with 46 opt-in skips. Direct checkout/module builds, module go test -race ./... -count=1, go vet ./..., verified golangci-lint 2.15.0 config/run with zero issues, and go mod tidy -diff passed. Initial archive VCS-stamping and sandbox/offline lint-metadata failures are preserved in /tmp/rg-review-r5-ebH9Ea; the direct checkout build and authorized pinned lint rerun passed. CI source includes these verification paths, and documentation matches implemented terms, bounds and recovery. The immutable 0.3.0 fixture passed new-CLI access/status/stop, unchanged record keys/supervisor identity, fixed old geometry and continuing input alongside an adaptive session. The checkout and index remained clean at the target. Hosted CI, release, installation and live owner sessions were not verified.
 
 ## Sources
 
