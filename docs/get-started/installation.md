@@ -104,7 +104,7 @@ expected to work there. See [compatibility](../reference/compatibility.md#suppor
 
 ## What the plugin installs
 
-The candidate package's seventeen skills include the generic `vh-adlc` entry, eleven engineering
+The released package's seventeen skills include the generic `vh-adlc` entry, eleven engineering
 operations, `vh-adlc-blog` for article and promotion drafts, `vh-adlc-diagram` for architecture diagrams, `vh-adlc-docs-impact` for
 selected-change documentation review, `vh-adlc-docs-drift` for corpus drift and
 stale audit proposals, and `vh-adlc-clean` for host cleanup. It includes
@@ -209,7 +209,9 @@ there is no cache-path guessing. Existing callers retain their path/stdin argume
 Projects coordination also uses Bun, Git and your authenticated GitHub CLI. It needs separate Projects
 scope and an explicit board/repository configuration; see the [Projects reference](../../plugins/vh-adlc/references/projects.md).
 
-## Standalone documentation drift candidate
+<a name="standalone-documentation-drift-candidate"></a>
+
+## Standalone documentation drift
 
 Verify that the selected installed payload contains `vh-adlc-docs-drift` and
 its packaged helpers. Resolve its actual plugin directory and check the
