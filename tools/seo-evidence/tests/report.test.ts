@@ -15,7 +15,8 @@ test("analytical bytes and finding identities are stable", async () => {
 test("CSV and Markdown keep hostile source text as data", async () => {
   const f = await site([{ path: "/", html: '<head><title>=SUM(1,2)\n# injected</title></head><main>Body</main>' }, { path: "/other", html: '<head><title>=SUM(1,2)\n# injected</title></head><main>Other</main>' }]);
   const r = applyPolicy(inspect(f.snapshot));
-  r.findings[0] = { ...r.findings[0]!, detail: '=cmd\n# forged <script>alert(1)</script> | "quote"' };
+  const first = r.findings[0]; if (!first) throw new Error("Expected a duplicate finding");
+  r.findings[0] = { ...first, detail: '=cmd\n# forged <script>alert(1)</script> | "quote"' };
   const files = renderFiles(r);
   expect(files["findings.csv"]).toContain("'=cmd");
   expect(files["report.md"]).not.toContain("\n# forged");
