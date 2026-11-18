@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: Final paired review and committed adoption verification pass; final cutover gate running
+status_description: Final tests and paired review pass; active Claude cache marker blocks remote cutover
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -88,10 +88,36 @@ and original legacy output, with the caller preserved.
 The final staged candidate passes complete scanner/protection parity and rollback.
 Claude Code Opus 5.5 finds no blocking or should-fix issues in its six-file routing
 switch. The actual adoption checklist is committed and passes the installed
-verifier. Final consumer tests, the repository gate and remote cutover remain
-pending. The owner selected Claude Code or Codex; native Copilot execution is
+verifier using the Codex-installed payload. All 90 consumer tests and the full
+48-check repository gate pass. An active ordinary Claude cache adds a process
+marker that the accepted exact-inventory rule refuses; remote cutover is held
+for the decision below. The owner selected Claude Code or Codex; native Copilot execution is
 unclaimed. GUI and phone tests stay deferred. Other agents stay on the separate
 migration roadmap.
+
+### Active ordinary Claude cache finding on 2026-11-18
+
+The final real global-install check finds a compatibility gap that empty-profile
+installation did not exercise. Codex's installed 0.26.0 payload matches all 291
+released files. Claude's installed 0.26.0 also matches every released file, mode
+and byte, but its active cache contains one extra `.in_use/<pid>` marker. It is
+a 38-byte JSON object with `pid` and `procStart` fields. The unchanged shared
+inspector correctly refuses it under the current no-exclusions design. The
+marker belongs to an existing process and is not removed or altered.
+
+This prevents claiming ordinary active Claude execution ready. Open Question Q1
+proposes a narrow validated metadata exception; no implementation or normative
+change is made while its answer is pending. The published component, local
+activation and original successful isolated trial keep their exact attribution.
+The remote consumer remains on legacy routing.
+
+At exact combined candidate `eaf6ae129d5a3764e517af0a0eeb8eac1766b336`, the
+complete consumer suite passes 90 tests and 747 assertions, and `make verify`
+passes all 48 runnable checks with zero failures or skips. Both owned process
+outcomes confirm cleanup and unchanged clean source. One earlier runner omitted
+the required shared-source environment value; its failed setup output remains
+retained. Integration/E2E and filesystem vulnerability checks are outside that
+ordinary local gate and are not claimed.
 
 ### Final adoption preparation on 2026-11-18
 
@@ -2101,7 +2127,21 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 ## Open Questions
 
-None. On 2026-11-17 the owner accepts the R-117 compatibility recommendations. The new companion fields ship with the compatible released binding and roll back with it. The new classifier applies only within standard-format feature roots. Other documents retain their existing protection paths.
+### Q1: Should the payload checker allow Claude's native process marker?
+
+**Recommendation:** A. Allow only the validated, non-executable `.in_use/<pid>`
+marker so an active ordinary Claude plugin can execute; keep every shipped-code,
+mode and other extra-file check strict.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Narrow marker exception** | Ordinary active Claude plugin execution without deleting its process metadata | Revise the explicit no-exclusions rule, independently review it and test both native behavior and malformed/extra-file refusals |
+| **B. Keep exact file set** | Existing rule and released component stay unchanged | Active Claude cache execution remains setup-required; Codex and the verified isolated paths still work |
+
+**Why this is yours:** The accepted Design expressly forbids installer-owned
+file exclusions. Its expectation that native metadata stays outside the plugin
+root is false for this active Claude installation. This changes that deliberate
+rule rather than relaxing a failing test or removing an unrelated process marker.
 
 ## Review Log
 
