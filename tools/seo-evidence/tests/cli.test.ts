@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { readArtifact, writeArtifact } from "../src/storage";
 import { stable } from "../src/bundle";
 import { site } from "./helpers/site";
-import { sha } from "./helpers/bundle";
+import { sha, fixture, captured } from "./helpers/bundle";
+import { parseSnapshot } from "../src/schema";
 
 import { example, resultSchema, run } from "./helpers/cli";
 test("real snapshot/inspect/compare flow verifies outputs without changing input", async () => {
@@ -49,5 +50,44 @@ test("manifest-valid partial snapshots cannot hide their missing evidence reason
     expect(r.code).toBe(2);
     expect(resultSchema.parse(JSON.parse(r.stdout) as unknown).analysis_status).toBe("invalid");
     expect(await Bun.file(join(root, name, "complete.json")).exists()).toBe(false);
+  }
+});
+test("shared body files do not turn plain-text responses into HTML evidence", async () => {
+  const f = await fixture('<title>Shared</title><main><a href="/bad">Bad</a></main>');
+  f.data.pages = [captured(), { ...captured("/plain"), content_type: "text/plain" }, { ...captured("/bad"), status: 404, content_type: "text/plain" }]; await f.save();
+  const root = await mkdtemp(join(tmpdir(), "seo-cli-media-"));
+  expect((await run(["snapshot", "--input", f.input, "--output", join(root, "snapshot"), "--json"])).code).toBe(0);
+  const input = join(root, "snapshot/snapshot.json"); const s = parseSnapshot(await readArtifact(input));
+  expect(s.observations[1]?.facts).toBeNull(); expect(s.observations[2]?.facts).toBeNull();
+  const policy = join(root, "policy.yaml"); await writeFile(policy, "schema_version: 1\nfail_rules: [duplicate_title, duplicate_main]\n");
+  expect((await run(["inspect", "--snapshot", input, "--policy", policy, "--output", join(root, "report"), "--json"])).code).toBe(0);
+  const report = await Bun.file(join(root, "report/findings.json")).json();
+  expect(report.findings.some((f: { url: string }) => f.url.endsWith("/plain"))).toBe(false);
+  const plain = s.observations[1]; if (!plain) throw new Error("Expected plain response"); plain.facts = s.observations[0]?.facts ?? null;
+  await writeArtifact(join(root, "forged"), { "snapshot.json": stable(s) });
+  const bad = join(root, "forged/snapshot.json");
+  for (const [name, args] of [["inspect", ["inspect", "--snapshot", bad]], ["compare", ["compare", "--baseline", input, "--current", bad]]] as const) {
+    const result = await run([...args, "--output", join(root, "invalid-" + name), "--json"]);
+    expect(result.code).toBe(2); expect(resultSchema.parse(JSON.parse(result.stdout) as unknown).analysis_status).toBe("invalid");
+  }
+});
+test("real comparisons do not enforce invented missing-href or other-context canonicals", async () => {
+  const old = '<head><link rel="canonical" href="/old"></head><main>Body</main>';
+  const before = await site([{ path: "/", html: old }]);
+  const root = await mkdtemp(join(tmpdir(), "seo-cli-canonical-context-"));
+  await run(["snapshot", "--input", before.input, "--output", join(root, "baseline"), "--json"]);
+  const policy = join(root, "policy.yaml"); await writeFile(policy, "schema_version: 1\nfail_rules: [canonical_changed, canonical_removed]\n");
+  const inputs = [
+    { html: '<head><link rel="canonical"></head><main>Body</main>', headers: {} },
+    { html: old, headers: { Link: ['</new>; rel="canonical"; anchor="/unrelated"'] } },
+    { html: old, headers: { Link: ['</new>; rel="canonical"; anchor="#part"'] } },
+  ];
+  for (const [i, page] of inputs.entries()) {
+    const current = await site([{ path: "/", ...page }]); const out = join(root, "snapshot" + i);
+    expect((await run(["snapshot", "--input", current.input, "--output", out, "--json"])).code).toBe(0);
+    const result = await run(["compare", "--baseline", join(root, "baseline/snapshot.json"), "--current", join(out, "snapshot.json"), "--policy", policy, "--output", join(root, "compare" + i), "--json"]);
+    expect(result.code).toBe(0);
+    const report = await Bun.file(join(root, "compare" + i, "findings.json")).json();
+    expect(report.findings.some((f: { rule: string }) => ["canonical_changed", "canonical_removed"].includes(f.rule))).toBe(false);
   }
 });

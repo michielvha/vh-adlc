@@ -60,3 +60,16 @@ test("HTTP canonical parameters require each separator while valid quoted syntax
   expect(parse("", { Link: ['</new>; rel="canonical"; title="a; b, c"'] }).controls.canonical_state).toBe("valid");
   expect(parse("", { Link: ['</new>; rel="next"; rel="canonical"'] }).controls.canonical_state).toBe("absent");
 });
+test("missing canonical href is unavailable while explicit empty href retains its URL meaning", () => {
+  expect(parse('<head><link rel="canonical"></head>').controls).toMatchObject({ canonical_state: "unavailable", canonical: null });
+  expect(parse('<head><link rel="canonical" href=""></head>').controls).toMatchObject({ canonical_state: "valid", canonical: "https://example.test/" });
+});
+test("HTTP Link anchor applies its context before contributing a document canonical", () => {
+  for (const anchor of ["/unrelated", "#part"]) {
+    const header = `</new>; rel="canonical"; anchor="${anchor}"`;
+    expect(parse("", { Link: [header] }).controls.canonical_state).toBe("absent");
+    expect(parse('<head><link rel="canonical" href="/old"></head>', { Link: [header] }).controls).toMatchObject({ canonical_state: "valid", canonical: "https://example.test/old" });
+  }
+  for (const anchor of ["/", "https://example.test/", ""]) expect(parse("", { Link: [`</new>; rel="canonical"; anchor="${anchor}"`] }).controls.canonical).toBe("https://example.test/new");
+  for (const suffix of ['anchor="http://["', 'anchor="/"; anchor="/other"']) expect(parse("", { Link: [`</new>; rel="canonical"; ${suffix}`] }).controls.canonical_state).toBe("unavailable");
+});

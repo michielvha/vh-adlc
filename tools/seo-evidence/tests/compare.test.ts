@@ -72,3 +72,14 @@ test("malformed HTTP canonical parameters remain unavailable without selected re
     expect(r.exit_code).toBe(0);
   }
 });
+test("canonical targets require an actual href and matching HTTP Link context", async () => {
+  const old = '<head><link rel="canonical" href="/old"></head><main>Body</main>';
+  const before = await site([{ path: "/", html: old }]);
+  const missing = await site([{ path: "/", html: '<head><link rel="canonical"></head><main>Body</main>' }]);
+  const r = applyPolicy(compare(before.snapshot, missing.snapshot), { schema_version: 1, fail_rules: ["canonical_changed", "canonical_removed"] });
+  expect(r.findings.some(f => f.rule === "comparison_unavailable")).toBe(true); expect(r.exit_code).toBe(0);
+  for (const anchor of ["/unrelated", "#part"]) {
+    const current = await site([{ path: "/", html: old, headers: { Link: [`</new>; rel="canonical"; anchor="${anchor}"`] } }]);
+    expect(compare(before.snapshot, current.snapshot).findings).toHaveLength(0);
+  }
+});
