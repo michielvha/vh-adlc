@@ -1977,7 +1977,6 @@ None. On 2026-11-17 the owner accepts the R-117 compatibility recommendations. T
 | 2026-11-18 | R-126 | implementation | `61ca344352664ae1529ff9b66a8be8f475f991bd` | claude-opus-5-5 | procedural | Seven criteria not verified; one test-coverage correction and one cleanup nit. |
 | 2026-11-18 | R-127 | implementation | `9335c8eca92062f5864ee86a97107c01ba7b4bc3` | claude-opus-5-5 | procedural | No findings; seven composite criteria remain not verified pending release and adoption. |
 | 2026-11-18 | R-128 | implementation | `94e40a7a15ce8e7f2cfef34cc62f4392ee2de2ff` | claude-opus-5-5 | procedural | No blocking or should-fix findings; three nits; seven composite criteria remain not verified. |
-
 | 2026-11-18 | R-129 | implementation | `ddc97c873416c337ea86ccb945086fc980bb90ee` | claude-opus-5-5 | procedural | No findings; seven composite criteria remain not verified pending release and adoption. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
