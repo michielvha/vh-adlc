@@ -80,7 +80,8 @@ retain original evidence.
 
 The owner-approved correction accepts only Claude's bounded, non-executable
 `.in_use/<pid>` JSON process marker. Every shipped file and mode still has
-to match; other extra files and all links remain refused. The checker neither
+to match; other extra files and symlinked entries below the installed root remain
+refused. Hard-linked shipped files keep their existing support. The checker neither
 executes metadata nor removes it or disturbs the running session. Retained
 private payload checks stay exact. No effect permission changes.
 
@@ -101,7 +102,7 @@ and byte, but its active cache contains one extra `.in_use/<pid>` marker. It is
 a 38-byte JSON object with `pid` and `procStart` fields. The unchanged shared
 inspector correctly refuses it under the previous no-exclusions design. The marker belongs to an existing process and is not removed or altered.
 
-A read-only Python probe uses `Path.read_bytes`, `json.loads`, `lstat`,
+A read-only Python probe reads at most 257 bytes through `Path.open`, then uses `json.loads`, `lstat`,
 `stat.S_IMODE`, `/proc/<pid>/comm`, `platform.freedesktop_os_release`, and
 `subprocess.check_output(["claude", "--version"])`. The command is
 `python3 t141-native-marker-probe.py <ordinary-installed-plugin-root>`;
@@ -137,7 +138,7 @@ ordinary local gate and are not claimed.
 ### Isolated marker prototype checkpoint on 2026-11-18
 
 The claimed feature tree still has no implementation change. An owned public-source
-diagnostic clone contains proposed candidate `8c5506bdd877d7e64bf282f2d9e2e22d395f6748`:
+diagnostic clone contains proposed candidate `1b862970d22d3a65792057bd83f83e9cec350f0c`:
 the inspector, its tests, the two 0.26.1 candidate manifests and setup guidance.
 It is not published or accepted migration proof.
 
@@ -161,8 +162,35 @@ The proposed inspector also verifies the real ordinary Codex and active Claude
 0.26.0 caches against their original 291-file fingerprint, preserving the live
 native marker bytes and modes. This read-only diagnostic invokes no provider and
 writes no remote state. It does not install or prove the corrected published
-runtime. A fresh actual Claude Code Opus 5.5 code diagnostic is running against
-the exact candidate and proposed details. Q2 remains pending; no promotion,
+runtime. Actual Claude Code Opus 5.5 diagnostic `docs-drift-paired-claude-r17`
+reads all 49 required fragments at `8c5506bd` and returns one low test-evidence
+finding and two nits. Candidate `1b862970` fixes them: empty-directory handling
+stays unchanged, refusals name their intended guards, and the bounded-read test
+must observe a read. The new three-case compatibility test fails before the
+correction and passes afterward. The first new caller test incorrectly expects
+a structured refusal instead of the existing rejected promise; its original
+failure is retained and the corrected assertion changes no API.
+
+The final candidate passes 70 bootstrap cases with 244 assertions, 68
+original-runtime/preflight cases with 189 assertions, and strict project types.
+The two owned test runs confirm cleanup and unchanged source. Fresh actual Opus
+diagnostic `docs-drift-paired-claude-r18` reads all 27 required fragments at
+`1b862970` and returns no findings; input hashes, model identity and process
+cleanup validate. Both raw reviews stay in the local archive. They are source
+diagnostics, not canonical completion or final paired migration reviews.
+
+An actual Claude Code 2.1.326 role loads the existing isolated ordinary 0.26.0
+install through `--plugin-dir`. Normal completion reports model
+`claude-opus-5-5`; a second invocation is cancelled after native initialization.
+Both initializations identify the plugin, no marker appears during the observed
+interval or remains afterward, and the original helper still verifies the
+payload. Both owned process groups are absent after cleanup. These observations
+cover this inline-role path and build only. They do not prove a registry-loaded
+active session on the corrected release or another platform/client build.
+Evidence is `t143-native-inline-marker/results.json`; no live session, foreign
+marker, phone configuration or remote repository state is changed.
+
+Q2 remains pending; no promotion,
 release, feature completion or remote routing switch is inferred from this work.
 
 ### Final adoption preparation on 2026-11-18
