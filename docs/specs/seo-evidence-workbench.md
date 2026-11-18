@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Independent review has no blocking or should-fix findings; awaiting owner acceptance."
+status: planned
+status_description: "Accepted after independent review; preparing tasks for isolated implementation."
 issue: null
 goal: "A person or agent can turn saved public-site evidence into repeatable cross-page findings and technical regression checks without depending on the unfinished SEO features."
 covers:
@@ -149,7 +149,7 @@ None yet; written once the reviewed document is accepted and planned. No depende
 
 ## Open Questions
 
-None. On 18 November 2026 the owner chose saved-evidence analysis before live collection, report-only defaults with explicit rule enforcement, and final-document nodes with explicit redirects, known final URLs and unverified conflicting captures. The detailed implementation scope still requires acceptance after independent review.
+None. On 18 November 2026 the owner chose saved-evidence analysis before live collection, report-only defaults with explicit rule enforcement, and final-document nodes with explicit redirects, known final URLs and unverified conflicting captures. The owner accepted R-2's reviewed scope and requested implementation tasks that day.
 
 ## Review Log
 
@@ -157,6 +157,7 @@ None. On 18 November 2026 the owner chose saved-evidence analysis before live co
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-18 | R-1 | spec | `a96d118449bc25dca438f527036cc217cb5222ff` | unknown | procedural | Three blocking and two should-fix findings; model identity not attested. |
 | 2026-11-18 | R-2 | spec | `0394a5f8aa6b72d63179843e13bca6e27eb1faeb` | unknown | procedural | One nit, no blocking or should-fix findings; model identity not attested. |
+| 2026-11-18 | R-2 | spec | `0394a5f8aa6b72d63179843e13bca6e27eb1faeb` | n/a | n/a | accepted by owner |
 
 ### R-1
 
