@@ -213,7 +213,7 @@ scope and an explicit board/repository configuration; see the [Projects referenc
 
 Verify that the selected installed payload contains `vh-adlc-docs-drift` and
 its packaged helpers. Resolve its actual plugin directory and check the
-[current acceptance record](../reference/compatibility.md#shared-documentation-drift-candidate)
+[current acceptance record](../reference/compatibility.md#shared-documentation-drift)
 before migration. The shared procedure works from consumer-owned settings and
 source. Create those new files through the [greenfield example](../../plugins/vh-adlc/examples/docs-drift/README.md)
 and [settings reference](../../plugins/vh-adlc/references/docs-drift-settings.md).
