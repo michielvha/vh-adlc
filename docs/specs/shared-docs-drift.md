@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Reviewed grammar fix; native rerun and exact-head CI pending."
+status_description: Published plugin verified through ordinary marketplace installs; consumer native publishing and activation pending
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -74,34 +74,64 @@ The scope excludes claim-by-claim docs-truth sweeps and their rolling ledger. Ex
 
 Move Stackweaver's whole-documentation audit and stale audit-PR resolver into the
 ordinary installed vh-adlc plugin. Findings and selected corrections are checked
-against current source and independently reviewed. Resolution keeps every
-original hunk and human decision; originals close after the replacement merges.
+against current source and independently reviewed. Resolution keeps original
+hunks and human decisions; originals close after the replacement merges.
 
 Stackweaver keeps its scanner, twelve detectors, feedback, generators, local
-rules, Monday schedule, publisher accounts and notifications. Verified metadata
-and acceptance-checkbox fixes remain available in its older local plans. Shared
-specs keep their lifecycle gates. The compatible tool and project settings ship
-and roll back together; historical records retain their original policy.
+rules, Monday schedule, accounts and notifications. Safe metadata and checkbox
+corrections remain available in older local plans. Shared specs retain their
+lifecycle gates. The compatible tool and project settings ship and roll back
+together; historical records retain their original policy.
 
 Recovery preserves original ownership and evidence. A publication lease keeps
 new audits pending before models run. Exact approved abandonment requires a
 stopped executor and atomically removes its own lease and receipt. Terminal
 receipts remain. Unsupported lease-only deletion can allow a fresh assessment.
 
-The accepted normative spec is unchanged. R-129 covered the earlier native
-reply-prefix correction. An actual unattended trial then exposed missing
-fresh-runner reader setup and a reviewer kind outside the strict grammar. The
-consumer bootstrap and shared reply instructions now correct those causes.
-Claude Code Opus 5.5 R-130 has no blocking or should-fix findings; its stale-summary
-nit is corrected here. The regression fails before the grammar fix and passes
-63 assertions after it. The merge controller remains stopped until the actual
-native rerun and exact-head CI pass. All seven composite criteria remain
-unverified pending their complete evidence.
+The accepted normative spec is unchanged. Claude Code Opus 5.5 R-130 clears the
+strict native reply-format correction with no blocking or should-fix finding.
+Actual unattended rehearsal 44305915096 passes cold setup, installed discovery,
+preparation and independent native verification in separate Opus 5.5 contexts.
+Its models use synthetic source/tracker data; it proves no real publication.
 
-The owner approved shared publication/release and gated Stackweaver migration.
-Released marketplace fresh installs/upgrades, final native/unattended checks,
-release-bound paired review, cutover and rollback remain required. GUI and phone
-checks retain their deferral. Other agent migrations stay in their own roadmap.
+PR #98 merges as `18388bde` after all six exact-head CI jobs pass. Plugin 0.26.0
+then passes ordinary Codex and Claude fresh-install and upgrade checks, matching
+all 291 files and the complete component fingerprint. The configured runtime
+remains the published verified 0.34.0; the default-branch version pipeline is
+still running. A concurrent main merge adds only unrelated SEO specifications
+and changes neither this accepted baseline nor the installed payload.
+
+The staged consumer retains legacy routing and all six open legacy proposal
+identities. Its integrated local gate passes 48 checks with no skips and its
+migration suite passes 83 tests. Preliminary Claude paired review has no remaining
+blocking or should-fix issue; its small notes are corrected. The bounded actual
+bot-publisher fixture, released native-profile observations, final paired C/D
+review, cutover and rollback remain required. All seven composite criteria stay
+unverified until their complete evidence is independently reviewed. GUI and
+phone checks remain owner-deferred. Other agents stay in their own roadmap.
+
+### Published payload and migration checkpoint on 2026-11-18
+
+The original exact-head CI is run `44305790900`; every job succeeds. The ordinary
+marketplace proof is `t130-marketplace-release-18388bde/installation.json` in the
+private operational archive. Both fresh profiles start empty; both upgrades
+start at ordinarily installed 0.25.0. All native installer commands exit zero
+with confirmed cleanup. The released component fingerprint is
+`e3789c55d3800692c0e84cf7515db1c47f999790f214e742df8a8fda77421628`.
+Global plugin and phone settings have not changed at this checkpoint.
+
+The current consumer uses the published source with the original twelve units,
+feedback and mode still staged. The next real publisher test is limited to one
+synthetic document, one draft PR and disjoint branch/lease/receipt refs. Existing
+private draft PRs establish availability without creating a probe. Original
+credential-scanned evidence includes hidden files. Partial or unknown operations
+retain their original journal and refs. Successful fixture cleanup closes only
+its own PR unmerged and preserves terminal receipts. Existing Secret Scan stays
+active with an explicitly reviewed range; it is observed separately from the
+native test job. No production or final migration claim is made.
+
+The following checkpoint notes retain their original historical observations.
+Their pending/review language is superseded by the current summary above.
 
 ### Native correction review follow-up
 
