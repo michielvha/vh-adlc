@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: draft
 status_description: Final tests and paired review pass; active Claude cache marker blocks remote cutover
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
