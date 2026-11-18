@@ -51,7 +51,7 @@ export async function runPreparation(options: { repo: string; run: RunDirectory;
     const prompt = [
       "Prepare only the selected documentation corrections in the request. Read the original source assessment, complete scanner findings, decisions, project procedure, feedback and current source.",
       "Keep the source checkout unchanged. Return proposed edits as data. Do not publish, commit, run network commands, delegate, resume another context or change policy.",
-      "Return MODEL: <actual full model ID> on its own line, then one JSON handoff {input_sha256:worker_input_sha256,edits:[{id,path,action,start,end,before_sha256,replacement_base64,after_mode}],publication:{operation_id,proposal:{kind,payload}}|null}.",
+      "A strict parser consumes the final reply. The MODEL header must be the first line: MODEL: <actual full model ID>, then one JSON handoff {input_sha256:worker_input_sha256,edits:[{id,path,action,start,end,before_sha256,replacement_base64,after_mode}],publication:{operation_id,proposal:{kind,payload}}|null}. Return no summary, fences, footer or prose outside this protocol.",
       (resolving ? "Use only edit_ids selected by the complete hunk dispositions." : "Use each selected decision ID exactly once.")
         + " Edit offsets and hashes refer to raw committed blobs. Actions are replace, create, delete or chmod. Respect protected documents, frontmatter and consumer rules. Report unavailable evidence explicitly.",
       "Publication is an exact proposed pr-create, pr-update or issue-create payload under consumer policy. It grants no publication permission. Keep it null if no proposal can be supported. Candidate verification, independent review and exact current authority follow separately.",

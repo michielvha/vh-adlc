@@ -18,10 +18,10 @@ afterAll(() => {
   else for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-test.each(["matching", "caller-change", "mixed-plans"])("normal prepare retains the original worker selection and edits only its owned candidate: %s", async fault => {
+test.each(["matching", "caller-change", "mixed-plans", "prepare-protocol"])("normal prepare retains the original worker selection and edits only its owned candidate: %s", async fault => {
   const component = ordinaryComponentFixture(roots, true), f = preflightFixture(roots, "none", { component: component.identity, executable: component.executable },
     fault === "mixed-plans" ? configureMixedPlanFixture : undefined);
-  writeFileSync(component.executable, auditClient(fault === "mixed-plans" ? fault : "prepare", true), { mode: 0o755 });
+  writeFileSync(component.executable, auditClient(["mixed-plans", "prepare-protocol"].includes(fault) ? fault : "prepare", true), { mode: 0o755 });
   const source = f.head(), origin = join(f.root, "origin.git"), directory = join(f.root, "run"), state = join(f.root, "state");
   git(f.root, "clone", "--bare", "--no-local", f.repo, origin);
   const service = installOwnedNativeService({ root: f.root, origin, source, head: source, publisher_identity: { actor: "fixture-owner", actor_id: 30 } });

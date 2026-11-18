@@ -9,7 +9,8 @@ const fixtureVersion = ${JSON.stringify(ordinary ? "1.0.112" : "fixture-1.0.0")}
 if (args.includes("--version")) { console.log(isClaude ? fixtureVersion + " (Claude Code)" : "GitHub Copilot CLI " + fixtureVersion + "."); process.exit(0); }
 if (args.includes("--help")) { console.log("--plugin-dir --model --session-id --output-format --available-tools --no-custom-instructions --disable-builtin-mcps"); process.exit(0); }
 if (${JSON.stringify(fault)} === "provider-error") process.exit(73);
-const line = (isClaude ? args.at(-1) : arg("--prompt")).split("\\n").find(line => line.startsWith("DOCS_DRIFT_REQUEST: "));
+const prompt = isClaude ? args.at(-1) : arg("--prompt");
+const line = prompt.split("\\n").find(line => line.startsWith("DOCS_DRIFT_REQUEST: "));
 if (!line || (isClaude ? process.env.CLAUDE_CODE_OAUTH_TOKEN : process.env.COPILOT_GITHUB_TOKEN) !== "synthetic-selected-provider") process.exit(91);
 const ref = JSON.parse(line.slice("DOCS_DRIFT_REQUEST: ".length));
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
@@ -73,12 +74,17 @@ if (request.kind === "docs-drift-closure-worker-request") {
 }
 if (${JSON.stringify(fault)} === "invalid-worker" && request.kind.endsWith("worker-request")) records = "Not a worker handoff\\n";
 if (${JSON.stringify(fault)} === "request-change") writeFileSync(ref.path, "Preserve this changed synthetic request\\n", { mode: 0o600 });
+// The real native preparation trial added a human summary before its otherwise
+// valid MODEL/JSON reply. Reproduce that response when the machine-only contract
+// is missing from the actual prompt delivered to this owned process.
+const prefix = ${JSON.stringify(fault)} === "prepare-protocol" && request.kind === "docs-drift-prepare-worker-request"
+  && !prompt.includes("The MODEL header must be the first line") ? "I prepared the selected edit.\\n\\n" : "";
 if (isClaude) {
   console.log(JSON.stringify({ type: "system", subtype: "init", session_id: arg("--session-id"), cwd: process.cwd(), model: "claude-opus-5.5" }));
   console.log(JSON.stringify({ type: "assistant", session_id: arg("--session-id"), message: { model: "claude-opus-5.5", content: [{ type: "text", text: "MODEL: claude-opus-5.5\\n" + records }] } }));
   console.log(JSON.stringify({ type: "result", subtype: "success", is_error: false, session_id: arg("--session-id"), result: "MODEL: claude-opus-5.5\\n" + records }));
 } else {
   console.log(JSON.stringify({ type: "session.start", data: { sessionId: arg("--session-id"), alreadyInUse: false, context: { cwd: process.cwd() } } }));
-  console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-opus-5.5", content: "MODEL: claude-opus-5.5\\n" + records } }));
+  console.log(JSON.stringify({ type: "assistant.message", data: { model: "claude-opus-5.5", content: prefix + "MODEL: claude-opus-5.5\\n" + records } }));
 }
 `; }

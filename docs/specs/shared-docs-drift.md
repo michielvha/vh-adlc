@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Local compatibility fixes verified; preparing publication and installed/provider acceptance."
+status_description: "Native candidate checks found a reply-format issue; correcting it before publication."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -80,7 +80,39 @@ The matching tool and project settings ship together and roll back together. The
 
 Recovery retains the original operation's ownership and evidence. A publication lease keeps new audits pending before models run. Administrative abandonment requires exact approval and a stopped original executor, then removes its lease and matching receipt atomically. Terminal receipts persist. Unsupported deletion of only a lease can permit a fresh assessment while its receipt remains.
 
-The owner accepted clean Claude Code Opus 5.5 R-122. Local scanner parity, companion rules and native synthetic workflow checks pass at their recorded revisions. Whole-feature Claude Code Opus 5.5 review R-127 has no findings after independently verifying those corrections. Every composite completion criterion remains unverified pending its full release/adoption proof. The final corrections restore local command behavior and scheduled safe-fix wording, preserve older metadata and remove unused helpers. Released marketplace installs, actual provider/hosted trials, final release-bound paired review, cutover and activated rollback remain open. GUI and phone tests are deferred. Merge, release and cutover retain their separate approval stages.
+The owner accepted clean Claude Code Opus 5.5 R-122. Local scanner parity, companion rules and native synthetic workflow checks pass at their recorded revisions. Whole-feature Claude Code Opus 5.5 review R-127 has no findings at its recorded source. The subsequent native reply-format clarification needs a fresh implementation review. Every composite completion criterion remains unverified pending its full release/adoption proof. The final corrections restore local command behavior and scheduled safe-fix wording, preserve older metadata and remove unused helpers. Released marketplace installs, actual provider/hosted trials, final release-bound paired review, cutover and activated rollback remain open. GUI and phone tests are deferred. Merge, release and cutover retain their separate approval stages.
+
+### Native preparation protocol correction on 2026-11-18
+
+The owner approves shared release and gated Stackweaver migration, preserving
+useful existing behavior. The exact-head release merge is held while a real
+native preparation rehearsal is corrected. Ordinary isolated Claude marketplace
+installation of candidate `a47bcb4a` matches all 291 plugin files. Its pinned
+Claude 2.1.325 report run observes Opus 5.5 worker and reviewer identities in
+separate native contexts and preserves source, tracker and refs. This is candidate
+proof, not released installation or hosted production acceptance.
+
+The actual native preparation worker proposes the correct synthetic source
+correction but prefixes its MODEL/JSON reply with a human summary. The strict
+decoder refuses it before preparation. Its original reply is retained. The
+normal-entry regression reproduces that failure. The corrected normal-entry
+regression passes 63 assertions through preparation, verification, refused approval
+and owned fake-service publication. Pinned production/test TypeScript passes.
+Tighten the existing machine handoff instructions to require the MODEL header as the first line and exclude
+summaries and prose. Apply the same clarification to the analogous closure-worker
+handoff. Keep the decoder, schemas, evidence requirements and effect gates intact.
+A fresh native correction run and independent implementation review remain open.
+
+Stackweaver integrates current default `56672d4c` at `d07e9695`, preserving both
+sides of its internal changelog conflict. Its normal hook passes 40 checks; the
+fast-mode backend vulnerability omission is separately run and finds none.
+Updated local corpus parity covers 873 documents and twelve detectors, with
+identical 828 findings, 63 suppressions, legacy JSON and console output. A
+concurrent shared Git-config change invalidates the live-caller preservation
+observation; repeating in an isolated source clone preserves caller state too.
+Legacy scanner, commands, weekly workflow and feedback bytes are unchanged by
+the intervening default-branch updates. Released installs, native/hosted trials,
+final paired C/D review and cutover/rollback retain their pending checks.
 
 ### Claude-only consumer configuration on 2026-11-18
 
