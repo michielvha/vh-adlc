@@ -45,6 +45,7 @@ func clientPID(ctx context.Context, c *conn, id uint32) (int, error) {
 	}
 	return int(le.Uint32(value[44:])), nil
 }
+
 func (h *Helper) ownsWindow(ctx context.Context, c *conn, id uint32, pid int) (bool, error) {
 	atom, err := h.intern(ctx, c, "_NET_WM_PID")
 	if err != nil {
@@ -60,6 +61,7 @@ func (h *Helper) ownsWindow(ctx context.Context, c *conn, id uint32, pid int) (b
 	actual, err := clientPID(ctx, c, id)
 	return actual == pid, err
 }
+
 func geometry(ctx context.Context, c *conn, id uint32) (Window, error) {
 	reply, err := c.call(ctx, windowRequest(14, id))
 	if err != nil {

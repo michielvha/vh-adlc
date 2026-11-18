@@ -36,7 +36,7 @@ required browser verification fails, report the blocker without a localhost fall
 
 Installation makes the plugin discoverable. Activation establishes remote context for future chats. Native-agent scenarios and a browser on the other device establish actual behavior; package discovery alone does not.
 
-Version 0.3.0 adds the viewer's clipboard panel and reusable profiles. Update the installed marketplace plugin through your agent's plugin manager, then start a new chat to load its instructions. Existing sessions retain their running supervisor's code. End an older session before using the new features.
+Version 0.4.0 adds automatic viewer sizing. The clipboard panel and reusable profiles remain available. Update the installed marketplace plugin through your agent's plugin manager, then start a new chat to load its instructions. Existing sessions retain their running supervisor's code. New sessions use the updated version.
 
 ## Human sign-in and agent hand-back
 

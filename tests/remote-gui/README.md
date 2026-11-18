@@ -25,6 +25,8 @@ Real tab focus switching runs in Chromium with Playwright's forced focus disable
 
 For actual 200 percent zoom, the fixture starts a separate private Xvfb display for its viewer, then sends native XTEST browser shortcuts. Headless keyboard shortcuts did not change browser zoom in local probes. This path needs the existing Python 3, X11 and XTEST libraries as well as the tools listed above. It never shares the remote browser's display or profile. `REMOTE_GUI_ARTIFACT_DIR` selects an external artifact directory; the default is `/tmp/rg-adaptive-evidence`. It retains synthetic viewport captures, zoom measurements and first-failure artifacts. Browser tracing, HAR and recordings remain disabled.
 
+`legacy.e2e.test.ts` archives the immutable 0.3.0 source at `4d7f8238ecabde6cd8693c5d16f3214f1fb142c6` and builds it through its independent package helper. It checks new-CLI access, status and stop against the old supervisor, unchanged record keys and supervisor identity, fixed legacy geometry and input while a new session adapts. This opt-in test needs that commit in local history; CI checks out the full history. It uses only disposable session state.
+
 Run the GUI component crash and expiry checks from the plugin module with the same existing GUI tool paths:
 
 ```sh

@@ -115,6 +115,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: plugins/remote-gui/go.mod
@@ -155,7 +156,7 @@ jobs:
           REMOTE_GUI_FIREFOX=$(bun -e 'console.log(require("./tests/remote-gui/node_modules/playwright-core").firefox.executablePath())')
           test -x "$REMOTE_GUI_FIREFOX"
           export REMOTE_GUI_FIREFOX
-          bun test tests/remote-gui/browser.e2e.test.ts tests/remote-gui/viewer-page.e2e.test.ts tests/remote-gui/viewport.e2e.test.ts
+          bun test tests/remote-gui/browser.e2e.test.ts tests/remote-gui/viewer-page.e2e.test.ts tests/remote-gui/viewport.e2e.test.ts tests/remote-gui/legacy.e2e.test.ts
       - name: Retain synthetic viewport evidence
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

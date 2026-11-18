@@ -36,6 +36,7 @@ type geometryController struct {
 var errViewportUnavailable = errors.New("viewport-unavailable")
 
 func (c *geometryController) eligible(ctx context.Context) bool { return ctx.Err() == nil && c.owns() }
+
 func (c *geometryController) apply(ctx context.Context, size viewport.Size) (bool, error) {
 	if !size.Valid() || !c.eligible(ctx) {
 		return false, errViewportUnavailable
@@ -98,6 +99,7 @@ func (c *geometryController) apply(ctx context.Context, size viewport.Size) (boo
 	c.observed, _ = c.helper.Windows(ctx, c.pid)
 	return false, errViewportUnavailable
 }
+
 func (r *runtime) viewportOwned() bool {
 	if r.stopped || r.chrome == nil || !r.modeReady || r.display == nil || (r.geometryCtx != nil && r.geometryCtx.Err() != nil) {
 		return false
@@ -113,6 +115,7 @@ func (r *runtime) viewportOwned() bool {
 	}
 	return false
 }
+
 func (r *runtime) vncGeometry(ctx context.Context, args ...string) ([]byte, error) {
 	if !r.viewportOwned() {
 		return nil, errViewportUnavailable
@@ -125,10 +128,12 @@ func (r *runtime) vncGeometry(ctx context.Context, args ...string) ([]byte, erro
 	}
 	return out, nil
 }
+
 func (r *runtime) setClip(ctx context.Context, size viewport.Size) error {
 	_, err := r.vncGeometry(ctx, "-sync", "-remote", fmt.Sprintf("clip:%dx%d+0+0", size.Width, size.Height))
 	return err
 }
+
 func (r *runtime) readClip(ctx context.Context) (viewport.Size, error) {
 	out, err := r.vncGeometry(ctx, "-query", "dpy_x,dpy_y")
 	if err != nil {
@@ -150,6 +155,7 @@ func (r *runtime) readClip(ctx context.Context) (viewport.Size, error) {
 	}
 	return size, nil
 }
+
 func (r *runtime) resize(ctx context.Context, size viewport.Size) (bool, error) {
 	if !r.mu.TryLock() {
 		return false, errors.New("viewport-busy")
@@ -171,6 +177,7 @@ func (r *runtime) resize(ctx context.Context, size viewport.Size) (bool, error) 
 	}
 	return r.geometry.apply(ctx, size)
 }
+
 func (r *runtime) startGeometry() {
 	helper, ok := r.clip.(geometryHelper)
 	if !ok {

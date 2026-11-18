@@ -37,6 +37,7 @@ func viewportWindow(t *testing.T, h *Helper, pid int, kind string) uint32 {
 	}
 	return id
 }
+
 func TestViewportWindowsAndWorkarea(t *testing.T) {
 	d := scratchDisplay(t)
 	h := open(t, d)
@@ -166,7 +167,6 @@ func TestViewportForeignClient(t *testing.T) {
 	if err != nil || changed {
 		t.Fatal("foreign client's native focus was stolen")
 	}
-
 }
 
 func TestViewportRestoresOnlyMissingNativeFocus(t *testing.T) {

@@ -22,6 +22,7 @@ func (f *geometryFake) Windows(_ context.Context, pid int) ([]xclip.Window, erro
 	f.seenPID = pid
 	return slices.Clone(f.windows), nil
 }
+
 func (f *geometryFake) Configure(ctx context.Context, _ int, w []xclip.Window) error {
 	f.configs++
 	if err := ctx.Err(); err != nil {
@@ -48,6 +49,7 @@ func geometryFixture() (*geometryController, *geometryFake, *viewport.Size, *int
 	}}
 	return c, f, &clip, &calls
 }
+
 func TestViewportTransactionAndNewWindows(t *testing.T) {
 	c, f, clip, calls := geometryFixture()
 	size := viewport.Size{Width: 390, Height: 812}
@@ -71,6 +73,7 @@ func TestViewportTransactionAndNewWindows(t *testing.T) {
 		t.Fatal("window destruction did not invalidate confirmation")
 	}
 }
+
 func TestViewportPartialRollbackRecovery(t *testing.T) {
 	for _, rollbackFails := range []bool{false, true} {
 		t.Run(map[bool]string{false: "confirmed rollback", true: "uncertain rollback"}[rollbackFails], func(t *testing.T) {
@@ -105,6 +108,7 @@ func TestViewportPartialRollbackRecovery(t *testing.T) {
 		})
 	}
 }
+
 func TestViewportOwnershipCancellationAndBusy(t *testing.T) {
 	c, f, _, calls := geometryFixture()
 	c.owns = func() bool { return false }

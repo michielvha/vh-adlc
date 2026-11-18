@@ -8,6 +8,11 @@ const plugin = join(repo, 'plugins/remote-gui');
 const read = (path: string) => readFileSync(join(repo, path), 'utf8');
 
 describe('independent remote-gui package', () => {
+ test('adaptive sizing is packaged as remote-gui 0.4.0', () => {
+  for (const path of ['plugins/remote-gui/plugin.json', 'plugins/remote-gui/.claude-plugin/plugin.json']) {
+   expect(JSON.parse(read(path)).version).toBe('0.4.0');
+  }
+ });
  test('both catalogs install the same independent source and manifests agree', () => {
   const agents = JSON.parse(read('.agents/plugins/marketplace.json')).plugins.find((p: any) => p.name === 'remote-gui');
   const claude = JSON.parse(read('.claude-plugin/marketplace.json')).plugins.find((p: any) => p.name === 'remote-gui');

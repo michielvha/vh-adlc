@@ -75,6 +75,7 @@ func decodeViewport(body []byte) (viewportRequest, bool) {
 	}
 	return request, config.ValidID(request.ViewerID) && request.Sequence > 0 && request.Sequence <= 9007199254740991 && (viewport.Size{Width: request.Width, Height: request.Height}).Valid()
 }
+
 func viewportReply(w http.ResponseWriter, status int, result string, size viewport.Size, code string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -86,6 +87,7 @@ func viewportReply(w http.ResponseWriter, status int, result string, size viewpo
 		Error  string `json:"error,omitempty"`
 	}{result, size.Width, size.Height, code})
 }
+
 func (p *Proxy) serveViewport(w http.ResponseWriter, r *http.Request) {
 	fail := func(status int, code string) { viewportReply(w, status, "", viewport.Size{}, code) }
 	for key, want := range map[string]string{"Origin": p.origin.String(), "Sec-Fetch-Site": "same-origin", "X-Remote-Gui-Viewport": "1", "Content-Type": "application/json"} {

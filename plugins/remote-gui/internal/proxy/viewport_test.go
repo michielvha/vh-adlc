@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/viewport"
 )
 
@@ -33,9 +33,11 @@ func viewportFixture(t *testing.T) (*Proxy, *httptest.Server, *testCredential, *
 	}
 	return p, s, enroll(t, p, s), calls
 }
+
 func viewportBody(id string, seq int, claim bool) string {
 	return fmt.Sprintf(`{"viewer_id":"%032s","sequence":%d,"claim":%t,"width":390,"height":812}`, id, seq, claim)
 }
+
 func sendViewport(t *testing.T, s *httptest.Server, c *testCredential, body string, edit func(*http.Request)) (int, string) {
 	t.Helper()
 	r, err := http.NewRequest(http.MethodPost, s.URL+"/__remote_gui/viewport", strings.NewReader(body))
@@ -63,17 +65,28 @@ func sendViewport(t *testing.T, s *httptest.Server, c *testCredential, body stri
 	_ = json.NewDecoder(reply.Body).Decode(&data)
 	return reply.StatusCode, data.Result
 }
+
 func TestViewportValidation(t *testing.T) {
 	cases := []struct {
 		name string
 		body string
 		edit func(*http.Request)
 	}{
-		{"missing origin", "", func(r *http.Request) { r.Header.Del("Origin") }}, {"foreign origin", "", func(r *http.Request) { r.Header.Set("Origin", "https://foreign.invalid") }}, {"duplicate origin", "", func(r *http.Request) { r.Header.Add("Origin", r.Header.Get("Origin")) }},
-		{"missing site", "", func(r *http.Request) { r.Header.Del("Sec-Fetch-Site") }}, {"foreign site", "", func(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "cross-site") }}, {"duplicate site", "", func(r *http.Request) { r.Header.Add("Sec-Fetch-Site", "same-origin") }},
-		{"missing marker", "", func(r *http.Request) { r.Header.Del("X-Remote-Gui-Viewport") }}, {"duplicate marker", "", func(r *http.Request) { r.Header.Add("X-Remote-Gui-Viewport", "1") }}, {"content type", "", func(r *http.Request) { r.Header.Set("Content-Type", "text/plain") }}, {"duplicate type", "", func(r *http.Request) { r.Header.Add("Content-Type", "application/json") }},
-		{"query", "", func(r *http.Request) { r.URL.RawQuery = "x=1" }}, {"method", "", func(r *http.Request) { r.Method = "PUT" }},
-		{"malformed", "{", nil}, {"large", strings.Repeat("x", 1025), nil}, {"duplicate field", `{"viewer_id":"0000000000000000000000000000000a","sequence":1,"claim":true,"width":390,"width":900,"height":812}`, nil},
+		{"missing origin", "", func(r *http.Request) { r.Header.Del("Origin") }},
+		{"foreign origin", "", func(r *http.Request) { r.Header.Set("Origin", "https://foreign.invalid") }},
+		{"duplicate origin", "", func(r *http.Request) { r.Header.Add("Origin", r.Header.Get("Origin")) }},
+		{"missing site", "", func(r *http.Request) { r.Header.Del("Sec-Fetch-Site") }},
+		{"foreign site", "", func(r *http.Request) { r.Header.Set("Sec-Fetch-Site", "cross-site") }},
+		{"duplicate site", "", func(r *http.Request) { r.Header.Add("Sec-Fetch-Site", "same-origin") }},
+		{"missing marker", "", func(r *http.Request) { r.Header.Del("X-Remote-Gui-Viewport") }},
+		{"duplicate marker", "", func(r *http.Request) { r.Header.Add("X-Remote-Gui-Viewport", "1") }},
+		{"content type", "", func(r *http.Request) { r.Header.Set("Content-Type", "text/plain") }},
+		{"duplicate type", "", func(r *http.Request) { r.Header.Add("Content-Type", "application/json") }},
+		{"query", "", func(r *http.Request) { r.URL.RawQuery = "x=1" }},
+		{"method", "", func(r *http.Request) { r.Method = "PUT" }},
+		{"malformed", "{", nil},
+		{"large", strings.Repeat("x", 1025), nil},
+		{"duplicate field", `{"viewer_id":"0000000000000000000000000000000a","sequence":1,"claim":true,"width":390,"width":900,"height":812}`, nil},
 	}
 	valid := viewportBody("a", 1, true)
 	for _, field := range []string{`"sequence":0`, `"sequence":9007199254740992`, `"width":319`, `"width":4097`, `"height":239`, `"height":4097`, `"width":390.5`, `"viewer_id":"invalid"`, `"claim":null`} {
@@ -113,6 +126,7 @@ func TestViewportValidation(t *testing.T) {
 		})
 	}
 }
+
 func TestViewportControlAndBusyRetry(t *testing.T) {
 	p, s, c, calls := viewportFixture(t)
 	for _, step := range []struct {
@@ -141,6 +155,7 @@ func TestViewportControlAndBusyRetry(t *testing.T) {
 		t.Fatal("retry reacquired control")
 	}
 }
+
 func TestViewportBoundAndExpiry(t *testing.T) {
 	p, s, c, _ := viewportFixture(t)
 	now := time.Now()
@@ -161,6 +176,7 @@ func TestViewportBoundAndExpiry(t *testing.T) {
 		t.Fatalf("expired viewers not reclaimed %d", code)
 	}
 }
+
 func TestViewportSessionBoundary(t *testing.T) {
 	p, s, c, calls := viewportFixture(t)
 	code, _ := sendViewport(t, s, nil, viewportBody("a", 1, true), nil)
