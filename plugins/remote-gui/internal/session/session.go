@@ -19,6 +19,7 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/profile"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/viewport"
 )
 
 type View struct {
@@ -57,6 +58,7 @@ type BrowserHandle struct {
 	Owned       []state.Process
 	Stop        func()
 	Clipboard   Clipboard
+	Resize      viewport.Resize
 }
 
 // Clipboard sets, reads and clears a browser session's remote clipboard.
