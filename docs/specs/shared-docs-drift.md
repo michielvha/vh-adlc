@@ -133,6 +133,9 @@ native test job. No production or final migration claim is made.
 The following checkpoint notes retain their original historical observations.
 Their pending/review language is superseded by the current summary above.
 
+The checkpoint notes below preserve earlier observations. Their pending statements
+refer to those checkpoints; the owner summary above states current acceptance.
+
 ### Native correction review follow-up
 
 The instrumented hosted run retains its actual worker/reviewer streams and
