@@ -1,0 +1,44 @@
+name: SEO evidence
+
+on:
+  push:
+    paths:
+      - tools/seo-evidence/**
+      - .github/workflows/seo-evidence.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seo-evidence-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: tools/seo-evidence
+    env:
+      BUN_RUNTIME_TRANSPILER_CACHE_PATH: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+      - name: Prepare the offline verification boundary
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap strace
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          bwrap --unshare-net --ro-bind / / -- /usr/bin/true
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Typecheck the toolkit
+        run: bun run typecheck
+      - name: Run actual command, example and isolation tests
+        run: bun test
