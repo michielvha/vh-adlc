@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted and task-planned; ready for isolated implementation."
+status: in-progress
+status_description: "Claimed on feat/seo-evidence-workbench; implementing the accepted tasks test-first."
+branch: feat/seo-evidence-workbench
 issue: null
 goal: "A person or agent can turn saved public-site evidence into repeatable cross-page findings and technical regression checks without depending on the unfinished SEO features."
 covers:
