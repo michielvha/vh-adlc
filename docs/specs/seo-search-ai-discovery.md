@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner agreed to the proposed scope; awaiting independent spec review and acceptance of the reviewed document."
+status_description: "Independent spec review has no findings; awaiting owner acceptance of the reviewed document."
 issue: null
 goal: "An adopter can identify and prepare verified repository repairs for conventional search and AI-search discovery while measuring visibility separately from technical readiness."
 covers:
@@ -140,6 +140,7 @@ None. The owner approved the proposed scope, local preparation followed by revie
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-18 | R-1 | spec | `f69e8e2b0905eb98eb12e6b9f3c523b5967d004b` | unknown | procedural | Two should-fix findings in comparison and retry proofs; model identity not attested. |
+| 2026-11-18 | R-2 | spec | `aabe627e581deb520bc74b1478aba4efd9037cfc` | unknown | procedural | No findings; model identity not attested. |
 
 ### R-1
 
@@ -156,6 +157,10 @@ SEVERITY: should-fix
 WHERE: Design > Repair route and recovery, line 96; Acceptance Criteria > AC-07, line 114; Test Plan > AC-06 and AC-07, lines 126-127
 EVIDENCE: The design requires retries to recheck current authorization and forbids replaying prior ship or submission permission. AC-07 repeats a completed local repair, while AC-06 checks endpoints without separate current authority. Neither proof requires an earlier authorized delivery or submission followed by a retry with that authority withdrawn or absent. An implementation that retains and replays a previously authorized action could pass both scenarios.
 PROPOSAL: Add a retry scenario whose first run has explicit ship or submission authority against recording endpoints, then resume or repeat the same task without that authority. Require task reuse and retained evidence while observing no repeated publication or submission request.
+
+### R-2
+
+NO FINDINGS
 
 ## Sources
 
