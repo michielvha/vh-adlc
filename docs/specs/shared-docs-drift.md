@@ -97,18 +97,21 @@ Its models use synthetic source/tracker data; it proves no real publication.
 PR #98 merges as `18388bde` after all six exact-head CI jobs pass. Plugin 0.26.0
 then passes ordinary Codex and Claude fresh-install and upgrade checks, matching
 all 291 files and the complete component fingerprint. The configured runtime
-remains the published verified 0.34.0; the default-branch version pipeline is
-still running. A concurrent main merge adds only unrelated SEO specifications
+remains the published verified 0.34.0; the default-branch version pipeline has
+pending checks. A concurrent main merge adds only unrelated SEO specifications
 and changes neither this accepted baseline nor the installed payload.
 
 The staged consumer retains legacy routing and all six open legacy proposal
 identities. Its integrated local gate passes 48 checks with no skips and its
 migration suite passes 83 tests. Preliminary Claude paired review has no remaining
 blocking or should-fix issue; its small notes are corrected. The bounded actual
-bot-publisher fixture, released native-profile observations, final paired C/D
+bot-publisher fixture, forwarded-command activation, final paired C/D
 review, cutover and rollback remain required. All seven composite criteria stay
 unverified until their complete evidence is independently reviewed. GUI and
 phone checks remain owner-deferred. Other agents stay in their own roadmap.
+
+The owner selected Claude Code or Codex for native execution. Native Copilot
+execution and Copilot marketplace installation remain unclaimed for 0.26.0.
 
 ### Published payload and migration checkpoint on 2026-11-18
 
@@ -120,6 +123,15 @@ with confirmed cleanup. The released component fingerprint is
 `e3789c55d3800692c0e84cf7515db1c47f999790f214e742df8a8fda77421628`.
 Global plugin and phone settings have not changed at this checkpoint.
 
+Run `44305790900` checks exact feature head `cb4a0d28979b275ae2a4e66c4c569fc03f74ce34`
+and completes all six jobs successfully. `git diff --name-only 18388bde a96d1184`
+returns only `docs/specs/seo-evidence-workbench.md`; its `-- plugins/vh-adlc`
+selection is empty, and the accepted normative comparison is unchanged.
+Configured main pipeline `44326348368` has head `a96d1184` and is observed pending
+through the native Actions API at this checkpoint. It follows main merge pipeline
+`44326173531`. These pending checks do not change the already published locked
+runtime 0.34.0 or the observed plugin 0.26.0 installation result.
+
 The current consumer uses the published source with the original twelve units,
 feedback and mode still staged. The next real publisher test is limited to one
 synthetic document, one draft PR and disjoint branch/lease/receipt refs. Existing
@@ -129,6 +141,45 @@ retain their original journal and refs. Successful fixture cleanup closes only
 its own PR unmerged and preserves terminal receipts. Existing Secret Scan stays
 active with an explicitly reviewed range; it is observed separately from the
 native test job. No production or final migration claim is made.
+
+### Selected-backend acceptance and released observations on 2026-11-18
+
+The owner's existing instruction is to use Claude Code or Codex without a new
+Copilot credential. T130 therefore executes the owner-authorized configured
+native backend, Claude, under the existing Test Plan wording. The `copilot`
+intake profile selects that same Claude backend; it is not native Copilot
+execution evidence. Native Copilot execution and Copilot marketplace installation
+remain explicitly unclaimed for plugin 0.26.0. The setup reference's backend
+names enumerate implemented configuration adapters; they do not establish a
+verified host or installed-operation claim. The public compatibility matrix
+states that distinction. No Test Plan or supported adapter is removed.
+
+Actions rehearsal [44305915096](https://github.com/michielvha/stackweaver/actions/runs/44305915096)
+runs consumer `b5505bd9` with shared `cb4a0d28`. It proves cold verified-reader
+setup, installed skill discovery, preparation and independent verification with
+Claude Code 2.1.325 and two original Opus 5.5 contexts. Its source/tracker effects
+are synthetic and it proves no native publication or adopted hosted context.
+
+Consumer `d0677605` passes the full 48-check gate with no skips and all 83 migration
+tests, with 698 assertions. Paired r12 is actual Claude Code Opus 5.5 at shared
+`cb4a0d28` and consumer `080086ad`; all 67 required fragments remain unchanged and
+process cleanup is confirmed. It has no blocking or should-fix finding. Its nits
+are corrected at `d0677605`: explicit dispatch/base guidance, an executed
+reordered-guard refusal, and digest-echo placeholder wording. Those corrections
+pass 11 focused cases with 206 assertions and strict types.
+
+The consumer binds published shared `18388bde` at `ded677aa`. Against ordinarily
+installed plugin 0.26.0, 46 protocol/migration/publisher neighbors pass with 381
+assertions. Real native `claude` and `copilot` intake-profile trials then run
+separate worker/reviewer Opus 5.5 contexts through Claude Code 2.1.326, using the
+actual Codex and Claude installed payloads respectively. Both pass repair
+preparation and independent verification, preserve caller/fixture/tracker/refs,
+and perform no actual remote writes. Original summaries and role provenance
+remain in `t130-released-native-claude/` and
+`t130-released-native-copilot-profile/` in the private operational archive.
+The actual released transport separately observes the interactive publisher
+account and repository IDs without retaining its credential. None of this closes
+the real bot publication, final C/D, cutover or rollback gates.
 
 The checkpoint notes below retain historical observations; their pending language
 is superseded by the current owner summary and released-observation record.
@@ -223,45 +274,6 @@ observation; repeating in an isolated source clone preserves caller state too.
 Legacy scanner, commands, weekly workflow and feedback bytes are unchanged by
 the intervening default-branch updates. Released installs, native/hosted trials,
 final paired C/D review and cutover/rollback retain their pending checks.
-
-### Selected-backend acceptance and released observations on 2026-11-18
-
-The owner's existing instruction is to use Claude Code or Codex without a new
-Copilot credential. T130 therefore executes the owner-authorized configured
-native backend, Claude, under the existing Test Plan wording. The `copilot`
-intake profile selects that same Claude backend; it is not native Copilot
-execution evidence. Native Copilot execution and Copilot marketplace installation
-remain explicitly unclaimed for plugin 0.26.0. The setup reference's backend
-names enumerate implemented configuration adapters; they do not establish a
-verified host or installed-operation claim. The public compatibility matrix
-states that distinction. No Test Plan or supported adapter is removed.
-
-Actions rehearsal [44305915096](https://github.com/michielvha/stackweaver/actions/runs/44305915096)
-runs consumer `b5505bd9` with shared `cb4a0d28`. It proves cold verified-reader
-setup, installed skill discovery, preparation and independent verification with
-Claude Code 2.1.325 and two original Opus 5.5 contexts. Its source/tracker effects
-are synthetic and it proves no native publication or adopted hosted context.
-
-Consumer `d0677605` passes the full 48-check gate with no skips and all 83 migration
-tests, with 698 assertions. Paired r12 is actual Claude Code Opus 5.5 at shared
-`cb4a0d28` and consumer `080086ad`; all 67 required fragments remain unchanged and
-process cleanup is confirmed. It has no blocking or should-fix finding. Its nits
-are corrected at `d0677605`: explicit dispatch/base guidance, an executed
-reordered-guard refusal, and digest-echo placeholder wording. Those corrections
-pass 11 focused cases with 206 assertions and strict types.
-
-The consumer binds published shared `18388bde` at `ded677aa`. Against ordinarily
-installed plugin 0.26.0, 46 protocol/migration/publisher neighbors pass with 381
-assertions. Real native `claude` and `copilot` intake-profile trials then run
-separate worker/reviewer Opus 5.5 contexts through Claude Code 2.1.326, using the
-actual Codex and Claude installed payloads respectively. Both pass repair
-preparation and independent verification, preserve caller/fixture/tracker/refs,
-and perform no actual remote writes. Original summaries and role provenance
-remain in `t130-released-native-claude/` and
-`t130-released-native-copilot-profile/` in the private operational archive.
-The actual released transport separately observes the interactive publisher
-account and repository IDs without retaining its credential. None of this closes
-the real bot publication, final C/D, cutover or rollback gates.
 
 ### Claude-only consumer configuration on 2026-11-18
 
