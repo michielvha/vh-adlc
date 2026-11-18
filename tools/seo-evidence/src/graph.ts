@@ -73,11 +73,16 @@ export function analyzeGraph(snapshot: Snapshot): { nodes: GraphNode[]; edges: E
     return { node: null, redirected };
   };
   const incomingByNode = new Map<string, Set<string>>();
-  for (const e of edges) if (e.from !== e.to) { const k = key(e.to, e.mode); const sources = incomingByNode.get(k) ?? new Set<string>(); sources.add(e.from); incomingByNode.set(k, sources); }
+  for (const e of edges) {
+    if (e.kind !== "anchor") continue;
+    const destination = transitions(e.to, e.mode).node?.url ?? e.to;
+    if (e.from === destination) continue;
+    const k = key(destination, e.mode); const sources = incomingByNode.get(k) ?? new Set<string>(); sources.add(e.from); incomingByNode.set(k, sources);
+  }
   for (const n of nodes) {
     n.incoming = incomingByNode.get(key(n.url, n.mode))?.size ?? 0;
     if (n.conflicting || !n.observation?.facts || n.observation.page.outcome !== "captured" || n.observation.page.status < 200 || n.observation.page.status >= 300) continue;
-    if (!snapshot.entry_urls.includes(n.url) && n.incoming === 0) findings.push(finding("zero_incoming", n.url, n.mode, "No incoming discovery observed within this corpus", nodeEvidence(n)));
+    if (n.depth !== 0 && n.incoming === 0) findings.push(finding("zero_incoming", n.url, n.mode, "No incoming discovery observed within this corpus", nodeEvidence(n)));
     if (n.depth === null) findings.push(finding("unreachable", n.url, n.mode, "No path from supplied roots in the observed graph; whole-site orphan status is unknown", nodeEvidence(n)));
     for (const a of n.observation.facts.anchors) {
       let status: LinkCheck["status"] = "unobserved"; let fragment: LinkCheck["fragment_status"] = a.fragment === null ? "not_applicable" : "unverified";

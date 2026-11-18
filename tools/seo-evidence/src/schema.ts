@@ -31,7 +31,9 @@ export function parseSnapshot(input: unknown): Snapshot {
     if (p.outcome !== "captured" && (o.evidence !== null || o.facts !== null)) throw new Error("Absent capture cannot supply facts");
     if (p.outcome === "captured" && p.content_type.split(";")[0]?.trim().toLowerCase() === "text/html" && o.facts === null) throw new Error("Captured HTML facts are missing");
   }
-  const partial = s.observations.some(o => o.page.outcome !== "captured") || reconcile(s.observations).some(n => n.conflicting);
-  if ((s.analysis_status === "partial") !== partial) throw new Error("Snapshot capture status is inconsistent");
+  const reasons = s.observations.filter(o => o.page.outcome !== "captured").map(o => `${o.page.mode}:${o.page.requested_url}:${o.page.outcome}`);
+  reasons.push(...reconcile(s.observations).filter(n => n.conflicting).map(n => `${n.mode}:${n.url}:final_conflict`));
+  reasons.sort();
+  if ((s.analysis_status === "partial") !== (reasons.length > 0) || JSON.stringify([...s.partial_reasons].sort()) !== JSON.stringify(reasons)) throw new Error("Snapshot capture status or partial reasons are inconsistent");
   return s;
 }

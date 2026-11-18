@@ -5,7 +5,7 @@ function csv(value: string): string {
   const safe = /^[\s]*[=+\-@]/u.test(value) || /^[\t\r\n]/u.test(value) ? "'" + value : value;
   return '"' + safe.replaceAll('"', '""') + '"';
 }
-const markdown = (value: string): string => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("|", "&#124;").replaceAll("`", "&#96;").replace(/\r\n|\r|\n/g, "\\n");
+const markdown = (value: string): string => value.replace(/[\\`*_{}\[\]()#+.!-]/g, "\\$&").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("|", "&#124;").replace(/\r\n|\r|\n/g, "\\n");
 export function renderFiles(report: PolicyResult): Record<string, string> {
   const header = ["id", "rule", "url", "mode", "detail", "evidence", "values"];
   const rows = report.findings.map(f => [f.id, f.rule, f.url, f.mode, f.detail, stable(f.evidence).trim(), stable(f.values).trim()]);

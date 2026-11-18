@@ -52,10 +52,11 @@ test("HTML and HTTP canonicals agree or remain unavailable without source select
   expect(parse("").controls.canonical_state).toBe("absent");
 });
 test("HTTP canonical parameters require each separator while valid quoted syntax remains supported", () => {
-  for (const value of ['</new> rel="canonical"', '</new>;; rel="canonical"', '</new>; rel="canonical";', '</new>; rel="canonical" title="missing separator"']) {
+  for (const value of ['</new> rel="canonical"', '</new>;; rel="canonical"', '</new>; rel="canonical";', '</new>; rel="canonical" title="missing separator"', '</bad path>; rel="canonical"', '</bad%XX>; rel="canonical"']) {
     const f = parse("", { Link: [value] });
     expect(f.controls.canonical_state).toBe("unavailable");
     expect(f.controls.issues.some(i => i.rule === "canonical_syntax")).toBe(true);
   }
   expect(parse("", { Link: ['</new>; rel="canonical"; title="a; b, c"'] }).controls.canonical_state).toBe("valid");
+  expect(parse("", { Link: ['</new>; rel="next"; rel="canonical"'] }).controls.canonical_state).toBe("absent");
 });

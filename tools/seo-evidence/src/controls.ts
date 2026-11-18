@@ -23,16 +23,22 @@ function split(value: string, separator: string): string[] {
 function linkCanonicals(value: string, finalUrl: string): Canonical[] {
   const result: Canonical[] = [];
   for (const item of split(value, ",")) {
-    const match = /^\s*<([^>]*)>\s*(.*)$/s.exec(item);
+    const match = /^\s*<([^<>\r\n]*)>(.*)$/s.exec(item);
     if (!match) throw new Error("Malformed HTTP Link value");
     const target = match[1]; const tail = match[2];
     if (target === undefined || tail === undefined) throw new Error("Malformed HTTP Link value");
-    let canonical = false;
-    for (const part of split(tail, ";")) {
-      if (!part.trim()) continue;
-      const parameter = /^\s*([!#$%&'*+.^_`|~\w-]+)\s*=\s*("(?:[^"\\]|\\.)*"|[^\s;"]+)\s*$/.exec(part);
+    if (!/^[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]*$/.test(target) || /%(?![a-f\d]{2})/i.test(target)) throw new Error("Malformed HTTP Link URI reference");
+    let canonical = false; let relationSeen = false;
+    const parts = split(tail, ";");
+    if (parts.shift()?.trim()) throw new Error("Missing HTTP Link parameter separator");
+    for (const part of parts) {
+      const parameter = /^[\t ]*([!#$%&'*+.^_`|~\w-]+)[\t ]*(?:=[\t ]*("(?:[^"\\\r\n]|\\[^\r\n])*"|[!#$%&'*+.^_`|~\w-]+))?[\t ]*$/.exec(part);
       if (!parameter) throw new Error("Malformed HTTP Link parameter");
       if (parameter[1]?.toLowerCase() === "rel") {
+        if (parameter[2] === undefined) throw new Error("HTTP Link relation is missing its value");
+        // RFC 8288: subsequent rel parameters in one link-value are ignored.
+        if (relationSeen) continue;
+        relationSeen = true;
         const rel = parameter[2]?.replace(/^"|"$/g, "").replace(/\\(.)/g, "$1");
         canonical ||= rel?.toLowerCase().split(/\s+/).includes("canonical") ?? false;
       }
