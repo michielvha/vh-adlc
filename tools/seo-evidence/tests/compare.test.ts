@@ -83,3 +83,12 @@ test("canonical targets require an actual href and matching HTTP Link context", 
     expect(compare(before.snapshot, current.snapshot).findings).toHaveLength(0);
   }
 });
+test("SVG titles cannot mask removed document titles and Unicode rel lookalikes cannot create canonicals", async () => {
+  const svg = '<svg><title>Logo</title></svg>';
+  const a = await site([{ path: "/", html: '<head><title>Document</title></head><main>' + svg + '</main>' }]);
+  const b = await site([{ path: "/", html: '<main>' + svg + '</main>' }]);
+  expect(applyPolicy(compare(a.snapshot, b.snapshot), { schema_version: 1, fail_rules: ["title_removed"] }).exit_code).toBe(3);
+  const x = await site([{ path: "/", html: '<head><link rel="canonical\u00a0stylesheet" href="/old"></head>' }]);
+  const y = await site([{ path: "/", html: '<head><link rel="canonical\u00a0stylesheet" href="/new"></head>' }]);
+  expect(applyPolicy(compare(x.snapshot, y.snapshot), { schema_version: 1, fail_rules: ["canonical_changed", "canonical_removed"] }).findings).toHaveLength(0);
+});

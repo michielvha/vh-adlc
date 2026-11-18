@@ -91,3 +91,31 @@ test("real comparisons do not enforce invented missing-href or other-context can
     expect(report.findings.some((f: { rule: string }) => ["canonical_changed", "canonical_removed"].includes(f.rule))).toBe(false);
   }
 });
+test("real selected rules use document titles and actual canonical relation tokens", async () => {
+  const svg = '<svg><title>Company logo</title></svg>';
+  const f = await site([{ path: "/", html: '<head><title>Home</title></head><main>A' + svg + '</main>' }, { path: "/about", html: '<head><title>About</title></head><main>B' + svg + '</main>' }]);
+  const root = await mkdtemp(join(tmpdir(), "seo-cli-document-metadata-"));
+  const capture = async (input: string, name: string) => { const output = join(root, name); expect((await run(["snapshot", "--input", input, "--output", output, "--json"])).code).toBe(0); return join(output, "snapshot.json"); };
+  const baseline = await capture(f.input, "baseline");
+  const duplicatePolicy = join(root, "duplicates.yaml"); await writeFile(duplicatePolicy, "schema_version: 1\nfail_rules: [duplicate_title]\n");
+  expect((await run(["inspect", "--snapshot", baseline, "--policy", duplicatePolicy, "--output", join(root, "inspect"), "--json"])).code).toBe(0);
+  const missing = await site([{ path: "/", html: '<main>A' + svg + '</main>' }, { path: "/about", html: '<head><title>About</title></head><main>B' + svg + '</main>' }]);
+  const current = await capture(missing.input, "missing");
+  const titlePolicy = join(root, "title.yaml"); await writeFile(titlePolicy, "schema_version: 1\nfail_rules: [title_removed]\n");
+  expect((await run(["compare", "--baseline", baseline, "--current", current, "--policy", titlePolicy, "--output", join(root, "removed"), "--json"])).code).toBe(3);
+  const x = await site([{ path: "/", html: '<head><link rel="canonical\u00a0stylesheet" href="/old"></head>' }]);
+  const y = await site([{ path: "/", html: '<head><link rel="canonical\u00a0stylesheet" href="/new"></head>' }]);
+  const old = await capture(x.input, "old-rel"); const next = await capture(y.input, "new-rel");
+  const canonicalPolicy = join(root, "canonical.yaml"); await writeFile(canonicalPolicy, "schema_version: 1\nfail_rules: [canonical_changed, canonical_removed]\n");
+  expect((await run(["compare", "--baseline", old, "--current", next, "--policy", canonicalPolicy, "--output", join(root, "rel"), "--json"])).code).toBe(0);
+}, 30000);
+test("hostile evidence paths remain literal in plain diagnostics", async () => {
+  const f = await fixture(); const name = "\u001b[2J\u009bclear\r\npage-ö.html";
+  await writeFile(join(f.dir, name), "changed"); f.data.pages = [{ ...captured(), body_file: name }]; f.data.files = [{ path: name, sha256: "0".repeat(64) }]; await f.save();
+  for (const [i, flags] of [["--plain"], [], ["--json", "--plain"]].entries()) {
+    const r = await run(["snapshot", "--input", f.input, "--output", join(f.dir, "result" + i), ...flags]);
+    expect(r.code).toBe(2); expect(r.stderr).not.toMatch(/[\u0000-\u001f\u007f-\u009f](?!$)/);
+    expect(r.stderr).toContain("ö.html"); expect(r.stderr).toContain("\\u001b[2J");
+    if (flags.includes("--json")) expect(resultSchema.parse(JSON.parse(r.stdout) as unknown).exit_code).toBe(2);
+  }
+});

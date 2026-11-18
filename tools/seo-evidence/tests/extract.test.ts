@@ -73,3 +73,15 @@ test("HTTP Link anchor applies its context before contributing a document canoni
   for (const anchor of ["/", "https://example.test/", ""]) expect(parse("", { Link: [`</new>; rel="canonical"; anchor="${anchor}"`] }).controls.canonical).toBe("https://example.test/new");
   for (const suffix of ['anchor="http://["', 'anchor="/"; anchor="/other"', 'anchor="https://example.test/ "']) expect(parse("", { Link: [`</new>; rel="canonical"; ${suffix}`] }).controls.canonical_state).toBe("unavailable");
 });
+test("foreign-namespace metadata cannot supply document titles, bases or canonical links", () => {
+  const f = parse('<head><title>Document</title></head><body><svg><title>Logo</title><base href="/wrong/"></base><head><link rel="canonical" href="/wrong"></link></head><script type="application/ld+json">bad</script><a name="legacy"></a></svg><main><a href="child">Child</a></main></body>');
+  expect(f.titles).toEqual(["Document"]);
+  expect(f.base_url).toBe("https://example.test/");
+  expect(f.controls.canonical_state).toBe("absent");
+  expect(f.jsonld.count).toBe(0); expect(f.named_anchors).toEqual([]);
+});
+test("canonical relations use their actual token separators", () => {
+  for (const separator of ["\u00a0", "\u000b", "\u2003"]) expect(parse(`<head><link rel="canonical${separator}stylesheet" href="/wrong"></head>`).controls.canonical_state).toBe("absent");
+  expect(parse('<head><link rel="\tCANONICAL\fstylesheet\n" href="/real"></head>').controls.canonical).toBe("https://example.test/real");
+  expect(parse("", { Link: ['</wrong>; rel="canonical\u00a0alternate"'] }).controls.canonical_state).toBe("absent");
+});
