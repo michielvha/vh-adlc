@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: Native marketplace publisher and corpus parity verified; final adoption rehearsal and cutover pending
+status_description: Final paired review and committed adoption verification pass; final cutover gate running
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -85,12 +85,44 @@ Its lease is released and terminal receipt retained. At the published consumer
 source, all 875 documents match across twelve detectors, findings, suppressions
 and original legacy output, with the caller preserved.
 
-The final staged candidate adds only adoption-state test/inventory corrections;
-its runtime, source helper and profile configuration retain the proven component.
-Legacy routes stay active until final source-bound rehearsal, paired C/D review,
-preflight and cutover pass. The owner selected Claude Code or Codex; native Copilot
-execution is unclaimed. GUI and phone tests remain deferred. Other agents stay
-on the separate migration roadmap.
+The final staged candidate passes complete scanner/protection parity and rollback.
+Claude Code Opus 5.5 finds no blocking or should-fix issues in its six-file routing
+switch. The actual adoption checklist is committed and passes the installed
+verifier. Final consumer tests, the repository gate and remote cutover remain
+pending. The owner selected Claude Code or Codex; native Copilot execution is
+unclaimed. GUI and phone tests stay deferred. Other agents stay on the separate
+migration roadmap.
+
+### Final adoption preparation on 2026-11-18
+
+Final staged C is `22b820109792dbd59df216640f39c96dd1483f5f`. Its complete
+875-document comparison preserves twelve detectors, 845 findings, 63 suppressions,
+legacy output and the caller. Protection classifies all documents against 4,908
+source blobs. A disposable ordinary revert restores its exact staged tree and
+eleven protected paths, including another writer's Azure feature claim.
+
+Paired review `docs-drift-paired-claude-r16` targets published shared component
+`18388bde0609e05e6fcef9c1cf5fb3ec68d3bdca`, C and activation digest
+`93e56f145c5972e53c1eeb7bea93732a85f01c03f5be76f10ffebb579eb0d6b2`.
+Actual Claude Code Opus 5.5 reads all 117 required fragments; original bytes,
+model events and successful owned-process cleanup are retained. It returns no
+blocking or should-fix findings. Its permission-wording nit is addressed in the
+checklist: unused OIDC write access is removed, and Actions read access is added
+for the shared worker. The reviewed routing diff needs no change.
+
+D, `f086bf5d9d3ec640a37159b9d51088e519fd2f0e`, is C's direct child. It changes
+only the six reviewed activation files and adds the readable YAML checklist.
+The ordinary installed verifier passes D and the combined current-main merge
+`eaf6ae129d5a3764e517af0a0eeb8eac1766b336`, preserving D's identity. The six
+legacy PRs and original terminal trial receipt remain unchanged; no production
+lease exists. The first final test attempt lacks the required shared-source
+environment variable and stops; its failed log is retained. The runner correction
+supplies the immutable released source and starts a fresh attempt. No feature
+assertion or runtime rule changes. Final checks and remote cutover are pending.
+
+The first full real-corpus run through the adopted weekly worker is not yet
+observed. The successful unattended native marketplace trial uses one synthetic
+document and the real Actions publisher; it is not a real backlog write claim.
 
 ### Published payload and migration checkpoint on 2026-11-18
 
