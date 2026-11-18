@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Standalone toolkit complete and independently reviewed locally; not pushed; hosted CI unverified."
+status_description: "Standalone toolkit complete and independently reviewed; hosted CI unverified."
 branch: feat/seo-evidence-workbench
 issue: null
 goal: "A person or agent can turn saved public-site evidence into repeatable cross-page findings and technical regression checks without depending on the unfinished SEO features."
@@ -550,5 +550,7 @@ EVIDENCE: From an independent archive of 11f64994a50f82b51d140d4ababf5ea7ebef8a6
 - [Google link guidance](https://developers.google.com/search/docs/crawling-indexing/links-crawlable): crawlable anchors and descriptive links. [Canonical guidance](https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls): canonicals are signals, not verified index choices. [Helpful-content guidance](https://developers.google.com/search/docs/fundamentals/creating-helpful-content): original reader value, not a numeric keyword recipe.
 - [Lighthouse overview](https://developer.chrome.com/docs/lighthouse/overview/): page audits, JSON reports and regression tooling already available upstream; this feature does not run them.
 - [HTML fragment selection](https://html.spec.whatwg.org/multipage/browsing-the-web.html#scroll-to-fragid) and [base-element behavior](https://html.spec.whatwg.org/multipage/semantics.html#the-base-element): valid fragment alternatives, first-base selection and fallback behavior. [Page-control sources](https://developers.google.com/search/docs/crawling-indexing/robots-meta-tag): generic versus crawler-scoped headers and equivalent negative directives.
+- [RFC 8288 Web Linking](https://www.rfc-editor.org/rfc/rfc8288.html#section-3): HTTP Link syntax, relation parameters and anchor context; a relation about another resource does not become this document's canonical.
+- [HTML document title](https://html.spec.whatwg.org/multipage/dom.html#document.title), [link-element semantics](https://html.spec.whatwg.org/multipage/semantics.html#the-link-element) and [link types](https://html.spec.whatwg.org/multipage/links.html#linkTypes), checked 18 November 2026: document metadata and namespace context, absent href behavior and ASCII-whitespace relation tokens. These sources informed the extraction repairs preserved in R-4 and R-5.
 - Local SEO source at `9e5e11f8c0f3b6b1503f5f58a9989e6c29502697` and the two linked feature documents: the existing behavior and non-overlapping parallel boundary.
 - Engineering conventions and `guides/humanize-prose.md` at `vhco-pro/docs@1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff`: feature format, code/runtime, CLI, review and delivery requirements.
