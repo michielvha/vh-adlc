@@ -11,7 +11,7 @@ import { verifyCandidate } from "./candidate-verification";
 import { readCandidatePatch } from "./preparation";
 import { collectReviewTarget } from "./review-target";
 import { collectCandidateReview } from "./candidate-review";
-import { captureConfiguredRole } from "./role-process";
+import { captureConfiguredRole, NATIVE_REVIEW_REPLY } from "./role-process";
 import { readAdoptedRolePolicy } from "./role-capture";
 import { readNativeCredential, withNativeObservation } from "./transport";
 
@@ -68,7 +68,7 @@ export async function runVerification(options: { repo: string; run: RunDirectory
       "Independently review the exact proposed documentation correction and every effect in the request manifest. Read the full raw candidate diff, original source assessment, worker output, decision packet, selected postimages, verification evidence, current source, consumer procedure and feedback.",
       "Check full accounting, source-grounded claims, protected documents/frontmatter, generator outputs, unchanged unrelated behavior and exact publication payload. For resolution, every original hunk and feedback choice must be accounted for. Unknown or incomplete evidence prevents a clean review.",
       "Use read-only tools. Do not write files, run shell/network commands, publish, delegate or reuse another context. This review supplies no owner permission.",
-      "Return exactly MODEL: <actual full model ID>, then canonical FINDING/KIND/SEVERITY/WHERE/EVIDENCE/PROPOSAL records or exactly NO FINDINGS. Blocking and should-fix findings stop publication. No fences, footer or alternate protocol.",
+      NATIVE_REVIEW_REPLY,
       "DOCS_DRIFT_REQUEST: " + JSON.stringify({ path: join(run.directory, request.path), sha256: request.sha256 }),
     ].join("\n");
     const cwd = verifiedCheckout;

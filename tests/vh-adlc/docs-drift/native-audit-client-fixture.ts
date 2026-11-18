@@ -73,6 +73,11 @@ if (request.kind === "docs-drift-closure-worker-request") {
   records = ${JSON.stringify(fault)} === "review-findings" ? "FINDING: F-01\\nKIND: factual\\nSEVERITY: should-fix\\nWHERE: synthetic assessment\\nEVIDENCE: Needs another source check\\nPROPOSAL: Correct it\\n" : "NO FINDINGS\\n";
 }
 if (${JSON.stringify(fault)} === "invalid-worker" && request.kind.endsWith("worker-request")) records = "Not a worker handoff\\n";
+// The real hosted reviewer used inaccurate-claim for a harmless wording nit.
+// Preserve strict validation and require the prompt to name its accepted values.
+if (${JSON.stringify(fault)} === "prepare-protocol" && request.kind === "docs-drift-candidate-review-request")
+  records = "FINDING: F-01\\nKIND: " + (prompt.includes("KIND must be factual or judgement") ? "factual" : "inaccurate-claim")
+    + "\\nSEVERITY: nit\\nWHERE: proposed body\\nEVIDENCE: Content digest is labelled a blob hash\\nPROPOSAL: Use the precise term\\n";
 if (${JSON.stringify(fault)} === "request-change") writeFileSync(ref.path, "Preserve this changed synthetic request\\n", { mode: 0o600 });
 // Reproduce the reply-prefix failure through the shared decoder using this owned
 // Copilot envelope. The real Claude before/after trial is recorded separately.

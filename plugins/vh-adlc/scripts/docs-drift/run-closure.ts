@@ -11,7 +11,7 @@ import { readNativeCredential, withNativeObservation } from "./transport";
 import { collectClosureWorkerInputs, collectClosureReviewTarget, collectClosureReview } from "./closure-worker";
 import { publishClosure, resumeClosure } from "./closure-controller";
 import { readResolutionProposal } from "./resolve-inputs";
-import { captureConfiguredRole } from "./role-process";
+import { captureConfiguredRole, NATIVE_REVIEW_REPLY } from "./role-process";
 import { readAdoptedRolePolicy } from "./role-capture";
 import { selectHostedExecutor } from "./hosted-executor";
 
@@ -91,7 +91,7 @@ export async function runClosure(options: { repo: string; run: RunDirectory }): 
     const reviewerPrompt = [
       "Independently review the exact post-merge cleanup manifest. Read every full original hunk, original worker records, current source, merged replacement, disposition, feedback and project procedure. Verify all comments and closures and the fresh source evidence for every scope. Unknown evidence or unmerged replacement prevents a clean review.",
       "Use read-only tools. Do not write, run shell/network commands, publish, delegate or reuse a session. This review grants no owner permission.",
-      "Return exactly MODEL: <actual full model ID>, then canonical FINDING/KIND/SEVERITY/WHERE/EVIDENCE/PROPOSAL records or exactly NO FINDINGS. Blocking and should-fix findings stop this batch. No fences, footer or alternate protocol.",
+      NATIVE_REVIEW_REPLY,
       "DOCS_DRIFT_REQUEST: " + JSON.stringify({ path: join(run.directory, reviewRequest.path), sha256: reviewRequest.sha256 }),
     ].join("\n");
     const reviewer = await captureConfiguredRole({ source_repo: repo, candidate_repo: cwd, source_commit: source, artifact_root: run.directory,

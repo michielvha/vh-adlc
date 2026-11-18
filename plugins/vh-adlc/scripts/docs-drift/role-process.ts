@@ -13,6 +13,18 @@ import { buildNativeRoleInvocation } from "./role-launch";
 import { artifactDirectoryScope, captureCallerState, matchesCallerState } from "./snapshot";
 
 type Reference = { path: string; sha256: string };
+/** Match the strict review record grammar, including non-blocking findings. */
+export const NATIVE_REVIEW_REPLY = `The MODEL header must be the first line: MODEL: <actual full model ID>.
+Then return exactly NO FINDINGS, or one or more records with these literal field lines:
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: <exact location>
+EVIDENCE: <observed evidence>
+PROPOSAL: <concrete correction>
+Give each finding a unique ID. KIND must be factual or judgement. SEVERITY must be blocking, should-fix or nit.
+Report every actual finding at its actual severity. Blocking and should-fix findings stop this operation.
+No preamble, fences, footer or alternate protocol.`;
 type Artifacts = Record<"invocation" | "launch" | "native" | "stderr" | "process" | "returned", Reference | null>;
 type Options = {
   source_repo: string; candidate_repo?: string; artifact_root: string; source_commit: string;
