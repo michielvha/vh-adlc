@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: Published plugin verified through ordinary marketplace installs; consumer native publishing and activation pending
+status_description: Native marketplace publisher and corpus parity verified; final adoption rehearsal and cutover pending
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -73,45 +73,24 @@ The scope excludes claim-by-claim docs-truth sweeps and their rolling ledger. Ex
 ### Owner summary
 
 Move Stackweaver's whole-documentation audit and stale audit-PR resolver into the
-ordinary installed vh-adlc plugin. Findings and selected corrections are checked
-against current source and independently reviewed. Resolution keeps original
-hunks and human decisions; originals close after the replacement merges.
+ordinary vh-adlc plugin. Keep its scanner, twelve detectors, flags, feedback,
+generators, local plan fixes, commands, Monday schedule, accounts and notifications.
+Enrolled shared specs retain their lifecycle gates. Originals close only after
+verified consolidation merges; interrupted writes retain their original evidence.
 
-Stackweaver keeps its scanner, twelve detectors, feedback, generators, local
-rules, Monday schedule, accounts and notifications. Safe metadata and checkbox
-corrections remain available in older local plans. Shared specs retain their
-lifecycle gates. The compatible tool and project settings ship and roll back
-together; historical records retain their original policy.
+Plugin 0.26.0 passes ordinary Codex/Claude fresh installs and upgrades. The real
+hosted marketplace trial passes with two separate Opus 5.5 contexts, the intended
+bot publisher, one synthetic document and a draft PR closed unmerged afterward.
+Its lease is released and terminal receipt retained. At the published consumer
+source, all 875 documents match across twelve detectors, findings, suppressions
+and original legacy output, with the caller preserved.
 
-Recovery preserves original ownership and evidence. A publication lease keeps
-new audits pending before models run. Exact approved abandonment requires a
-stopped executor and atomically removes its own lease and receipt. Terminal
-receipts remain. Unsupported lease-only deletion can allow a fresh assessment.
-
-The accepted normative spec is unchanged. Claude Code Opus 5.5 R-130 clears the
-strict native reply-format correction with no blocking or should-fix finding.
-Actual unattended rehearsal 44305915096 passes cold setup, installed discovery,
-preparation and independent native verification in separate Opus 5.5 contexts.
-Its models use synthetic source/tracker data; it proves no real publication.
-
-PR #98 merges as `18388bde` after all six exact-head CI jobs pass. Plugin 0.26.0
-then passes ordinary Codex and Claude fresh-install and upgrade checks, matching
-all 291 files and the complete component fingerprint. The configured runtime
-remains the published verified 0.34.0; the default-branch version pipeline has
-pending checks. A concurrent main merge adds only unrelated SEO specifications
-and changes neither this accepted baseline nor the installed payload.
-
-The staged consumer retains legacy routing and all six open legacy proposal
-identities. Its integrated local gate passes 48 checks with no skips and its
-migration suite passes 83 tests. Preliminary Claude paired review has no remaining
-blocking or should-fix issue; its small notes are corrected. The bounded actual
-bot-publisher fixture, forwarded-command activation, final paired C/D
-review, cutover and rollback remain required. All seven composite criteria stay
-unverified until their complete evidence is independently reviewed. GUI and
-phone checks remain owner-deferred. Other agents stay in their own roadmap.
-
-The owner selected Claude Code or Codex for native execution. Native Copilot
-execution and Copilot marketplace installation remain unclaimed for 0.26.0.
+The final staged candidate adds only adoption-state test/inventory corrections;
+its runtime, source helper and profile configuration retain the proven component.
+Legacy routes stay active until final source-bound rehearsal, paired C/D review,
+preflight and cutover pass. The owner selected Claude Code or Codex; native Copilot
+execution is unclaimed. GUI and phone tests remain deferred. Other agents stay
+on the separate migration roadmap.
 
 ### Published payload and migration checkpoint on 2026-11-18
 
@@ -271,6 +250,44 @@ product E2E and filesystem-vulnerability suites retain their separate environmen
 limits; this prerequisite changes internal workflow/test code rather than product
 runtime. Publication now proceeds to the approved staged prerequisite, followed
 by its actual single-document native publisher test. Final migration remains gated.
+
+### Successful native publication and final adoption-state corrections
+
+Private prerequisite PR #1151 merges as `79580317`. Its independently reviewed
+head `a1aba631` passes the full 48-check gate and all 90 migration tests with 742
+assertions. The only intervening main change is another writer's Azure plan
+claim; it is preserved. Actual Actions run `44355982425`, attempt 1, succeeds at
+`79580317`, including ordinary marketplace install, independently pinned payload
+inspection, pre-credential tests, original native worker/reviewer and publication.
+Secret Scan also succeeds over the explicitly reviewed outgoing range.
+
+The original artifact records the actual installed cache root and Claude Code
+2.1.325. Both distinct native contexts attest `claude-opus-5-5`; cleanup is
+confirmed. Dispatcher/triggering actor `michielvha` remains distinct from publisher
+`github-actions[bot]`. All 71 exported originals match their inventory hashes.
+Only synthetic draft PR #1152 is created. After the executor completes, it closes
+unmerged and its unchanged candidate branch is deleted with an exact Git lease.
+Terminal receipt `29dfba94b977ba7e01a34cf7c8686c127e272ed8` remains. No production
+backlog write is claimed. Original evidence stays private in
+`t136-native-publisher-artifact/` and the bounded proof projection.
+
+Full raw corpus comparison at `79580317` passes 875 documents, twelve detector
+units, 845 findings and 63 suppressions. Original JSON/console bytes, normalized
+findings, suppressions and stale-suppression counts all agree; the caller is
+preserved with zero diagnostics. Its controller prepares the raw baseline probe
+before measuring preservation. Original source and process records are retained.
+
+The proposed adopted route catches two test/inventory gaps: an unbound fixture
+must explicitly stay staged, and `AGENTS.md` becomes a known shared caller.
+Both corrected staged/adopted migration runs pass 16 cases (99/104 assertions).
+An observation-only invalid checklist specimen then reproduces its omitted
+caller classification; explicitly accounting for that exact path turns the
+inventory green without weakening unknown-caller refusal. Final staged candidate
+`22b82010` contains only these three test/inventory lines relative to the proven
+runtime source. Workflow, controller, component and entry configuration remain
+byte-identical. Native observations keep their original consumer commits; current
+applicability is rechecked rather than retargeting them. Fresh final-candidate
+corpus/protection/rollback, final paired review and activation remain required.
 
 ### Native correction review follow-up
 
