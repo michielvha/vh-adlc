@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Owner accepted keyboard/touch scope and one controlling viewer; revised reuse-first design awaits independent spec review."
+status: planned
+status_description: "Accepted after clean independent review; implementation must first prove upstream reuse and native-phone feasibility."
 issue: null
 goal: "Use a remote-gui browser from a phone with selective first-tap native keyboard input, normal text editing and touch scrolling."
 covers:
@@ -27,7 +27,7 @@ The implementation must reuse noVNC's existing gesture recognition, key transpor
 
 The candidate metadata source is a private, session-owned Linux accessibility adapter. It may publish safe editable geometry and input flags, never field contents, labels or URLs. Human mode keeps automation, CDP and extensions disabled. Installed libraries and upstream APIs establish possible routes; this work has proved neither sandboxed Chromium integration nor native phone-keyboard behavior. A later implementation must first pass the owned synthetic feasibility gate on actual iOS Safari and Android Chrome. Exact phone models, OS/browser versions and keyboard settings belong in that implementation evidence; their availability has not been assumed.
 
-Independent R-1 found three should-fix issues. This revision applies the accepted control policy and strengthens mode and endpoint proofs; a new independent review is pending. The owner accepted the brief in session on 2026-11-19 and requested upstream reuse. That settles scope without another preference question. It does not authorize mobile code or probes in this spec-only operation. Planning still requires a clean current review and the deterministic gate. A later implementation request, release, installation and any changed privacy/dependency boundary remain separate actions.
+Independent R-2 returned no findings on the revised baseline; its model identity was not attested and isolation was procedural. The owner accepted the brief in session on 2026-11-19 and requested upstream reuse. R-1 remains preserved as history. That acceptance settles scope and is recorded against R-2 without another preference question. It does not authorize mobile code or probes in this spec-only operation. The deterministic planning gate passed; no implementation proof is implied. A later implementation request, release, installation and any changed privacy/dependency boundary remain separate actions.
 
 ### Background
 
@@ -158,6 +158,7 @@ None. The owner accepted keyboard/touch scope first, both platform targets and o
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-19 | R-1 | spec | `363a6140f6c2a1383da8d9c1fee5f2d3c36fa0fa` | unknown | procedural | Three should-fix findings preserved; applied in the subsequent owner-directed revision, awaiting a new independent review. |
 | 2026-11-19 | R-2 | spec | `3fa0bae68d8c1d25d9255c2d90cd1ec0b9d06886` | unknown | procedural | No findings; model identity was not attested. |
+| 2026-11-19 | R-2 | spec | `3fa0bae68d8c1d25d9255c2d90cd1ec0b9d06886` | n/a | n/a | accepted by owner |
 
 ### R-1
 
