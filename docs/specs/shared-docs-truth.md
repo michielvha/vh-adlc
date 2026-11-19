@@ -110,7 +110,8 @@ Review the exact candidate before publication and identify which criteria need p
 
 ## Tasks
 
-- [ ] T1 `plugins/vh-adlc/skills/vh-adlc-docs-truth/SKILL.md`, `plugins/vh-adlc/references/{docs-truth,lifecycle}.md`, package manifests, discovery tests and installation guides - the package discovers and routes the on-demand skill through one shared read-only procedure, and the existing docs routes still pass discovery checks (AC-01, AC-02, AC-04)
+- [x] T1 `plugins/vh-adlc/skills/vh-adlc-docs-truth/SKILL.md`, `plugins/vh-adlc/references/{docs-truth,lifecycle}.md`, package manifests, discovery tests and installation guides - the package discovers and routes the on-demand skill through one shared read-only procedure, and the existing docs routes still pass discovery checks (AC-01, AC-02, AC-04)
+      Evidence: The new discovery test failed on the missing skill and route before implementation. After the change, the package checker and docs-truth, triage and maintenance discovery suites pass 76 tests and 410 assertions. The skill metadata validator passes. This proves source packaging and routing checks. Native behavior and installed acceptance remain open.
 - [ ] T2 `plugins/vh-adlc/examples/docs-truth/` and `tests/vh-adlc/docs-truth/` - a runnable fixture covers selected paths, complete and partial selection, and the expected evidence and verdicts without writing the assessed checkout (AC-01, AC-02)
 - [ ] T3 `tests/vh-adlc/docs-truth/native-trial.ts` and compatibility and marketplace guides - run the committed shared fixture through both candidate catalog paths and retain the exact package, native discovery and report transcripts (AC-01, AC-02, AC-04)
 - [ ] T4 Stackweaver's `.claude/commands/docs-truth.md`, `.vh-adlc/docs-truth.md` and `tests/agent-docs-truth/native-trial.ts` - prepare the unpublished routing and consumer proof, including legacy comparison, authorized writes, recovery and rollback in disposable clones (AC-03)

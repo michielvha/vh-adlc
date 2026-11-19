@@ -104,10 +104,10 @@ expected to work there. See [compatibility](../reference/compatibility.md#suppor
 
 ## What the plugin installs
 
-The released package's seventeen skills include the generic `vh-adlc` entry, eleven engineering
+The package's eighteen skills include the generic `vh-adlc` entry, eleven engineering
 operations, `vh-adlc-blog` for article and promotion drafts, `vh-adlc-diagram` for architecture diagrams, `vh-adlc-docs-impact` for
 selected-change documentation review, `vh-adlc-docs-drift` for corpus drift and
-stale audit proposals, and `vh-adlc-clean` for host cleanup. It includes
+stale audit proposals, `vh-adlc-docs-truth` for factual claim review, and `vh-adlc-clean` for host cleanup. It includes
 separate feature-reviewer and prose-editor definitions. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
