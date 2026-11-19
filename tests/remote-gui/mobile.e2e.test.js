@@ -12,7 +12,7 @@ import { promisify } from 'node:util';
 const enabled = process.env.REMOTE_GUI_MOBILE_E2E === '1';
 const requireModule = createRequire(import.meta.url);
 
-test.skipIf(!enabled)('two inline taps and one key through stock Chromium and noVNC', async () => {
+test.skipIf(!enabled)('two inline taps edit a URL and a field through stock Chromium and noVNC', async () => {
     const { chromium } = requireModule(process.env.REMOTE_GUI_PLAYWRIGHT_MODULE);
     const root = mkdtempSync(join(tmpdir(), 'rg-mobile-e2e-'));
     const observations = { geometry: null, edit: null };
@@ -28,7 +28,7 @@ test.skipIf(!enabled)('two inline taps and one key through stock Chromium and no
             response.writeHead(204).end();
             return;
         }
-        if (request.method !== 'GET' || path !== '/') {
+        if (request.method !== 'GET' || path !== '/s') {
             response.writeHead(404).end();
             return;
         }
@@ -82,24 +82,54 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         await page.getByRole('link', { name: 'Open session' }).click();
         await page.getByText('Shared browser connected').waitFor({ timeout: 15000 });
         const canvas = page.locator('#screen canvas');
-        await canvas.click({ position: { x: 18, y: 140 } });
-        await canvas.focus();
-        await page.keyboard.press('Control+t');
-        for (let attempt = 0; attempt < 3 && !observations.geometry; attempt++) {
-            await canvas.focus();
-            await page.keyboard.press('Control+l');
-            await page.keyboard.type('http://127.0.0.1:' + fixture.address().port + '/', { delay: 14 });
-            await page.keyboard.press('Enter');
-            await delay(850);
-        }
-        assert.ok(observations.geometry, 'synthetic page did not start');
-        await delay(350);
-        const bounds = await canvas.boundingBox();
-        const [width, height] = await canvas.evaluate(node => [node.width, node.height]);
-        const { top } = observations.geometry;
-        const tap = (x, y) => page.touchscreen.tap(bounds.x + x * bounds.width / width, bounds.y + y * bounds.height / height);
         const prompt = page.getByRole('button', { name: 'Tap to type' });
         const editor = page.locator('#mobile-editor');
+        const editorFocused = () => editor.evaluate(node => document.activeElement === node);
+        const tap = async (x, y) => {
+            const { left, top, scaleX, scaleY } = await canvas.evaluate(node => {
+                const box = node.getBoundingClientRect();
+                return { left: box.left, top: box.top, scaleX: box.width / node.width, scaleY: box.height / node.height };
+            });
+            await page.touchscreen.tap(left + x * scaleX, top + y * scaleY);
+        };
+        await canvas.focus();
+        await page.keyboard.press('Control+t');
+        await page.waitForFunction(() => document.querySelector('#screen canvas')?.width === 390);
+        await page.route('**/__remote_gui/editable', route => route.fulfill({ status: 503 }), { times: 1 });
+        await tap(195, 60);
+        await prompt.waitFor({ timeout: 5500 });
+        assert.equal(await editorFocused(), false);
+        await prompt.tap();
+        assert.equal(await editorFocused(), true);
+        // Exercise a keyboard transition that briefly reports the old height.
+        await page.evaluate(async () => {
+            const viewport = window.visualViewport;
+            const baseline = viewport.height;
+            let height = baseline;
+            Object.defineProperty(viewport, 'height', { configurable: true, get: () => height });
+            const resize = (next) => {
+                height = next;
+                viewport.dispatchEvent(new Event('resize'));
+            };
+            resize(baseline - 230);
+            resize(baseline - 8);
+            await new Promise(resolve => setTimeout(resolve, 80));
+            resize(baseline - 235);
+        });
+        assert.equal(await editorFocused(), true, 'the keyboard animation dismissed the editor');
+        const address = 'http://127.0.0.1:' + fixture.address().port + '/t';
+        for (const character of address) await page.keyboard.insertText(character);
+        await page.keyboard.press('Shift+ArrowLeft');
+        await page.keyboard.insertText('s');
+        await page.keyboard.press('Enter');
+        for (let attempt = 0; attempt < 35 && !observations.geometry; attempt++) await delay(100);
+        assert.ok(observations.geometry, 'the corrected address did not load the expected page');
+        await page.evaluate(() => {
+            delete window.visualViewport.height;
+            window.visualViewport.dispatchEvent(new Event('resize'));
+        });
+        await delay(350);
+        const { top } = observations.geometry;
         await tap(120, top + 340);
         await delay(550);
         assert.equal(await prompt.count(), 0);

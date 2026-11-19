@@ -124,7 +124,9 @@ func (r *runtime) editableAt(ctx context.Context, x, y int) (*mobile.Field, erro
 		return nil, errors.New("mobile-focus-unavailable")
 	}
 	defer r.mobileQuery.Unlock()
-	r.mu.Lock()
+	if !r.mu.TryLock() {
+		return nil, errors.New("mobile-focus-unavailable")
+	}
 	browser, phase, helper := r.chrome, r.generation.Load(), r.mobile
 	epoch := r.mobilePhase.Load()
 	ready := !r.stopped && r.modeReady && browser != nil && helper.live() && r.mobileScalePhase == phase
@@ -151,7 +153,9 @@ func (r *runtime) editableAt(ctx context.Context, x, y int) (*mobile.Field, erro
 	if len(result) > 512 || json.Unmarshal(result, &sample) != nil {
 		return nil, errors.New("mobile-focus-unavailable")
 	}
-	r.mu.Lock()
+	if !r.mu.TryLock() {
+		return nil, errors.New("mobile-focus-unavailable")
+	}
 	defer r.mu.Unlock()
 	if r.stopped || !r.modeReady || r.chrome != browser || r.generation.Load() != phase || r.mobilePhase.Load() != epoch || !state.Alive(browser.identity) || !helper.live() {
 		return nil, errors.New("mobile-focus-unavailable")

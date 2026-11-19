@@ -26,6 +26,11 @@ def has(states, name):
     return bool(int(states[bit // 32]) & (1 << (bit % 32)))
 
 
+def contains_point(bounds, x, y):
+    left, top, width, height = bounds
+    return left <= x < left + width and top <= y < top + height
+
+
 def keyboard_mode(bus, owner, path, node, states):
     role = str(node.GetRoleName(timeout=.08))
     if role == "password text":
@@ -61,7 +66,7 @@ def read_field(bus, owner, path, states, x, y):
         return None
     component = interface(bus, owner, path, "org.a11y.atspi.Component")
     left, top, width, height = map(int, component.GetExtents(dbus.UInt32(0), timeout=.08))
-    if not (left <= x < left + width and top <= y < top + height):
+    if not contains_point((left, top, width, height), x, y):
         return None
     node = interface(bus, owner, path, ACCESSIBLE)
     mode = keyboard_mode(bus, owner, path, node, states)
@@ -100,16 +105,33 @@ def focused(address, pid, x, y, hint):
         except dbus.DBusException:
             pass
     pending = [(owner, ROOT)]
+    documents = []
+    searching_web = False
     seen = set()
     found = None
-    while pending:
+    while pending or documents:
         if len(seen) >= 256 or time.monotonic() >= deadline:
             return None
+        if not pending:
+            # Finish the browser chrome first. A large New Tab Page must not
+            # consume the address bar's search budget. If a document reports
+            # that it covers the tap, still check it for ambiguous focus.
+            pending = documents
+            documents = []
+            searching_web = True
+            if not pending:
+                break
         name, path = map(str, pending.pop())
         if name != owner or not path.startswith(PREFIX) or path in seen:
             continue
-        seen.add(path)
         node = interface(bus, owner, path, ACCESSIBLE)
+        if not searching_web and str(node.GetRoleName(timeout=.08)) == "document web":
+            component = interface(bus, owner, path, "org.a11y.atspi.Component")
+            bounds = map(int, component.GetExtents(dbus.UInt32(0), timeout=.08))
+            if contains_point(bounds, x, y):
+                documents.append((name, path))
+            continue
+        seen.add(path)
         states = node.GetState(timeout=.08)
         match = read_field(bus, owner, path, states, x, y)
         if match is not None:

@@ -2,7 +2,7 @@ import keysyms from '/core/input/keysymdef.js';
 
 // The second tap runs focus() directly in a trusted click. Editing uses
 // ordinary noVNC keys, so the remote browser's current focus receives them.
-export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
+export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn) {
     const prompt = document.getElementById('mobile-type');
     const editor = document.getElementById('mobile-editor');
     const hint = document.getElementById('mobile-hint');
@@ -16,25 +16,32 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
     let observedPhase = 0;
     let request = null;
     let target = null;
+    let framebuffer = '';
     let lease = 0;
     let editing = false;
     let composing = false;
+    let committed = '';
     let baseHeight = 0;
     let keyboardSeen = false;
+    let keyboardCloseTimer = 0;
+    const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
     function clear() {
         epoch++;
         clearTimeout(timer);
         clearTimeout(expiryTimer);
         clearTimeout(phaseTimer);
+        clearTimeout(keyboardCloseTimer);
         phaseRequest?.abort();
         phaseRequest = null;
         awaiting = false;
         request?.abort();
         request = null;
         target = null;
+        framebuffer = '';
         lease = 0;
         composing = false;
+        committed = '';
         const wasEditing = editing;
         editing = false;
         prompt.hidden = true;
@@ -55,8 +62,12 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
         const centerY = bounds.top + (field.y + field.height / 2) * bounds.height / canvas.height;
         prompt.style.left = Math.max(4, Math.min(innerWidth - 116, centerX - 56)) + 'px';
         prompt.style.top = Math.max(36, Math.min(viewportHeight() - 48, centerY - 22)) + 'px';
-        editor.style.left = Math.max(4, Math.min(innerWidth - 10, centerX)) + 'px';
-        editor.style.top = Math.max(36, Math.min(viewportHeight() - 24, centerY)) + 'px';
+    }
+
+    function updatePromptLayout() {
+        if (editing || (!target && !awaiting)) return;
+        if (framebuffer !== canvas.width + 'x' + canvas.height) clear();
+        else if (target) position(target);
     }
 
     const metadataHeaders = { 'Content-Type': 'application/json', 'X-Remote-Gui-Editable': '1' };
@@ -87,6 +98,14 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
         }
     }
 
+    function retrySample(point, generation, attempt) {
+        // A temporary failure never extends a verified association.
+        if (target ? performance.now() < lease : attempt < 4) {
+            const delay = target ? 20 : 75 * (attempt + 1);
+            timer = setTimeout(() => void sample(point, generation, attempt + 1), delay);
+        } else clear();
+    }
+
     async function sample(point, generation, attempt) {
         if (generation !== epoch || !panel.hidden) return;
         const controller = new AbortController();
@@ -99,12 +118,14 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
                 headers: metadataHeaders,
                 body: JSON.stringify(point),
             });
+            if (generation !== epoch) return;
+            if (response.status === 503) { retrySample(point, generation, attempt); return; }
             if (!response.ok) throw Error('editable focus unavailable');
             const field = await response.json();
             if (generation !== epoch) return;
             if (performance.now() >= started + 500) { clear(); return; }
-            if (!field && !target && attempt < 4) {
-                timer = setTimeout(() => void sample(point, generation, attempt + 1), 75);
+            if (!field && !target) {
+                retrySample(point, generation, attempt);
                 return;
             }
             if (!field || field.phase < observedPhase || (target && (field.token !== target.token || field.mode !== target.mode || field.phase !== target.phase))) {
@@ -126,8 +147,11 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
                 prompt.hidden = false;
             }
             timer = setTimeout(() => void sample(point, generation, attempt), Math.max(0, 170 - (performance.now() - started)));
-        } catch {
-            if (generation === epoch) clear();
+        } catch (error) {
+            if (generation === epoch) {
+                if (error.name === 'AbortError') retrySample(point, generation, attempt);
+                else clear();
+            }
         } finally {
             clearTimeout(deadline);
             if (request === controller) request = null;
@@ -141,11 +165,29 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
         return false;
     }
 
-    function insert(text) {
-        if (validEdit()) {
-            for (const character of text) rfb.sendKey(keysyms.lookup(character.codePointAt(0)));
+    function syncInput() {
+        if (!validEdit()) return;
+        const value = editor.value;
+        let start = committed.length;
+        if (!value.startsWith(committed)) {
+            // Like noVNC's editor, replay the changed suffix using ordinary
+            // Backspace and text keys. Backspace removes a whole grapheme.
+            start = 0;
+            let changed = false;
+            for (const { segment, index } of graphemes.segment(committed)) {
+                if (!changed && value.startsWith(segment, index)) start = index + segment.length;
+                else {
+                    changed = true;
+                    rfb.sendKey(0xff08, 'Backspace');
+                }
+            }
         }
-        editor.value = '';
+        for (const character of value.slice(start)) rfb.sendKey(keysyms.lookup(character.codePointAt(0)));
+        committed = value;
+        if (editor.type === 'password') {
+            committed = '';
+            editor.value = '';
+        }
     }
 
     canvas.addEventListener('gesturestart', event => {
@@ -160,6 +202,7 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
         const y = display.absY(position.y);
         if (![x, y].every(value => Number.isInteger(value) && value >= 0 && value < 4096)) return;
         const generation = epoch;
+        framebuffer = canvas.width + 'x' + canvas.height;
         awaiting = true;
         void watchPhase(generation);
         timer = setTimeout(() => void sample({ x, y }, generation, 0), 75);
@@ -171,6 +214,7 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
         editor.type = mode === 'password' ? 'password' : 'text';
         editor.inputMode = mode === 'number' ? 'numeric' : mode === 'password' ? 'text' : mode;
         editing = true;
+        onEditingStart();
         keyboardSeen = false;
         baseHeight = viewportHeight();
         prompt.hidden = true;
@@ -183,13 +227,14 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
 
     editor.addEventListener('blur', () => { if (editing) clear(); });
     editor.addEventListener('compositionstart', () => { composing = true; });
-    editor.addEventListener('compositionend', event => {
+    editor.addEventListener('compositionend', () => {
         composing = false;
-        insert(event.data ?? '');
+        syncInput();
     });
     editor.addEventListener('beforeinput', event => {
         if (composing || event.isComposing) return;
-        if (event.inputType === 'deleteContentBackward' || event.inputType === 'deleteContentForward') {
+        if ((event.inputType === 'deleteContentBackward' && !editor.value) ||
+            (event.inputType === 'deleteContentForward' && editor.selectionStart === editor.value.length)) {
             event.preventDefault();
             if (!validEdit()) return;
             if (event.inputType === 'deleteContentBackward') rfb.sendKey(0xff08, 'Backspace');
@@ -198,13 +243,13 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
     });
     editor.addEventListener('input', event => {
         if (composing || event.isComposing) return;
-        if (event.inputType === 'insertCompositionText' || event.inputType === 'insertFromComposition') {
-            editor.value = '';
-            return;
-        }
-        insert(editor.value);
+        syncInput();
     });
     editor.addEventListener('keydown', event => {
+        if (event.key === 'Backspace' && !editor.value && !composing && !event.isComposing) {
+            event.preventDefault();
+            if (validEdit()) rfb.sendKey(0xff08, 'Backspace');
+        }
         if (event.key === 'Enter' && !composing && !event.isComposing) {
             event.preventDefault();
             if (validEdit()) rfb.sendKey(0xff0d, 'Enter');
@@ -217,12 +262,13 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
     rfb.addEventListener('disconnect', clear);
     rfb.addEventListener('securityfailure', clear);
     window.addEventListener('orientationchange', clear);
-    new ResizeObserver(() => { if (!editing && (target || awaiting)) clear(); }).observe(canvas);
+    new ResizeObserver(updatePromptLayout).observe(canvas);
     window.visualViewport?.addEventListener('resize', () => {
-        if (!editing) { if (target || awaiting) clear(); return; }
+        if (!editing) { updatePromptLayout(); return; }
         const height = viewportHeight();
+        clearTimeout(keyboardCloseTimer);
         if (height < baseHeight - 90) keyboardSeen = true;
-        else if (keyboardSeen) clear();
+        else if (keyboardSeen && height >= baseHeight - 40) keyboardCloseTimer = setTimeout(clear, 250);
     });
 
     return {

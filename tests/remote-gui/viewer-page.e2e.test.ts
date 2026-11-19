@@ -266,7 +266,12 @@ for(const family of ['chromium','firefox'] as const)test.skipIf(!enabled||(famil
   const first=state.requests.length;for(const width of [1100,1050,1000,900])await page.setViewportSize({width,height:1000});await waitCalls(first+1);await Bun.sleep(200);check(state.requests.length===first+1&&state.requests.at(-1)?.width===900&&state.requests.at(-1)?.height===968,'resize burst was not debounced');
   await page.evaluate(()=>window.dispatchEvent(new Event('resize')));await Bun.sleep(250);check(state.requests.length===first+1,'unchanged geometry repeated work');
   state.delay=450;await page.setViewportSize({width:800,height:900});await waitCalls(first+2);await page.setViewportSize({width:700,height:900});await page.setViewportSize({width:600,height:900});await waitCalls(first+3);await Bun.sleep(500);check(state.peak===1&&state.requests.at(-1)?.width===600,'in-flight requests were not coalesced');state.delay=0;
-  state.status=503;await page.setViewportSize({width:500,height:900});await page.getByText('Automatic sizing unavailable; fitting the shared browser.',{exact:true}).waitFor();
+  state.status=503;
+  await page.setViewportSize({width:393,height:655});
+  const notice=page.getByText('Automatic sizing unavailable; fitting the shared browser.',{exact:true});
+  await notice.waitFor();
+  const noticeBox=await notice.boundingBox(),screenBox=await page.locator('#screen').boundingBox();
+  check(noticeBox&&screenBox&&noticeBox.y+noticeBox.height<=screenBox.y,'sizing notice covers the shared browser controls');
   state.status=200;await page.setViewportSize({width:600,height:900});await page.locator('#viewport-status').waitFor({state:'hidden'});
   await page.getByRole('button',{name:'Clipboard',exact:true}).click();const field=page.getByLabel('Text for the remote browser',{exact:true});await field.fill('synthetic clipboard field');await page.setViewportSize({width:390,height:667});await Bun.sleep(350);check(await field.evaluate((n:HTMLElement)=>document.activeElement===n),'sizing stole clipboard focus');
   const beforeZero=state.requests.length;await page.locator('#screen').evaluate((node:HTMLElement)=>{node.style.width='0px'});await Bun.sleep(250);check(state.requests.length===beforeZero,'zero-size area sent geometry');await page.locator('#screen').evaluate((node:HTMLElement)=>{node.style.width='100%'});await Bun.sleep(250);

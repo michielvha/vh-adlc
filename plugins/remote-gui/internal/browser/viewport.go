@@ -192,7 +192,13 @@ func (r *runtime) startGeometry() {
 			case <-r.geometryCtx.Done():
 				return
 			case <-ticker.C:
+				// Leave the runtime lock available for an in-flight focus
+				// lookup to validate its result before the viewer lease expires.
+				if !r.mobileQuery.TryLock() {
+					continue
+				}
 				if !r.mu.TryLock() {
+					r.mobileQuery.Unlock()
 					continue
 				}
 				if !r.stopped && r.modeReady && r.chrome != nil {
@@ -211,6 +217,7 @@ func (r *runtime) startGeometry() {
 					cancel()
 				}
 				r.mu.Unlock()
+				r.mobileQuery.Unlock()
 			}
 		}
 	}()
