@@ -96,6 +96,74 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 
+| 2026-11-19 | R-1 | spec | `9f5c531346a95f7419c7b81b8366a470929b6e92` | unknown | procedural | Three blocking and six should-fix findings. |
+
+### R-1
+
+TARGET: 9f5c531346a95f7419c7b81b8366a470929b6e92
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Owner summary (lines 26-28), Scope (lines 38-40), Shared procedure (lines 46, 50, 52-54), Stackweaver adoption (lines 58-60), AC-01 through AC-03 and their Test Plan rows (lines 72-74, 81-83), Open Questions (lines 90-92)
+EVIDENCE: The design reads policy from the selected checkout and allows a project command to select a write procedure "under committed local authority." A committed candidate branch can carry both the command and its purported grant. No rule identifies the authoritative policy revision or the allowed effects. The Stackweaver entry also has no precedence rule for an explicit report-only or no-push request. `plugins/vh-adlc/references/authority.md:3-6,42-50` says routing creates no permission and the current task retains its limits.
+PROPOSAL: Ask the owner which existing Stackweaver invocations carry which local and remote effects, then document the current authorization or already adopted policy that each effect needs. Keep the shared invocation and generic intake read-only, enforce caller restrictions at the handoff, and test that a candidate policy and a report-only invocation cannot activate the writer.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Owner summary (lines 26-28), Scope (lines 38-40), Shared procedure (lines 50-54), Stackweaver adoption (lines 58-60), AC-03 and its Test Plan row (lines 74, 83)
+EVIDENCE: The write path checks changed source or documents and the base of its isolated checkout. Two writers can pass those checks in different checkouts against one ledger snapshot. The design gives no way to detect a ledger-only change, identify a prior application, or distinguish a delivered batch from one whose push response was lost. The proposed local-commit retry case does not observe an accepted push with a lost response or a second writer at the delivery boundary.
+PROPOSAL: Bind the consumer handoff to the assessed source, document and ledger revisions and define how its existing writer rejects competing or stale applications and recognizes the exact prior result before retrying. Prove the overlapping writer, ledger-only advance and lost-response retry against disposable consumer state and a local bare remote, or narrow the delivery guarantee to the effects the retained consumer procedure can establish.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner summary (lines 26-28), Scope (lines 38-40), Shared procedure (lines 46-48, 52-54), Stackweaver adoption (lines 58-60), Terms (lines 66-68), AC-02 and AC-03 and their Test Plan rows (lines 73-74, 82-83)
+EVIDENCE: The design describes full and targeted review, leaves unknown claims visible and bars interrupted reports from completed history. It gives no rule for whether a completed targeted review, an unresolved unknown, or a document whose correction is still pending advances full-document freshness. The tests can pass if the report labels each outcome correctly while the writer records an old document as fully verified and the selector deprioritizes it.
+PROPOSAL: Bind each review outcome to its permitted consumer ledger effect, preserving the meaning of existing rows. Assert the ledger state and next selection after a complete full review, a targeted review, an unknown, a pending correction and an interruption.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (lines 26-28), Shared procedure (lines 46-52), Stackweaver adoption (lines 58-60), AC-01 and AC-02 and their Test Plan rows (lines 72-73, 81-82)
+EVIDENCE: The skill loads committed policy, but candidate validation is specified only as "tracked" and "non-regular." An implementation can validate against the index or a filesystem `stat` result while opening a different object from the one at the assessed commit. The fixture checks a symlink and an untracked file but does not exercise an escaped path, duplicate aliases, a policy symlink, or a tracked path changed after validation. A clean Git status also does not rule out helper side effects in ignored files, shared caches or a remote.
+PROPOSAL: Define the inputs as unique repo-relative regular files from the assessed commit, validate aliases and path containment before loading policy or documents, and define the approved non-mutating method for selector and evidence commands in an owned snapshot. Test ref versus filesystem mismatches and show that rejected or interrupted runs leave the assessed repository and verification history intact.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (lines 26-28), Background (lines 32-34), Scope (lines 38-40), Shared procedure (lines 46-54), Stackweaver adoption (lines 58-60), Terms (lines 66-68), AC-01 through AC-03 and their Test Plan rows (lines 72-74, 81-83)
+EVIDENCE: "The shared entry defaults to a report" can mean `report`, which reads freshness without checking claims, or a default-sized `next` review that reports findings. `sweep <path>...` selects documents but the specification gives no way to name targeted claims or say whether a sweep without a claim filter is full. Only the configured batch size is required to be positive. The generic intake proof also omits ambiguous requests and explicit direct invocations, even though `plugins/vh-adlc/references/lifecycle.md:92-99` currently sends a claim review to a selected local workflow or an unsupported handoff.
+PROPOSAL: State the no-argument mode, valid explicit limits, full versus targeted selection, and which entries retain the legacy defaults. Assert missing or invalid mode arguments, explicit report-only review, the freshness-only `report` mode, and ambiguous and explicit intake cases alongside the existing docs routes.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: blocking
+WHERE: `covers` (lines 6-15), Scope (line 38), Stackweaver adoption (lines 58-60), AC-04 and its Test Plan row (lines 75, 84)
+EVIDENCE: `tests/vh-adlc/check.test.ts:23,235-241` enumerates recognized skill directories, and `tests/vh-adlc/triage/discovery.test.ts:12-23,46-52` asserts seventeen skills and the installation guide's existing count. Adding the required skill fails those existing checks without changes outside the listed scope. `docs/get-started/installation.md:105-110` enumerates the package's operations, and both package versions live in `plugins/vh-adlc/plugin.json` and `plugins/vh-adlc/.claude-plugin/plugin.json`, outside `covers`. The root marketplace manifests already point to the package directory. `.github/workflows/ci.yml:194-205` versions the repository, while `.github/workflows/release.yml:3-13` invokes the Go release workflow. AC-04's unnamed "configured path" leaves room to prove the Go release instead of the marketplace payload.
+PROPOSAL: Name the catalog-to-package installation path, the package metadata and existing discovery checks that change, and cover those files and the installation inventory. Make the candidate check prove installation of the exact package through both catalog paths, and retain the separate ordinary published install and upgrade proof.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner summary (line 28), Scope (line 38), Stackweaver adoption (line 60), AC-03 and AC-04 and their Test Plan rows (lines 74-75, 83-84), Open Questions (lines 90-92)
+EVIDENCE: The final criteria need a published marketplace package and subsequent consumer adoption. The ordinary completion route runs `vh-adlc gate complete` before the feature's delivery, while `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:74-82` expressly allows a separately requested in-progress PR with unmet criteria. The draft schedules post-release checks but omits which route publishes the incomplete feature and how review resumes after the separate consumer cutover. The pinned `conventions/delivery.md:102-117` requires exact committed review, one feature PR and real publication evidence.
+PROPOSAL: Record the owner-approved in-progress publication and completion sequence, including the candidate checks needed before publication, the exact published and consumer evidence needed afterward, and when the final review and completion gate run.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (lines 26-28), Background (lines 32-34), Scope (lines 38-40), Stackweaver adoption (lines 58-60), AC-03 and its Test Plan row (lines 74, 83), Sources (lines 101-103)
+EVIDENCE: The baseline command, selector and ledger behavior at `72e48ed577af958034d6aa598e2835ef36ccdb8c` are operator observations from private sources. The reported `--fast 3` check observes only selection and establishes neither the 15-document default nor dispatch, validation, ledger and delivery effects. The parity row asks one fixed snapshot to contain the old and newly routed entry without identifying the entry versions, permitted overlay, exact protected paths or retained policy checks. The public migration roadmap's Adoption contract calls for exact shared and consumer commits and verification of the actual native and harness-neutral entry points.
+PROPOSAL: Preserve an operator-attested baseline with the legacy command and policy references, observed mode defaults and effects, then compare the exact old and adapter revisions over the same reviewed corpus, source and ledger inputs. Record the permitted routing delta, installed plugin identity and actual forwarded command checks, and exercise rollback and reapplication without changing the ledger.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Shared procedure (lines 48-52), Terms (lines 64-68), AC-02 and its Test Plan row (lines 73, 82)
+EVIDENCE: AC-02 requires accurate full and targeted coverage and visible unsupported corrections and possible product issues. Its proof names claims and a partial run but only checks that verdicts refer to source results. A run can cite the right inputs while giving every claim the same verdict, recommending an unsupported replacement, or labelling a targeted run full. The glossary also omits the three user-facing verdicts. Pinned `conventions/feature-documents.md:121-125,163-166` requires a pass condition and glossary coverage for introduced terms.
+PROPOSAL: Give each fixture claim its expected verdict, support and disposition, and assert the exact in-scope claims and coverage status for full and targeted runs. Add the verdicts to the glossary and have the fixture check their use.
+
 ## Sources
 
 - [Stackweaver command at the checked commit](https://github.com/michielvha/stackweaver/blob/72e48ed577af958034d6aa598e2835ef36ccdb8c/.claude/commands/docs-truth.md) defines the local entry and modes.
