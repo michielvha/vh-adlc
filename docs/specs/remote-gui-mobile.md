@@ -200,6 +200,8 @@ NO FINDINGS
 
 ## Sources
 
+- [Post-merge agent entry](https://github.com/vhco-pro/docs/blob/0c983f6793bfe35eb96ae95ad0c361c6200af44f/AGENTS.md) and [feature-document standard](https://github.com/vhco-pro/docs/blob/0c983f6793bfe35eb96ae95ad0c361c6200af44f/conventions/feature-documents.md): current review rules, retained acceptance after covered-source drift and corrections outside the normative baseline.
+
 - [Pinned agent entry](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/AGENTS.md) and [task routes](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/README.md): required knowledge and authoring routes.
 - [Pinned feature-document standard](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/conventions/feature-documents.md), [template](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/guides/feature-document-template.md), [documentation](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/conventions/documentation.md), [delivery](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/conventions/delivery.md), [frontend verification](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/conventions/frontend-testing.md) and [humanize prose](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/guides/humanize-prose.md): authoring, evidence and publication rules used for this draft.
 - [noVNC overview](https://novnc.com/info.html) and [RFB API](https://novnc.com/noVNC/docs/API.html): mobile remote desktop and canvas input are existing capabilities; the core library differs from its complete application and exposes no editable-DOM map.
