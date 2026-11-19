@@ -185,6 +185,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-7 | spec | `a03bf98503d8c377eaed65e2ebf51577c4483a39` | unknown | procedural | Six should-fix findings and one evidence-link nit. Model identity was not attested. |
 | 2026-11-19 | R-8 | spec | `a668b87a40c01d15880c890f6857969706d26148` | unknown | procedural | One blocking finding, six should-fix findings and one nit. Model identity was not attested. |
 | 2026-11-19 | R-9 | spec | `39b5042cb63aa553818ee2fe56f9605b6cefff23` | unknown | procedural | Four should-fix findings and one evidence nit. Model identity was not attested. |
+| 2026-11-19 | R-10 | spec | `ad01fed9eb16e0083875c61be063160e444cf3f6` | unknown | procedural | Four should-fix findings and one fixture wording nit. Model identity was not attested. |
 
 ### R-1
 
@@ -459,6 +460,43 @@ SEVERITY: nit
 WHERE: Context / Two-tap feasibility fixture (lines 33 and 35), Sources
 EVIDENCE: The post-R-8 revision corrects the opening sentence and adds the warm-cache and ordinary contenteditable observations. The linked fixture's `focused.py:41-55` still checks focus and bounds. The separate hit, overlay, omnibox and contenteditable observations have no named replay procedure or retained result in the document.
 PROPOSAL: Name the disposable procedures or sanitized retained evidence for those observations where available.
+
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 23), Scope (lines 115-116), Design / Detect and show the prompt (lines 124 and 128-130), Acceptance Criteria AC-10, Test Plan AC-10 and AC-12, Tasks T6-T7
+EVIDENCE: The post-R-9 design now uses the dispatched point. Installed noVNC 1.5.0 `core/rfb.js:1226-1254` can snap a nearby repeat tap back to the first point. AC-10 records the emitted coordinate but accepts either containment or a hidden prompt. A viewer that hides the prompt on every nearby repeat tap can pass that check even when the known dispatched point is inside an eligible reported focus.
+PROPOSAL: Test a repeat tap whose raw and dispatched points fall on opposite sides of the reported bounds. Require a prompt when the known dispatched point is inside eligible bounds and suppression when it is outside.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 23), Scope (lines 115-116), Design / Detect and show the prompt (lines 124 and 128-130), Acceptance Criteria AC-10, Test Plan AC-10, Tasks T6-T7
+EVIDENCE: AC-10 promises a prompt on the first tap of a supported field. The design samples focus after RFB dispatch, but the metadata request can return before Chromium processes the click. If the sample still reports a different field outside the dispatched point, the prompt stays hidden and the specified refresh never starts. The delayed different-field test names the action but gives no expected outcome after the click reaches Chromium.
+PROPOSAL: Specify whether an otherwise valid tap must recover from a sample that precedes the click. Give the delayed different-field case explicit assertions before and after click delivery, including whether the user needs another field tap.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 25 and 29), Design / Detect and show the prompt (lines 124, 130 and 134), Design / Type and dismiss (line 140), Acceptance Criteria AC-11, AC-13 and AC-14, Test Plan AC-11 through AC-14, Tasks T7-T8
+EVIDENCE: The post-R-9 AC-13 proof now observes the viewer, but it releases the old reply after a live handoff without checking whether its lease is still valid. The existing handoff waits for the old Chromium process to exit and launches the replacement in `plugins/remote-gui/internal/browser/phase.go:184-227`. If the handoff consumes the 500 millisecond lease, expiry alone clears the editor and rejects the reply. The test can pass with phase validation missing.
+PROPOSAL: Keep the real handoff scenario and add a deterministic phase-change check that delivers an otherwise valid old-phase success before lease expiry. Assert that the viewer clears the old editor and composition on phase invalidation, discards the reply and sends no keys from a late composition event.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 27), Scope (lines 115-116), Design / Detect and show the prompt (lines 124 and 128-130), Acceptance Criteria AC-10 and AC-12, Test Plan AC-10 and AC-12, Tasks T6-T7
+EVIDENCE: The design requires conversion between dispatched framebuffer pixels and AT-SPI screen geometry, with suppression for unknown mappings. AC-12 exercises a scaled, offset viewer canvas. That exercises the viewer conversion but can run with unit host scale throughout, allowing a helper that assumes framebuffer pixels always equal AT-SPI coordinates to pass.
+PROPOSAL: Exercise a known non-unit host conversion or prove suppression when that conversion cannot be verified. Keep the scaled and offset canvas case for the viewer conversion.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Two-tap feasibility fixture (lines 33-35), Design / Detect and show the prompt (lines 128-130), linked `tests/remote-gui/mobile-feasibility/two-tap/README.md` (line 17)
+EVIDENCE: The revision names the disposable hit and signature probes and records the owner's reported-focus decision. The linked fixture still says the product requires additional hit checks, which conflicts with that decision.
+PROPOSAL: Update the fixture description to name the remaining reported-focus association, geometry and freshness checks.
 
 ## Sources
 
