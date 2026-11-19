@@ -186,6 +186,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-8 | spec | `a668b87a40c01d15880c890f6857969706d26148` | unknown | procedural | One blocking finding, six should-fix findings and one nit. Model identity was not attested. |
 | 2026-11-19 | R-9 | spec | `39b5042cb63aa553818ee2fe56f9605b6cefff23` | unknown | procedural | Four should-fix findings and one evidence nit. Model identity was not attested. |
 | 2026-11-19 | R-10 | spec | `ad01fed9eb16e0083875c61be063160e444cf3f6` | unknown | procedural | Four should-fix findings and one fixture wording nit. Model identity was not attested. |
+| 2026-11-19 | R-11 | spec | `f54bb1ad8854cfd80f03c73cdd12127a784e0f38` | unknown | procedural | Two should-fix test proof findings. Model identity was not attested. |
 
 ### R-1
 
@@ -497,6 +498,22 @@ SEVERITY: nit
 WHERE: Context / Two-tap feasibility fixture (lines 33-35), Design / Detect and show the prompt (lines 128-130), linked `tests/remote-gui/mobile-feasibility/two-tap/README.md` (line 17)
 EVIDENCE: The revision names the disposable hit and signature probes and records the owner's reported-focus decision. The linked fixture still says the product requires additional hit checks, which conflicts with that decision.
 PROPOSAL: Update the fixture description to name the remaining reported-focus association, geometry and freshness checks.
+
+### R-11
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 23), Scope (lines 115-116), Design / Detect and show the prompt (lines 128-130), Acceptance Criteria AC-10, Test Plan AC-10 and AC-12, Tasks T6-T7
+EVIDENCE: The R-10 revision gives AC-10 explicit outcomes for emitted points inside and outside reported bounds. The fixture still need not demonstrate that noVNC snapped a repeat tap across those bounds. Installed noVNC 1.5.0 `core/rfb.js:1226-1254` only substitutes the previous point under its timing, gesture-type and distance conditions. Both test cases can produce matching raw and emitted eligibility, allowing a viewer that uses raw coordinates to pass.
+PROPOSAL: Require the fixture to measure and assert a snap with the raw and emitted points on opposite sides of the same eligible bounds. Cover both directions and derive the expected prompt outcome from the emitted point.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 25 and 29), Design / Detect and show the prompt (lines 124, 130 and 134), Design / Type and dismiss (line 140), Acceptance Criteria AC-11, AC-13 and AC-14, Test Plan AC-11 through AC-14, Tasks T7-T8
+EVIDENCE: The R-10 revision checks server-side rejection when the generation changes before a helper result is released. That leaves the viewer untested against a successful old-generation reply that the server produced before the transition and that arrives after the viewer sees the change. The real handoff case releases a held reply without requiring it to remain within the 500 millisecond lease. The server check and lease expiry can make both cases pass even if the viewer accepts a still-fresh old-generation success.
+PROPOSAL: Retain the server rejection case. Add a deterministic viewer case that delivers a successful old-generation reply within its lease after the viewer observes the new generation, then delivers a late composition commit and asserts no prompt or editor restoration and no key traffic.
 
 ## Sources
 
