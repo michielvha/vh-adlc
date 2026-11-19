@@ -154,6 +154,30 @@ None yet; written once the document is planned. The first implementation task mu
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-19 | R-1 | spec | `363a6140f6c2a1383da8d9c1fee5f2d3c36fa0fa` | unknown | procedural | Three should-fix findings; owner input policy and proof corrections pending. |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope (preserve desktop pointer and hardware-keyboard input); Design / Input and geometry boundaries (ordinary pointer transport, context invalidation, focus acknowledgement and active controlling viewer); Design / Editing and viewport behavior (remote field changes); Acceptance Criteria AC-06; Test Plan AC-06
+EVIDENCE: The document keeps ordinary RFB pointer transport at line 73, acknowledges the selected field before sending text at line 79, and restricts editing bindings to an undefined active controlling viewer at line 81. In the cited source, browser.go:570-571 launches x11vnc with -shared, and viewer.go:201-202 at 417c4c4 creates each RFB client with viewOnly=false. The sizing controller arbitrates viewport requests, not RFB pointer or hardware-keyboard events. The design does not say how a second viewer's ordinary click or key event participates in the binding transaction, or how input already authorized for field A is prevented from following such an event to field B. Implementers could preserve unrestricted RFB control or gate it behind the new controller, with different desktop behavior and different guarantees. Scenario S6 races adapter/transport fixtures but does not require this real ordinary-input path.
+PROPOSAL: Define controller acquisition and transfer, and how ordinary RFB pointer and hardware-keyboard events invalidate or participate in an editing binding before another edit can apply. Add a real two-viewer case that changes focus through RFB while the first viewer has acknowledged and in-flight input; require either delivery to the original bound target or cancellation, with no delivery to the other field.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope (field-appropriate keyboard modes); Design / Input and geometry boundaries (safe input-mode flags); Design / Editing and viewport behavior (secure password semantics); Acceptance Criteria AC-02; Test Plan AC-01, AC-02 and AC-08
+EVIDENCE: Scope line 47 and AC-02 require text, email, URL, search, telephone and numeric keyboard modes. Design line 85 also requires password input without prediction, capitalization or spelling suggestions. Gate F1 checks keyboard opening and caret placement across these field types, while M2 compares resulting text and only names password and numeric/email modes. No proof explicitly observes the URL, search or telephone keyboard modes or the password suggestion settings. A bridge that always uses a generic text editor for these fields could satisfy the stated opening and text-result checks while failing the required native keyboard behavior.
+PROPOSAL: Extend the real-device procedure to verify each required input mode and the password editor's secure behavior, including transitions between field types while the keyboard is already open. State the observable pass condition for each accepted OS/browser/keyboard combination and retain any unsupported mode as a failure requiring a scope decision.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Input and geometry boundaries (metadata and input access checks); Acceptance Criteria AC-05; Test Plan AC-05, AC-06 and AC-08
+EVIDENCE: Design line 81 applies session identity, origin, method, expiry and process ownership checks to both metadata and input access, and AC-05 covers all new routes. S5 explicitly exercises actual metadata routes with adversarial identities and headers, but does not exercise the actual input/binding routes under those conditions or include wrong-method requests. S6 uses deterministic adapter/transport fixtures for delivery races. An implementation that protects metadata correctly but omits a required check on an input or binding endpoint could therefore pass the specified security procedures.
+PROPOSAL: Apply the actual-route security matrix to every metadata, binding, input and controller endpoint the probe introduces, including wrong methods, wrong origins, forged ingress headers, foreign identities, expired sessions and changed process ownership. Assert both refusal and zero remote input or binding mutation for each rejected request.
 
 ## Sources
 
