@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementation starts with the noVNC reuse and native phone feasibility checks."
+status: draft
+status_description: "Revising the privacy boundary for keyboard mode detection after the synthetic feasibility probe."
 branch: feat/remote-gui-mobile
 issue: null
 goal: "Use a remote-gui browser from a phone with selective first-tap native keyboard input, normal text editing and touch scrolling."
