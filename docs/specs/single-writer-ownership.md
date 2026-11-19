@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The owner selected Git-remote coordination. R-1 found two blocking and five should-fix gaps; release/admission, compatible-client rollout and authority initialization await owner decisions. No ownership runtime is implemented or released."
+status_description: "The owner decided the R-1 questions. The revised Git coordination and writer fencing design awaits a fresh independent review. Implementation and native validation are pending."
 issue: null
 goal: "One canonical repository work item has one verified agent writer across clones, worktrees and supported hosts, with an explicit, preserved handoff."
 covers:
@@ -51,27 +51,27 @@ using the actual helper and binary admits two clean feature worktrees for the sa
 synthetic issue: both isolation results are `continue`, and both in-progress gates pass.
 The desired second-writer refusal fails. No external Git remote was used by that probe.
 
-This feature adds an atomic owner record keyed by repository and work item. Every
+This feature adds an atomic writer record keyed by repository and work item. Every
 write-capable workflow checks it before mutation. A different branch name, clone,
 agent model or resumed session cannot establish another owner. Read-only review and
 owner-delegated assessment remain possible. An authorized handoff preserves unfinished
-work, changes the owner generation, and leaves a durable notice for the former writer.
+work, advances the generation and leaves a durable notice for the former writer.
 Quota exhaustion and missing processes are not automatic ownership release.
 
-The owner selected the repository's Git remote as the shared authority, with conditional
-updates and a reserved coordination ref, so different clones and machines share it.
-When current ownership cannot be verified, write-capable entry stays held. Source publication, PR creation, merge and deployment retain their existing grants.
-Adoption must explicitly authorize coordination-state writes; it does not grant source
-publication. No coordinator ref has been created for this draft.
+The repository's Git remote holds the shared record. Adoption explicitly initializes a
+reserved ref, binds its identity in committed policy and confirms that existing writers
+have stopped or upgraded. If the established ref disappears, writing stops until an
+authorized recovery restores its history. Source publication still needs its own grant.
 
-The proposed repository conventions update resolves a missing testing page at the old
-repository pin. It applies only in this isolated draft checkout; the plugin's default
-knowledge pin and other sessions' checkouts are unchanged.
+Release and takeover close admission, drain all admitted actions and invalidate the old
+token before making work available again. A supported Claude or Codex route must still
+refuse mutation when its checker fails after setup. Other routes remain read-only.
+Downgrading a client holds writing and preserves the coordination record.
 
-Accepting the final, independently reviewed document will authorize local implementation
-and tests. Publishing and consumer adoption require their own authority. The runtime is
-not built, tested as a fix, or released. Claude's present quota limit leaves actual
-native-host acknowledgment/proof pending; a hook-contract simulation is not that proof.
+Validation includes concurrent clones, admission racing with handoff, initialization
+response loss, stale-token publication and actual native clients with their checker broken.
+The current result is a spec revision. Accepting it after independent review authorizes
+local implementation and tests. Release and consumer adoption have separate grants.
 
 ### Owner decision
 
@@ -79,7 +79,9 @@ On 19 November the owner selected Git-remote coordination as recommended and req
 continued work, validation across Claude and Codex, takeover notification to the former
 Claude session, and continued consumer consolidation. The owner also explicitly requested
 publication of this draft so it is backed up remotely. Publication of the draft is distinct
-from releasing or adopting a working ownership runtime.
+from releasing or adopting a working ownership runtime. The owner also accepted the
+same closing protocol for release and transfer, compatible writers before activation,
+and explicit initialization with no automatic authority reset (R-1 Q2A-Q4A).
 
 ### Measured incident and current gaps
 
@@ -88,7 +90,7 @@ from releasing or adopting a working ownership runtime.
   claim pushes have rejection handling. Re-entering an already claimed feature has
   no persistent session owner check.
 - `primaryWorktree()` reads the first local `git worktree list` result, and `isolation()`
-  accepts a linked worktree (`claim.ts:65-80`). Separate clones have separate lists.
+  accepts a linked worktree (`plugins/vh-adlc/scripts/loop/claim.ts:57-71`). Separate clones have separate lists.
 - The handoff rule explicitly says a claim is not a lock
   (`plugins/vh-adlc/references/authority.md`, Preservation and Handoff).
   `tests/vh-adlc/worktree-handoff.test.ts` grades the handoff question and preservation;
@@ -97,10 +99,8 @@ from releasing or adopting a working ownership runtime.
   (`plugins/vh-adlc/scripts/triage/execution-lock.ts:6-25`). That protects a running triage
   execution; it neither coordinates all lifecycle writers nor persists a paused feature's
   owner across machines.
-- The synthetic two-clone result and actual failing assertion are retained in
-  `/home/m/code/stackweaver-maintenance-20261106.n4ujyavc/nov19-independent-clone-ownership-reproduction.json`
-  and its `runtime/probe-independent-clone-ownership.ts`. The fixture uses synthetic
-  review/acceptance records solely to exercise gates; these are not real feature reviews.
+- The incident's two-clone receipt and probe are retained with the consumer's private
+  evidence. The probe used synthetic review and acceptance records to exercise gates.
 - The actual collision is Stackweaver issue #1079. The accepted consumer branch at
   `3f3f7754` and the other clone at `db3a6a44` have independent implementation histories.
   Both histories and the latter's two uncommitted files are preserved. The consumer's
@@ -114,10 +114,9 @@ repairs. Reuse each operation's existing records and authority checks. Resolve a
 issue/spec/task identity before allocating a new work item. An unresolved alias or duplicate
 stops the writer instead of silently creating another feature.
 
-Store one current owner plus ordered handoff/release history. Identify its session/host,
+Store one current writer plus ordered handoff and release history. Identify its session/host,
 canonical checkout and branch, accepted work item and generation. Keep private possession
-tokens outside Git and redact them from diagnostics. A status command reports the owner and
-canonical location so an agent does not have to ask the owner which clone is authoritative.
+tokens outside Git and redact them from diagnostics. A status command reports the current writer and canonical location.
 
 Keep feature specs, task order, review records, test evidence and delivery policy in their
 existing consumer homes. This adds no task scheduler, PR queue, automatic merge, automatic
@@ -136,98 +135,99 @@ resumed claimed document must resolve its existing item. Branch names alone are 
 Different features may have different owners; delegated read-only workers name the owning
 item and immutable target, and cannot inherit a source-writing token.
 
-### D2: Shared owner authority
+### D2: Shared Git authority
 
-The owner-selected Git-remote authority uses a reserved coordination ref
-whose commits contain ownership records, separate from product source and release branches.
-Use non-force conditional updates against the observed ref. Do not put a read-then-write issue
-comment or a clone-local file in the place of an atomic claim.
+The Go binary owns authority initialization and the status, acquire, check, release and
+transfer transitions. Host adapters call the verified binary. Committed adoption policy
+names the canonical repository, remote, reserved ref (default
+`refs/heads/vh-adlc/work-ownership`), authority ID and genesis commit. Verify that the
+remote protects the established ref from deletion and history rewrites, and excludes it
+from branch cleanup and product release. First adoption has explicit authority for this
+ref and its policy binding. It grants no source or tracker publication privileges.
 
-Two simultaneous claims for one key must have one winner. On a rejected update, refetch and
-classify the observed owner before any bounded retry. A lost response is reconciled by
-reading back the exact generation and owner identity. Unknown authorization, state or remote
-outcome stops write-capable work. A local cache is diagnostic and cannot grant ownership.
+Initialization creates the ref with an expected absent tip and an adoption operation ID.
+The proposed genesis binds the repository and authority ID. Only one concurrent creation
+can succeed. On response loss, read back and verify the exact genesis and operation ID.
+A competing genesis stays held until the owner reconciles it. A created ref with a
+missing policy binding remains inactive. Activate only when the committed policy and
+remote history agree and D5's cutover is complete. Ordinary acquisition never initializes
+the ref. A missing, rewritten, mismatched or unverifiable established authority stays
+held. Recovery requires separate authorization and the verified established history.
 
-Adoption declares the authority and grants only its scoped coordination updates. Existing
-source/issue/PR publication and merge checks remain independent. Reserve the coordination
-namespace from ordinary feature cleanup and release processing. No coordination ref is
-created, pushed or merged as part of specification.
+Each record binds the work aliases, state, generation, opaque writer/session and checkout
+identities, token digest and operation ID. Keep the possession token and private paths
+outside Git. Status reports the canonical source branch/spec and opaque remote location,
+with an absolute path only for a locally resolved checkout. Unknown schema, alias or
+remote state holds mutation. Cached state is diagnostic only.
 
-Implement the shared authority in the existing Go binary, exposed through its ownership
-status, acquire, check, release and transfer commands. Host adapters call that verified
-binary instead of duplicating Git arbitration in prompts. Adopted configuration names one
-canonical repository, remote and reserved ref. The default ref is
-`refs/heads/vh-adlc/work-ownership`; adoption verifies that this namespace is excluded from
-the consumer's source-release and branch-cleanup paths before any coordination push.
+Build each update as a child of the exact observed tip using Git plumbing outside the
+source index and branches. Require the remote to compare the old object ID with that tip
+when it installs the new one. Verify ancestry before submission, including when Git's
+explicit expected-tip lease is used. Reject any attempt to rewrite the authority history.
+On conflict, read back and classify the writer before a bounded retry. After ambiguous
+response, reconcile by operation ID and the intended transition before returning success.
+Use the same conditional update for admission, closing, drain receipts and finalization.
 
-A versioned record binds canonical work aliases, state, generation, opaque owner/session
-and checkout identity, token digest, and the last operation ID. Keep the possession token
-and private absolute checkout/host details in local runtime state. Status reports local
-paths only when locally resolved; remote owners are identified by their registered opaque
-location and canonical source branch/spec. Unknown schema or alias mapping stops admission.
+### D3: Enforce mutation at execution
 
-Use Git plumbing to build the coordination commit from the observed authority commit,
-without modifying the caller's source index, HEAD or branches. The push is non-force and
-must descend from that exact observed commit. Concurrent same-item claims cannot both win;
-a rejected update reloads ownership before retry. Operation IDs make retries/read-back
-idempotent. Release and transfer update records through the same compare-and-set path.
+Check ownership at lifecycle entry and re-entry and require a valid generation for each
+mutation, including commits and authorized publication. Keep existing worktree, preservation
+and delivery checks. A status result is informational and grants no action admission.
 
-### D3: Enforce entry and continuation
+Run the native Claude or Codex session in an enforced route that keeps the model read-only
+with respect to the worktree, Git refs and external mutation endpoints. Source mutation
+goes through a trusted controller outside that session. Reuse the existing confined
+controller and owned-process patterns where they enforce the required boundary
+(`plugins/vh-adlc/scripts/triage/controller.ts`, `owned-process.ts`). The controller owns
+the writer token and scoped mutation credentials. It authenticates the requesting session
+and binds each request to the work item, checkout, generation and exact proposed effect.
+It rejects out-of-scope targets and arbitrary shell forwarding. Failure to reach the
+controller or obtain a valid admission starts no action.
+Verify native configuration, tool exposure and confinement on each supported route.
+If the host cannot enforce those limits, keep the route read-only. Claude SessionStart
+and Codex resume hooks may surface notices. PreToolUse may report a refusal early.
+Neither hooks nor their trust state grant access to mutation capabilities.
 
-Add the ownership check to the shared lifecycle entry before source mutation and to re-entry
-of an existing branch. The existing local branch/worktree and preservation checks still run.
-Every write-capable operation must acquire or verify the same owner generation; no operation
-silently falls back to clone-local ownership. Check again before commit, push and handoff.
+Before execution, register an action ID against the active generation through the
+authority's conditional update. Registration and closing compete at that same point.
+A preliminary check followed by a delayed registration cannot grant admission after
+closing. If registration wins, closing includes that action until its result is settled.
+The controller tracks the registered ID before spawning any child and keeps it until the
+process and its descendants and input channels have stopped and external effects have been
+reconciled. Then it records settlement using the action ID. Keep publication guarded by
+both ownership and its separate grant.
+Never reuse an action ID to launch a second process after an ambiguous response. A controller
+restart with unknown activity keeps that ID outstanding until quiescence can be verified.
 
-Integrate through shared runtime helpers and supported host adapters, rather than maintaining
-separate copies of the ownership logic in Claude and Codex prompts. A tool adapter verifies
-ownership before a source-mutating action. Report which boundary is actually enforced on a
-host. A procedural instruction is not an enforced tool boundary. A host without the required
-write guard remains read-only until a supported route is available; it cannot claim full
-single-writer protection from a successful status query or Git hook alone.
-
-Claude's adapter uses SessionStart/resume context and PreToolUse checks. Codex's adapter
-uses its native hooks for Bash/unified execution, apply_patch and covered MCP/function
-tools. Both call the same ownership checker and use documented denial output or exit 2.
-Hook errors, missing helpers and changed/untrusted hooks must hold write-mode setup; a
-hook that the client skips is not an installed fence. Keep the bootstrap exception narrow:
-only the exact installed status/acquire invocation is permitted before ownership, with
-validated arguments and no composed shell commands or source mutation.
-
-Codex subagents can expose the parent's session ID. Do not grant a delegated actor the
-writer's token on that basis. Use an independently scoped, native read-only client route
-when the host cannot identify and fence the delegated actor. Existing reviewers already
-have an independent command route that can be reused.
-
-An admitted long-lived shell can retain an input channel: Codex write_stdin does not run
-PreToolUse again. The owning execution controller must drain or stop that process and its
-input channel before transfer. Unknown in-flight ownership keeps transfer held. A new
-owner cannot become active while an old admitted mutator can still write. Unsupported
-specialized tool paths remain outside write-mode until their boundary is verified.
-
-Tests must distinguish logical owner arbitration, workflow entry, tool-action fencing and
-publication fencing. The feature does not claim an operating-system security boundary against
-arbitrary direct filesystem writes outside the adopted runtime.
+Delegated reviewers use an independently scoped read-only route. A host-provided parent
+session ID grants no privilege, and tokens and action admission are inaccessible to the
+delegated actor. Long-lived shells and continuing input must be owned and tracked by the
+controller to run as writer. Codex write_stdin does not retrigger PreToolUse. Cover it in
+the drain or keep that channel unavailable for mutation. The contract covers the adopted
+routes and their declared enforceable boundaries.
 
 ### D4: Resume, release and explicit handoff
 
-A matching owner resumes its existing record; it does not create another claim. A different
-session sees the current owner/location and remains read-only until an authorized handoff.
-No PID observation, timeout, quota failure or heartbeat age automatically makes the item free.
+A matching writer resumes its record. A conflicting session sees the current writer and
+location and stays held. Process absence, timeout, quota failure and age grant no takeover.
 
-A handoff names the old owner/generation, new owner and canonical checkout. Preserve committed
-history and uncommitted source/evidence before transfer. Drain or stop the previous mutating
-execution before activating the replacement. If that cannot be established, remain held;
-expiry alone cannot fence an in-flight write. Advance the generation atomically. Old tokens
-must fail subsequent mutation and publication checks. Replaying an already completed handoff
-returns its recorded result without moving ownership again.
+For release or transfer, atomically change the active generation to closing and reject new
+admissions. Track every action that won registration before closing. Drain or stop them
+through the controller and verify completion, child and input-channel shutdown and any
+pending remote effect. Preserve both histories and unfinished source/evidence for handoff.
+An outstanding action or uncertain outcome holds finalization. A transfer names the old
+writer and generation, the incoming writer and the canonical checkout.
 
-Retain a notice targeted to the former session and any known parent/delegator. Record delivery
-queued, delivered and acknowledged separately. A notice on disk is not a live acknowledgment.
-If direct session messaging is unavailable, install a supported resume-visible notice and
-report its limit. Do not launch a paid/out-of-quota model just to manufacture acknowledgment.
-Releasing a claim requires the current owner or an explicit owner-directed transfer/closure;
-completed source remains subject to its ordinary review and shipment gates.
+Once drained, conditionally advance the generation and invalidate the old token. Transfer
+activates exactly the named replacement. Release leaves a vacant record with its history
+and generation intact. Reacquisition advances that retained generation and uses a new
+token. Replay returns the prior transition outcome without repeating it. Release requires
+the current writer or explicit owner direction. Old tokens cannot acquire by resumption,
+admit mutation or publish, even with a valid separate publication grant.
+
+Retain a notice for the former session and known parent/delegator. Record queueing, delivery
+and acknowledgment independently. If direct messaging is unavailable, surface the durable
+notice on resume. The former writer remains held whether or not it acknowledges.
 
 ### D5: Adoption, compatibility and bounded state
 
@@ -235,6 +235,15 @@ Existing consumers first inventory claimed work and detect duplicates. Ambiguity
 preserved conflict record and requires one selected canonical owner. Do not migrate both
 clones into separate records for the same issue. Never reset, stash, delete, rebase or amend
 another writer's history to establish ownership.
+
+Hold write access while inventorying active and paused clients across hosts. Stop or
+upgrade each known writer, account for in-flight actions and require verified compatible
+routes and binaries before enabling ownership. Unknown writers or control gaps hold
+activation. A rollback closes and drains active generations, preserves the bound authority
+and leaves writer access held, including for incompatible versions. To resume, restore
+compatible writers and reverify the same authority and its outstanding records. Old clients
+do not implement these checks themselves. Cutover and rollback must disable their adopted
+write access at the enforcing boundary, including existing sessions and credentials.
 
 Update shared references, skills and compatibility documentation together. Publish through
 both existing marketplace manifests and verify actual Codex/Claude adoption. The repository
@@ -248,16 +257,28 @@ Candidate validation uses the built candidate explicitly; do not invent a future
 checksum or successful marketplace install. No new deployable service or satellite is added.
 
 
+### Glossary
+
+| Term | Meaning |
+| --- | --- |
+| Owner | The human who authorizes adoption, takeover and delivery. |
+| Current writer | The session and checkout authorized to request admitted mutations for a work item. |
+| Work item | One canonical repository task resolved from its issue, spec or task aliases. |
+| Generation | The monotonic authority revision for writer identity, advanced on release, transfer and acquisition. |
+| Possession token | Private proof the controller uses for a writer generation. Diagnostics never display it. |
+| Held | Mutation is unavailable until ownership and the applicable execution or recovery prerequisites are verified. |
+
 ## Acceptance Criteria
 
-- [ ] AC-01: Two simultaneous writers for the same repository/work item in independent clones have one owner; the loser stops before source mutation and receives the canonical owner/location.
+- [ ] AC-01: Two simultaneous claimants for the same work item in independent clones admit one current writer. The conflicting claimant stops before source mutation and receives the writer's canonical location.
 - [ ] AC-02: SSH/HTTPS repository aliases, issue/spec aliases and branch/session changes cannot create another owner for the same item, while separate work items may proceed independently.
-- [ ] AC-03: Resumption, unknown remote outcomes, network failure and quota/process absence cannot bypass ownership; stale generations cannot mutate or publish after handoff.
-- [ ] AC-04: An authorized handoff preserves both histories and unfinished files, drains or stops the former writer, activates one replacement and records notice delivery/acknowledgment accurately.
+- [ ] AC-03: Resumption, unknown remote outcomes, network failure and quota/process absence cannot bypass ownership; stale generations cannot mutate or publish after release or handoff, and loss of an established authority holds mutation.
+- [ ] AC-04: An authorized handoff preserves both histories and unfinished files, drains or stops the former writer, activates one replacement and records notice delivery/acknowledgment accurately. Release shares that admission and drain guarantee before reacquisition.
 - [ ] AC-05: Existing lifecycle and selected repair writers share the same ownership check; delegated read-only reviews remain possible and cannot obtain source-writing authority.
 - [ ] AC-06: Source publication, issue/PR changes, merge, release and cleanup retain their separate gates; coordination state cannot trigger a product release or be removed as a stale feature branch.
-- [ ] AC-07: Actual supported Codex and Claude routes refuse a former owner/new conflicting writer before source changes, with tested adapter limits and no unsupported-host success claim.
-- [ ] AC-08: Existing consumers with duplicate/incomplete claims receive a preserved migration conflict and one explicit reconciliation path, and marketplace installs expose the verified ownership capability.
+- [ ] AC-07: Actual supported Codex and Claude routes refuse a former owner/new conflicting writer before source changes, including when a checker or controller fails after successful setup. Unsupported routes remain read-only.
+- [ ] AC-08: Existing consumers with duplicate/incomplete claims receive a preserved migration conflict and one explicit reconciliation path, and marketplace installs expose the verified ownership capability. Adoption creates one explicitly bound authority and holds incompatible writers during cutover and rollback.
+- [ ] AC-09: Ownership command output distinguishes the human owner, current writer, work item, generation and held state using the glossary. It never discloses a possession token.
 
 ## Test Plan
 
@@ -265,12 +286,13 @@ checksum or successful marketplace install. No new deployable service or satelli
 | --- | --- |
 | AC-01 | First retain the failing two-independent-clone reproduction. Add true concurrent claimant processes against one disposable Git authority and assert one winner, zero loser source/index/branch writes, exact owner diagnostics and bounded conflict retry. Repeat in separate Git common directories. |
 | AC-02 | Exercise SSH/HTTPS and `.git` spelling aliases, issue/spec association, different branch names, source paths containing spaces, resumed session IDs and two separate work items. Assert one canonical identity or an explicit ambiguity refusal. |
-| AC-03 | Inject response loss after successful claim, rejected update, missing authority, inaccessible remote, old generation, process death and quota failure. Read-back reconciles the same owner; no timestamp/PID shortcut authorizes another writer. |
-| AC-04 | Start with two dirty source files and committed review history. Transfer only after the old mutator is stopped/drained; replay it and attempt a stale-owner mutation. Compare exact hashes/history and ownership generation. Test direct messaging unavailable, queued notice, actual resume delivery and independent acknowledgment states. |
+| AC-03 | Inject response loss after successful claim, rejected update, missing authority, inaccessible remote, old generation, process death and quota failure. Read-back reconciles the same writer. With an otherwise valid delivery grant, a stale token reaches no destination mutation after transfer; the current token succeeds with the same grant. A deleted established ref cannot be recreated by a delayed update. |
+| AC-04 | Start with two dirty source files and committed review history. Transfer only after the old mutator is stopped/drained; replay it and attempt a stale-owner mutation. Compare exact hashes/history and ownership generation. Pause an action after preliminary check before registration and race transfer, then reverse which transition wins. Hold a registered process/input channel across a release and attempt reacquisition before and after confirmed drain. Assert increasing generations and stale-token refusal. Test unavailable direct messaging, queued notice, actual resume delivery and independent acknowledgment. |
 | AC-05 | Contract tests cover every shared write entry/re-entry and selected maintenance/audit/docs repair route. Each must reject a conflicting token. Delegate a read-only exact-head review, observe preserved source and prove it cannot claim/write under the parent's token. |
 | AC-06 | Recording Git/issue/PR endpoints observe no source push, PR, merge, release or cleanup without its separate grant. The reserved authority ref is excluded from release and stale-branch paths. Existing claim-push rejection, scope preservation and delivery tests remain passing. |
-| AC-07 | Run actual native Codex and Claude against two fixture clones through the declared adapters. Plant a write in the former/conflicting session and observe refusal before the file changes. Also prove a permitted owner's write and an unrelated feature. Keep unavailable model quota/native interception visibly pending; synthetic hook JSON alone cannot satisfy this row. |
-| AC-08 | Seed unclaimed, valid claimed, duplicated and unknown-owner consumer records. Migration preserves all dirty bytes/reviews, selects one canonical item and records unresolved cases. Run both marketplace install/discovery paths and the required repository Go and Bun checks on the final implementation head. |
+| AC-07 | Run actual native Codex and Claude against two fixture clones through the declared adapters. Attempt writes from the former and conflicting sessions. Prove a permitted writer action and an unrelated item. After successful setup, kill the controller or break the checker and submit invalid decisions or skip the hook; verify that source, refs and publication targets remain untouched. Exercise continuing input and unsupported tools in the actual clients. Native runs without observed mutation and refusal remain pending. |
+| AC-08 | Seed unclaimed, valid claimed, duplicated and unknown-owner consumer records. Migration preserves all dirty bytes/reviews, selects one canonical item and records unresolved cases. Race two initializers, lose the winning response and test missing/mismatched established state from a fresh clone. Start cutover and downgrade with an older paused client and prove it cannot resume mutation while held. Verify preserved history and compatible recovery. Run both marketplace install/discovery paths and the required repository Go and Bun checks on the final implementation head. |
+| AC-09 | Run ownership status, acquire, release and transfer in the same fixture. Verify human authorization and current writer are distinct, work item and generation stay visible, held output explains the prerequisite, and neither stdout nor stderr contains the fixture token. |
 
 ## Tasks
 
@@ -278,51 +300,9 @@ Pending independent spec review and the implementation gate. The owner selected 
 
 ## Open Questions
 
-Q1A was answered in session on 19 November: use Git-remote coordination as recommended,
-validate Claude and Codex, ensure the former Claude session receives the takeover notice,
-and continue consolidation. R-1 identified the following decisions before revision.
-
-### Q2: Should release and handoff use one closing protocol that holds unsupported writer routes?
-
-**Recommendation:** A. Close admission, account for and drain every admitted action,
-invalidate the old token, then advance the generation. Keep a native route read-only
-unless it refuses mutation when its checker fails, including failure after setup.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Close, drain and fence** | One writer through release, reacquisition and handoff, including an action paused during admission. | A stuck action or unsupported native boundary holds replacement writing. |
-| **B. Keep this design pending** | Time to choose another execution protocol. | No validated coordination capability can be implemented from the current design. |
-
-**Why this is yours:** R-1 F-02 and F-03 require an execution and release policy;
-F-01 also rules out treating a successful native-hook setup as continued enforcement.
-This affects which sessions may write and when replacement work may begin.
-
-### Q3: Should adoption and rollback hold every incompatible writer?
-
-**Recommendation:** A. Activate only after known writers are stopped or upgraded;
-a downgrade preserves authority history and holds writing until compatible again.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Require compatible writers** | Older paused clients and downgrades cannot silently bypass an adopted ownership rule. | Adoption requires a writer inventory and coordinated cutover; rollback cannot resume incompatible writing. |
-| **B. Keep this design pending** | Time to choose another compatibility policy. | R-1 F-04 remains unresolved and rollout stays blocked. |
-
-**Why this is yours:** Existing client versions never check remote ownership.
-Stopping or upgrading them changes the operator's cutover and recovery procedure.
-
-### Q4: Should authority creation require explicit adoption and refuse automatic recreation?
-
-**Recommendation:** A. Initialize through an explicitly authorized adoption step,
-bind its identity in repository configuration and admit one concurrent initializer.
-An established ref that disappears stops writers instead of resetting ownership.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Explicit initialization** | A fresh clone distinguishes first adoption from lost established state; response loss cannot create another authority. | Adoption records the authority identity, and missing state requires recovery. |
-| **B. Keep this design pending** | Time to choose another bootstrap policy. | R-1 F-05 remains unresolved and no coordinator ref is created. |
-
-**Why this is yours:** Creating the shared ref is a remote effect, and recovery must
-preserve existing ownership rather than infer permission from its absence.
+None. The owner selected Git-remote coordination (Q1A), the common closing and
+fail-closed execution protocol (Q2A), compatible writers before cutover with a held
+rollback (Q3A), and explicit authority initialization with no automatic reset (Q4A).
 
 ## Review Log
 
