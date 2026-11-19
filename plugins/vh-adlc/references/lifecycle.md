@@ -81,6 +81,10 @@ stays investigation and backlog ranking stays triage, even with audit settings. 
 or "audit the code for security issues" needs one focused persistent/full/dependency/diagnosis scope
 question before dependent work. Never silently invoke full mode. Continue independent reads while waiting.
 
+Feature intake and read-only review can identify a work item without acquiring it. When
+routing into feature writing, the selected operation follows the
+[feature writer entry](authority.md#feature-writer-entry) after resolving the issue or spec.
+
 ## Documentation drift intake
 
 “Scan all docs for accumulated drift” selects docs-drift audit. “Recheck and

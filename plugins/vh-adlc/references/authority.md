@@ -133,6 +133,78 @@ the owner confirms no issue exists, use `--not-created true`. Use a new approval
 future create. On an alias conflict, keep both histories and stop both writers until the
 owner selects one reservation through `resolve-alias`.
 
+## Reservation adoption
+
+Use this procedure only for a repository and remote the owner selected. Pause feature
+writers, record existing claims and keep their history and uncommitted work. Verify
+that installed Codex and Claude Code routes recognize their own sessions and that
+other writer routes will remain paused or read-only.
+
+Inspect the adopting remote's effective rules for `refs/heads/vh-adlc/work-ownership`.
+They must allow ordinary append updates by the selected writers and forbid deletion
+and history rewrites. Inspect the consumer's branch cleanup and release workflows,
+including push, manual dispatch and PR preview. Each must exclude this branch from
+destructive cleanup and tag-capable execution. Use read-only rules inspection for the
+real remote and a disposable remote to test prohibited pushes. Keep writers paused
+when you cannot verify one of these controls.
+
+With explicit owner approval to initialize the remote ref, choose a stable operation
+ID and run:
+
+```sh
+bun <plugin>/scripts/ownership/cli.ts initialize --repo <checkout> --approved true --operation <id>
+```
+
+Keep the returned genesis. If the result is lost, retry only with the same operation
+ID. A different existing genesis needs owner reconciliation. Add a binding to the
+consumer's default branch under `.vh-adlc/work-ownership.yaml`:
+
+```yaml
+schema_version: 1
+repository: github.com/example/project
+genesis: <verified genesis>
+ready: false
+```
+
+Apply the consumer's existing authority rules to publishing that policy. Set `ready`
+to `true` only after checking remote policy, genesis, protection and release routes.
+Keep general entry paused while you enroll existing claims. For each claim, follow
+the handoff command below with `--expected-operation absent` from the selected
+writer's checkout. Resume general writers after you verify the bindings and enrollment.
+Routine feature entry can then update the reserved ref under the adopted policy.
+Publication of code and issues still needs its own authority.
+
+For rollback, pause writers and use `ready: false` while retaining the bound ref and
+genesis. Coordinate any temporarily incompatible clients manually. Before restoring
+automatic entry, verify the same history and compatible clients. If a remote restore
+can remove both records, pause all feature writer entry first and keep it paused until
+you restore and verify them. A fresh clone may have no local evidence that the old
+remote was adopted.
+
+## Transfer a reservation
+
+Inspect the item with the `status` command and keep the returned operation. Confirm
+the previous writer has stopped and keep it stopped until the transfer is verified.
+Select the incoming session and its checkout. Keep the existing checkout or verify
+that the destination contains the commits, staged, unstaged and untracked work
+required to continue. If issue creation was pending, copy its marker and preview
+together from `vh-adlc-reservation-pending` below the checkout's Git directory to
+the same place at the destination. Verify both files, then keep draft entry held
+until issue recovery completes.
+
+From the incoming session and chosen checkout, run:
+
+```sh
+bun <plugin>/scripts/ownership/cli.ts handoff --repo <checkout> --spec <document> \
+  --expected-operation <observed operation> --operation <new id> \
+  --approved true --stopped true --preserved true
+```
+
+If Git reports an uncertain outcome, keep the old writer stopped and inspect status.
+Retry with the same inputs only while the prior record is still current or the original
+transfer is already verified. A different writer or operation requires fresh owner
+direction. The previous writer sees the transfer on its next feature entry.
+
 ## Handoff
 
 A session cannot see whether another session is still writing a feature. So once a feature has a claim (a

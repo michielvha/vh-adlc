@@ -226,6 +226,14 @@ those capabilities.
 
 <a name="shared-documentation-drift-candidate"></a>
 
+## Feature reservations
+
+The reservation workflow targets ordinary Codex and Claude Code sessions in opted-in repositories.
+Other clients may inspect or review there. Unadopted repositories retain their existing routes.
+A nested client must start without its parent's session markers so it can supply its own identity.
+Native resume and adoption must be verified against the installed package before an adopter enables
+writers. See [adoption and handoff](../../plugins/vh-adlc/references/authority.md#reservation-adoption).
+
 ## Shared documentation drift
 
 Plugin 0.26.1 packages `vh-adlc-docs-drift`, strict consumer settings,
