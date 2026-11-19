@@ -309,6 +309,7 @@ rollback (Q3A), and explicit authority initialization with no automatic reset (Q
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-19 | R-1 | spec | `7e7ebe74c28f4071f20f3d963b2e54a6a24418c3` | gpt-6.1-sol | procedural | Two blocking and five should-fix findings; native failure refusal and ownership transitions need revision. |
+| 2026-11-19 | R-2 | spec | `c13b42da1e2bcf8ff80150320dc42a45b7ba56ad` | gpt-6.1-sol | procedural | Three should-fix findings and one nit on distinct native failures, release publication checks, cross-platform packaging and evidence references. |
 
 ### R-1
 
@@ -367,6 +368,36 @@ SEVERITY: nit
 WHERE: Context, Measured incident and current gaps, primaryWorktree/isolation citation.
 EVIDENCE: The document cites claim.ts:65-80 for primaryWorktree and isolation. At the cited dae76bf9 revision, primaryWorktree is at lines 57-62 and isolation is at lines 64-71. The described behavior is correct, but the citation omits primaryWorktree.
 PROPOSAL: Correct the citation to plugins/vh-adlc/scripts/loop/claim.ts:57-71.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary, checker-failure guarantee and validation; Design D3, failure refusal and hook independence; AC-07; Test Plan, AC-07.
+EVIDENCE: The revised AC-07 proof permits “kill the controller or break the checker” and “submit invalid decisions or skip the hook”. Killing the controller and skipping the hook can satisfy that procedure without testing a live controller whose ownership checker fails or returns an invalid decision. A controller that allows mutation on checker failure can therefore pass the stated native scenario. This disjunction was introduced while correcting R-1 F-01.
+PROPOSAL: Require separate native scenarios for controller unavailability, checker execution failure, invalid checker decisions and skipped hooks. Keep the controller running during checker-failure scenarios and assert that no mutation reaches source, refs or publication targets.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary, release token invalidation; Design D3, publication admission; Design D4, release, reacquisition and stale-token publication; AC-03, AC-04, AC-06; Test Plan, AC-03, AC-04, AC-06, AC-07.
+EVIDENCE: The R-1 corrections extend AC-03 to forbid stale-generation publication after release as well as handoff. The valid-grant publication scenario in the AC-03 proof still runs only “after transfer”. AC-04 exercises release draining and unspecified stale-token refusal, while AC-06 tests publication without its separate grant. These checks can pass when release invalidates source-writing access but a publication path still accepts the released token with a valid grant.
+PROPOSAL: Run the valid-grant stale-publication scenario after release, both before and after reacquisition, as well as after transfer. Verify no destination mutation and pair reacquisition with successful publication by the new current writer.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design D5, artifact validation and release path; AC-08; Test Plan, AC-08.
+EVIDENCE: The pinned conventions/delivery.md, Feature delivery, requires a pre-merge check that rebuilds affected artifacts through their actual release build path. D5 and the AC-08 proof require Go and Bun checks and marketplace installation, but no release-configured binary build or packaging check. The actual .goreleaser.yml:7-28 builds and archives Darwin and Linux binaries for amd64 and arm64 with CGO disabled and release flags. Host-local Go checks can pass while one of those published targets fails.
+PROPOSAL: Add a nonpublishing build and packaging check using the existing GoReleaser configuration and its complete target matrix at the final candidate commit. Keep signing and publication under their separate authorization.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Measured incident and current gaps, private incident evidence; Sources, Stackweaver probe receipts.
+EVIDENCE: Sources says the probe receipts are “named in Context”, but Context now supplies only “the consumer's private evidence”. The previous reviewed revision named the receipt and probe; this revision removed those locators. The underlying reproduction is supported, but the remaining citation no longer identifies its evidence.
+PROPOSAL: Give the private evidence a stable receipt identifier that its owner can resolve, and make Sources reference that identifier without exposing private host paths.
 
 ## Sources
 
