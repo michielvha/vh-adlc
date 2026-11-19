@@ -159,14 +159,27 @@ func fakeBrowser(dir string, c config.Config, id string) (BrowserHandle, error) 
 		}
 	}
 	var once sync.Once
+	stopBegan := make(chan struct{})
 	return BrowserHandle{
 		BrowserMode: c.Mode(),
 		Target:      "http://" + listener.Addr().String() + "/vnc.html",
 		Assets:      dir,
 		Password:    "fixture",
-		Alive:       func() bool { return true },
+		Alive: func() bool {
+			if overlap := os.Getenv("REMOTE_GUI_TEST_STOP_HEALTH_OVERLAP"); overlap != "" {
+				if _, err := os.Stat(filepath.Join(dir, "health-armed-"+id)); err == nil {
+					stamp(filepath.Join(dir, "health-entered-"+id))
+					if overlap == "stop" {
+						<-stopBegan
+					}
+					return false
+				}
+			}
+			return true
+		},
 		Stop: func() {
 			once.Do(func() {
+				close(stopBegan)
 				closeBrowser()
 				_ = server.Close()
 				_ = os.WriteFile(filepath.Join(dir, "stopped-"+id), nil, 0o600)
@@ -1294,6 +1307,41 @@ func TestAbandonedHolderClearIsRecoveredByTheNextStart(t *testing.T) {
 			}
 			if lockHeld(c) != "free" || rawHolder(t, f, "work") != "" {
 				t.Fatal("the next session left the profile locked or held")
+			}
+		})
+	}
+}
+
+// A queued health check can finish after a reusable browser has begun its
+// normal stop. Cancellation owns that result; an active session still fails
+// when its upstream loses ownership.
+func TestProfileStopDuringHealthCheck(t *testing.T) {
+	for _, ending := range []string{"stop", "ownership-loss"} {
+		t.Run(ending, func(t *testing.T) {
+			f := newProfileFixture(t)
+			t.Setenv("REMOTE_GUI_TEST_STOP_HEALTH_OVERLAP", ending)
+			v, err := Start(f.config(t, "work"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			stamp(filepath.Join(f.fake, "health-armed-"+v.ID))
+			deadline := time.Now().Add(5 * time.Second)
+			for {
+				if _, err := os.Stat(filepath.Join(f.fake, "health-entered-"+v.ID)); err == nil {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatal("health check did not enter")
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+			if ending == "stop" {
+				end, err := Stop(f.home, v.ID)
+				if err != nil || end.State != "stopped" || end.Diagnostic != "" {
+					t.Fatalf("normal stop raced with health: state=%s diagnostic=%s error=%v", end.State, end.Diagnostic, err)
+				}
+			} else if end := waitEnd(t, f.home, v.ID); end.State != "failed" || end.Diagnostic != "upstream-ownership-changed" {
+				t.Fatalf("active ownership loss was not refused: state=%s diagnostic=%s", end.State, end.Diagnostic)
 			}
 		})
 	}

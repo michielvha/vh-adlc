@@ -34,6 +34,19 @@ Before that handoff, a fresh Tailscale viewer passed asset, WebSocket, canvas, h
 
 The mobile gap is keyboard and touch interaction. The current viewer creates a noVNC RFB canvas and focuses it, but provides no phone keyboard control or local text-input bridge (`plugins/remote-gui/internal/proxy/viewer.go:201-207`). The installed noVNC application demonstrates a separate keyboard input element, a keyboard button and input-event forwarding (`app/ui.js`, `showVirtualKeyboard` and `keyInput`); the custom viewer imports the RFB core rather than that application. A follow-up should assess keyboard opening and dismissal, text composition and deletion, touch scrolling, reachable controls and keeping the focused remote field visible above the phone keyboard. Automatically opening the keyboard when a remote textbox is tapped needs a separate focus-detection design and real iPhone Safari and Android Chrome validation. These are proposed follow-up concerns, not implemented behavior or additional criteria for this completed feature.
 
+### Hosted CI follow-up
+
+The owner selected vh-adlc 0.26.1 for the CI follow-up and authorized the resizing merge after the required checks.
+Hosted run 44476411768 failed two real viewport scenarios after earlier sizes passed: Chromium retained the prior streamed framebuffer, and Firefox disconnected at the final extreme-size transition.
+Both unchanged local viewport suites passed with the host noVNC 1.5.0 assets and a temporary upstream 1.6.0 source fixture; another 312 diagnostic matrix transitions passed, including a run confined to one CPU.
+Those checks do not establish the hosted framebuffer failure's cause, which remains unresolved.
+
+Hosted retry 44488921093 failed the existing reusable-profile no-key stop check before reaching the real viewer suite.
+A focused local run reproduced five failures in ten, and a deterministic stop/health overlap reproduced the same diagnostic at both the feature head and pre-sizing base f5bd3a49.
+The supervisor could wait inside a health check while an ordinary stop ended the runtime, then misclassify that normal stop as `upstream-ownership-changed`.
+The repair rechecks cancellation after a failed health result; an active session still fails on genuine upstream ownership loss.
+The deterministic regression and focused native checks now pass, with fresh independent review and hosted CI still required for the repaired commit.
+
 ### Background
 
 - At base `f5bd3a494c04b36c47461912848787df71bf89e6`, Xvfb starts at 1440 by 900 and Chromium starts at that window size (`plugins/remote-gui/internal/browser/browser.go:488`, `plugins/remote-gui/internal/browser/phase.go:31`). The viewer reserves a 32-pixel toolbar and enables proportional scaling (`plugins/remote-gui/internal/proxy/viewer.go:12-14`, `plugins/remote-gui/internal/proxy/viewer.go:123`).
@@ -143,6 +156,9 @@ Validate the package through its existing helper from a temporary install-shaped
 
 - [x] T7 `plugins/remote-gui/internal/proxy/viewport.go`, `viewport_test.go` - observe the inactive higher-sequence replay regression fail, retain each registered viewer's validated higher sequence before refusing inactive work, preserve unknown-viewer claim admission, and pass proxy race plus real viewer checks (AC-03).
       Evidence: TestViewportInactiveSequencePreventsOlderClaim first failed with B sequence 2 applied and backend calls increasing to 3 (/tmp/rg-adaptive-evidence/T7-replay-red.log). The full proxy race suite then passed, including lower/equal delayed claim refusal, legitimate later control and 17 unknown updates reserving no entries. Module vet, exact golangci-lint 2.15.0 config/run and tidy pass. A fresh package-helper static build passes all six controlled/real viewer tests in Chromium and Firefox (/tmp/rg-adaptive-evidence/T7-viewer-checks.log). Manual documentation review found no user-guidance drift; this implements the accepted sequence policy. R-4 is preserved as returned and a fresh review is required.
+
+- [x] T8 `plugins/remote-gui/internal/session/daemon.go`, `profile_test.go` - reproduce the normal-stop/health-check race, preserve active-session ownership refusal, and recheck cancellation after a blocked health result before classifying it as an upstream failure (AC-06, AC-07).
+      Evidence: The deterministic TestProfileStopDuringHealthCheck first failed its normal-stop case while its active ownership-loss control passed (/tmp/rg-ci-repair-native-stop/repo-red.log); both cases pass in three race-detected repetitions after the cancellation recheck. The existing native TestRealReusableProfileStopSendsNoKeys reproduced five failures in ten before repair and passes all ten after it (/tmp/rg-ci-repair-native-stop/focused-head.log and focused-green.log). The module build, ordinary full race suite, vet, tidy, exact golangci-lint 2.15.0 configuration/run and package checks pass. Manual documentation review found no user-guidance change; the existing stop and ownership contracts are preserved. Fresh independent implementation review remains required, and the earlier framebuffer CI failure retains its separate unresolved cause.
 
 ## Open Questions
 

@@ -747,6 +747,11 @@ func serve(ctx context.Context, r state.Record) (result error) {
 				return errors.New("lifetime-guard-stopped")
 			}
 			if !alive() {
+				// A normal reusable-profile stop can finish while this check
+				// waits for the runtime lock. Cancellation owns that result.
+				if ctx.Err() != nil {
+					return nil
+				}
 				return errors.New("upstream-ownership-changed")
 			}
 			if p.Problem() != "" {
