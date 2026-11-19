@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: Marker compatibility details approved for cutover; fresh spec review follows
+status: planned
+status_description: Accepted marker correction; implementation and released-install gates follow
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -127,11 +127,11 @@ The observed process name is not a new native-client version attestation. This
 observation establishes the Fedora 43 marker shape only. Other platforms, client
 versions and marker shapes remain unclaimed until T130 observes them; unsupported
 shapes stay setup-required. The corrected release must also pass with its own
-actually observed native CLI session. R-133's format, retry, caller and rollback clarifications are proposed below.
+actually observed native CLI session. R-133's format, retry, caller and rollback clarifications are specified below.
 The owner summary records the selected compatibility details and authority.
 
 
-This prevents claiming ordinary active Claude execution ready. The owner now approves the narrow validated metadata exception. This revision specifies that bounded correction; T156 implements and tests it; all other changes stay
+The marker refusal prevents claiming ordinary active Claude execution ready. The owner now approves the narrow validated metadata exception. This revision specifies that bounded correction; T156 implements and tests it; all other changes stay
 out of scope. The published component, local
 activation and original successful isolated trial keep their exact attribution.
 The remote consumer remains on legacy routing.
@@ -2459,6 +2459,8 @@ are outside this decision.
 | 2026-11-18 | R-133 | spec | `623472e84df587232785670f36bee5b8f1160e74` | claude-opus-5-5 | procedural | 7 should-fix, 2 nit. |
 | 2026-11-18 | R-134 | spec | `0c70b647cd21fa6d4df4ee7965f33e5fa3e32322` | claude-opus-5-5 | procedural | 4 should-fix, 1 nit. |
 | 2026-11-19 | R-135 | spec | `b82c89f81f942ca766b7748a862201e8cdc799fb` | claude-opus-5-5 | procedural | 1 should-fix, 2 nit. |
+| 2026-11-19 | R-136 | spec | `4c0c2dfe389b7906cdafc0dfb0eeb9a190a24e28` | claude-opus-5-5 | procedural | 2 nit. |
+| 2026-11-19 | R-136 | spec | `4c0c2dfe389b7906cdafc0dfb0eeb9a190a24e28` | n/a | n/a | accepted by owner |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -4463,6 +4465,24 @@ SEVERITY: nit
 WHERE: Design, Installation and role execution, marker paragraph ("The existing installed policy still accepts hard-linked shipped files and a canonicalized root selector alias; only marker files acquire the single-link rule"); Context, Owner summary ("Hard-linked shipped files keep their existing support")
 EVIDENCE: The convention says "Context and Design cite their claims: a `file:line`, or a command and its output". The claim is true. bootstrap.ts:78 and :87 apply `nlink !== 1` only under `policy === "retained"`. bootstrap.ts:64-65 resolve and lstat the canonical root for the installed policy. The test at tests/vh-adlc/docs-drift/bootstrap.test.ts:77-91 hard-links guide.md, inspects through a symlinked root alias and passes. However, the new sentence added in response to R-134 F-01 cites none of this.
 PROPOSAL: Cite bootstrap.ts:78, :87 and :64-65 and bootstrap.test.ts:77-91 after the Design sentence.
+
+### R-136
+
+TARGET: 4c0c2dfe389b7906cdafc0dfb0eeb9a190a24e28
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Installation and role execution, marker paragraph ("See `plugins/vh-adlc/scripts/docs-drift/bootstrap.ts:64-65`, `:78` and `:87`, and `tests/vh-adlc/docs-drift/bootstrap.test.ts:77-91` at b82c89f")
+EVIDENCE: The bootstrap.ts citations are correct. Line 64 is `const root = realpathSync(directory)`, line 65 is `lstatSync(policy === "installed" ? root : directory)`, and lines 78 and 87 apply `nlink !== 1` only when `policy === "retained"`. The test citation is one line early. In shared/tests/vh-adlc/docs-drift/bootstrap.test.ts, line 77 is blank. The test "ordinary installed payloads keep their existing modes and support a canonical root alias" runs from line 78 to its closing `});` at line 92. The test file has no changes between b82c89f and this target. This revision copied the range from R-135 F-03's proposal, and that proposal already had the wrong range.
+PROPOSAL: Change the test citation to `tests/vh-adlc/docs-drift/bootstrap.test.ts:78-92`.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Active ordinary Claude cache finding on 2026-11-18 ("R-133's format, retry, caller and rollback clarifications are proposed below. The owner summary records the selected compatibility details and authority." followed by "This prevents claiming ordinary active Claude execution ready."); Context, Owner summary (fourth paragraph); Open Questions
+EVIDENCE: The Owner summary and Open Questions both say the 2026-11-19 decision accepts these details: field order, ASCII whitespace, explicit rerun, uniform inspection and rollback. The Context paragraph still calls them "proposed below", which conflicts with the accepted state. This revision also replaced the removed authorization sentences with "The owner summary records the selected compatibility details and authority." As a result, the next paragraph's opening "This prevents claiming..." now reads as if it refers to the owner summary. It was meant to refer to the marker refusal described earlier. The text came from this revision's response to R-135 F-02. Nothing an implementer builds or a proof checks changes.
+PROPOSAL: Change "are proposed below" to "are specified below". Start the next paragraph with "The marker refusal prevents claiming ordinary active Claude execution ready."
 
 ## Sources
 
