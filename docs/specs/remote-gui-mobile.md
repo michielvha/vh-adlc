@@ -188,6 +188,7 @@ None. The owner accepted keyboard/touch scope first, both platform targets and o
 | 2026-11-19 | R-2 | spec | `3fa0bae68d8c1d25d9255c2d90cd1ec0b9d06886` | n/a | n/a | accepted by owner |
 | 2026-11-19 | R-3 | spec | `0708e3cb33dd1fe1e85f4e8da74b598ee32f96a0` | unknown | procedural | No findings after covered-source drift; model identity was not attested. |
 | 2026-11-19 | R-4 | spec | `d3fad7181862b2bee55f7cb981745b8057333b50` | gpt-6.2-sol | procedural | One blocking finding and two should-fix findings. Independent synthetic mode probe confirmed. |
+| 2026-11-19 | R-5 | spec | `5168c70da624c76d87a4de41dd39c744a61c53e0` | gpt-6.2-sol | procedural | No blocking or should-fix findings. One Context nit. |
 
 ### R-1
 
@@ -242,6 +243,15 @@ SEVERITY: should-fix
 WHERE: Context / First feasibility run, Design / Reuse existing noVNC capabilities first, Design / Input ownership and field binding, Test Plan / AC-09 Scenario U9
 EVIDENCE: Design permits the smallest enforcing adapter if x11vnc cannot supply trusted client attribution or a transfer barrier. U9 requires proving native client attribution and a synchronous disable, drain and re-enable barrier without saying how that requirement changes when the native evaluation fails. Context records that the permission command leaves a held button down. A reviewer could read U9 as rejecting an enforcing adapter that proves the full transfer without relying on native client IDs.
 PROPOSAL: Require the native evaluation and its recorded result in every case. Require native client attribution where the chosen implementation relies on it, and test the complete transfer barrier through whichever enforcement path is delivered.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary, Context / Resizing prerequisite after merge
+EVIDENCE: At 5168c70d, lines 31 and 51 describe the R-2 acceptance as still settling the scope and the normative baseline as unchanged. Those were true when R-3 ran. The document is now draft and revises Design, AC-05, and the Test Plan. The same historical paragraphs describe the work as spec-only and say no feasibility probe had started, while the First feasibility run records one.
+PROPOSAL: Frame both paragraphs as historical checkpoints before the metadata revision. State that R-2 acceptance applied to the baseline R-3 checked and that the revised baseline awaits acceptance.
 
 ## Sources
 
