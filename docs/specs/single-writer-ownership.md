@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The independent-clone collision is reproduced. The owner selected Git-remote coordination with fail-closed writer checks. Independent review and native-host validation are next; no ownership runtime is implemented or released."
+status_description: "The owner selected Git-remote coordination. R-1 found two blocking and five should-fix gaps; release/admission, compatible-client rollout and authority initialization await owner decisions. No ownership runtime is implemented or released."
 issue: null
 goal: "One canonical repository work item has one verified agent writer across clones, worktrees and supported hosts, with an explicit, preserved handoff."
 covers:
@@ -278,12 +278,115 @@ Pending independent spec review and the implementation gate. The owner selected 
 
 ## Open Questions
 
-None. Q1A was answered in session on 19 November: use Git-remote coordination as recommended, validate Claude and Codex, ensure the former Claude session receives the takeover notice, and continue consolidation. This selects the authority; implementation and native-host evidence are still pending.
+Q1A was answered in session on 19 November: use Git-remote coordination as recommended,
+validate Claude and Codex, ensure the former Claude session receives the takeover notice,
+and continue consolidation. R-1 identified the following decisions before revision.
+
+### Q2: Should release and handoff use one closing protocol that holds unsupported writer routes?
+
+**Recommendation:** A. Close admission, account for and drain every admitted action,
+invalidate the old token, then advance the generation. Keep a native route read-only
+unless it refuses mutation when its checker fails, including failure after setup.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Close, drain and fence** | One writer through release, reacquisition and handoff, including an action paused during admission. | A stuck action or unsupported native boundary holds replacement writing. |
+| **B. Keep this design pending** | Time to choose another execution protocol. | No validated coordination capability can be implemented from the current design. |
+
+**Why this is yours:** R-1 F-02 and F-03 require an execution and release policy;
+F-01 also rules out treating a successful native-hook setup as continued enforcement.
+This affects which sessions may write and when replacement work may begin.
+
+### Q3: Should adoption and rollback hold every incompatible writer?
+
+**Recommendation:** A. Activate only after known writers are stopped or upgraded;
+a downgrade preserves authority history and holds writing until compatible again.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Require compatible writers** | Older paused clients and downgrades cannot silently bypass an adopted ownership rule. | Adoption requires a writer inventory and coordinated cutover; rollback cannot resume incompatible writing. |
+| **B. Keep this design pending** | Time to choose another compatibility policy. | R-1 F-04 remains unresolved and rollout stays blocked. |
+
+**Why this is yours:** Existing client versions never check remote ownership.
+Stopping or upgrading them changes the operator's cutover and recovery procedure.
+
+### Q4: Should authority creation require explicit adoption and refuse automatic recreation?
+
+**Recommendation:** A. Initialize through an explicitly authorized adoption step,
+bind its identity in repository configuration and admit one concurrent initializer.
+An established ref that disappears stops writers instead of resetting ownership.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Explicit initialization** | A fresh clone distinguishes first adoption from lost established state; response loss cannot create another authority. | Adoption records the authority identity, and missing state requires recovery. |
+| **B. Keep this design pending** | Time to choose another bootstrap policy. | R-1 F-05 remains unresolved and no coordinator ref is created. |
+
+**Why this is yours:** Creating the shared ref is a remote effect, and recovery must
+preserve existing ownership rather than infer permission from its absence.
 
 ## Review Log
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-19 | R-1 | spec | `7e7ebe74c28f4071f20f3d963b2e54a6a24418c3` | gpt-6.1-sol | procedural | Two blocking and five should-fix findings; native failure refusal and ownership transitions need revision. |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context, Owner summary; Design D2, unknown outcomes; Design D3, host fencing and native hooks; AC-07; Test Plan, AC-07.
+EVIDENCE: The native-hook design was added in this revision. D3 requires hook errors and missing helpers to hold write-mode setup, but provides no enforcement when an installed hook subsequently fails. The [official Codex hooks documentation](https://learn.chatgpt.com/docs/hooks) documents failure paths that continue the tool call, including unsupported PreToolUse output and unavailable MCP hook tools. A successful setup check therefore cannot establish continued refusal before source mutation. The native scenario tests conflicting ownership with a working adapter, so it can pass while this bypass remains.
+PROPOSAL: Specify a route that prevents mutation when the checker cannot execute or return a valid decision, and leave routes without that capability unavailable for writing. Extend native validation to break the helper after successful setup and verify that source mutation remains blocked.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: blocking
+WHERE: Context, Owner summary; Scope, ownership and release history; Design D2, release commands and conditional updates; Design D3, execution draining; Design D4, release and handoff; AC-01, AC-03, AC-04; Test Plan, AC-01, AC-03, AC-04.
+EVIDENCE: D3 and D4 require draining before transfer, while the release rule at lines 229-230 requires only the current owner or an explicit owner-directed transfer/closure. No release transition requires quiescence, invalidates the released token, or preserves a generation across reacquisition. An admitted shell can consequently survive release while another session acquires the freed item. The proof rows exercise transfer rather than release followed by acquisition.
+PROPOSAL: Decide and specify the release protocol, including stopping admission, draining existing mutators, invalidating tokens and preserving generation history before another acquisition succeeds. Add a release/reacquire scenario with an admitted old mutator and stale-token attempts.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design D3, checks before mutation and execution-controller draining; Design D4, handoff ordering; AC-04, AC-07; Test Plan, AC-04, AC-07.
+EVIDENCE: D3 checks ownership before a tool action and requires the execution controller to drain processes before transfer. It does not define how admission is registered or closed atomically with that drain. A request can pass its ownership check, pause before process registration, and start after another request observes an empty execution set and transfers ownership. The stated invariant forbids this outcome, but the design supplies no ordering that prevents it and neither proof row schedules this interleaving.
+PROPOSAL: Define the synchronization between action admission, closing a generation, tracking admitted actions and activating its replacement. Add a deterministic test that pauses an action after its ownership check and attempts transfer before allowing the action to continue.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Owner summary, migration and validation; Design D3, unsupported-host behavior; Design D5, adoption and compatibility; AC-07, AC-08; Test Plan, AC-07, AC-08.
+EVIDENCE: D5 inventories claimed documents and installs the new binary/plugin, but defines no mixed-version cutover or rollback behavior. The inspected predecessor claim and isolation paths in plugins/vh-adlc/scripts/loop/claim.ts do not consult remote ownership. An older paused client can therefore resume after another host adopts the feature, and an ordinary plugin downgrade can restore that behavior. Unknown-schema refusal in the new binary does not govern those older callers. This revision adds the signed-binary and plugin-lock rollout without defining these transitions.
+PROPOSAL: Specify the conditions for activating ownership across existing sessions and hosts, plus a rollback procedure that preserves authority records and holds incompatible writers. Add upgrade and downgrade scenarios starting with an existing claimed feature and an older paused client.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design D2, adoption, reserved ref, observed-parent updates and unknown outcomes; Design D3, bootstrap exception; Design D5, adoption; AC-03, AC-08; Test Plan, AC-03, AC-08.
+EVIDENCE: D2 requires coordination commits to descend from the exact observed authority commit. On first adoption that commit does not exist. The document declares scoped coordination authority but never defines initialization, concurrent initializers, or how a fresh clone distinguishes an uninitialized authority from a previously initialized authority whose ref is missing. AC-03's proof treats missing authority as a refusal case. The reserved-ref and observed-parent requirements were added in this revision.
+PROPOSAL: Define an explicitly authorized initialization transition and how subsequent clients recognize initialized authority. Test concurrent initialization, response loss during initialization, and disappearance of an established ref without permitting automatic ownership reset.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design D3, checks before commit and push; Design D4, stale-token publication refusal; AC-03; Test Plan, AC-03, AC-04, AC-06, AC-07.
+EVIDENCE: AC-03 requires stale generations to lose both mutation and publication authority. The AC-04 row attempts a stale-owner mutation, AC-07 observes source changes, and AC-06 checks publication without its separate grant. None explicitly attempts publication with a stale ownership token and an otherwise valid publication grant. A publication path that checks the grant but ignores ownership can satisfy these stated scenarios.
+PROPOSAL: Add a stale-generation publication attempt after handoff using an otherwise valid grant, and verify that the destination receives no applied mutation. Pair it with a successful current-owner attempt using the same publication authority.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope; Design D1-D4; Acceptance Criteria; Test Plan.
+EVIDENCE: The pinned conventions/feature-documents.md:168-169 requires introduced user-facing terms to appear in glossary rows and be held to those definitions by a criterion. The document introduces ownership commands, generations, possession tokens and held admission without a glossary or a criterion checking their user-facing meanings. In particular, “owner” denotes both the human authorizer and the agent recorded as writer.
+PROPOSAL: Add glossary rows distinguishing the human authorizer, current writer, work item, generation, possession token and held state. Add criterion coverage and a proof that ownership command output uses those meanings consistently.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Measured incident and current gaps, primaryWorktree/isolation citation.
+EVIDENCE: The document cites claim.ts:65-80 for primaryWorktree and isolation. At the cited dae76bf9 revision, primaryWorktree is at lines 57-62 and isolation is at lines 64-71. The described behavior is correct, but the citation omits primaryWorktree.
+PROPOSAL: Correct the citation to plugins/vh-adlc/scripts/loop/claim.ts:57-71.
 
 ## Sources
 
