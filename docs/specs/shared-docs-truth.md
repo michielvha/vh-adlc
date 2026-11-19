@@ -119,6 +119,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 
 | 2026-11-19 | R-1 | spec | `9f5c531346a95f7419c7b81b8366a470929b6e92` | unknown | procedural | Three blocking and six should-fix findings. |
+| 2026-11-19 | R-2 | spec | `15108beb46ba30de104af0c46212f162738d8834` | unknown | procedural | One blocking and five should-fix findings. |
 
 ### R-1
 
@@ -185,6 +186,51 @@ SEVERITY: should-fix
 WHERE: Shared procedure (lines 48-52), Terms (lines 64-68), AC-02 and its Test Plan row (lines 73, 82)
 EVIDENCE: AC-02 requires accurate full and targeted coverage and visible unsupported corrections and possible product issues. Its proof names claims and a partial run but only checks that verdicts refer to source results. A run can cite the right inputs while giving every claim the same verdict, recommending an unsupported replacement, or labelling a targeted run full. The glossary also omits the three user-facing verdicts. Pinned `conventions/feature-documents.md:121-125,163-166` requires a pass condition and glossary coverage for introduced terms.
 PROPOSAL: Give each fixture claim its expected verdict, support and disposition, and assert the exact in-scope claims and coverage status for full and targeted runs. Add the verdicts to the glossary and have the fixture check their use.
+
+### R-2
+
+TARGET: 15108beb46ba30de104af0c46212f162738d8834
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Owner summary (line 37), Scope (line 47), Stackweaver adoption (lines 77-79), AC-03 and AC-04 and their Test Plan rows (lines 96-97, 105-106), Open Questions (lines 112-114)
+EVIDENCE: The R-1 F-07 revision adds an in-progress PR before ordinary marketplace publication and puts the completion gate after that publication and consumer cutover. `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:113-124` ends the feature branch and cleans its worktree after the authorized merge. The pinned complete gate still requires `on_feature_branch_if_set`, and `internal/gate/gate.go:103-111` compares the current branch with the document's recorded branch. The stated sequence leaves no authorized branch for the final review record and completion gate. An ordinary marketplace install from the published catalog serves a different purpose from a candidate install against an owned checkout.
+PROPOSAL: Resolve the publication and completion route with the owner before acceptance. Name the actual refs and review checkpoints that make released and adopted proof possible under the existing gate and cleanup rules, or track the approved post-release obligations separately and make the shared feature's completion boundary explicit.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (line 33), Scope (line 47), Shared procedure (lines 55-61), Stackweaver adoption (line 69), AC-01 and AC-03 and their Test Plan rows (lines 94, 96, 103, 105)
+EVIDENCE: The R-1 F-04 revision tightened object and path validation but removed the express out-of-scope rejection. Only `next` explicitly takes eligible candidates, while `sweep` checks exact requested documents and `meta` takes declared files. A tracked regular file outside the configured scope can satisfy the stated Git checks for those paths. The fixture has no excluded yet otherwise valid tracked path and does not show that the historical exception is confined to an explicitly permitted exact sweep.
+PROPOSAL: Apply the committed eligibility and exclusions to every selection mode before reading document bodies, with the stated historical exception limited to explicitly permitted exact sweeps. Exercise an excluded regular blob and an allowed historical exact sweep, and verify that the historical file remains excluded from automatic selection.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (lines 35-37), Shared procedure (lines 63-65), Stackweaver adoption (lines 71-77), AC-03 and its Test Plan row (lines 96, 105)
+EVIDENCE: The R-1 F-02 revision specifies the race at push and the lost-response retry. It removed the earlier instruction for interruption before commit. A consumer can stop after changing a document or staging part of the batch. A retry then sees changes against the input identities and has no stated way to recognize the partial attempt, preserve it, or decide whether to resume. The test row's interruption appears among ledger outcomes and can pass after cancelling the read-only review alone.
+PROPOSAL: State how the existing consumer writer handles pre-commit interruption in its owned checkout, including the point at which it must stop and preserve pending changes. Interrupt after one local edit or index update, retry, and assert that no partial batch is committed or published.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope (line 47), Stackweaver adoption (lines 69, 77-79), AC-01 through AC-04 and their Test Plan rows (lines 94-97, 103-106)
+EVIDENCE: The revised rows depend on actual agent sessions for intake, claim review, legacy forwarding and installed behavior. They describe what to observe but provide no committed way to reproduce those sessions or retain their transcripts. `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:110-114` expressly requires a committed rerun script with retained transcript when the proof is what an agent does in a session. An operator description or a discovery test cannot satisfy that proof.
+PROPOSAL: Name committed rerun entry points for the agent-session scenarios and the transcript evidence each retains. Reuse the existing lifecycle runner or a small fixture runner, keeping private consumer inputs and transcripts in the consumer's authorized evidence location.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Shared procedure (lines 61, 65), Stackweaver adoption (lines 69, 75, 77-79), AC-02 and AC-03 and their Test Plan rows (lines 95-96, 104-105)
+EVIDENCE: The R-1 F-04 revision lets the shared skill use a separate owned checkout for project commands. `plugins/vh-adlc/references/authority.md:92-97` limits plugin-created linked Git worktrees to named procedures and their exceptions. The draft neither selects a permitted checkout method nor asks the owner to change that rule. A disposable clone can meet the snapshot requirement without changing the source repository's worktree metadata.
+PROPOSAL: Specify the permitted ownership path for the assessment and write fixtures, such as a caller-owned checkout at the assessed commit or an isolated disposable clone. Raise an owner decision only if a new linked-worktree exception is necessary.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (lines 31-33), Shared procedure (lines 55, 59, 61-65), AC-02 and its Test Plan row (lines 95, 104)
+EVIDENCE: The revision turns source independence into a literal ordering rule by requiring collection of independent source evidence before reading selected docs. In a full review, a novel claim or a targeted section can be the first information that identifies which source fact or command to check. The draft supplies only project instructions for how to collect evidence. The fixture can pass with all facts known in advance, leaving the ordinary unknown-claim case undefined.
+PROPOSAL: Allow an initial inventory of trusted source locations, then identify claims from the assessed document and verify each against independent source evidence before giving a verdict. Include a claim whose relevant source target is discovered from the document.
 
 ## Sources
 
