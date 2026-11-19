@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { adopt, enter, fixture, SPEC } from "./fixture";
 
@@ -54,4 +54,43 @@ test("the feature skills route each writing entry to the reservation and leave r
   expect(resume).toContain("the selected writer operation runs the reservation check");
   const review = readFileSync(join(root, "skills/vh-adlc-review/SKILL.md"), "utf8");
   expect(review).toContain("Independent read-only review does not acquire a reservation");
+});
+
+test("an adopted claim can be retried from the new default tip without losing the pending commit", async () => {
+  const f = fixture();
+  try {
+    await adopt(f);
+    const first = f.clone("first-claim");
+    const branch = "feat/example";
+    const run = (root: string, message: string, env = f.env) => {
+      const child = Bun.spawnSync([process.execPath, loop, "claim", "--repo", root, "--document", SPEC, "--client", "codex",
+        "--feature-branch", branch, "--default-branch", "main", "--status-description", "In progress", "--message", message],
+        { env, stdout: "pipe", stderr: "pipe" });
+      return JSON.parse(child.stdout.toString()) as { status: string; commit?: string };
+    };
+    writeFileSync(join(f.bare, "hooks/pre-receive"), `#!/bin/sh
+while read -r old new ref; do
+  if test "$ref" = refs/heads/main && test "$(git show -s --format=%s "$new")" = 'fixture: reject initial claim'; then
+    exit 91
+  fi
+done
+`, { mode: 0o700 });
+    const pending = run(first, "fixture: reject initial claim");
+    expect(pending.status).toBe("pending");
+    expect(f.git(first, "rev-parse", "HEAD")).toBe(pending.commit);
+    expect(f.git(first, "branch", "--list", branch)).toBe("");
+    writeFileSync(join(f.seed, "advance.txt"), "Advance default after the rejected claim.\n");
+    f.git(f.seed, "add", "--", "advance.txt");
+    f.git(f.seed, "commit", "-qm", "fixture: advance default", "--", "advance.txt");
+    f.git(f.seed, "push", "-q", "origin", "main");
+    f.git(first, "fetch", "-q", "origin", "main");
+    const retry = join(f.root, "fresh-worktree");
+    f.git(first, "worktree", "add", "--detach", "-q", retry, "origin/main");
+    expect(run(retry, "fixture: competitor", { ...f.env, CODEX_THREAD_ID: "other-writer" }).status).toBe("refused");
+    expect(run(retry, "fixture: retry").status).toBe("claimed");
+    expect(f.git(retry, "branch", "--show-current")).toBe(branch);
+    expect(f.git(first, "rev-parse", "HEAD")).toBe(pending.commit);
+  } finally {
+    f.cleanup();
+  }
 });
