@@ -93,11 +93,11 @@ with a fresh closure basis. The owner selects scope and effects. Configured
 settings never choose an operation or grant a write.
 
 An ambiguous “audit” or “audit the docs” gets one focused scope question
-before reading candidate documents, scanning or writing. Ask whether the desired result is accumulated docs
+before any scan or write and before reading candidate documents. Ask whether the desired result is accumulated docs
 drift, selected-change docs impact, persistent code audit or factual claim
 review, using the context to keep the question short. An explicit rolling claim
-review follows docs truth. A specifically named project command follows its
-own entry and authority. Plain doc edits keep artifact
+review follows docs truth. A project command that names a local truth workflow
+follows its own entry and authority. Plain doc edits keep artifact
 editing. A mixed feature request keeps its feature procedure and docs-impact
 obligation.
 
