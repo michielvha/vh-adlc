@@ -1,7 +1,6 @@
 ---
 status: complete
-branch: feat/remote-gui-adaptive-sizing
-status_description: "Implemented, owner-accepted and independently reverified; new-head hosted CI, merge, release and installation remain pending."
+status_description: "Merged after owner acceptance and independent review; plugin updates apply to new sessions."
 issue: null
 goal: "The shared browser fills the active viewer at a readable size and adapts automatically when that viewer changes size."
 covers:
@@ -77,6 +76,12 @@ That frame remains preserved with its cause unproved.
 The normal author run produced readable original and settled native menu captures, and R-7 independently inspected fully painted, readable menu captures in both engines.
 R-7 also preserved a partial Chromium 200-percent Playwright capture, then used a passive native capture of the owned viewer display to verify the complete usable zoomed view; the original image remains unchanged.
 The earlier owner-preview HTTP 503 remains separate; the cursor trace does not establish its cause.
+
+### Merge and delivery
+
+[PR 121](https://github.com/michielvha/vh-adlc/pull/121) merged at [0708e3cb](https://github.com/michielvha/vh-adlc/commit/0708e3cb33dd1fe1e85f4e8da74b598ee32f96a0) from reviewed head [8ed05bb2](https://github.com/michielvha/vh-adlc/commit/8ed05bb2ac4f56256514b32a062ec1c66a1c3c2c) on 2026-11-19. Its [exact-head hosted run](https://github.com/michielvha/vh-adlc/actions/runs/44515120227) passed remote-gui, verify, macOS and paseo-hosts. The full native browser suite and all 13 viewer scenarios passed. The Linux framework checker was still running at merge time; its inputs were unchanged from the earlier complete passing run at 2e1a0a62. No branch-policy bypass was used.
+
+The 0.4.0 source package is available through the marketplace's local package paths on main. Installation was not updated in this run; an update affects new sessions. The merged feature branch and its tracking ref were removed, and its clean managed worktree was archived. Earlier failed runs and R-1 through R-7 remain preserved.
 
 ### Background
 

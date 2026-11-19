@@ -29,6 +29,12 @@ The candidate metadata source is a private, session-owned Linux accessibility ad
 
 Independent R-2 returned no findings on the revised baseline; its model identity was not attested and isolation was procedural. The owner accepted the brief in session on 2026-11-19 and requested upstream reuse. R-1 remains preserved as history. That acceptance settles scope and is recorded against R-2 without another preference question. It does not authorize mobile code or probes in this spec-only operation. The deterministic planning gate passed; no implementation proof is implied. A later implementation request, release, installation and any changed privacy/dependency boundary remain separate actions.
 
+### Resizing prerequisite after merge
+
+[PR 121](https://github.com/michielvha/vh-adlc/pull/121) merged at [0708e3cb](https://github.com/michielvha/vh-adlc/commit/0708e3cb33dd1fe1e85f4e8da74b598ee32f96a0) on 2026-11-19. Both remote-gui manifests at that commit report 0.4.0, and both marketplace catalogs resolve to its local package. This establishes the prerequisite in the default-branch source; it does not establish an installed plugin update or any mobile capability.
+
+Independent R-3 rechecked this unchanged mobile baseline against the merged source with no findings. Model identity was not attested and isolation was procedural. The existing R-2 owner acceptance remains valid because Scope, Design, Acceptance Criteria, Test Plan and covers are unchanged. No mobile task breakdown, implementation or feasibility probe was started.
+
 ### Background
 
 At default-branch commit [cdf8956](https://github.com/michielvha/vh-adlc/commit/cdf89564a5d079340922584c83f183ca4ffa8cc2), the viewer imports noVNC's RFB core and connects a canvas. Its local textarea belongs to the Clipboard panel; resize restores canvas focus except while that panel owns focus (`plugins/remote-gui/internal/proxy/viewer.go:30,39-45,118-128`). Human Chromium disables extensions; only agent mode adds automation and loopback debugging (`plugins/remote-gui/internal/browser/phase.go:20-58`). Owner identity and expiry checks precede viewer access (`plugins/remote-gui/internal/proxy/proxy.go:289-315`, `identity.go:17-67`). Existing X11 helpers handle clipboard, menus and native windows, not page-editable semantics (`plugins/remote-gui/internal/xclip/xclip.go:1-5`, `menus.go:1-16`).
@@ -159,6 +165,7 @@ None. The owner accepted keyboard/touch scope first, both platform targets and o
 | 2026-11-19 | R-1 | spec | `363a6140f6c2a1383da8d9c1fee5f2d3c36fa0fa` | unknown | procedural | Three should-fix findings preserved; applied in the subsequent owner-directed revision, awaiting a new independent review. |
 | 2026-11-19 | R-2 | spec | `3fa0bae68d8c1d25d9255c2d90cd1ec0b9d06886` | unknown | procedural | No findings; model identity was not attested. |
 | 2026-11-19 | R-2 | spec | `3fa0bae68d8c1d25d9255c2d90cd1ec0b9d06886` | n/a | n/a | accepted by owner |
+| 2026-11-19 | R-3 | spec | `0708e3cb33dd1fe1e85f4e8da74b598ee32f96a0` | unknown | procedural | No findings after covered-source drift; model identity was not attested. |
 
 ### R-1
 
@@ -184,6 +191,10 @@ EVIDENCE: Design line 81 applies session identity, origin, method, expiry and pr
 PROPOSAL: Apply the actual-route security matrix to every metadata, binding, input and controller endpoint the probe introduces, including wrong methods, wrong origins, forged ingress headers, foreign identities, expired sessions and changed process ownership. Assert both refusal and zero remote input or binding mutation for each rejected request.
 
 ### R-2
+
+NO FINDINGS
+
+### R-3
 
 NO FINDINGS
 
