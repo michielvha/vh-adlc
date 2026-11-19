@@ -1,7 +1,7 @@
 ---
 status: planned
 status_description: "The owner accepted the spec after clean review R-4. Ready for implementation planning."
-issue: null
+issue: https://github.com/michielvha/vh-adlc/issues/127
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-docs-truth/
@@ -109,7 +109,10 @@ Review the exact candidate before publication and identify which criteria need p
 
 ## Tasks
 
-None yet. Write tasks after acceptance.
+- [ ] T1 `plugins/vh-adlc/skills/vh-adlc-docs-truth/SKILL.md`, `plugins/vh-adlc/references/{docs-truth,lifecycle}.md`, package manifests, discovery tests and installation guides - the package discovers and routes the on-demand skill through one shared read-only procedure, and the existing docs routes still pass discovery checks (AC-01, AC-02, AC-04)
+- [ ] T2 `plugins/vh-adlc/examples/docs-truth/` and `tests/vh-adlc/docs-truth/` - a runnable fixture covers selected paths, complete and partial selection, and the expected evidence and verdicts without writing the assessed checkout (AC-01, AC-02)
+- [ ] T3 `tests/vh-adlc/docs-truth/native-trial.ts` and compatibility and marketplace guides - run the committed shared fixture through both candidate catalog paths and retain the exact package, native discovery and report transcripts (AC-01, AC-02, AC-04)
+- [ ] T4 Stackweaver's `.claude/commands/docs-truth.md`, `.vh-adlc/docs-truth.md` and `tests/agent-docs-truth/native-trial.ts` - prepare the unpublished routing and consumer proof, including legacy comparison, authorized writes, recovery and rollback in disposable clones (AC-03)
 
 ## Open Questions
 
