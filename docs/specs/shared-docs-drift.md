@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: Accepted marker correction; implementation and released-install gates follow
+status: in-progress
+status_description: Implementing the reviewed marker correction before released install and cutover
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
