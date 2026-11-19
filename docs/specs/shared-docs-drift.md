@@ -172,22 +172,24 @@ release-bound acceptance.
 R-137 finds that the inspector-only race checks do not observe the ordinary CLI
 outcomes. T157 now tests that boundary through the copied, verified actual
 component before any provider access: report returns pending, prepare returns
-setup-required, and both carry an unmatched component. Removal, replacement and
-invalid JSON values are separate cases. Each fault is observed once; the native
-credential boundary is never called. Restoring valid input permits an explicit
-scan to return collected with a matched component in the same validation scope.
-This establishes recovered inspection, without bypassing later execution policy.
+setup-required, and both carry an unmatched component. Removal, replacement,
+growth, shrink and invalid JSON values are separate cases. Each fault is observed
+once; the native credential boundary is never called. Restoring valid input permits
+an explicit scan to return collected with a matched component in the same validation
+scope. This establishes recovered inspection, without bypassing later execution policy.
 
-The exact six tests first fail against a deliberate catch/rethrow mutation in
-an owned clone: every healthy scan passes, then the caller incorrectly returns
-incomplete. An ordinary revert restores runtime bytes identical to reviewed
-`05e49ab8`; those same tests then pass 78 assertions. The owning CLI/bootstrap
-neighbor run passes 151 cases and 536 assertions with unchanged source/doc
-hashes and confirmed cleanup; strict TypeScript includes the new test and passes.
-Evidence is `t144-marker-caller-{red2,green}-result.json`, the retained original
-logs, `t144-marker-caller-composed-proof.json`, and the owning neighbor result.
-Failed synthetic fixtures remain owned and retained for diagnosis. No production
-runtime, permission, provider API or remote state changes to close this proof gap.
+The exact ten tests fail against each of two deliberate mutations in an owned
+clone: broken mapping returns incomplete, and a hidden retry enumerates twice
+while preserving the correct refusal outcome. Ordinary reverts restore runtime
+bytes identical to reviewed `05e49ab8`; those same tests pass 160 assertions.
+The owning CLI/bootstrap neighbor run passes 155 cases and 618 assertions with
+unchanged source/doc hashes and confirmed cleanup; strict TypeScript includes
+the new test and passes. Evidence is `t144-marker-caller-full-proof.json`,
+`t144-marker-caller-{red4,redretry,green4,green5}-result.json`, the original logs
+and `t144-marker-caller-full-neighbors-result.json`. The earlier six-case proof
+remains separate. Failed synthetic fixtures remain owned and retained for diagnosis.
+No production runtime, permission, provider API or remote state changes to close
+this proof gap.
 
 ### Isolated marker prototype checkpoint on 2026-11-18
 
@@ -2348,7 +2350,7 @@ The following tasks implement the revised baseline after spec review and owner a
 - [x] T120 `plugins/vh-adlc/scripts/docs-drift/cli.ts, tests/vh-adlc/docs-drift/closure-worker.test.ts` - Fix the reproducible normal closure-role child timeout using the existing final-replayed native observation boundary. Preserve deadlines, assert three native account reads per command, reject a late material change, preserve failed process evidence and pass exact-source checks plus independent review. (AC-05, AC-07)
 
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
-- [x] T157 `tests/vh-adlc/docs-drift/installed-marker-caller.test.ts` - Exercise removal, replacement and invalid-marker failures through actual ordinary report/prepare calls, require pending/setup-required with no native work, and explicitly recover matched inspection after repair. Make all six cases fail against a deliberately broken mapping in an owned clone, restore the original runtime and pass strict types and CLI/bootstrap neighbors. (AC-01, AC-07)
+- [x] T157 `tests/vh-adlc/docs-drift/installed-marker-caller.test.ts` - Exercise removal, replacement, growth, shrink and invalid-marker failures through actual ordinary report/prepare calls, require pending/setup-required with no native work or automatic retry, and explicitly recover matched inspection after repair. Make all ten cases fail against both broken-mapping and hidden-retry mutations in an owned clone, restore the original runtime and pass strict types and CLI/bootstrap neighbors. (AC-01, AC-07)
 
   Evidence: Exact test SHA matches across red2 and green. The owned mutation returns incomplete instead of pending/setup-required in all six cases; restoring the original mapping by ordinary revert gives six passes and 78 assertions. The entire shipped plugin tree then matches reviewed `05e49ab8`. The owning 151-case/536-assertion CLI/bootstrap run and strict TypeScript pass with all inputs preserved and owned children cleaned. Native access remains at zero and the consumer source stays unchanged. This tests existing behavior and adds no production seam.
 

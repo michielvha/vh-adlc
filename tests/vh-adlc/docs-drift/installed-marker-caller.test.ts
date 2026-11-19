@@ -17,7 +17,7 @@ afterAll(() => {
 });
 
 const cases = (["report", "prepare"] as const).flatMap(command =>
-  (["removal", "replacement", "invalid"] as const).map(fault => [command, fault] as const));
+  (["removal", "replacement", "growth", "shrink", "invalid"] as const).map(fault => [command, fault] as const));
 test.each(cases)("ordinary %s caller preserves marker failure outcomes and explicit rerun: %s", async (command, fault) => {
   const sourceRepo = resolve(import.meta.dir, "../../.."), source = readGit(sourceRepo, "rev-parse", "HEAD").toString().trim();
   const identity = computeComponentIdentity(sourceRepo, source);
@@ -38,8 +38,9 @@ test.each(cases)("ordinary %s caller preserves marker failure outcomes and expli
   const transport: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/transport") = await import(pathToFileURL(join(plugin, "scripts/docs-drift/transport.ts")).href);
   const metadata = join(plugin, ".in_use"), marker = join(metadata, "12345"), replacement = join(root, "replacement");
   mkdirSync(metadata); const bytes = '{"pid":12345,"procStart":"1"}'; writeFileSync(marker, bytes);
-  let output = "", nativeCalls = 0, armed = false, attempts = 0;
+  let output = "", nativeCalls = 0, armed = false, attempts = 0, enumerations = 0, markerFd: number | null = null;
   const originalWrite = filesystem.writeSync, originalList = filesystem.readdirSync, originalOpen = filesystem.openSync;
+  const originalStat = filesystem.fstatSync;
   const previousState = process.env.XDG_STATE_HOME; process.env.XDG_STATE_HOME = join(root, "state");
   const writing = spyOn(filesystem, "writeSync").mockImplementation(((...args: unknown[]) => {
     if (args[0] === 1 && typeof args[1] === "string") { output += args[1]; return Buffer.byteLength(args[1]); }
@@ -47,13 +48,23 @@ test.each(cases)("ordinary %s caller preserves marker failure outcomes and expli
   }) as typeof filesystem.writeSync);
   const listing = spyOn(filesystem, "readdirSync").mockImplementation(((...args: unknown[]) => {
     const result = Reflect.apply(originalList, filesystem, args) as ReturnType<typeof filesystem.readdirSync>;
+    if (args[0] === metadata) enumerations++;
     if (armed && fault === "removal" && args[0] === metadata) { attempts++; armed = false; rmSync(marker); }
     return result;
   }) as typeof filesystem.readdirSync);
   const opening = spyOn(filesystem, "openSync").mockImplementation((...args: unknown[]) => {
     if (armed && fault === "replacement" && args[0] === marker) { attempts++; armed = false; filesystem.renameSync(replacement, marker); }
-    return Reflect.apply(originalOpen, filesystem, args) as number;
+    const fd = Reflect.apply(originalOpen, filesystem, args) as number;
+    if (args[0] === marker) markerFd = fd;
+    return fd;
   });
+  const stating = spyOn(filesystem, "fstatSync").mockImplementation(((...args: unknown[]) => {
+    const result = Reflect.apply(originalStat, filesystem, args) as ReturnType<typeof filesystem.fstatSync>;
+    if (armed && (fault === "growth" || fault === "shrink") && args[0] === markerFd) {
+      attempts++; armed = false; writeFileSync(marker, fault === "growth" ? bytes + " ".repeat(4096) : "{");
+    }
+    return result;
+  }) as typeof filesystem.fstatSync);
   const native = spyOn(transport, "readNativeCredential").mockImplementation(async () => {
     nativeCalls++; throw Error("Unexpected native work in a marker refusal");
   });
@@ -68,25 +79,31 @@ test.each(cases)("ordinary %s caller preserves marker failure outcomes and expli
     const healthy = await invoke("scan", ["--source", consumer]);
     expect(healthy.status).toBe(0); expect(healthy.report.component).toMatchObject({ matched: true });
     writeFileSync(marker, fault === "invalid" ? '{"pid":12345,"procStart":"bad"}' : bytes);
-    writeFileSync(replacement, bytes); armed = true; const previousAttempts = attempts;
+    writeFileSync(replacement, bytes); markerFd = null; armed = true;
+    const previousAttempts = attempts, previousEnumerations = enumerations;
     await validation.withRuntimeValidation(async () => {
-        const refused = await invoke(command);
-        expect(refused.report.outcome).toBe(command === "report" ? "pending" : "setup-required");
-        expect(refused.status).toBe(command === "report" ? 1 : 2);
-        expect(refused.report).toMatchObject({ outcome: command === "report" ? "pending" : "setup-required", component: { matched: false } });
-        expect(refused.report.diagnostics).toEqual([expect.stringContaining("selected component differs")]);
-        expect(attempts - previousAttempts).toBe(fault === "invalid" ? 0 : 1);
-        expect(nativeCalls).toBe(0);
-        armed = false; writeFileSync(marker, bytes);
-        const rerun = await invoke("scan");
-        expect(rerun.status).toBe(0);
-        expect(rerun.report).toMatchObject({ outcome: "collected", component: { matched: true } });
-        expect(readFileSync(marker, "utf8")).toBe(bytes);
+      const refused = await invoke(command);
+      expect(refused.report.outcome).toBe(command === "report" ? "pending" : "setup-required");
+      expect(refused.status).toBe(command === "report" ? 1 : 2);
+      expect(refused.report).toMatchObject({ outcome: command === "report" ? "pending" : "setup-required", component: { matched: false } });
+      expect(refused.report.diagnostics).toEqual([expect.stringContaining("selected component differs")]);
+      expect(attempts - previousAttempts).toBe(fault === "invalid" ? 0 : 1);
+      expect(enumerations - previousEnumerations).toBe(1);
+      expect(nativeCalls).toBe(0);
+      if (fault === "removal") expect(filesystem.existsSync(marker)).toBe(false);
+      else expect(readFileSync(marker, "utf8")).toBe(fault === "invalid" ? '{"pid":12345,"procStart":"bad"}'
+        : fault === "growth" ? bytes + " ".repeat(4096) : fault === "shrink" ? "{" : bytes);
+      armed = false; writeFileSync(marker, bytes);
+      const rerun = await invoke("scan");
+      expect(rerun.status).toBe(0);
+      expect(rerun.report).toMatchObject({ outcome: "collected", component: { matched: true } });
+      expect(enumerations - previousEnumerations).toBe(2);
+      expect(readFileSync(marker, "utf8")).toBe(bytes);
     });
     expect(nativeCalls).toBe(0); expect(captureRepositoryState(repo)).toEqual(before);
     completed.add(root);
   } finally {
-    native.mockRestore(); opening.mockRestore(); listing.mockRestore(); writing.mockRestore();
+    native.mockRestore(); stating.mockRestore(); opening.mockRestore(); listing.mockRestore(); writing.mockRestore();
     if (previousState === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = previousState;
   }
 });
