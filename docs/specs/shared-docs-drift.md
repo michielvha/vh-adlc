@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: Narrow marker revision awaits compatibility-detail approval and fresh review
+status_description: Marker compatibility details approved for cutover; fresh spec review follows
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -118,8 +118,11 @@ observation establishes the Fedora 43 marker shape only. Other platforms, client
 versions and marker shapes remain unclaimed until T130 observes them; unsupported
 shapes stay setup-required. The corrected release must also pass with its own
 actually observed native CLI session. R-133's format, retry, caller and rollback clarifications are proposed below.
-R-134 requires explicit owner answers under the pinned spec procedure; Q2 bundles
-those recommendations. They propose no new effect permission or recovery mechanism.
+On 2026-11-19 the owner requests cutover after the pending bundle was explained.
+The recommended serialization, explicit-rerun, uniform-inspection and legacy-rollback
+choices are authorized, together with conservative details within this marker-only
+scope after clean review. No new effect permission, broader exclusion or recovery
+mechanism is authorized.
 
 
 This prevents claiming ordinary active Claude execution ready. The owner now approves the narrow validated metadata exception. This revision specifies that bounded correction; T156 implements and tests it; all other changes stay
@@ -190,8 +193,9 @@ active session on the corrected release or another platform/client build.
 Evidence is `t143-native-inline-marker/results.json`; no live session, foreign
 marker, phone configuration or remote repository state is changed.
 
-Q2 remains pending; no promotion,
-release, feature completion or remote routing switch is inferred from this work.
+The owner now authorizes the recommended compatibility bundle and cutover.
+Fresh spec review, release/install checks and the paired migration gate still
+precede the remote switch; these diagnostics do not substitute for those checks.
 
 ### Final adoption preparation on 2026-11-18
 
@@ -1340,7 +1344,8 @@ must encode exactly the literal keys `pid` and `procStart`, once each, in either
 order. JSON ASCII whitespace (space, tab, CR, LF) is allowed; escaped keys,
 duplicate/missing/unknown keys, a BOM and noncanonical PID number forms
 (including `1e3`, `1.0`, `-0` and leading zeros) are refused. `procStart` is a
-quoted nonempty decimal string of at most 32 digits. Read no more than 257 bytes
+quote byte, one to 32 literal ASCII digit bytes `0` through `9`, then a
+quote byte. Escapes in that value are refused; the bound counts raw digit bytes. Read no more than 257 bytes
 and accept no more than 256 bytes, including whitespace. Oversized or malformed
 observations are refused before exclusion. No marker data is executed or used as
 process ownership, verification evidence or effect authority. Valid stale
@@ -1354,7 +1359,9 @@ checks are unchanged. Retained private payload verification remains exact.
 `computeComponentIdentity` keeps counting every Git release file and rejects a
 release that contains the reserved `.in_use` path or descendants, so process
 metadata cannot be published as shipped content and then excluded at runtime.
-All other extra, missing, changed, linked or nonregular inputs remain refused.
+All other extra, missing, changed, symlinked or nonregular inputs remain refused.
+The existing installed policy still accepts hard-linked shipped files and a
+canonicalized root selector alias; only marker files acquire the single-link rule.
 
 There is no automatic retry. Removal between enumeration and lstat, changed
 observed device/inode/size/mode between lstat and open, an incomplete read, growth
@@ -1366,13 +1373,20 @@ and preserves installer modes. Only a successful inspection is reused within
 its existing invocation scope.
 
 Pre-correction helpers, including published 0.26.0, keep their original exact
-inventory check and refuse active Claude caches. Rollback to those releases and
-execution of their original pending operations use an existing matching
-metadata-free install, such as the verified Codex installation, an empty-profile
-installation or a published hosted checkout. The original helper, component,
-policy and authority still govern original effects; the new metadata rule does
-not backport itself or transfer operation ownership. Retain that old-cache
-refusal and verify the alternative install during the rollback proof.
+inventory check and refuse active caches containing native markers. Stackweaver's
+migration rollback restores its reviewed legacy routing, companion and binding
+together. Recovery of an original shared operation still uses that exact old
+component in an existing matching marker-free ordinary install. The verified
+Codex install or a marker-free hosted checkout remains an inspection/recovery
+surface; an old Claude-role path is supported only when its actual normal and
+cancelled invocations leave that selected directory verifiably marker-free.
+T130 records those observations for the selected client/build; unsupported paths
+stay blocked. Original recovery itself launches no role. The original helper,
+policy, ownership and authority govern its effects; no marker exception is
+backported and no new per-invocation installer or ownership transfer is added.
+The original recovery caller's existing incomplete/setup classification remains
+unchanged and blocks effects on a failed inspection. Retain the old active-cache
+refusal and verify the selected matching alternative in the rollback proof.
 
 Hosted execution checks out the exact published `component.source_commit` through ordinary Git/checkout tooling and invokes its plugin directory, then validates the recorded version/fingerprint. Interactive execution uses an ordinary installed directory that matches that same component binding. Both Codex and Claude support installing from an ordinary local marketplace checkout of that release. On 2026-11-15, `codex plugin marketplace add --help` returned `Add a local or Git marketplace to the configured marketplace sources`, a SOURCE accepting `a local path, owner/repo[@ref], HTTPS Git URL, or SSH Git URL`, and `--ref <REF>` with `Git ref to fetch for Git marketplace sources`. `claude plugin marketplace add --help` returned `Add a marketplace from a URL, path, or GitHub repo`. These observed help outputs establish argument support. The actual isolated release install remains a T130 check. Use isolated project/test profiles or an explicitly selected existing matching install, preserving the user's global marketplace. These are normal source/plugin installations, with normal native clients. If an interactive install contains a newer payload than the committed binding, report setup-required before effects. Never silently select latest or change the consumer binding. Rollback selects the previous published checkout/install and restores the reviewed previous consumer binding through the same path.
 
@@ -1502,7 +1516,7 @@ The owner confirmed ordinary installed clients and the capability-preserving che
 - [ ] AC-04: Resolution retains the correct detector-versus-interpretation feedback and current disposition for every original hunk. A selected original closes only after its merged consolidation and every carried or terminal disposition are freshly verified.
 - [ ] AC-05: Concise reports, independent exact-target review and declared permissions govern local and remote effects. Scheduled and interactive publisher accounts remain distinct and correctly bound. Complete unchanged carried attention can finish green. Original-operation recovery observes before replay, preserves partial/unknown outcomes as pending, supports evidence-backed owner acknowledgement and never repeats a completed write or transfers ownership. A present lease keeps both local and scheduled audits pending before model execution. Exact owner-approved administrative abandonment requires a stopped original executor and atomically removes only the present lease and its validated operation receipt. Normal hosted production execution uses the durable `hosted` profile and retains native-validated original run/attempt identity before lease acquisition, with exact configured workflow and assessed-source checks. Stopped-job evidence must match the production member or a native trial's existing launch binding. Collector trials are ineligible for administrative abandonment. Stale object preconditions reject all deletions. With no lease, reports assess current findings independently while retaining receipt-only evidence.
 - [ ] AC-06: Stackweaver adopts the published installed workflow after scanner parity, independent paired review, installed/native operation checks and a successful unattended shared trial, with its local rules, credentials, commands, schedule and notifications preserved and a verified rollback path.
-- [ ] AC-07: Recorded repository, package and portable-host checks pass for the exact released/installed payload. Native model/entry trials establish their actual supported surfaces. GUI, phone and unperformed surfaces remain explicitly deferred or unclaimed. The selected component binding gates provider execution and remote effects, with explicit read-only mismatch reporting. Simpler installation, run/recovery and migration interfaces replace the private client installer and historical adoption/runtime record machinery under the accepted tradeoffs, while retaining the test-only installed synthetic harness and durable operation recovery records. An actively used ordinary Claude installation with valid native process markers satisfies the same shipped component binding; other extra, changed, linked or nonregular inputs remain refused, and retained exports keep their exact inventory rule.
+- [ ] AC-07: Recorded repository, package and portable-host checks pass for the exact released/installed payload. Native model/entry trials establish their actual supported surfaces. GUI, phone and unperformed surfaces remain explicitly deferred or unclaimed. The selected component binding gates provider execution and remote effects, with explicit read-only mismatch reporting. Simpler installation, run/recovery and migration interfaces replace the private client installer and historical adoption/runtime record machinery under the accepted tradeoffs, while retaining the test-only installed synthetic harness and durable operation recovery records. An actively used ordinary Claude installation with valid native process markers satisfies the same shipped component binding; other extra, changed, symlinked or nonregular inputs remain refused, and retained exports keep their exact inventory rule.
 
 ## Test Plan
 
@@ -1523,16 +1537,19 @@ The owner confirmed ordinary installed clients and the capability-preserving che
   stale markers, and valid marker content/membership changes. Require the same
   version, fingerprint and shipped inventory, with marker bytes and modes unchanged.
 - Refuse duplicate/missing/unknown or escaped keys, BOM/invalid UTF-8/JSON,
-  noncanonical or unsafe PID values, filename/PID mismatch, invalid start values,
+  zero PID with filename `0`, noncanonical or unsafe PID values, filename/PID
+  mismatch, invalid start values or escaped digit bytes in `procStart`,
   257-byte data, any execute bit, hard links, symlinks, nonregular files, nested
   entries and other extra names. A valid marker cannot hide changed shipped code.
-  Require setup-required before provider/effect work and no checker-authored file
-  or mode change. Retained exports still refuse a valid extra marker, and a Git
+  Require setup-required at the ordinary selection caller before provider/effect
+  work and no checker-authored file or mode change. Original recovery retains its
+  existing incomplete/setup outcome with effects blocked; its error API is unchanged. Retained exports still refuse a valid extra marker, and a Git
   release containing the reserved path is refused.
 - Inject removal after enumeration and replacement between lstat/open. Require
   setup-required, no automatic retry and successful explicit rerun after restoring
-  valid input in the same invocation. Inject growth between the size observation
-  and read, and observe that no marker read request exceeds 257 bytes; an
+  valid input in the same invocation. Inject growth and shrinkage between the
+  size observation and read. Require at least one observed read and no marker
+  read request above 257 bytes; an
   oversized-file test alone is insufficient. Existing filesystem test spies may
   provide these deterministic faults; add no production injection API.
 - Publish the correction and inspect the actual ordinary installed payload while
@@ -1540,9 +1557,13 @@ The owner confirmed ordinary installed clients and the capability-preserving che
   actual role identity and marker-schema observations separately. Preserve the
   existing live session and metadata. Unsupported host/client shapes stay unclaimed.
 - Through the actual pre-correction helper, retain active-Claude-cache refusal
-  and matching metadata-free Codex/empty-profile/hosted selection. Rehearse the
-  reviewed consumer rollback with that matching older surface, retaining original
-  records, permission gates and deferred phone/GUI checks.
+  and matching marker-free Codex/hosted selection. Observe actual normal and
+  cancelled Claude `--plugin-dir` roles for the selected build and record marker
+  presence during execution and after cleanup. An old role path lacking that
+  proof stays blocked. Rehearse legacy consumer-routing rollback with the matched
+  old companion/binding, retaining original records, permission gates and deferred
+  phone/GUI checks. Do not infer that an old helper accepts an active cache or
+  change its original recovery error classification.
 
 ## Tasks
 
@@ -2271,33 +2292,14 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 ## Open Questions
 
-### Q2: May the proposed compatibility details and bounded clarification authority be accepted together?
-
-**Recommendation:** A. Accept this bundle and let the implementation settle further
-conservative details within the approved marker-only scope after clean review.
-
-1. Accept either JSON field order and JSON ASCII whitespace; reject duplicate or
-   escaped keys/values and noncanonical numbers. Refuse marker hard links and any
-   execute bit; preserve installed shipped-file hard-link support.
-2. Keep the existing fail-closed outcome and explicit caller rerun, without
-   automatic retry.
-3. Apply metadata validation uniformly to installed-runtime inspection, including
-   current/hosted/original inspection. Preserve all effect/recovery permissions,
-   original helper/component attribution and recorded evidence.
-4. Keep old releases unchanged. Migration rollback restores legacy Stackweaver
-   routing. Original shared-operation recovery uses an existing matching
-   metadata-free installation; unsupported old Claude-role paths stay setup-required.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Accept and delegate bounded details** | This bundle and routine conservative clarifications can proceed through clean review without repeated parsing questions | The agent selects those details within the stated marker-only boundary; new authority or wider exclusions still need owner approval |
-| **B. Accept this bundle only** | These four recommendations are approved | Further judgement findings return to the owner |
-
-**Why this is yours:** R-134 F-04 applies the pinned spec procedure's explicit-owner
-rule to R-133's technical alternatives. The existing owner grant approves the
-narrow marker exception, review, minimal fix and active-install tests. This
-question records the specific recommendations and any delegated clarification
-scope. It grants no new remote effect or credential permission.
+None. On 2026-11-19 the owner authorizes cutover after the recommended compatibility
+bundle was explained: strict unambiguous marker bytes with either field order and
+JSON ASCII whitespace, explicit rerun without automatic retry, uniform installed
+inspection without effect/recovery changes, and unchanged old releases with legacy
+consumer rollback and matching marker-free original recovery. Conservative details
+within that marker-only scope may proceed after clean review. Existing publication,
+release and gated migration authority remains; broader exclusions or new permissions
+are outside this decision.
 
 ## Review Log
 
