@@ -5,6 +5,14 @@ issue: null
 goal: "One canonical repository work item has one verified agent writer across clones, worktrees and supported hosts, with an explicit, preserved handoff."
 covers:
   - AGENTS.md
+  - cmd/vh-adlc/**
+  - internal/ownership/**
+  - internal/gate/**
+  - plugins/vh-adlc/vh-adlc.lock.json
+  - plugins/vh-adlc/scripts/ensure-vh-adlc.sh
+  - scripts/release/lock-binary.sh
+  - .github/workflows/release.yml
+  - .goreleaser.yml
   - plugins/vh-adlc/scripts/loop/**
   - plugins/vh-adlc/scripts/triage/execution-lock.ts
   - plugins/vh-adlc/scripts/ownership/**
@@ -145,6 +153,25 @@ source/issue/PR publication and merge checks remain independent. Reserve the coo
 namespace from ordinary feature cleanup and release processing. No coordination ref is
 created, pushed or merged as part of specification.
 
+Implement the shared authority in the existing Go binary, exposed through its ownership
+status, acquire, check, release and transfer commands. Host adapters call that verified
+binary instead of duplicating Git arbitration in prompts. Adopted configuration names one
+canonical repository, remote and reserved ref. The default ref is
+`refs/heads/vh-adlc/work-ownership`; adoption verifies that this namespace is excluded from
+the consumer's source-release and branch-cleanup paths before any coordination push.
+
+A versioned record binds canonical work aliases, state, generation, opaque owner/session
+and checkout identity, token digest, and the last operation ID. Keep the possession token
+and private absolute checkout/host details in local runtime state. Status reports local
+paths only when locally resolved; remote owners are identified by their registered opaque
+location and canonical source branch/spec. Unknown schema or alias mapping stops admission.
+
+Use Git plumbing to build the coordination commit from the observed authority commit,
+without modifying the caller's source index, HEAD or branches. The push is non-force and
+must descend from that exact observed commit. Concurrent same-item claims cannot both win;
+a rejected update reloads ownership before retry. Operation IDs make retries/read-back
+idempotent. Release and transfer update records through the same compare-and-set path.
+
 ### D3: Enforce entry and continuation
 
 Add the ownership check to the shared lifecycle entry before source mutation and to re-entry
@@ -158,6 +185,25 @@ ownership before a source-mutating action. Report which boundary is actually enf
 host. A procedural instruction is not an enforced tool boundary. A host without the required
 write guard remains read-only until a supported route is available; it cannot claim full
 single-writer protection from a successful status query or Git hook alone.
+
+Claude's adapter uses SessionStart/resume context and PreToolUse checks. Codex's adapter
+uses its native hooks for Bash/unified execution, apply_patch and covered MCP/function
+tools. Both call the same ownership checker and use documented denial output or exit 2.
+Hook errors, missing helpers and changed/untrusted hooks must hold write-mode setup; a
+hook that the client skips is not an installed fence. Keep the bootstrap exception narrow:
+only the exact installed status/acquire invocation is permitted before ownership, with
+validated arguments and no composed shell commands or source mutation.
+
+Codex subagents can expose the parent's session ID. Do not grant a delegated actor the
+writer's token on that basis. Use an independently scoped, native read-only client route
+when the host cannot identify and fence the delegated actor. Existing reviewers already
+have an independent command route that can be reused.
+
+An admitted long-lived shell can retain an input channel: Codex write_stdin does not run
+PreToolUse again. The owning execution controller must drain or stop that process and its
+input channel before transfer. Unknown in-flight ownership keeps transfer held. A new
+owner cannot become active while an old admitted mutator can still write. Unsupported
+specialized tool paths remain outside write-mode until their boundary is verified.
 
 Tests must distinguish logical owner arbitration, workflow entry, tool-action fencing and
 publication fencing. The feature does not claim an operating-system security boundary against
@@ -195,6 +241,12 @@ both existing marketplace manifests and verify actual Codex/Claude adoption. The
 pin update to `0c983f6793bfe35eb96ae95ad0c361c6200af44f` supplies the required testing guide;
 the shipped plugin default pin is unchanged unless a separately reviewed change requires it.
 Private host/session details remain in runtime state, not product documentation or source.
+The artifacts are the existing signed Go binary and shared plugin. Run the binary's Go
+checks and the plugin's Bun checks, publish the binary through the existing release
+workflow, and update the plugin lock only to an observed signed/checksummed release.
+Candidate validation uses the built candidate explicitly; do not invent a future version,
+checksum or successful marketplace install. No new deployable service or satellite is added.
+
 
 ## Acceptance Criteria
 
@@ -239,3 +291,7 @@ None. Q1A was answered in session on 19 November: use Git-remote coordination as
 - Stackweaver local incident comparison and the two-clone probe receipts named in Context, read/run 19 November 2026. These are incident evidence, not shared implementation completion.
 - [Claude Code hooks](https://code.claude.com/docs/en/hooks), read 19 November 2026: resume-context injection and pre-tool permission denial are distinct from acknowledgment or arbitrary filesystem isolation.
 - [Claude Code project instructions](https://code.claude.com/docs/en/memory), read 19 November 2026: instruction text is context, not enforced configuration.
+
+- [Codex hooks](https://learn.chatgpt.com/docs/hooks), read 19 November 2026:
+  native hook coverage, exact-hook trust, parent session identity and continuing stdin
+  channels constrain the supported fencing boundary. The installed CLI reports hooks enabled.
