@@ -161,8 +161,8 @@ before the status update. The stated operational limits remain unchanged.
 
 ### Interrupted final review handoff on 2026-11-19
 
-The staged and merged consumer acceptance above passes; lifecycle completion is
-still pending. The first final-review attempt is retained as incomplete after
+This handoff preceded R-139. Consumer acceptance had passed; lifecycle completion
+remained pending. The first final-review attempt is retained as incomplete after
 stalled additional local suite runs. A complete ten-case caller regression run
 passes with 160 assertions; the bounded whole-directory diagnostic makes progress
 but expires, so it supplies no full-suite pass. No failing or incomplete attempt
@@ -178,9 +178,9 @@ regression head `8a50aed3`. Later target changes are documentation only.
 Fresh Claude Code Opus 5.5 attempt `canonical-implementation-claude-r11` reads
 source and original evidence but becomes unavailable before returning canonical
 criterion records. Both attempts preserve the source/index/refs and confirm
-owned-process cleanup. No R-139 row or verdict is stored. T129/T130 and the
-completion gate remain open. The owner previously authorized Codex or Claude
-Code for this feature, so the remaining review can continue on Codex.
+owned-process cleanup. At this handoff, no R-139 row or verdict had been stored.
+T129/T130 and the completion gate remained open until the review and gate above.
+The owner's previous authorization allowed the review to continue on Codex.
 The adopted routing and the stated GUI/phone, native Copilot and first-production
 limits remain unchanged.
 
