@@ -52,8 +52,8 @@ Editing, shell commands, builds and tests run as usual. This relies on agents en
 work through vh-adlc and on your stop confirmation during a handoff. It cannot stop
 a session that is still running or an edit made outside the workflow.
 
-Repositories opt in once and authorize updates to the reservation ref. During setup,
-choose the writer for any existing claim. vh-adlc checks
+Repositories opt in once and authorize updates to the reservation ref. Pause feature
+writers during setup and choose the writer for any existing claim. vh-adlc checks
 the current remote policy at entry. If Git cannot verify it or the reservation, vh-adlc
 pauses the start or resume and explains what to check. The planned proof is a race between two clones,
 a normal resume, and a handoff with unfinished work. These are implementation checks
@@ -117,8 +117,11 @@ pauses entry for explicit reconciliation. Reread and resolve again after a rejec
 When creating an issue for an existing draft, link the returned issue number in the
 reservation immediately after creation, before handing it to another session as a work item.
 The tracker and Git are separate. An issue found independently before the link appears
-can look like a separate item. If it already has a reservation when the link is attempted,
-hold the link and have the owner reconcile the two records without overwriting either one.
+can look like a separate item. If both have reservations when the relationship is found,
+record the conflict in the same Git update mechanism. Entry through either identity pauses.
+After both writers stop, the owner can select one existing reservation and its work location.
+An exact-tip update points both aliases at the selected reservation and keeps the former
+records in Git history. This changes reservation metadata only. Preserve both work locations.
 
 ### Store the reservation in Git
 
@@ -156,14 +159,15 @@ after any competing writers have stopped. The helper records this as the item's 
 reservation using the verified tip and an expected absent item record. The same conflict
 and response-loss rules apply. A competing reconciliation cannot replace the winner.
 
-The installed workflow passes its current client, `codex` or `claude`, to the shared helper
-and to the loop claim command it invokes. A direct claim in an adopted repository also
-requires the caller to declare the client. The helper reads only that client's ID, `CODEX_THREAD_ID`
-or `CLAUDE_CODE_SESSION_ID`. A nested session can inherit both variables, so the presence
-of a variable alone cannot select the client ([client observations](session-retrospective.md)).
-Derive a client-namespaced fingerprint for the Git record. The same conversation must retain
-its ID through process restart. Hold if the selected ID is unavailable, including when the other
-client's variable is present. A fresh conversation in the same checkout has a different ID.
+Detect the current client only in an unambiguous native environment. Codex supplies
+`CODEX_THREAD_ID`, and Claude Code supplies `CLAUDECODE` and `CLAUDE_CODE_SESSION_ID`.
+Any of those markers or `CODEX_SESSION_ID` counts as evidence of its client family. If both
+families are present, or the required ID is missing, hold entry and direct the user to the
+ordinary client session. Nested invocations can inherit both families
+([client observations](session-retrospective.md)). A direct claim in an adopted repository
+also requires an explicit client that matches this check. Derive a client-namespaced fingerprint
+from the ID for Git. The same conversation must retain its ID through process restart.
+A fresh conversation in the same checkout has a different ID.
 
 The session owns the reservation. The existing worktree checks still decide where it
 can write. When the same session takes the normal route from a spec to an isolated
@@ -188,8 +192,10 @@ the usual lifecycle determines whether it can be worked on again.
 
 Read adoption policy from the current default-branch tip on the canonical remote, including
 from feature checkouts made before adoption. Verify the reserved ref alongside it. Reuse
-the default-branch refresh already required by the workflow where possible. An absent
-policy and absent ref establish legacy behavior. If either configured remote lookup fails,
+the default-branch refresh already required by the workflow where possible. Two absent
+lookups establish legacy behavior only when there is no evidence of prior adoption. The last
+verified adoption binding takes precedence, including when both remote records disappear.
+If either configured remote lookup fails,
 or only one side exists, hold entry and report the missing or unverifiable part. A checkout
 with no configured remote can use an explicit local-only exception when the owner requests
 a new private draft without an issue or branch and there is no evidence of prior adoption.
@@ -210,8 +216,13 @@ dispatches it for a labeled PR (`.github/workflows/preview.yml:3-21`). The relea
 starts on version tags (`.github/workflows/release.yml:3-5`).
 
 Before setup, identify existing claims and have the owner pause feature writers. Resume
-only after the supported clients and both setup steps are verified. Resolve ambiguous or duplicate
-claims by selecting one writer and location while preserving other work. A downgrade to a
+only after verifying supported clients, both setup steps, and the adopting repository's
+own protection and release routes. Read the effective remote rules for the exact ref to
+verify that ordinary writer updates are allowed and deletion and rewrites are forbidden.
+Inspect the consumer's actual cleanup and tag-capable workflow paths, including dispatch,
+for the reserved ref. Missing or unverifiable controls keep adoption paused. Test rejection
+of destructive ref changes on disposable remotes. Resolve ambiguous or duplicate claims
+by selecting one writer and location while preserving other work. A downgrade to a
 client without the check removes its duplicate-work protection. Keep the ref and its history,
 coordinate writers manually during rollback and reverify the same ref before restoring checks.
 
@@ -244,9 +255,9 @@ binary continues to supply the existing lifecycle gates.
 | Criterion | Proof |
 | --- | --- |
 | AC-10 | Race two processes through feature entry with independent clones of a disposable bare remote. Verify one reservation, unchanged source, index and refs in the losing clone apart from remote reads, and the current writer and location in the refusal. Race two starts for the same new issue-less spec path and verify only the winner can write the draft. Separate items both succeed. |
-| AC-11 | Enter through issue, spec and branch using HTTPS and SSH spellings for valid fetch and push. Pair the canonical fetch URL with a push URL to a different repo at the same tip. Refuse entry and confirm both remotes are unchanged. Race an old alias against a move and refuse an alias reserved elsewhere. Try entry by a newly created issue number before and after linking it to a reserved draft. Verify the documented unlinked behavior and that an early reservation cannot overwrite the draft reservation. Exercise spec authoring through isolated implementation in the same session with no extra owner approval. Retain a rejected claim commit and retry from the new tip while a competitor stays held. Lose the response after an accepted update, verify exactly one matching operation and admit its writer. Pair it with a rejected or superseded operation and hold if either the operation or resulting record cannot be verified. A missing ref, unrelated genesis or offline remote holds entry. Prove each direct writer entry and both claim paths stop a competitor before edit, commit or push. Run a read-only review, then edit and test as current writer with no additional reservation calls. In each installed client, restart the process, resume the same conversation successfully and refuse a fresh conversation in the same checkout. In a mixed environment, exercise both client selections and verify entry holds when the selected ID is absent and the other is present. |
+| AC-11 | Enter through issue, spec and branch using HTTPS and SSH spellings for valid fetch and push. Pair the canonical fetch URL with a push URL to a different repo at the same tip. Refuse entry and confirm both remotes are unchanged. Race an old alias against a move and refuse an alias reserved elsewhere. Try entry by a newly created issue number before and after linking it to a reserved draft. Verify unlinked behavior, then discover a collision between existing reservations. Hold both entry paths until an explicit choice binds them to one writer, with both histories and working trees preserved. Exercise spec authoring through isolated implementation in the same session with no extra owner approval. Retain a rejected claim commit and retry from the new tip while a competitor stays held. Lose the response after an accepted update, verify exactly one matching operation and admit its writer. Pair it with a rejected or superseded operation and hold if either the operation or resulting record cannot be verified. A missing ref, unrelated genesis or offline remote holds entry. Prove each direct writer entry and both claim paths stop a competitor before edit, commit or push. Run a read-only review, then edit and test as current writer with no additional reservation calls. In each installed client, restart the process, resume the same conversation successfully and refuse a fresh conversation in the same checkout. Exercise both actual installed entry routes with mixed host environment markers and assert a hold. Invoke standalone claim with a matching explicit client and with a missing or mismatched ID. Verify no fallback to the other family. |
 | AC-12 | Seed committed and dirty work. Refuse handoff without stop confirmation. Prove same-checkout handoff and handoff to a clone that initially lacks the work. Before transfer, compare the required commits, file hashes and index entries in the prepared destination. Simulate an uncertain transfer and require the owner to keep the old writer stopped until verification, with original work retained. Race or replay transfer requests and verify no request overwrites a later handoff. Resume both sessions through vh-adlc after success. Verify the new writer can continue, the old one sees the transfer, and a paused or quota-limited owner retains its reservation until handoff. |
-| AC-13 | Check stale-checkout policy discovery, both halves of interrupted setup, an unadopted remote, and an unsupported or missing client on both unadopted and adopted repositories. Give the same explicit local-only draft request to an original local repository and a stale clone whose origin was removed before adoption verification. Both permit only a new local draft, and shared writer entry without origin holds. A verified adopted clone refuses the exception after origin is removed. Try a direct writer against an unresolved legacy claim and verify the ref stays unchanged. Race two owner reconciliations or lose a winning response, then resume the selected existing writer and hold another clone. Race initializers, lose a create response, and verify downgrade and compatible recovery of the same history. Prove a disposable remote accepts appends and refuses deletion and rewrites. Make the reserved and ordinary refs otherwise eligible for cleanup and select only the ordinary branch. Verify push and dispatch can reach tag-capable CI for an ordinary product branch but cannot for the reserved ref. Observe a permitted coordination push and a no-push refusal, with source refs and tracker unchanged. Run the Bun plugin checks and install from both exact candidate catalogs in isolated profiles. |
+| AC-13 | Check stale-checkout policy discovery, both halves of interrupted setup, both records lost after verified adoption, a genuinely unadopted remote, and an unsupported or missing client on both unadopted and adopted repositories. Give the same explicit local-only draft request to an original local repository and a stale clone whose origin was removed before adoption verification. Both permit only a new local draft, and shared writer entry without origin holds. A verified adopted clone refuses the exception after origin is removed. Try a direct writer against an unresolved legacy claim and verify the ref stays unchanged. Race two owner reconciliations or lose a winning response, then resume the selected existing writer and hold another clone. Race initializers, lose a create response, and verify downgrade and compatible recovery of the same history. Keep the adopting fixture paused if its effective remote protection or release exclusion is missing. Verify both against the fixture consumer’s own policy before resumption. Prove a disposable remote accepts appends and refuses deletion and rewrites. Make the reserved and ordinary refs otherwise eligible for cleanup and select only the ordinary branch. Verify push and dispatch can reach tag-capable CI for an ordinary product branch but cannot for the reserved ref. Observe a permitted coordination push and a no-push refusal, with source refs and tracker unchanged. Run the Bun plugin checks and install from both exact candidate catalogs in isolated profiles. |
 | AC-14 | Capture conflict and transfer output from a remote clone and a checkout where the work location resolves locally. Verify the current writer's host and branch or spec, and an absolute path only in the local case. Inspect the shared history and remote diagnostics for permitted identifiers and absence of the planted raw session ID and absolute checkout path. |
 
 ## Tasks
@@ -269,6 +280,7 @@ None. The owner selected the Git reservation, entry checks and explicit handoff.
 | 2026-11-19 | R-6 | spec | `b2c53b40737f7bd15ee8b1d3de804a92347dc139` | unknown | procedural | Two blocking and six should-fix findings on existing entry paths and verification. Model identity was not attested. |
 | 2026-11-19 | R-7 | spec | `d14c0aa5db6970bb9225cefd54cbebed6273624f` | unknown | procedural | Three should-fix findings on client, local-only and remote identification. Model identity was not attested. |
 | 2026-11-19 | R-8 | spec | `810132e29e1e69ee15b1f37bf5b1d5fb86ba0cab` | unknown | procedural | One blocking and five should-fix findings on rollout, linking and proof. Model identity was not attested. |
+| 2026-11-19 | R-9 | spec | `23ff6ec2d3e0907aafbc5a74e0af550ae4f802f2` | unknown | procedural | One blocking and three should-fix findings on remembered adoption, alias collisions and installed client proof. Model identity was not attested. |
 
 ### R-1
 
@@ -567,6 +579,36 @@ SEVERITY: should-fix
 WHERE: Context, Owner summary, current writer and work location; Design, Store the reservation in Git, shared and local fields; Design, Start, resume and hand off, transfer message; Glossary, Current writer and Work location; AC-10 and AC-12; Test Plan, AC-10 and AC-12.
 EVIDENCE: The design forbids raw session IDs and absolute checkout paths in the shared ref, and defines the work location as a host label plus branch or spec with a checkout path when local. The proof checks for a writer and location in the refusal and checks the handoff result. It can pass if the ref contains the raw fields or if the reported location lacks the defined host and branch or spec information. The pinned `conventions/feature-documents.md`, Open questions, requires introduced user-facing terms to be held to their glossary definitions by a criterion.
 PROPOSAL: Check the reservation history and remote diagnostics for the permitted fields and absence of raw session IDs and absolute paths. Verify that conflict and transfer output identifies the current writer's host and branch or spec, with the local checkout path only when safely resolved.
+
+### R-9
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context, Owner summary, adoption verification. Scope, adopted and unadopted entry. Design, Identify the same work, Store the reservation in Git, and Adopt and roll back. AC-11 and AC-13. Test Plan, AC-11 and AC-13.
+EVIDENCE: Lines 137-138 require a hold when an adopted ref is missing. Lines 189-199 say that two absent remote lookups establish legacy behavior, and use remembered adoption only to refuse the local-only exception. If the canonical remote is restored from a pre-adoption backup, a previously verified checkout can see both lookups succeed with absence and enter without checking the reservation. The proof covers each missing half and removed origin, so both checks can pass while this route admits a writer.
+PROPOSAL: Make a verified adoption binding take precedence over remote absence. Test a known-adopted checkout whose canonical remote answers both lookups with absence, alongside a genuinely unadopted checkout that may still enter.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Identify the same work, alias reconciliation and issue creation. Design, Start, resume and hand off, existing-claim reconciliation. AC-10 and AC-11. Test Plan, AC-11.
+EVIDENCE: The R-8 revision defines the window when a new issue can be reserved independently and tells the owner to reconcile the two records once the relationship is known. Lines 111-121 hold a conflicting alias and retain both existing bindings. Lines 148-157 supply a transition only for a legacy claim with no reservation. The proof can pass after observing a refused link while future issue and spec entries still select different current writers for the now-identified feature.
+PROPOSAL: Define what the owner can do after both records exist, including which entry paths hold before reconciliation and which writer can continue afterward. If automated reconciliation is outside this feature, state the supported stopping point and test it from both entry paths.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Owner summary, adoption and verification. Scope, adopted repositories and delivery. Design, Adopt and roll back, protection, release routing and cutover. AC-13. Test Plan, AC-13.
+EVIDENCE: Lines 202-216 require remote protection and release exclusion before writers resume, but do not identify what verifies these conditions in the adopting consumer. The cited `.github/workflows/ci.yml` and `preview.yml` configure this repository only. A disposable bare remote and checks of vh-adlc's own workflows can pass while a consumer's reserved branch remains unprotected or enters that consumer's release routing. The Owner summary also omits the required pause across setup.
+PROPOSAL: State the adopter's checks for its actual remote protection and release routes, and tie resumption to observing those checks with the writers still paused. Exercise adoption with a consumer fixture that initially lacks the required protection or exclusion.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope, supported and unidentified clients. Design, Start, resume and hand off, client selection, and Adopt and roll back, installed checks. AC-11 and AC-13. Test Plan, AC-11 and AC-13.
+EVIDENCE: The two catalogs resolve to the same plugin source at `.agents/plugins/marketplace.json:18-22` and `.claude-plugin/marketplace.json:18-20`. Lines 159-166 require the installed workflow to select the current client, but the mixed-environment proof can pass by calling the helper with each client flag fixed by the test. `docs/specs/session-retrospective.md:762-765` records a real nested invocation inheriting both IDs. Separate installed resumes and helper-only mixed tests can therefore pass while an installed entry chooses the parent client and admits the wrong session.
+PROPOSAL: Specify how the installed entry identifies its client independently of the inherited session variables. Drive the mixed-environment proof through the installed entry, and exercise the standalone claim command separately with an explicit client.
 
 ## Sources
 
