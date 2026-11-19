@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "The owner accepted the Git reservation design reviewed in R-13. Implementation tasks and the claim are next."
+status: in-progress
+status_description: "The feature is claimed on feat/single-writer-ownership. The first task is the two-clone regression."
 issue: null
+branch: feat/single-writer-ownership
 goal: "Two sessions using vh-adlc cannot accidentally start or resume the same feature as its writer."
 covers:
   - AGENTS.md
