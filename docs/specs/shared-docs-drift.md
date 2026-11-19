@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: Published marker correction; verifying the native retry and final Stackweaver cutover
+status_description: Stackweaver cutover merged; final canonical review and completion gate pending
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -72,40 +72,64 @@ The scope excludes claim-by-claim docs-truth sweeps and their rolling ledger. Ex
 
 ### Owner summary
 
-Move Stackweaver's whole-documentation audit and stale audit-PR resolver into the
-ordinary vh-adlc plugin. Keep its scanner, twelve detectors, flags, feedback,
-generators, safe older-plan fixes, commands, Monday schedule, accounts and
-notifications. Shared specs retain their lifecycle gates and interrupted writes
-retain original evidence.
+Stackweaver's whole-documentation audit and stale audit-PR resolver now route
+through the ordinary vh-adlc plugin. Its scanner, twelve detectors, flags,
+feedback, generators, safe older-plan repairs, command shortcuts, Monday schedule,
+accounts, credential mapping and notification routing remain local. Shared specs
+keep their lifecycle gates; interrupted writes retain their original evidence.
 
-The owner-approved correction accepts only Claude's bounded, non-executable
-`.in_use/<pid>` JSON process marker. Every shipped file and mode still has
-to match; other extra files and symlinked entries below the installed root remain
-refused. Hard-linked shipped files keep their existing support. The checker neither
-executes metadata nor removes it or disturbs the running session. Retained
-private payload checks stay exact. No effect permission changes.
+Published plugin 0.26.1 passes actual Codex/Claude marketplace fresh installs and
+upgrades. An active registered Claude session also matches all 291 shipped files
+with its valid native process marker present. Other extra files, changed code,
+symlinks and nonregular inputs still refuse. Earlier observations retain their
+original release and source attribution.
 
-Previous 0.26.0 marketplace/native tests, 875-document parity, the clean paired
-routing review, 90 consumer tests and the 48-check local gate remain evidence of
-their original versions. The marker correction is implemented and source-reviewed
-at `05e49ab8`; the owning first-red run, 212 passing focused cases and the clean
-scoped Opus review are recorded below. T157 adds the missing ordinary-caller
-outcome proof without changing production code. All six exact-head checks pass,
-PR #120 is merged, and published 0.26.1 passes ordinary Codex/Claude fresh installs
-and upgrades plus an active registered Claude session. Stackweaver remains staged
-while final paired migration and activation checks remain. The corrected hosted
-trial has passed. GUI/phone and
-native Copilot execution stay deferred or unclaimed.
-Other agent migrations stay on their separate roadmap.
+The corrected real Actions trial passes with separate native Opus 5.5 worker and
+reviewer contexts. It published one owned synthetic draft PR, then closed it
+unmerged and removed only its branch after execution stopped. Terminal receipts
+remain. Final paired source review has no blocking or should-fix findings; both
+small follow-ups are addressed. The exact activation and final feature preflight,
+92 consumer tests, 48 repository checks with no skips, whole-tree rollback and
+875-document scanner parity passed before [Stackweaver #1160](https://github.com/michielvha/stackweaver/pull/1160)
+merged. Final canonical review and the completion gate remain pending.
 
-The 2026-11-19 cutover decision accepts either JSON field order and ASCII JSON
-whitespace, explicit rerun without automatic retry, and uniform installed
-inspection. Rollback restores legacy routing and the old companion/binding;
-old-release recovery needs its matching marker-free install. Old Claude-role
-paths without observed marker-free runs stay blocked. The earlier Claude 2.1.326
-inline-role observation is a source diagnostic, not corrected-release native
-acceptance. T130 retains that published-install and final migration gate. Conservative marker-only
-details may proceed after clean review under the existing publication authority.
+No production backlog sweep was dispatched. The first real weekly run remains
+unobserved; GUI/phone checks are owner-deferred and native Copilot execution is
+unclaimed. The named Copilot intake profile uses the selected Claude backend.
+Other agent migrations remain on their separate roadmap.
+
+### Stackweaver cutover on 2026-11-19
+
+[Stackweaver #1160](https://github.com/michielvha/stackweaver/pull/1160) merges
+feature head `234dd4ef871e81cd6e88e4c684be6671b69dfb8e` as
+`aa3980cc204084e16956bba172e88b8d46fda4d6`. The merge tree equals that verified
+feature tree. Staged candidate C is `d809d0c6a94f0eddc56e286e162ee7a9ecd81d29`;
+activation D is its direct single-parent child `f18f26272c7fab3ac2cddea1fcbb32ec22280939`.
+Its six afterimages match reviewed target
+`bc310bf1ef6fbac6e5af3d5b181d3bceb9bb9076eb8e7a9af35ccdea79758c36`.
+Actual installed preflight passes at D, the feature head and the server merge,
+selecting D with policy digest `bea0fc743a74d45524e16db24a5cd26878dd1576666209937321b96dfaa7cf54`.
+The original refused alias-emitting checklist at `89f95b00` remains in history;
+the normal corrective merge selects the strict-reader-compatible plain YAML.
+
+Fresh Claude Code Opus 5.5 paired review r21 reads all 154 bounded fragments at
+C/P and has no blocking or should-fix findings. Its original return hash is
+`dcff84f612b2fb1f929392b7716c1bae48496027ca4ba9a841082bdabd6532ea`.
+The consumer now tests the adopted preflight at committed HEAD, and CLAUDE.md
+describes the shared weekly worker. The guard fails on an actual committed
+entry-point mutation and passes after an ordinary revert with identical test bytes.
+Edits to a bound activation file require a reviewed successor checklist.
+
+The actual D passes 91 consumer tests/750 assertions and all 48 repository checks.
+The final feature passes 92 tests/752 assertions and all declared applicable
+verification rungs, including 48 repository checks with zero skips. No product
+integration or browser rung applies. A normal revert of real D in an owned
+rehearsal restores C's entire tree exactly; the separately retained rollback
+restores the legacy companion and matching original component together.
+Original artifacts are `t145-gates-*-f18f2627`, `t145-gates-*-234dd4ef`,
+`t145-adopted-preflight-guard-proof.json`, `t146-actual-D-rollback.json` and
+`t146-merged-preflight.json` in the local review archive. Private report bodies
+and application source stay local.
 
 ### Corrected release checkpoint on 2026-11-19
 
@@ -129,9 +153,9 @@ This is corrected-release active-install evidence, not a production backlog swee
 
 [PR #122](https://github.com/michielvha/vh-adlc/pull/122) separately publishes
 the ten caller regressions and R-138 records so its complete CI can run without
-restarting #120. Runtime bytes remain identical. Stackweaver's current staged
-update binds the published component; its normal hooks, hosted synthetic trial,
-new C/P review, activation preflight and final consumer gate remain pending.
+restarting #120. Runtime bytes remain identical. The cutover record above supersedes this
+checkpoint's staged status. Native trial, C/P review, activation and final
+feature gates now have their own exact-source evidence.
 
 ### Linked trial-definition correction on 2026-11-19
 
@@ -1858,9 +1882,9 @@ The following tasks implement the revised baseline after spec review and owner a
   Verification. Qualified actual Claude Code Opus 5.5 r22 reads all 147 fragments at `2f3aedf5` and finds no concrete T152 defect. Its proportionality observations remain recorded verbatim. Original policy reconstruction now reuses the existing `policyBinding(plan)` representation and overrides its policy digest with the verified original preflight result. This carries recorded attribution through the established representation. All 70 original-runtime/journal/authority cases pass 340 assertions in `t153-policy-reuse-controls.log`; strict production/test compilation passes. The recovery guide states the active-job and current exact approval prerequisites of the accepted hosted capability. Manual doc-impact inspection covers that guide and the original metadata loader. The repository's owned GitHub remote accepts an atomic-push dry run, and a subsequent read confirms its branch is still `8a1fbe0b`; this establishes capability without a ref update. Full native write/trial proof remains T130. Broader conditional controller/gate reductions remain for the final whole-feature review.
 
 - [x] T154 `plugins/vh-adlc/scripts/docs-drift/{protection,protection-source,preflight}.ts, tests/vh-adlc/docs-drift/{protection,source-protection,worker-assessment,normal-report,normal-preparation,preflight,local-history,history-producer,closure-inputs,original-runtime,flat-history}.test.ts, tests/vh-adlc/docs-drift/{preflight-fixture,native-audit-client-fixture}.ts, tests/vh-adlc/docs-drift/fixtures/pre-mixed-policy/, plugins/vh-adlc/references/{docs-drift,docs-drift-settings}.md, plugins/vh-adlc/examples/docs-drift/{README.md,basic/.vh-adlc/docs-drift-project.md}, tests/vh-adlc/docs-drift/public-docs.test.ts` - Preserve safe declared older-plan corrections in mixed roots. First fail index/local-status preparation and normal-entry legacy fixes. Extend the existing committed data-only protection policy and reuse the matcher. Remove caller policy merging, retain only verified coordination context, and migrate caller-policy fixtures to committed declarations. Define mixed-root shared enrollment from the exact unfenced Review Log header, preserving existing standard-root fallback and local branch activity through the declared status vocabulary. Prove no effect for out-of-root matches and local-format repositories. Preserve claims, proof/history and exact-byte compatibility. Bind the new rule/coverage projection through the source-selected configuration digest, with post-adoption policy-mutation refusal, prose-only compatibility, plain second-adopter and unrelated-successor tests. Trace scheduled/local history, closure inputs and original-policy recovery readers at their original commits, and prove old-proof eligibility plus new-source downgrade refusal. Preserve established digest-row refresh and writer-coordination paths. Update canonical settings/adoption guides and the public-guide test to describe that binding and the existing activation rules. Pass conflict/ambiguity/refusal and normal report/prepare/revalidation controls, strict types and protection neighbors. (AC-01, AC-03, AC-06, AC-07)
-- [ ] T155 `Stackweaver project companion, dormant worker, scheduled/repair entries and migration tests` - Apply the selected local classifications and safe editable parts. Correct the reviewed worker contract, exact two-file history artifact, setup/final status, bounded diagnostics, attribution, route inventory and rollback checks. First reproduce the concrete defects and pass actual committed-worker and archive-reader controls. Keep new companion fields on the isolated branch until the compatible published binding is verified. Activate through the reviewed C/D pair and restore the companion plus binding together on rollback. Prepare mode-neutral companion instructions in C. Bind its projected `local_documents` and coverage values through the shared configuration digest, keeping actual route changes in the existing activation list. Test old/new readers against both companion versions, preserving deliberate older-reader refusal. Repeat the full protection inventory and paired review at exact commits. (AC-01, AC-03, AC-05, AC-06, AC-07)
+- [x] T155 `Stackweaver project companion, dormant worker, scheduled/repair entries and migration tests` - Apply the selected local classifications and safe editable parts. Correct the reviewed worker contract, exact two-file history artifact, setup/final status, bounded diagnostics, attribution, route inventory and rollback checks. First reproduce the concrete defects and pass actual committed-worker and archive-reader controls. Keep new companion fields on the isolated branch until the compatible published binding is verified. Activate through the reviewed C/D pair and restore the companion plus binding together on rollback. Prepare mode-neutral companion instructions in C. Bind its projected `local_documents` and coverage values through the shared configuration digest, keeping actual route changes in the existing activation list. Test old/new readers against both companion versions, preserving deliberate older-reader refusal. Repeat the full protection inventory and paired review at exact commits. (AC-01, AC-03, AC-05, AC-06, AC-07)
 
-- [ ] T128 `Stackweaver staged migration config, companion, command, workflow and tests` - Update the isolated staged adopter to the replacement interface and checklist, preserving legacy behavior and routing. Run corpus/protocol/feedback/config parity and disposable rollback tests at exact commits. Exercise the actual scheduled-worker route after lost ownership, requiring a pending report while the lease remains, then fresh current collection and review after exact atomic abandonment. Verify stopped-executor eligibility and exact same-operation selection, all-or-nothing refusal on a stale approved object, and collected/zero fresh assessment with unchanged orphan receipt in the empty-findings unsupported lease-only-deletion fixture. (AC-01, AC-02, AC-03, AC-06)
+- [x] T128 `Stackweaver staged migration config, companion, command, workflow and tests` - Update the isolated staged adopter to the replacement interface and checklist, preserving legacy behavior and routing. Run corpus/protocol/feedback/config parity and disposable rollback tests at exact commits. Exercise the actual scheduled-worker route after lost ownership, requiring a pending report while the lease remains, then fresh current collection and review after exact atomic abandonment. Verify stopped-executor eligibility and exact same-operation selection, all-or-nothing refusal on a stale approved object, and collected/zero fresh assessment with unchanged orphan receipt in the empty-findings unsupported lease-only-deletion fixture. (AC-01, AC-02, AC-03, AC-06)
   Checkpoint on 2026-11-16. The owned consumer branch integrates default commit `cd59366d8f4c25892ed4e7033eb6b10ffa7a1dbe` at `d10355a6999e4c01ae28c79177b082a7240c99e6`. Its sole generated coverage conflict is regenerated through the existing index builder. The normal commit hook passes the scoped repository verification, including Go/frontend/chart and satellite-build checks. Committed consumer knowledge resolves `0c983f6793bfe35eb96ae95ad0c361c6200af44f` with no missing required page. The configuration regression first fails on schema version 1, then the version-two settings and actual run-directory entry pass all 24 protocol/migration cases with 124 assertions. Both publisher accounts, twelve units, ordinary legacy scanner output and the existing active command/schedule are preserved. Caller inventory has 59 references and zero unclassified paths before the new worker files.
 
   Attribution update on 2026-11-17. The unchanged clean frozen consumer commit `5e622c4971ae2c8f113b813a8dd211fb89df8118` passes the current 24 entry/protocol cases and 126 assertions, with 65 current references and zero unclassified paths. `r107-clean-frozen-consumer-entry-protocol.log` records the run against the shared `cfdb6665` code and current lock. An earlier attempt in the retained corpus-comparison clone fails the inventory check because that clone contains the intentionally untracked original-scanner comparison script. The clean clone retains the same committed source and preserves the failed attempt separately. Earlier 124-assertion and 59-reference counts describe their own prior overlays.
