@@ -1,0 +1,11 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Two-tap phone keyboard probe</title>
+<style>
+body{margin:12px;font:16px system-ui}p{margin:8px}
+#screen{position:relative;height:270px;background:#eee}
+#prompt{position:fixed;z-index:3;min-width:96px;min-height:44px;font:16px system-ui;color:#fff;background:#202735;border:1px solid #5b6f8e;border-radius:7px}
+#editor{position:fixed;left:20px;top:50px;opacity:.01;pointer-events:none;font-size:16px;width:100px}
+</style>
+<p id="status" role="status">Connecting</p><div id="screen"></div>
+<button id="prompt" type="button" hidden>Tap to type</button>
+<input id="editor" aria-label="Local synthetic input" autocomplete="off" autocapitalize="off" spellcheck="false">
+<script type="module" src="/viewer.js"></script>
