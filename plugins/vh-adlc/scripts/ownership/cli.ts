@@ -1,4 +1,5 @@
-import { enter, initialize, type Result } from "./entry";
+import { enter, initialize, type EntryRequest, type Result } from "./entry";
+import { handoff, status } from "./handoff";
 
 function options(argv: string[]): Record<string, string> {
   const found: Record<string, string> = Object.create(null);
@@ -18,11 +19,13 @@ function main(argv: string[]): Result {
   if (command === "initialize") {
     return initialize(input.repo, input.approved === "true", input.operation ?? "");
   }
-  if (command === "enter") {
-    return enter({ repo: input.repo, client: input.client, issue: input.issue, spec: input.spec, branch: input.branch,
-      noPush: input["no-push"] === "true", localDraft: input["local-draft"] === "true" });
-  }
-  throw Error("use initialize or enter");
+  const request: EntryRequest = { repo: input.repo, client: input.client, issue: input.issue, spec: input.spec, branch: input.branch,
+    noPush: input["no-push"] === "true", localDraft: input["local-draft"] === "true" };
+  if (command === "enter") return enter(request);
+  if (command === "status") return status(request);
+  if (command === "handoff") return handoff({ ...request, approved: input.approved === "true", stopped: input.stopped === "true",
+    preserved: input.preserved === "true", expected: input["expected-operation"] ?? "", operation: input.operation ?? "" });
+  throw Error("use initialize, status, enter or handoff");
 }
 
 if (import.meta.main) {

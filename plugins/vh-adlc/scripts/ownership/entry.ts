@@ -1,14 +1,17 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { OID, OwnershipGit, POLICY, REF, STATE, type Environment, type RemoteTip } from "./git";
 import { associate, privateDraft, validAlias, validHost, validLocator, verifyDestination, writer, type Item, type Writer } from "./identity";
 
-export type RecordState = { aliases: string[]; writer: Writer; operation: string };
+export type RecordState = { aliases: string[]; writer: Writer; operation: string; previous?: string };
 export type State = { schema_version: 1; repository: string; operation: string; items: RecordState[] };
 export type Binding = { repository: string; genesis: string };
 export type EntryRequest = Item & { repo: string; env?: Environment; client?: string; noPush?: boolean; localDraft?: boolean };
-export type Result = { status: "held" | "entered" | "legacy" | "local-draft" | "initialized"; reason?: string; writer?: Writer; item?: string; operation?: string; genesis?: string; tip?: string };
-type Snapshot = { tip: RemoteTip & { reservation: string }; state: State; binding: Binding };
+export type Result = { status: "held" | "entered" | "legacy" | "local-draft" | "initialized" | "reserved" | "vacant" | "transferred"; reason?: string; writer?: Writer; item?: string; operation?: string; genesis?: string; tip?: string; localPath?: string };
+export type Snapshot = { tip: RemoteTip & { reservation: string }; state: State; binding: Binding };
 export const OPERATION = /^[a-zA-Z0-9_-]{1,128}$/;
+const CHECKOUT = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("invalid reservation data");
@@ -32,12 +35,13 @@ function checkedBinding(raw: string): Binding {
 
 function checkedWriter(value: unknown): Writer {
   const data = object(value);
-  exactKeys(data, ["fingerprint", "host", "locator"]);
+  exactKeys(data, ["fingerprint", "host", "locator", "checkout"]);
   if (typeof data.fingerprint !== "string" || !/^[a-f0-9]{64}$/.test(data.fingerprint) ||
-      typeof data.host !== "string" || !validHost(data.host) || typeof data.locator !== "string" || !validLocator(data.locator)) {
+      typeof data.host !== "string" || !validHost(data.host) || typeof data.locator !== "string" || !validLocator(data.locator) ||
+      typeof data.checkout !== "string" || !CHECKOUT.test(data.checkout)) {
     throw Error("invalid writer record");
   }
-  return { fingerprint: data.fingerprint, host: data.host, locator: data.locator };
+  return { fingerprint: data.fingerprint, host: data.host, locator: data.locator, checkout: data.checkout };
 }
 
 export function decodeState(raw: string, repository: string): State {
@@ -51,8 +55,9 @@ export function decodeState(raw: string, repository: string): State {
   const aliases = new Set<string>();
   const items = data.items.map(value => {
     const record = object(value);
-    exactKeys(record, ["aliases", "writer", "operation"]);
-    if (!Array.isArray(record.aliases) || !record.aliases.length || typeof record.operation !== "string" || !OPERATION.test(record.operation)) {
+    exactKeys(record, ["aliases", "writer", "operation", ...(Object.hasOwn(record, "previous") ? ["previous"] : [])]);
+    if (!Array.isArray(record.aliases) || !record.aliases.length || typeof record.operation !== "string" || !OPERATION.test(record.operation) ||
+        (record.previous !== undefined && (typeof record.previous !== "string" || !OPERATION.test(record.previous)))) {
       throw Error("invalid reservation item");
     }
     const names = record.aliases.map(alias => {
@@ -60,7 +65,8 @@ export function decodeState(raw: string, repository: string): State {
       aliases.add(alias);
       return alias;
     });
-    return { aliases: names, writer: checkedWriter(record.writer), operation: record.operation };
+    return { aliases: names, writer: checkedWriter(record.writer), operation: record.operation,
+      ...(typeof record.previous === "string" ? { previous: record.previous } : {}) };
   });
   return { schema_version: 1, repository, operation: data.operation, items };
 }
@@ -83,7 +89,7 @@ function stateAt(git: OwnershipGit, oid: string, repository: string): State {
   return decodeState(raw, repository);
 }
 
-export function snapshot(git: OwnershipGit): Snapshot | "legacy" | "no-remote" {
+export function snapshot(git: OwnershipGit, remember = true): Snapshot | "legacy" | "no-remote" {
   const prior = bound(git);
   const remotes = git.remotes();
   if (!remotes.includes("origin")) {
@@ -104,7 +110,7 @@ export function snapshot(git: OwnershipGit): Snapshot | "legacy" | "no-remote" {
   const genesis = stateAt(git, binding.genesis, binding.repository);
   if (genesis.items.length || git.text("show", "-s", "--format=%P", binding.genesis)) throw Error("invalid reservation genesis");
   const state = stateAt(git, tip.reservation, binding.repository);
-  if (!prior) git.run(["config", "--local", BINDING_KEY, marker]);
+  if (!prior && remember) git.run(["config", "--local", BINDING_KEY, marker]);
   return { tip: { ...tip, reservation: tip.reservation }, state, binding };
 }
 
@@ -138,9 +144,31 @@ export function publish(git: OwnershipGit, view: Snapshot, state: State): boolea
   return git.install(view.tip.reservation, git.commit(JSON.stringify(state), view.tip.reservation));
 }
 
-function owned(record: RecordState, mine: Writer): boolean { return record.writer.fingerprint === mine.fingerprint; }
-function entered(record: RecordState, tip?: string): Result {
-  return { status: "entered", writer: record.writer, item: record.aliases[0], operation: record.operation, tip };
+function localCheckout(git: OwnershipGit, create: boolean): string | undefined {
+  const path = join(git.text("rev-parse", "--absolute-git-dir"), "vh-adlc-reservation-checkout");
+  try {
+    const value = readFileSync(path, "utf8").trim();
+    if (!CHECKOUT.test(value)) throw Error("invalid local work location binding");
+    return value;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (!create) return undefined;
+  }
+  try { writeFileSync(path, `${randomUUID()}\n`, { flag: "wx", mode: 0o600 }); }
+  catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+  return localCheckout(git, false);
+}
+
+export function currentWriter(git: OwnershipGit, env: Environment, locator: string, client?: string): Writer {
+  const identity = writer(env, locator, client);
+  const checkout = localCheckout(git, true);
+  if (!checkout) throw Error("could not bind this checkout as the work location");
+  return { ...identity, checkout };
+}
+
+export function describeRecord(git: OwnershipGit, record: RecordState, status: Result["status"], tip?: string): Result {
+  const localPath = localCheckout(git, false) === record.writer.checkout ? git.root : undefined;
+  return { status, writer: record.writer, item: record.aliases[0], operation: record.operation, tip, ...(localPath ? { localPath } : {}) };
 }
 
 export function enter(request: EntryRequest): Result {
@@ -162,19 +190,24 @@ export function enter(request: EntryRequest): Result {
       }
       const branch = git.text("rev-parse", "--abbrev-ref", "HEAD");
       const association = associate(git, view.tip.main, view.binding.repository, request, branch);
-      const mine = writer(request.env ?? process.env, association.locator, request.client);
+      const env = request.env ?? process.env;
+      const identity = writer(env, association.locator, request.client);
       const matches = matching(view.state, association.aliases);
       if (matches.length > 1) throw Error("feature aliases have conflicting reservations; ask the owner to reconcile them");
       const current = matches[0];
-      if (pending && current?.operation === operation && JSON.stringify(current) === JSON.stringify(pending)) return entered(current, view.tip.reservation);
-      if (current && !owned(current, mine)) {
-        return { status: "held", reason: "another session holds this item; if this was your previous reservation, it has been handed off", writer: current.writer, item: current.aliases[0] };
+      if (pending && current?.operation === operation && JSON.stringify(current) === JSON.stringify(pending)) return describeRecord(git, current, "entered", view.tip.reservation);
+      if (current && current.writer.fingerprint !== identity.fingerprint) {
+        return { ...describeRecord(git, current, "held"), reason: "another session holds this item; if this was your previous reservation, it has been handed off" };
       }
       if (pending && JSON.stringify(current) !== JSON.stringify(prior)) throw Error("attempted reservation was superseded; inspect the current writer before retrying");
       if (!current && association.claimed) throw Error("existing claim has no reservation; ask the owner to reconcile it");
       const aliases = [...new Set([...(current?.aliases ?? []), ...association.aliases])];
-      if (current && JSON.stringify(current.writer) === JSON.stringify(mine) && aliases.length === current.aliases.length) return entered(current, view.tip.reservation);
+      if (current && current.writer.host === identity.host && current.writer.locator === identity.locator &&
+          current.writer.checkout === localCheckout(git, false) && aliases.length === current.aliases.length) {
+        return describeRecord(git, current, "entered", view.tip.reservation);
+      }
       if (request.noPush) throw Error("reservation update requires Git permission for the coordination ref");
+      const mine = currentWriter(git, env, association.locator, request.client);
       pending = { aliases, writer: mine, operation };
       prior = current;
       publish(git, view, { ...view.state, operation, items: [...view.state.items.filter(record => record !== current), pending] });

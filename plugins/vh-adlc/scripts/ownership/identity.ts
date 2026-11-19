@@ -4,7 +4,7 @@ import { hostname } from "node:os";
 import { join } from "node:path";
 import type { Environment, OwnershipGit } from "./git";
 
-export type Writer = { fingerprint: string; host: string; locator: string };
+export type Writer = { fingerprint: string; host: string; locator: string; checkout: string };
 export type Item = { issue?: string; spec?: string; branch?: string };
 export type Association = { aliases: string[]; locator: string; claimed: boolean };
 
@@ -35,7 +35,7 @@ export function verifyDestination(git: OwnershipGit): string {
   return repositoryURL(fetch[0]!);
 }
 
-export function writer(env: Environment, locator: string, client?: string, host = hostname()): Writer {
+export function writer(env: Environment, locator: string, client?: string, host = hostname()): Omit<Writer, "checkout"> {
   const codex = Boolean(env.CODEX_THREAD_ID || env.CODEX_SESSION_ID);
   const claude = Boolean(env.CLAUDECODE || env.CLAUDE_CODE_SESSION_ID);
   const kind = codex && !claude ? "codex" : claude && !codex ? "claude" : undefined;
