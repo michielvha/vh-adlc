@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Fresh independent spec review R-3 has no findings on current main; awaiting owner acceptance of the reviewed document."
+status: planned
+status_description: "Owner accepted reviewed R-3; implementation tasks are next, and implementation waits for the base SEO assessment feature to finish and land."
 issue: null
 goal: "An adopter can identify and prepare verified repository repairs for conventional search and AI-search discovery while measuring visibility separately from technical readiness."
 covers:
@@ -34,7 +34,7 @@ The owner chose local preparation and testing followed by vh-adlc review and shi
 
 First-party search data and dated provider-answer observations are used when authorized and available. Missing measurements remain unknown. No paid provider call, account setup, scheduled monitoring, search-engine submission, publication or deployment follows merely from assessment or local repair. IndexNow is evaluated as a possible consumer improvement, with its submission step requiring separate authority. An optional documentation index such as `llms.txt` must have a maintenance purpose and receives no promised ranking benefit.
 
-Implementation depends on completing the existing [SEO assessment feature](seo-assessment.md), which remains claimed on `feat/seo-agent`. This document does not take over that feature. The checks below are planned, not executed implementation proof. The owner's initial scope approval precedes independent review and is not recorded as acceptance of a reviewed commit. Acceptance of this document authorizes the shared-agent feature within its scope; individual consumer repairs, spending, shipping and live operations retain their own authority requirements.
+Implementation depends on completing the existing [SEO assessment feature](seo-assessment.md), which remains claimed on `feat/seo-agent`. This document does not take over that feature. The checks below are planned, not executed implementation proof. The owner accepted R-3 at reviewed commit `2ad0443a658b40fd2d69a1d958370c620f730c49` on 19 November 2026. Acceptance of this document authorizes the shared-agent feature within its scope; individual consumer repairs, spending, shipping and live operations retain their own authority requirements.
 
 ### Background
 
@@ -142,6 +142,8 @@ None. The owner approved the proposed scope, local preparation followed by revie
 | 2026-11-18 | R-1 | spec | `f69e8e2b0905eb98eb12e6b9f3c523b5967d004b` | unknown | procedural | Two should-fix findings in comparison and retry proofs; model identity not attested. |
 | 2026-11-18 | R-2 | spec | `aabe627e581deb520bc74b1478aba4efd9037cfc` | unknown | procedural | No findings; model identity not attested. |
 | 2026-11-18 | R-3 | spec | `2ad0443a658b40fd2d69a1d958370c620f730c49` | unknown | procedural | No findings; model identity not attested. |
+| 2026-11-19 | R-3 | spec | `2ad0443a658b40fd2d69a1d958370c620f730c49` | n/a | n/a | accepted by owner |
+
 
 ### R-1
 
