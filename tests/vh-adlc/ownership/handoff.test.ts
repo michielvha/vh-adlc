@@ -36,10 +36,12 @@ test("only an exact owner-approved handoff transfers work, and replay does not r
     expect(remoteDiagnostic.writer?.locator).toBe(`spec:${SPEC}`);
     expect(remoteDiagnostic.writer?.host).toBeTruthy();
     expect(remoteDiagnostic.localPath).toBeUndefined();
-    const remoteState = f.git(f.bare, "show", `${REF}:reservations.json`);
-    expect(remoteState).not.toContain(f.env.CODEX_THREAD_ID!);
-    expect(remoteState).not.toContain(incoming.CODEX_THREAD_ID);
-    expect(remoteState).not.toContain(root);
+    const states = f.git(f.bare, "rev-list", REF).split("\n").map(oid => f.git(f.bare, "show", `${oid}:reservations.json`));
+    for (const output of [...states, JSON.stringify(remoteDiagnostic)]) {
+      expect(output).not.toContain(f.env.CODEX_THREAD_ID!);
+      expect(output).not.toContain(incoming.CODEX_THREAD_ID);
+      expect(output).not.toContain(root);
+    }
   } finally {
     f.cleanup();
   }

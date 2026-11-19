@@ -186,6 +186,7 @@ export function enter(request: EntryRequest): Result {
     let prior: RecordState | undefined;
     for (let attempt = 0; attempt < 4; attempt++) {
       const view = snapshot(git);
+      if (request.localDraft && view !== "no-remote") throw Error("private draft mode requires a checkout with no configured remote");
       if (typeof view === "string") {
         if (pending) throw Error("reservation disappeared after attempting an update");
         if (view === "legacy") return { status: "legacy" };

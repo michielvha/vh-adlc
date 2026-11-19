@@ -144,3 +144,19 @@ test("a replacement history cannot satisfy a committed genesis", async () => {
     f.cleanup();
   }
 });
+
+test("explicit no-push setup and local-only entry cannot write shared coordination", async () => {
+  const f = fixture();
+  try {
+    const denied = await invoke(f.seed, f.env, "initialize", "--approved", "true", "--no-push", "true", "--operation", "fixture-blocked");
+    expect(denied.status).toBe("held");
+    expect(f.git(f.bare, "for-each-ref", "--format=%(refname)", REF)).toBe("");
+    await adopt(f);
+    const clone = f.clone("local-only-request");
+    const before = f.git(f.bare, "rev-parse", REF);
+    expect((await enter(clone, f.env, "--spec", "docs/specs/private.md", "--local-draft", "true")).status).toBe("held");
+    expect(f.git(f.bare, "rev-parse", REF)).toBe(before);
+  } finally {
+    f.cleanup();
+  }
+});

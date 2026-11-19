@@ -18,6 +18,7 @@ function main(argv: string[]): Result {
   const input = options(args);
   if (!input.repo) throw Error("--repo is required");
   if (command === "initialize") {
+    if (input["no-push"] === "true") throw Error("initialization needs permission to create the reservation ref");
     return initialize(input.repo, input.approved === "true", input.operation ?? "");
   }
   const request: EntryRequest = { repo: input.repo, client: input.client, issue: input.issue, spec: input.spec, branch: input.branch,

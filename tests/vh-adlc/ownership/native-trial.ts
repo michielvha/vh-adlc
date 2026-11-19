@@ -1,6 +1,6 @@
 // Explicit native trial for the exact candidate. Ordinary Bun tests launch neither client.
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runOwnedClient } from "../../../plugins/vh-adlc/scripts/triage/owned-process";
 import { fixture, git, REF, SPEC, type Env, type Reply } from "./fixture";
@@ -17,7 +17,7 @@ export function payloadDigest(root: string): string {
       const name = prefix + entry.name;
       const path = join(dir, entry.name);
       if (entry.isDirectory()) visit(path, name + "/");
-      else if (entry.isFile()) hash.update(JSON.stringify([name, createHash("sha256").update(readFileSync(path)).digest("hex")]) + "\n");
+      else if (entry.isFile()) hash.update(JSON.stringify([name, statSync(path).mode & 0o777, createHash("sha256").update(readFileSync(path)).digest("hex")]) + "\n");
       else throw Error("candidate payload contains an unsupported Git entry");
     }
   }
@@ -115,12 +115,16 @@ async function trial(client: Client, repository: string, commit: string, output:
     }
 
     const a = f.clone("first"), b = f.clone("second");
-    const before = new Map([a, b].map(path => [path, git(path, f.env, "rev-parse", "HEAD")]));
+    const sourceState = (path: string) => {
+      const head = git(path, f.env, "rev-parse", "HEAD");
+      const index = git(path, f.env, "rev-parse", "--path-format=absolute", "--git-path", "index");
+      return `${head}:${createHash("sha256").update(readFileSync(index)).digest("hex")}`;
+    };
+    const before = new Map([a, b].map(path => [path, sourceState(path)]));
     const nativeEnv = { ...fixtureEnv, CODEX_THREAD_ID: undefined, CODEX_SESSION_ID: undefined, CLAUDECODE: undefined, CLAUDE_CODE_SESSION_ID: undefined };
     async function entry(id: string, cwd: string, expectedStatus: string, args: string[], resume?: string, extra: Env = {}) {
       const result = join(logs, id + ".decision.json");
-      const command = [process.execPath, cli, "--repo", cwd];
-      command.splice(2, 0, ...args);
+      const command = [process.execPath, cli, ...args, "--repo", cwd];
       const shell = command.map(quote).join(" ") + " > " + quote(result);
       const prompt = "Run this one Bash command. It performs a disposable ownership fixture check. Return its result and make no other changes.\n" + shell;
       const argv = client === "codex"
@@ -129,7 +133,7 @@ async function trial(client: Client, repository: string, commit: string, output:
         : [client, "-p", "--output-format", "stream-json", "--verbose", "--allowedTools", "Bash", ...(resume ? ["--resume", resume] : []), prompt];
       const raw = await invoke(id, argv, cwd, { ...nativeEnv, ...extra });
       const decision = JSON.parse(readFileSync(result, "utf8")) as Reply;
-      if (decision.status !== expectedStatus || git(cwd, f.env, "rev-parse", "HEAD") !== before.get(cwd) ||
+      if (decision.status !== expectedStatus || sourceState(cwd) !== before.get(cwd) ||
           git(cwd, f.env, "status", "--porcelain=v1")) throw Error(`unexpected native writer result or fixture mutation at ${id}`);
       return { id: transcriptId(client, raw), decision };
     }
