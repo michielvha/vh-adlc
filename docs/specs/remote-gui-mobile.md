@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "The keyboard metadata boundary is accepted. Native phone feasibility remains open."
+status: in-progress
+status_description: "Synthetic keyboard mode detection passed. Physical phone and input transfer feasibility remain open."
 branch: feat/remote-gui-mobile
 issue: null
 goal: "Use a remote-gui browser from a phone with selective first-tap native keyboard input, normal text editing and touch scrolling."
