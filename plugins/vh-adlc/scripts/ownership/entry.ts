@@ -6,7 +6,7 @@ import { associate, privateDraft, validAlias, validHost, validLocator, verifyDes
 
 export type RecordState = { aliases: string[]; writer: Writer; operation: string; previous?: string; pending?: string; conflict?: string };
 export type State = { schema_version: 1; repository: string; operation: string; items: RecordState[] };
-export type Binding = { repository: string; genesis: string };
+export type Binding = { repository: string; genesis: string; ready: boolean };
 export type EntryRequest = Item & { repo: string; env?: Environment; client?: string; noPush?: boolean; localDraft?: boolean; explicitClient?: boolean; defaultBranch?: string };
 export type Result = { status: "held" | "entered" | "legacy" | "local-draft" | "initialized" | "reserved" | "vacant" | "transferred" | "pending" | "linked" | "conflict"; reason?: string; writer?: Writer; item?: string; operation?: string; genesis?: string; tip?: string; localPath?: string; pending?: string; conflict?: string; preview?: string };
 export type Snapshot = { tip: RemoteTip & { reservation: string }; state: State; binding: Binding };
@@ -26,11 +26,11 @@ function checkedBinding(raw: string): Binding {
   let value: unknown;
   try { value = Bun.YAML.parse(raw); } catch { throw Error("invalid committed reservation policy"); }
   const data = object(value);
-  exactKeys(data, ["schema_version", "repository", "genesis"]);
-  if (data.schema_version !== 1 || typeof data.repository !== "string" || typeof data.genesis !== "string" || !OID.test(data.genesis)) {
+  exactKeys(data, ["schema_version", "repository", "genesis", "ready"]);
+  if (data.schema_version !== 1 || typeof data.repository !== "string" || typeof data.genesis !== "string" || !OID.test(data.genesis) || typeof data.ready !== "boolean") {
     throw Error("invalid committed reservation policy");
   }
-  return { repository: data.repository, genesis: data.genesis };
+  return { repository: data.repository, genesis: data.genesis, ready: data.ready };
 }
 
 function checkedWriter(value: unknown): Writer {
@@ -110,6 +110,7 @@ export function snapshot(git: OwnershipGit, remember = true): Snapshot | "legacy
   if (binding.repository !== verifyDestination(git)) throw Error("origin does not match the adopted reservation repository");
   const marker = `${binding.repository} ${binding.genesis}`;
   if (prior && prior !== marker) throw Error("reservation policy differs from the previously verified adoption");
+  if (!binding.ready) throw Error("reservation adoption is paused; verify the remote’s protection and release routes before enabling writers");
   git.objects(tip.reservation);
   if (!git.ok("merge-base", "--is-ancestor", binding.genesis, tip.reservation)) throw Error("reservation history does not descend from the bound genesis");
   const genesis = stateAt(git, binding.genesis, binding.repository);

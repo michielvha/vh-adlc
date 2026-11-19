@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ['**']
+    branches: ['**', '!vh-adlc/work-ownership']
   workflow_dispatch:
 
 permissions:
@@ -194,6 +194,7 @@ jobs:
   # Tags main, and a branch whose open PR has the release:preview label at this
   # commit. Every other run only calculates the version.
   version:
+    if: github.ref != 'refs/heads/vh-adlc/work-ownership'
     needs: [verify, checker, checker-macos, remote-gui, paseo-hosts]
     permissions:
       contents: read

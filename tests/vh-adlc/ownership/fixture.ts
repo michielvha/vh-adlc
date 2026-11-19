@@ -60,8 +60,8 @@ exec "$verb" "$VH_FIXTURE_GIT/team/$remote.git"
       return path;
     },
     git(cwd: string, ...args: string[]) { return git(cwd, env, ...args); },
-    policy(genesis: string) {
-      writeFileSync(join(seed, POLICY), `schema_version: 1\nrepository: ${ID}\ngenesis: ${genesis}\n`);
+    policy(genesis: string, ready = true) {
+      writeFileSync(join(seed, POLICY), `schema_version: 1\nrepository: ${ID}\ngenesis: ${genesis}\nready: ${ready}\n`);
       git(seed, env, "add", "--", POLICY);
       git(seed, env, "commit", "-qm", "fixture: adopt reservations", "--", POLICY);
       git(seed, env, "push", "-q", "origin", "main");
