@@ -184,6 +184,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-6 | spec | `77d28a4e94817bd1e51113c5839736f784cc3f30` | unknown | procedural | Eight should-fix findings and one Context nit. Model identity was not attested. |
 | 2026-11-19 | R-7 | spec | `a03bf98503d8c377eaed65e2ebf51577c4483a39` | unknown | procedural | Six should-fix findings and one evidence-link nit. Model identity was not attested. |
 | 2026-11-19 | R-8 | spec | `a668b87a40c01d15880c890f6857969706d26148` | unknown | procedural | One blocking finding, six should-fix findings and one nit. Model identity was not attested. |
+| 2026-11-19 | R-9 | spec | `39b5042cb63aa553818ee2fe56f9605b6cefff23` | unknown | procedural | Four should-fix findings and one evidence nit. Model identity was not attested. |
 
 ### R-1
 
@@ -421,6 +422,43 @@ SEVERITY: nit
 WHERE: Context / Two-tap feasibility fixture (lines 33 and 35), Sources
 EVIDENCE: The R-7 revision adds the two-tap fixture and the iPhone result location. Its tracked helper at `tests/remote-gui/mobile-feasibility/two-tap/focused.py:41-55` uses focus and bounds. The separate hit-test, overlay and omnibox observations still have no command or retained result identified in the document, and line 33 joins the Chromium and private-bus clauses without a conjunction.
 PROPOSAL: Link or name the separate synthetic checks where their evidence is available and repair the opening sentence.
+
+### R-9
+
+FINDING: F-01  
+KIND: factual  
+SEVERITY: should-fix  
+WHERE: Context / Owner summary (lines 23 and 27), Context / Two-tap feasibility fixture (line 35), Scope (line 116), Design / Detect and show the prompt (line 128), Acceptance Criteria AC-10, Test Plan AC-10, Open Questions  
+EVIDENCE: The post-R-8 revision permits a prompt over page content covering an eligible reported focus. The owner summary describes matching the tap to a field without explaining that exception. The fixture summary still lists stricter hit checks as pending, although the revised design expressly excludes a visual hit test from eligibility.  
+PROPOSAL: Add the covered-field behavior to the owner summary and describe the remaining packaged checks as reported-focus association, geometry and expiry.
+
+FINDING: F-02  
+KIND: factual  
+SEVERITY: should-fix  
+WHERE: Context / Owner summary (line 23), Scope (lines 115-116), Design / Detect and show the prompt (lines 128-130), Acceptance Criteria AC-10, Test Plan AC-10 and AC-12, Tasks T6-T7  
+EVIDENCE: The post-R-8 coordinate rules transform the initiating viewer CSS point. Installed noVNC 1.5.0 `core/rfb.js:1226-1254` can substitute an earlier tap point before emitting a nearby repeat click. A correct CSS-to-framebuffer transform of the raw gesture point can still produce a different point from the click. AC-10 exercises adjacent rapid taps but the design leaves which point governs eligibility undefined.  
+PROPOSAL: Use the point emitted by noVNC for eligibility, or suppress the prompt when that point differs from the raw tap or cannot be established. Assert the emitted point in the adjacent-tap proof.
+
+FINDING: F-03  
+KIND: factual  
+SEVERITY: should-fix  
+WHERE: Scope (line 116), Design / Detect and show the prompt (line 128), Acceptance Criteria AC-10, Test Plan AC-10, Tasks T6, Open Questions  
+EVIDENCE: The R-8 overlay findings were superseded by the owner's decision to follow reported focus. AC-10 asks the test to verify that the prompt requires a deliberate second tap after a field is covered. The row gives no explicit pass condition for prompt visibility or successful activation in that case. A test that only verifies the keyboard stays closed after the first tap can pass when the viewer suppresses the prompt entirely.  
+PROPOSAL: With reported focus, mode and bounds held eligible, require the first tap to leave the keyboard closed and show the prompt. Require a deliberate tap on that prompt to open the keyboard.
+
+FINDING: F-04  
+KIND: factual  
+SEVERITY: should-fix  
+WHERE: Context / Owner summary (lines 25 and 29), Design / Detect and show the prompt (lines 124, 130 and 134), Design / Type and dismiss (line 140), Acceptance Criteria AC-11, AC-13 and AC-14, Test Plan AC-11, AC-13 and AC-14, Tasks T7-T8  
+EVIDENCE: The post-R-8 AC-13 proof now holds a sample and composition during handoff, but it requires no old reply or text in the replacement browser. The viewing handset consumes the sample. A late sample could restore the old prompt or editor there while the replacement Chromium receives no text. The existing handoff regression confirms the RFB connection stays open at `tests/remote-gui/browser.e2e.test.ts:374-377`.  
+PROPOSAL: Release the held old-phase reply after handoff and assert that the viewer discards it, clears the old editor and pending composition, and sends no stale keys. Then prove a fresh two-tap edit through the same connected viewer.
+
+FINDING: F-05  
+KIND: factual  
+SEVERITY: nit  
+WHERE: Context / Two-tap feasibility fixture (lines 33 and 35), Sources  
+EVIDENCE: The post-R-8 revision corrects the opening sentence and adds the warm-cache and ordinary contenteditable observations. The linked fixture's `focused.py:41-55` still checks focus and bounds. The separate hit, overlay, omnibox and contenteditable observations have no named replay procedure or retained result in the document.  
+PROPOSAL: Name the disposable procedures or sanitized retained evidence for those observations where available.
 
 ## Sources
 
