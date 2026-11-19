@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: Implementing the reviewed marker correction before released install and cutover
+status_description: Published marker correction; verifying the native retry and final Stackweaver cutover
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -131,6 +131,34 @@ the ten caller regressions and R-138 records so its complete CI can run without
 restarting #120. Runtime bytes remain identical. Stackweaver's current staged
 update binds the published component; its normal hooks, hosted synthetic trial,
 new C/P review, activation preflight and final consumer gate remain pending.
+
+### Linked trial-definition correction on 2026-11-19
+
+Stackweaver [PR #1157](https://github.com/michielvha/stackweaver/pull/1157)
+merges the staged M2 binding after 90 consumer cases/742 assertions and all 48
+local verification checks pass at `163edb4f`. The original native run
+`44484609848` at `2bd98e16` correctly stops before model capture or publication:
+updating the definition's component fields left its selecting hash at the M1
+value. Secret Scan passes; only the earlier terminal receipt remains, with no
+new lease or fixture. The original failed logs are retained.
+
+The real-file invariant first reproduces that mismatch, then passes with the
+one-field hash correction. All 35 affected cases/352 assertions, the complete
+91-case consumer suite/745 assertions, and all 48 verification checks pass at
+`780b1913`. The installed M2 reader refuses the old committed selector with the
+exact diagnostic and selects the corrected commit without credentials or effects.
+Actual Claude Code Opus 5.5 scoped review r20 reads all 53 required fragments,
+preserves inputs and confirms cleanup. Its two evidence nits are covered by a
+separate reverse-component mutation/restore and the exact refusal/argument record.
+No shared runtime, permission, identity, client or namespace change is made.
+
+[PR #1158](https://github.com/michielvha/stackweaver/pull/1158) merges that
+correction as `92f1c685f6b39abf0af83a5d63749f4a3492861a`. A fresh native run
+`44486848125` uses this source; its outcome remains pending here. T130 retains
+native success, fresh C/P parity, activation and rollback gates. The proposed
+activation settings derive from actual committed C and change only its mode,
+preserving linked selectors. Existing failed and earlier successful observations
+keep their original targets.
 
 ### Active ordinary Claude cache finding on 2026-11-18
 
@@ -2381,6 +2409,10 @@ The following tasks implement the revised baseline after spec review and owner a
 - [x] T157 `tests/vh-adlc/docs-drift/installed-marker-caller.test.ts` - Exercise removal, replacement, growth, shrink and invalid-marker failures through actual ordinary report/prepare calls, require pending/setup-required with no native work or automatic retry, and explicitly recover matched inspection after repair. Make all ten cases fail against both broken-mapping and hidden-retry mutations in an owned clone, restore the original runtime and pass strict types and CLI/bootstrap neighbors. (AC-01, AC-07)
 
   Evidence: `t144-marker-caller-full-proof.json` binds the identical test SHA across red4, redretry, green4 and green5. Broken outcome mapping and a hidden second inspection each fail all ten cases. Ordinary reverts restore the shipped plugin bytes identical to reviewed `05e49ab8`; ten cases then pass with 160 assertions. CLI/bootstrap neighbors pass 155 cases/618 assertions, and strict TypeScript passes. Inputs stay preserved, owned children are cleaned and native access stays zero. The earlier six-case/78-assertion and 151-case/536-assertion proof remains separately retained, not retargeted. Actual Claude Code Opus 5.5 R-138 reads all 102 required fragments and finds no blocking or should-fix issue. Its task-record nit is corrected here; the unchanged baseline wording/citation nits remain for a later substantive revision. This tests existing behavior and adds no production seam.
+
+- [x] T158 `Stackweaver .vh-adlc/docs-drift.yaml and tests/agent-docs-drift/migration.test.js` - Reproduce the real stale definition-selector failure, refresh its dependent hash, and guard the actual definition bytes plus component together. Verify both mismatch directions, the original committed refusal and corrected committed selection, normal hooks, complete consumer/local gates and a fresh bounded review. Retain the failed run and require a new native trial under T130. (AC-06, AC-07)
+
+  Evidence: `t145-definition-hash-first-red.stderr` fails on the actual old selector. The 35-case neighborhood, 91-case consumer suite/745 assertions and 48-check local gate pass at `780b1913`. Scoped actual Opus 5.5 r20 has no blocking issue and validates all 53 reads, unchanged inputs and cleanup. `t145-selector-reverse-proof.json` retains the same-test reverse mismatch and restored success in an owned clone; `t145-definition-committed-guard-proof-detailed.json` records the exact old error and both selector arguments. Normal PR #1158 publication preserves that commit and the original refused run. New native and final migration acceptance remain open.
 
 ## Open Questions
 
