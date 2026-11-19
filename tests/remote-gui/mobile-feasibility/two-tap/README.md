@@ -14,4 +14,4 @@ dbus-run-session -- xvfb-run -a -s '-screen 0 960x720x24 -nolisten tcp' bash "$p
 
 The fixture writes its loopback port and owned process ID to the new directory. Use only localhost or a verified temporary owner-only share. The iPhone runner uses the disposable Xcode project documented in the [earlier fixture](../keyboard-gesture/README.md). Use `TwoTapTests.swift` as that project's sole UI test source and pass the verified HTTPS fixture URL in `RG_FIXTURE_URL`. The test checks the OS keyboard and one synthetic remote edit. The fixture starts with empty fields for each device. Stop the owned fixture and its share after the run.
 
-This specimen checks current focus and bounds. The product design requires additional hit and freshness checks. The keyboard proof covers the specimen and does not certify the packaged plugin.
+This specimen checks current focus and bounds. The product design adds reported-focus association, geometry and freshness checks. The keyboard proof covers the specimen and does not certify the packaged plugin.
