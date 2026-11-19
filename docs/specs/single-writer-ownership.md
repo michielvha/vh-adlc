@@ -317,6 +317,7 @@ rollback (Q3A), and explicit authority initialization with no automatic reset (Q
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-19 | R-1 | spec | `7e7ebe74c28f4071f20f3d963b2e54a6a24418c3` | gpt-6.1-sol | procedural | Two blocking and five should-fix findings; native failure refusal and ownership transitions need revision. |
 | 2026-11-19 | R-2 | spec | `c13b42da1e2bcf8ff80150320dc42a45b7ba56ad` | gpt-6.1-sol | procedural | Three should-fix findings and one nit on distinct native failures, release publication checks, cross-platform packaging and evidence references. |
+| 2026-11-19 | R-3 | spec | `b7fc9a58858df974f1959a805adb6b1f0a8da8c9` | gpt-6.1-sol | procedural | Two should-fix findings on branch cleanup coverage and recovering an admitted action. |
 
 ### R-1
 
@@ -405,6 +406,22 @@ SEVERITY: nit
 WHERE: Context, Measured incident and current gaps, private incident evidence; Sources, Stackweaver probe receipts.
 EVIDENCE: Sources says the probe receipts are “named in Context”, but Context now supplies only “the consumer's private evidence”. The previous reviewed revision named the receipt and probe; this revision removed those locators. The underlying reproduction is supported, but the remaining citation no longer identifies its evidence.
 PROPOSAL: Give the private evidence a stable receipt identifier that its owner can resolve, and make Sources reference that identifier without exposing private host paths.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter, covers; Design D2, branch-cleanup exclusion; AC-06; Test Plan, AC-06.
+EVIDENCE: The cleanup implementation at plugins/vh-adlc/scripts/branches/branches.ts:335-349 selects remote deletions and tracking-ref pruning; lines 465-476 execute ref deletions. No covers entry includes this file. Changes affecting the required authority-ref exclusion can therefore escape the covered-path freshness and dirty-tree checks in internal/fresh/fresh.go. The pinned feature-document standard requires covers to include every path whose change can affect the feature.
+PROPOSAL: Add the branch-cleanup implementation and its relevant verification paths to covers. Include any shared enforcement implementation actually reused by this feature.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary, admission and drain guarantee; Design D2, ambiguous updates; Design D3, action IDs and controller restart; Design D4, uncertain outcomes and replay; Design D5, outstanding records during recovery; AC-03, AC-04; Test Plan, AC-03, AC-04, AC-07, AC-08.
+EVIDENCE: D3:195-204 requires action registration, prohibits launching a second process for the same action after an ambiguous response, and preserves outstanding activity across controller restart. The proof plan loses responses during acquisition and initialization, replays a former mutator after transfer, and tests controller unavailability. It does not retry an already launched action while its generation remains active or restart the controller with that action unresolved. A controller that launches the action again, or forgets it during restart and prematurely permits finalization, can pass the stated scenarios.
+PROPOSAL: Add deterministic response-loss and controller-restart scenarios around an admitted action. Assert at most one launch/effect for its action ID and hold release or transfer until the original activity and external outcome are verified settled.
 
 ## Sources
 
