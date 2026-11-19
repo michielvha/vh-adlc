@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The draft specifies a Git reservation with start, resume and handoff checks. The review follow-up awaits a fresh pass."
+status_description: "R-13 found no blockers in the Git reservation draft. Owner acceptance is pending."
 issue: null
 goal: "Two sessions using vh-adlc cannot accidentally start or resume the same feature as its writer."
 covers:
@@ -80,6 +80,15 @@ start problem, the owner chose checks at workflow entry and removed the requirem
 intercept writes or prove that a process stopped. Reviews R-1 through R-4 describe the
 earlier draft. Its unchecked criteria AC-01 through AC-09 are superseded and remain in
 Git history. Neither draft was accepted.
+
+### Review follow-up for task planning
+
+R-13 F-01 flagged a gap in the planned proof for an interrupted issue creation. When
+planning AC-11 and AC-12, run the pending-state fixture through a same-session worktree
+move and through a handoff. At each destination, try direct writer entry before recovery
+and verify that it holds while lookup stays available. After recovery, verify that the
+writer can resume and that there is still only one tracker issue. The reviewed design
+already requires this behavior.
 
 ## Scope
 
@@ -311,6 +320,7 @@ None. The owner selected the Git reservation, entry checks and explicit handoff.
 | 2026-11-19 | R-10 | spec | `1e5b607fdf49755d051f53d7c209e8513cb68a54` | unknown | procedural | No blocking findings. Three should-fix findings on recovery limits, retained aliases and nested client identity. Model identity was not attested. |
 | 2026-11-19 | R-11 | spec | `6b107fa86ebff48dfeed86378128ef481a9284ad` | unknown | procedural | One should-fix finding on recovery after an uncertain issue creation. Model identity was not attested. |
 | 2026-11-19 | R-12 | spec | `1844e72a74c9b7065e443b631375b542642e6307` | unknown | procedural | Two should-fix findings on pending draft entry and preservation of its marker. Model identity was not attested. |
+| 2026-11-19 | R-13 | spec | `014299049c45051a2d4f8e3b40ba33e3de4ba51f` | unknown | procedural | No blocking findings. One should-fix on exercising already-specified pending behavior through both move paths. Model identity was not attested. |
 
 ### R-1
 
@@ -687,6 +697,15 @@ SEVERITY: should-fix
 WHERE: Design, Identify the same work, pending creation. Design, Start, resume and hand off, work location changes and transfer. AC-11 and AC-12. Test Plan, AC-11 and AC-12.
 EVIDENCE: The R-11 follow-up at `docs/specs/single-writer-ownership.md:129-135,188-203` marks creation pending separately from the approved preview but names only the preview when transferring work to another location. The preview already exists before submission (`plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:41-46`), so its presence alone cannot tell the incoming writer whether GitHub may have created the issue. The restart in AC-11 and the handoff in AC-12 can both pass while moving private work state loses the pending marker.
 PROPOSAL: Preserve the pending marker and its approved preview together when private work state moves. Seed an uncertain creation before moving to another clone and verify that the incoming writer recovers the existing issue without sending another creation request.
+
+### R-13
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary, interrupted issue creation. Design, Identify the same work, pending creation. Design, Start, resume and hand off, same-session moves and handoffs. AC-11 and AC-12. Test Plan, AC-11 and AC-12.
+EVIDENCE: The R-12 follow-up at `docs/specs/single-writer-ownership.md:132-139,192-206` requires pending draft entry to stay held after either kind of move. AC-11 checks the hold after a restart and exercises an ordinary same-session move. AC-12 checks that an incoming writer can recover the issue after moving. Both rows can pass if the same-session move drops the marker or if the incoming writer can enter before recovery.
+PROPOSAL: Exercise a pending issue creation through both move paths. At each destination, try direct writer entry before recovery, verify that it holds with read-only lookup available, then complete recovery and verify that the writer can resume without creating a second issue.
 
 ## Sources
 
