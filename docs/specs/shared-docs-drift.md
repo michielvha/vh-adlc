@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: Stackweaver cutover merged; final canonical review and completion gate pending
+status_description: Stackweaver cutover verified; final canonical review awaits an available reviewer
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -143,6 +143,30 @@ Original artifacts are `t145-gates-*-f18f2627`, `t145-gates-*-234dd4ef`,
 `t145-adopted-preflight-guard-proof.json`, `t146-actual-D-rollback.json` and
 `t146-merged-preflight.json` in the local review archive. Private report bodies
 and application source stay local.
+
+### Final review handoff on 2026-11-19
+
+The staged and merged consumer acceptance above passes; lifecycle completion is
+still pending. The first final-review attempt is retained as incomplete after
+stalled additional local suite runs. A complete ten-case caller regression run
+passes with 160 assertions; the bounded whole-directory diagnostic makes progress
+but expires, so it supplies no full-suite pass. No failing or incomplete attempt
+is substituted for the original exact-source CI results.
+
+The corrected bounded packet `t147-final-proof` adds original public API records
+and full job logs for main run `44482198425` and regression run `44477818102`.
+Both have six successful jobs, including Linux and macOS checks. Its
+`source-applicability.json` compares target `de403d1f` with the actual CI heads:
+the plugin and Go code match published `dae76bf9`, and every test file matches
+regression head `8a50aed3`. Later target changes are documentation only.
+
+Fresh Claude Code Opus 5.5 attempt `canonical-implementation-claude-r11` reads
+source and original evidence but becomes unavailable before returning canonical
+criterion records. Both attempts preserve the source/index/refs and confirm
+owned-process cleanup. No R-139 row or verdict is stored. T129/T130 and the
+completion gate remain open; a different reviewer requires the owner's choice.
+The adopted routing and the stated GUI/phone, native Copilot and first-production
+limits remain unchanged.
 
 ### Corrected release checkpoint on 2026-11-19
 
