@@ -1628,7 +1628,7 @@ The following tasks implement the revised baseline after spec review and owner a
 
 - [x] T156 `plugins/vh-adlc/scripts/docs-drift/bootstrap.ts, tests/vh-adlc/docs-drift/bootstrap.test.ts, plugins/vh-adlc/plugin.json, plugins/vh-adlc/.claude-plugin/plugin.json, plugins/vh-adlc/references/docs-drift-settings.md` - First reproduce the native marker refusal. Add only the normative bounded installed-metadata validation and reserved Git-path refusal. Exercise the active-install proof matrix, read-bound and race faults, exact retained checks, normal runtime neighbors and strict types. Obtain a fresh actual Claude Code Opus 5.5 implementation review. T130 retains actual release/install/native-session and rollback acceptance. (AC-01, AC-06, AC-07)
 
-  Caller-level proof qualification: The original 212-case checkpoint establishes the inspector and neighboring contracts. R-137 correctly identifies its missing ordinary-caller race outcome observations. T157 supplies those six cases and the real-code/mutant distinction; its evidence below completes that part of the matrix. No source-diagnostic claim is promoted to T130 release/native acceptance.
+  Caller-level proof qualification: The original 212-case checkpoint establishes the inspector and neighboring contracts. R-137 correctly identifies its missing ordinary-caller race outcome observations. T157 supplies those ten cases and the real-code/mutant distinction; its evidence below completes that part of the matrix. No source-diagnostic claim is promoted to T130 release/native acceptance.
 
   Evidence: Owning source first-red retains 32 passing and 11 failing cases, including valid native markers, before the correction. The corrected tested inputs pass 212 cases/734 assertions, strict pinned TypeScript, uncached Go tests, vet/lint/modules, ZIP, actionlint and 34 registration cases. Input hashes map those tested overlays to committed `05e49ab8`. Actual Claude Code Opus 5.5 source diagnostic `docs-drift-paired-claude-r19` at that exact pushed commit reads all 49 required fragments, has no blocking or should-fix finding, preserves every input hash and confirms owned cleanup. Its compatibility-record nit is included in T130; the harmless existing baseline citation nit remains unapplied under the nit rule. This is scoped T156 source acceptance, not whole-feature completion, actual corrected marketplace/native acceptance or final consumer review. T130 remains open.
 
@@ -2352,7 +2352,7 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 - [x] T157 `tests/vh-adlc/docs-drift/installed-marker-caller.test.ts` - Exercise removal, replacement, growth, shrink and invalid-marker failures through actual ordinary report/prepare calls, require pending/setup-required with no native work or automatic retry, and explicitly recover matched inspection after repair. Make all ten cases fail against both broken-mapping and hidden-retry mutations in an owned clone, restore the original runtime and pass strict types and CLI/bootstrap neighbors. (AC-01, AC-07)
 
-  Evidence: Exact test SHA matches across red2 and green. The owned mutation returns incomplete instead of pending/setup-required in all six cases; restoring the original mapping by ordinary revert gives six passes and 78 assertions. The entire shipped plugin tree then matches reviewed `05e49ab8`. The owning 151-case/536-assertion CLI/bootstrap run and strict TypeScript pass with all inputs preserved and owned children cleaned. Native access remains at zero and the consumer source stays unchanged. This tests existing behavior and adds no production seam.
+  Evidence: `t144-marker-caller-full-proof.json` binds the identical test SHA across red4, redretry, green4 and green5. Broken outcome mapping and a hidden second inspection each fail all ten cases. Ordinary reverts restore the shipped plugin bytes identical to reviewed `05e49ab8`; ten cases then pass with 160 assertions. CLI/bootstrap neighbors pass 155 cases/618 assertions, and strict TypeScript passes. Inputs stay preserved, owned children are cleaned and native access stays zero. The earlier six-case/78-assertion and 151-case/536-assertion proof remains separately retained, not retargeted. Actual Claude Code Opus 5.5 R-138 reads all 102 required fragments and finds no blocking or should-fix issue. Its task-record nit is corrected here; the unchanged baseline wording/citation nits remain for a later substantive revision. This tests existing behavior and adds no production seam.
 
 ## Open Questions
 
@@ -2517,6 +2517,7 @@ are outside this decision.
 | 2026-11-19 | R-136 | spec | `4c0c2dfe389b7906cdafc0dfb0eeb9a190a24e28` | claude-opus-5-5 | procedural | 2 nit. |
 | 2026-11-19 | R-136 | spec | `4c0c2dfe389b7906cdafc0dfb0eeb9a190a24e28` | n/a | n/a | accepted by owner |
 | 2026-11-19 | R-137 | spec | `3c927349ee6e5e0d5a22870515d9add99cca75ea` | claude-opus-5-5 | procedural | 1 should-fix, 2 nit. |
+| 2026-11-19 | R-138 | spec | `e81271b89bfaf650d264595a6ca83659a97260fb` | claude-opus-5-5 | procedural | 3 nit. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -4563,6 +4564,31 @@ KIND: factual
 SEVERITY: nit
 WHERE: Design, Installation and role execution, marker paragraph ("`tests/vh-adlc/docs-drift/bootstrap.test.ts:77-91` at b82c89f", line 1393)
 EVIDENCE: R-136 F-01 already raised this. The author left it unapplied on purpose under the nit rule, and it is unchanged at this target. R-136 recorded that at b82c89f the cited test runs from line 78 to line 92. It is listed again only because this pass must return every finding it can establish.
+PROPOSAL: Change the range to `78-92` the next time a revision touches this paragraph.
+
+### R-138
+
+TARGET: e81271b89bfaf650d264595a6ca83659a97260fb
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T157 Evidence line ("The owned mutation returns incomplete instead of pending/setup-required in all six cases; restoring the original mapping by ordinary revert gives six passes and 78 assertions ... The owning 151-case/536-assertion CLI/bootstrap run"); Tasks, T156 "Caller-level proof qualification" line ("T157 supplies those six cases and the real-code/mutant distinction"); Context, Ordinary-caller marker proof on 2026-11-19 ("The exact ten tests fail against each of two deliberate mutations ... those same tests pass 160 assertions ... passes 155 cases and 618 assertions")
+EVIDENCE: The T157 task text says "Make all ten cases fail against both broken-mapping and hidden-retry mutations". The Context section and the retained evidence agree with that. evidence/t144-marker-caller-full-proof.json records "cases": 10, "mapping_red": "10 failed: incorrect incomplete outcome", "retry_red": "10 failed: second enumeration despite unchanged refusal outcome", "green": "10 pass, 160 assertions" and "neighbors": "155 pass, 618 assertions". The red4 stderr ends "0 pass 10 fail" with Received "incomplete". The redretry stderr ends "0 pass 10 fail" with enumerations Expected 1 Received 2. The green5 stderr ends "10 pass 160 expect() calls". The full-neighbors stderr ends "155 pass 618 expect() calls". installed-marker-caller.test.ts builds 2 commands times 5 faults. The evidence line under the ticked T157 still describes the earlier six-case proof instead: one mapping mutation, six cases, 78 assertions, 151/536 neighbors and "red2". It never mentions the hidden-retry mutant that the done condition requires. The T156 qualification also still says "six cases". This revision brought these lines in alongside the ten-case Context text. The code and the executed proof are correct. Only the task records are stale, and they sit outside the normative baseline.
+PROPOSAL: Rewrite the T157 Evidence line to cite the ten-case proof: both mutants red on all ten cases, ten passes with 160 assertions on the restored 05e49ab8 runtime bytes, 155/618 neighbors and strict types. Say the six-case run is retained separately, and change "six cases" to "ten cases" in the T156 qualification. Neither edit touches the normative baseline, so neither makes the accepted review stale.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Installation and role execution, marker retry paragraph ("Removal between enumeration and lstat ... and a transient temporary filename yield setup-required at the ordinary caller"); Design, Publication, concurrency and recovery ("A component-binding mismatch produces static source diagnostics with pending status before native assessment"); Test Plan, Active native install proof (AC-07), second bullet ("Require setup-required at the ordinary selection caller before provider/effect work") and third bullet ("Both races require setup-required at the ordinary caller"); Context, Ordinary-caller marker proof on 2026-11-19 ("report returns pending, prepare returns setup-required")
+EVIDENCE: run-cli.ts componentForRun catches every inspection error and returns matched false. The report branch then sets `report.outcome = source.complete ? "pending" : "incomplete"`. The executing branches set "setup-required" through `else if (!component.matched || !component.expected)`. installed-marker-caller.test.ts asserts `command === "report" ? "pending" : "setup-required"`. That matches the Design rule that a component mismatch keeps report pending. The marker paragraph and both Test Plan bullets name only setup-required "at the ordinary caller" and give no report exception, so a literal reading conflicts with the report rule. The general mismatch rule and the Context text resolve the conflict, so nothing an implementer builds changes. A proof can still pass through prepare.
+PROPOSAL: The next time a revision touches these lines, add "(pending for report, under the component-mismatch rule)" after each "setup-required at the ordinary caller".
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Installation and role execution, marker paragraph ("`tests/vh-adlc/docs-drift/bootstrap.test.ts:77-91` at b82c89f")
+EVIDENCE: R-136 F-01 and R-137 F-03 already raised this. The author deliberately left it unapplied under the nit rule, and it is unchanged at this target. R-136 recorded that at b82c89f the cited test runs from line 78 to line 92. It is listed again only because each pass must return every finding it can establish. It does not by itself call for a normative revision.
 PROPOSAL: Change the range to `78-92` the next time a revision touches this paragraph.
 
 ## Sources
