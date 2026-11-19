@@ -94,7 +94,8 @@ Review the exact candidate before publication and identify which criteria need p
 
 ## Acceptance Criteria
 
-- [ ] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+- [x] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+      Evidence: Installed Codex passed explicit and ambiguous intake on 78e6da7b. Independent R-9 verified the exact installed component and clarified read boundary. Prior direct skill receipts retain their own targets.
 - [x] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
       Evidence: Independent R-7 inspected the exact candidate Codex evidence for source-backed claims, unsupported replacement, retained product contract, incomplete report and preserved source, refs and index.
 - [ ] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
@@ -139,6 +140,7 @@ None.
 | 2026-11-19 | R-6 | implementation | `3698d2472244c6a13a6b0a2abdfd12cfaf50213e` | unknown | procedural | One blocker and two should-fix findings in native receipt checks. |
 | 2026-11-19 | R-7 | implementation | `8cda536e00bc5752fd17de860b05d2347b8fab9f` | unknown | procedural | No findings. AC-02 met. Released and consumer checks remain open. |
 | 2026-11-19 | R-8 | implementation | `694458f7c6550ac630b09f4eef853f40ba4f7d26` | unknown | procedural | One blocker and one should-fix finding in generic intake proof. |
+| 2026-11-19 | R-9 | implementation | `bd1f6d0490254610fb17313fe053df4aadea49cc` | unknown | procedural | No findings. Shared behavior verified. Released and consumer checks remain open. |
 
 ### R-1
 
@@ -417,6 +419,25 @@ SEVERITY: should-fix
 WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:132-139`, `plugins/vh-adlc/references/lifecycle.md` ambiguous documentation intake, AC-01 clarification proof
 EVIDENCE: The exact-package ambiguity transcript read the installed lifecycle reference through a brace-expanded shell path. The verifier's literal command substring missed the read. The transcript also shows that the agent opened the synthetic README before asking for scope, so the case does not establish clarification before document collection.
 PROPOSAL: Verify the observed lifecycle reference without relying on shell command spelling. State that the ambiguous intake branch asks for scope before opening candidate documents, then rerun it and verify the read boundary.
+
+### R-9
+
+TARGET: bd1f6d0490254610fb17313fe053df4aadea49cc
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: met
+EVIDENCE: At bd1f6d04, the focused suite passed 74 tests and 337 assertions, and feature lint passed. Both native Codex intake cases passed on the 78e6da7b package, whose 304-file fingerprint matches bd1f6d04. The traces contain the revised installed lifecycle body. Explicit intake selected docs truth and verified source. Ambiguous intake asked for scope without opening candidate documents or running the selector. Earlier 18d20daf transcripts establish the direct modes, refusals and interrupted-selection behavior. The direct skill, procedure and fixture bytes are unchanged.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The 78e6da7b generic-intake transcript cites committed source for the verdicts, including the unresolved worker count, and preserves HEAD, refs, index and project files. R-7's 18d20daf direct-mode receipts establish the unsupported-replacement flag, product issue, full and targeted coverage, unfinished-work report and freshness-only read boundary. The R-8 remedies and current intake change leave the direct procedure and fixture unchanged.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 records operator-observed selector parity and rollback for Stackweaver 72e48ed5 and 22e5b96f. This review did not inspect private consumer files or observe native forwarding, authorized writes, recovery or cutover.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: I inspected the two native local-catalog installation receipts and the Claude discovery inventory for the 78e6da7b payload, and recomputed its matching fingerprint at bd1f6d04. Codex ran both revised intake cases through the installed package. Published marketplace fresh installs and upgrades, Claude claim review, and the adoption record remain open.
 
 ## Sources
 
