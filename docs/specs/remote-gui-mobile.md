@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "The iPhone live-stream fixture passed. The stock Chromium path still lacks safe field-bound editing."
+status: draft
+status_description: "Revising the feature for the owner-approved two-tap keyboard flow."
 branch: feat/remote-gui-mobile
 issue: null
 goal: "Use a remote-gui browser from a phone with selective first-tap native keyboard input, normal text editing and touch scrolling."
