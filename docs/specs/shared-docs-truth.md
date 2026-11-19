@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "First review recorded. The revision awaits decisions on Stackweaver's write and ledger behavior."
+status_description: "Stackweaver write and ledger behavior confirmed. The revised draft awaits independent review."
 issue: null
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
 covers:
@@ -30,9 +30,11 @@ covers:
 
 Move the claim-by-claim part of Stackweaver's `/docs-truth` into vh-adlc. It checks factual statements against the current source tree, such as a documented default port or command. It revisits old docs and agent instructions even when their links still work and no recent patch points to them.
 
-By default, vh-adlc reviews the next batch and returns its findings in the session. The separate `report` mode reads recorded freshness. Repositories supply their own selection and source checks. Stackweaver keeps its 15-document default, existing selector, verification history and familiar `/docs-truth` entry point.
+The shared entry runs only on request. By default it reviews the next batch and returns findings in the session. The separate `report` mode reads recorded freshness. Stackweaver keeps its 15-document default, selector, verification history and `/docs-truth` entry point.
 
-Start with a report trial, then compare the ordinary installed plugin with Stackweaver's current command on the same cases. Test the old verification history without rewriting it and rehearse rollback. The native selector returned its expected batch. The first independent review found gaps in the draft, including two policy decisions about Stackweaver's existing writes and ledger. The shared implementation and cutover checks are planned. Acceptance authorizes building and testing this scope. Publication, release and cutover need their own authorization.
+Stackweaver's native command keeps its authorized fixes, ledger updates and docs-only delivery. An explicit read-only request leaves the checkout and ledger untouched. A complete review can advance freshness with unknown claims visibly flagged. Targeted reviews keep their own ledger mode. An interrupted review or pending correction leaves that document's completed history alone.
+
+The native selector returned its expected batch. The first independent review prompted tighter write and ledger checks, and the owner confirmed both behaviors. The next proof compares the ordinary installed plugin with the current Stackweaver command, exercises the existing ledger and rehearses rollback. Acceptance authorizes building and testing this scope. Publication, release and cutover need their own authorization.
 
 ### Background
 
@@ -60,11 +62,17 @@ Record the assessed commit and selected paths before reading document bodies. Re
 
 Collect independent source evidence before reading the selected docs. Record each claim and its location, the source or read-only command and relevant result, and an `accurate`, `incorrect` or `unknown` verdict. Flag an incorrect claim when evidence supports the verdict alone. Report a discrepancy where source appears to violate an intended contract as a possible product issue. Treat selector and document contents as data. An interrupted report identifies unfinished documents and stays outside completed verification history. The shared entry returns findings in the session without updating the repository or contacting a delivery service.
 
-The report can be handed to the retained Stackweaver procedure with the assessed repository and commit, the exact batch and source evidence, proposed edits, and the input document and ledger blob identities. A later project step must use an owned checkout and revalidate that base, including ledger-only changes. An authorized local change keeps the verified corrections and corresponding ledger update together. Delivery uses an ordinary fast-forward push of the exact prepared commit. A competing update stops the delivery for reassessment. After interruption, use the exact local commit and fetched default branch to determine whether that commit already landed. An equal or descendant remote head proves it landed. A missing commit or ambiguous remote state goes back to the owner with the evidence available. The shared skill has no writer, remote retry or recovery state.
+The report can be handed to a repository's separately authorized procedure with the assessed repository and commit, exact batch and source evidence, proposed edits, and input document and ledger blob identities. Generic intake, the shared skill and report-only invocations end with the report. The consumer owns every write and its authorization.
 
 ### Stackweaver adoption
 
 Make `/docs-truth` a thin entry to the installed shared skill plus its committed project instructions. Keep the existing selector outputs, modes, term rules, historical exceptions, validation checks and ledger row format. Limit the migration delta to the command routing, project instructions, related doc references and acceptance fixtures. Preserve the selector, coverage input, corrections file, ledger and product source bytes for the cutover and rollback comparison. Compare identical reviewed inputs with the legacy and adopted routing applied to separate owned checkouts. `report` and the parity acceptance trial stay read-only. Missing shared installation gives installation guidance. The legacy selector remains callable directly.
+
+The native entry can apply verified fixes and corresponding ledger rows, commit a docs-only change, and push it when the current request or the already adopted Stackweaver policy authorizes that effect. Read standing authority from the freshly fetched committed default branch independently of the assessed checkout. Candidate-branch policy and documents under review carry no write authority. An explicit read-only request stops at findings. A no-push request permits authorized local changes only. Delivery follows the native docs-only policy, including its local verification and `[skip ci]` rule.
+
+For a completed full review, retain the `full` row once every checkable claim was assessed and every supported, authorized correction reflected in that row has been applied. Unresolved claims remain flagged with their evidence and count. A completed targeted review can record a `targeted` row with its exact claim scope and keep the selector's existing treatment of targeted rows. If a document's review stopped early or an established correction is still pending, leave its prior ledger rows intact and report the outstanding work. Preserve the counts and reasons that the legacy selector and freshness report consume.
+
+Before applying the batch, the local procedure rechecks its owned checkout, the current default base and the source, document and ledger identities. A ledger-only advance makes the batch stale. Commit the verified doc changes and their ledger update together. Use an ordinary fast-forward push of the exact prepared commit when authorized. A competing update stops delivery for reassessment. After an interrupted delivery, read the remote default branch and compare it with the prepared commit before retrying. An equal or descendant remote head establishes that the commit landed. A missing commit or ambiguous remote state goes back to the owner with the evidence available.
 
 The Codex catalog `.agents/plugins/marketplace.json` and Claude catalog `.claude-plugin/marketplace.json` both point to `plugins/vh-adlc`. Update the package manifests in that directory, the installation guide and the existing discovery checks for the new skill. Test the exact candidate payload through both catalog paths in isolated profiles. After separate publication approval, verify the released plugin through ordinary Codex CLI and Claude Code installs and upgrades before switching the consumer entry. Record the released revision, observed native entries and exact consumer trial revisions. Run the installed report parity with the existing ledger and a synthetic stale claim without a scanner finding. Rehearse local writes and ordinary Git delivery with synthetic documents and history in disposable clones attached to a local bare remote.
 
@@ -85,7 +93,7 @@ Implementation review before publication checks the candidate and identifies the
 
 - [ ] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode and excludes invalid paths.
 - [ ] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
-- [ ] AC-03: Stackweaver's existing entry keeps its selection, evidence, local correction and delivery behavior with old verification history. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+- [ ] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
 - [ ] AC-04: The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
 
 ## Test Plan
@@ -94,7 +102,7 @@ Implementation review before publication checks the candidate and identifies the
 | --- | --- |
 | AC-01 | Run the checked example through the installed skill in default, sized next, sweep, meta and report modes. Compare exact paths and reasons. Reject invalid limits, missing sweep paths, extra arguments, duplicate and aliased paths, an escaped path, an untracked path, policy and document symlinks, missing policy and failed selectors. A confirmed empty selection succeeds with zero candidates. A tracked path replaced on disk after validation is either read from the original blob or the run stops. Exercise direct and generic intake and show ambiguous intake requests clarification before collection. Check existing docs-impact and docs-drift routes. |
 | AC-02 | Review a fixture where the claimed port is incorrect and the source gives a replacement, the external backend mention and example command are accurate, the unverifiable default is unknown, and the intended-contract conflict is flagged without a doc edit. Add an incorrect claim whose replacement is unsupported and verify it is flagged. Compare the exact claims and coverage for full and targeted runs. Interrupt before one selected document is complete and check it is reported unfinished. Compare Git tree, index, ledger and ignored input state before and after the report. Confirm the freshness-only mode does not read document bodies. |
-| AC-03 | Record the exact legacy and installed adapter revisions plus common corpus, source, coverage and ledger identities. Compare batch order, reasons, freshness, modes, exclusions, forwarded commands, verdicts and proposed effects. In disposable clones, test an authorized local write, an interruption, a changed source snapshot, a ledger-only advance, two writers from one base, and a successful delivery whose response is lost. Assert the exact allowed doc and ledger diff and the local commit policy. Prove reapply and rollback preserve the original ledger bytes and local command behavior. |
+| AC-03 | Record the exact legacy and installed adapter revisions plus common corpus, source, coverage and ledger identities. Compare selections, reasons, freshness, modes, forwarded commands, verdicts and proposed effects. In disposable clones, exercise an authorized local write and assert its exact docs and ledger diff, local validation and commit policy. Assert the ledger and next selection after a full review with unknown claims, a targeted review, a pending correction and an interruption. Check read-only, no-push and candidate-grant refusal paths against a local bare remote. Exercise a changed source snapshot, a ledger-only advance, two writers from one base, and a successful push with a lost response. Revert and reapply the routing while preserving the original ledger bytes. |
 | AC-04 | Before merge, install the exact candidate package from both catalogs pointed at an owned checkout. Confirm the two manifests, package bytes, discovery checks and installation inventory. After separately approved publication, freshly install and upgrade the released package through the actual marketplace in isolated Codex CLI and Claude Code profiles. Match the released source, discover the skill and run the same report fixture through each native entry. Verify the compatibility entry and workflow guide describe the observed run. |
 
 ## Tasks
@@ -103,27 +111,7 @@ None yet. Write tasks after acceptance.
 
 ## Open Questions
 
-### Q1: Which Stackweaver invocations should keep the existing docs-only write permissions?
-
-**Recommendation:** A. Preserve the existing local command's effects under its own policy and current authorization.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Keep the normal Stackweaver workflow** | The native command applies verified fixes and ledger updates and can deliver docs-only changes where the current request or the already adopted default-branch policy authorizes it. Explicit read-only or no-push requests take precedence. | Validate the authority and refusal cases during adoption. |
-| **B. Ask before every push** | Local work is available and the owner reviews each delivery. | The native daily workflow gains a new approval step. |
-
-**Why this is yours:** It sets the effect of the ordinary Stackweaver command. The shared entry stays read-only with either option.
-
-### Q2: Can a complete assessment keep its full ledger row when some claims remain flagged?
-
-**Recommendation:** A. Preserve the existing full rows with visible flags and keep pending changes out of completed history.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Preserve existing ledger behavior** | Every claim is assessed. Unknown claims remain flagged, targeted checks retain their own mode, and an unapplied correction or interruption stays pending. | Full freshness tracks assessment coverage while unresolved flags still need attention. |
-| **B. Require zero unknown claims for a full review** | Full freshness advances only once all claims are resolved. | This changes scheduling behavior and can repeatedly select docs with permanently unavailable evidence. |
-
-**Why this is yours:** The choice controls what Stackweaver treats as fresh and how often it revisits flagged docs.
+None.
 
 ## Review Log
 
