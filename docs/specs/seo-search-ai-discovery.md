@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Independent spec review has no findings; awaiting owner acceptance of the reviewed document."
+status_description: "Fresh independent spec review R-3 has no findings on current main; awaiting owner acceptance of the reviewed document."
 issue: null
 goal: "An adopter can identify and prepare verified repository repairs for conventional search and AI-search discovery while measuring visibility separately from technical readiness."
 covers:
@@ -141,6 +141,7 @@ None. The owner approved the proposed scope, local preparation followed by revie
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-18 | R-1 | spec | `f69e8e2b0905eb98eb12e6b9f3c523b5967d004b` | unknown | procedural | Two should-fix findings in comparison and retry proofs; model identity not attested. |
 | 2026-11-18 | R-2 | spec | `aabe627e581deb520bc74b1478aba4efd9037cfc` | unknown | procedural | No findings; model identity not attested. |
+| 2026-11-18 | R-3 | spec | `2ad0443a658b40fd2d69a1d958370c620f730c49` | unknown | procedural | No findings; model identity not attested. |
 
 ### R-1
 
@@ -159,6 +160,10 @@ EVIDENCE: The design requires retries to recheck current authorization and forbi
 PROPOSAL: Add a retry scenario whose first run has explicit ship or submission authority against recording endpoints, then resume or repeat the same task without that authority. Require task reuse and retained evidence while observing no repeated publication or submission request.
 
 ### R-2
+
+NO FINDINGS
+
+### R-3
 
 NO FINDINGS
 
