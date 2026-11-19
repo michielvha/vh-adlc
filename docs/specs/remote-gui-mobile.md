@@ -44,6 +44,12 @@ With two authenticated RFB clients on the disposable Xvfb display, x11vnc 0.9.17
 
 The same synthetic HTTPS viewer can exercise both phone browsers. On iPhone, an Xcode UI test can send a screen tap in Safari and assert the system keyboard appears. On Android, ADB can drive Chrome taps and record Android's input method visibility along with an OS screenshot. Both runs also need to assert which synthetic remote field received the caret and that taps outside editable regions leave the keyboard closed. An iOS Simulator or Android emulator can help develop these runs. Neither replaces the accepted physical phone proof. The Mac is reachable over SSH, but Xcode reported administrator authorization was required for its components and listed no paired device. No physical Android device was available to the run.
 
+### Physical iPhone gesture probe
+
+Xcode 27.0 ran `testSelectiveFirstTapOpensNativeKeyboard` on a wirelessly paired iPhone 15 Pro Max with iOS 27.2.1. XCTest reported one pass, zero failures and zero skips. In Safari, the keyboard started closed and stayed closed after the plain-area tap. It appeared after the first editable-area tap. The probe uses noVNC 1.5.0's stock gesture recognizer and focuses a real local input from the one-tap callback.
+
+The [reproducible fixture](../../tests/remote-gui/mobile-feasibility/keyboard-gesture/README.md) uses fixed hit regions on a synthetic canvas. It establishes the iPhone's native keyboard opening mechanism. It does not exercise live Chromium geometry, remote caret placement, typing or RFB controller transfer. The full T1 gate and AC-01 remain open. ADB reported no connected Android test device.
+
 ### Resizing prerequisite after merge
 
 [PR 121](https://github.com/michielvha/vh-adlc/pull/121) merged at [0708e3cb](https://github.com/michielvha/vh-adlc/commit/0708e3cb33dd1fe1e85f4e8da74b598ee32f96a0) on 2026-11-19. Both remote-gui manifests at that commit report 0.4.0, and both marketplace catalogs resolve to its local package. This establishes the prerequisite in the default-branch source; it does not establish an installed plugin update or any mobile capability.
