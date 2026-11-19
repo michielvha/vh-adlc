@@ -93,6 +93,16 @@ corrected component and refresh actual install and migration proof before the
 remote switch. GUI/phone and native Copilot execution stay deferred or unclaimed.
 Other agent migrations stay on their separate roadmap.
 
+The 2026-11-19 cutover decision accepts either JSON field order and ASCII JSON
+whitespace, explicit rerun without automatic retry, and uniform installed
+inspection. Rollback restores legacy routing and the old companion/binding;
+old-release recovery needs its matching marker-free install. Old Claude-role
+paths without observed marker-free runs stay blocked. Candidate `1b862970` has a
+clean scoped Opus review, 138 focused passing cases, and a Claude 2.1.326 inline
+role observation. These are source diagnostics; corrected-release installation
+and the final migration gate still precede cutover. Conservative marker-only
+details may proceed after clean review under the existing publication authority.
+
 ### Active ordinary Claude cache finding on 2026-11-18
 
 The final real global-install check finds a compatibility gap that empty-profile
@@ -118,11 +128,7 @@ observation establishes the Fedora 43 marker shape only. Other platforms, client
 versions and marker shapes remain unclaimed until T130 observes them; unsupported
 shapes stay setup-required. The corrected release must also pass with its own
 actually observed native CLI session. R-133's format, retry, caller and rollback clarifications are proposed below.
-On 2026-11-19 the owner requests cutover after the pending bundle was explained.
-The recommended serialization, explicit-rerun, uniform-inspection and legacy-rollback
-choices are authorized, together with conservative details within this marker-only
-scope after clean review. No new effect permission, broader exclusion or recovery
-mechanism is authorized.
+The owner summary records the selected compatibility details and authority.
 
 
 This prevents claiming ordinary active Claude execution ready. The owner now approves the narrow validated metadata exception. This revision specifies that bounded correction; T156 implements and tests it; all other changes stay
@@ -193,9 +199,8 @@ active session on the corrected release or another platform/client build.
 Evidence is `t143-native-inline-marker/results.json`; no live session, foreign
 marker, phone configuration or remote repository state is changed.
 
-The owner now authorizes the recommended compatibility bundle and cutover.
 Fresh spec review, release/install checks and the paired migration gate still
-precede the remote switch; these diagnostics do not substitute for those checks.
+precede the remote switch.
 
 ### Final adoption preparation on 2026-11-18
 
@@ -1362,6 +1367,9 @@ metadata cannot be published as shipped content and then excluded at runtime.
 All other extra, missing, changed, symlinked or nonregular inputs remain refused.
 The existing installed policy still accepts hard-linked shipped files and a
 canonicalized root selector alias; only marker files acquire the single-link rule.
+See `plugins/vh-adlc/scripts/docs-drift/bootstrap.ts:64-65`, `:78` and `:87`, and
+`tests/vh-adlc/docs-drift/bootstrap.test.ts:77-91` at
+[b82c89f](https://github.com/michielvha/vh-adlc/commit/b82c89f81f942ca766b7748a862201e8cdc799fb).
 
 There is no automatic retry. Removal between enumeration and lstat, changed
 observed device/inode/size/mode between lstat and open, an incomplete read, growth
@@ -1549,8 +1557,9 @@ The owner confirmed ordinary installed clients and the capability-preserving che
   setup-required, no automatic retry and successful explicit rerun after restoring
   valid input in the same invocation. Inject growth and shrinkage between the
   size observation and read. Require at least one observed read and no marker
-  read request above 257 bytes; an
-  oversized-file test alone is insufficient. Existing filesystem test spies may
+  read request above 257 bytes. Both races require setup-required at the ordinary
+  caller, no checker-authored change, and successful explicit rerun after valid
+  input is restored; an oversized-file test alone is insufficient. Existing filesystem test spies may
   provide these deterministic faults; add no production injection API.
 - Publish the correction and inspect the actual ordinary installed payload while
   its native Claude session holds its marker. Record OS, CLI, plugin, component,
@@ -2449,6 +2458,7 @@ are outside this decision.
 | 2026-11-18 | R-132 | spec | `d06daa36296e60c20b98f1be08bc908511495b57` | claude-opus-5-5 | procedural | No blocking or should-fix findings; five documentation nits; selected-backend ambiguity resolved. |
 | 2026-11-18 | R-133 | spec | `623472e84df587232785670f36bee5b8f1160e74` | claude-opus-5-5 | procedural | 7 should-fix, 2 nit. |
 | 2026-11-18 | R-134 | spec | `0c70b647cd21fa6d4df4ee7965f33e5fa3e32322` | claude-opus-5-5 | procedural | 4 should-fix, 1 nit. |
+| 2026-11-19 | R-135 | spec | `b82c89f81f942ca766b7748a862201e8cdc799fb` | claude-opus-5-5 | procedural | 1 should-fix, 2 nit. |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -4428,6 +4438,31 @@ SEVERITY: nit
 WHERE: Test Plan, Active native install proof (AC-07) (:1460-1486); Design, Installation and role execution, marker paragraphs (:1278-1279, :1300-1302)
 EVIDENCE: Design requires a `pid` "greater than zero" and names "an incomplete read" as a fail-closed case. The proof matrix lists "noncanonical or unsafe PID values" and growth during read, but it does not list a zero PID (`0` is canonical and safe) or a marker that shrinks between the size observation and the read. Both cases are covered by the Design text, so an implementer builds the same thing either way.
 PROPOSAL: Add a zero PID with filename `0`, and a marker that shrinks between the size observation and the read, to the refusal bullets.
+
+### R-135
+
+TARGET: b82c89f81f942ca766b7748a862201e8cdc799fb
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, Active native install proof (AC-07), third bullet ("Inject growth and shrinkage between the size observation and read. Require at least one observed read and no marker read request above 257 bytes"); Design, Installation and role execution, marker retry paragraph ("an incomplete read, growth beyond the byte bound, and a transient temporary filename yield setup-required at the ordinary caller"); new task T156 ("read-bound and race faults")
+EVIDENCE: Design gives the outcome for an incomplete read and for growth beyond the bound: setup-required. The proof bullet gives that outcome only for its first two injections (removal after enumeration, replacement between lstat and open). For the growth and shrinkage injections it requires only an observed read and a read request no larger than 257 bytes. So an implementation that reads at most 257 bytes but then parses the bytes it got, without comparing their length to the observed size, still passes the proof. That implementation accepts a shrunken marker, and it also accepts a grown one if it trims to the observed size before parsing. Both outcomes contradict Design. The current reader rejects `bytes.length !== stat.size` (plugins/vh-adlc/scripts/docs-drift/bootstrap.ts:90). The bounded marker reader is new code, and nothing in the matrix requires it to keep that comparison. This revision added the shrinkage case in response to R-134 F-05 but did not add an expected outcome for it.
+PROPOSAL: In the growth and shrinkage sentence, also require setup-required at the ordinary caller, no checker-authored change and a successful explicit rerun after valid input is restored, matching the removal and replacement cases.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary (second and third paragraphs); Context, Active ordinary Claude cache finding on 2026-11-18 ("On 2026-11-19 the owner requests cutover after the pending bundle was explained..."); Context, Isolated marker prototype checkpoint on 2026-11-18, last paragraph ("The owner now authorizes the recommended compatibility bundle and cutover"); Open Questions
+EVIDENCE: The convention says the summary covers "validation state and owner decisions", includes "migration or recovery where it matters", and is refreshed "when scope, proof or decisions change and before asking for acceptance". The summary leaves out three things this revision added. First, the 2026-11-19 decisions: either key order with JSON ASCII whitespace, explicit rerun with no automatic retry, uniform installed inspection, and legacy rollback. Second, the rollback and recovery limit: pre-correction helpers still refuse active Claude caches, original recovery needs a matching marker-free install, and old Claude-role paths stay blocked without observed marker-free runs. Third, the new diagnostic state: candidate 1b862970 with clean R18 and the Claude 2.1.326 inline-role observation. Meanwhile the cutover authorization is stated three times in Context and once more in Open Questions. No implementer would build anything different because of this.
+PROPOSAL: Add one or two sentences to the Owner summary naming the 2026-11-19 decisions, the old-release rollback and recovery limits, and that the prototype and inline-role results are source diagnostics only. Drop the repeated authorization sentences in Context so the record lives in one place plus Open Questions.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Installation and role execution, marker paragraph ("The existing installed policy still accepts hard-linked shipped files and a canonicalized root selector alias; only marker files acquire the single-link rule"); Context, Owner summary ("Hard-linked shipped files keep their existing support")
+EVIDENCE: The convention says "Context and Design cite their claims: a `file:line`, or a command and its output". The claim is true. bootstrap.ts:78 and :87 apply `nlink !== 1` only under `policy === "retained"`. bootstrap.ts:64-65 resolve and lstat the canonical root for the installed policy. The test at tests/vh-adlc/docs-drift/bootstrap.test.ts:77-91 hard-links guide.md, inspects through a symlinked root alias and passes. However, the new sentence added in response to R-134 F-01 cites none of this.
+PROPOSAL: Cite bootstrap.ts:78, :87 and :64-65 and bootstrap.test.ts:77-91 after the Design sentence.
 
 ## Sources
 
