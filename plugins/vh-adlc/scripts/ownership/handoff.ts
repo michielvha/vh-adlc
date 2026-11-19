@@ -1,5 +1,6 @@
 import { OwnershipGit } from "./git";
 import { associate } from "./identity";
+import { requirePending } from "./pending";
 import { currentWriter, describeRecord, matching, OPERATION, publish, snapshot, type EntryRequest, type RecordState, type Result, type Snapshot } from "./entry";
 
 type Transfer = EntryRequest & { approved: boolean; stopped: boolean; preserved: boolean; expected: string; operation: string };
@@ -34,6 +35,8 @@ export function handoff(request: Transfer): Result {
     const view = snapshot(git);
     if (typeof view === "string") throw Error("there is no adopted reservation to transfer");
     const { association, current } = select(git, view, request);
+    if (current?.conflict) throw Error("resolve the alias conflict before transferring a writer");
+    if (current?.pending) requirePending(git, current.pending);
     const incoming = currentWriter(git, request.env ?? process.env, association.locator, request.client);
     if (current?.operation === request.operation) {
       if (current.previous !== request.expected || JSON.stringify(current.writer) !== JSON.stringify(incoming)) {
@@ -46,7 +49,7 @@ export function handoff(request: Transfer): Result {
     }
     const next: RecordState = {
       aliases: [...new Set([...(current?.aliases ?? []), ...association.aliases])],
-      writer: incoming, operation: request.operation, previous: request.expected,
+      writer: incoming, operation: request.operation, previous: request.expected, ...(current?.pending ? { pending: current.pending } : {}),
     };
     publish(git, view, { ...view.state, operation: request.operation, items: [...view.state.items.filter(row => row !== current), next] });
   }

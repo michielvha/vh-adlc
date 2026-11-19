@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { OID, OwnershipGit, POLICY, REF, STATE, type Environment, type RemoteTip } from "./git";
 import { associate, privateDraft, validAlias, validHost, validLocator, verifyDestination, writer, type Item, type Writer } from "./identity";
 
-export type RecordState = { aliases: string[]; writer: Writer; operation: string; previous?: string };
+export type RecordState = { aliases: string[]; writer: Writer; operation: string; previous?: string; pending?: string; conflict?: string };
 export type State = { schema_version: 1; repository: string; operation: string; items: RecordState[] };
 export type Binding = { repository: string; genesis: string };
 export type EntryRequest = Item & { repo: string; env?: Environment; client?: string; noPush?: boolean; localDraft?: boolean };
-export type Result = { status: "held" | "entered" | "legacy" | "local-draft" | "initialized" | "reserved" | "vacant" | "transferred"; reason?: string; writer?: Writer; item?: string; operation?: string; genesis?: string; tip?: string; localPath?: string };
+export type Result = { status: "held" | "entered" | "legacy" | "local-draft" | "initialized" | "reserved" | "vacant" | "transferred" | "pending" | "linked" | "conflict"; reason?: string; writer?: Writer; item?: string; operation?: string; genesis?: string; tip?: string; localPath?: string; pending?: string; conflict?: string; preview?: string };
 export type Snapshot = { tip: RemoteTip & { reservation: string }; state: State; binding: Binding };
 export const OPERATION = /^[a-zA-Z0-9_-]{1,128}$/;
 const CHECKOUT = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
@@ -55,9 +55,12 @@ export function decodeState(raw: string, repository: string): State {
   const aliases = new Set<string>();
   const items = data.items.map(value => {
     const record = object(value);
-    exactKeys(record, ["aliases", "writer", "operation", ...(Object.hasOwn(record, "previous") ? ["previous"] : [])]);
+    const optional = ["previous", "pending", "conflict"].filter(key => Object.hasOwn(record, key));
+    exactKeys(record, ["aliases", "writer", "operation", ...optional]);
     if (!Array.isArray(record.aliases) || !record.aliases.length || typeof record.operation !== "string" || !OPERATION.test(record.operation) ||
-        (record.previous !== undefined && (typeof record.previous !== "string" || !OPERATION.test(record.previous)))) {
+        (record.previous !== undefined && (typeof record.previous !== "string" || !OPERATION.test(record.previous))) ||
+        (record.pending !== undefined && (typeof record.pending !== "string" || !/^[a-f0-9]{64}$/.test(record.pending))) ||
+        (record.conflict !== undefined && (typeof record.conflict !== "string" || !OPERATION.test(record.conflict)))) {
       throw Error("invalid reservation item");
     }
     const names = record.aliases.map(alias => {
@@ -66,7 +69,9 @@ export function decodeState(raw: string, repository: string): State {
       return alias;
     });
     return { aliases: names, writer: checkedWriter(record.writer), operation: record.operation,
-      ...(typeof record.previous === "string" ? { previous: record.previous } : {}) };
+      ...(typeof record.previous === "string" ? { previous: record.previous } : {}),
+      ...(typeof record.pending === "string" ? { pending: record.pending } : {}),
+      ...(typeof record.conflict === "string" ? { conflict: record.conflict } : {}) };
   });
   return { schema_version: 1, repository, operation: data.operation, items };
 }
@@ -168,7 +173,8 @@ export function currentWriter(git: OwnershipGit, env: Environment, locator: stri
 
 export function describeRecord(git: OwnershipGit, record: RecordState, status: Result["status"], tip?: string): Result {
   const localPath = localCheckout(git, false) === record.writer.checkout ? git.root : undefined;
-  return { status, writer: record.writer, item: record.aliases[0], operation: record.operation, tip, ...(localPath ? { localPath } : {}) };
+  return { status, writer: record.writer, item: record.aliases[0], operation: record.operation, tip, localPath,
+    pending: record.pending, conflict: record.conflict };
 }
 
 export function enter(request: EntryRequest): Result {
@@ -195,6 +201,8 @@ export function enter(request: EntryRequest): Result {
       const matches = matching(view.state, association.aliases);
       if (matches.length > 1) throw Error("feature aliases have conflicting reservations; ask the owner to reconcile them");
       const current = matches[0];
+      if (current?.conflict) return { ...describeRecord(git, current, "held"), reason: "feature aliases conflict; ask the owner to select one reservation" };
+      if (current?.pending) return { ...describeRecord(git, current, "held"), reason: "issue creation is pending; use read-only lookup and owner-confirmed recovery" };
       if (pending && current?.operation === operation && JSON.stringify(current) === JSON.stringify(pending)) return describeRecord(git, current, "entered", view.tip.reservation);
       if (current && current.writer.fingerprint !== identity.fingerprint) {
         return { ...describeRecord(git, current, "held"), reason: "another session holds this item; if this was your previous reservation, it has been handed off" };

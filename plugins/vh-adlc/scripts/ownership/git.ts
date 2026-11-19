@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { gitEnvironment, gitReadArguments } from "../git-read";
 
 export const REF = "refs/heads/vh-adlc/work-ownership";
@@ -89,7 +90,7 @@ export class OwnershipGit {
   commit(data: string, parent?: string): string {
     const blob = this.run(["hash-object", "-w", "--stdin"], data).trim();
     const tree = this.run(["mktree"], `100644 blob ${blob}\t${STATE}\n`).trim();
-    const commit = this.text("commit-tree", tree, ...(parent ? ["-p", parent] : []), "-m", "vh-adlc reservation [skip ci]");
+    const commit = this.text("commit-tree", tree, ...(parent ? ["-p", parent] : []), "-m", "vh-adlc reservation [skip ci]", "-m", randomUUID());
     if (!OID.test(commit) || (parent && this.text("show", "-s", "--format=%P", commit) !== parent)) {
       throw Error("reservation update did not produce an append-only commit");
     }

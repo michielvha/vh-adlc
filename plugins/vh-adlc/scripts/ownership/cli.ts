@@ -1,5 +1,6 @@
 import { enter, initialize, type EntryRequest, type Result } from "./entry";
 import { handoff, status } from "./handoff";
+import { updateAliases } from "./issue-link";
 
 function options(argv: string[]): Record<string, string> {
   const found: Record<string, string> = Object.create(null);
@@ -25,7 +26,13 @@ function main(argv: string[]): Result {
   if (command === "status") return status(request);
   if (command === "handoff") return handoff({ ...request, approved: input.approved === "true", stopped: input.stopped === "true",
     preserved: input.preserved === "true", expected: input["expected-operation"] ?? "", operation: input.operation ?? "" });
-  throw Error("use initialize, status, enter or handoff");
+  if (command === "link" || command === "issue-pending" || command === "issue-recover" || command === "resolve-alias") {
+    const alias = input["alias-issue"] || input["alias-spec"] ? { issue: input["alias-issue"], spec: input["alias-spec"] } : undefined;
+    return updateAliases(command, { ...request, alias, operation: input.operation ?? "", preview: input.preview,
+      confirmed: input.confirmed === "true", notCreated: input["not-created"] === "true", conflict: input.conflict, choose: input.choose,
+      approved: input.approved === "true", stopped: input.stopped === "true", preserved: input.preserved === "true" });
+  }
+  throw Error("use initialize, status, enter, handoff, link, resolve-alias, issue-pending or issue-recover");
 }
 
 if (import.meta.main) {

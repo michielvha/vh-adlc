@@ -71,7 +71,7 @@ exec "$verb" "$VH_FIXTURE_GIT/team/$remote.git"
 }
 
 export const CLI = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/ownership/cli.ts");
-export type Reply = { status: string; reason?: string; writer?: { fingerprint: string; host: string; locator: string }; genesis?: string; item?: string; operation?: string; localPath?: string };
+export type Reply = { status: string; reason?: string; writer?: { fingerprint: string; host: string; locator: string }; genesis?: string; item?: string; operation?: string; localPath?: string; pending?: string };
 
 export async function invoke(repo: string, env: Env, ...args: string[]): Promise<Reply> {
   const child = Bun.spawn([process.execPath, CLI, ...args, "--repo", repo], { env, stdout: "pipe", stderr: "pipe" });
