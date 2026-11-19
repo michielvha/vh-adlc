@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { hostname } from "node:os";
+import { join } from "node:path";
 import type { Environment, OwnershipGit } from "./git";
 
 export type Writer = { fingerprint: string; host: string; locator: string };
@@ -65,7 +67,8 @@ function issueNumber(issue: unknown, repository: string): string | undefined {
 function fields(raw: string): Record<string, unknown> | undefined {
   const block = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(raw)?.[1];
   if (block === undefined) return undefined;
-  const value: unknown = Bun.YAML.parse(block);
+  let value: unknown;
+  try { value = Bun.YAML.parse(block); } catch { throw Error("invalid feature frontmatter"); }
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   return value as Record<string, unknown>;
 }
@@ -80,19 +83,46 @@ export function validAlias(alias: string): boolean {
   return /^issue:[1-9][0-9]{0,14}$/.test(alias) || (alias.startsWith("spec:") && validLocator(alias));
 }
 
+function featureRoot(raw: string | undefined): string {
+  const root = (raw?.match(/^Feature documents: `?([^\s`]+)`?$/m)?.[1] ?? "docs/internal/plans").replace(/\/$/, "");
+  if (!safePath(root)) throw Error("invalid feature document root");
+  return root;
+}
+
+function validateSpec(spec: string, root: string) {
+  if (!safePath(spec) || !spec.startsWith(`${root}/`) || !spec.endsWith(".md")) throw Error("spec path is outside the canonical feature root");
+}
+
+export function privateDraft(git: OwnershipGit, path: string): void {
+  const head = git.lookup("HEAD");
+  const instructions = join(git.root, "AGENTS.md");
+  const raw = head ? git.file(head, "AGENTS.md") : existsSync(instructions) && lstatSync(instructions).isFile() ? readFileSync(instructions, "utf8") : undefined;
+  validateSpec(path, featureRoot(raw));
+  let located = git.root;
+  for (const [index, component] of path.split("/").entries()) {
+    located = join(located, component);
+    try {
+      const state = lstatSync(located);
+      if (!state.isDirectory() || index === path.split("/").length - 1) throw Error("private draft must be a new file in this checkout");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+  if (head && git.file(head, path) !== undefined) throw Error("private draft must be a new file in this checkout");
+}
+
 export function associate(git: OwnershipGit, main: string, repository: string, item: Item, branch: string): Association {
   if ([item.issue, item.spec, item.branch].filter(value => value !== undefined).length !== 1) {
     throw Error("select exactly one issue, spec or feature branch");
   }
-  const rawRoot = git.file(main, "AGENTS.md")?.match(/^Feature documents: `?([^\s`]+)`?$/m)?.[1] ?? "docs/internal/plans";
-  const root = rawRoot.replace(/\/$/, "");
-  if (!safePath(root)) throw Error("invalid feature document root");
-  const number = issueNumber(item.issue, repository);
-  if (item.spec && (!safePath(item.spec) || !item.spec.startsWith(`${root}/`) || !item.spec.endsWith(".md"))) {
-    throw Error("spec path is outside the canonical feature root");
-  }
+  const root = featureRoot(git.file(main, "AGENTS.md"));
+  if (item.spec) validateSpec(item.spec, root);
+  const selected = item.spec ? git.file(main, item.spec) : undefined;
+  const number = issueNumber(selected ? fields(selected)?.issue : item.issue, repository);
+  const search = number ?? item.branch;
+  const candidates = new Set([...(search ? git.matchingFiles(main, root, search) : []), ...(item.spec ? [item.spec] : [])]);
   const matches: { path: string; issue?: string; branch?: string }[] = [];
-  for (const path of git.paths(main, root)) {
+  for (const path of candidates) {
     if (!path.endsWith(".md")) continue;
     const raw = git.file(main, path);
     if (!raw) continue;

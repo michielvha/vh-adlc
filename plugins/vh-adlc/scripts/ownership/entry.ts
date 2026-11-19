@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { OID, OwnershipGit, POLICY, REF, STATE, type Environment, type RemoteTip } from "./git";
-import { associate, validAlias, validHost, validLocator, verifyDestination, writer, type Item, type Writer } from "./identity";
+import { associate, privateDraft, validAlias, validHost, validLocator, verifyDestination, writer, type Item, type Writer } from "./identity";
 
 export type RecordState = { aliases: string[]; writer: Writer; operation: string };
 export type State = { schema_version: 1; repository: string; operation: string; items: RecordState[] };
@@ -71,6 +71,12 @@ function bound(git: OwnershipGit): string | undefined {
   return git.config(BINDING_KEY);
 }
 
+function checkedOutPolicy(git: OwnershipGit): boolean {
+  const head = git.lookup("HEAD");
+  const saved = git.lookup("refs/remotes/origin/HEAD");
+  return [head, saved].some(ref => ref !== undefined && git.file(ref, POLICY) !== undefined);
+}
+
 function stateAt(git: OwnershipGit, oid: string, repository: string): State {
   const raw = git.file(oid, STATE);
   if (!raw) throw Error("reservation commit has no state");
@@ -81,13 +87,13 @@ export function snapshot(git: OwnershipGit): Snapshot | "legacy" | "no-remote" {
   const prior = bound(git);
   const remotes = git.remotes();
   if (!remotes.includes("origin")) {
-    if (prior || remotes.length) throw Error("canonical origin is missing");
+    if (prior || remotes.length || checkedOutPolicy(git)) throw Error("canonical origin is missing");
     return "no-remote";
   }
   const tip = git.remote();
   git.objects(tip.main);
   const raw = git.file(tip.main, POLICY);
-  if (raw === undefined && !tip.reservation && !prior) return "legacy";
+  if (raw === undefined && !tip.reservation && !prior && !checkedOutPolicy(git)) return "legacy";
   if (!raw || !tip.reservation) throw Error("reservation policy or established remote history is missing; verify or restore the original adoption");
   const binding = checkedBinding(raw);
   if (binding.repository !== verifyDestination(git)) throw Error("origin does not match the adopted reservation repository");
@@ -142,13 +148,16 @@ export function enter(request: EntryRequest): Result {
     const git = new OwnershipGit(request.repo, request.env);
     const operation = randomUUID();
     let pending: RecordState | undefined;
+    let prior: RecordState | undefined;
     for (let attempt = 0; attempt < 4; attempt++) {
       const view = snapshot(git);
       if (typeof view === "string") {
         if (pending) throw Error("reservation disappeared after attempting an update");
         if (view === "legacy") return { status: "legacy" };
-        if (request.localDraft && request.spec && !request.issue && !request.branch &&
-            !git.file(git.text("rev-parse", "HEAD"), request.spec)) return { status: "local-draft" };
+        if (request.localDraft && request.spec && !request.issue && !request.branch) {
+          privateDraft(git, request.spec);
+          return { status: "local-draft" };
+        }
         throw Error("no origin; only an explicitly authorized new private draft can proceed without a remote");
       }
       const branch = git.text("rev-parse", "--abbrev-ref", "HEAD");
@@ -161,12 +170,13 @@ export function enter(request: EntryRequest): Result {
       if (current && !owned(current, mine)) {
         return { status: "held", reason: "another session holds this item; if this was your previous reservation, it has been handed off", writer: current.writer, item: current.aliases[0] };
       }
-      if (pending && current?.operation === operation) throw Error("attempted reservation does not match the current record");
+      if (pending && JSON.stringify(current) !== JSON.stringify(prior)) throw Error("attempted reservation was superseded; inspect the current writer before retrying");
       if (!current && association.claimed) throw Error("existing claim has no reservation; ask the owner to reconcile it");
       const aliases = [...new Set([...(current?.aliases ?? []), ...association.aliases])];
       if (current && JSON.stringify(current.writer) === JSON.stringify(mine) && aliases.length === current.aliases.length) return entered(current, view.tip.reservation);
       if (request.noPush) throw Error("reservation update requires Git permission for the coordination ref");
       pending = { aliases, writer: mine, operation };
+      prior = current;
       publish(git, view, { ...view.state, operation, items: [...view.state.items.filter(record => record !== current), pending] });
     }
     throw Error(`unable to verify the reservation update on ${REF}; inspect the current writer before retrying`);

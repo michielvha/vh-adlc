@@ -60,8 +60,23 @@ export class OwnershipGit {
     if (missing.some(oid => !this.ok("cat-file", "-e", `${oid}^{commit}`))) throw Error("incomplete remote reservation history");
   }
 
-  paths(commit: string, beneath: string): string[] {
-    return this.run(["ls-tree", "-rz", "--name-only", "--full-tree", commit, "--", beneath]).split("\0").filter(Boolean);
+  matchingFiles(commit: string, beneath: string, literal: string): string[] {
+    const result = this.invoke(["grep", "--no-textconv", "-l", "-z", "-F", "-e", literal, commit, "--", beneath]);
+    if (result.status === 1 && !result.out) return [];
+    if (!result.ok) throw Error("Git could not resolve the feature association");
+    const prefix = `${commit}:`;
+    return result.out.split("\0").filter(Boolean).map(row => {
+      if (!row.startsWith(prefix)) throw Error("unknown feature association response");
+      return row.slice(prefix.length);
+    });
+  }
+
+  lookup(ref: string): string | undefined {
+    const answer = this.invoke(["rev-parse", "--verify", "-q", `${ref}^{commit}`]);
+    if (answer.status === 1 && !answer.out) return undefined;
+    const oid = answer.out.trim();
+    if (!answer.ok || !OID.test(oid)) throw Error("unable to resolve the local repository state");
+    return oid;
   }
 
   file(commit: string, path: string): string | undefined {
