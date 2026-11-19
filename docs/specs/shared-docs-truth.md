@@ -135,6 +135,7 @@ None.
 | 2026-11-19 | R-4 | spec | `f06f8906ae4801b062c29957269b42f375ef442a` | unknown | procedural | No findings. |
 | 2026-11-19 | R-4 | spec | `f06f8906ae4801b062c29957269b42f375ef442a` | n/a | n/a | accepted by owner |
 | 2026-11-19 | R-5 | implementation | `18d20daf80d86d3f3c7c604fd0fe6c879b77ae58` | unknown | procedural | One blocker in fixture isolation and four should-fix findings. |
+| 2026-11-19 | R-6 | implementation | `3698d2472244c6a13a6b0a2abdfd12cfaf50213e` | unknown | procedural | One blocker and two should-fix findings in native receipt checks. |
 
 ### R-1
 
@@ -321,6 +322,46 @@ SEVERITY: should-fix
 WHERE: Feature `covers` (lines 7-23), Task T1 (lines 113-114), `tests/vh-adlc/maintenance/discovery.test.ts:12`
 EVIDENCE: This candidate changes the maintenance discovery test's fixed skill count to a check for the maintenance skill. The prior assertion fails when the docs-truth skill is installed in the source tree. The feature cites the maintenance suite as discovery evidence, but its coverage excludes this changed test, so later edits to that test do not stale the review.
 PROPOSAL: Cover the changed discovery test through the accepted spec revision and review process, or establish the same discovery proof through the already covered tests without depending on the uncovered change.
+
+### R-6
+
+TARGET: 3698d2472244c6a13a6b0a2abdfd12cfaf50213e
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: not verified
+EVIDENCE: At 3698d247, the focused Bun suite passed 74 tests and 337 assertions, including the inherited Git context regression. On the identical shipped component from 18d20daf, I inspected Codex traces showing the default selection and reason, refusal after a partial selector returned one path, and refusal after a tracked file changed on disk. The remaining mode, intake and refusal cases ran at the earlier 04d58a64 fingerprint. The revised runner has not established the whole criterion on the exact candidate.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: untested
+EVIDENCE: The 18d20daf Codex transcripts show source-backed verdicts, the HTTP 500 versus 503 product discrepancy, a source-backed refusal to invent the configured retention duration, and a freshness-only report. Git HEAD, refs, index and project files match in the completed report receipts. The runner rejects the correct unsupported-replacement responses. The interruption trace establishes cancellation before the second document and preservation, but contains no native unfinished-review report.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 at 3698d247 records operator-observed selector parity and rollback between Stackweaver baseline 72e48ed5 and adapter 22e5b96f. I did not inspect private consumer files or observe native forwarding, authorized writes, delivery recovery or cutover. Those checks remain open.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: I inspected both local catalog install receipts and the Claude discovery inventory, and recomputed matching fingerprints for the 304 shipped files at 18d20daf and 3698d247. Codex executed the exact installed skill in the retained local trial. The dispatcher reports that Claude's model attempts returned HTTP 429. Ordinary published marketplace installs, upgrades, Claude claim review and post-adoption documentation remain unverified.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:12-16,156-159`, AC-02 proof
+EVIDENCE: The R-5 F-03 remedy added an unsupported-replacement case. Both retained runs correctly mark the exact 30-day claim incorrect and cite the 14-day maximum and operator-set duration. The rerun says "No fixed-duration replacement is supported." The verifier rejects that correct disposition because its wording is absent from the regular expression. This blocks the fixture proof.
+PROPOSAL: Have the fixture request a structured unsupported-replacement disposition and assert it alongside the verdict and source. Preserve both failed receipts and check that the verifier accepts the observed correct outcome and rejects a proposed unverified duration.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:214-225,231-251`, AC-02 proof and Task T3
+EVIDENCE: The R-5 F-03 remedy cancels the process after the first document-body read. The retained run exited 143 with no native final report. The runner marks the case successful and populates `unfinished` with both expected paths itself. This verifies cancellation and unchanged state, but cannot prove that the review exposes unfinished work.
+PROPOSAL: Retain the hard-cancellation case as preservation evidence. Add a controlled interruption that lets the installed procedure return unfinished work, and verify the completed and unfinished paths from that output.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:85-119,121-159`, AC-01 and AC-02 proof
+EVIDENCE: The R-5 F-02 remedy adds checks for trace markers, freshness output and selection reasons. A generic failed response still passes a negative case without evidence of the intended refusal. The partial case need not show that the selector actually returned a path and exited with failure. In a sized full review, the six setup findings alone still pass even if all README claims are missing. The meta and historical cases accept an empty findings array.
+PROPOSAL: For each required refusal, attest the input and diagnostic that distinguish it from a generic failure. Assert the expected findings and evidence for every document in the sized, meta and historical cases.
 
 ## Sources
 
