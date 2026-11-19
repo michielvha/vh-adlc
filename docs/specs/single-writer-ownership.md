@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-13 found no blockers in the Git reservation draft. Owner acceptance is pending."
+status: planned
+status_description: "The owner accepted the Git reservation design reviewed in R-13. Implementation tasks and the claim are next."
 issue: null
 goal: "Two sessions using vh-adlc cannot accidentally start or resume the same feature as its writer."
 covers:
@@ -79,7 +79,7 @@ The owner kept Git coordination and explicit adoption and handoff. For the dupli
 start problem, the owner chose checks at workflow entry and removed the requirement to
 intercept writes or prove that a process stopped. Reviews R-1 through R-4 describe the
 earlier draft. Its unchecked criteria AC-01 through AC-09 are superseded and remain in
-Git history. Neither draft was accepted.
+Git history. The owner accepted the simpler Git reservation design at R-13.
 
 ### Review follow-up for task planning
 
@@ -321,6 +321,7 @@ None. The owner selected the Git reservation, entry checks and explicit handoff.
 | 2026-11-19 | R-11 | spec | `6b107fa86ebff48dfeed86378128ef481a9284ad` | unknown | procedural | One should-fix finding on recovery after an uncertain issue creation. Model identity was not attested. |
 | 2026-11-19 | R-12 | spec | `1844e72a74c9b7065e443b631375b542642e6307` | unknown | procedural | Two should-fix findings on pending draft entry and preservation of its marker. Model identity was not attested. |
 | 2026-11-19 | R-13 | spec | `014299049c45051a2d4f8e3b40ba33e3de4ba51f` | unknown | procedural | No blocking findings. One should-fix on exercising already-specified pending behavior through both move paths. Model identity was not attested. |
+| 2026-11-19 | R-13 | spec | `014299049c45051a2d4f8e3b40ba33e3de4ba51f` | n/a | n/a | accepted by owner |
 
 ### R-1
 
