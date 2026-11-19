@@ -52,32 +52,36 @@ Stackweaver keeps its project rules in settings and one project procedure.
 
 ### Owner summary
 
-Stackweaver still runs its own spec-driven loop (`agents/spec.md`, `tasks.md`, `implement.md`,
-`ship.md`, `investigate.md`, `reviewer.md`), while triage, maintenance, audit, docs impact and SEO
-already run through vh-adlc. This feature moves the rest, roadmap row D-05, without losing a native
-capability. A comparison of about 120 behaviors found vh-adlc stronger in several places (independent
+Stackweaver uses the shared vh-adlc loop for new and enrolled specs. The adoption landed in
+[Stackweaver #1084](https://github.com/michielvha/stackweaver/pull/1084).
+[Issue #85](https://github.com/michielvha/vh-adlc/issues/85) tracks the remaining live-session
+checks. Stackweaver's [loop settings](https://github.com/michielvha/stackweaver/blob/main/.vh-adlc/loop.yaml)
+define the current reviewer commands and model pins.
+
+This feature moved the spec, review, tasks, implementation, shipping and investigation workflows
+onto vh-adlc. A comparison of about 120 behaviors found vh-adlc stronger in several places (independent
 implementation review, binary-checked gates, claim commits, handoff, resume) and found 21 conflicts and
 9 missing hooks, which the design resolves.
 
-The shared side gains: per-role model routing in a committed `.vh-adlc/loop.yaml`; a generic external
-command route for the two reviewer roles, so a Claude session gets a `gpt-6.1-sol` review through the
-Codex CLI that is stored and checked like any other (read-only spec reviews, which write nothing, read a read-only export of
+The shared loop has per-role model routing in a committed `.vh-adlc/loop.yaml` and an external
+command route for both independent reviewer roles. A Claude session can receive a review from the
+configured Codex CLI and store it through the same review checks (spec reviews read an export of
 the exact commit; implementation reviews get shell, guarded by a before-and-after check of refs, index
 and files); a project procedure and declared review lenses read by every SDD operation; verification
 rungs by path that must pass before push, completion and delivery; manual-CI reporting, a post-merge
 watch, and consumer skip-CI paths; claims from a host worktree plus an opt-in rule that keeps implement
 out of the primary checkout; `**` in `covers`; and investigation defaults.
 
-Stackweaver adopts it through thin adapters, `loop.yaml` and `agents/loop-project.md`, behind a parity map
+Stackweaver adopted it through thin adapters, `loop.yaml` and `agents/loop-project.md`, behind a parity map
 that fails if a legacy rule has no home. Each command routes per document: enrolled specs go to vh-adlc,
-others to the native agents, which retire only once no non-terminal spec is unenrolled. Draft specs move
-now; planned, in-progress and parked specs finish natively unless the owner moves one. Feature PRs land
+others to the native agents, which retire only once no non-terminal spec is unenrolled. Existing planned,
+in-progress and parked specs finish natively unless the owner enrolls them. Feature PRs land
 by merge commit. `/implement` keeps handing straight to ship under a written grant, and small fixes keep
 shipping through Stackweaver's own `/ship`. The live slot pass, kind runs for named E2E specs and the
 final full kind run stay binding.
 
-Delivery follows an Order list after completion, as `host-cleanup.md` does: release, lock PR, marketplace
-install, then Stackweaver's adoption PR. Rollback is rehearsed on a disposable checkout.
+Delivery followed the order recorded above: release, lock PR, marketplace install, then Stackweaver's
+adoption PR. Rollback was rehearsed on a disposable checkout.
 
 A revision after the first acceptance only adds the code paths the design needs to `covers`
 (`plugins/vh-adlc/scripts/loop/`, `scripts/triage/owned-process.ts`, `references/loop-settings.md`,
