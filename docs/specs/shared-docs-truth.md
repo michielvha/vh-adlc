@@ -138,6 +138,7 @@ None.
 | 2026-11-19 | R-5 | implementation | `18d20daf80d86d3f3c7c604fd0fe6c879b77ae58` | unknown | procedural | One blocker in fixture isolation and four should-fix findings. |
 | 2026-11-19 | R-6 | implementation | `3698d2472244c6a13a6b0a2abdfd12cfaf50213e` | unknown | procedural | One blocker and two should-fix findings in native receipt checks. |
 | 2026-11-19 | R-7 | implementation | `8cda536e00bc5752fd17de860b05d2347b8fab9f` | unknown | procedural | No findings. AC-02 met. Released and consumer checks remain open. |
+| 2026-11-19 | R-8 | implementation | `694458f7c6550ac630b09f4eef853f40ba4f7d26` | unknown | procedural | One blocker and one should-fix finding in generic intake proof. |
 
 ### R-1
 
@@ -383,6 +384,39 @@ EVIDENCE: Task T4 records operator-observed selector parity and rollback for Sta
 CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
 VERDICT: not verified
 EVIDENCE: I inspected both native local-catalog installation receipts and the Claude discovery inventory. The 304-file component fingerprint at 8cda536e matches the 18d20daf candidate receipt. Codex executed the installed procedure. Claude model execution remains pending after the reported HTTP 429 responses. Actual published installs, upgrades and the post-adoption record remain open.
+
+### R-8
+
+TARGET: 694458f7c6550ac630b09f4eef853f40ba4f7d26
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: not verified
+EVIDENCE: At 694458f7, the focused Bun suite passed 74 tests and 337 assertions, and feature lint passed. The shipped fingerprint matches 18d20daf. The new same-package Codex transcripts passed the structured duplicate-path, outside-scope and incomplete-inventory cases with unchanged state. Earlier same-package transcripts establish the remaining selection modes and input refusals. The installed intake proof still has the two gaps below.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The shipped component is unchanged since R-7. I inspected the retained same-package evidence showing the source-backed verdicts, the product contract conflict, the targeted unsupported-replacement flag, the native unfinished-work report, and the freshness-only path. The completed and paused trial snapshots preserve HEAD, refs, index and project files. The reason-code change applies only to refusal assertions.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 records operator-observed selector parity and rollback for Stackweaver 72e48ed5 and 22e5b96f. This review did not inspect private consumer files or observe native forwarding, authorized writes, recovery or cutover.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: The native local-catalog installation receipts apply to the same 304 shipped files at 18d20daf and 694458f7. Codex executed the installed procedure. Claude discovery was observed locally, while model execution remains open after the reported HTTP 429 responses. Ordinary published installs, upgrades and adoption documentation remain unverified.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:167-178`, AC-01 intake proof
+EVIDENCE: The exact-package generic-intake transcript correctly marks the worker count unknown. It cites a search of the assessed commit for worker references and explains that the Makefile only prints a message. The existing source regex requires `workers`, `config` or `source`, so the runner rejects this valid evidence. The reason-code correction leaves this independent assertion unchanged.
+PROPOSAL: Accept the observed source description and retain a requirement for independent source evidence. Keep the rejected receipt and rerun generic intake.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:132-139`, `plugins/vh-adlc/references/lifecycle.md` ambiguous documentation intake, AC-01 clarification proof
+EVIDENCE: The exact-package ambiguity transcript read the installed lifecycle reference through a brace-expanded shell path. The verifier's literal command substring missed the read. The transcript also shows that the agent opened the synthetic README before asking for scope, so the case does not establish clarification before document collection.
+PROPOSAL: Verify the observed lifecycle reference without relying on shell command spelling. State that the ambiguous intake branch asks for scope before opening candidate documents, then rerun it and verify the read boundary.
 
 ## Sources
 
