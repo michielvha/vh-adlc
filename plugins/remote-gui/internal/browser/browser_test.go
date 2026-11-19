@@ -123,8 +123,40 @@ func TestBrowserPhaseArguments(t *testing.T) {
 	}
 }
 
+// The larger private backing display must not select oversized native
+// cursors, including when the management workstation requests a large cursor.
+func TestPrivateDisplayKeepsNormalCursorSize(t *testing.T) {
+	for _, inherited := range []struct{ name, size string }{{"default", ""}, {"normal", "24"}, {"oversized-host", "96"}} {
+		t.Run(inherited.name, func(t *testing.T) {
+			t.Setenv("XCURSOR_SIZE", inherited.size)
+			t.Setenv("XCURSOR_THEME", "fixture-theme")
+			var sizes []string
+			var theme, display, authority string
+			for _, entry := range cleanEnv(":123", "/owned/Xauthority") {
+				key, value, _ := strings.Cut(entry, "=")
+				switch key {
+				case "XCURSOR_SIZE":
+					sizes = append(sizes, value)
+				case "XCURSOR_THEME":
+					theme = value
+				case "DISPLAY":
+					display = value
+				case "XAUTHORITY":
+					authority = value
+				}
+			}
+			if !slices.Equal(sizes, []string{"24"}) {
+				t.Fatalf("private cursor sizes = %q, want one 24-pixel setting", sizes)
+			}
+			if theme != "fixture-theme" || display != ":123" || authority != "/owned/Xauthority" {
+				t.Fatal("cursor selection changed theme or private display ownership")
+			}
+		})
+	}
+}
+
 func TestVNCArgumentsLeaveSelectionsToTheHelper(t *testing.T) {
-	want := []string{"-display", ":123", "-localhost", "-rfbport", "5901", "-rfbauth", "/owned/session/vnc.passwd", "-forever", "-shared", "-noxdamage", "-nosel", "-quiet"}
+	want := []string{"-display", ":123", "-localhost", "-rfbport", "5901", "-rfbauth", "/owned/session/vnc.passwd", "-forever", "-shared", "-noxdamage", "-nosel", "-quiet", "-clip", "1440x900+0+0"}
 	if got := vncArgs(":123", "5901", "/owned/session/vnc.passwd"); !slices.Equal(got, want) {
 		t.Fatalf("x11vnc arguments: %q", got)
 	}

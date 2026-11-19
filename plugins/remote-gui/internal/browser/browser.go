@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"os"
@@ -34,27 +35,30 @@ type child struct {
 	done     chan struct{}
 }
 type runtime struct {
-	mu           sync.Mutex
-	current      session.BrowserHandle
-	profile      string
-	downloads    string
-	reusable     bool
-	env          []string
-	vncAddress   string
-	chrome       *child
-	modeReady    bool
-	stopped      bool
-	generation   atomic.Uint64
-	loaded       atomic.Bool
-	automated    atomic.Bool
-	inputChecked atomic.Bool
-	markerServer *http.Server
-	home, id     string
-	children     []*child
-	display      *state.Display
-	once         sync.Once
-	cleanupErr   error
-	clip         clipboardHelper
+	geometry       *geometryController
+	geometryCtx    context.Context
+	geometryCancel context.CancelFunc
+	mu             sync.Mutex
+	current        session.BrowserHandle
+	profile        string
+	downloads      string
+	reusable       bool
+	env            []string
+	vncAddress     string
+	chrome         *child
+	modeReady      bool
+	stopped        bool
+	generation     atomic.Uint64
+	loaded         atomic.Bool
+	automated      atomic.Bool
+	inputChecked   atomic.Bool
+	markerServer   *http.Server
+	home, id       string
+	children       []*child
+	display        *state.Display
+	once           sync.Once
+	cleanupErr     error
+	clip           clipboardHelper
 	// clipMu guards the switch mark and the clipboard's own copy of the
 	// browser mode. Health checks never take it, and the handoff holds it
 	// only to mark and unmark a switch.
@@ -160,12 +164,13 @@ func cleanEnv(display, auth string) []string {
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
 		switch key {
-		case "DISPLAY", "XAUTHORITY", "CHROME_LOG_FILE", "CHROMIUM_FLAGS", "CHROME_FLAGS", "CHROMIUM_USER_FLAGS":
+		case "DISPLAY", "XAUTHORITY", "XCURSOR_SIZE", "CHROME_LOG_FILE", "CHROMIUM_FLAGS", "CHROME_FLAGS", "CHROMIUM_USER_FLAGS":
 			continue
 		}
 		out = append(out, entry)
 	}
-	return append(out, "DISPLAY="+display, "XAUTHORITY="+auth)
+	// Keep native themed cursors independent of the larger backing display.
+	return append(out, "DISPLAY="+display, "XAUTHORITY="+auth, "XCURSOR_SIZE=24")
 }
 
 func (r *runtime) spawn(role, binary string, args, env []string) (*child, error) {
@@ -246,6 +251,9 @@ func freePort() (string, error) {
 }
 
 func (r *runtime) stop() {
+	if r.geometryCancel != nil {
+		r.geometryCancel()
+	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.once.Do(func() {
@@ -410,6 +418,7 @@ func Start(ctx context.Context, c config.Config, id string) (session.BrowserHand
 	}
 	for range 3 {
 		r := &runtime{home: c.Home, id: id}
+		r.geometryCtx, r.geometryCancel = context.WithCancel(context.Background())
 		handle, e := r.start(ctx, c)
 		if e == nil {
 			handle.Stop = r.stop
@@ -485,7 +494,7 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 	if err = runInput(ctx, app.Tool("REMOTE_GUI_XAUTH", "xauth"), []string{"-f", auth}, "add "+display+" . "+hex.EncodeToString(cookie)+"\n", env); err != nil {
 		return empty, err
 	}
-	x, err := r.spawn("display", app.Tool("REMOTE_GUI_XVFB", "Xvfb"), []string{display, "-screen", "0", "1440x900x24", "-nolisten", "tcp", "-auth", auth}, env)
+	x, err := r.spawn("display", app.Tool("REMOTE_GUI_XVFB", "Xvfb"), []string{display, "-screen", "0", "4096x4096x24", "-nolisten", "tcp", "-auth", auth}, env)
 	if err != nil {
 		return empty, err
 	}
@@ -563,12 +572,13 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 	r.clipMu.Lock()
 	r.clipMode = handle.BrowserMode
 	r.clipMu.Unlock()
-	return handle, nil
+	r.startGeometry()
+	return r.snapshot(), nil
 }
 
 // x11vnc leaves selections and cut buffers alone, so only the clipboard helper touches them.
 func vncArgs(display, port, passwordFile string) []string {
-	return []string{"-display", display, "-localhost", "-rfbport", port, "-rfbauth", passwordFile, "-forever", "-shared", "-noxdamage", "-nosel", "-quiet"}
+	return []string{"-display", display, "-localhost", "-rfbport", port, "-rfbauth", passwordFile, "-forever", "-shared", "-noxdamage", "-nosel", "-quiet", "-clip", "1440x900+0+0"}
 }
 
 // prepareLaunch returns Chromium's arguments for one launch. A reusable
@@ -601,6 +611,14 @@ func (r *runtime) launch(ctx context.Context, mode string) (session.BrowserHandl
 		return empty, errors.New("stale-browser-control-file-unavailable")
 	}
 	args, err := r.prepareLaunch(mode, generation)
+	if r.geometry != nil {
+		for i, arg := range args {
+			if strings.HasPrefix(arg, "--window-size=") {
+				args[i] = fmt.Sprintf("--window-size=%d,%d", r.geometry.size.Width, r.geometry.size.Height)
+			}
+		}
+		r.geometry.confirmed = false
+	}
 	if err != nil {
 		return empty, err
 	}

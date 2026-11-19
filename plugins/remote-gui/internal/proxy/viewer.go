@@ -8,10 +8,11 @@ import (
 )
 
 const viewerPage = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shared browser</title><style>
-html,body{margin:0;height:100%;background:#15171c;color:#eee;font:14px system-ui}
-header{height:32px;padding:3px 8px;box-sizing:border-box;display:flex;align-items:center;gap:12px}
+html,body{margin:0;height:100%;overflow:hidden;background:#15171c;color:#eee;font:14px system-ui}
+header{position:relative;height:32px;padding:3px 8px;box-sizing:border-box;display:flex;align-items:center;gap:12px}
 #status{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #screen{height:calc(100% - 32px);width:100%}
+#viewport-status{position:absolute;top:36px;right:8px;z-index:2;margin:0;box-sizing:border-box;width:min(30rem,calc(100vw - 16px));padding:8px;border-radius:4px;background:#2b303b;color:#eee}
 button{font:inherit;color:#eee;background:#2b303b;border:1px solid #4a5160;border-radius:4px;padding:2px 10px;min-height:26px;cursor:pointer}
 button:focus-visible,textarea:focus-visible,#clipboard-remote:focus-visible{outline:2px solid #7aa7ff;outline-offset:1px}
 #clipboard{position:absolute;top:36px;right:8px;z-index:1;width:min(30rem,calc(100% - 16px));max-height:calc(100% - 48px);overflow:auto;box-sizing:border-box;padding:12px;background:#1f232b;border:1px solid #4a5160;border-radius:6px;display:flex;flex-direction:column;gap:8px}
@@ -22,7 +23,7 @@ textarea{font:inherit;color:#eee;background:#15171c;border:1px solid #4a5160;bor
 #clipboard-remote{margin:0;min-height:3em;max-height:12em;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#15171c;border:1px solid #4a5160;border-radius:4px;padding:4px;font:13px ui-monospace,monospace}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 </style></head><body>
-<header><span id="status">Connecting to shared browser</span><button id="clipboard-toggle" type="button" aria-expanded="false" aria-controls="clipboard">Clipboard</button></header>
+<header><span id="status">Connecting to shared browser</span><p id="viewport-status" role="status" aria-live="polite" hidden></p><button id="clipboard-toggle" type="button" aria-expanded="false" aria-controls="clipboard">Clipboard</button></header>
 <section id="clipboard" aria-label="Clipboard panel" hidden>
 <p id="clipboard-mode">Opening the panel shows who controls the shared browser.</p>
 <p id="clipboard-warning" hidden>Text you send now is readable by the agent.</p>
@@ -115,15 +116,93 @@ $('clipboard-copy').addEventListener('click',copy);
 $('clipboard-refresh').addEventListener('click',()=>{void refresh()});
 $('clipboard-clear').addEventListener('click',()=>{void clearAll()});
 window.addEventListener('pagehide',forget);
+// Geometry is page-local. Identifiers order requests; session authentication still owns access.
+const sizingNotice=$('viewport-status'),screen=$('screen');
+const viewerID=Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,'0')).join('');
+let sizingConnected=false,controlsSize=false,sequence=0,generation=0;
+let pendingSize=null,sizeTimer=0,sizeInFlight=false,sizeAbort=null,lastSize='';
+const sizingEligible=()=>sizingConnected&&document.visibilityState==='visible'&&document.hasFocus();
+function fitViewerHeight(){
+ const height=Math.floor(window.visualViewport?window.visualViewport.height:window.innerHeight);
+ screen.style.height=Math.max(0,height-32)+'px';
+ panel.style.maxHeight=Math.max(0,height-48)+'px';
+}
+function measuredSize(){
+ const box=screen.getBoundingClientRect();
+ if(!Number.isFinite(box.width)||!Number.isFinite(box.height))return null;
+ const scale=Math.min(1,4096/box.width,4096/box.height);
+ const width=Math.floor(box.width*scale),height=Math.floor(box.height*scale);
+ return width>=320&&height>=240?{width,height}:null;
+}
+function pauseSizing(){
+ generation++;clearTimeout(sizeTimer);sizeTimer=0;pendingSize=null;controlsSize=false;
+ if(sizeAbort)sizeAbort.abort();
+}
+function queueSize(claim=false){
+ if(!sizingEligible()||(!claim&&!controlsSize))return;
+ const size=measuredSize();
+ if(!size){clearTimeout(sizeTimer);sizeTimer=0;pendingSize=null;return}
+ const key=size.width+'x'+size.height;
+ if(!claim&&!sizeInFlight&&key===lastSize)return;
+ if(claim){generation++;controlsSize=true}
+ pendingSize={...size,claim:claim||Boolean(pendingSize&&pendingSize.claim),retries:0,generation};
+ clearTimeout(sizeTimer);sizeTimer=setTimeout(()=>{sizeTimer=0;void flushSize()},150);
+}
+async function flushSize(){
+ if(sizeInFlight||!pendingSize||!sizingEligible())return;
+ const request=pendingSize;pendingSize=null;sizeInFlight=true;
+ const controller=new AbortController();sizeAbort=controller;
+ const deadline=setTimeout(()=>controller.abort(),5000);
+ try{
+  const reply=await fetch('/__remote_gui/viewport',{
+   method:'POST',credentials:'same-origin',cache:'no-store',signal:controller.signal,
+   headers:{'Content-Type':'application/json','X-Remote-Gui-Viewport':'1'},
+   body:JSON.stringify({viewer_id:viewerID,sequence:++sequence,claim:request.claim,width:request.width,height:request.height})
+  });
+  const data=await reply.json();
+  if(request.generation!==generation||!sizingEligible())return;
+  if(reply.status===409&&data&&data.error==='viewport-busy'){
+   if(request.retries<4){
+    const next=pendingSize||request;
+    pendingSize={...next,claim:false,retries:request.retries+1,generation};
+    clearTimeout(sizeTimer);sizeTimer=setTimeout(()=>{sizeTimer=0;void flushSize()},500);
+   }
+   return;
+  }
+  if(reply.ok&&data&&data.result==='inactive'){
+   controlsSize=false;
+   if(pendingSize&&!pendingSize.claim)pendingSize=null;
+   return;
+  }
+  if(!reply.ok||!data||!['applied','unchanged'].includes(data.result)||data.width!==request.width||data.height!==request.height)throw Error('Sizing refused');
+  lastSize=request.width+'x'+request.height;
+  sizingNotice.hidden=true;
+ }catch{
+  if(request.generation===generation&&sizingEligible()){
+   lastSize='';sizingNotice.textContent='Automatic sizing unavailable; fitting the shared browser.';sizingNotice.hidden=false;
+  }
+ }finally{
+  clearTimeout(deadline);if(sizeAbort===controller)sizeAbort=null;sizeInFlight=false;
+  if(pendingSize&&!sizeTimer&&sizingEligible())void flushSize();
+ }
+}
+fitViewerHeight();
+new ResizeObserver(()=>queueSize()).observe(screen);
+window.addEventListener('resize',()=>{fitViewerHeight();queueSize()});
+if(window.visualViewport)window.visualViewport.addEventListener('resize',()=>{fitViewerHeight();queueSize()});
+window.addEventListener('focus',()=>queueSize(true));
+window.addEventListener('blur',pauseSizing);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')queueSize(true);else pauseSizing()});
+window.addEventListener('pagehide',pauseSizing);
 try{
  const reply=await fetch('/__remote_gui/viewer-access',{credentials:'same-origin',cache:'no-store'});
  if(!reply.ok)throw Error('Access expired');
  const credentials=await reply.json();
  remote=new RFB($('screen'),(location.protocol==='https:'?'wss://':'ws://')+location.host+'/websockify',{credentials:{password:credentials.password}});
  remote.scaleViewport=true;remote.viewOnly=false;
- remote.addEventListener('connect',()=>{status.textContent='Shared browser connected';focusRemote()});
- remote.addEventListener('disconnect',()=>{status.textContent='Shared browser disconnected';forget()});
- remote.addEventListener('securityfailure',()=>{status.textContent='Shared browser authentication failed';forget()});
+ remote.addEventListener('connect',()=>{status.textContent='Shared browser connected';sizingConnected=true;focusRemote();queueSize(true)});
+ remote.addEventListener('disconnect',()=>{status.textContent='Shared browser disconnected';sizingConnected=false;pauseSizing();sizingNotice.hidden=true;forget()});
+ remote.addEventListener('securityfailure',()=>{status.textContent='Shared browser authentication failed';sizingConnected=false;pauseSizing();forget()});
  // A phone keyboard resizes the viewport; typing in the panel must stay there.
  window.addEventListener('resize',focusRemote);
 }catch(error){status.textContent='Shared browser unavailable. Reopen the session link.'}

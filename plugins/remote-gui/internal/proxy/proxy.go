@@ -25,6 +25,7 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/tailnet"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/viewport"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/xclip"
 )
 
@@ -58,6 +59,7 @@ type Options struct {
 	UpstreamConnection func(context.Context, net.Conn) bool
 	OnCompatibility    func(string)
 	Clipboard          Clipboard
+	Resize             viewport.Resize
 }
 type client struct {
 	probe   bool
@@ -92,6 +94,11 @@ type (
 		onCompatibility    func(string)
 		problem            string
 		clipboard          Clipboard
+		resize             viewport.Resize
+		viewportMu         sync.Mutex
+		viewportEntries    map[string]viewportEntry
+		viewportActive     string
+		viewportNow        func() time.Time
 	}
 )
 
@@ -133,6 +140,7 @@ func New(o Options) (*Proxy, error) {
 	p := &Proxy{ownerLogin: o.OwnerLogin, servePeer: o.ServePeer, assets: assets, viewerPassword: o.ViewerPassword, landing: landing, id: o.ID, origin: origin, target: target, deadline: o.Deadline, clients: make(map[[32]byte]*client), connections: make(map[net.Conn]bool), upstreamAlive: o.UpstreamAlive, upstreamConnection: o.UpstreamConnection, onCompatibility: o.OnCompatibility}
 	if assets != nil {
 		p.clipboard = o.Clipboard
+		p.resize = o.Resize
 	}
 	p.reverse = &httputil.ReverseProxy{Rewrite: p.rewrite, ModifyResponse: p.response, ErrorLog: log.New(io.Discard, "", 0), ErrorHandler: func(w http.ResponseWriter, _ *http.Request, _ error) {
 		p.fail("upstream-or-compatibility-failure")
@@ -278,7 +286,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.enroll(w, r)
 		return
 	}
-	if strings.HasPrefix(r.URL.Path, "/__remote_gui") && (p.assets == nil || r.URL.Path != "/__remote_gui/viewer-access") && (p.clipboard == nil || r.URL.Path != clipboardPath) {
+	if strings.HasPrefix(r.URL.Path, "/__remote_gui") && (p.assets == nil || r.URL.Path != "/__remote_gui/viewer-access") && (p.clipboard == nil || r.URL.Path != clipboardPath) && (p.resize == nil || r.URL.Path != viewportPath) {
 		http.NotFound(w, r)
 		return
 	}
@@ -306,6 +314,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if p.upstreamAlive != nil && !p.upstreamAlive() {
 		p.Revoke()
 		http.Error(w, "application ownership changed", http.StatusGone)
+		return
+	}
+	if p.resize != nil && r.URL.Path == viewportPath {
+		p.serveViewport(w, r)
 		return
 	}
 	if p.clipboard != nil && r.URL.Path == clipboardPath {

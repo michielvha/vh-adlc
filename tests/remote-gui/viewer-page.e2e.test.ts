@@ -240,3 +240,45 @@ for(const family of ['chromium','firefox'] as const)test.skipIf(!enabled||(famil
   server.stop(true);
  }
 },120000);
+
+for(const family of ['chromium','firefox'] as const)test.skipIf(!enabled||(family==='firefox'&&!process.env.REMOTE_GUI_FIREFOX))(`viewer automatic sizing: ${family}`,async()=>{
+ const html=await viewerPage();
+ const state={status:200,delay:0,busy:0,requests:[] as {width:number;height:number;claim:boolean;sequence:number;at:number}[],inFlight:0,peak:0};
+ const server=Bun.serve({hostname:'127.0.0.1',port:0,async fetch(request){const path=new URL(request.url).pathname;
+  if(path==='/')return new Response(html,{headers:{'content-type':'text/html'}});
+  if(path==='/core/rfb.js')return new Response(rfbStub,{headers:{'content-type':'text/javascript'}});
+  if(path==='/__remote_gui/viewer-access')return Response.json({password:'synthetic'});
+  if(path==='/__remote_gui/clipboard')return Response.json({text:'',browser_mode:'human'});
+  if(path!=='/__remote_gui/viewport')return new Response('',{status:404});
+  const value=await request.json() as {width:number;height:number;claim:boolean;sequence:number};state.requests.push({...value,at:Date.now()});state.inFlight++;state.peak=Math.max(state.peak,state.inFlight);
+  const status=state.busy>0?409:state.status;if(state.busy>0)state.busy--;if(state.delay)await Bun.sleep(state.delay);state.inFlight--;
+  return Response.json(status===200?{result:'applied',width:value.width,height:value.height}:{error:status===409?'viewport-busy':'viewport-unavailable'},{status});
+ }});
+ const runtime=createRequire(import.meta.url)(process.env.REMOTE_GUI_PLAYWRIGHT_MODULE!) as Record<string,{launch:(options:Record<string,unknown>)=>Promise<any>}>;
+ const browser=await runtime[family].launch(family==='chromium'?{executablePath:process.env.REMOTE_GUI_CHROMIUM,headless:true,chromiumSandbox:true,args:['--disable-gpu']}:{executablePath:process.env.REMOTE_GUI_FIREFOX,headless:true});
+ try {
+  const context=await browser.newContext({viewport:{width:1200,height:800},deviceScaleFactor:2,reducedMotion:'reduce'});
+  await context.addInitScript(()=>{(window as any).__focused=true;(window as any).__visible=true;document.hasFocus=()=>Boolean((window as any).__focused);Object.defineProperty(document,'visibilityState',{get:()=>(window as any).__visible?'visible':'hidden',configurable:true})});
+  const page=await context.newPage();const errors:string[]=[];page.on('pageerror',(e:Error)=>errors.push(e.message));await page.goto(server.url.href);await page.waitForFunction(()=>(window as any).__rfb);
+  await page.evaluate(()=>(window as any).__rfb.dispatchEvent(new Event('connect')));
+  const waitCalls=async(n:number)=>{const end=Date.now()+7000;while(state.requests.length<n&&Date.now()<end)await Bun.sleep(20);check(state.requests.length>=n,'missing automatic size request '+n)};
+  await waitCalls(1);check(state.requests[0].width===1200&&state.requests[0].height===768&&state.requests[0].claim,'initial CSS geometry/claim incorrect');
+  const first=state.requests.length;for(const width of [1100,1050,1000,900])await page.setViewportSize({width,height:1000});await waitCalls(first+1);await Bun.sleep(200);check(state.requests.length===first+1&&state.requests.at(-1)?.width===900&&state.requests.at(-1)?.height===968,'resize burst was not debounced');
+  await page.evaluate(()=>window.dispatchEvent(new Event('resize')));await Bun.sleep(250);check(state.requests.length===first+1,'unchanged geometry repeated work');
+  state.delay=450;await page.setViewportSize({width:800,height:900});await waitCalls(first+2);await page.setViewportSize({width:700,height:900});await page.setViewportSize({width:600,height:900});await waitCalls(first+3);await Bun.sleep(500);check(state.peak===1&&state.requests.at(-1)?.width===600,'in-flight requests were not coalesced');state.delay=0;
+  state.status=503;await page.setViewportSize({width:500,height:900});await page.getByText('Automatic sizing unavailable; fitting the shared browser.',{exact:true}).waitFor();
+  state.status=200;await page.setViewportSize({width:600,height:900});await page.locator('#viewport-status').waitFor({state:'hidden'});
+  await page.getByRole('button',{name:'Clipboard',exact:true}).click();const field=page.getByLabel('Text for the remote browser',{exact:true});await field.fill('synthetic clipboard field');await page.setViewportSize({width:390,height:667});await Bun.sleep(350);check(await field.evaluate((n:HTMLElement)=>document.activeElement===n),'sizing stole clipboard focus');
+  const beforeZero=state.requests.length;await page.locator('#screen').evaluate((node:HTMLElement)=>{node.style.width='0px'});await Bun.sleep(250);check(state.requests.length===beforeZero,'zero-size area sent geometry');await page.locator('#screen').evaluate((node:HTMLElement)=>{node.style.width='100%'});await Bun.sleep(250);
+  const beforeLimits=state.requests.length;for(const size of [{width:200,height:200},{width:320,height:8224},{width:8192,height:272}]){await page.setViewportSize(size);await Bun.sleep(200)}check(state.requests.length===beforeLimits,'unsupported aspect ratio requested an invalid size');
+  await page.setViewportSize({width:8192,height:2032});await waitCalls(beforeLimits+1);check(state.requests.at(-1)?.width===4096&&state.requests.at(-1)?.height===1000,'above-limit viewer did not preserve aspect ratio');
+  await page.evaluate(()=>{(window as any).__visible=false;document.dispatchEvent(new Event('visibilitychange'))});const hidden=state.requests.length;await page.setViewportSize({width:900,height:1000});await Bun.sleep(350);check(state.requests.length===hidden,'hidden viewer sent geometry');
+  await page.evaluate(()=>{(window as any).__visible=true;document.dispatchEvent(new Event('visibilitychange'))});await waitCalls(hidden+1);
+  state.busy=5;const beforeBusy=state.requests.length;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await waitCalls(beforeBusy+5);await Bun.sleep(750);check(state.requests.length===beforeBusy+5,'busy retries were unbounded');const retries=state.requests.slice(beforeBusy);check(retries[0].claim&&retries.slice(1).every(r=>!r.claim),'busy retry replayed a focus claim');
+  await page.setViewportSize({width:901,height:1000});await waitCalls(beforeBusy+6);await Bun.sleep(200);
+  state.busy=5;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await waitCalls(beforeBusy+7);await page.evaluate(()=>{(window as any).__focused=false;window.dispatchEvent(new Event('blur'))});const blurred=state.requests.length;await Bun.sleep(750);check(state.requests.length===blurred,'blurred viewer retried sizing');state.busy=0;await page.evaluate(()=>{(window as any).__focused=true;window.dispatchEvent(new Event('focus'))});await waitCalls(blurred+1);
+
+  await page.evaluate(()=>(window as any).__rfb.dispatchEvent(new Event('disconnect')));const disconnected=state.requests.length;await page.setViewportSize({width:902,height:1000});await Bun.sleep(250);check(state.requests.length===disconnected,'disconnected viewer sent geometry');await page.evaluate(()=>(window as any).__rfb.dispatchEvent(new Event('connect')));await waitCalls(disconnected+1);check(state.requests.at(-1)?.claim,'reconnect did not claim');
+  check(errors.length===0,'viewer console errors: '+errors.join(','));await context.close();
+ }finally{await browser.close();server.stop(true)}
+},120000);

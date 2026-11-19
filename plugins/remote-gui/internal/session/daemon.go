@@ -566,7 +566,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	if r.Kind == "share" {
 		connectionCheck = func(ctx context.Context, conn net.Conn) bool { return connectionOwned(ctx, r, conn) }
 	}
-	p, err := proxy.New(proxy.Options{OwnerLogin: ownerLogin, ServePeer: servePeer, ID: id, Origin: origin, Target: target, Deadline: r.Expires, UpstreamAlive: alive, UpstreamConnection: connectionCheck, ViewerAssets: bundle.Assets, ViewerPassword: bundle.Password, Clipboard: bundle.Clipboard})
+	p, err := proxy.New(proxy.Options{OwnerLogin: ownerLogin, ServePeer: servePeer, ID: id, Origin: origin, Target: target, Deadline: r.Expires, UpstreamAlive: alive, UpstreamConnection: connectionCheck, ViewerAssets: bundle.Assets, ViewerPassword: bundle.Password, Clipboard: bundle.Clipboard, Resize: bundle.Resize})
 	if err != nil {
 		return err
 	}
@@ -747,6 +747,11 @@ func serve(ctx context.Context, r state.Record) (result error) {
 				return errors.New("lifetime-guard-stopped")
 			}
 			if !alive() {
+				// A normal reusable-profile stop can finish while this check
+				// waits for the runtime lock. Cancellation owns that result.
+				if ctx.Err() != nil {
+					return nil
+				}
 				return errors.New("upstream-ownership-changed")
 			}
 			if p.Problem() != "" {

@@ -115,6 +115,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: plugins/remote-gui/go.mod
@@ -136,8 +137,9 @@ jobs:
       - name: Prepare real browser verification
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb xauth x11vnc novnc websockify
+          sudo apt-get install -y --no-install-recommends xvfb xauth x11vnc novnc websockify python3 libxtst6
           bun install --cwd tests/remote-gui --frozen-lockfile --ignore-scripts
+          bun tests/remote-gui/node_modules/playwright-core/cli.js install --with-deps firefox
           test -x /usr/bin/google-chrome
       - name: Verify browser phases and session continuity
         env:
@@ -146,11 +148,23 @@ jobs:
           REMOTE_GUI_CHROMIUM: /usr/bin/google-chrome
           REMOTE_GUI_PLAYWRIGHT_MODULE: ${{ github.workspace }}/tests/remote-gui/node_modules/playwright-core
           REMOTE_GUI_TEST_BINARY: ${{ github.workspace }}/plugins/remote-gui/remote-gui
+          REMOTE_GUI_ARTIFACT_DIR: ${{ runner.temp }}/remote-gui-viewport
         run: |
           cd plugins/remote-gui
           go test -race ./internal/browser ./internal/xclip -count=1
           cd ../..
-          bun test tests/remote-gui/browser.e2e.test.ts tests/remote-gui/viewer-page.e2e.test.ts
+          REMOTE_GUI_FIREFOX=$(bun -e 'console.log(require("./tests/remote-gui/node_modules/playwright-core").firefox.executablePath())')
+          test -x "$REMOTE_GUI_FIREFOX"
+          export REMOTE_GUI_FIREFOX
+          bun test tests/remote-gui/browser.e2e.test.ts tests/remote-gui/viewer-page.e2e.test.ts tests/remote-gui/viewport.e2e.test.ts tests/remote-gui/legacy.e2e.test.ts
+      - name: Retain synthetic viewport evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: remote-gui-viewport-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/remote-gui-viewport
+          if-no-files-found: ignore
+          retention-days: 7
 
   paseo-hosts:
     runs-on: ubuntu-latest

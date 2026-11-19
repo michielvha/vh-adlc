@@ -2,6 +2,16 @@
 
 Share a task-local app through private Tailscale HTTPS, or give a human control of a fresh headed Chromium browser. Human sign-in runs with automation and browser debugging disabled. After the owner confirms completion, the agent can resume in the same disposable profile. Tailscale access opens directly for the selected owner's identity, with no viewer password or enrollment step.
 
+## Viewer sizing
+
+New browser sessions adapt to the viewer's available space below its toolbar. Text uses normal CSS-pixel sizing, including on high-density screens. Resizing the viewer or rotating the device keeps the browser process, tabs and form state.
+
+When several viewers are open, a focus or connection request takes size control in the order the server accepts it. Other viewers scale the shared image. A delayed focus request can take control until you refocus the viewer you want.
+
+The exported size ranges from 320 by 240 to 4096 by 4096. Larger viewers scale proportionally within that bound. Smaller areas and extreme aspect ratios keep the last usable resolution and fit it proportionally. The backing display uses about 64 MiB for its main framebuffer, plus other session memory. The private display requests 24-pixel themed cursors, independently of its larger backing size.
+
+If the viewer reports `Automatic sizing unavailable; fitting the shared browser.`, the connection remains available. Resize the viewer or refocus it to retry. Clipboard fields keep their keyboard focus during sizing. Existing supervisors keep their original behavior; updating the plugin changes new sessions only.
+
 ## Install and activate
 
 Install `remote-gui` independently from the vhco-tools marketplace. For Claude Code:
@@ -26,7 +36,7 @@ required browser verification fails, report the blocker without a localhost fall
 
 Installation makes the plugin discoverable. Activation establishes remote context for future chats. Native-agent scenarios and a browser on the other device establish actual behavior; package discovery alone does not.
 
-Version 0.3.0 adds the viewer's clipboard panel and reusable profiles. Update the installed marketplace plugin through your agent's plugin manager, then start a new chat to load its instructions. Existing sessions retain their running supervisor's code. End an older session before using the new features.
+Version 0.4.0 adds automatic viewer sizing. The clipboard panel and reusable profiles remain available. Update the installed marketplace plugin through your agent's plugin manager, then start a new chat to load its instructions. Existing sessions retain their running supervisor's code. New sessions use the updated version.
 
 ## Human sign-in and agent hand-back
 

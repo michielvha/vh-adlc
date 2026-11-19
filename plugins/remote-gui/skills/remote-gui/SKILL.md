@@ -66,6 +66,14 @@ A reusable profile is a named remote-gui profile that survives stop and expiry; 
 - Never list, read or copy files under the profile store. Reach a profile only through a remote-gui session.
 - `profile-in-use` means another session holds the profile; do not start a competing one. For `profile-browser-still-running` naming a session, run `cleanup` until that session is no longer `cleanup-pending` and reports `stopped` or `failed`, then retry; otherwise ask the owner to close the browser they started on that profile.
 
+## Viewer sizing
+
+New browser sessions adapt to the viewer's available space below the toolbar in CSS pixels. Resizing preserves the browser process, tabs and form state. A focused viewer's focus or connection claim takes size control in server acceptance order. Other viewers fit the shared image. A delayed claim can take control until the intended viewer is refocused.
+
+Supported exported sizes range from 320 by 240 to 4096 by 4096. Larger viewers scale proportionally within the maximum. Smaller areas and infeasible aspect ratios fit the last usable resolution. If the viewer reports `Automatic sizing unavailable; fitting the shared browser.`, keep the session available and refocus or resize the viewer to retry. Clipboard fields retain focus. Do not restart Chromium to recover a failed resize.
+
+An installed update affects new sessions. Keep an existing healthy supervisor running with its original behavior; do not stop or rotate it to demonstrate sizing.
+
 ## Clipboard panel
 
 The browser viewer has a clipboard panel that the owner opens with its **Clipboard** button. Offer it when the owner needs to put text such as a long URL into the shared browser, or take text out of it. Text moves only when the owner presses a button; nothing copies between the clipboards on its own.
