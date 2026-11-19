@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The independent-clone collision is reproduced. Shared coordination choice Q1 is pending; no ownership runtime is implemented or released."
+status_description: "The independent-clone collision is reproduced. The owner selected Git-remote coordination with fail-closed writer checks. Independent review and native-host validation are next; no ownership runtime is implemented or released."
 issue: null
 goal: "One canonical repository work item has one verified agent writer across clones, worktrees and supported hosts, with an explicit, preserved handoff."
 covers:
@@ -50,11 +50,9 @@ owner-delegated assessment remain possible. An authorized handoff preserves unfi
 work, changes the owner generation, and leaves a durable notice for the former writer.
 Quota exhaustion and missing processes are not automatic ownership release.
 
-Q1 asks where the shared authority lives. The recommendation is the repository's Git
-remote, with conditional updates and a reserved coordination ref, so different machines
-share it. A host-only registry fixes this workstation's collision but cannot cover
-another machine. When current ownership cannot be verified, write-capable entry stays
-held. Source publication, PR creation, merge and deployment retain their existing grants.
+The owner selected the repository's Git remote as the shared authority, with conditional
+updates and a reserved coordination ref, so different clones and machines share it.
+When current ownership cannot be verified, write-capable entry stays held. Source publication, PR creation, merge and deployment retain their existing grants.
 Adoption must explicitly authorize coordination-state writes; it does not grant source
 publication. No coordinator ref has been created for this draft.
 
@@ -66,6 +64,14 @@ Accepting the final, independently reviewed document will authorize local implem
 and tests. Publishing and consumer adoption require their own authority. The runtime is
 not built, tested as a fix, or released. Claude's present quota limit leaves actual
 native-host acknowledgment/proof pending; a hook-contract simulation is not that proof.
+
+### Owner decision
+
+On 19 November the owner selected Git-remote coordination as recommended and requested
+continued work, validation across Claude and Codex, takeover notification to the former
+Claude session, and continued consumer consolidation. The owner also explicitly requested
+publication of this draft so it is backed up remotely. Publication of the draft is distinct
+from releasing or adopting a working ownership runtime.
 
 ### Measured incident and current gaps
 
@@ -124,7 +130,7 @@ item and immutable target, and cannot inherit a source-writing token.
 
 ### D2: Shared owner authority
 
-Q1 selects the authority. The recommended Git-remote design uses a reserved coordination ref
+The owner-selected Git-remote authority uses a reserved coordination ref
 whose commits contain ownership records, separate from product source and release branches.
 Use non-force conditional updates against the observed ref. Do not put a read-then-write issue
 comment or a clone-local file in the place of an atomic claim.
@@ -216,15 +222,11 @@ Private host/session details remain in runtime state, not product documentation 
 
 ## Tasks
 
-Pending the Q1 decision, independent spec review and owner acceptance. No implementation task is complete.
+Pending independent spec review and the implementation gate. The owner selected Git-remote coordination and requested continuation. No implementation task is complete.
 
 ## Open Questions
 
-Q1: Where must the shared owner authority live?
-
-- Recommendation: use the repository's Git remote with atomic conditional claim updates and fail closed for unverified writes. This covers different clones and hosts and needs explicit adoption of coordination-state updates.
-- Alternative: use only a host-wide registry. This prevents same-host clone collisions but leaves other machines outside the guarantee.
-- State: asked in session; unanswered. No authority backend is accepted or implemented.
+None. Q1A was answered in session on 19 November: use Git-remote coordination as recommended, validate Claude and Codex, ensure the former Claude session receives the takeover notice, and continue consolidation. This selects the authority; implementation and native-host evidence are still pending.
 
 ## Review Log
 
