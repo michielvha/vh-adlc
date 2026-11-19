@@ -7,6 +7,7 @@ covers:
   - AGENTS.md
   - plugins/vh-adlc/scripts/ownership/**
   - plugins/vh-adlc/scripts/loop/**
+  - plugins/vh-adlc/scripts/labels/**
   - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/references/branches.md
   - plugins/vh-adlc/references/lifecycle.md
@@ -125,6 +126,14 @@ After both writers stop, the owner can select one existing reservation and its w
 An exact-tip update points all aliases of both records at the selected reservation and keeps the former
 records in Git history. This changes reservation metadata only. Preserve both work locations.
 
+Keep the existing approved issue preview with the writer's private work state and mark the
+creation pending before sending it. If the tracker outcome is uncertain, use the preview to
+check the target repository for the created issue. The owner confirms the existing issue number
+before vh-adlc binds it, using the same conflict procedure if it is already reserved. If the result
+cannot be verified, leave the link pending and do not repeat creation. Clear pending state after
+the alias is verified, or after the owner confirms no issue was created. Any new creation keeps
+its existing approval requirement.
+
 ### Store the reservation in Git
 
 Use one reserved ref on the adopted Git remote,
@@ -188,7 +197,8 @@ A handoff requires the owner to select the incoming session and keep the old ses
 feature work stopped until Git confirms the transfer, including during an uncertain result.
 Reuse the original checkout when possible. To move, the owner and incoming writer verify
 that the destination has the commits and unfinished work required to continue, including
-staged, unstaged and untracked changes, before transferring. Keep the original work intact
+staged, unstaged and untracked changes and any pending issue preview, before transferring.
+Keep the original work intact
 if the transfer fails. Update the reservation only if the observed prior writer and record
 are still current. Stale and repeated requests cannot overwrite a later handoff. The
 former writer receives the current location and a transfer message at its next
@@ -266,7 +276,7 @@ binary continues to supply the existing lifecycle gates.
 | Criterion | Proof |
 | --- | --- |
 | AC-10 | Race two processes through feature entry with independent clones of a disposable bare remote. Verify one reservation, unchanged source, index and refs in the losing clone apart from remote reads, and the current writer and location in the refusal. Race two starts for the same new issue-less spec path and verify only the winner can write the draft. Separate items both succeed. |
-| AC-11 | Enter through issue, spec and branch using HTTPS and SSH spellings for valid fetch and push. Pair the canonical fetch URL with a push URL to a different repo at the same tip. Refuse entry and confirm both remotes are unchanged. Race an old alias against a move and refuse an alias reserved elsewhere. Try entry by a newly created issue number before and after linking it to a reserved draft. Verify unlinked behavior, then discover a collision between existing reservations. Use a draft with a retained old spec path. Hold entry through every alias of both records until an explicit choice binds them all to one writer, preserving both histories and working trees. Exercise spec authoring through isolated implementation in the same session with no extra owner approval. Retain a rejected claim commit and retry from the new tip while a competitor stays held. Lose the response after an accepted update, verify exactly one matching operation and admit its writer. Pair it with a rejected or superseded operation and hold if either the operation or resulting record cannot be verified. A missing ref, unrelated genesis or offline remote holds entry. Prove each direct writer entry and both claim paths stop a competitor before edit, commit or push. Run a read-only review, then edit and test as current writer with no additional reservation calls. In each installed client, restart the process, resume the same conversation successfully and refuse a fresh conversation in the same checkout. Exercise both actual installed entry routes with mixed host environment markers and assert a hold. Invoke standalone claim with a matching explicit client and with a missing or mismatched ID. Verify no fallback to the other family. In a fixture, show why an unsupported child inheriting only its parent's client markers is outside the guarantee, then clear those markers and verify that writer entry holds without a native identity. |
+| AC-11 | Enter through issue, spec and branch using HTTPS and SSH spellings for valid fetch and push. Pair the canonical fetch URL with a push URL to a different repo at the same tip. Refuse entry and confirm both remotes are unchanged. Race an old alias against a move and refuse an alias reserved elsewhere. Try entry by a newly created issue number before and after linking it to a reserved draft. Let a tracker fixture create an issue and lose its response. Restart the draft workflow, recover the existing issue from its pending preview without creating another, and apply the same conflict procedure if the issue was independently reserved. Verify unlinked behavior, then discover a collision between existing reservations. Use a draft with a retained old spec path. Hold entry through every alias of both records until an explicit choice binds them all to one writer, preserving both histories and working trees. Exercise spec authoring through isolated implementation in the same session with no extra owner approval. Retain a rejected claim commit and retry from the new tip while a competitor stays held. Lose the response after an accepted update, verify exactly one matching operation and admit its writer. Pair it with a rejected or superseded operation and hold if either the operation or resulting record cannot be verified. A missing ref, unrelated genesis or offline remote holds entry. Prove each direct writer entry and both claim paths stop a competitor before edit, commit or push. Run a read-only review, then edit and test as current writer with no additional reservation calls. In each installed client, restart the process, resume the same conversation successfully and refuse a fresh conversation in the same checkout. Exercise both actual installed entry routes with mixed host environment markers and assert a hold. Invoke standalone claim with a matching explicit client and with a missing or mismatched ID. Verify no fallback to the other family. In a fixture, show why an unsupported child inheriting only its parent's client markers is outside the guarantee, then clear those markers and verify that writer entry holds without a native identity. |
 | AC-12 | Seed committed and dirty work. Refuse handoff without stop confirmation. Prove same-checkout handoff and handoff to a clone that initially lacks the work. Before transfer, compare the required commits, file hashes and index entries in the prepared destination. Simulate an uncertain transfer and require the owner to keep the old writer stopped until verification, with original work retained. Race or replay transfer requests and verify no request overwrites a later handoff. Resume both sessions through vh-adlc after success. Verify the new writer can continue, the old one sees the transfer, and a paused or quota-limited owner retains its reservation until handoff. |
 | AC-13 | Check stale-checkout policy discovery, both halves of interrupted setup, both records lost after verified adoption, a fresh clone of the restored remote with no prior binding, a genuinely unadopted remote, and an unsupported or missing client on both unadopted and adopted repositories. Verify the previously bound checkout holds, and show that the fresh clone cannot know the remote was adopted. Keep writing paused until restoring the original authority. Give the same explicit local-only draft request to an original local repository and a stale clone whose origin was removed before adoption verification. Both permit only a new local draft, and shared writer entry without origin holds. A verified adopted clone refuses the exception after origin is removed. Try a direct writer against an unresolved legacy claim and verify the ref stays unchanged. Race two owner reconciliations or lose a winning response, then resume the selected existing writer and hold another clone. Race initializers, lose a create response, and verify downgrade and compatible recovery of the same history. Keep the adopting fixture paused if its effective remote protection or release exclusion is missing. Verify both against the fixture consumer’s own policy before resumption. Prove a disposable remote accepts appends and refuses deletion and rewrites. Make the reserved and ordinary refs otherwise eligible for cleanup and select only the ordinary branch. Verify push and dispatch can reach tag-capable CI for an ordinary product branch but cannot for the reserved ref. Observe a permitted coordination push and a no-push refusal, with source refs and tracker unchanged. Run the Bun plugin checks and install from both exact candidate catalogs in isolated profiles. |
 | AC-14 | Capture conflict and transfer output from a remote clone and a checkout where the work location resolves locally. Verify the current writer's host and branch or spec, and an absolute path only in the local case. Inspect the shared history and remote diagnostics for permitted identifiers and absence of the planted raw session ID and absolute checkout path. |
@@ -293,6 +303,7 @@ None. The owner selected the Git reservation, entry checks and explicit handoff.
 | 2026-11-19 | R-8 | spec | `810132e29e1e69ee15b1f37bf5b1d5fb86ba0cab` | unknown | procedural | One blocking and five should-fix findings on rollout, linking and proof. Model identity was not attested. |
 | 2026-11-19 | R-9 | spec | `23ff6ec2d3e0907aafbc5a74e0af550ae4f802f2` | unknown | procedural | One blocking and three should-fix findings on remembered adoption, alias collisions and installed client proof. Model identity was not attested. |
 | 2026-11-19 | R-10 | spec | `1e5b607fdf49755d051f53d7c209e8513cb68a54` | unknown | procedural | No blocking findings. Three should-fix findings on recovery limits, retained aliases and nested client identity. Model identity was not attested. |
+| 2026-11-19 | R-11 | spec | `6b107fa86ebff48dfeed86378128ef481a9284ad` | unknown | procedural | One should-fix finding on recovery after an uncertain issue creation. Model identity was not attested. |
 
 ### R-1
 
@@ -644,6 +655,15 @@ SEVERITY: should-fix
 WHERE: Context, Owner summary, supported clients. Scope, supported and unidentified clients. Design, Start, resume and hand off, client detection, and Adopt and roll back, installed checks. AC-11 and AC-13. Test Plan, AC-11 and AC-13.
 EVIDENCE: The R-9 follow-up at lines 162-170 rejects mixed Codex and Claude markers, but treats a single supported family's environment as the current client's identity. A different harness launched as a child of a Codex session can inherit that session's IDs without supplying Claude markers. The helper can attribute the child's entry to the parent writer. AC-11 tests both supported families together and AC-13 can exercise an unsupported client with a clean environment, so both can pass despite this path.
 PROPOSAL: Define how an installed writer route distinguishes its own client from inherited markers, or state the operational limit for nested unsupported clients. Test an unsupported route with the active writer's markers inherited and verify the chosen behavior.
+
+### R-11
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Identify the same work, issue creation and alias reconciliation. Design, Store the reservation in Git, lost responses. AC-10 and AC-11. Test Plan, AC-11.
+EVIDENCE: The R-8 and R-9 follow-ups at `docs/specs/single-writer-ownership.md:118-126` define the pre-link window and reconciliation once the relationship is found. The issue helper sends the tracker request and returns the issue number separately from the Git update (`plugins/vh-adlc/scripts/labels/github.ts:46-49`). If the tracker creates the issue and its response is lost, the resumed draft has no specified way to recover the link. The proof at line 269 can pass with every creation response delivered, while two sessions continue through the draft and issue after an interrupted creation.
+PROPOSAL: Document how the owner checks an uncertain issue creation and links the existing issue before continuing the draft or retrying creation. Exercise a successful tracker creation with a lost response, then verify that recovery uses the existing issue and applies the existing conflict procedure if another session already reserved it.
 
 ## Sources
 
