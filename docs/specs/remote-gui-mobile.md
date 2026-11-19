@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "The owner accepted reported-focus prompts. Implement and verify on the existing feature branch."
+status: in-progress
+status_description: "Implementing reported-focus prompts. Physical proof against the package remains open."
 branch: feat/remote-gui-mobile
 issue: null
 goal: "Tap a remote Chromium field, then tap its inline prompt to type using the phone keyboard."
