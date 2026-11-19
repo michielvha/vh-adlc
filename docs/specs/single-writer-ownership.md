@@ -19,6 +19,7 @@ covers:
   - .agents/plugins/marketplace.json
   - .claude-plugin/marketplace.json
   - .github/workflows/ci.yml
+  - .github/workflows/preview.yml
   - .github/workflows/release.yml
   - tests/vh-adlc/ownership/**
   - tests/vh-adlc/branches/**
@@ -39,9 +40,9 @@ covers:
 
 When you start an issue through vh-adlc, it reserves that issue for your session in Git.
 A second session starting or resuming the same issue sees who has it and where the work
-lives, even if it uses another clone. The current writer can resume without asking you
-again. An idle session or one that ran out of quota keeps its reservation. Reviews and
-work on other issues can continue.
+lives, even if it uses another clone. The current writer can resume or follow the normal
+route into an isolated worktree without asking you again. An idle session or one that ran
+out of quota keeps its reservation. Reviews and work on other issues can continue.
 
 For a handoff, you name the replacement and keep the old session stopped until
 vh-adlc confirms the transfer in Git. The existing work stays intact. If the old
@@ -95,8 +96,11 @@ background polling, automatic takeover or session messaging.
 Use the adopted Git repository identity and the feature's canonical issue. Normalize
 HTTPS and SSH forms of the same origin. The remote used for reservation reads and updates
 must resolve to that repository. Resolve a linked spec to its issue, including
-when a session enters via its branch. An issue-less feature uses its tracked canonical
-spec path. A branch name, clone path or issue title is never a substitute for the
+when a session enters via its branch. An issue-less feature uses its canonical spec path.
+For a new draft, run existing spec discovery and pick the final spec path under the configured
+feature root before writing. Reserve that path even when the file does not yet exist. Two
+unlinked goals given different spec paths cannot be recognized as duplicates. A branch name,
+clone path or issue title is never a substitute for the
 canonical item. Resolve aliases using current default-branch associations and the exact
 reservation tip used for the update. When linking an issue or moving a spec, bind the old
 and new aliases to the existing reservation before publishing the new link or path. Keep
@@ -109,8 +113,8 @@ Use one reserved ref on the adopted Git remote,
 `refs/heads/vh-adlc/work-ownership`. A small shared helper in the vh-adlc plugin owns
 the Git operations. Use Git objects and an exact expected-tip push without touching
 the source index or branches. Each update is a child of the verified tip and records
-the work item, opaque writer and checkout identifiers, work location, and a unique
-operation ID. Keep local session state and absolute checkout paths outside the shared
+the work item, opaque writer identity, work location and a unique operation ID. Keep
+raw session IDs and absolute checkout paths outside the shared
 ref. Show a useful host label and branch or spec locator, and a local checkout path
 when it can be resolved safely.
 
@@ -123,21 +127,31 @@ remote stops entry and gives the next step. Cached state is available for diagno
 Adoption explicitly permits ordinary acquisition on that ref during feature entry, using
 the caller's Git access. An explicit no-push or coordination restriction takes precedence.
 If acquiring or changing a reservation is forbidden, hold the writer entry that needs it.
-A matching resume only reads. Source and tracker writes still require their existing authority.
+A matching resume at the same location only reads. Source and tracker writes still require
+their existing authority.
 
 ### Start, resume and hand off
 
-Use the same check in the feature writer paths for Codex and Claude. Before the chosen
-operation writes or claims a branch, check for another writer. An unreserved item is
-reserved once. Use the current client's session binding and a local checkout binding.
-Both must match on resume. Status output is informational. Opening the same checkout
-in a second session leaves the reservation with the first.
-A resume with no history of ownership stays held if the item already has a legacy claim
-until the owner reconciles it. A rejected claim push keeps the pending commit and the
-reservation. If the existing retry procedure requires a worktree at the new default tip,
-use the same handoff procedure to update the current writer's checkout binding. Keep the
-pending commit reachable in the original checkout, then retry at the new tip with the
-existing claim checks. A second session cannot reserve the item in the meantime.
+Use the same check before the first feature mutation, including both the skill-driven
+claim and the standalone loop claim command. An unreserved item can be reserved after
+checking for unresolved legacy claims. Every writer entry, including direct commands,
+holds an existing claim without a reservation until the owner reconciles it. A hold
+leaves the reservation ref unchanged.
+
+Read the session ID from the current client's environment. Use Codex's `CODEX_THREAD_ID`
+or Claude Code's `CLAUDE_CODE_SESSION_ID`, as described in the
+[client observations](session-retrospective.md). Derive a client-namespaced fingerprint
+for the Git record. The same conversation must retain the ID through process restart.
+Hold entry if the ID is missing or the client cannot supply it reliably. Status output
+is informational. A fresh conversation in the same checkout has a different ID.
+
+The session owns the reservation. The existing worktree checks still decide where it
+can write. When the same session takes the normal route from a spec to an isolated
+worktree, or retries a rejected claim at the new default tip, update the work location
+after verifying the permitted checkout and before feature mutation. Use the ordinary
+reservation update so a concurrent handoff wins or loses against it. No owner handoff
+is needed when the writer stays the same. Keep any rejected claim commit reachable in
+the original checkout and leave unfinished work intact. Other sessions stay held.
 
 A handoff requires the owner to select the incoming session and keep the old session's
 feature work stopped until Git confirms the transfer, including during an uncertain result.
@@ -152,20 +166,26 @@ the usual lifecycle determines whether it can be worked on again.
 
 ### Adopt and roll back
 
-Read adoption policy from the current default-branch tip on the adopted remote, including
+Read adoption policy from the current default-branch tip on the canonical remote, including
 from feature checkouts made before adoption. Verify the reserved ref alongside it. Reuse
 the default-branch refresh already required by the workflow where possible. An absent
-policy and absent ref establish legacy behavior. If either lookup fails, or only one side
-exists, hold entry and report the missing or unverifiable part.
+policy and absent ref establish legacy behavior. If either configured remote lookup fails,
+or only one side exists, hold entry and report the missing or unverifiable part. In a repository
+created for local-only work with no remote, the ordinary explicitly local draft path remains
+available. An adopted checkout keeps evidence of that binding in its local Git metadata
+after verification. Losing its origin is an entry error, including when the binding is
+visible in the checkout or the last fetched policy. Never treat a missing remote by itself
+as a request to switch a checkout to local-only work.
 
 An authorized setup creates the reserved ref only if it is absent and binds its genesis
 in committed default-branch policy. If the create response is lost, verify the same genesis
 and operation before binding. If another setup wins or the history vanishes, stop and ask
-the owner to reconcile it. Verify that the adopted remote
-protects this ref against deletion and history rewrites. Exclude it from feature branch
-cleanup and CI that can create product tags. The current CI takes pushes on all
-branches and invokes versioning (`.github/workflows/ci.yml:3-6,194-205`). The release
-workflow starts on version tags (`.github/workflows/release.yml:3-5`).
+the owner to reconcile it. Entry verifies that the observed tip descends from the bound
+genesis. Verify that the remote allows appends and rejects deletion and history rewrites.
+Exclude the ref from feature branch cleanup and tag-capable CI on push and dispatch.
+The current CI accepts both (`.github/workflows/ci.yml:3-6,194-205`), and the preview workflow
+dispatches it for a labeled PR (`.github/workflows/preview.yml:3-21`). The release workflow
+starts on version tags (`.github/workflows/release.yml:3-5`).
 
 Before setup, identify existing claims and have the owner pause feature writers. Resume
 only after the new clients and both setup steps are verified. Resolve ambiguous or duplicate
@@ -173,8 +193,8 @@ claims by selecting one writer and location while preserving other work. A downg
 client without the check removes its duplicate-work protection. Keep the ref and its history,
 coordinate writers manually during rollback and reverify the same ref before restoring checks.
 
-Both clients publish the shared plugin through their Git-backed vhco-tools catalog in
-this repository. Codex uses `.agents/plugins/marketplace.json` and Claude Code uses
+This repository publishes the shared plugin through two Git-backed vhco-tools catalogs.
+Codex uses `.agents/plugins/marketplace.json` and Claude Code uses
 `.claude-plugin/marketplace.json`. Before merge, run the Bun plugin checks and install
 from both catalogs at the exact candidate commit using isolated client profiles. Run the
 entry scenarios against those installed packages in disposable repositories. The Go
@@ -187,7 +207,7 @@ binary continues to supply the existing lifecycle gates.
 | Reservation | The Git record assigning a work item to one current writer. |
 | Current writer | The session allowed to start or resume feature writing through vh-adlc. |
 | Work location | The writer's host label and branch or spec, with a checkout path when local. |
-| Handoff | An owner-approved change of writer or checkout while the previous feature work stays stopped. |
+| Handoff | An owner-approved change of writer while the previous feature work stays stopped. |
 
 ## Acceptance Criteria
 
@@ -200,10 +220,10 @@ binary continues to supply the existing lifecycle gates.
 
 | Criterion | Proof |
 | --- | --- |
-| AC-10 | Race two processes at the feature entry using independent clones of a disposable bare remote. Verify one reservation, byte-identical source, index and refs in the losing clone apart from remote reads, and the current writer and work location in the refusal. Repeat with separate items that both succeed. |
-| AC-11 | Enter through issue, spec and branch, including HTTPS and SSH spellings, an issue-less spec and a second session in the same checkout. Race an old alias against a move and refuse a new alias already reserved elsewhere. After a rejected claim push, retain the pending commit and successfully retry from a verified checkout at the new tip while a competitor stays held. Verify a lost response, missing ref and offline remote cannot admit an unverified writer. Test each direct writer entry listed in Scope, including ship and review recording, against a competing session. Run an independent read-only review. Count reservation calls during successful entry, then edit and test locally without additional reservation calls. Exercise start and resume using the candidate installed from both catalogs. |
+| AC-10 | Race two processes through feature entry with independent clones of a disposable bare remote. Verify one reservation, unchanged source, index and refs in the losing clone apart from remote reads, and the current writer and location in the refusal. Race two starts for the same new issue-less spec path and verify only the winner can write the draft. Separate items both succeed. |
+| AC-11 | Enter through issue, spec and branch using HTTPS and SSH spellings. Race an old alias against a move and refuse an alias reserved elsewhere. Exercise spec authoring through isolated implementation in the same session with no extra owner approval. Retain a rejected claim commit and retry from the new tip while a competitor stays held. Verify lost responses, a missing ref, unrelated genesis and an offline remote hold unverified writers. Prove each direct writer entry and both claim paths stop a competitor before edit, commit or push. Run a read-only review, then edit and test as current writer with no additional reservation calls. In each installed client, restart the process, resume the same conversation successfully and refuse a fresh conversation in the same checkout. Verify entry holds without the client's session ID. |
 | AC-12 | Seed committed and dirty work. Refuse handoff without stop confirmation. Prove same-checkout handoff and handoff to a clone that initially lacks the work. Before transfer, compare the required commits, file hashes and index entries in the prepared destination. Simulate an uncertain transfer and require the owner to keep the old writer stopped until verification, with original work retained. Race or replay transfer requests and verify no request overwrites a later handoff. Resume both sessions through vh-adlc after success. Verify the new writer can continue, the old one sees the transfer, and a paused or quota-limited owner retains its reservation until handoff. |
-| AC-13 | Test policy discovery from a stale feature checkout and both halves of interrupted setup. Include an unadopted fixture, competing initializers, lost create response, duplicate and legacy claims, and downgrade followed by compatible recovery of the verified history. Make the reserved ref and a normal branch otherwise eligible for cleanup and verify only the ordinary branch is selected. Check that a reservation ref cannot reach tag-capable CI while an ordinary product branch still can. Observe a permitted coordination push and refusal under a no-push restriction, with source refs and tracker unchanged. Run the Bun plugin checks and install from both exact candidate catalogs in isolated profiles. |
+| AC-13 | Check stale-checkout policy discovery, both halves of interrupted setup, unadopted remote and local-only authoring, and loss of origin after adoption. Try a direct writer against an unresolved legacy claim and verify the ref is unchanged until owner reconciliation. Race initializers, lose a create response, and verify downgrade and compatible recovery of the same history. Prove a disposable remote accepts appends and refuses deletion and rewrites. Make the reserved and ordinary refs otherwise eligible for cleanup and select only the ordinary branch. Verify push and dispatch can reach tag-capable CI for an ordinary product branch but cannot for the reserved ref. Observe a permitted coordination push and a no-push refusal, with source refs and tracker unchanged. Run the Bun plugin checks and install from both exact candidate catalogs in isolated profiles. |
 
 ## Tasks
 
@@ -222,6 +242,7 @@ None. The owner selected the Git reservation, entry checks and explicit handoff.
 | 2026-11-19 | R-3 | spec | `b7fc9a58858df974f1959a805adb6b1f0a8da8c9` | gpt-6.1-sol | procedural | Two should-fix findings on branch cleanup coverage and recovering an admitted action. |
 | 2026-11-19 | R-4 | spec | `13b62cefb0cd4eff6388f4a9eb328f835172bff6` | gpt-6.1-sol | procedural | NO FINDINGS. |
 | 2026-11-19 | R-5 | spec | `e0894287d8f4b9812ce2cf9eb522791c364e0761` | unknown | procedural | Three blocking and six should-fix findings on workflow routes, adoption, handoff and proof. Model identity was not attested. |
+| 2026-11-19 | R-6 | spec | `b2c53b40737f7bd15ee8b1d3de804a92347dc139` | unknown | procedural | Two blocking and six should-fix findings on existing entry paths and verification. Model identity was not attested. |
 
 ### R-1
 
@@ -396,9 +417,68 @@ WHERE: Design, Adopt and roll back, affected artifact and candidate packaging; T
 EVIDENCE: The pinned `conventions/delivery.md`, Feature delivery, requires naming each affected artifact's publication path and verifying the candidate through that path before merge. The revision names both marketplaces but only asks for candidate payload checks and feature entry. `docs/reference/marketplace.md:5-22` and `docs/get-started/installation.md:61-88` establish that both clients install from the Git-backed marketplace catalogs. A copied package can satisfy the stated candidate checks without either catalog installing it.
 PROPOSAL: Name both catalog publication paths and run pre-merge checks by installing the exact candidate from both catalogs into isolated profiles. Run the feature entry scenarios against those installed packages.
 
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope, feature-writing entry; Design, Identify the same work and Start, resume and hand off; AC-10 and AC-11; Test Plan, AC-10 and AC-11.
+EVIDENCE: The revised design requires a tracked canonical spec path for an issue-less feature and pauses unresolved identities before any feature write. `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:25,48-63,76` accepts a goal and creates a new draft when `find` returns nothing. Before writing that draft, the operation may have neither an issue nor a tracked spec. The issue-less spec test can use an existing file and miss this blocked entry.
+PROPOSAL: Define how an issue-less draft gets a canonical reservation key before its first write, or obtain an owner decision to restrict that authoring route. Test two sessions starting the same new issue-less draft and verify that the winner can write it.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope, direct and resume entries; Design, Start, resume and hand off and Adopt and roll back; AC-10, AC-11 and AC-13; Test Plan, AC-11 and AC-13.
+EVIDENCE: The revision expands the check to direct operations, but the legacy-claim exception still says “A resume with no history of ownership stays held.” Direct spec revision and implementation can enter an already claimed feature without invoking resume (`plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:53-57` and `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:90-98`). Applying “An unreserved item is reserved once” on those routes can give an unreconciled entrant the reservation before the existing handoff instruction stops source writes, preventing the legitimate writer from continuing.
+PROPOSAL: Apply the unresolved-legacy-claim hold to every writer entry before acquiring a reservation. Test a direct operation against an existing claim with no reservation and require an unchanged reservation ref until the owner reconciles it.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Owner summary, ordinary resume and handoff; Scope, existing worktree procedure; Design, Start, resume and hand off; Glossary, Handoff; AC-11 and AC-12; Test Plan, AC-11 and AC-12.
+EVIDENCE: Direct spec authoring uses a worktree holding the default branch, and `implement_worktree: isolated` sends implementation from the primary checkout to a new host worktree (`plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:53-57` and `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:46-53`). `tests/vh-adlc/loop/claim.test.ts:96-115` covers that ordinary move before the first claim. The revision defines checkout rebinding for a rejected claim, but the first transition from a reserved spec to isolated implementation also changes the checkout binding. A matching resume and a rejected-claim retry can both pass while that normal path stalls.
+PROPOSAL: State when the reservation is checked and how the same writer moves to the isolated worktree on the first implementation entry. If that transition needs an owner-approved handoff, make the extra step explicit and exercise the complete spec-to-claim sequence.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Owner summary, current-writer resume and handoff; Design, Store the reservation in Git and Start, resume and hand off; Glossary, Current writer and Handoff; AC-11 and AC-12; Test Plan, AC-11 and AC-12.
+EVIDENCE: The design calls for “the current client's session binding” but leaves its source and lifetime undefined. The checked-in native role launcher passes a generated session ID to child commands (`plugins/vh-adlc/scripts/docs-drift/role-launch.ts:79,98`). That code does not establish how an ordinary installed session obtains or recovers its own binding. The same-checkout test can use two synthetic IDs, and a successful installed resume can run in the original process. Both can pass while the original conversation loses ownership after a process restart, or while a fresh conversation inherits ownership from checkout-local state.
+PROPOSAL: Define how each supported client supplies a stable session binding, when it survives a resume and how entry holds when the binding is unavailable. In both installed clients, resume the original conversation after restarting the process and refuse a fresh conversation in the same checkout.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Owner summary, adoption and verification; Scope, adopted repositories; Design, Store the reservation in Git and Adopt and roll back; AC-11 and AC-13; Test Plan, AC-11 and AC-13.
+EVIDENCE: The revision holds entry if either remote lookup fails and requires two successful absences to establish legacy behavior. Generic intake currently allows a local draft, check and commit without publication authority (`plugins/vh-adlc/references/lifecycle.md:110-124`). A local Git repository without an origin cannot prove either remote absence. The unadopted fixture can use a reachable origin and miss the loss of this local entry path.
+PROPOSAL: Specify the result for a repository with no adoption remote, including a way to distinguish it from an adopted checkout whose origin is missing or unavailable. Exercise local authoring without an origin and confirm that removing origin from an adopted checkout cannot bypass its reservation.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope, direct entry; Design, Start, resume and hand off; AC-10 and AC-11; Test Plan, AC-10 and AC-11.
+EVIDENCE: The existing workflow has both a skill-driven claim (`plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:68-88`) and a mutating `loop/cli.ts claim` command used by isolated implementation and rejected-claim retry (`plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:46-53`, `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md:37-39` and `tests/vh-adlc/loop/cli.test.ts:107-122`). The revised proof names operations, but does not require the direct claim command or both claim paths. An implementation can check a caller and leave the documented command able to write without checking ownership.
+PROPOSAL: Identify where both supported claim paths enforce or receive the same entry decision. Invoke the documented claim command against a competing reservation and prove it holds before editing, committing or pushing.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Owner summary, adoption verification; Design, Store the reservation in Git and Adopt and roll back; AC-11 and AC-13; Test Plan, AC-11 and AC-13.
+EVIDENCE: The revision binds a genesis and requires protected history, but the adoption proof checks missing halves, initializer contention and compatible recovery. A reader that accepts any present ref can pass those cases and admit a fresh writer after the real ref is recreated with a different genesis. Cleanup exclusion also provides no evidence that the remote itself refuses deletion or history replacement.
+PROPOSAL: Require admission to verify that the observed reservation history descends from the policy's bound genesis. Test an unrelated replacement ref and verify on a disposable remote that ordinary append succeeds while deletion and a non-fast-forward rewrite are rejected.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Adopt and roll back, CI and release routing; AC-13; Test Plan, AC-13.
+EVIDENCE: The revised release proof adds a useful ordinary-branch control, but cites only push and tag routing. `.github/workflows/ci.yml:3-6,194-205` also permits manual dispatch, and `.github/workflows/preview.yml:3-21` dispatches the same workflow on the PR head. A push-only filter can pass a push comparison while leaving dispatch to the tag-capable job available.
+PROPOSAL: Verify exclusion for both push and dispatch routes through the tag-capable job, with an ordinary product branch as the positive control. If the reservation artifact itself prevents dispatch, demonstrate that with the actual artifact shape.
+
 ## Sources
 
 - [Earlier draft and historical incident receipt reference](https://github.com/michielvha/vh-adlc/blob/289a043d21cdc76310d3d32a62322b5f4cab9637/docs/specs/single-writer-ownership.md#measured-incident-and-current-gaps).
 - [Claim and isolation helpers](../../plugins/vh-adlc/scripts/loop/claim.ts) and [existing handoff procedure](../../plugins/vh-adlc/references/authority.md#handoff).
-- [CI push and version routing](../../.github/workflows/ci.yml) and [tag release trigger](../../.github/workflows/release.yml).
+- [CI push and version routing](../../.github/workflows/ci.yml), [preview dispatch](../../.github/workflows/preview.yml) and [tag release trigger](../../.github/workflows/release.yml).
+- [Recorded CLI session ID observations](session-retrospective.md). This checkout exposes the Codex variable names. The current Claude route still needs its installed-client proof.
 - [Marketplace source layout](../reference/marketplace.md) and [client installation paths](../get-started/installation.md).
