@@ -90,9 +90,11 @@ routing review, 90 consumer tests and the 48-check local gate remain evidence of
 their original versions. The marker correction is implemented and source-reviewed
 at `05e49ab8`; the owning first-red run, 212 passing focused cases and the clean
 scoped Opus review are recorded below. T157 adds the missing ordinary-caller
-outcome proof without changing production code. Exact-head CI, publication,
-corrected installation/native-session checks and final paired migration proof
-still precede the remote switch. GUI/phone and native Copilot execution stay deferred or unclaimed.
+outcome proof without changing production code. All six exact-head checks pass,
+PR #120 is merged, and published 0.26.1 passes ordinary Codex/Claude fresh installs
+and upgrades plus an active registered Claude session. Stackweaver remains staged
+until the new hosted trial and final paired migration proof pass. GUI/phone and
+native Copilot execution stay deferred or unclaimed.
 Other agent migrations stay on their separate roadmap.
 
 The 2026-11-19 cutover decision accepts either JSON field order and ASCII JSON
@@ -103,6 +105,32 @@ paths without observed marker-free runs stay blocked. The earlier Claude 2.1.326
 inline-role observation is a source diagnostic, not corrected-release native
 acceptance. T130 retains that published-install and final migration gate. Conservative marker-only
 details may proceed after clean review under the existing publication authority.
+
+### Corrected release checkpoint on 2026-11-19
+
+[PR #120](https://github.com/michielvha/vh-adlc/pull/120) merges reviewed
+`05e49ab8` as `dae76bf9eca4b99368819ca03c7db1fb4a136d24` after all six
+[CI checks](https://github.com/michielvha/vh-adlc/actions/runs/44466640629)
+pass. Plugin 0.26.1 has 291 shipped files and fingerprint
+`0051ac4a84e00887b6f1621e4afa35e02f06a356b073b1afffd0e0bab9104a61`.
+Actual ordinary Codex and Claude fresh installs and upgrades from 0.26.0 all
+match that fingerprint. Original native command outcomes and inventories remain
+in `t144-marketplace-release-dae76bf9`; no cache is reconstructed.
+
+The ordinary registered Claude plugin is updated through its native CLI. A real
+Claude Code 2.1.326 Opus 5.5 session loads 0.26.1 while its own native marker is
+present, and the installed checker matches all 291 files. The marker is a regular,
+non-executable, single-link 38-byte file with the accepted two-key shape. Owned
+process cleanup is confirmed, foreign markers are preserved, and notification
+settings remain unchanged across both update and execution. The original capture
+is `t145-registry-marker-release-dae76bf9`; global host inputs stay local.
+This is corrected-release active-install evidence, not a production backlog sweep.
+
+[PR #122](https://github.com/michielvha/vh-adlc/pull/122) separately publishes
+the ten caller regressions and R-138 records so its complete CI can run without
+restarting #120. Runtime bytes remain identical. Stackweaver's current staged
+update binds the published component; its normal hooks, hosted synthetic trial,
+new C/P review, activation preflight and final consumer gate remain pending.
 
 ### Active ordinary Claude cache finding on 2026-11-18
 
