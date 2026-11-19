@@ -32,3 +32,12 @@ test("explicit claim review routes to docs truth alongside the existing document
   expect(lifecycle).toMatch(/\| Review documentation affected by a code change \|[^\n]*skills\/vh-adlc-docs-impact\/SKILL.md/);
   expect(lifecycle).toMatch(/\| Whole-corpus documentation drift[^\n]*skills\/vh-adlc-docs-drift\/SKILL.md/);
 });
+
+test("generic discovery exposes the ambiguity guard before the lifecycle reference is loaded", () => {
+  const skill = readFileSync(resolve(plugin, "skills/vh-adlc/SKILL.md"), "utf8");
+  const header = /^---\n([\s\S]*?)\n---\n/.exec(skill);
+  expect(header).not.toBeNull();
+  const metadata = Bun.YAML.parse(header![1]) as { description: string };
+  expect(metadata.description).toMatch(/ambiguous documentation audit.+before opening candidate documents/i);
+  expect(skill.indexOf("before opening candidate documents")).toBeLessThan(skill.indexOf("../../references/lifecycle.md"));
+});
