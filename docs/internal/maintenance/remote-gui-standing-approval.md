@@ -83,8 +83,28 @@ shared package guidance. It does not claim a new marketplace release.
 
 ## Reviews
 
-Independent review pending.
+### R-1
+
+Target: `bec33ce76b0cf083f062bddced407e352b3395c8`.
+Model: unknown; the native Codex review context supplied no exact model identifier.
+Isolation: procedural, read-only source instructions; HEAD, branch, index and
+working tree were verified unchanged before/after.
+
+The reviewer independently observed 11 passing Bun package checks, 46 opt-in
+skips, and passing uncached Go race checks for config, profile and session.
+An initial read-only cache error and sandbox-denied socket option were environment
+limits; the same fixture checks then passed with an owned temporary cache and
+the permitted native test boundary. Live host/profile claims remain author evidence.
+
+Verbatim return:
+
+```text
+MODEL: unknown
+NO FINDINGS
+```
 
 ## State
 
-Active. No merge or release has occurred.
+Locally complete and independently reviewed. The shared guidance and adopted host
+instruction agree. Publication bookkeeping may be appended without changing the
+reviewed source or Definition. No merge or marketplace release has occurred.
