@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "All selected workflows are published and adopted in Stackweaver. Docs truth and domain extensions stay local. Live-session follow-ups remain tracked in the child features."
+status_description: "The earlier extractions are adopted in Stackweaver. Rolling docs truth is selected and in specification. Live-session follow-ups remain tracked in the child features."
 issue: null
 goal: "Selected reusable Stackweaver workflows are delivered through vh-adlc, with a separate accepted spec and verified migration for each capability."
 covers:
@@ -26,8 +26,9 @@ Docs impact identifies documents affected by a code change. Docs drift audits th
 scanner findings, and rechecks stale audit proposals. Stackweaver's
 [docs truth workflow](https://github.com/michielvha/stackweaver/blob/main/agents/docs-truth.md)
 revisits factual claims across the corpus and repository instructions in batches and records its
-progress in a local ledger. The accepted [docs-drift scope](shared-docs-drift.md#scope) explicitly
-excluded that separate workflow and ledger.
+progress in a local ledger. The accepted [docs-drift scope](shared-docs-drift.md#scope) excluded
+that workflow and ledger. The [docs-truth child spec](shared-docs-truth.md) now tracks the separate
+extraction and its Stackweaver migration.
 
 Triage is the first extraction. Its accepted behavior and local verification remain in
 [shared-triage.md](shared-triage.md), initially completed at `0e033f8` and refreshed by Copilot Opus 5.5 R-34 before publication.
@@ -83,7 +84,7 @@ updated rollback baseline. GUI discovery remains unverified under #33.
 | D-03 | Documentation impact and drift audit/resolution | Docs impact is published in [vh-adlc #51](https://github.com/michielvha/vh-adlc/pull/51) and adopted through [Stackweaver #1033](https://github.com/michielvha/stackweaver/pull/1033), after actual Codex/Claude marketplace fresh installs/upgrades, fresh paired Claude Code Opus 5.5 review and installed acceptance. The [child spec](shared-docs-impact.md#published-stackweaver-adoption) records exact revisions, all 15 current-component Copilot trial cases, Linux/macOS CI, post-merge corpus/caller/rollback checks and deferred surfaces. The child is complete: independent Claude Code Opus 5.5 R-16 marks all seven criteria met and its complete gate passes. Site/index/visual generation remains local. The [docs-drift feature](shared-docs-drift.md) is published as 0.26.1 and adopted through [Stackweaver #1160](https://github.com/michielvha/stackweaver/pull/1160), after ordinary Codex/Claude marketplace fresh installs/upgrades, a successful owned native Actions trial, final paired Claude Code Opus 5.5 C/P review, exact activation preflight, scanner parity, local gates and rollback. Its child is complete after independent Codex R-139 returns all seven criteria met and its completion gate passes; exact targets and proof limits remain in that child. The first production weekly sweep is unobserved; GUI/phone checks are owner-deferred and native Copilot execution is unclaimed. Scanner-specific policy, feedback files and schedules remain local; this roadmap grants no permission to run or publish a live sweep. |
 | D-04 | TFE compatibility and provider-fork workflows | Keep `agents/tfe-compat.md` and `agents/provider-fork.md` as domain extensions in Stackweaver. Extract only a separately selected reusable part, preserving product contracts and licensing boundaries. |
 | D-05 | Shared development loop | Spec, review, tasks, implementation, shipping and investigation are published and adopted through [vh-adlc #87](https://github.com/michielvha/vh-adlc/pull/87) and [Stackweaver #1084](https://github.com/michielvha/stackweaver/pull/1084). The [child spec](shared-development-loop.md) is complete. [Issue #85](https://github.com/michielvha/vh-adlc/issues/85) tracks the owner-deferred live-session tests. Stackweaver retains its plan formats, worktree isolation, integration/browser checks and release policy. |
-| Deferred | Rolling documentation truth audit | The native `/docs-truth` workflow, its shard selector and its ledger remain in Stackweaver. Extracting reusable parts would need a separately selected child feature. |
+| D-06 | Rolling documentation truth audit | Selected for extraction in the [docs-truth child spec](shared-docs-truth.md). The native workflow continues to run in Stackweaver during specification and verification. |
 
 ### Child feature contract
 
@@ -136,7 +137,7 @@ its own equivalent handoff. A parent status never replaces a child's acceptance 
       Evidence: `shared-maintenance.md` drafted and independently reviewed by actual Copilot Opus 5.5 through R-17 at `ad48fedfb7931e5479c32f1b9029829b1fe16a4b`, refreshing covered metadata/compatibility drift after the owner requested summaries before acceptance. R-17 has no blockers and its historical-baseline clarification is fixed; R-16's missing-default-checkout fixture remains tracked for task planning. The owner accepted the child after the summary, and its published delivery and adoption are recorded in D-01. The live Claude model trial remains an owner-deferred test.
 - [x] T4 `docs/specs/` - when the owner selects audit, draft and independently review its own child spec before implementation (AC-01, AC-04).
       Evidence: `shared-audit.md` reviewed by actual Copilot Opus 5.5 through R-12 at `67a91a17944bb219ce956364963531532577c396`, with no blockers and the merge-outcome recovery obligation retained for implementation. The owner accepted the summary and authorized documentation/issue/claim publication plus implementation on 2026-11-02.
-- [ ] T5 `docs/specs/` and this document - revisit the deferred docs truth and domain workflows only when selected; retain their dispositions meanwhile (AC-01, AC-04).
+- [ ] T5 `docs/specs/shared-docs-truth.md` and this document - record reviewed scope, verified publication and Stackweaver adoption for rolling docs truth. Keep the existing dispositions for the other domain workflows (AC-01, AC-04).
 
 - [x] T6 `docs/specs/shared-audit.md` and this document - record the authorized audit publication, actual marketplace fresh/upgrade acceptance, final paired preflight and consumer adoption with exact revisions; keep real Claude, GUI/phone and product operations visibly unclaimed until tested (AC-02, AC-03).
       Evidence: Shared merge `afb0c4b8`, normal signed v0.11.0, all four real marketplace cases, exact published/current-consumer paired review, installed preflight and Stackweaver merge `14a2779c` passed. Read-only adopted policy matches every parity mode and policy blob; ledger bytes remain unchanged and synthetic scoped rollback/reapply passes. See the child delivery evidence for full revisions and retained failures.
