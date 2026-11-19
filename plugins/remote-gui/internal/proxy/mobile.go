@@ -7,8 +7,10 @@ import (
 	"net/http"
 )
 
-const editablePath = "/__remote_gui/editable"
-const editablePhasePath = "/__remote_gui/editable-phase"
+const (
+	editablePath      = "/__remote_gui/editable"
+	editablePhasePath = "/__remote_gui/editable-phase"
+)
 
 func focusPoint(body []byte) (int, int, bool) {
 	d := json.NewDecoder(bytes.NewReader(body))
