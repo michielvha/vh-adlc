@@ -9,9 +9,10 @@ import { fixtureGit, withoutGitOverrides } from "./fixture-git";
 const repo = resolve(import.meta.dir, "../../..");
 const skill = "vh-adlc:vh-adlc-docs-truth";
 const setup = "docs/current/setup.md";
-const reportFormat = "Finish with a single JSON object containing status (complete, failed or clarification), "
+const reportFormat = "Finish with a single JSON object containing status (complete, incomplete, failed or clarification), "
   + "mode, paths (the ordered paths selected for claim review), coverage (full, targeted or none), and findings "
-  + "(an array of claim, verdict, source and disposition strings). For next mode give the selector's exact "
+  + "(an array of claim, verdict, source and disposition strings, and disposition_type set to retain, propose, flag or product_issue). "
+  + "For an incomplete review include completed and unfinished arrays of document paths. For next mode give the selector's exact "
   + "reasons in a reasons array. For report mode give the exact selector output (without a final newline) "
   + "in a freshness string. Put diagnostic details in a message string. "
   + "Use the installed procedure and actual repository evidence before giving the result. Keep the project read-only.";
@@ -42,7 +43,22 @@ const cases = {
     mode: "sweep", paths: [setup], coverage: "targeted" },
   interrupted: { ask: "next 2. Complete the first document before starting the second. Read the first document in its own command.",
     mode: "next", paths: [setup, "README.md"], coverage: "full" },
+  paused: { ask: "next 2. Check all claims in the first document, then stop before reading the second and report unfinished work.",
+    mode: "next", status: "incomplete", paths: [setup, "README.md"], coverage: "full" },
 } satisfies Record<string, TrialCase>;
+
+const refusalReasons: Record<string, RegExp> = {
+  invalid: /positive|invalid.*(?:0|limit|size)|(?:limit|size).*0/i,
+  duplicate: /duplicate|same path|repeated/i,
+  alias: /alias|canonical|\.\/docs\//i,
+  escape: /traversal|outside|escap|\.\.\/outside/i,
+  excluded: /excluded|out.of.scope|ineligible|not eligible|outside|not markdown/i,
+  untracked: /untracked|not (?:tracked|committed|present)|clean checkout/i,
+  docLink: /symlink|symbolic|120000|regular blob/i,
+  policyLink: /symlink|symbolic|120000|regular blob/i,
+  noPolicy: /missing|absent|no committed/i,
+  partial: /selector|inventory|(?:exit|status).*17/i,
+};
 
 type TrialCase = { ask: string; mode?: string; paths: string[]; coverage: string; status?: string; automatic?: boolean };
 
@@ -84,21 +100,28 @@ function parseReply(text: string, host: string) {
 
 function trace(text: string, host: string) {
   const commands: string[] = [], outputs: string[] = [];
+  let partialFailure = false;
   for (const line of text.split("\n").filter(Boolean)) {
     let event;
     try { event = JSON.parse(line); } catch { continue; }
     if (host === "codex" && event.type === "item.completed" && event.item?.type === "command_execution") {
       commands.push(event.item.command);
       outputs.push(event.item.aggregated_output);
+      if (event.item.aggregated_output?.includes("inventory failed")
+        && event.item.aggregated_output.includes(setup) && event.item.exit_code === 17) partialFailure = true;
     }
     if (host === "claude" && Array.isArray(event.message?.content)) {
       for (const content of event.message.content) {
         if (content.type === "tool_use") commands.push(JSON.stringify(content.input));
-        if (content.type === "tool_result") outputs.push(JSON.stringify(content.content));
+        if (content.type === "tool_result") {
+          const output = JSON.stringify(content.content);
+          outputs.push(output);
+          if (content.is_error && output.includes("inventory failed") && output.includes(setup)) partialFailure = true;
+        }
       }
     }
   }
-  return { commands, outputs: outputs.join("\n") };
+  return { commands, outputs: outputs.join("\n"), partialFailure };
 }
 
 const bodyMarker = "The service listens on port 9000 by default.";
@@ -108,11 +131,15 @@ function verifyReads(log: ReturnType<typeof trace>, id: string, selected: TrialC
   const reference = id === "ambiguous" ? "references/lifecycle.md" : "references/docs-truth.md";
   if (!log.commands.some((line) => line.includes(reference))) throw Error("installed procedure read not observed");
   const documentMarkers = [bodyMarker, "The default service port is 3900.", "The first lab launch used port 8999."];
-  if ((selected.status || id === "report" || id === "empty")
+  if ((selected.status === "failed" || selected.status === "clarification" || id === "report" || id === "empty")
     && documentMarkers.some((marker) => log.outputs.includes(marker))) {
     throw Error("read a document body outside a successful claim review");
   }
   if (id === "report" && !log.outputs.includes(freshness.split("\n")[0])) throw Error("freshness selector output not observed");
+  if (id === "partial" && !log.partialFailure) throw Error("partial selector output and failure not observed");
+  if (id === "paused" && (!log.outputs.includes(bodyMarker) || log.outputs.includes("# Example service"))) {
+    throw Error("pause occurred outside the intended document boundary");
+  }
   if (["default", "intake", "sized"].includes(id) && !log.outputs.includes("PORT=3900")) {
     throw Error("independent service evidence not observed");
   }
@@ -124,13 +151,16 @@ function verifyReport(report: Record<string, unknown>, selected: TrialCase, id: 
     throw Error("native report status, scope or coverage differed");
   }
   if (!Array.isArray(report.findings)) throw Error("missing findings inventory");
+  if (refusalReasons[id] && (typeof report.message !== "string" || !refusalReasons[id].test(report.message))) {
+    throw Error("report does not identify the expected refusal");
+  }
   if (selected.coverage === "none" && report.findings.length) throw Error("unexpected claim review");
   if (id === "report" && report.freshness !== freshness) throw Error("freshness differs from selector");
   if (selected.mode === "next" && !selected.status) {
     const reasons = selected.paths.map((path) => path === setup ? "never verified" : "verified 2026-01-01");
     if (reasons.length && JSON.stringify(report.reasons) !== JSON.stringify(reasons)) throw Error("selection reasons differ");
   }
-  if (["default", "intake", "sized"].includes(id)) {
+  if (["default", "intake", "sized", "paused"].includes(id)) {
     const expected = [
       [/9000|port/i, "incorrect", /service\.conf.*3900|service\.conf/i],
       [/make start/i, "accurate", /Makefile/i],
@@ -151,13 +181,22 @@ function verifyReport(report: Record<string, unknown>, selected: TrialCase, id: 
     if (id === "sized") allowed.push(/3900|setup instructions|docs\/current\/setup\.md.*exists/i);
     if (report.findings.some((row) => !allowed.some((claim) => claim.test(row.claim)))) throw Error("unexpected full-review claim");
   }
+  if (["sized", "meta"].includes(id) && !report.findings.some((row) =>
+    /3900/.test(row.claim) && row.verdict === "accurate" && /service\.conf/i.test(row.source))) {
+    throw Error("README claim and source evidence missing");
+  }
+  if (id === "historical" && !report.findings.some((row) => /8999/.test(row.claim) && row.verdict === "unknown")) {
+    throw Error("historical claim was not reviewed as unresolved");
+  }
   if (id === "sweep" && (report.findings.length !== 1 || report.findings[0].verdict !== "incorrect"
     || !/port/i.test(report.findings[0].claim))) throw Error("targeted port review differed");
   if (id === "unsupported" && (report.findings.length !== 1 || report.findings[0].verdict !== "incorrect"
     || !/retention\.conf/i.test(report.findings[0].source)
-    || !/flag|unresolved|unknown|unverified|cannot|requires the operator/i.test(report.findings[0].disposition))) {
+    || report.findings[0].disposition_type !== "flag")) {
     throw Error("unsupported replacement was not flagged");
   }
+  if (id === "paused" && (JSON.stringify(report.completed) !== JSON.stringify([setup])
+    || JSON.stringify(report.unfinished) !== JSON.stringify(["README.md"]))) throw Error("unfinished report differs");
 }
 
 const [host, profile, installed, commit, output, ...selected] = Bun.argv.slice(2);
@@ -248,7 +287,7 @@ for (const id of selected) {
     failure = error instanceof Error ? error.message : String(error);
   }
   results.push({ id, skill, prompt, before, after, ...processResult, failure, transcript: stdout,
-    ...(id === "interrupted" && eventObserved ? { unfinished: testCase.paths } : {}) });
+    ...(id === "interrupted" && eventObserved ? { forcedCancellation: true } : {}) });
   const result = { host, commit, component: identity.component_sha256, version: identity.plugin_version, results };
   writeFileSync(join(destination, "result.json"), JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify({ id, host, pass: !failure, failure }));
