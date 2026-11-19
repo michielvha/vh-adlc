@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Initial draft based on the Stackweaver browser comparison. Independent review pending."
+status_description: "Initial draft based on the Stackweaver browser comparison. R-1 factual fixes applied. Owner decisions and follow-up independent review pending."
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
 covers:
@@ -9,7 +9,10 @@ covers:
   - plugins/vh-adlc/scripts/website-check/
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
+  - plugins/vh-adlc/scripts/seo/
   - tools/seo-evidence/
+  - .agents/plugins/marketplace.json
+  - .claude-plugin/marketplace.json
   - tests/vh-adlc/
 ---
 
@@ -21,16 +24,18 @@ covers:
 
 Run the same browser smoke checks against the local production build and the deployed site. The command runs directly from a terminal or pipeline. A vh-adlc skill reads its results, explains failures, and points to the project code and deploy configuration that own each fix. Each adopter supplies a short profile with a route, a page assertion and any site-specific expected responses. Stackweaver starts in report mode. Other projects can start with just a public homepage and add coverage as needed.
 
-Start with Playwright, the existing SEO evidence toolkit, and the project's installed secret scanner. Use axe through Playwright for automated accessibility checks. Use the local MDN HTTP Observatory CLI for deployed header findings if its current rule output fits the report. The shared code supplies browser event collection where an existing runner lacks it, tool adapters, and a consistent report. Browser smoke coverage requires Playwright and a supported browser. The default profile needs Chromium only. Accessibility, SEO analysis, secret scanning and deployed header checks can each be enabled separately. A missing tool is reported per check, and incomplete required coverage prevents an enabled gate from passing.
+Start with Playwright, the existing SEO evidence toolkit, and the project's installed secret scanner. Use axe through Playwright for automated accessibility checks. The SEO adapter uses the installed canonical analyzer bundle from the shared SEO feature. Use the local MDN HTTP Observatory CLI for deployed header findings if its current rule output fits the report. The shared code supplies browser event collection where an existing runner lacks it, tool adapters, and a consistent report. Browser smoke coverage requires Playwright and a supported browser. The default profile needs Chromium only. Accessibility, SEO analysis, secret scanning and deployed header checks can each be enabled separately. A missing tool is reported per check, and incomplete required coverage prevents an enabled gate from passing.
 
-The Stackweaver comparison already shows why the two targets need their own evidence. Both browsers saw the deployed homepage return 200 and make one signed-out session request that returned 401. Chromium reported that request as a console error. The clean local build served by its pinned Nginx image had a different failure: its default API URL points to localhost, and the page's policy blocked session and health requests. The local run used default configuration and the deployed artifact identity is unknown. The original scanner's full finding counts were not reproduced.
+The Stackweaver comparison already shows why the two targets need their own evidence. Both browsers saw the deployed homepage return 200 and make one signed-out session request that returned 401. Chromium reported that request as a console error. The clean local build served by its pinned Nginx image had a different failure: its default API URL points to localhost, and the page's policy blocked session and health requests. The local run used default configuration and the deployed artifact identity is unknown. The original scanner's full finding counts were not reproduced. Chromium's console diagnostic stays visible even when the HTTP response has an expected verdict.
 
 ### Background
+
+The local evidence directory is `/tmp/stackweaver-release-check.HSTmoi/`. The build output is in `build.log` and browser observations are in `nginx-built.jsonl`, `built.jsonl` and `deployed.jsonl`. The capture removed URL queries and omitted request methods and redirect chains. The pinned client source establishes the session request method. The proposed exception still needs a proof with the full request tuple.
 
 - Stackweaver source was exported from fetched `origin/main` at `72e48ed577af958034d6aa598e2835ef36ccdb8c`. `npm run build` exited 0. `frontend/Dockerfile` uses that build command and a pinned Nginx image. The browser run mounted the resulting files and the build's generated Nginx configuration into that image, with no injected deploy settings.
 - Fresh anonymous Chromium 158 and Firefox 159 visits waited for the load event and observed seven more seconds. Local Nginx returned 200 in both and logged 12 and 7 console errors respectively. The errors name the policy blocking `http://localhost:8022/auth/session` or `/health` and follow-on fetch failures. There were no observed 401 responses in that Nginx run. The plain static server control returned one 401 per engine from the local API, which the browser could reach without the Nginx response policy.
 - The deployed homepage returned 200 in both engines and one 401 each from `https://stackweaver.sh/auth/session`. Chromium logged one console error for that response. Neither engine reported an uncaught page error or transport failure. No other 401s were observed. This is one visit per engine per measured target.
-- In that Stackweaver revision, `frontend/src/config.ts:45` defaults the API URL to localhost and `frontend/src/lib/zitadel.ts:96-98` maps a session 401 to an anonymous session. `e2e/tests/public-seo.spec.ts:388-389` already exercises public browser navigation and collects page errors. `scripts/verify-local.sh:209-221` already invokes Gitleaks for repository changes.
+- In that Stackweaver revision, `frontend/src/config.ts:45` defaults the API URL to localhost and `frontend/src/lib/zitadel.ts:96-98` maps a session 401 to an anonymous session. `e2e/tests/public-seo.spec.ts:388-389` exercises public browser navigation and collects page errors. The next line intercepts the session request and returns a fixture 401. Reuse its runtime and compatible assertions in a separate anonymous smoke project with real responses. `scripts/verify-local.sh:209-221` already invokes Gitleaks for repository changes.
 - In vh-adlc at `84e59c898cbdb0bd4e76bd207b30a5356b495b32`, `tools/seo-evidence/README.md:25-32` describes the offline snapshot and inspection commands. Its policy section at line 125 defaults to report only. Reuse its bundle and finding formats for the evidence it already handles.
 
 ## Scope
@@ -39,28 +44,42 @@ Check explicitly configured routes on two targets: the adopter's locally served 
 
 ## Design
 
-- Provide a script in the shared plugin with two explicit modes, build and deployed. Each consumes a checked-in YAML profile that selects origins, routes, capabilities, required rules, and precise expected responses. The adopter owns how the production artifact is built and served. Reuse its configured Playwright runtime and existing route fixtures where possible. A minimum profile selects one route and one visible page assertion. An existing Playwright suite is reused when present. For a new adopter, the plugin provides a generic anonymous smoke scenario driven by the profile, run with a pinned Playwright runtime and Chromium installed through documented repository setup. Firefox is opt-in for the release check. Optional adapters are disabled unless selected. A disabled adapter is not applicable to this run. A selected adapter with a missing prerequisite is skipped with a reason. Stackweaver's first adoption is report only, as the owner decided. Enforcement requires an explicit policy.
+- Provide a script in the shared plugin with two explicit modes, build and deployed. Each consumes a checked-in YAML profile that selects origins, routes, capabilities, required rules, and precise expected responses. The adopter owns how the production artifact is built and served. Reuse its configured Playwright runtime and compatible page assertions. Release runs use a dedicated anonymous browser scenario with real responses. They cannot inherit route interception, seeded session state or authenticated setup. A minimum profile selects one route and one visible page assertion. An existing Playwright suite can call the shared runner from a dedicated project. For a new adopter, the plugin provides a generic anonymous smoke scenario driven by the profile, run with a pinned Playwright runtime and Chromium installed through documented repository setup. Firefox is opt-in for the release check. Optional adapters are disabled unless selected. A disabled adapter is not applicable to this run. A selected adapter with a missing prerequisite is skipped with a reason. Stackweaver's first adoption is report only, as the owner decided. Enforcement requires an explicit policy.
 - Capture each selected page in a fresh browser context. Attach Playwright listeners before navigation for console errors, uncaught page errors, failed requests, and HTTP responses. Record browser version, route, request method, resource type, sanitized URL and source location, and observed status or error text. Group repeated events while preserving their count. Use existing assertions for required page content so a successful HTTP response alone cannot pass.
-- Classify a declared anonymous session response as expected only for its exact method, origin, path, resource type, status and anonymous context. Stackweaver's deployed profile allows only the same-origin fetch `GET https://stackweaver.sh/auth/session` with status 401 in a fresh anonymous context. Match the full normalized URL including query, with no redirect and no query in this exception. Other profiles declare their own exceptions, including any local equivalent. Do not carry the Stackweaver exception across targets or apply it to unrelated console or page errors. Keep the original observation and reason. A script returning the same status, a changed endpoint status, or a CSP-blocked connection remains actionable. A public-only profile explicitly shows login and private API journeys as outside its scope.
-- Use the existing SEO evidence toolkit for saved HTML and link analysis. Use Playwright with axe for automated accessibility and consume the adopter's configured Gitleaks invocation for built files, with redaction. For deployed headers, prefer the local MDN HTTP Observatory CLI and retain individual outcomes. Use ordinary HTTPS requests for redirects and certificate validation when the tool output does not already cover them. Add Lighthouse CI only when the adopter needs lab performance budgets.
-- Emit versioned JSON plus a short human summary. Record the tested commit or artifact digest, when known, the deployed URL, selected profile, tool versions, and per-rule pass, fail, skipped, not applicable, or expected result. Record unavailable release identity explicitly. Keep failed attempts and write each retry or parallel run to its own directory. Treat failure to complete a required check as an unsuccessful gate. Write reports locally. The skill reads the report and proposes fixes from its evidence.
-- Validate packaging through the existing plugin build and installation path. Pin adopter tool versions using the existing runtime or lockfile. Document the minimum browser setup, production serve command, public route assertions, and optional adapters in the installed skill's adoption procedure. Align that procedure with the pinned shared frontend testing convention. The companion draft extension to that convention documents the repository-owned release smoke pattern. Publication of the shared convention and consumer pin updates have their own delivery paths. Allow an adopter to opt out by removing the check invocation and its profile. Existing SEO assessment and release workflows keep their current behavior until a consumer adopts this check.
+- Classify a declared anonymous session response as expected only for its exact method, origin, path, resource type, status and anonymous context. Stackweaver's deployed profile allows only the same-origin fetch `GET https://stackweaver.sh/auth/session` with status 401 in a fresh anonymous context. Match the full normalized URL including query, with no redirect and no query in this exception. Other profiles declare their own exceptions, including any local equivalent. Apply the exception only to the matching HTTP response. Console messages and page errors keep separate records. Console messages without reliable request identity remain diagnostic observations with no attribution to the expected response. Required failures come from typed browser or HTTP observations and assertions, including captured Content Security Policy violations and uncaught page errors. Keep the original observation and reason. A script returning the same status, a changed endpoint status, or a CSP-blocked connection remains actionable. A public-only profile explicitly shows login and private API journeys as outside its scope.
+- When enabled, invoke the canonical `plugins/vh-adlc/scripts/seo/evidence.js` bundle through Bun from the plugin installation. The [shared SEO assessment feature](seo-assessment.md) owns generating that bundle from `tools/seo-evidence/` with its license and provenance. The enabled SEO adapter depends on a released plugin containing that bundle. Base browser checks can ship independently with SEO disabled. Both marketplace manifests package `plugins/vh-adlc` as the release artifact. Use Playwright with axe for automated accessibility and reuse the adopter's pinned Gitleaks version and config. Run its directory mode on the explicit built artifact root with redacted JSON and a distinct configured finding exit code. Validate the report and classify scanner errors as incomplete evidence. For deployed headers, prefer the local MDN HTTP Observatory CLI and retain individual outcomes. Use ordinary HTTPS requests for redirects and certificate validation when the tool output does not already cover them. Add Lighthouse CI only when the adopter needs lab performance budgets.
+- Emit versioned JSON on stdout in machine mode. Diagnostics go to stderr. Human output uses labelled statuses and plain text when piped or when plain mode is selected. Keep ANSI controls out of machine and plain streams. Record the tested commit or artifact digest, when known, the deployed URL, selected profile, tool versions, and per-rule pass, fail, skipped, not applicable, or expected result. Record unavailable release identity explicitly. Keep failed attempts and write each retry or parallel run to its own directory. Treat failure to complete a required check as an unsuccessful gate. Write reports locally. The skill reads the report and proposes fixes from its evidence.
+- Validate packaging through the existing plugin build and installation path. Pin adopter tool versions using the existing runtime or lockfile. Document the minimum browser setup, production serve command, public route assertions, and optional adapters in the installed skill's adoption procedure. Align that procedure with the pinned shared frontend testing convention. The companion convention draft at local commit `1680a2742f37f419e4e4b01d25a918a76ec05184` extends `conventions/frontend-testing.md` and `guides/onboard-a-repository.md`. Publication of the shared convention and consumer pin updates have their own delivery paths. Allow an adopter to opt out by removing the check invocation and its profile. Existing SEO assessment and release workflows keep their current behavior until a consumer adopts this check.
+
+### Terms
+
+| Term | Meaning |
+| --- | --- |
+| Build | Local production artifact served with the adopter's release configuration. |
+| Deployed | The selected running release at an owned origin. |
+| Report only | Findings are visible without a release policy deciding pass or fail. |
+| Enforcement | Apply an explicitly selected policy to the observed results. |
+| Pass | The check observed its required result. |
+| Fail | An observation contradicts the check. |
+| Skipped | The selected check lacks a prerequisite or sufficient evidence. |
+| Not applicable | The check is disabled or outside the selected target's capabilities. |
+| Expected | An observed response matches the target's complete exception rule. |
 
 ## Acceptance Criteria
 
 - [ ] AC-01: A project with either an existing Playwright suite or the documented minimum browser setup can run the same configured public route checks against a production build and its deployed origin without an external scanning service or model.
 - [ ] AC-02: A known anonymous session response remains visible as expected, while a blocked connection, failed required asset, or unexpected status is reported with enough evidence to locate it.
-- [ ] AC-03: The report identifies what the enabled tools checked and what they could not check. An explicit gate rejects failures and incomplete required coverage.
+- [ ] AC-03: The command, report and skill use the glossary meanings for modes and outcomes. The report identifies what enabled tools checked and what they could not check. An explicit gate rejects failures and incomplete required coverage.
 - [ ] AC-04: A project can invoke the installed skill to interpret an existing report and trace its findings to the evidence without rerunning the checks.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Run both modes against a locally served production fixture and an owned HTTPS deployment fixture. Check that both execute the same route assertions and that deploy-only observations are present only in the deployed report. Prove the same one-route smoke profile works in a minimal static fixture with no existing Playwright suite and no optional tools. Run with third-party scanning services unavailable. |
-| AC-02 | Serve an anonymous session 401, a required script returning 401, a wrong query or method with a 401, a redirected 401, and a page with a connection refused by CSP. Assert distinct outcomes, sanitized URLs, and retained browser evidence. Check Chromium and Firefox differences without depending on identical console wording. |
-| AC-03 | Feed actual outputs from Playwright, axe, the SEO toolkit, Gitleaks, and the deployment header tool. Compare an all-pass run with required failure, tool absence and interrupted collection. Assert reported coverage and gate exits, plus separate artifacts for parallel runs. |
-| AC-04 | Install the packaged plugin in a fresh supported environment. Give the skill a saved fixture report and verify its findings cite the matching records and identify skipped checks. |
+| AC-01 | Run both modes against a locally served production fixture and an owned HTTPS deployment fixture. Check that both execute the same route assertions and that deploy-only observations are present only in the deployed report. Prove the same one-route smoke profile works in a minimal static fixture with no existing Playwright suite and no optional tools. In an existing-suite fixture, show that the release scenario observes a real backend failure masked by the ordinary mocked test. Run with third-party scanning services unavailable. |
+| AC-02 | Serve an anonymous session 401, a required script returning 401, a wrong query or method with a 401, a redirected 401, and a page with a connection refused by CSP. Also emit an unrelated console error and make a different request to the same URL in that visit. Assert that only the exact HTTP observation is expected and raw console diagnostics remain independently visible. Assert distinct outcomes and sanitized URLs. Check Chromium and Firefox differences without depending on identical console wording. |
+| AC-03 | Exercise real outputs from the enabled tools. Put a synthetic secret only in the built output and exercise a Gitleaks execution error. Assert distinct outcomes and redacted findings. Check piped human output and JSON stdout with separate stderr for success, failure, skipped and partial runs. Compare an all-pass run with required failure, tool absence and interrupted collection. Assert reported coverage and gate exits, plus separate artifacts for parallel runs. |
+| AC-04 | Install the packaged plugin in a fresh supported environment. Enable SEO in a fresh marketplace installation whose bundle includes the analyzer. Run the check without the source checkout. Give the skill a saved fixture report and verify its findings cite the matching records and identify skipped checks. |
 
 ## Tasks
 
@@ -68,7 +87,40 @@ None yet. Task breakdown follows acceptance.
 
 ## Open Questions
 
-None. The owner selected report mode for the initial Stackweaver adoption.
+The owner selected report mode for the initial Stackweaver adoption. The remaining choices came from R-1.
+
+### Q1: How should the command report results and decide when a route is finished?
+
+**Recommendation:** A. Use bounded per-route assertions and required requests, with explicit outcomes for missing coverage.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Explicit outcomes** | Report mode exits successfully for a completed capture with findings. Bad configuration, failed startup or incomplete required capture exits nonzero. Enforced runs also fail a failed required rule. Reject requirements for disabled or inapplicable rules. Optional failures stay visible. Wait for the assertion and declared required requests within a deadline. Missing required requests fail coverage. | Adopters declare the resources a route needs. |
+| **B. Report prototype** | Record observations in a fixed window. Defer enforcement and required-resource guarantees to a later feature. | Delayed and absent requests can remain outside the evidence. |
+
+**Why this is yours:** This sets the meaning of a successful run in the pipeline. It addresses F-05 and F-06.
+
+### Q2: What network and evidence defaults should the shared runner enforce?
+
+**Recommendation:** A. Scope requests and retain a sanitized report that readers can verify as complete.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Scoped capture** | Allow declared origins and schemes, record and stop off-scope or downgrade redirects, and mark an adapter unsupported when it cannot enforce scope. Keep only sanitized observations and selected tool fields, omitting credentials, headers and body content from shared reports unless specifically safe. Publish a versioned completion marker using the SEO evidence pattern. Refuse unfinished or unknown-schema results and label completed partial coverage. | Less raw output is available in shared reports. |
+| **B. Repository-owned capture** | Reuse the adopter's existing redirect controls and artifact handling. The shared layer consumes only reports it can validate. | Adopters supply more setup and coverage varies across repositories. |
+
+**Why this is yours:** This decides which responsibilities belong in the shared package. It addresses F-07 through F-09.
+
+### Q3: Which adoption work should ship with the shared feature?
+
+**Recommendation:** A. Keep the shared feature independently releasable, then adopt it in Stackweaver in report mode.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Separate adoption** | A shared implementation proved on generic fixtures, followed by a Stackweaver change with real build and deployed runs. Lighthouse stays an optional adopter workflow. | A second consumer change after shared delivery. |
+| **B. Joint adoption** | The release requires matching Stackweaver profile evidence. Include a local-only Lighthouse adapter if needed and add its proof to the scope. | Wider delivery and coupling to consumer changes. |
+
+**Why this is yours:** This sets the delivery boundary and initial tool scope. It addresses F-10 and F-12.
 
 ## Review Log
 
@@ -181,6 +233,7 @@ PROPOSAL: Cite the captured artifacts and companion convention revision, and ide
 
 - [Stackweaver homepage](https://stackweaver.sh/), observed deployed navigation and anonymous session response.
 - [VibeCodeCheck report](https://vibecodecheck.nl/scan/7261c49e-8e0d-4614-b3ef-59fec3db92f5), the owner's pasted findings include three 401s and 34 console errors.
+- [Playwright ConsoleMessage API](https://playwright.dev/docs/api/class-consolemessage), console event fields.
 - [Playwright network events](https://playwright.dev/docs/network), browser request and response observation.
 - [Playwright accessibility testing](https://playwright.dev/docs/accessibility-testing), integration with axe.
 - [MDN HTTP Observatory](https://github.com/mdn/mdn-http-observatory), local CLI and rule results.
