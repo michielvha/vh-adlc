@@ -132,6 +132,7 @@ None.
 | 2026-11-19 | R-3 | spec | `0f910f12b9473d7956c5dc1fcedd9a873986e44b` | unknown | procedural | Two should-fix findings. |
 | 2026-11-19 | R-4 | spec | `f06f8906ae4801b062c29957269b42f375ef442a` | unknown | procedural | No findings. |
 | 2026-11-19 | R-4 | spec | `f06f8906ae4801b062c29957269b42f375ef442a` | n/a | n/a | accepted by owner |
+| 2026-11-19 | R-5 | implementation | `18d20daf80d86d3f3c7c604fd0fe6c879b77ae58` | unknown | procedural | One blocker in fixture isolation and four should-fix findings. |
 
 ### R-1
 
@@ -264,6 +265,60 @@ PROPOSAL: Treat failed or incomplete selection as a failed batch, distinct from 
 ### R-4
 
 NO FINDINGS
+
+### R-5
+
+TARGET: 18d20daf80d86d3f3c7c604fd0fe6c879b77ae58
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: untested
+EVIDENCE: At 18d20daf, the package checker, example selector and three discovery suites passed 77 tests and 422 assertions. I inspected the 19 retained Codex case results at 04d58a64 and the tool traces for representative modes and rejections. The partial selector exited 17 after returning a path, and that trace contains no document-body read or write handoff. The committed runner lacks the required on-disk path replacement case and does not check selection reasons or the full read boundary.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: untested
+EVIDENCE: The retained Codex default and targeted transcripts at 04d58a64 cite committed source, propose port 3900, flag the HTTP 500 versus 503 contract discrepancy, and leave the worker count unresolved. The freshness transcript shows the ledger and selector reads without document-body reads. Receipt snapshots match. The committed trial has no interrupted report case and no contradicted claim whose replacement is unsupported.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: At 18d20daf, the public feature document leaves the consumer adapter and proof task open. The dispatcher supplied selector parity and rollback as operator observations. I did not inspect or run the private consumer's forwarding, write, recovery or cutover checks.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: The dual-catalog receipt covers local candidate 87c076a8. The Codex scenario receipts cover 04d58a64. I recomputed distinct component fingerprints for those revisions and 18d20daf. The dispatcher reports Claude's native model attempts returned HTTP 429. Ordinary published installs, upgrades and post-adoption documentation were not observed.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:40-44,117-118,137-142`, AC-01 and AC-02 proof
+EVIDENCE: The native client receives an environment with `GIT_*` removed. The runner's own Git helper inherits the original environment. An inherited `GIT_DIR`, `GIT_WORK_TREE` or `GIT_INDEX_FILE` can redirect the fixture's `git init`, `git add` or `git commit` outside the disposable repository before the preservation snapshot. The neighboring example test strips repository overrides from those commands.
+PROPOSAL: Use an isolated Git environment for all fixture setup and snapshot commands. Test inherited Git overrides with a second disposable repository and verify that its refs, index and worktree stay intact.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:11-14,49-65,80-106,154-162`, AC-01 and AC-02 proof
+EVIDENCE: The verifier checks the model's final status, paths and coverage. It does not verify selection reasons, freshness output, installed procedure use, or whether the model opened document bodies before refusing a request. A generic failure answer passes the negative cases. A generic complete answer with an empty findings array passes freshness mode. Full review uses subset matching, so a report can omit some claims and still pass. The preservation check skips Git metadata other than the index and current HEAD.
+PROPOSAL: Bind the trial verdict to observed procedure and source reads, exact selection reasons and expected findings. Assert the refusal and freshness-only read boundary and compare repository refs as well as the existing state snapshot.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:16-36,121-161`, `plugins/vh-adlc/examples/docs-truth/project/docs/current/setup.md:3-9`, AC-01 and AC-02 proof
+EVIDENCE: No case replaces a tracked document on disk after validation. No case interrupts a review after some work is done, and the runner rejects process failure before checking unfinished work. The fixture's contradicted port and timeout both have supported replacements. Its unresolved worker count is an unknown claim, so it cannot show that the verifier flags an incorrect claim whose replacement is unsupported.
+PROPOSAL: Add the path replacement and interrupted-report cases and assert their accepted outcomes. Add a contradicted claim for which the evidence cannot support replacement wording.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Stackweaver adoption (line 78), AC-04 proof (line 109), Task T3 (lines 117-119)
+EVIDENCE: The accepted pre-merge check requires installing the exact candidate through both catalogs. The dual-catalog receipt is for 87c076a8 and component fingerprint `88716ecc0cdf`. The Codex transcripts use 04d58a64 and `f7d706eaeb54`. I computed `ca01ed832dc4` for 18d20daf. Its installed package includes a revised example README. Matching the count of 304 files is insufficient to reconcile these identities.
+PROPOSAL: Repeat ordinary local candidate installation and discovery through both catalogs at the exact publishable package fingerprint before merge. Preserve the earlier receipts against their original revisions and keep the separate published-marketplace checks open.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Feature `covers` (lines 7-23), Task T1 (lines 113-114), `tests/vh-adlc/maintenance/discovery.test.ts:12`
+EVIDENCE: This candidate changes the maintenance discovery test's fixed skill count to a check for the maintenance skill. The prior assertion fails when the docs-truth skill is installed in the source tree. The feature cites the maintenance suite as discovery evidence, but its coverage excludes this changed test, so later edits to that test do not stale the review.
+PROPOSAL: Cover the changed discovery test through the accepted spec revision and review process, or establish the same discovery proof through the already covered tests without depending on the uncovered change.
 
 ## Sources
 
