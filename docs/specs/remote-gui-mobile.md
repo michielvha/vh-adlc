@@ -152,7 +152,11 @@ These are planned proofs, not executed mobile results. Later evidence records th
 
 ## Tasks
 
-None yet; written once the document is planned. The first implementation task must establish the upstream reuse evaluation and Gate F1 before the remaining mobile implementation proceeds. This spec-only operation authorizes no probe or implementation execution.
+- [ ] T1 `tests/remote-gui/mobile-feasibility/` and `docs/specs/remote-gui-mobile.md` - evaluate the installed noVNC bridge and x11vnc permissions, then run the private geometry and input-binding probe against the synthetic fixture. Gate F1 must show selective first-tap native keyboard opening on both physical phones and safe delivery through the actual input boundary before T2 starts (AC-01, AC-05, AC-06, AC-09)
+- [ ] T2 `plugins/remote-gui/internal/browser/`, `plugins/remote-gui/internal/proxy/` and `tests/remote-gui/` - implement the proven controller fence and private editable metadata path. S5 and S6 must show that unauthorized and stale input cannot mutate the session (AC-05, AC-06)
+- [ ] T3 `plugins/remote-gui/internal/proxy/` and `tests/remote-gui/` - connect the local editor to noVNC and the confirmed remote target. AC-01 and M2 must pass on both phones, with one remote edit per intended operation in U9 (AC-01, AC-02, AC-09)
+- [ ] T4 `plugins/remote-gui/internal/proxy/` and `tests/remote-gui/` - adapt noVNC touch gestures and preserve editing across viewport changes. M3 and M4 must pass with keyboard dismissal, reachable controls and no duplicate events (AC-03, AC-04)
+- [ ] T5 `plugins/remote-gui/` and `tests/remote-gui/` - verify the independent package, document prerequisites and run the full desktop and phone procedure. P7 and the documented aggregate verification must pass against the package delivered by the helper (AC-05, AC-07, AC-08, AC-09)
 
 ## Open Questions
 
