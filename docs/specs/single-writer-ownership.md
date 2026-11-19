@@ -1,12 +1,13 @@
 ---
 status: draft
-status_description: "The owner decided the R-1 questions. The test plan addresses the R-2 findings and awaits a fresh independent review. Implementation and native validation are pending."
+status_description: "The owner decided the R-1 questions. Coverage and the test plan address the R-2 and R-3 findings. The draft awaits a fresh review before implementation."
 issue: null
 goal: "One canonical repository work item has one verified agent writer across clones, worktrees and supported hosts, with an explicit, preserved handoff."
 covers:
   - AGENTS.md
   - cmd/vh-adlc/**
   - internal/ownership/**
+  - internal/fresh/**
   - internal/gate/**
   - plugins/vh-adlc/vh-adlc.lock.json
   - plugins/vh-adlc/scripts/ensure-vh-adlc.sh
@@ -14,9 +15,14 @@ covers:
   - .github/workflows/release.yml
   - .goreleaser.yml
   - plugins/vh-adlc/scripts/loop/**
+  - plugins/vh-adlc/scripts/branches/**
   - plugins/vh-adlc/scripts/triage/execution-lock.ts
+  - plugins/vh-adlc/scripts/triage/controller*.ts
+  - plugins/vh-adlc/scripts/triage/check-boundary.ts
+  - plugins/vh-adlc/scripts/triage/owned-process.ts
   - plugins/vh-adlc/scripts/ownership/**
   - plugins/vh-adlc/references/authority.md
+  - plugins/vh-adlc/references/branches.md
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/references/loop.md
   - plugins/vh-adlc/references/loop-settings.md
@@ -27,7 +33,11 @@ covers:
   - .agents/plugins/marketplace.json
   - .claude-plugin/marketplace.json
   - tests/vh-adlc/ownership/**
+  - tests/vh-adlc/branches/**
   - tests/vh-adlc/loop/**
+  - tests/vh-adlc/triage/controller*.ts
+  - tests/vh-adlc/triage/owned-process.test.ts
+  - tests/vh-adlc/triage/boundary-test.ts
   - tests/vh-adlc/worktree-handoff.test.ts
   - tests/vh-adlc/check.test.ts
   - docs/user-guides/workflows.md
@@ -68,8 +78,8 @@ token before making work available again. A supported Claude or Codex route must
 refuse mutation when its checker fails after setup. Other routes remain read-only.
 Downgrading a client holds writing and preserves the coordination record.
 
-Validation includes concurrent clones, admission racing with handoff, initialization
-response loss, stale-token publication after handoff and release, and actual native clients
+Validation includes concurrent clones, admission racing with handoff, lost responses during
+initialization and action execution, stale-token publication after handoff and release, and actual native clients
 with separate controller, checker and hook failures. The release build must package the
 binary for all four supported OS and architecture combinations.
 The current result is a spec revision. Accepting it after independent review authorizes
@@ -294,7 +304,7 @@ checksum or successful marketplace install. No new deployable service or satelli
 | AC-01 | First retain the failing two-independent-clone reproduction. Add true concurrent claimant processes against one disposable Git authority and assert one winner, zero loser source/index/branch writes, exact owner diagnostics and bounded conflict retry. Repeat in separate Git common directories. |
 | AC-02 | Exercise SSH/HTTPS and `.git` spelling aliases, issue/spec association, different branch names, source paths containing spaces, resumed session IDs and two separate work items. Assert one canonical identity or an explicit ambiguity refusal. |
 | AC-03 | Inject response loss after successful claim, rejected update, missing authority, inaccessible remote, old generation, process death and quota failure. Read-back reconciles the same writer. Give the stale writer otherwise valid publication authority and attempt the same publication after transfer, after release while vacant, and after reacquisition. Assert no destination mutation in each case. The current writer succeeds with the same publication authority after transfer and after reacquisition. A deleted established ref cannot be recreated by a delayed update. |
-| AC-04 | Start with two dirty source files and committed review history. Transfer only after the old mutator is stopped/drained; replay it and attempt a stale-owner mutation. Compare exact hashes/history and ownership generation. Pause an action after preliminary check before registration and race transfer, then reverse which transition wins. Hold a registered process/input channel across a release and attempt reacquisition before and after confirmed drain. Assert increasing generations and stale-token refusal. Test unavailable direct messaging, queued notice, actual resume delivery and independent acknowledgment. |
+| AC-04 | Start with two dirty source files and committed review history. Transfer only after the old mutator is stopped/drained; replay it and attempt a stale-owner mutation. Compare exact hashes/history and ownership generation. Pause an action after preliminary check before registration and race transfer, then reverse which transition wins. Once an admitted action has launched, drop its response and retry the same action ID while the generation is active. Observe at most one launch and one effect. Restart the controller while the original action is unresolved, with an open input channel or an ambiguous external result. In separate release and transfer cases, refuse finalization until the original activity has stopped and its external outcome is reconciled. After settlement, finish the transition once. Assert increasing generations and stale-token refusal. Test unavailable direct messaging, queued notice, actual resume delivery and independent acknowledgment. |
 | AC-05 | Contract tests cover every shared write entry/re-entry and selected maintenance/audit/docs repair route. Each must reject a conflicting token. Delegate a read-only exact-head review, observe preserved source and prove it cannot claim/write under the parent's token. |
 | AC-06 | Recording Git/issue/PR endpoints observe no source push, PR, merge, release or cleanup without its separate grant. The reserved authority ref is excluded from release and stale-branch paths. Existing claim-push rejection, scope preservation and delivery tests remain passing. |
 | AC-07 | Run actual native Codex and Claude against two fixture clones through the declared adapters. Attempt writes from the former and conflicting sessions. Prove a permitted writer action and an unrelated item. After successful setup, independently test controller unavailability, checker execution failure, an invalid checker decision and skipped hooks. Keep the controller live for both checker tests and observe that it receives but refuses each request. In every negative case assert that source, refs and publication targets remain untouched. Exercise continuing input and unsupported tools in the actual clients. Native runs without observed mutation and refusal remain pending. |
