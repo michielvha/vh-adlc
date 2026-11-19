@@ -160,10 +160,11 @@ unchanged inputs. Exact commands, hashes and original outputs are retained under
 Manual documentation-impact review updates the canonical settings guide for the
 marker exception and old-release limits. Root AGENTS.md has no adoption marker,
 so this is the retained manual path. The runtime change is limited to bounded
-installed metadata inspection and reserved Git-path refusal. Source review at
-the committed implementation, publication/CI, actual corrected installs and the
-consumer migration checks still precede cutover. T156 remains open until its
-fresh source review returns; T130 retains release-bound native acceptance.
+installed metadata inspection and reserved Git-path refusal. Actual Claude Code Opus 5.5 source review at committed `05e49ab8` now has no
+blocking or should-fix finding, with all 49 reads, model identity, immutable
+inputs and cleanup validated. T156 is complete. Publication/CI, actual corrected
+installs and consumer migration checks still precede cutover; T130 retains that
+release-bound acceptance.
 
 ### Isolated marker prototype checkpoint on 2026-11-18
 
@@ -220,8 +221,8 @@ active session on the corrected release or another platform/client build.
 Evidence is `t143-native-inline-marker/results.json`; no live session, foreign
 marker, phone configuration or remote repository state is changed.
 
-Fresh spec review, release/install checks and the paired migration gate still
-precede the remote switch.
+The reviewed source correction now awaits exact-head CI, publication, actual
+release/install checks and the paired migration gate before the remote switch.
 
 ### Final adoption preparation on 2026-11-18
 
@@ -1600,7 +1601,9 @@ The owner confirmed ordinary installed clients and the capability-preserving che
 
 The following tasks implement the revised baseline after spec review and owner acceptance. Earlier checked tasks below retain their original completed-work evidence.
 
-- [ ] T156 `plugins/vh-adlc/scripts/docs-drift/bootstrap.ts, tests/vh-adlc/docs-drift/bootstrap.test.ts, plugins/vh-adlc/plugin.json, plugins/vh-adlc/.claude-plugin/plugin.json, plugins/vh-adlc/references/docs-drift-settings.md` - First reproduce the native marker refusal. Add only the normative bounded installed-metadata validation and reserved Git-path refusal. Exercise the active-install proof matrix, read-bound and race faults, exact retained checks, normal runtime neighbors and strict types. Obtain a fresh actual Claude Code Opus 5.5 implementation review. T130 retains actual release/install/native-session and rollback acceptance. (AC-01, AC-06, AC-07)
+- [x] T156 `plugins/vh-adlc/scripts/docs-drift/bootstrap.ts, tests/vh-adlc/docs-drift/bootstrap.test.ts, plugins/vh-adlc/plugin.json, plugins/vh-adlc/.claude-plugin/plugin.json, plugins/vh-adlc/references/docs-drift-settings.md` - First reproduce the native marker refusal. Add only the normative bounded installed-metadata validation and reserved Git-path refusal. Exercise the active-install proof matrix, read-bound and race faults, exact retained checks, normal runtime neighbors and strict types. Obtain a fresh actual Claude Code Opus 5.5 implementation review. T130 retains actual release/install/native-session and rollback acceptance. (AC-01, AC-06, AC-07)
+
+  Evidence: Owning source first-red retains 32 passing and 11 failing cases, including valid native markers, before the correction. The corrected tested inputs pass 212 cases/734 assertions, strict pinned TypeScript, uncached Go tests, vet/lint/modules, ZIP, actionlint and 34 registration cases. Input hashes map those tested overlays to committed `05e49ab8`. Actual Claude Code Opus 5.5 source diagnostic `docs-drift-paired-claude-r19` at that exact pushed commit reads all 49 required fragments, has no blocking or should-fix finding, preserves every input hash and confirms owned cleanup. Its compatibility-record nit is included in T130; the harmless existing baseline citation nit remains unapplied under the nit rule. This is scoped T156 source acceptance, not whole-feature completion, actual corrected marketplace/native acceptance or final consumer review. T130 remains open.
 
 - [x] T121 `tests/vh-adlc/docs-drift/, staged Stackweaver migration callers` - Inventory real and development callers, pending-run artifacts and retained compatibility needs. Record a failing ordinary-install/run-directory entry case and the before-change API/module/config surface. Keep old runtime artifacts where an actual pending run needs them. (AC-01, AC-05, AC-06, AC-07)
 
