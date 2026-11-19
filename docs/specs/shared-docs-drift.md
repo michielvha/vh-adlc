@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: Stackweaver cutover verified; canonical review returned seven met criteria, completion gate pending
+status: complete
+status_description: Published plugin 0.26.1 adopted in Stackweaver; all seven criteria reviewed and completion gate passed
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -92,7 +92,7 @@ small follow-ups are addressed. The exact activation and final feature preflight
 92 consumer tests, 48 repository checks with no skips, whole-tree rollback and
 875-document scanner parity passed before [Stackweaver #1160](https://github.com/michielvha/stackweaver/pull/1160)
 merged. Independent Codex R-139 returns all seven criteria met.
-The completion gate remains pending.
+The completion gate passes; this feature is complete.
 
 No production backlog sweep was dispatched. The first real weekly run remains
 unobserved; GUI/phone checks are owner-deferred and native Copilot execution is
@@ -155,7 +155,9 @@ model override was requested. Isolation
 is procedural. Source files, semantic index, HEAD and refs in both the owning
 worktree and independent public clone are unchanged, and all packet hashes
 remain intact. The original return hash is `26780561e28a131b97fdefe0504ea5a9778dcd1f5eb0059baf1a1529bba076ab`.
-Review validation and the lifecycle completion gate remain separate checks.
+Review validation passes with byte-identical returned records. The completion
+gate at `cae8102dfcbd2b1f0f3de949ba3a2d85399175c0` returns `vh-adlc gate complete: pass (rules 1, docs 0c983f6)`
+before the status update. The stated operational limits remain unchanged.
 
 ### Interrupted final review handoff on 2026-11-19
 
