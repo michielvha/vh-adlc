@@ -32,8 +32,16 @@ if [[ ! -d $build_cache || ! -O $build_cache || $(stat -c %a -- "$build_cache") 
   exit 1
 fi
 identity=$(
+  set -e
   cd -- "$plugin_root"
-  { "$go_cmd" version; "$go_cmd" env GOOS GOARCH; find cmd internal -type f -name '*.go' -print0 | sort -z | xargs -0 sha256sum; sha256sum go.mod scripts/remote-gui.sh; if [[ -f go.sum ]]; then sha256sum go.sum; fi; } | sha256sum
+  {
+    "$go_cmd" version
+    "$go_cmd" env GOOS GOARCH
+    # Include assets embedded by the Go compiler alongside the Go source.
+    find cmd internal -type f -print0 | sort -z | xargs -0 sha256sum
+    sha256sum go.mod scripts/remote-gui.sh
+    if [[ -f go.sum ]]; then sha256sum go.sum; fi
+  } | sha256sum
 )
 identity=${identity%% *}
 output=$build_cache/$identity

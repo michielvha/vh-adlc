@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, cpSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -24,13 +24,32 @@ describe('independent remote-gui package', () => {
   const root=mkdtempSync(join(tmpdir(),'rg-installed-'));
   try {
    const installed=join(root,'plugin');
+   const cache=join(root,'cache');
    const toolchain=Bun.spawnSync(['go','env','GOROOT'],{cwd:plugin}).stdout.toString().trim();
    cpSync(plugin,installed,{recursive:true,filter:(path)=>!/(?:^|\/)core(?:\.[0-9]+)?$/.test(path)});
-   const result=Bun.spawnSync(['/usr/bin/bash',join(installed,'scripts/remote-gui.sh'),'help'],{cwd:root,env:{...process.env,REMOTE_GUI_BUILD_CACHE:join(root,'cache'),REMOTE_GUI_GO:join(toolchain,'bin/go'),GOTOOLCHAIN:'local'}});
+   const launch=()=>Bun.spawnSync(['/usr/bin/bash',join(installed,'scripts/remote-gui.sh'),'help'],{cwd:root,env:{...process.env,REMOTE_GUI_BUILD_CACHE:cache,REMOTE_GUI_GO:join(toolchain,'bin/go'),GOTOOLCHAIN:'local'}});
+   const result=launch();
    expect(result.exitCode,result.stderr.toString()).toBe(0);
    expect(result.stdout.toString()).toContain('share <local-http-url>');
    expect(result.stdout.toString()).toContain('--browser-mode human|agent');
    expect(result.stdout.toString()).toContain('handoff <id>');
+   let cached=readdirSync(cache);
+   expect(cached).toHaveLength(1);
+   for (const [asset, comment] of [
+    ['internal/proxy/mobile.js', '// embedded viewer cache probe'],
+    ['internal/browser/mobile_focus.py', '# embedded helper cache probe'],
+   ]) {
+    appendFileSync(join(installed,asset),'\n'+comment+'\n');
+    const rebuilt=launch();
+    expect(rebuilt.exitCode,rebuilt.stderr.toString()).toBe(0);
+    const entries=readdirSync(cache);
+    const added=entries.filter((entry)=>!cached.includes(entry));
+    expect(added,asset).toHaveLength(1);
+    expect(readFileSync(join(cache,added[0],'remote-gui')).includes(comment),asset).toBe(true);
+    cached=entries;
+   }
+   expect(launch().exitCode).toBe(0);
+   expect(readdirSync(cache).sort()).toEqual(cached.sort());
    const missing=Bun.spawnSync(['/usr/bin/bash',join(installed,'scripts/remote-gui.sh'),'help'],{cwd:root,env:{PATH:root,HOME:root}});
    expect(missing.exitCode).not.toBe(0);
    expect(missing.stderr.toString()).toContain('Go');
