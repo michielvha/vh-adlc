@@ -27,7 +27,7 @@ on your host.
 | Persistent codebase audit | Keep stable findings in a ledger, distinguish historical status from current verification, and select repairs under local policy. |
 | Diagnosis | Investigate and report. A report-only request does not authorize a fix. |
 | Documentation | Edit the requested document and check it. A prose edit does not need a feature spec. |
-| Accumulated documentation drift | Assess the configured corpus and selected stale documentation-audit proposals through the candidate docs-drift operation. |
+| Accumulated documentation drift | Assess the configured corpus and selected stale documentation-audit proposals through the released docs-drift operation. |
 | Article or social draft | Read the project's evidence and the site's voice rules, draft or revise the requested prose, and obtain a source-comparing editorial pass. Publication is separate. |
 | Small maintenance | Preserve the public contract, keep a short task record, run appropriate checks, and obtain an independent review. |
 | A new feature or a wider change | Use a feature document with acceptance, tests, reviews, and binary status gates. |
@@ -55,7 +55,7 @@ see [installation](../get-started/installation.md).
 | Resume | `vh-adlc-resume` | Reconstruct the state and continue the next safe step. |
 | Architecture diagram | `vh-adlc-diagram` | Create and verify repository-grounded draw.io architecture diagrams. |
 | Documentation impact | `vh-adlc-docs-impact` | Find and review docs affected by selected code changes. |
-| Documentation drift candidate | `vh-adlc-docs-drift` | Audit the configured corpus, resolve selected stale docs-audit PRs and freshly review selected post-merge closures. |
+| Documentation drift | `vh-adlc-docs-drift` | Audit the configured corpus, resolve selected stale docs-audit PRs and freshly review selected post-merge closures. |
 | Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
 | Clean | `vh-adlc-clean` | Plan and remove what killed runs left in `/tmp` and the project's temp root; Compose projects and kind clusters only on request. |
 
@@ -386,7 +386,7 @@ and [complete runnable example](../../plugins/vh-adlc/examples/docs-impact/READM
 
 ## Documentation drift
 
-The candidate `vh-adlc-docs-drift` operation handles accumulated documentation
+The released `vh-adlc-docs-drift` operation handles accumulated documentation
 problems and selected stale documentation-audit proposals. Select the intended
 work explicitly, for example with one of these requests.
 
@@ -446,7 +446,7 @@ eligibility and inspection.
 Consumer migration needs published marketplace installation checks, installed
 role/forwarding tests, paired review, hosted advisory/history observations and
 verified cutover/rollback. The example's staged collection diagnostic preserves
-those later obligations. Current [acceptance and deferred surfaces](../reference/compatibility.md#shared-documentation-drift-candidate)
+those later obligations. Current [acceptance and deferred surfaces](../reference/compatibility.md#shared-documentation-drift)
 remain visible until their own tests pass.
 
 ## Architecture diagrams

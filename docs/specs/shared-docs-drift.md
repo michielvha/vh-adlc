@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Reviewed grammar fix; native rerun and exact-head CI pending."
+status_description: Implementing the reviewed marker correction before released install and cutover
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -73,35 +73,383 @@ The scope excludes claim-by-claim docs-truth sweeps and their rolling ledger. Ex
 ### Owner summary
 
 Move Stackweaver's whole-documentation audit and stale audit-PR resolver into the
-ordinary installed vh-adlc plugin. Findings and selected corrections are checked
-against current source and independently reviewed. Resolution keeps every
-original hunk and human decision; originals close after the replacement merges.
+ordinary vh-adlc plugin. Keep its scanner, twelve detectors, flags, feedback,
+generators, safe older-plan fixes, commands, Monday schedule, accounts and
+notifications. Shared specs retain their lifecycle gates and interrupted writes
+retain original evidence.
 
-Stackweaver keeps its scanner, twelve detectors, feedback, generators, local
-rules, Monday schedule, publisher accounts and notifications. Verified metadata
-and acceptance-checkbox fixes remain available in its older local plans. Shared
-specs keep their lifecycle gates. The compatible tool and project settings ship
-and roll back together; historical records retain their original policy.
+The owner-approved correction accepts only Claude's bounded, non-executable
+`.in_use/<pid>` JSON process marker. Every shipped file and mode still has
+to match; other extra files and symlinked entries below the installed root remain
+refused. Hard-linked shipped files keep their existing support. The checker neither
+executes metadata nor removes it or disturbs the running session. Retained
+private payload checks stay exact. No effect permission changes.
 
-Recovery preserves original ownership and evidence. A publication lease keeps
-new audits pending before models run. Exact approved abandonment requires a
-stopped executor and atomically removes its own lease and receipt. Terminal
-receipts remain. Unsupported lease-only deletion can allow a fresh assessment.
+Previous 0.26.0 marketplace/native tests, 875-document parity, the clean paired
+routing review, 90 consumer tests and the 48-check local gate remain evidence of
+their original versions. They do not prove this correction. Review the revised
+spec, reproduce the marker failure, review/test the minimal fix, then publish a
+corrected component and refresh actual install and migration proof before the
+remote switch. GUI/phone and native Copilot execution stay deferred or unclaimed.
+Other agent migrations stay on their separate roadmap.
 
-The accepted normative spec is unchanged. R-129 covered the earlier native
-reply-prefix correction. An actual unattended trial then exposed missing
-fresh-runner reader setup and a reviewer kind outside the strict grammar. The
-consumer bootstrap and shared reply instructions now correct those causes.
-Claude Code Opus 5.5 R-130 has no blocking or should-fix findings; its stale-summary
-nit is corrected here. The regression fails before the grammar fix and passes
-63 assertions after it. The merge controller remains stopped until the actual
-native rerun and exact-head CI pass. All seven composite criteria remain
-unverified pending their complete evidence.
+The 2026-11-19 cutover decision accepts either JSON field order and ASCII JSON
+whitespace, explicit rerun without automatic retry, and uniform installed
+inspection. Rollback restores legacy routing and the old companion/binding;
+old-release recovery needs its matching marker-free install. Old Claude-role
+paths without observed marker-free runs stay blocked. Candidate `1b862970` has a
+clean scoped Opus review, 138 focused passing cases, and a Claude 2.1.326 inline
+role observation. These are source diagnostics; corrected-release installation
+and the final migration gate still precede cutover. Conservative marker-only
+details may proceed after clean review under the existing publication authority.
 
-The owner approved shared publication/release and gated Stackweaver migration.
-Released marketplace fresh installs/upgrades, final native/unattended checks,
-release-bound paired review, cutover and rollback remain required. GUI and phone
-checks retain their deferral. Other agent migrations stay in their own roadmap.
+### Active ordinary Claude cache finding on 2026-11-18
+
+The final real global-install check finds a compatibility gap that empty-profile
+installation did not exercise. Codex's installed 0.26.0 payload matches all 291
+released files. Claude's installed 0.26.0 also matches every released file, mode
+and byte, but its active cache contains one extra `.in_use/<pid>` marker. It is
+a 38-byte JSON object with `pid` and `procStart` fields. The unchanged shared
+inspector correctly refuses it under the previous no-exclusions design. The marker belongs to an existing process and is not removed or altered.
+
+A read-only Python probe reads at most 257 bytes through `Path.open`, then uses `json.loads`, `lstat`,
+`stat.S_IMODE`, `/proc/<pid>/comm`, `platform.freedesktop_os_release`, and
+`subprocess.check_output(["claude", "--version"])`. The command is
+`python3 t141-native-marker-probe.py <ordinary-installed-plugin-root>`;
+its recorded output below redacts the PID and start value, retaining their
+validation results. The probe neither writes files nor signals processes.
+
+```json
+{"platform":"Linux","os_id":"fedora","os_version":"43","current_cli":"2.1.326 (Claude Code)","marker_process_comm":"2.1.322","bytes":38,"pid_type":"int","pid_matches_name":true,"procStart_type":"str","procStart_length":8,"procStart_decimal":true,"file_mode":"0o644","link_count":1,"regular":true,"any_execute_bit":false,"keys":["pid","procStart"]}
+```
+
+The observed process name is not a new native-client version attestation. This
+observation establishes the Fedora 43 marker shape only. Other platforms, client
+versions and marker shapes remain unclaimed until T130 observes them; unsupported
+shapes stay setup-required. The corrected release must also pass with its own
+actually observed native CLI session. R-133's format, retry, caller and rollback clarifications are specified below.
+The owner summary records the selected compatibility details and authority.
+
+
+The marker refusal prevents claiming ordinary active Claude execution ready. The owner now approves the narrow validated metadata exception. This revision specifies that bounded correction; T156 implements and tests it; all other changes stay
+out of scope. The published component, local
+activation and original successful isolated trial keep their exact attribution.
+The remote consumer remains on legacy routing.
+
+At exact combined candidate `eaf6ae129d5a3764e517af0a0eeb8eac1766b336`, the
+complete consumer suite passes 90 tests and 747 assertions, and `make verify`
+passes all 48 runnable checks with zero failures or skips. Both owned process
+outcomes confirm cleanup and unchanged clean source. One earlier runner omitted
+the required shared-source environment value; its failed setup output remains
+retained. Integration/E2E and filesystem vulnerability checks are outside that
+ordinary local gate and are not claimed.
+
+### Marker correction implementation checkpoint on 2026-11-19
+
+R-136 has no blocking or should-fix finding at the accepted revision. The
+planned and implementation re-entry gates pass. In the owning branch, the
+reviewed tests first fail against original inspector `d3879e50`: 32 pass and
+11 fail, including both valid-marker binding forms. The corrected source then
+passes all 212 bootstrap, original-runtime, preflight, public-doc and package
+cases with 734 assertions. Strict TypeScript 7.0.2, uncached Go tests, vet,
+linter configuration/run, module consistency, reproducible ZIP, actionlint and
+34 registration cases pass. All owned process outcomes confirm cleanup and
+unchanged inputs. Exact commands, hashes and original outputs are retained under
+`t144-owner-*`; the original failed run remains separate.
+
+Manual documentation-impact review updates the canonical settings guide for the
+marker exception and old-release limits. Root AGENTS.md has no adoption marker,
+so this is the retained manual path. The runtime change is limited to bounded
+installed metadata inspection and reserved Git-path refusal. Source review at
+the committed implementation, publication/CI, actual corrected installs and the
+consumer migration checks still precede cutover. T156 remains open until its
+fresh source review returns; T130 retains release-bound native acceptance.
+
+### Isolated marker prototype checkpoint on 2026-11-18
+
+The claimed feature tree still has no implementation change. An owned public-source
+diagnostic clone contains proposed candidate `1b862970d22d3a65792057bd83f83e9cec350f0c`:
+the inspector, its tests, the two 0.26.1 candidate manifests and setup guidance.
+It is not published or accepted migration proof.
+
+The corrected first-red fixture demonstrates the original valid-marker refusal.
+The exact same test bytes pass after the inspector change. Later typing and
+lexical-test corrections retain their own source attribution. At `91165d20`, all
+66 bootstrap/runtime cases pass 228 assertions and strict project TypeScript
+passes. The guide-only successor `464925c0` preserves the runtime and test blobs;
+its original-runtime, preflight, public-doc and package neighbors pass 142 cases
+and 484 assertions, with confirmed cleanup and unchanged clean source.
+
+A test-quality mutation exposes a missing path-form counter: an intentionally
+unbounded `readFileSync(path)` passed the earlier two boundary tests. Counting
+both the descriptor and path makes that unchanged mutant fail twice with an
+unbounded-read count of one. Restoring the real 257-byte reader makes both pass.
+Only that strengthened test changes in `8c5506bd`; its strict project types pass.
+The original implementation is restored exactly, and all mutation inputs and
+false-green/red/green outputs stay in the local diagnostic archive.
+
+The proposed inspector also verifies the real ordinary Codex and active Claude
+0.26.0 caches against their original 291-file fingerprint, preserving the live
+native marker bytes and modes. This read-only diagnostic invokes no provider and
+writes no remote state. It does not install or prove the corrected published
+runtime. Actual Claude Code Opus 5.5 diagnostic `docs-drift-paired-claude-r17`
+reads all 49 required fragments at `8c5506bd` and returns one low test-evidence
+finding and two nits. Candidate `1b862970` fixes them: empty-directory handling
+stays unchanged, refusals name their intended guards, and the bounded-read test
+must observe a read. The new three-case compatibility test fails before the
+correction and passes afterward. The first new caller test incorrectly expects
+a structured refusal instead of the existing rejected promise; its original
+failure is retained and the corrected assertion changes no API.
+
+The final candidate passes 70 bootstrap cases with 244 assertions, 68
+original-runtime/preflight cases with 189 assertions, and strict project types.
+The two owned test runs confirm cleanup and unchanged source. Fresh actual Opus
+diagnostic `docs-drift-paired-claude-r18` reads all 27 required fragments at
+`1b862970` and returns no findings; input hashes, model identity and process
+cleanup validate. Both raw reviews stay in the local archive. They are source
+diagnostics, not canonical completion or final paired migration reviews.
+
+An actual Claude Code 2.1.326 role loads the existing isolated ordinary 0.26.0
+install through `--plugin-dir`. Normal completion reports model
+`claude-opus-5-5`; a second invocation is cancelled after native initialization.
+Both initializations identify the plugin, no marker appears during the observed
+interval or remains afterward, and the original helper still verifies the
+payload. Both owned process groups are absent after cleanup. These observations
+cover this inline-role path and build only. They do not prove a registry-loaded
+active session on the corrected release or another platform/client build.
+Evidence is `t143-native-inline-marker/results.json`; no live session, foreign
+marker, phone configuration or remote repository state is changed.
+
+Fresh spec review, release/install checks and the paired migration gate still
+precede the remote switch.
+
+### Final adoption preparation on 2026-11-18
+
+Final staged C is `22b820109792dbd59df216640f39c96dd1483f5f`. Its complete
+875-document comparison preserves twelve detectors, 845 findings, 63 suppressions,
+legacy output and the caller. Protection classifies all documents against 4,908
+source blobs. A disposable ordinary revert restores its exact staged tree and
+eleven protected paths, including another writer's Azure feature claim.
+
+Paired review `docs-drift-paired-claude-r16` targets published shared component
+`18388bde0609e05e6fcef9c1cf5fb3ec68d3bdca`, C and activation digest
+`93e56f145c5972e53c1eeb7bea93732a85f01c03f5be76f10ffebb579eb0d6b2`.
+Actual Claude Code Opus 5.5 reads all 117 required fragments; original bytes,
+model events and successful owned-process cleanup are retained. It returns no
+blocking or should-fix findings. Its permission-wording nit is addressed in the
+checklist: unused OIDC write access is removed, and Actions read access is added
+for the shared worker. The reviewed routing diff needs no change.
+
+D, `f086bf5d9d3ec640a37159b9d51088e519fd2f0e`, is C's direct child. It changes
+only the six reviewed activation files and adds the readable YAML checklist.
+The ordinary installed verifier passes D and the combined current-main merge
+`eaf6ae129d5a3764e517af0a0eeb8eac1766b336`, preserving D's identity. The six
+legacy PRs and original terminal trial receipt remain unchanged; no production
+lease exists. The first final test attempt lacks the required shared-source
+environment variable and stops; its failed log is retained. The runner correction
+supplies the immutable released source and starts a fresh attempt. No feature
+assertion or runtime rule changes. Final checks and remote cutover are pending.
+
+The first full real-corpus run through the adopted weekly worker is not yet
+observed. The successful unattended native marketplace trial uses one synthetic
+document and the real Actions publisher; it is not a real backlog write claim.
+
+### Published payload and migration checkpoint on 2026-11-18
+
+The original exact-head CI is run `44305790900`; every job succeeds. The ordinary
+marketplace proof is `t130-marketplace-release-18388bde/installation.json` in the
+private operational archive. Both fresh profiles start empty; both upgrades
+start at ordinarily installed 0.25.0. All native installer commands exit zero
+with confirmed cleanup. The released component fingerprint is
+`e3789c55d3800692c0e84cf7515db1c47f999790f214e742df8a8fda77421628`.
+Global plugin and phone settings have not changed at this checkpoint.
+
+Run `44305790900` checks exact feature head `cb4a0d28979b275ae2a4e66c4c569fc03f74ce34`
+and completes all six jobs successfully. `git diff --name-only 18388bde a96d1184`
+returns only `docs/specs/seo-evidence-workbench.md`; its `-- plugins/vh-adlc`
+selection is empty, and the accepted normative comparison is unchanged.
+Configured main pipeline `44326348368` has head `a96d1184` and is observed pending
+through the native Actions API at this checkpoint. It follows main merge pipeline
+`44326173531`. These pending checks do not change the already published locked
+runtime 0.34.0 or the observed plugin 0.26.0 installation result.
+
+The current consumer uses the published source with the original twelve units,
+feedback and mode still staged. The next real publisher test is limited to one
+synthetic document, one draft PR and disjoint branch/lease/receipt refs. Existing
+private draft PRs establish availability without creating a probe. Original
+credential-scanned evidence includes hidden files. Partial or unknown operations
+retain their original journal and refs. Successful fixture cleanup closes only
+its own PR unmerged and preserves terminal receipts. Existing Secret Scan stays
+active with an explicitly reviewed range; it is observed separately from the
+native test job. No production or final migration claim is made.
+
+### Selected-backend acceptance and released observations on 2026-11-18
+
+The owner's existing instruction is to use Claude Code or Codex without a new
+Copilot credential. T130 therefore executes the owner-authorized configured
+native backend, Claude, under the existing Test Plan wording. The `copilot`
+intake profile selects that same Claude backend; it is not native Copilot
+execution evidence. Native Copilot execution and Copilot marketplace installation
+remain explicitly unclaimed for plugin 0.26.0. The setup reference's backend
+names enumerate implemented configuration adapters; they do not establish a
+verified host or installed-operation claim. The public compatibility matrix
+states that distinction. No Test Plan or supported adapter is removed.
+
+Actions rehearsal [44305915096](https://github.com/michielvha/stackweaver/actions/runs/44305915096)
+runs consumer `b5505bd9` with shared `cb4a0d28`. It proves cold verified-reader
+setup, installed skill discovery, preparation and independent verification with
+Claude Code 2.1.325 and two original Opus 5.5 contexts. Its source/tracker effects
+are synthetic and it proves no native publication or adopted hosted context.
+
+Consumer `d0677605` passes the full 48-check gate with no skips and all 83 migration
+tests, with 698 assertions. Paired r12 is actual Claude Code Opus 5.5 at shared
+`cb4a0d28` and consumer `080086ad`; all 67 required fragments remain unchanged and
+process cleanup is confirmed. It has no blocking or should-fix finding. Its nits
+are corrected at `d0677605`: explicit dispatch/base guidance, an executed
+reordered-guard refusal, and digest-echo placeholder wording. Those corrections
+pass 11 focused cases with 206 assertions and strict types.
+
+The consumer binds published shared `18388bde` at `ded677aa`. Against ordinarily
+installed plugin 0.26.0, 46 protocol/migration/publisher neighbors pass with 381
+assertions. Real native `claude` and `copilot` intake-profile trials then run
+separate worker/reviewer Opus 5.5 contexts through Claude Code 2.1.326, using the
+actual Codex and Claude installed payloads respectively. Both pass repair
+preparation and independent verification, preserve caller/fixture/tracker/refs,
+and perform no actual remote writes. Original summaries and role provenance
+remain in `t130-released-native-claude/` and
+`t130-released-native-copilot-profile/` in the private operational archive.
+The actual released transport separately observes the interactive publisher
+account and repository IDs without retaining its credential. None of this closes
+the real bot publication, final C/D, cutover or rollback gates.
+
+The checkpoint notes below retain historical observations; their pending language
+is superseded by the current owner summary and released-observation record.
+
+### Actual publisher fixture refusal and correction on 2026-11-18
+
+Staged Stackweaver support merges through PR #1149 as `22242b15`; its existing
+command, agents and weekly workflow remain active. Actual native run
+`44337071097` attempt 1 stops before any publication. The original Opus 5.5
+reviewer finds that the supplied assessment identifies the credential bot but
+omits the owner who dispatched the workflow. Secret Scan succeeds independently.
+The test namespace remains empty, and all 21 exported original evidence files
+match their inventory digests. This is a useful refusal, not a successful live
+publisher test.
+
+The bounded consumer acceptance controller now reads the exact native run
+attempt and binds owner/triggering-account evidence separately from the publisher
+bot. The reproduced finding and both wrong-account early-refusal controls fail
+before the correction, then all 13 focused cases pass with 217 assertions.
+Strict types and actionlint pass. No shared policy, parser or release byte changes.
+The hosted fixture now selects an ordinary marketplace installation in an
+isolated profile; its locked Claude Code 2.1.325 CLI also passes that installation
+locally. Full local verification, fresh bounded paired review and the actual
+hosted rerun remain pending before activation. Existing behavior preservation
+and final C/D/rollback obligations remain unchanged.
+
+### Bounded consumer review follow-up on 2026-11-18
+
+Actual Claude Code Opus 5.5 paired r13 reviews shared `93a7c50c` and consumer
+`b3e1f74e`. All 69 required fragments are successfully read; packet bytes remain
+unchanged and owned-process cleanup is confirmed. Original return and provenance
+remain in `docs-drift-paired-claude-r13/`. It confirms preservation and
+proportionality, and identifies one should-fix plus three nits.
+
+The working correction verifies the installed cache through the existing
+inspector imported from the independently pinned checkout, before selecting or
+importing installed code. A proposed recursive directory diff rejects ordinary
+empty Claude installer metadata; its failure is retained. The existing inspector
+preserves that shipped contract while rejecting changed files, extra files and
+links. Owned physical Bash controls prove that those refusals precede selection
+and that altered installed code never executes. Removing this verification
+reproduces the refusals' regression. Numeric trigger-account checking and actual
+installed-root provenance also have failing-first controls. All 18 focused cases
+pass with 250 assertions; strict types and actionlint pass. Bounded refusal
+metadata and the ordinary-manual-CI exception description address the remaining
+notes. The earlier full local gate passes 48 checks without skips, and the full
+consumer suite passes 85 tests with 709 assertions. Fresh exact-source review and
+the actual publisher rerun remain required. The accepted baseline is unchanged.
+
+### Test-only follow-up after paired r14
+
+Actual Claude Code Opus 5.5 paired r14 at shared `a8a454e7` and consumer
+`7f703dc5` reads all 73 required fragments successfully, with no read errors,
+unchanged packet bytes and confirmed cleanup. It clears the workflow, controller,
+validation order, preserved behavior and proportionality. Its remaining
+should-fix and nit concern the test fixture only.
+
+The earlier canary lacks a named export, so a self-importing broken workflow
+passes all four old guard cases without evaluating that module. This false green
+is reproduced. The corrected valid export then catches the broken self-check:
+its retained observation records exit zero, selection and actual canary execution.
+The pinned-source workflow refuses that same payload and all 18 focused cases
+pass with 250 assertions. The guard now uses the hosted three-field binding and
+preserves failed fixtures. A narrowly scoped fresh review covers this test-only
+change; published shared bytes and consumer runtime/controller stay unchanged.
+
+The configured shared merge pipeline `44326173531` completes successfully at
+`18388bde`, and runtime release `v0.35.0` is published. The ordinarily installed
+plugin remains the independently verified 0.26.0 payload and uses its existing
+locked verified runtime 0.34.0. Later unrelated main edits are documentation-only.
+Actual native publisher success, final C/D review and cutover remain pending.
+
+### Reviewed publisher prerequisite at `a1aba631`
+
+Actual Claude Code Opus 5.5 paired r15 at shared `5b6713ef` and consumer
+`a1aba631` reads all 29 required fragments without errors. Packet bytes stay
+unchanged and process cleanup is confirmed. It returns no blocking or should-fix
+findings. The remaining nit concerns an unused top-level source field in an
+offline fixture; its consumed component binding is correct. The workflow and
+controller remain those cleared by r14.
+
+The final exact consumer commit passes all 90 migration cases with 742 assertions.
+The full repository gate passes 48 checks with no skips, unchanged source and a
+clean tree. A first gate is interrupted by SIGTERM during frontend lint and has
+no success record. Its original output is retained; a bounded detached rerun
+records exit zero, no surviving owned processes and the complete 48-check result.
+Evidence is `t136-a1aba631-*` in the private operational archive. Integration,
+product E2E and filesystem-vulnerability suites retain their separate environment
+limits; this prerequisite changes internal workflow/test code rather than product
+runtime. Publication now proceeds to the approved staged prerequisite, followed
+by its actual single-document native publisher test. Final migration remains gated.
+
+### Successful native publication and final adoption-state corrections
+
+Private prerequisite PR #1151 merges as `79580317`. Its independently reviewed
+head `a1aba631` passes the full 48-check gate and all 90 migration tests with 742
+assertions. The only intervening main change is another writer's Azure plan
+claim; it is preserved. Actual Actions run `44355982425`, attempt 1, succeeds at
+`79580317`, including ordinary marketplace install, independently pinned payload
+inspection, pre-credential tests, original native worker/reviewer and publication.
+Secret Scan also succeeds over the explicitly reviewed outgoing range.
+
+The original artifact records the actual installed cache root and Claude Code
+2.1.325. Both distinct native contexts attest `claude-opus-5-5`; cleanup is
+confirmed. Dispatcher/triggering actor `michielvha` remains distinct from publisher
+`github-actions[bot]`. All 71 exported originals match their inventory hashes.
+Only synthetic draft PR #1152 is created. After the executor completes, it closes
+unmerged and its unchanged candidate branch is deleted with an exact Git lease.
+Terminal receipt `29dfba94b977ba7e01a34cf7c8686c127e272ed8` remains. No production
+backlog write is claimed. Original evidence stays private in
+`t136-native-publisher-artifact/` and the bounded proof projection.
+
+Full raw corpus comparison at `79580317` passes 875 documents, twelve detector
+units, 845 findings and 63 suppressions. Original JSON/console bytes, normalized
+findings, suppressions and stale-suppression counts all agree; the caller is
+preserved with zero diagnostics. Its controller prepares the raw baseline probe
+before measuring preservation. Original source and process records are retained.
+
+The proposed adopted route catches two test/inventory gaps: an unbound fixture
+must explicitly stay staged, and `AGENTS.md` becomes a known shared caller.
+Both corrected staged/adopted migration runs pass 16 cases (99/104 assertions).
+An observation-only invalid checklist specimen then reproduces its omitted
+caller classification; explicitly accounting for that exact path turns the
+inventory green without weakening unknown-caller refusal. Final staged candidate
+`22b82010` contains only these three test/inventory lines relative to the proven
+runtime source. Workflow, controller, component and entry configuration remain
+byte-identical. Native observations keep their original consumer commits; current
+applicability is rechecked rather than retargeting them. Fresh final-candidate
+corpus/protection/rollback, final paired review and activation remain required.
 
 ### Native correction review follow-up
 
@@ -220,7 +568,7 @@ no findings, with both canonical reviews fresh. Publication, actual 0.26.0
 marketplace fresh installs/upgrades, native/hosted trials and migration/rollback
 retain their existing gates; no composite criterion is ticked by these checks.
 
-### Current committed review on 2026-11-18
+### R-125 committed review on 2026-11-18
 
 Claude Code Opus 5.5 R-125 independently reviews exact shared commit `f5cf1897`.
 Its observed checks pass 379 protocol/authority cases and 219 affected cases. Both
@@ -303,7 +651,7 @@ strict types pass after the cleanup. Mark that local implementation task complet
 retaining the exact source attribution. T155 and T128 still include release-bound
 consumer work; T129/T130 retain final review, publication and acceptance gates.
 
-### Current implementation review and publication boundary
+### Earlier implementation review and publication boundary
 
 Claude Code Opus 5.5 R-127 reviews exact [9335c8ec](https://github.com/michielvha/vh-adlc/commit/9335c8eca92062f5864ee86a97107c01ba7b4bc3)
 with no findings. It independently repeats the precise assessed-unknown mutation:
@@ -366,7 +714,7 @@ The feature's [upstream integration](https://github.com/michielvha/vh-adlc/commi
 
 R-120 identifies costs introduced by hashing every old declaration and by changing the digest of earlier records. Preserve those supported paths. The new digest projects only the new `local_documents` rules and their coverage policy. Exclude the existing digest-bound rows and writer inventory. Presence of the new member in the original committed companion selects the projected form. Its absence keeps the established settings-only form. Every current and historical reader derives that single expected form from its own source commit. This preserves old history carry-forward, closure and original-policy recovery while refusing a settings-only downgrade at a new-policy source. The checks include post-edit legacy-row refresh, writer changes, both history forms and rollback. Reuse the existing checklist field and committed-source readers.
 
-### Current worker verification on 2026-11-17
+### Worker verification checkpoint on 2026-11-17
 
 Consumer correction `6a4a2c52` is the reviewed worker checkpoint. The focused working-tree run in `t128-worker-r5-neighbors.log` records 49 protocol, migration and hosted-contract cases with 239 assertions. Qualified Claude Code Opus 5.5 bounded review r6 at that committed consumer and shared `8484a008` reads all 52 required fragments, preserves packet bytes and returns no findings. The clean-source rerun in `t128-worker6a-final-scheduled` records nine native-service recovery cases and 161 assertions with identical before/after source hashes. The full local gate in `t128-worker6a-final-full` records 48 passing checks, zero failures/skips and the same clean before/after commit. Those are local developer-workflow checks. An initial interpretation mistook the reusable OAuth input for a separate repository secret. The committed caller mapping already selects the existing secret correctly. A new parity test now checks that complete mapping. Read-only secret-name inspection identifies only the configured Copilot reviewer secret as missing for the hosted trial. Actual released install/provider/hosted/final paired/cutover acceptance remains open.
 
@@ -1008,7 +1356,66 @@ The normal entry is harness-agnostic. The installed skill and one shared helper 
 
 Use the ordinary marketplace installation, plugin revision and verified binary installer. Record the actual plugin revision, native client version, Bun version, requested model, observed model and operation target in the run. The adopter provisions its normal client and credentials. Setup checks required commands/capabilities before work. CI continues using the declared toolchain. Publication uses the selected validated run inputs without repeating an exact Bun-version equality check for every effect.
 
-The approved component binding is distinct from the engineering docs revision passed as `--plugin-pin`. The consumer records the released plugin version, released source commit and existing component payload fingerprint. Extract/reuse `componentDigest` and the byte/inventory checks from `inspectRetainedPayload` in `bootstrap.ts` for the ordinary installed directory. Its existing private-cache ownership/0700/nlink policy is inapplicable to marketplace installation and must not be imposed on or used to chmod that installation. Resolve its actual root and verify the released regular-file inventory, executable modes and bytes without creating another copy. Installed directories and hosted plugin checkouts require exact regular-file set equality, including ignored, untracked and hidden files. Missing or extra files, symlinked entries and other nonregular entries fail. A symlink selecting the root may be canonically resolved once; entries below it cannot be symlinks. There are no installer-owned file exclusions in this design. Installer metadata is expected to live outside the selected plugin root. T130 verifies that expectation against each actual installed payload. An install that cannot satisfy the inventory gets setup-required instead of a silent exclusion. The fingerprint is SHA-256 of canonical JSON containing UTF-8-sorted `[relative_path, Git_mode, SHA256(raw_bytes)]` rows for the published plugin files. Compare the ordinary installed payload to that released inventory once per invocation. T140 removes the known inner duplicate while retaining the full installed-runtime check before client execution. T127 removes the remaining repeated entry/collector checks before final acceptance, preserving the exact byte/mode/inventory refusal and live effect gates. In both staged and adopted modes, matching the selected binding is required before any provider execution or remote mutation. New production work uses the current consumer binding. Recovery effects use the original operation component binding under the current recovery-specific permission and evidence checks described below, even when the consumer has since upgraded. They cannot authorize new business work under an old checklist. Staged synthetic trials match their declared candidate binding. Static local scan and report may run with a mismatch, record that mismatch and remain ineligible for provider execution/publication. A caller-authored report cannot supply a missing assessment or review. All other operations stop at their first provider/effect stage with setup-required when the binding differs. A source-file change under the same version fails the binding. The docs revision remains independently pinned.
+The approved component binding is distinct from the engineering docs revision passed as `--plugin-pin`. The consumer records the released plugin version, released source commit and existing component payload fingerprint. Extract/reuse `componentDigest` and the byte/inventory checks from `inspectRetainedPayload` in `bootstrap.ts` for the ordinary installed directory. Its existing private-cache ownership/0700/nlink policy is inapplicable to marketplace installation and must not be imposed on or used to chmod that installation. Resolve its actual root and verify the released regular-file inventory, executable modes and bytes without creating another copy. Installed directories and hosted plugin checkouts require exact shipped regular-file set equality, including ignored, untracked and hidden files, apart from the single validated native process-marker exception below. Missing or other extra files, symlinked entries and other nonregular entries fail. A symlink selecting the root may be canonically resolved once; entries below it cannot be symlinks. There are no other installer-owned file exclusions. T130 checks both empty-profile installation and an actively used ordinary Claude installation. An install that cannot satisfy these checks gets setup-required. The fingerprint is SHA-256 of canonical JSON containing UTF-8-sorted `[relative_path, Git_mode, SHA256(raw_bytes)]` rows for the published plugin files. Compare the ordinary installed payload to that released inventory once per invocation. T140 removes the known inner duplicate while retaining the full installed-runtime check before client execution. T127 removes the remaining repeated entry/collector checks before final acceptance, preserving the exact byte/mode/inventory refusal and live effect gates. In both staged and adopted modes, matching the selected binding is required before any provider execution or remote mutation. New production work uses the current consumer binding. Recovery effects use the original operation component binding under the current recovery-specific permission and evidence checks described below, even when the consumer has since upgraded. They cannot authorize new business work under an old checklist. Staged synthetic trials match their declared candidate binding. Static local scan and report may run with a mismatch, record that mismatch and remain ineligible for provider execution/publication. A caller-authored report cannot supply a missing assessment or review. All other operations stop at their first provider/effect stage with setup-required when the binding differs. A source-file change under the same version fails the binding. The docs revision remains independently pinned.
+
+
+The installed-directory inspector may omit only validated Claude native
+`.in_use/<pid>` process markers from the component fingerprint. An absent or empty
+reserved directory is valid. It is at the selected plugin root and may contain
+only direct regular marker files with no execute bits (`mode & 0o111 == 0`) and
+one hard link (`nlink == 1`). Directory and file symlinks, nested entries and
+other nonregular entries are refused. The filename is the canonical positive
+decimal PID, matching a JSON safe-integer `pid` greater than zero. The UTF-8 bytes
+must encode exactly the literal keys `pid` and `procStart`, once each, in either
+order. JSON ASCII whitespace (space, tab, CR, LF) is allowed; escaped keys,
+duplicate/missing/unknown keys, a BOM and noncanonical PID number forms
+(including `1e3`, `1.0`, `-0` and leading zeros) are refused. `procStart` is a
+quote byte, one to 32 literal ASCII digit bytes `0` through `9`, then a
+quote byte. Escapes in that value are refused; the bound counts raw digit bytes. Read no more than 257 bytes
+and accept no more than 256 bytes, including whitespace. Oversized or malformed
+observations are refused before exclusion. No marker data is executed or used as
+process ownership, verification evidence or effect authority. Valid stale
+markers are harmless data and need no liveness probe, signal or deletion.
+
+The exception applies uniformly wherever the updated installed inspector is
+called: interactive runtime selection, current hosted-release selection and
+original-release runtime inspection. Only installed-file inspection changes;
+provider, publisher, source, approval, recovery permission and original-evidence
+checks are unchanged. Retained private payload verification remains exact.
+`computeComponentIdentity` keeps counting every Git release file and rejects a
+release that contains the reserved `.in_use` path or descendants, so process
+metadata cannot be published as shipped content and then excluded at runtime.
+All other extra, missing, changed, symlinked or nonregular inputs remain refused.
+The existing installed policy still accepts hard-linked shipped files and a
+canonicalized root selector alias; only marker files acquire the single-link rule.
+See `plugins/vh-adlc/scripts/docs-drift/bootstrap.ts:64-65`, `:78` and `:87`, and
+`tests/vh-adlc/docs-drift/bootstrap.test.ts:77-91` at
+[b82c89f](https://github.com/michielvha/vh-adlc/commit/b82c89f81f942ca766b7748a862201e8cdc799fb).
+
+There is no automatic retry. Removal between enumeration and lstat, changed
+observed device/inode/size/mode between lstat and open, an incomplete read, growth
+beyond the byte bound, and a transient temporary filename yield setup-required
+at the ordinary caller. A later explicit caller rerun may succeed; failed
+inspection is not cached. Valid marker membership/content changes between
+inspections do not change the shipped identity. The checker performs no writes
+and preserves installer modes. Only a successful inspection is reused within
+its existing invocation scope.
+
+Pre-correction helpers, including published 0.26.0, keep their original exact
+inventory check and refuse active caches containing native markers. Stackweaver's
+migration rollback restores its reviewed legacy routing, companion and binding
+together. Recovery of an original shared operation still uses that exact old
+component in an existing matching marker-free ordinary install. The verified
+Codex install or a marker-free hosted checkout remains an inspection/recovery
+surface; an old Claude-role path is supported only when its actual normal and
+cancelled invocations leave that selected directory verifiably marker-free.
+T130 records those observations for the selected client/build; unsupported paths
+stay blocked. Original recovery itself launches no role. The original helper,
+policy, ownership and authority govern its effects; no marker exception is
+backported and no new per-invocation installer or ownership transfer is added.
+The original recovery caller's existing incomplete/setup classification remains
+unchanged and blocks effects on a failed inspection. Retain the old active-cache
+refusal and verify the selected matching alternative in the rollback proof.
 
 Hosted execution checks out the exact published `component.source_commit` through ordinary Git/checkout tooling and invokes its plugin directory, then validates the recorded version/fingerprint. Interactive execution uses an ordinary installed directory that matches that same component binding. Both Codex and Claude support installing from an ordinary local marketplace checkout of that release. On 2026-11-15, `codex plugin marketplace add --help` returned `Add a local or Git marketplace to the configured marketplace sources`, a SOURCE accepting `a local path, owner/repo[@ref], HTTPS Git URL, or SSH Git URL`, and `--ref <REF>` with `Git ref to fetch for Git marketplace sources`. `claude plugin marketplace add --help` returned `Add a marketplace from a URL, path, or GitHub repo`. These observed help outputs establish argument support. The actual isolated release install remains a T130 check. Use isolated project/test profiles or an explicitly selected existing matching install, preserving the user's global marketplace. These are normal source/plugin installations, with normal native clients. If an interactive install contains a newer payload than the committed binding, report setup-required before effects. Never silently select latest or change the consumer binding. Rollback selects the previous published checkout/install and restores the reviewed previous consumer binding through the same path.
 
@@ -1133,19 +1540,12 @@ The owner confirmed ordinary installed clients and the capability-preserving che
 ## Acceptance Criteria
 
 - [ ] AC-01: An adopting repository can audit documentation and resolve stale audit proposals through one discoverable harness-agnostic workflow, retaining its scanner, detector policy and existing change-scoped docs-impact behavior.
-      Evidence: R-130 returns not verified at bda802b5; see its exact observations and limitations in the Review Log.
 - [ ] AC-02: Complete assessments independently match scanner document/per-unit inventories and raw-byte digests to the selected Git tree and committed selectors. Failed, skipped, partial, stale or unreadable required input remains visible and prevents a clean claim. Confirmed findings and proposed fixes carry document/source evidence.
-      Evidence: R-130 returns not verified at bda802b5; see its exact observations and limitations in the Review Log.
 - [ ] AC-03: Authorized preparation preserves unrelated work, intended contracts, historical evidence and local feature-review rules while producing only selected verified corrections. Mixed plan directories preserve safe locally authorized mechanical corrections and ordinary-document preparation without weakening enrolled shared-spec gates. Caller repositories and foreign resources retain their original state.
-      Evidence: R-130 returns not verified at bda802b5; see its exact observations and limitations in the Review Log.
 - [ ] AC-04: Resolution retains the correct detector-versus-interpretation feedback and current disposition for every original hunk. A selected original closes only after its merged consolidation and every carried or terminal disposition are freshly verified.
-      Evidence: R-130 returns not verified at bda802b5; see its exact observations and limitations in the Review Log.
 - [ ] AC-05: Concise reports, independent exact-target review and declared permissions govern local and remote effects. Scheduled and interactive publisher accounts remain distinct and correctly bound. Complete unchanged carried attention can finish green. Original-operation recovery observes before replay, preserves partial/unknown outcomes as pending, supports evidence-backed owner acknowledgement and never repeats a completed write or transfers ownership. A present lease keeps both local and scheduled audits pending before model execution. Exact owner-approved administrative abandonment requires a stopped original executor and atomically removes only the present lease and its validated operation receipt. Normal hosted production execution uses the durable `hosted` profile and retains native-validated original run/attempt identity before lease acquisition, with exact configured workflow and assessed-source checks. Stopped-job evidence must match the production member or a native trial's existing launch binding. Collector trials are ineligible for administrative abandonment. Stale object preconditions reject all deletions. With no lease, reports assess current findings independently while retaining receipt-only evidence.
-      Evidence: R-130 returns not verified at bda802b5; see its exact observations and limitations in the Review Log.
 - [ ] AC-06: Stackweaver adopts the published installed workflow after scanner parity, independent paired review, installed/native operation checks and a successful unattended shared trial, with its local rules, credentials, commands, schedule and notifications preserved and a verified rollback path.
-      Evidence: R-130 returns not verified at bda802b5; see its exact observations and limitations in the Review Log.
-- [ ] AC-07: Recorded repository, package and portable-host checks pass for the exact released/installed payload. Native model/entry trials establish their actual supported surfaces. GUI, phone and unperformed surfaces remain explicitly deferred or unclaimed. The selected component binding gates provider execution and remote effects, with explicit read-only mismatch reporting. Simpler installation, run/recovery and migration interfaces replace the private client installer and historical adoption/runtime record machinery under the accepted tradeoffs, while retaining the test-only installed synthetic harness and durable operation recovery records.
-      Evidence: R-130 returns not verified at bda802b5; see its exact observations and limitations in the Review Log.
+- [ ] AC-07: Recorded repository, package and portable-host checks pass for the exact released/installed payload. Native model/entry trials establish their actual supported surfaces. GUI, phone and unperformed surfaces remain explicitly deferred or unclaimed. The selected component binding gates provider execution and remote effects, with explicit read-only mismatch reporting. Simpler installation, run/recovery and migration interfaces replace the private client installer and historical adoption/runtime record machinery under the accepted tradeoffs, while retaining the test-only installed synthetic harness and durable operation recovery records. An actively used ordinary Claude installation with valid native process markers satisfies the same shipped component binding; other extra, changed, symlinked or nonregular inputs remain refused, and retained exports keep their exact inventory rule.
 
 ## Test Plan
 
@@ -1157,11 +1557,50 @@ The owner confirmed ordinary installed clients and the capability-preserving che
 | AC-04 | Run full-diff resolution, feedback and closure tests for duplicate/conflicting/stale proposals, wrong detector versus interpretation, stale suppression retirement and binary/generated changes. Verify a complete merged consolidation closes only selected accounted-for originals, an unmerged or modified replacement leaves them open and a changed explanation needs fresh review. Verify pre-change consolidation heads with their original settings-only digest, and keep selected originals eligible for approved post-merge closure. |
 | AC-05 | Run real helper/native fake-service paths for independently reviewed audit/publication/closure and both bot/owner accounts. Test before-send failure, response loss, intent/outcome interruption, partial text/labels/draft, concurrent leases, two same-directory resumers and copied-run observation-only refusals, same-account recasing, changed ID/material login, foreign recovery and stale review. Preserve original plan/evidence bytes and count remote effects once. Exercise exact owner acknowledgement, missing/contradictory application evidence, unresolved neighboring effects and cleanup crashes. Verify green unchanged attention, new/changed attention, incomplete history and cross-entry read-only history without ownership transfer. End a hosted job after lease acquisition, discard its local directory and run the next schedule on a fresh runner. Restore bounded remote inspection context, require zero business writes and report pending ownership/application proof with the lease retained. A stopped client and repeated absence reads cannot replace settlement evidence. Test the documented outside-helper Git abandonment procedure using saved inspect/restore JSON and adjacent exact approval, requiring its non-success resource/outcome fields and no new abandonment command. Test both local and scheduled entries: a present lease skips both models and returns pending, while an initially absent lease acquired during assessment prevents a green report. Cover readable/foreign/unreadable metadata, failed lease lookup and a 404 without established Contents access, requiring incomplete status for unavailable access. Verify normal hosted publication/closure plans retain native-validated run/attempt identity before lease acquisition. Select `hosted` with all Actions variables absent and require refusal before native effects. Reject missing/invalid selectors, local-profile Actions invocation, native repository/head-repository/workflow/default-branch/source/event mismatch, completed or otherwise inactive run status and unavailable run observations. Match `reports.workflow_id`, the accepted native forms of `reports.workflow_path` and `head_sha === manifest.bindings.source_commit`. Refuse `hosted_executor` in local production, native-trial, collector and version-one plans. An unchanged re-seal/policy binding preserves both IDs exactly. Original execution/resume under another run or attempt refuses before effects. Read old version-one/version-two records byte-for-byte without adding identity. Rehearse manual eligibility against the recorded identity: absent identity, another run or attempt, or unavailable terminal native status remains ineligible and pending with an explicit original-evidence hand-off. Rehearse a lost-origin native trial using its recorded `trial_launch` run/attempt and exact terminal native observation, permitting only separately approved atomic abandonment in its original trial namespace. Wrong/missing launch identity remains pending; collector-only trials remain ineligible and send no deletion. Rehearse the documented manual eligibility checks with saved native stopped-executor evidence linked to the original operation. A running or unknown executor, missing linkage, a receipt-only selection or an additional foreign/terminal receipt makes the procedure ineligible and sends no deletion. Preserve the existing live-original per-effect lease fence and test lease removal while that controller remains alive. Test one atomic `git push --atomic` with exact expected objects for the present lease and its operation receipt. A stale or missing approved ref or atomic-disabled server refuses the whole push and preserves every ref. In the fixed empty-findings/no-proposal fixture, unsupported manual lease-only deletion requires fresh independent assessment and collected/zero, with the orphan receipt unchanged, no abandoned-plan replay and no settlement or abandonment-success claim. Exact approved atomic abandonment permits only a fresh reviewed plan from current resources. Preserve every terminal receipt belonging to another operation. A copied run with identical machine ID/path but no external origin record remains observation-only. Refuse all cross-host ownership transfer and helper-driven effects from a lost-origin mirror. Exact owner approval alone cannot replace the original ownership or settlement proof. Test GraphQL/REST bot representations with one numeric ID, missing discovery authors and uncovered publication prefixes. Retain ZIP traversal, duplicate-name, nonregular-entry, false-size, entry-count and expanded-byte limit controls. Require `resume --action retire-receipt` to match any other unknown action at argument parsing, with diagnostic `Select a supported resume action.`, outcome `incomplete` and exit 2. Cover both absent and existing original run directories, preserve every existing run/journal/stage byte and require zero transport calls. Help, usage and public guides list no `retire-receipt` resume action or helper receipt-deletion command. They document indefinite terminal-receipt retention and the separately scoped unresolved-operation abandonment hand-off. Require new version-2 plans/grants containing `receipt-retire` to refuse before lease acquisition, while version-1 retained records remain inspectable with their original bytes. After completed publish, closure and acknowledgement, compare each original receipt ref/object and require unchanged receipts with zero receipt-deletion transport calls. Include acknowledged, retired and invalidated terminal outcomes in retained-ref checks. No completed-receipt cleanup route, expiry or standing-procedure grant is advertised or executed. The earlier separately exact-approved unresolved-operation administrative-abandonment rehearsal remains required. Verify original-policy recovery at its original commit using that source-selected digest form. Preserve all original-release, stopped-executor and current exact approval restrictions. |
 | AC-06 | Compare legacy scanner JSON/console/exits and real-corpus collection in the isolated consumer branch. Run final bounded private paired review through actual Claude Code Opus 5.5 after release/install at the exact component binding, final staged consumer C and activation diff, under its exact packet approval. Validate original native model/target/context and process completion; changed relevant targets require a new review. Test fresh marketplace install/upgrade and installed command routing, normal client/version preflight, an authorized successful unattended installed synthetic trial in its owned namespace, legacy freeze/inventory, the actual routing switch and disposable rollback. Preserve runtime providers/credential references and notification configuration byte-for-byte unless a separately selected change requires otherwise. |
-| AC-07 | Run strict TypeScript with resolved file inclusion, Go tests/vet/lint/module checks, full plugin/registration tests, package/discovery checks and Linux/macOS CI at recorded commits. Exercise unchanged loop/triage callers when shared helpers change. Test interrupted-run handling after plugin/role/source/config/candidate/payload/authority/publisher changes, requiring fresh review. A diagnostic-only Bun/Git/gh/native-client version patch keeps unchanged review usable when capabilities and the original recorded model/config binding match. Exercise resume without a role process and assert no provider call or model probe. Test lost local application evidence and refusal of helper-driven lease abandonment without original settlement proof. For a bot-owned hosted interruption followed by runner loss and upgrade, verify that current-release inspection retains the lease and reports manual administrative abandonment. A rollback, an owner dispatch and a foreign interactive owner still cannot take over or mutate that operation. Restore version-2 inspection context after removing private caches/setup chains and upgrading the consumer component. The fresh hosted current-release job inspects and hands off. A surviving-origin controller using an explicitly selected original ordinary release performs only separately approved recovery effects under its original committed policy, exact current recovery approval, current native permissions and preimages. An upgrade adding an unknown settings field does not make the old release parse that successor schema. A rollback to staged legacy routing permits only surviving-origin exact approved recovery effects while new business writes remain blocked. A lost-origin hosted mirror stays observation-only under either schema/mode. Test upgrade and rollback with pending version-2 operations, including a pre-version-2 rollback that cannot replay them. Recover an interrupted native unattended trial against its definition/component/native-launch policy digest before any checklist exists. Exercise an owner-dispatched `workflow_dispatch` run whose configured bot publishes, compare the bot REST identity with the definition and keep the triggering owner separate. Refuse wrong publisher, event or dispatch head. Separately recover a hermetic collector trial against its synthetic-manifest digest and refuse a digest or transport swap between the two. Inspect old version-1 records byte-for-byte without silently upgrading/executing them, displaying `approval_sha256` as the effect-grants digest. Independently test version-2 grants and context-specific policy-digest mismatches. Test staged production refusal, binding mismatch allowing static scan/report while blocking provider/effects in both modes, altered installed bytes, an extra/missing file or a symlinked entry under the same version, a newer marketplace payload against the old binding, wrong component binding, incomplete/mismatched checklist, direct-child C-to-D shape, merge-commit delivery, unrelated intervening commits and the fixed upgrade rows for unrelated component releases and routine activation-workflow pins. Check that selected successor checks repeat and unaffected evidence retains its original attribution. Check that preflight needs no future switch outcome and that unapproved activation changes fail. Compare before/after module/command/config surfaces and identify every retained component by a real caller and behavior. Rebuild via the actual release path, verify published integrity, perform isolated Codex/Claude marketplace install/upgrade/discovery and authorized Copilot/Claude operations using the installed payload. Preserve explicit GUI/phone deferrals. Test the prior reader with the new companion fields, retaining its incomplete refusal. Test the successor with the old declarations and preserve their earlier behavior. Rehearse publishing the compatible payload before companion activation, then restore the old companion and binding together on rollback. A protection-policy change selects the existing scanner/scope/feedback and effect/recovery proof rows. Bind new local-document rules and their coverage policy through the source-selected existing configuration digest. Refuse a projected `local_documents` or local-coverage change after adoption without a reviewed successor checklist even while settings and component remain identical. Require identical declaration values in C and D. Run unrelated-component successor, routine workflow-pin successor, plain second-adopter and prose-only checks with `local_documents` present, as well as the legacy absent-member cases. Require their success without artificial companion edits. Confirm that a prose-only change leaves the opted-in digest stable and that every declared coverage value, including a local-format ignored key, changes it when edited. Permit prose-only changes outside actual activation files. Retain full-file after-hash refusal for declared activation files. Test old-member absence selecting the existing settings-only digest, new-member presence including an empty list selecting the projection, absent local coverage as null, canonical object ordering and preserved list order. Editing a digest-declared document and refreshing its row, and adding/removing an old writer row, retain their existing eligibility without a successor checklist. A projected-rule or coverage-policy change still requires one. Test pre-change history carry-forward, pre-change consolidation closure, original-policy recovery, reverse rollback to a reader unable to verify new-form history, new-source refusal of a settings-only digest, missing original source, original-record preservation and paired rollback. |
+| AC-07 | Run strict TypeScript with resolved file inclusion, Go tests/vet/lint/module checks, full plugin/registration tests, package/discovery checks and Linux/macOS CI at recorded commits. Exercise unchanged loop/triage callers when shared helpers change. Test interrupted-run handling after plugin/role/source/config/candidate/payload/authority/publisher changes, requiring fresh review. A diagnostic-only Bun/Git/gh/native-client version patch keeps unchanged review usable when capabilities and the original recorded model/config binding match. Exercise resume without a role process and assert no provider call or model probe. Test lost local application evidence and refusal of helper-driven lease abandonment without original settlement proof. For a bot-owned hosted interruption followed by runner loss and upgrade, verify that current-release inspection retains the lease and reports manual administrative abandonment. A rollback, an owner dispatch and a foreign interactive owner still cannot take over or mutate that operation. Restore version-2 inspection context after removing private caches/setup chains and upgrading the consumer component. The fresh hosted current-release job inspects and hands off. A surviving-origin controller using an explicitly selected original ordinary release performs only separately approved recovery effects under its original committed policy, exact current recovery approval, current native permissions and preimages. An upgrade adding an unknown settings field does not make the old release parse that successor schema. A rollback to staged legacy routing permits only surviving-origin exact approved recovery effects while new business writes remain blocked. A lost-origin hosted mirror stays observation-only under either schema/mode. Test upgrade and rollback with pending version-2 operations, including a pre-version-2 rollback that cannot replay them. Recover an interrupted native unattended trial against its definition/component/native-launch policy digest before any checklist exists. Exercise an owner-dispatched `workflow_dispatch` run whose configured bot publishes, compare the bot REST identity with the definition and keep the triggering owner separate. Refuse wrong publisher, event or dispatch head. Separately recover a hermetic collector trial against its synthetic-manifest digest and refuse a digest or transport swap between the two. Inspect old version-1 records byte-for-byte without silently upgrading/executing them, displaying `approval_sha256` as the effect-grants digest. Independently test version-2 grants and context-specific policy-digest mismatches. Test staged production refusal, binding mismatch allowing static scan/report while blocking provider/effects in both modes, altered installed bytes, an extra/missing file or a symlinked entry under the same version, a newer marketplace payload against the old binding, wrong component binding, incomplete/mismatched checklist, direct-child C-to-D shape, merge-commit delivery, unrelated intervening commits and the fixed upgrade rows for unrelated component releases and routine activation-workflow pins. Check that selected successor checks repeat and unaffected evidence retains its original attribution. Check that preflight needs no future switch outcome and that unapproved activation changes fail. Compare before/after module/command/config surfaces and identify every retained component by a real caller and behavior. Rebuild via the actual release path, verify published integrity, perform isolated Codex/Claude marketplace install/upgrade/discovery and authorized Copilot/Claude operations using the installed payload. Preserve explicit GUI/phone deferrals. Test the prior reader with the new companion fields, retaining its incomplete refusal. Test the successor with the old declarations and preserve their earlier behavior. Rehearse publishing the compatible payload before companion activation, then restore the old companion and binding together on rollback. A protection-policy change selects the existing scanner/scope/feedback and effect/recovery proof rows. Bind new local-document rules and their coverage policy through the source-selected existing configuration digest. Refuse a projected `local_documents` or local-coverage change after adoption without a reviewed successor checklist even while settings and component remain identical. Require identical declaration values in C and D. Run unrelated-component successor, routine workflow-pin successor, plain second-adopter and prose-only checks with `local_documents` present, as well as the legacy absent-member cases. Require their success without artificial companion edits. Confirm that a prose-only change leaves the opted-in digest stable and that every declared coverage value, including a local-format ignored key, changes it when edited. Permit prose-only changes outside actual activation files. Retain full-file after-hash refusal for declared activation files. Test old-member absence selecting the existing settings-only digest, new-member presence including an empty list selecting the projection, absent local coverage as null, canonical object ordering and preserved list order. Editing a digest-declared document and refreshing its row, and adding/removing an old writer row, retain their existing eligibility without a successor checklist. A projected-rule or coverage-policy change still requires one. Test pre-change history carry-forward, pre-change consolidation closure, original-policy recovery, reverse rollback to a reader unable to verify new-form history, new-source refusal of a settings-only digest, missing original source, original-record preservation and paired rollback. Execute the normative active-install matrix below, including the real installed-session and original-release rollback observations. |
+
+### Active native install proof (AC-07)
+
+- With both full-manifest and three-field bindings, accept absent/empty metadata,
+  either key order, JSON ASCII whitespace through the 256-byte boundary, valid
+  stale markers, and valid marker content/membership changes. Require the same
+  version, fingerprint and shipped inventory, with marker bytes and modes unchanged.
+- Refuse duplicate/missing/unknown or escaped keys, BOM/invalid UTF-8/JSON,
+  zero PID with filename `0`, noncanonical or unsafe PID values, filename/PID
+  mismatch, invalid start values or escaped digit bytes in `procStart`,
+  257-byte data, any execute bit, hard links, symlinks, nonregular files, nested
+  entries and other extra names. A valid marker cannot hide changed shipped code.
+  Require setup-required at the ordinary selection caller before provider/effect
+  work and no checker-authored file or mode change. Original recovery retains its
+  existing incomplete/setup outcome with effects blocked; its error API is unchanged. Retained exports still refuse a valid extra marker, and a Git
+  release containing the reserved path is refused.
+- Inject removal after enumeration and replacement between lstat/open. Require
+  setup-required, no automatic retry and successful explicit rerun after restoring
+  valid input in the same invocation. Inject growth and shrinkage between the
+  size observation and read. Require at least one observed read and no marker
+  read request above 257 bytes. Both races require setup-required at the ordinary
+  caller, no checker-authored change, and successful explicit rerun after valid
+  input is restored; an oversized-file test alone is insufficient. Existing filesystem test spies may
+  provide these deterministic faults; add no production injection API.
+- Publish the correction and inspect the actual ordinary installed payload while
+  its native Claude session holds its marker. Record OS, CLI, plugin, component,
+  actual role identity and marker-schema observations separately. Preserve the
+  existing live session and metadata. Unsupported host/client shapes stay unclaimed.
+- Through the actual pre-correction helper, retain active-Claude-cache refusal
+  and matching marker-free Codex/hosted selection. Observe actual normal and
+  cancelled Claude `--plugin-dir` roles for the selected build and record marker
+  presence during execution and after cleanup. An old role path lacking that
+  proof stays blocked. Rehearse legacy consumer-routing rollback with the matched
+  old companion/binding, retaining original records, permission gates and deferred
+  phone/GUI checks. Do not infer that an old helper accepts an active cache or
+  change its original recovery error classification.
 
 ## Tasks
 
+
 The following tasks implement the revised baseline after spec review and owner acceptance. Earlier checked tasks below retain their original completed-work evidence.
+
+- [ ] T156 `plugins/vh-adlc/scripts/docs-drift/bootstrap.ts, tests/vh-adlc/docs-drift/bootstrap.test.ts, plugins/vh-adlc/plugin.json, plugins/vh-adlc/.claude-plugin/plugin.json, plugins/vh-adlc/references/docs-drift-settings.md` - First reproduce the native marker refusal. Add only the normative bounded installed-metadata validation and reserved Git-path refusal. Exercise the active-install proof matrix, read-bound and race faults, exact retained checks, normal runtime neighbors and strict types. Obtain a fresh actual Claude Code Opus 5.5 implementation review. T130 retains actual release/install/native-session and rollback acceptance. (AC-01, AC-06, AC-07)
 
 - [x] T121 `tests/vh-adlc/docs-drift/, staged Stackweaver migration callers` - Inventory real and development callers, pending-run artifacts and retained compatibility needs. Record a failing ordinary-install/run-directory entry case and the before-change API/module/config surface. Keep old runtime artifacts where an actual pending run needs them. (AC-01, AC-05, AC-06, AC-07)
 
@@ -1326,7 +1765,7 @@ The following tasks implement the revised baseline after spec review and owner a
   Local checkpoint. Pushed source `8785808d` fails macOS CI run `44024107766`, job `133840212519`, in the combined memory-capture control. Its actual result has exit zero, reaped state, absent group, no survivors and a denied `SIGTERM` with `EPERM`. The old `failedSignal` condition still marks cleanup unconfirmed despite the final observed absence. The deterministic denied-signal/absent-group case first fails, while the unknown final probe remains unconfirmed. The correction derives confirmation from the final group observation, reaping and survivor inventory, retaining all signal diagnostics. All ten focused process cases pass 39 assertions. Together with lifecycle process neighbors, 17 cases pass 54 assertions, including detached descendants, timeouts and denied-probe refusal. Native macOS CI passes at `94fdc83a` in run `44027321231`, job `133850773270`. Qualified actual Claude Code Opus 5.5 diagnostic r18 reads all 89 required fragments and reports the process correction as correct. Its separate publication-retention finding is recorded under T147.
 
 - [ ] T129 `shared and consumer verification evidence, docs/specs/shared-docs-drift.md` - Run exact committed-source repository/package/portable checks and actual Claude Code Opus 5.5 implementation and preliminary paired migration reviews, validating native model/target/context and cleanup, with a proportionality check. Retain failed observations, criterion outcomes and all remaining external acceptance gaps. Prepare the exact bounded private paired packet for its required destination approval. (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07)
-- [ ] T130 `published shared payload, installed/model/hosted trial and consumer cutover` - Under the existing separate publication/execution/cutover grants, verify actual release/marketplace integrity, native discovery/operations, paired migration, successful installed synthetic unattended trial, final released-payload/consumer paired review, acyclic preflight-backed staged/adopted and component-binding gating, affected-upgrade checks, legacy freeze/inventory and routing/rollback. Mark completion only after original evidence, independent review and the complete gate establish every criterion. (AC-06, AC-07)
+- [ ] T130 `published shared payload, installed/model/hosted trial and consumer cutover` - Under the existing separate publication/execution/cutover grants, verify actual release/marketplace integrity, native discovery/operations, paired migration, successful installed synthetic unattended trial, final released-payload/consumer paired review, acyclic preflight-backed staged/adopted and component-binding gating, affected-upgrade checks, legacy freeze/inventory and routing/rollback. Repeat release/install/native/paired checks for the corrected published component, including native use of an ordinary active Claude cache without deleting process metadata. Refresh the consumer binding and C/P/D evidence rather than retargeting 0.26.0 observations. Mark completion only after original evidence, independent review and the complete gate establish every criterion. (AC-06, AC-07)
 
 ### Previously completed implementation tasks
 
@@ -1883,7 +2322,14 @@ The following tasks implement the revised baseline after spec review and owner a
   Evidence. Exact `c49c801` passes the normal closure-role CLI regression with 28 assertions and unchanged deadlines. The complete CLI is reviewed in qualified component R6 at `df2d49c`; its isolated exact-source retry passes the same 28 assertions with confirmed cleanup. Original failure, retry and clean-source records remain in `verify-boundaries-df2d49c`. Context records both observations.
 ## Open Questions
 
-None. On 2026-11-17 the owner accepts the R-117 compatibility recommendations. The new companion fields ship with the compatible released binding and roll back with it. The new classifier applies only within standard-format feature roots. Other documents retain their existing protection paths.
+None. On 2026-11-19 the owner authorizes cutover after the recommended compatibility
+bundle was explained: strict unambiguous marker bytes with either field order and
+JSON ASCII whitespace, explicit rerun without automatic retry, uniform installed
+inspection without effect/recovery changes, and unchanged old releases with legacy
+consumer rollback and matching marker-free original recovery. Conservative details
+within that marker-only scope may proceed after clean review. Existing publication,
+release and gated migration authority remains; broader exclusions or new permissions
+are outside this decision.
 
 ## Review Log
 
@@ -2029,6 +2475,13 @@ None. On 2026-11-17 the owner accepts the R-117 compatibility recommendations. T
 | 2026-11-18 | R-128 | implementation | `94e40a7a15ce8e7f2cfef34cc62f4392ee2de2ff` | claude-opus-5-5 | procedural | No blocking or should-fix findings; three nits; seven composite criteria remain not verified. |
 | 2026-11-18 | R-129 | implementation | `ddc97c873416c337ea86ccb945086fc980bb90ee` | claude-opus-5-5 | procedural | No findings; seven composite criteria remain not verified pending release and adoption. |
 | 2026-11-18 | R-130 | implementation | `bda802b57236949a7c18092de0e59ef246affb2c` | claude-opus-5-5 | procedural | No blocking or should-fix findings; one owner-summary nit corrected; seven criteria not verified. |
+| 2026-11-18 | R-131 | spec | `5491b6770f7efa719810c1dead028bf0528d2b1c` | claude-opus-5-5 | procedural | One selected-backend clarification and three documentation nits; unchanged accepted baseline. |
+| 2026-11-18 | R-132 | spec | `d06daa36296e60c20b98f1be08bc908511495b57` | claude-opus-5-5 | procedural | No blocking or should-fix findings; five documentation nits; selected-backend ambiguity resolved. |
+| 2026-11-18 | R-133 | spec | `623472e84df587232785670f36bee5b8f1160e74` | claude-opus-5-5 | procedural | 7 should-fix, 2 nit. |
+| 2026-11-18 | R-134 | spec | `0c70b647cd21fa6d4df4ee7965f33e5fa3e32322` | claude-opus-5-5 | procedural | 4 should-fix, 1 nit. |
+| 2026-11-19 | R-135 | spec | `b82c89f81f942ca766b7748a862201e8cdc799fb` | claude-opus-5-5 | procedural | 1 should-fix, 2 nit. |
+| 2026-11-19 | R-136 | spec | `4c0c2dfe389b7906cdafc0dfb0eeb9a190a24e28` | claude-opus-5-5 | procedural | 2 nit. |
+| 2026-11-19 | R-136 | spec | `4c0c2dfe389b7906cdafc0dfb0eeb9a190a24e28` | n/a | n/a | accepted by owner |
 
 Historical returned review records are preserved verbatim in the [review history](../history/shared-docs-drift-reviews.md). Records for R-57 and R-60 onward appear below.
 
@@ -3903,6 +4356,155 @@ CRITERION: AC-07 Recorded repository, package and portable-host checks pass for 
 VERDICT: not verified
 EVIDENCE: At 9335c8ec, typecheck.sh exited 0 under `unshare -rn` with Bun 1.4.4, installing only from the existing bun cache; tsconfig includes tests/vh-adlc/docs-drift/**/*.ts. `go test ./...` passed every package and `go vet ./...` exited 0. Pinned golangci-lint 2.15.0 ran offline from the module cache: config verify exited 0 and run reported 0 issues. `go mod tidy -diff` exited 0. `build-zip.ts --check` reported the frozen ZIP reader bundle byte-identical. The verified binary gives lint pass, spec review R-123 fresh, and R-126 stale on covered-changed for four paths. gate in-progress passes. gate complete fails all_met, impl_review_clean and impl_review_fresh. b3e65115 is an ancestor of HEAD. I scanned docs-drift exports for production callers. The only exports without one are checkPublication and checkClosurePublication, which are real stage functions under the Design's private-stage allowance, plus three type aliases (ComponentBinding, EntryIdentities, LegacyPublisherEntry) with no runtime payload. bootstrap.ts:57-100 checks installed payloads without the retained uid/0700/nlink policy and refuses linked entries. Limitations: I did not run the full plugin suite or Linux/macOS CI at this target. The f5cf1897 full gate is an earlier source. No released or installed payload, marketplace install or upgrade, or native Copilot/Claude operation was performed (T130).
 
+### R-133
+
+TARGET: 623472e84df587232785670f36bee5b8f1160e74
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Active ordinary Claude cache finding on 2026-11-18 (docs/specs/shared-docs-drift.md:101); Context, Owner summary (:81-82); Design, Installation and role execution, native process-marker paragraph (:1256-1271); Test Plan, AC-07 row (:1412); Tasks, T156 (:1416)
+EVIDENCE: This revision's diff adds a precise acceptance predicate at :1256-1271: the file name is the canonical decimal PID, `pid` is a JSON safe integer, and `procStart` is "a nonempty decimal string of at most 32 digits". The only recorded observation is :101, "a 38-byte JSON object with `pid` and `procStart` fields". It gives no command and output, JSON types, value lengths, file mode, OS, or Claude Code version. The convention requires that "Context and Design cite their claims: a `file:line`, or a command and its output". The marker is an undocumented native-client format. AC-07 claims Linux/macOS portable-host checks, but the only real observation is one active cache on one unrecorded host and client version. If the observed `procStart` is a JSON number, or another platform or client version writes a different shape, the predicate refuses the real marker and the original problem remains.
+PROPOSAL: Record the observation in Context as a command plus redacted output, giving the JSON types and lengths, file mode, OS and Claude Code version. State that other platforms and client versions stay unclaimed until T130 observes them, and that any other shape stays setup-required.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Installation and role execution, native process-marker paragraph (:1256-1271); Context, Owner summary ("bounded, non-executable", :81-83); Tasks, T156 (:1416); Test Plan, AC-07 row (:1412)
+EVIDENCE: This revision introduces the predicate, and it leaves several outcomes open. (1) "exactly `pid` and `procStart`" does not say whether duplicate keys, non-canonical number forms such as `1e3`, `1.0` or `-0`, a BOM, or surrounding whitespace are refused. `JSON.parse` silently keeps the last duplicate and accepts `1e3`. (2) "non-executable" does not say which bits count. The existing code tests only the owner bit, `(stat.mode & 0o100)` at plugins/vh-adlc/scripts/docs-drift/bootstrap.ts:81. (3) "linked markers" does not say whether hard links are included. The installed policy deliberately accepts nlink>1 for shipped files (bootstrap.ts:78; tests/vh-adlc/docs-drift/bootstrap.test.ts:78-92). (4) It does not say whether an empty `.in_use` directory is allowed. (5) It does not say whether a released Git inventory containing a `.in_use/` path is refused at release time. Two careful implementers would build different acceptance sets, and the T156 "malformed/UTF-8/JSON" and "link" controls have no defined expected outcome.
+PROPOSAL: Define the exact rules in Design. For example: compare the marker bytes with a canonical re-serialization or a strict byte regex, refuse any execute bit (0o111) and nlink>1, allow an empty or absent `.in_use` directory, and have `computeComponentIdentity` refuse shipped `.in_use/` paths. List each rule as an accept or refuse case in the AC-07 proof.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Installation and role execution, native process-marker paragraph ("Incomplete or replaced observations fail closed and may be retried", :1256-1271); Tasks, T156 (:1416); Test Plan, AC-07 row (:1412)
+EVIDENCE: This revision's text does not say who retries, how many times, or what the caller sees in the meantime: an automatic bounded retry inside `inspectInstalledPayload`, or a setup-required result that the operator reruns. It also does not define "replaced". The existing walk detects a dev/ino/size/mode change between `lstat` and `open` (bootstrap.ts:85-88), but nothing defines a marker that disappears between `readdirSync` and `lstat` (ENOENT), or a transient temporary file a native atomic write might leave in `.in_use`. A live Claude session starts and stops markers concurrently with inspection, so these paths occur in the exact scenario the correction targets. `inspectInstalledPayload` caches only successes (bootstrap.ts:124-133), so an automatic retry policy changes observable behavior.
+PROPOSAL: State whether the inspector retries automatically, and if so the bound and the final outcome. Otherwise say that a race yields setup-required for a caller rerun. List ENOENT after readdir, dev/ino change and transient temporary names as fail-closed cases with expected results.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Installation and role execution, native process-marker paragraph ("The installed-directory inspector alone may omit" and "No provider, publisher, source, approval or recovery check changes", :1256-1271); Design, Installation and role execution ("Installed directories and hosted plugin checkouts require exact shipped regular-file set equality ... apart from the single validated native process-marker exception", :1253); Design, Publication, concurrency and recovery ("Execution of exact surviving-origin recovery effects uses the original recorded released component through an explicitly selected ordinary matching install")
+EVIDENCE: Recovery runtime selection calls the same inspector: `readOriginalRuntime` calls `inspectInstalledPayload` at bootstrap.ts:299-307, and `selectOriginalOperationRuntime` reaches it at :313-320. Current hosted production resolves the running plugin directory (bootstrap.ts:327). Under "the installed-directory inspector alone", the exception therefore also relaxes the original-release recovery bytes check and the hosted checkout check. Under "no ... recovery check changes", an implementer could instead keep exact rules for recovery and split the policy. Two careful implementers would build different behavior for recovery from an active Claude install. This traces to this revision.
+PROPOSAL: Name each caller the exception applies to (interactive selection, hosted current-release selection, original-release recovery selection). Clarify that "recovery check" means recovery permission and evidence checks, not installed-payload inspection, or state the opposite explicitly.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Installation and role execution ("Rollback selects the previous published checkout/install and restores the reviewed previous consumer binding through the same path", :1273); Design, Migration, compatibility and rollout ("Rollback to an earlier shared reader restores the previous companion and binding together"; "A successor or rollback may activate while an operation remains pending"); Design, Publication, concurrency and recovery (original-release recovery effects); Test Plan, AC-06 row ("disposable rollback") and AC-07 row ("paired rollback", "Test upgrade and rollback with pending version-2 operations")
+EVIDENCE: The published 0.26.0 component and every earlier release lack the exception, and Context :101-103 confirms the unchanged inspector refuses the marker. Rolling back the consumer binding to 0.26.0, or recovering an operation whose original release is 0.26.0, through an actively used ordinary Claude install will therefore be setup-required. The revised spec does not define this upgrade/rollback boundary or say which install surfaces the rollback rehearsal must use. The reviewer role treats an undefined upgrade or rollback path as a finding. This traces to this revision.
+PROPOSAL: State that pre-correction releases refuse active Claude caches and remain setup-required there. Say that rollback and original-release recovery for those releases use an empty-profile install, a Codex install or a hosted checkout, and add that refusal and the alternative path to the AC-07 rollback proof.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-07 (:1400) and AC-06 (:1399); Test Plan, AC-07 row (:1412)
+EVIDENCE: The original problem appeared while every check on empty-profile installs passed (Context :97-103). The revision changes no criterion text. AC-07 still says only "checks pass for the exact released/installed payload". No criterion states the end state this correction exists for: an actively used ordinary Claude install with valid native markers passes the binding, while every other extra, changed, linked or nonregular entry is still refused. The convention says a criterion states "the end state, observable without reading the code". As written, an implementation reviewer can return `met` for AC-07 from empty-profile evidence alone, which is how the gap was missed before.
+PROPOSAL: Add a clause to AC-07, or a new AC-NN, stating that an actively used ordinary Claude installation with valid native process markers satisfies the same component binding, while other extra, changed, linked or nonregular entries and retained exports stay refused.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-07 row (:1412); Tasks, T156 (:1416)
+EVIDENCE: The new proof says "Exercise the exact native process-marker acceptance and refusal matrix from Design and T156". Tasks sits outside the normative baseline, so T156 can change without a revision while the proof's content changes with it. The row gives no pass condition, such as setup-required with marker bytes, modes and installer files unchanged. "Verify bounded reads" in T156 has no distinguishing check. An oversized-file refusal also passes an implementation that pre-checks `lstat` size and then calls an unbounded `readFileSync(fd)`, as bootstrap.ts:89 does today, so the 257-byte read limit is never exercised. The race cases in Design ("Incomplete or replaced observations") also have no deterministic check. A proof could pass on a wrong implementation.
+PROPOSAL: Write the accept and refuse matrix and its pass conditions directly into the AC-07 row. Add a check that observes the read bound, for example an injected file-read seam or a marker that grows between `lstat` and read, plus deterministic injected cases for removal and replacement during inspection.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Active ordinary Claude cache finding on 2026-11-18 (:102, :105-106); Context, Owner summary (:82)
+EVIDENCE: :106 says "This normative revision and its tests implement that bounded correction", but no implementation or test exists yet (T156 is unticked, and the dispatch states no implementation change). :102 still calls the refusal correct "under the current no-exclusions design", but this revision replaces that design. :82 says "Every shipped code file and mode still has to match", while Design :1253 requires every shipped file, including docs and manifests. These are wording slips introduced by this revision; the convention asks the summary to distinguish planned checks from observed proof.
+PROPOSAL: Reword :106 as planned work ("This revision specifies that bounded correction; T156 implements and tests it"), say "the previous no-exclusions design" at :102, and say "Every shipped file and mode" at :82.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Tasks, T156 (:1416-1418)
+EVIDENCE: T156 names "plugin manifests and setup guidance" rather than the files it touches. The convention says each task "names the file it touches". T156 also sits above the sentence "The following tasks implement the revised baseline after spec review and owner acceptance", which introduces the open tasks, so it falls outside that grouping.
+PROPOSAL: Name the exact files, for example `plugins/vh-adlc/.claude-plugin/plugin.json`, `plugins/vh-adlc/plugin.json`, the marketplace files and the specific setup guide, and move T156 below the introductory sentence.
+
+### R-134
+
+TARGET: 0c70b647cd21fa6d4df4ee7965f33e5fa3e32322
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Owner summary ("other extra files and all links remain refused", docs/specs/shared-docs-drift.md:83); Design, Installation and role execution, marker paragraphs ("one hard link (`nlink == 1`)", :1277; "All other extra, missing, changed, linked or nonregular inputs remain refused", :1298); Design, Installation and role execution ("Its existing private-cache ownership/0700/nlink policy is inapplicable to marketplace installation", :1270); Acceptance Criteria, AC-07 ("other extra, changed, linked or nonregular inputs remain refused", :1446); Test Plan, Active native install proof (AC-07) ("hard links", :1460 onward)
+EVIDENCE: The installed policy accepts hard-linked shipped files. bootstrap.ts applies `stat.nlink !== 1` only when `policy === "retained"` (plugins/vh-adlc/scripts/docs-drift/bootstrap.ts, inspectRetainedFiles walk). The test "ordinary installed payloads keep their existing modes and support a canonical root alias" replaces guide.md with `linkSync(...)` and expects inspection to succeed (tests/vh-adlc/docs-drift/bootstrap.test.ts, fragment 0002 lines 21-35). This revision adds a hard-link refusal for markers only. The generic word "linked" in Design :1298 and in the AC-07 criterion text now reads as covering hard links too, and the Owner summary says outright that "all links remain refused", which is false for shipped files. R-133 F-02(3) raised this same ambiguity about "linked markers". The revision resolved it for markers but left the criterion and summary wording, so an implementer could impose nlink == 1 on every installed file, and an implementation reviewer checking AC-07's exact text could fail a correct implementation that keeps the existing test passing. This traces to this revision.
+PROPOSAL: Replace "linked" with "symlinked" in Design :1298 and AC-07, and in the Owner summary say "all symlinks remain refused". Add one sentence saying that hard-linked shipped files stay accepted under the installed policy and that only marker files require nlink == 1.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Active ordinary Claude cache finding on 2026-11-18 (:97-121); Design, Installation and role execution, pre-correction rollback paragraph ("use an existing matching metadata-free install, such as the verified Codex installation, an empty-profile installation or a published hosted checkout", :1309-1316); Design, Installation and role execution, owned-process reuse ("Cancellation/timeout must clean the owned process tree"); Test Plan, Active native install proof (AC-07), rollback bullet (:1483-1486)
+EVIDENCE: The probe output at :112 records the marker's shape, mode and link count. The spec never says which Claude process writes `.in_use/<pid>` or into which directory: only an installed cache, or any plugin directory a Claude process loads. The helper starts Claude roles with `loader: { ..., argv: ["--plugin-dir", inspected.directory] }` (bootstrap.ts, selectInstalledRuntime return value). The spec accepts "Valid stale markers", so markers can outlive their process. Owned-process timeout cleanup kills the role's process tree, which can leave such a marker behind. If a Claude role marks its `--plugin-dir`, a pre-correction 0.26.0 helper running Claude roles against an empty-profile install or hosted checkout stops being "metadata-free". Its next invocation (resume, original-release recovery or rollback rehearsal) then refuses its own install, and the rollback path this revision defines fails for Claude-role entries. The design leaves this rollback path undefined. This traces to this revision's F-05 response.
+PROPOSAL: Record in Context, or require T130 to observe, whether a Claude role launched with `--plugin-dir` writes `.in_use` into that directory and whether killed roles leave it behind. If it does, say how pre-correction rollback and recovery with Claude roles stay usable (for example a fresh disposable install per invocation, or Codex-only roles), or that they stay setup-required. Add that case to the rollback bullet of the AC-07 proof.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Installation and role execution, marker grammar ("The UTF-8 bytes must encode exactly the literal keys ... escaped keys ... are refused. `procStart` is a quoted nonempty decimal string of at most 32 digits", :1278-1285); Test Plan, Active native install proof (AC-07) ("Refuse duplicate/missing/unknown or escaped keys ... invalid start values", :1460 onward)
+EVIDENCE: The grammar requires literal key bytes and refuses escaped keys, but it does not say whether the `procStart` value must be literal ASCII digits between quotes. A JSON escape such as `"\u0031\u0032"` decodes to the digit string "12". An implementer who uses `JSON.parse` and then checks `/^\d{1,32}$/` accepts it. An implementer who follows the "literal byte grammar" described for keys refuses it. "At most 32 digits" is likewise unclear about whether it counts decoded characters or raw bytes. The proof lists only "invalid start values", so the matrix has no expected outcome here, and two careful implementers would accept different files. This traces to this revision's F-02 response.
+PROPOSAL: State that `procStart` is a quote byte, 1 to 32 ASCII bytes `0`-`9`, and a quote byte, with no escapes. Add an escaped-digit value to the refusal list of the AC-07 proof.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions ("None. On 2026-11-18 the owner approves the narrow Claude process-marker exception ...", :2213-2218); Context, Active ordinary Claude cache finding ("R-133's format, retry, caller and rollback clarifications below implement the owner's existing narrow-exception selection", :119-121); Design, Installation and role execution, marker paragraphs (:1273-1316)
+EVIDENCE: R-133 F-02 to F-07 were judgement findings, and each offered alternatives. Examples are automatic bounded retry versus setup-required (F-03), applying the exception to original-release recovery versus splitting the policy (F-04), the rollback surface for pre-correction releases (F-05), and strict canonical serialization versus either key order with whitespace (F-02). This revision decides each one itself and records the decisions as already within the owner's earlier approval. The convention says "Every trade-off the document settles is an open question, including one the author would answer the same way the owner would". The review protocol says to "turn judgement findings into Open Questions for the owner without answering them". The recorded owner approval covers the narrow exception and authorizes revising the spec. It does not name these choices.
+PROPOSAL: Raise the retry, recovery-caller, rollback-surface and accepted-serialization choices as Open Questions with recommendations, or record the owner's explicit in-session answers to each one in the document, before asking for acceptance.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, Active native install proof (AC-07) (:1460-1486); Design, Installation and role execution, marker paragraphs (:1278-1279, :1300-1302)
+EVIDENCE: Design requires a `pid` "greater than zero" and names "an incomplete read" as a fail-closed case. The proof matrix lists "noncanonical or unsafe PID values" and growth during read, but it does not list a zero PID (`0` is canonical and safe) or a marker that shrinks between the size observation and the read. Both cases are covered by the Design text, so an implementer builds the same thing either way.
+PROPOSAL: Add a zero PID with filename `0`, and a marker that shrinks between the size observation and the read, to the refusal bullets.
+
+### R-135
+
+TARGET: b82c89f81f942ca766b7748a862201e8cdc799fb
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, Active native install proof (AC-07), third bullet ("Inject growth and shrinkage between the size observation and read. Require at least one observed read and no marker read request above 257 bytes"); Design, Installation and role execution, marker retry paragraph ("an incomplete read, growth beyond the byte bound, and a transient temporary filename yield setup-required at the ordinary caller"); new task T156 ("read-bound and race faults")
+EVIDENCE: Design gives the outcome for an incomplete read and for growth beyond the bound: setup-required. The proof bullet gives that outcome only for its first two injections (removal after enumeration, replacement between lstat and open). For the growth and shrinkage injections it requires only an observed read and a read request no larger than 257 bytes. So an implementation that reads at most 257 bytes but then parses the bytes it got, without comparing their length to the observed size, still passes the proof. That implementation accepts a shrunken marker, and it also accepts a grown one if it trims to the observed size before parsing. Both outcomes contradict Design. The current reader rejects `bytes.length !== stat.size` (plugins/vh-adlc/scripts/docs-drift/bootstrap.ts:90). The bounded marker reader is new code, and nothing in the matrix requires it to keep that comparison. This revision added the shrinkage case in response to R-134 F-05 but did not add an expected outcome for it.
+PROPOSAL: In the growth and shrinkage sentence, also require setup-required at the ordinary caller, no checker-authored change and a successful explicit rerun after valid input is restored, matching the removal and replacement cases.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary (second and third paragraphs); Context, Active ordinary Claude cache finding on 2026-11-18 ("On 2026-11-19 the owner requests cutover after the pending bundle was explained..."); Context, Isolated marker prototype checkpoint on 2026-11-18, last paragraph ("The owner now authorizes the recommended compatibility bundle and cutover"); Open Questions
+EVIDENCE: The convention says the summary covers "validation state and owner decisions", includes "migration or recovery where it matters", and is refreshed "when scope, proof or decisions change and before asking for acceptance". The summary leaves out three things this revision added. First, the 2026-11-19 decisions: either key order with JSON ASCII whitespace, explicit rerun with no automatic retry, uniform installed inspection, and legacy rollback. Second, the rollback and recovery limit: pre-correction helpers still refuse active Claude caches, original recovery needs a matching marker-free install, and old Claude-role paths stay blocked without observed marker-free runs. Third, the new diagnostic state: candidate 1b862970 with clean R18 and the Claude 2.1.326 inline-role observation. Meanwhile the cutover authorization is stated three times in Context and once more in Open Questions. No implementer would build anything different because of this.
+PROPOSAL: Add one or two sentences to the Owner summary naming the 2026-11-19 decisions, the old-release rollback and recovery limits, and that the prototype and inline-role results are source diagnostics only. Drop the repeated authorization sentences in Context so the record lives in one place plus Open Questions.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Installation and role execution, marker paragraph ("The existing installed policy still accepts hard-linked shipped files and a canonicalized root selector alias; only marker files acquire the single-link rule"); Context, Owner summary ("Hard-linked shipped files keep their existing support")
+EVIDENCE: The convention says "Context and Design cite their claims: a `file:line`, or a command and its output". The claim is true. bootstrap.ts:78 and :87 apply `nlink !== 1` only under `policy === "retained"`. bootstrap.ts:64-65 resolve and lstat the canonical root for the installed policy. The test at tests/vh-adlc/docs-drift/bootstrap.test.ts:77-91 hard-links guide.md, inspects through a symlinked root alias and passes. However, the new sentence added in response to R-134 F-01 cites none of this.
+PROPOSAL: Cite bootstrap.ts:78, :87 and :64-65 and bootstrap.test.ts:77-91 after the Design sentence.
+
+### R-136
+
+TARGET: 4c0c2dfe389b7906cdafc0dfb0eeb9a190a24e28
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Installation and role execution, marker paragraph ("See `plugins/vh-adlc/scripts/docs-drift/bootstrap.ts:64-65`, `:78` and `:87`, and `tests/vh-adlc/docs-drift/bootstrap.test.ts:77-91` at b82c89f")
+EVIDENCE: The bootstrap.ts citations are correct. Line 64 is `const root = realpathSync(directory)`, line 65 is `lstatSync(policy === "installed" ? root : directory)`, and lines 78 and 87 apply `nlink !== 1` only when `policy === "retained"`. The test citation is one line early. In shared/tests/vh-adlc/docs-drift/bootstrap.test.ts, line 77 is blank. The test "ordinary installed payloads keep their existing modes and support a canonical root alias" runs from line 78 to its closing `});` at line 92. The test file has no changes between b82c89f and this target. This revision copied the range from R-135 F-03's proposal, and that proposal already had the wrong range.
+PROPOSAL: Change the test citation to `tests/vh-adlc/docs-drift/bootstrap.test.ts:78-92`.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Active ordinary Claude cache finding on 2026-11-18 ("R-133's format, retry, caller and rollback clarifications are proposed below. The owner summary records the selected compatibility details and authority." followed by "This prevents claiming ordinary active Claude execution ready."); Context, Owner summary (fourth paragraph); Open Questions
+EVIDENCE: The Owner summary and Open Questions both say the 2026-11-19 decision accepts these details: field order, ASCII whitespace, explicit rerun, uniform inspection and rollback. The Context paragraph still calls them "proposed below", which conflicts with the accepted state. This revision also replaced the removed authorization sentences with "The owner summary records the selected compatibility details and authority." As a result, the next paragraph's opening "This prevents claiming..." now reads as if it refers to the owner summary. It was meant to refer to the marker refusal described earlier. The text came from this revision's response to R-135 F-02. Nothing an implementer builds or a proof checks changes.
+PROPOSAL: Change "are proposed below" to "are specified below". Start the next paragraph with "The marker refusal prevents claiming ordinary active Claude execution ready."
+
 ## Sources
 
 - GitHub REST users reference, read 2026-11-15. Durable numeric-ID lookup supports GitHub App installation tokens and returns a native login and numeric ID. [Get a user using their ID](https://docs.github.com/en/rest/users/users#get-a-user-using-their-id).
@@ -4047,3 +4649,72 @@ SEVERITY: nit
 WHERE: Context, Owner summary (docs/specs/shared-docs-drift.md:81); compare frontmatter status_description (line 3) and Context, Native correction review follow-up (lines 87-98, 112-119)
 EVIDENCE: Line 81 says "Claude Code Opus 5.5 R-129 reviews the final native reply-format clarification with no findings". It lists the merge prerequisites as "exact-head CI, its configured release, ordinary marketplace install/upgrade tests and gated Stackweaver migration". At this target that clarification is no longer final. Commit 2e87164e adds a further reviewer grammar correction, and the follow-up says "Fresh independent review and actual native rerun are required before the release hold clears". The follow-up also says the real unattended run failed verification and that "The automatic merge controller is stopped". The summary omits the failed trial, the stopped controller and the native rerun and fresh review prerequisites. The sentence was introduced by 4a2bb86c, after R-129. The text is outside the normative baseline and changes nothing that is built or checked.
 PROPOSAL: Update the owner summary to say that R-129 covered the earlier clarification and that the real hosted verification refused a nonstandard reviewer kind. Also say that the shared reply grammar now corrects it, and that native rerun, fresh review and exact-head CI must pass before the stopped merge controller resumes.
+
+### R-131
+
+TARGET: 5491b6770f7efa719810c1dead028bf0528d2b1c
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context "Claude-only consumer configuration on 2026-11-18" (docs/specs/shared-docs-drift.md:230-238); Acceptance Criteria AC-07 ("unperformed surfaces remain explicitly deferred or unclaimed"); Test Plan AC-07 row (:1193, "authorized Copilot/Claude operations using the installed payload"); Tasks T130 (:1362); covered plugins/vh-adlc/references/docs-drift-settings.md:60; covered docs/reference/compatibility.md:239-240
+EVIDENCE: On 2026-11-18 the owner picked Claude Code or Codex so that no further Copilot credential is needed. Context says "the shared operation remains provider-neutral and its accepted Design and Test Plan are unchanged" and that the Copilot intake profile "remains available without requiring a Copilot backend". The AC-07 proof still asks for "authorized Copilot/Claude operations using the installed payload". docs-drift-settings.md:60 says "Copilot and Claude are the supported native role backends", and compatibility.md:240 lists "Installed Copilot worker/reviewer and synthetic resolve/closure/issue entry" as Pending. The only Copilot operation evidence the document cites is candidate evidence from before release (T35, :760; the owned Copilot envelope fixture, :188). It is not an observation of the released 0.26.0 payload. No section or task says whether T130 must observe a Copilot operation against the installed payload, for example through the owner's existing local Copilot login without a hosted secret, or whether Copilot stays unclaimed for this release with the public support statement narrowed. This gap comes from the 2026-11-18 Context addition, which came after the R-123 acceptance. One implementer would run a Copilot operation. Another would close AC-07 with Claude only, while the shipped guide still claims Copilot support that AC-07 says must stay unclaimed.
+PROPOSAL: State in Context which reading T130 follows for "authorized Copilot/Claude operations": an observed Copilot operation on the installed released payload, or Copilot left unclaimed for this release with docs-drift-settings.md and compatibility.md updated to match. If the chosen reading needs different Test Plan wording, raise it as an Open Question instead of editing the baseline.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Owner summary", fourth and fifth paragraphs (docs/specs/shared-docs-drift.md:93-95, :104-107); Context "Published payload and migration checkpoint on 2026-11-18" (:113-131)
+EVIDENCE: The summary says "Actual unattended rehearsal 44305915096 passes cold setup, installed discovery, preparation and independent native verification in separate Opus 5.5 contexts". It also says the staged consumer's "integrated local gate passes 48 checks with no skips and its migration suite passes 83 tests", and that "Preliminary Claude paired review has no remaining blocking or should-fix issue; its small notes are corrected." The run ID 44305915096 appears only at :93. The detailed sections name no consumer commit for the 83-test suite and give no reviewer identity, target or nit disposition for that later paired review. The detailed 48-check record is for an earlier commit, `16791b81` (:271-273). The latest paired review recorded in detail is r10 at `76c00464`, with one nit (:240-247). The standard says the summary must agree with the detailed sections and keep observed proof distinct, and that Context cites its claims. Nothing an implementer builds or a proof checks changes.
+PROPOSAL: Add a short record to the 2026-11-18 checkpoint section that names rehearsal run 44305915096 and what it covered, the consumer commit for the 48-check gate and 83-test suite, and the preliminary paired review's model, target and corrected nits. Otherwise, drop those claims from the summary.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, paragraphs after the 2026-11-18 checkpoint (docs/specs/shared-docs-drift.md:133-137); Context headings "Current committed review on 2026-11-18" (:256), "Current implementation review and publication boundary" (:339) and "Current worker verification on 2026-11-17" (:402)
+EVIDENCE: Two paragraphs in a row say the same thing: "The following checkpoint notes retain their original historical observations. Their pending/review language is superseded by the current summary above." and "The checkpoint notes below preserve earlier observations. Their pending statements refer to those checkpoints; the owner summary above states current acceptance." Three later historical sections still begin with "Current". The one at :339 still says "Shared merge/release remains the next separately approved step", but the summary records the PR #98 merge and the 0.26.0 release. The previous pass's F-01 raised the same kind of stale "Current" heading. The disclaimer covers the meaning, so nothing an implementer builds changes.
+PROPOSAL: Merge the two disclaimer paragraphs into one sentence. Retitle the three "Current" headings with their date or target, for example "R-125 committed review on 2026-11-18".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Owner summary", fourth paragraph (docs/specs/shared-docs-drift.md:97-99) and "Published payload and migration checkpoint on 2026-11-18" (:113-121); covered docs/reference/compatibility.md:229-239, docs/reference/marketplace.md:117 and docs/user-guides/workflows.md:30, :58, :389
+EVIDENCE: The document says PR #98 merged as `18388bde` and that plugin 0.26.0 "passes ordinary Codex and Claude fresh-install and upgrade checks". Both manifests at the target declare 0.26.0 (plugins/vh-adlc/plugin.json:4, plugins/vh-adlc/.claude-plugin/plugin.json:3). The covered compatibility page still says "The local candidate packages `vh-adlc-docs-drift`" (:229) and "Independent source/procedure review is in progress" (:238), although R-130 has returned (Review Log :2064). It also lists "Actual Codex, Claude and Copilot marketplace fresh installs/upgrades | Pending for the docs-drift payload" (:239). marketplace.md:117 calls the skill part of the "candidate package", and workflows.md calls it the "candidate docs-drift operation". The AC-01 proof checks public guides against what the operation actually provides. The released payload is outside the document itself, so this is documentation impact, and nothing an implementer builds changes.
+PROPOSAL: Update the compatibility rows to record the observed Codex and Claude 0.26.0 fresh installs and upgrades and the returned R-130 review, keeping the Copilot, native-operation and adoption rows pending. Describe docs-drift in the three covered guides as released but not yet adopted, not as a local candidate.
+
+### R-132
+
+TARGET: d06daa36296e60c20b98f1be08bc908511495b57
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: covered plugins/vh-adlc/references/docs-drift-settings.md:60; Context "Selected-backend acceptance and released observations on 2026-11-18" (docs/specs/shared-docs-drift.md:227-237, sentence at :234); covered docs/reference/compatibility.md, Shared documentation drift section ("The setup reference lists implemented native client adapters") and Support matrix definition of "Supported"; Test Plan AC-07 row (:1229, "authorized Copilot/Claude operations using the installed payload")
+EVIDENCE: The new Context section fixes the T130 reading. T130 runs only the owner-authorized Claude backend. The `copilot` intake profile is not native Copilot evidence. Native Copilot execution and Copilot marketplace installation are unclaimed for 0.26.0. The compatibility page says the same, so R-131 F-01's ambiguity about what T130 must observe is gone. One wording conflict remains. The shipped setup reference still says "Copilot and Claude are the supported native role backends". The compatibility page defines "Supported means the scenario run in `tests/vh-adlc/evidence/` passed on that host". Context says the setup reference's backend names "enumerate implemented configuration adapters", but the shipped sentence uses the word "supported". This comes from the R-131 F-01 correction: it updated compatibility.md and left docs-drift-settings.md unchanged, which keeps the 291-file fingerprint. The Context reading and the compatibility row decide what T130 does, so implementers build the same thing.
+PROPOSAL: The next time a release changes docs-drift-settings.md, reword line 60 to "implemented native role adapters" and point readers to the compatibility record for observed support. Until then, keep the Context note as the stated reading.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Owner summary", fifth paragraph (docs/specs/shared-docs-drift.md:104-111, sentence at :107-109); Context "Selected-backend acceptance and released observations on 2026-11-18" (:227-264, trials at :255-264); covered docs/reference/compatibility.md row "Actual Claude native worker/reviewer identities"
+EVIDENCE: The summary says "The bounded actual bot-publisher fixture, released native-profile observations, final paired C/D review, cutover and rollback remain required." The detailed section at :255 onward records that real native `claude` and `copilot` intake-profile trials passed against ordinarily installed 0.26.0 payloads. The compatibility row records the same passing trials and leaves only forwarded-command activation pending. The summary also leaves out the owner's selection of Claude Code or Codex, and it leaves out that native Copilot execution and Copilot marketplace installation are unclaimed for 0.26.0. That decision is the material change since R-131, and it limits what AC-07 can claim. The pinned standard says the summary must agree with the detailed sections, explain material changes and state owner decisions. This is in Context only, so nothing built or proved changes.
+PROPOSAL: Replace "released native-profile observations" in the summary with what actually remains, such as forwarded-command activation and the hosted context. Add one sentence on the Claude-only backend selection and the unclaimed Copilot surfaces.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context "Owner summary", third paragraph (docs/specs/shared-docs-drift.md:98-103); Context "Published payload and migration checkpoint on 2026-11-18" (:113-131)
+EVIDENCE: The summary states three things the detailed sections do not cite: "after all six exact-head CI jobs pass", "the default-branch version pipeline is still running" and "A concurrent main merge adds only unrelated SEO specifications and changes neither this accepted baseline nor the installed payload". The checkpoint section names CI run `44305790900` but gives neither its head commit nor its job count. No section names the main merge commit, its changed paths or the version-pipeline run. The standard says Context cites its claims with a file:line, or a command and its output. Freshness is still decided by `vh-adlc fresh`, so nothing an implementer builds changes.
+PROPOSAL: In the checkpoint section, add the head commit of run 44305790900, the main merge commit with a diff command and output showing it touches no covered path, and the version-pipeline run ID. Otherwise, drop those clauses from the summary.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: covered docs/get-started/installation.md:212 (heading "Standalone documentation drift candidate") and its "What the plugin installs" paragraph ("The candidate package's seventeen skills ... `vh-adlc-docs-drift`"); covered docs/user-guides/workflows.md:15 ("The candidate package combines this entry")
+EVIDENCE: R-131 F-04 asked the covered guides to describe docs-drift as released but not yet adopted, not as a candidate. README, the workflows Documentation drift section and marketplace.md now say "released" or "from plugin version 0.26.0". installation.md still titles its docs-drift section "Standalone documentation drift candidate", and the install inventory still calls the package containing docs-drift a candidate. A search finds no link to `#standalone-documentation-drift-candidate`. The only retained old anchor is compatibility.md:227. The AC-01 proof checks public guides against what the operation provides. These files are covered documentation outside the document, so nothing built changes.
+PROPOSAL: Rename the installation heading to "Standalone documentation drift". Since no inbound link uses its anchor, nothing else needs to change. When those package sentences are next edited, drop "candidate" from them too.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Context disclaimer (docs/specs/shared-docs-drift.md:133-134); Context "Selected-backend acceptance and released observations on 2026-11-18" (:227); Context "Claude-only consumer configuration on 2026-11-18" (:266)
+EVIDENCE: The merged disclaimer reads "The checkpoint notes below retain historical observations; their pending language is superseded by the current owner summary and released-observation record." The released-observation record at :227 sits below that line. So does the Claude-only configuration at :266, which the record relies on. The sentence therefore labels the current record as a historical note superseded by itself. This placement came from the R-131 F-03 merge together with the newly inserted section. The meaning can still be recovered from the summary, so nothing an implementer builds changes.
+PROPOSAL: Move the two 2026-11-18 sections above the disclaimer, next to the published payload checkpoint. Otherwise, name in the disclaimer the sections that remain current.

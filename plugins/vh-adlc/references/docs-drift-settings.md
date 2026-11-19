@@ -57,8 +57,8 @@ production effects. The native run must match that workflow, the assessed source
 commit, repository and attempt, with an active schedule or manual execution.
 Other profiles are local and refuse Actions production effects.
 
-Each role selects a client ID, model and allowed arguments. Copilot and Claude are the supported native role
-backends. Their original native streams must establish the actual full model,
+Each role selects a client ID, model and allowed arguments. Copilot and Claude are implemented native role
+adapters; the compatibility matrix records the surfaces actually verified. Their original native streams must establish the actual full model,
 fresh context and successful final reply. Missing tools, capabilities or model
 identity leave setup/review pending.
 
@@ -73,6 +73,20 @@ its inputs again. An installed payload that differs from the binding leaves
 provider execution and remote effects at setup-required. Static collection and
 its diagnostic report remain available. Bun's exact version is diagnostic for
 ordinary version-two operations. Required execution capabilities still apply.
+
+The installed checker accepts only the supported, bounded native Claude
+`.in_use/<pid>` process marker format outside that shipped inventory. Marker
+files must be non-executable and single-linked; other extra files, symlinked entries,
+malformed metadata and changed shipped files remain setup-required. Hard-linked
+shipped files retain their existing installed-policy support. The checker leaves
+native markers and installer permissions untouched. A race fails closed for an
+explicit rerun; it does not retry automatically.
+
+Older helpers, including 0.26.0, retain their original metadata refusal. Follow
+the adopter's reviewed legacy-routing rollback. Original-operation recovery uses
+the exact old component and a matching marker-free installation; unsupported
+old Claude-role paths remain setup-required. This does not transfer permissions
+or change the operation's recorded evidence.
 
 Use `publication.actor` for one account, or declare every configured profile
 in `publication.entry_actors`. Include each publisher in `pr_discovery.authors`

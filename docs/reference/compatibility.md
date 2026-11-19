@@ -224,24 +224,30 @@ Claude docs-impact model execution, GUI/phone entry and live Stackweaver screens
 capture remain unclaimed. Other operations' compatibility rows do not establish
 those capabilities.
 
-## Shared documentation drift candidate
+<a name="shared-documentation-drift-candidate"></a>
 
-The local candidate packages `vh-adlc-docs-drift`, strict consumer settings,
+## Shared documentation drift
+
+Plugin 0.26.0 packages `vh-adlc-docs-drift`, strict consumer settings,
 source-accounted collection, selected correction/resolution preparation and
-native publication/recovery helpers. Its evidence remains scoped to the tested
-source and fixture. The [feature document](../specs/shared-docs-drift.md) tracks
-current checks, source targets, retained failures and remaining adoption gates.
+native publication/recovery helpers. Release, native execution and consumer
+adoption retain separate evidence. The [feature document](../specs/shared-docs-drift.md)
+tracks exact sources, retained failures and the remaining migration gates.
+
+The setup reference lists implemented native client adapters. That configuration
+list is not a live backend-verification claim. Native Copilot execution is
+unclaimed for 0.26.0; Stackweaver selects Claude for every configured profile.
 
 | Surface or capability | Current evidence |
 | --- | --- |
-| Local shared source and owned Git/API fixtures | Focused checks cover collection, protection, exact payloads, lost-response recovery, resume and bounded closure request cost. Shared discovery, documented command grammar and staged collection examples pass local checks. |
-| Claude Code Opus 5.5 source review | Independent source/procedure review is in progress. Source review and actual installed workflow execution retain separate results. |
-| Actual Codex, Claude and Copilot marketplace fresh installs/upgrades | Pending for the docs-drift payload. Earlier operations' install results retain their original scope. |
-| Installed Copilot worker/reviewer and synthetic resolve/closure/issue entry | Pending. Local toy-client and collector results remain labelled synthetic. |
-| Actual Claude forwarded command and selected role identities | Pending. The actual forwarding bytes and native result must match the migration candidate before cutover. |
-| Actual unattended hosted advisory and subsequent read-only history check | Pending. Staged collection diagnostics supply no advisory/history-trial result. |
-| Stackweaver paired source/scanner parity, operator originals, cutover and rollback | Pending. Legacy publishing routes remain active through the required replacement evidence and selected cutover. |
-| Codex desktop, VS Code Local and other GUI/phone entry | Deferred for this operation. Required CLI and hosted checks stay open. |
+| Local shared source and owned Git/API fixtures | Exact-feature-head CI passes collection, protection, payload, recovery, resume, discovery and packaged command checks. Local fixtures remain labelled synthetic. |
+| Claude Code Opus 5.5 source review | R-130 returns no blocking or should-fix finding; its summary nit is corrected. All seven composite feature criteria remain unverified pending complete migration evidence. |
+| Actual Codex and Claude marketplace fresh installs/upgrades | Passed for plugin 0.26.0 at published source `18388bde`; all 291 payload files match in each of the four ordinary install paths. Earlier operations keep their original evidence scope. |
+| Copilot marketplace installation and native worker/reviewer execution | Unclaimed for this release. No new Copilot credential or backend operation is required by Stackweaver's Claude-only configuration. |
+| Actual Claude native worker/reviewer identities | Both configured interactive intake profiles pass synthetic repair preparation and independent verification through actual Claude Code 2.1.326, with separate Opus 5.5 contexts and installed skill discovery. Neither trial makes a real tracker write. Actual forwarded-command activation stays pending. |
+| Actual unattended hosted advisory and subsequent read-only history check | Pending. Rehearsal `44305915096` proves cold setup and synthetic native preparation/verification, not real publication or adopted hosted execution. |
+| Stackweaver paired source/scanner parity, operator originals, cutover and rollback | Preliminary paired review, installed checks and full-corpus parity are recorded. Real bounded bot publication, final released C/D review, activation and rollback stay pending; legacy publishing remains active. |
+| Codex desktop, VS Code Local and other GUI/phone entry | Owner-deferred for this operation. No live GUI/phone behavior is claimed. |
 
 Runtime selection checks the ordinary installed payload against the consumer's
 released component binding and flat preflight checklist. The checklist records
