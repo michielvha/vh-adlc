@@ -1,12 +1,13 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
+import { promisify } from 'node:util';
 
 const enabled = process.env.REMOTE_GUI_MOBILE_E2E === '1';
 const requireModule = createRequire(import.meta.url);
@@ -82,6 +83,8 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         await page.getByText('Shared browser connected').waitFor({ timeout: 15000 });
         const canvas = page.locator('#screen canvas');
         await canvas.click({ position: { x: 18, y: 140 } });
+        await canvas.focus();
+        await page.keyboard.press('Control+t');
         for (let attempt = 0; attempt < 3 && !observations.geometry; attempt++) {
             await canvas.focus();
             await page.keyboard.press('Control+l');
@@ -148,10 +151,44 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         } finally {
             finishLookup();
         }
+
+        await page.unroute('**/__remote_gui/editable');
+        await page.unroute('**/__remote_gui/editable-phase');
+        const readPhase = () => page.evaluate(async () => {
+            const response = await fetch('/__remote_gui/editable-phase', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Remote-Gui-Editable': '1' },
+            });
+            return response.ok ? await response.json() : null;
+        });
+        const originalPhase = await readPhase();
+        assert.ok(Number.isSafeInteger(originalPhase));
+        let handoffFinished = false;
+        const handoff = promisify(execFile)(process.env.REMOTE_GUI_TEST_BINARY,
+            ['handoff', session.id, '--browser-mode', 'agent', '--home', root, '--transport', 'loopback'],
+            { encoding: 'utf8', timeout: 30000 })
+            .then(({ stdout }) => JSON.parse(stdout))
+            .finally(() => { handoffFinished = true; });
+        try {
+            let observedPhase = originalPhase;
+            for (let i = 0; i < 25 && observedPhase === originalPhase; i++) {
+                observedPhase = await readPhase();
+                if (observedPhase === originalPhase) await delay(50);
+            }
+            assert.equal(observedPhase, originalPhase + 1);
+            assert.equal(handoffFinished, false, 'phase endpoint waited for the live browser handoff');
+        } finally {
+            const result = await handoff;
+            assert.equal(result.browser_mode, 'agent');
+        }
+        assert.equal(await page.getByText('Shared browser connected').count(), 1);
     } finally {
         try {
             if (browser) await browser.close();
-            if (session) assert.equal(cli('stop', session.id).state, 'stopped');
+            if (session) {
+                const stopped = cli('stop', session.id);
+                assert.equal(stopped.state, 'stopped', stopped.diagnostic);
+            }
             safe = true;
         } finally {
             fixture.closeAllConnections();

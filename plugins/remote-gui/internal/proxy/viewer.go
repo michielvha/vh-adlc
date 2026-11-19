@@ -45,7 +45,7 @@ textarea{font:inherit;color:#eee;background:#15171c;border:1px solid #4a5160;bor
 </section>
 <div id="screen"></div>
 <button id="mobile-type" type="button" hidden>Tap to type</button>
-<input id="mobile-editor" aria-label="Shared browser keyboard" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" tabindex="-1">
+<input id="mobile-editor" aria-label="Shared browser keyboard" autocomplete="off" autocapitalize="off" spellcheck="false" inputmode="text" tabindex="-1" hidden>
 <p id="mobile-hint" hidden>Typing follows the shared browser’s focus.</p>
 <script type="module">
 import RFB from '/core/rfb.js';

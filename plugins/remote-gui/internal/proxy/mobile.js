@@ -41,6 +41,7 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
         hint.hidden = true;
         editor.value = '';
         editor.blur();
+        editor.hidden = true;
         if (wasEditing) onFocusReturn();
     }
 
@@ -176,6 +177,7 @@ export function mobileKeyboard(rfb, screen, panel, onFocusReturn) {
         hint.hidden = false;
         rfb.focusOnClick = false;
         rfb.blur();
+        editor.hidden = false;
         editor.focus({ preventScroll: true });
     });
 
