@@ -56,6 +56,16 @@ ADB ran the same synthetic canvas and noVNC 1.5.0 gesture module over USB on a p
 
 These two phone probes establish native keyboard opening for the synthetic regions on the tested devices. Current Android coverage, live remote field targeting, remote caret placement, typing and controller transfer still need evidence before T1 can pass.
 
+### Remote field binding feasibility
+
+The installed Chromium 156.0.8078.79 exposed roles, state and geometry on its private AT-SPI bus. It advertised no `EditableText` interface for the eight synthetic controls tested. A direct `EditableText.InsertText` request against the verified owner of the plain test field returned `org.freedesktop.DBus.Error.UnknownMethod`. The probe queried no field value or text. This matches the [Chromium Linux accessibility implementation](https://github.com/chromium/chromium/blob/156.0.8078.79/ui/accessibility/platform/ax_platform_node_auralinux.cc#L2383), which registers text and selection interfaces but does not register `AtkEditableText`.
+
+The [focus race probe](../../tests/remote-gui/mobile-feasibility/README.md) opened an isolated human browser through the source-built remote-gui CLI, stock noVNC 1.5.0 and x11vnc 0.9.17. A control key reached confirmed field A. In the first scenario, the synthetic page moved focus to B after the acknowledgement of A and before a second key. The key reached B. In the second scenario, A was still focused immediately before the second key and the page moved focus to B in A's keydown handler. The key reached B again. These were real RFB key events. The fixture reported only the destination of its input event and never read the field contents. Both runs stopped the isolated browser.
+
+A single viewer and a focus read cannot protect an edit sent as a global RFB key on Chromium. The accepted design requires a target-scoped delivery path, or an owner decision on a different host mechanism. The mobile feasibility gate remains open and the second implementation task has not started.
+
+[Firefox's Linux accessibility source](https://github.com/mozilla-firefox/firefox/blob/ad9e608654767b746c82196bf2de7c867c564498/accessible/atk/nsMaiInterfaceEditableText.cpp#L28) implements insertion addressed to an accessible object. A separate, disposable Firefox probe could test whether that API preserves the target across a focus change, without reading values or enabling debugging. This source finding does not establish that Firefox meets the feature scope. A browser change would also need a separate handoff and compatibility review.
+
 ### Resizing prerequisite after merge
 
 [PR 121](https://github.com/michielvha/vh-adlc/pull/121) merged at [0708e3cb](https://github.com/michielvha/vh-adlc/commit/0708e3cb33dd1fe1e85f4e8da74b598ee32f96a0) on 2026-11-19. Both remote-gui manifests at that commit report 0.4.0, and both marketplace catalogs resolve to its local package. This establishes the prerequisite in the default-branch source; it does not establish an installed plugin update or any mobile capability.

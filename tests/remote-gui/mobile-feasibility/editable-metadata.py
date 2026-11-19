@@ -104,7 +104,7 @@ def role_state_geometry(ref, owner, found, visited):
         flags = [key.lower() for key in keys if state_contains(words, getattr(Atspi.StateType, key))]
         methods = node.GetInterfaces(timeout=2)
         bounds = dbus.Interface(obj, a11y + "Component").GetExtents(dbus.UInt32(0), timeout=2) if a11y + "Component" in methods else []
-        found.append({"role": role, "flags": flags, "bounds": list(map(int, bounds)), "node": node})
+        found.append({"role": role, "flags": flags, "bounds": list(map(int, bounds)), "node": node, "interfaces": list(map(str, methods))})
     # Traverse only structural metadata. Attribute reads happen later and
     # only for known eligible controls in the synthetic fixture.
     for descendant in node.GetChildren(timeout=2):
@@ -162,7 +162,27 @@ with (work / "chromium.stderr").open("w") as log:
             }
         except KeyError as err:
             raise RuntimeError("fixture field geometry did not match the known row positions") from err
-        if os.environ.get("REMOTE_GUI_PROBE_GEOMETRY_ONLY") == "1":
+        if os.environ.get("REMOTE_GUI_PROBE_EDIT_INTERFACE") == "1":
+            editable_interface = a11y + "EditableText"
+            interface_support = {
+                kind: editable_interface in by_y[first_y + index * 36]["interfaces"]
+                for index, kind in enumerate(types)
+            }
+            print(json.dumps(interface_support, sort_keys=True))
+            if any(interface_support.values()):
+                raise RuntimeError("An editable control advertises EditableText. Recheck direct editing.")
+            field = by_y[first_y]["node"]
+            try:
+                field.InsertText(dbus.Int32(0), "k", dbus.Int32(1),
+                                 dbus_interface=editable_interface, timeout=2)
+            except dbus.DBusException as error:
+                if error.get_dbus_name() not in {"org.freedesktop.DBus.Error.UnknownMethod",
+                                                   "org.freedesktop.DBus.Error.UnknownInterface"}:
+                    raise
+                print(f"Target-scoped InsertText refused: {error.get_dbus_name()}")
+            else:
+                raise RuntimeError("The unadvertised edit method returned. Recheck direct editing.")
+        elif os.environ.get("REMOTE_GUI_PROBE_GEOMETRY_ONLY") == "1":
             print(json.dumps(signatures, indent=2))
             candidate_types = ("text", "email", "url", "search", "tel")
             if len({json.dumps(signatures[kind]) for kind in candidate_types}) != len(candidate_types):
