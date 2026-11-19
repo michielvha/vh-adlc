@@ -122,6 +122,7 @@ None.
 
 | 2026-11-19 | R-1 | spec | `9f5c531346a95f7419c7b81b8366a470929b6e92` | unknown | procedural | Three blocking and six should-fix findings. |
 | 2026-11-19 | R-2 | spec | `15108beb46ba30de104af0c46212f162738d8834` | unknown | procedural | One blocking and five should-fix findings. |
+| 2026-11-19 | R-3 | spec | `0f910f12b9473d7956c5dc1fcedd9a873986e44b` | unknown | procedural | Two should-fix findings. |
 
 ### R-1
 
@@ -233,6 +234,23 @@ SEVERITY: should-fix
 WHERE: Owner summary (lines 31-33), Shared procedure (lines 55, 59, 61-65), AC-02 and its Test Plan row (lines 95, 104)
 EVIDENCE: The revision turns source independence into a literal ordering rule by requiring collection of independent source evidence before reading selected docs. In a full review, a novel claim or a targeted section can be the first information that identifies which source fact or command to check. The draft supplies only project instructions for how to collect evidence. The fixture can pass with all facts known in advance, leaving the ordinary unknown-claim case undefined.
 PROPOSAL: Allow an initial inventory of trusted source locations, then identify claims from the assessed document and verify each against independent source evidence before giving a verdict. Include a claim whose relevant source target is discovered from the document.
+
+### R-3
+
+TARGET: 0f910f12b9473d7956c5dc1fcedd9a873986e44b
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary (line 37), Stackweaver adoption (line 81)
+EVIDENCE: The R-2 F-01 revision correctly uses `after-merge --worktrees false` to retain the checked-out feature branch through the completion gate. The final cleanup rule then says to verify containment and remove that branch through the helper. `plugins/vh-adlc/scripts/branches/branches.ts:319-330` checks containment in the original PR head for `after-merge`. The completion tip is newer, so that route keeps it. The ordinary cleanup plan also keeps a branch on default-branch history until its age check passes and needs its own approval under `plugins/vh-adlc/references/branches.md:97-122`.
+PROPOSAL: State that the successful publication ends feature delivery and that the advanced local branch goes through the approved ordinary cleanup plan when it qualifies. Report the branch as retained if the helper keeps it.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Shared procedure (lines 55-65), Stackweaver adoption (lines 73-75), AC-01 and AC-03 and their Test Plan rows (lines 96, 98, 105, 107)
+EVIDENCE: The initial draft explicitly made selector failure and incomplete inventory failures. The current Shared procedure requires only that a failure, skipped input or incomplete inventory stay visible. AC-01 rejects failed selectors but does not exercise a selector that returns some valid paths without completing inventory. An implementation could warn and pass that partial batch to the consumer as a successful selection.
+PROPOSAL: Treat failed or incomplete selection as a failed batch, distinct from confirmed empty. Test a partial selector result and assert that it produces no successful selection or authorized write handoff.
 
 ## Sources
 
