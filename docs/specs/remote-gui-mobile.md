@@ -184,6 +184,7 @@ None. The owner chose stock Chromium, ordinary current-focus typing, a second ta
 | 2026-11-19 | R-5 | spec | `5168c70da624c76d87a4de41dd39c744a61c53e0` | n/a | n/a | accepted by owner |
 | 2026-11-19 | R-6 | spec | `77d28a4e94817bd1e51113c5839736f784cc3f30` | unknown | procedural | Eight should-fix findings and one Context nit. Model identity was not attested. |
 | 2026-11-19 | R-7 | spec | `a03bf98503d8c377eaed65e2ebf51577c4483a39` | unknown | procedural | Six should-fix findings and one evidence-link nit. Model identity was not attested. |
+| 2026-11-19 | R-8 | spec | `a668b87a40c01d15880c890f6857969706d26148` | unknown | procedural | One blocking finding, six should-fix findings and one nit. Model identity was not attested. |
 
 ### R-1
 
@@ -363,6 +364,64 @@ SEVERITY: nit
 WHERE: Context / Two-tap feasibility fixture (lines 33-35); Sources
 EVIDENCE: The new fixture, source and XCTest observations have no evidence pointer in the exact target. `git ls-files '*two-tap*'` returned no fixture or artifact. A reader can distinguish the limited feasibility claim from the planned package proof, but cannot reproduce or inspect the stated run from its citations.
 PROPOSAL: Link the disposable fixture source and a sanitized retained result or reproducible command for the desktop, hit-test and iPhone observations.
+
+### R-8
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context / Owner summary (line 23), Design / Detect and show the prompt (line 128), Acceptance Criteria AC-10, Test Plan AC-10, Tasks T6
+EVIDENCE: The R-7 revision permits the prompt to appear while a same-field retap is in flight. It also permits withholding the prompt until a fresh framebuffer update makes the result eligible. AC-10 requires the test to activate the prompt and type before releasing the delayed pointer packet. That proof fails an implementation that safely waits for the click to place the caret. With a static page, the click can itself be the first operation that changes the framebuffer.
+PROPOSAL: Let the delayed-click proof accept a prompt that becomes usable after the click places the caret. If the implementation offers it earlier, require the test to queue an edit before releasing the pointer packets and observe the caret placement before the edit.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 23 and 27), Context / Two-tap feasibility fixture (lines 33 and 35), Scope (line 116), Design / Detect and show the prompt (lines 124 and 128), Acceptance Criteria AC-10, Test Plan AC-10, Tasks T6
+EVIDENCE: The R-7 revision adds consistent AT-SPI hits across a fresh framebuffer update. Chromium 156.0.8078.79 delegates the synchronous web hit to `CachingAsyncHitTest`. The renderer response and the framebuffer update have no freshness relationship established by this design. A redraw can occur while both calls return the same stale editable object with unchanged extent and focus. The AC-10 overlay check can run after the cache has caught up and miss that interval. The retained fixture's `focused.py:41-55` checks bounds and focus and does not reproduce the sequence. [Chromium hit-test delegate](https://github.com/chromium/chromium/blob/156.0.8078.79/ui/accessibility/platform/browser_accessibility.cc#L1135) [Chromium hit-testing design](https://chromium.googlesource.com/chromium/src/+/90f68b6bda019ed49895b274cbb151bb6b3cc541/docs/accessibility/browser/how_a11y_works_3.md#hit-testing)
+PROPOSAL: Make T6 establish an allowed signal that distinguishes a current point hit from repeated stale hits. Require the prewarmed-overlay proof to confirm the newly covered pixels while the stale editable result is still observable and assert that no prompt appears in that interval. Return to the owner if stock Chromium cannot supply a signal that passes both the negative case and its uncovered positive control.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 23 and 27), Scope (line 116), Design / Detect and show the prompt (lines 124 and 128-132), Acceptance Criteria AC-10 and AC-12, Test Plan AC-10 and AC-12, Tasks T6-T7
+EVIDENCE: The R-7 revision adds extent changes to the conditions that clear an open prompt. Its refresh can still check only the focused object and renew the lease when an overlay arrives after the prompt opens, leaving the object's identity, role, state and bounds unchanged. AC-10 covers an overlay already present at the first tap. AC-12 moves the field, which changes extent and does not reproduce occlusion at a fixed extent.
+PROPOSAL: Specify how the viewer invalidates a visible prompt when its confirmed point ceases to be usable. Add a real case that covers the field after the prompt is visible without moving the field or changing focus, and require the viewer to reject activation when the refreshed hit is invalid or uncertain.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 23 and 27), Scope (lines 115-116), Design / Detect and show the prompt (lines 124 and 128-132), Acceptance Criteria AC-10 and AC-12, Test Plan AC-10 and AC-12, Tasks T6-T7
+EVIDENCE: The design crosses viewer CSS coordinates, noVNC framebuffer pixels, X11 pointer coordinates and AT-SPI screen geometry without specifying their mapping. The installed noVNC `core/rfb.js:1162-1163` sends coordinates transformed by `Display.absX` and `Display.absY`. Chromium's Linux adapter gets the AT-SPI extents from unclipped screen DIPs. The fixture and phone proof can exercise a host with unit scale and miss an implementation that uses remote pixel coordinates as CSS or AT-SPI coordinates. [Chromium AT-SPI extent implementation](https://github.com/chromium/chromium/blob/156.0.8078.79/ui/accessibility/platform/ax_platform_node_auralinux.cc#L4103)
+PROPOSAL: Define the coordinate conversions and the behavior when a required conversion cannot be established. Exercise a scaled canvas with a nonzero offset and prove that the actual click, accessibility hit and rendered prompt refer to the same field.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 23 and 25), Design / Detect and show the prompt (lines 130-132), Design / Type and dismiss (lines 138-140), Acceptance Criteria AC-10 through AC-12, Test Plan AC-10 through AC-12, Tasks T7
+EVIDENCE: The R-7 revision checks that expired or late responses cannot restore a prompt or emit a commit. Its proofs never require successful renewal across a full original lease on an unchanged target. A viewer that opens only when the second tap is immediate, or dismisses a healthy editor after 500 milliseconds, can pass the listed negative assertions. The prior iPhone fixture has no lease and explicitly waits one second with the keyboard closed before tapping the prompt at `tests/remote-gui/mobile-feasibility/two-tap/TwoTapTests.swift:21-25`.
+PROPOSAL: Hold a valid prompt beyond its initial lease with healthy refreshes, then open it. Hold the editor beyond its initial lease on the same focus and prove a later deliberate commit still arrives exactly once.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Evidence from the first design (line 41), Design / Type and dismiss (line 138), Acceptance Criteria AC-11, Test Plan AC-11, Tasks T7-T8
+EVIDENCE: AC-11 promises one matching ordinary key pair per committed codepoint. Its proof uses `z`, `é` and `é`, all composed of BMP codepoints. A UTF-16 code-unit loop like the existing noVNC application bridge described in Context can pass every listed case while splitting a supplementary character into two invalid units.
+PROPOSAL: Add a supplementary-plane character entered with the native keyboard or its emoji picker. Require one matching keysym press and release and the exact resulting synthetic text.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 25 and 29), Design / Detect and show the prompt (lines 124, 130 and 134), Design / Type and dismiss (line 140), Acceptance Criteria AC-11, AC-13 and AC-14, Test Plan AC-11, AC-13 and AC-14, Tasks T7-T8
+EVIDENCE: The design discards in-flight metadata and pending text when the browser phase changes. AC-11 tests a focus change, a monitoring interruption and a disconnected RFB stream. AC-13 checks a stale generation and AC-14 runs the existing handoff regression. The existing Clipboard regression explicitly checks that RFB stays connected through handoff at `tests/remote-gui/browser.e2e.test.ts:374-377`. None of the listed tests holds an old-phase metadata reply or pending composition across that live handoff.
+PROPOSAL: Add a live handoff while the viewer holds a pending composition and an in-flight metadata sample. Confirm the old editor and prompt are cleared, the delayed result cannot revive them, the replacement browser receives no stale text, and a deliberate new two-tap sequence works in the new phase.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Two-tap feasibility fixture (lines 33 and 35), Sources
+EVIDENCE: The R-7 revision adds the two-tap fixture and the iPhone result location. Its tracked helper at `tests/remote-gui/mobile-feasibility/two-tap/focused.py:41-55` uses focus and bounds. The separate hit-test, overlay and omnibox observations still have no command or retained result identified in the document, and line 33 joins the Chromium and private-bus clauses without a conjunction.
+PROPOSAL: Link or name the separate synthetic checks where their evidence is available and repair the opening sentence.
 
 ## Sources
 
