@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Stackweaver write and ledger behavior confirmed. The revised draft awaits independent review."
+status_description: "Independent spec review R-4 returned no findings. The draft awaits owner acceptance."
 issue: null
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
 covers:
@@ -34,7 +34,7 @@ The shared entry runs only on request. By default it reviews the next batch and 
 
 Stackweaver's native command keeps its authorized fixes, ledger updates and docs-only delivery. An explicit read-only request leaves the checkout and ledger untouched. A complete review can advance freshness with unknown claims visibly flagged. Targeted reviews keep their own ledger mode. An interrupted review or pending correction leaves that document's completed history alone.
 
-The native selector returned its expected batch. The owner confirmed the write and ledger rules. The next proof compares the ordinary installed plugin with the current Stackweaver command, exercises the existing ledger and rehearses rollback. The shared package will ship first. Its feature stays open until the published install and Stackweaver cutover pass. Acceptance authorizes building and testing this scope. Publication, release and cutover need their own authorization.
+The native selector returned its expected batch. The owner confirmed the write and ledger rules. Independent spec review R-4 returned no findings. The next proof compares the ordinary installed plugin with the current Stackweaver command, exercises the existing ledger and rehearses rollback. The shared package will ship first. Its feature stays open until the published install and Stackweaver cutover pass. Acceptance authorizes building and testing this scope. Publication, release and cutover need their own authorization.
 
 ### Background
 
@@ -119,10 +119,10 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
-
 | 2026-11-19 | R-1 | spec | `9f5c531346a95f7419c7b81b8366a470929b6e92` | unknown | procedural | Three blocking and six should-fix findings. |
 | 2026-11-19 | R-2 | spec | `15108beb46ba30de104af0c46212f162738d8834` | unknown | procedural | One blocking and five should-fix findings. |
 | 2026-11-19 | R-3 | spec | `0f910f12b9473d7956c5dc1fcedd9a873986e44b` | unknown | procedural | Two should-fix findings. |
+| 2026-11-19 | R-4 | spec | `f06f8906ae4801b062c29957269b42f375ef442a` | unknown | procedural | No findings. |
 
 ### R-1
 
@@ -251,6 +251,10 @@ SEVERITY: should-fix
 WHERE: Shared procedure (lines 55-65), Stackweaver adoption (lines 73-75), AC-01 and AC-03 and their Test Plan rows (lines 96, 98, 105, 107)
 EVIDENCE: The initial draft explicitly made selector failure and incomplete inventory failures. The current Shared procedure requires only that a failure, skipped input or incomplete inventory stay visible. AC-01 rejects failed selectors but does not exercise a selector that returns some valid paths without completing inventory. An implementation could warn and pass that partial batch to the consumer as a successful selection.
 PROPOSAL: Treat failed or incomplete selection as a failed batch, distinct from confirmed empty. Test a partial selector result and assert that it produces no successful selection or authorized write handoff.
+
+### R-4
+
+NO FINDINGS
 
 ## Sources
 
