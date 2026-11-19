@@ -21,6 +21,16 @@ The [Codex catalog](../../.agents/plugins/marketplace.json) and
 [Claude catalog](../../.claude-plugin/marketplace.json) define package sources.
 Both pin auth-refresh to the same component commit.
 
+## Documentation truth review
+
+`vh-adlc-docs-truth` is included in vh-adlc 0.27.0. Install or update
+`vh-adlc@vhco-tools` through your client's ordinary marketplace commands.
+Check that the installed version exposes the skill before replacing an existing
+project command. Start with the [runnable example](../../plugins/vh-adlc/examples/docs-truth/README.md)
+and [workflow guide](../user-guides/workflows.md#documentation-truth-review).
+Project selection, verification history and approval for local changes belong
+to the repository using the skill.
+
 ## Persistent audit
 
 `vh-adlc-audit` is included from plugin 0.8.0. It keeps persistent findings, re-verification and

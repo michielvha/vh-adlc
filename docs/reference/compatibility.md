@@ -226,6 +226,15 @@ those capabilities.
 
 <a name="shared-documentation-drift-candidate"></a>
 
+## Documentation truth review
+
+The 0.27.0 candidate installed through both native CLI catalog paths in isolated
+profiles. Both clients discovered the skill and matched the exact candidate
+payload. Codex CLI also exercised the synthetic report through the installed
+skill. The Claude Code model trial requires available account capacity.
+See the [feature evidence](../specs/shared-docs-truth.md) for the exact reviewed
+commits and the released install and adoption checks.
+
 ## Shared documentation drift
 
 Plugin 0.26.1 packages `vh-adlc-docs-drift`, strict consumer settings,
