@@ -14,7 +14,9 @@ const reportFormat = "Finish with a single JSON object containing status (comple
   + "(an array of claim, verdict, source and disposition strings, and disposition_type set to retain, propose, flag or product_issue). "
   + "For an incomplete review include completed and unfinished arrays of document paths. For next mode give the selector's exact "
   + "reasons in a reasons array. For report mode give the exact selector output (without a final newline) "
-  + "in a freshness string. Put diagnostic details in a message string. "
+  + "in a freshness string. For refused input, include a message explaining what failed and a reasonCode from: "
+  + "invalid-arguments, duplicate-path, noncanonical-path, outside-scope (including excluded or non-document paths), "
+  + "untracked-path, dirty-checkout, non-regular-document, non-regular-policy, missing-policy, incomplete-inventory. "
   + "Use the installed procedure and actual repository evidence before giving the result. Keep the project read-only.";
 
 const cases = {
@@ -47,17 +49,17 @@ const cases = {
     mode: "next", status: "incomplete", paths: [setup, "README.md"], coverage: "full" },
 } satisfies Record<string, TrialCase>;
 
-const refusalReasons: Record<string, RegExp> = {
-  invalid: /positive|invalid.*(?:0|limit|size)|(?:limit|size).*0/i,
-  duplicate: /duplicate|same path|repeated/i,
-  alias: /alias|canonical|\.\/docs\//i,
-  escape: /traversal|outside|escap|\.\.\/outside/i,
-  excluded: /excluded|out.of.scope|ineligible|not eligible|outside|not markdown/i,
-  untracked: /untracked|not (?:tracked|committed|present)|clean checkout/i,
-  docLink: /symlink|symbolic|120000|regular blob/i,
-  policyLink: /symlink|symbolic|120000|regular blob/i,
-  noPolicy: /missing|absent|no committed/i,
-  partial: /selector|inventory|(?:exit|status).*17/i,
+const refusalReasons: Record<string, string[]> = {
+  invalid: ["invalid-arguments"],
+  duplicate: ["duplicate-path"],
+  alias: ["noncanonical-path"],
+  escape: ["outside-scope", "noncanonical-path"],
+  excluded: ["outside-scope"],
+  untracked: ["untracked-path", "dirty-checkout"],
+  docLink: ["non-regular-document"],
+  policyLink: ["non-regular-policy"],
+  noPolicy: ["missing-policy"],
+  partial: ["incomplete-inventory"],
 };
 
 type TrialCase = { ask: string; mode?: string; paths: string[]; coverage: string; status?: string; automatic?: boolean };
@@ -151,7 +153,8 @@ function verifyReport(report: Record<string, unknown>, selected: TrialCase, id: 
     throw Error("native report status, scope or coverage differed");
   }
   if (!Array.isArray(report.findings)) throw Error("missing findings inventory");
-  if (refusalReasons[id] && (typeof report.message !== "string" || !refusalReasons[id].test(report.message))) {
+  if (refusalReasons[id] && (typeof report.message !== "string" || report.message.trim() === ""
+    || typeof report.reasonCode !== "string" || !refusalReasons[id].includes(report.reasonCode))) {
     throw Error("report does not identify the expected refusal");
   }
   if (selected.coverage === "none" && report.findings.length) throw Error("unexpected claim review");
