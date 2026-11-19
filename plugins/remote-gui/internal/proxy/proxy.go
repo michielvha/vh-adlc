@@ -23,6 +23,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/mobile"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/tailnet"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/viewport"
@@ -60,6 +61,8 @@ type Options struct {
 	OnCompatibility    func(string)
 	Clipboard          Clipboard
 	Resize             viewport.Resize
+	MobileLookup       mobile.Lookup
+	MobilePhase        func() uint64
 }
 type client struct {
 	probe   bool
@@ -95,6 +98,8 @@ type (
 		problem            string
 		clipboard          Clipboard
 		resize             viewport.Resize
+		mobileLookup       mobile.Lookup
+		mobilePhase        func() uint64
 		viewportMu         sync.Mutex
 		viewportEntries    map[string]viewportEntry
 		viewportActive     string
@@ -141,6 +146,8 @@ func New(o Options) (*Proxy, error) {
 	if assets != nil {
 		p.clipboard = o.Clipboard
 		p.resize = o.Resize
+		p.mobileLookup = o.MobileLookup
+		p.mobilePhase = o.MobilePhase
 	}
 	p.reverse = &httputil.ReverseProxy{Rewrite: p.rewrite, ModifyResponse: p.response, ErrorLog: log.New(io.Discard, "", 0), ErrorHandler: func(w http.ResponseWriter, _ *http.Request, _ error) {
 		p.fail("upstream-or-compatibility-failure")
@@ -286,7 +293,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.enroll(w, r)
 		return
 	}
-	if strings.HasPrefix(r.URL.Path, "/__remote_gui") && (p.assets == nil || r.URL.Path != "/__remote_gui/viewer-access") && (p.clipboard == nil || r.URL.Path != clipboardPath) && (p.resize == nil || r.URL.Path != viewportPath) {
+	if strings.HasPrefix(r.URL.Path, "/__remote_gui") && (p.assets == nil || (r.URL.Path != "/__remote_gui/viewer-access" && r.URL.Path != "/__remote_gui/mobile.js")) && (p.clipboard == nil || r.URL.Path != clipboardPath) && (p.resize == nil || r.URL.Path != viewportPath) && (p.mobileLookup == nil || r.URL.Path != editablePath) && (p.mobilePhase == nil || r.URL.Path != editablePhasePath) {
 		http.NotFound(w, r)
 		return
 	}
@@ -299,6 +306,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		c = p.identityClient(w, r)
 	}
 	if c == nil {
+		if r.URL.Path == editablePath || r.URL.Path == editablePhasePath {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
 		if p.ownerLogin != "" {
 			accessError(w, "remote session requires its owner's Tailscale identity", http.StatusForbidden)
 			return
@@ -311,9 +322,17 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "compatibility-blocked: application Authorization headers are unsupported", http.StatusConflict)
 		return
 	}
+	if p.mobilePhase != nil && r.URL.Path == editablePhasePath {
+		p.serveEditablePhase(w, r)
+		return
+	}
 	if p.upstreamAlive != nil && !p.upstreamAlive() {
 		p.Revoke()
 		http.Error(w, "application ownership changed", http.StatusGone)
+		return
+	}
+	if p.mobileLookup != nil && r.URL.Path == editablePath {
+		p.serveEditable(w, r)
 		return
 	}
 	if p.resize != nil && r.URL.Path == viewportPath {
