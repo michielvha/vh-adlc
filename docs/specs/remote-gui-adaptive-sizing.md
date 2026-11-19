@@ -15,19 +15,19 @@ covers:
 
 ### Owner summary
 
-The shared browser currently has a fixed landscape resolution. A taller viewer gets empty bands and small text. The requested outcome is a browser that fills the viewer and reflows when its window size or orientation changes.
+At specification time, the shared browser had a fixed landscape resolution. A taller viewer produced empty bands and small text. The implemented feature fills the viewer and reflows when its window size or orientation changes.
 
-The proposed implementation measures the space below the viewer toolbar in CSS pixels, resizes Chromium through native X11, and changes the framebuffer area exported by x11vnc. Xvfb has a bounded larger backing display. The streamed area contains the resized browser; web content reflows to its new dimensions. Resizing keeps the same processes, tabs, profile and viewer connection, including during human control, when browser debugging remains disabled.
+The implementation measures the space below the viewer toolbar in CSS pixels, resizes Chromium through native X11, and changes the framebuffer area exported by x11vnc. Xvfb has a bounded larger backing display. The streamed area contains the resized browser; web content reflows to its new dimensions. Resizing keeps the same processes, tabs, profile and viewer connection, including during human control, when browser debugging remains disabled.
 
 On 2026-11-18, the owner selected automatic focus-based control, CSS pixels and the existing display tools. Focus claims take effect in the order the server accepts them: a delayed claim may temporarily take control until the intended viewer is refocused. The owner also selected proportional fitting at the last usable resolution for exceptional aspect ratios that cannot fit the supported bounds. A 4096 by 4096 backing display needs about 64 MiB for its main 32-bit framebuffer, plus other session memory. This is an estimate of the main buffer; total session memory is larger.
 
 The work includes request validation, ordering concurrent updates, bounded dimensions, recovery when resizing fails, clipboard focus protection, browser tests and plugin documentation. Private transport, owner authorization and human/agent handoff rules remain in force. There are no host dependency installations or changes to existing sessions. New sessions receive the implementation after the plugin is updated. An older supervisor continues with its original fixed sizing.
 
-Scratch probes established that the installed x11vnc can change its exported dimensions and Chromium accepts narrow native window sizes. Complete viewer behavior remains unverified. The first independent review found one blocking and four should-fix findings, preserved in R-1. The next review found one missing scenario for a newly opened normal Chromium window, preserved in R-2. R-3 independently reviewed the corrected specification with no findings. The owner accepted it on 2026-11-18 and authorized implementation, vh-adlc 0.26.0 for this run and documentation-only pushes to the default branch. The version check now reports matching installed and running versions. Planned verification covers real noVNC, Chromium and Firefox viewers, responsive geometry, input, concurrent viewers, failure recovery and both handoff directions. Acceptance after a clean independent spec review authorizes task planning and local implementation. Merge, release, installation and changes to live sessions require separate authority.
+Initial scratch probes established that the installed x11vnc can change its exported dimensions and Chromium accepts narrow native window sizes. Those probes did not verify complete viewer behavior. Later real-browser and hosted checks below verify the accepted resizing criteria. The first independent review found one blocking and four should-fix findings, preserved in R-1. The next review found one missing scenario for a newly opened normal Chromium window, preserved in R-2. R-3 independently reviewed the corrected specification with no findings. The owner accepted it on 2026-11-18 and authorized implementation, vh-adlc 0.26.0 for this run and documentation-only pushes to the default branch. At that stage, the version check reported matching installed and running versions. The verification plan covered real noVNC, Chromium and Firefox viewers, responsive geometry, input, concurrent viewers, failure recovery and both handoff directions. Acceptance after a clean independent spec review authorizes task planning and local implementation. Merge, release, installation and changes to live sessions require separate authority.
 
 ### Owner validation and follow-up
 
-On 2026-11-19, the owner tested the private candidate viewer and confirmed that it resizes automatically and looks good. The owner accepted the resizing outcome and requested that mobile usability be treated as a follow-up. This confirms the observed resizing behavior on the owner's device; it does not establish a complete mobile input experience. Publication, merge, release and installation remain pending.
+On 2026-11-19, the owner tested the private candidate viewer and confirmed that it resizes automatically and looks good. The owner accepted the resizing outcome and requested that mobile usability be treated as a follow-up. This confirms the observed resizing behavior on the owner's device; it does not establish a complete mobile input experience. Publication, merge, release and installation were pending at that owner-acceptance checkpoint. The later merge is recorded below.
 
 Before that handoff, a fresh Tailscale viewer passed asset, WebSocket, canvas, harmless marker input, portrait sizing and desktop sizing checks against the reviewed static candidate. One earlier session returned HTTP 503 `viewport-unavailable` and was stopped. Fresh disposable sessions and the handed-over session subsequently resized successfully with the configured tools unchanged. The earlier failure's cause remains unresolved; owner acceptance does not establish that every session starts without a sizing failure.
 
@@ -69,7 +69,7 @@ The normal fixed-source author run passed both full viewport scenarios in 84.25 
 Fresh independent R-7 at 72547f19 rebuilt the same static candidate and passed the unchanged 13-scenario suite on that Ubuntu backend in 208.78 seconds, plus focused native race checks and module/package verification.
 All seven criteria returned met with no findings; model identity was not attested, and isolation was procedural.
 Before/after snapshots preserved target files, index, HEAD, status and refs; the reviewer verified its owned containers were absent after cleanup.
-Hosted CI at the new pushed head remains required before merge.
+At that checkpoint, hosted CI at the new pushed head was still required before merge. Its later result is recorded under Merge and delivery.
 
 One author Firefox menu capture in the causal experiment was mostly blank despite passing the existing pixel assertion.
 That frame remains preserved with its cause unproved.
@@ -215,6 +215,7 @@ None. The owner answered the viewer-control, pixel-density and backend questions
 | 2026-11-18 | R-5 | implementation | `e2ac2d757750d3495a1167dfd5ea29674ad68ca1` | unknown | procedural | All seven criteria met; no findings. Model identity not attested. |
 | 2026-11-19 | R-6 | implementation | `1f5efb97272ff49f975015f4e8b51b286bf1689d` | unknown | procedural | All seven criteria met; no findings. Model identity not attested; unrelated shared ref advancement preserved in evidence. |
 | 2026-11-19 | R-7 | implementation | `72547f19a92c4f0cb9b82945020a499c119cd46b` | unknown | procedural | All seven criteria met; no findings. Normal reproduced-Ubuntu verification passed; model identity not attested. |
+| 2026-11-19 | R-8 | spec | `2511847c1eaa0b270f90b53e5bf272278c77572f` | unknown | procedural | One factual Context nit; no design or proof findings; model identity was not attested. |
 
 ### R-1
 
@@ -392,7 +393,18 @@ CRITERION: AC-07 The independently packaged plugin and both manifests agree on t
 VERDICT: met
 EVIDENCE: At 72547f19a92c4f0cb9b82945020a499c119cd46b, module build, go test -race ./... -count=1, go vet ./..., go mod tidy -diff and independently identified golangci-lint 2.15.0 version/config/run passed; lint reported zero issues. The initial restricted race attempt failed on denied fixture sockets and is retained separately from the authorized successful rerun. The independent package suite passed 11 tests with 46 opt-in skips; the four selected browser files separately passed all 13 scenarios with no skips. Both manifests report 0.4.0, and the fresh installer-shaped helper build ran without vh-adlc or a repository. The genuine immutable 0.3.0 archive passed legacy access/status/stop, unchanged record keys and supervisor identity, fixed old geometry and continuing input beside an adaptive session. I compared documented bounds/control/notice/cursor terms with implementation and inspected the existing CI inclusion. Hosted CI, release, installation and live owner sessions were not verified. Before/after snapshots confirm unchanged target files, index, HEAD, status and refs; all independently named fixture containers were absent after cleanup. Logs and receipts are retained under /tmp/rg-r7-independent.777gjrlo.
 
+### R-8
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context: Owner summary (docs/specs/remote-gui-adaptive-sizing.md:18, :20, :26); Owner validation and follow-up (:30); Native cursor follow-up (:72)
+EVIDENCE: Commit 2511847c adds the completed merge and exact-head verification at :82, but retains present-tense statements that sizing is fixed, complete viewer behavior remains unverified, and merge remains pending. GitHub PR 121 confirms merge 0708e3cb from 8ed05bb2; job 135529036854 logs confirm that exact checkout passed native browser checks and all 13 viewer scenarios. These stale status statements affect the summary, not the accepted design or proofs.
+PROPOSAL: Refresh the owner summary to reflect the completed resizing work and identify earlier pending-status statements as historical snapshots. Preserve the failed-attempt history, unresolved HTTP 503, installation limits and verbatim review records.
+
 ## Sources
+
+- [Post-merge agent entry](https://github.com/vhco-pro/docs/blob/0c983f6793bfe35eb96ae95ad0c361c6200af44f/AGENTS.md) and [feature-document standard](https://github.com/vhco-pro/docs/blob/0c983f6793bfe35eb96ae95ad0c361c6200af44f/conventions/feature-documents.md): current review rules, retained acceptance after covered-source drift and corrections outside the normative baseline.
 
 - [Repository conventions](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/AGENTS.md): task routes and pinned engineering rules.
 - [Feature documents](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/conventions/feature-documents.md): scope, acceptance, review and evidence rules.
