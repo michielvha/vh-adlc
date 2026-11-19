@@ -75,6 +75,108 @@ None. The owner selected report mode for the initial Stackweaver adoption.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 
+| 2026-11-19 | R-1 | spec | `24e61d66d71bbc1562f8208edb9bb41035ffaa0f` | unknown | procedural | One blocking, twelve should-fix and one nit |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context / Background line 33, Design lines 42-44, Acceptance Criteria AC-01 and AC-02, Test Plan AC-01 and AC-02
+EVIDENCE: Stackweaver at `72e48ed5`, `e2e/tests/public-seo.spec.ts:388-391`, intercepts every matching `/auth/session` request and fulfills it with 401. Running that existing scenario as specified can report an expected 401 when the production endpoint was never reached. The fixtures in the Test Plan do not exercise the existing-suite path.
+PROPOSAL: Reuse the existing Playwright runtime and compatible assertions. Require release scenarios to collect real responses without interception or authenticated setup, and prove the integration with an existing-suite fixture whose smoke scenario observes a backend failure the ordinary mocked test would mask.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 26, Design lines 43-44, Acceptance Criteria AC-02, Test Plan AC-02
+EVIDENCE: `deployed.jsonl` records one Chromium HTTP 401 and one console error at the same URL. Playwright's `ConsoleMessage` provides location, page, text and time but exposes no request identity, HTTP method, resource type or status. The draft lets the exception affect related console errors without defining what establishes that relationship. [Playwright ConsoleMessage API](https://playwright.dev/docs/api/class-consolemessage)
+PROPOSAL: Specify the console verdict when a matching network response also produces a console error, including the fallback when the correlation cannot be established. Exercise a matching fetch alongside an unrelated console error and a different request to the same URL in the same visit.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 24, Context / Background line 34, frontmatter covers, Design lines 45 and 47, Test Plan AC-03 and AC-04
+EVIDENCE: `.agents/plugins/marketplace.json:17-22` and `.claude-plugin/marketplace.json:17-20` install `plugins/vh-adlc`. The SEO CLI and its lockfile are outside that directory under `tools/seo-evidence/`. Pinned `conventions/delivery.md:111-117` requires the affected artifacts and actual build and publication paths to be named. AC-03 can consume outputs made from a checkout, while AC-04 can pass by reading a prewritten report from a fresh install.
+PROPOSAL: Name the supported distribution or separately pinned installation path for the existing SEO toolkit, enumerate any affected packaging entry points in `covers`, and exercise the enabled SEO check from the installed product with no source checkout.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 24, Context / Background line 33, Scope line 38, Design line 45, Test Plan AC-03
+EVIDENCE: Stackweaver's `scripts/verify-local.sh:209-221` uses Gitleaks for staged changes and Git history. Reusing that invocation as the design directs can produce a pass without scanning the built files. Current Gitleaks documentation identifies a separate file and directory mode and an exit code shared by findings and execution errors by default. [Gitleaks directory mode and exit codes](https://github.com/gitleaks/gitleaks)
+PROPOSAL: Reuse the adopter's Gitleaks version and configuration with a pinned invocation that scans the explicit built artifact. Require an artifact-only synthetic finding and a scanner error in the proof, with distinct report outcomes and redacted evidence.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary lines 22 and 24, Scope line 38, Design lines 42 and 45-46, Acceptance Criteria AC-03, Test Plan AC-01 and AC-03, Open Questions
+EVIDENCE: The report-only status is settled for Stackweaver, while the YAML can independently select capabilities and required rules. The design defines disabled and missing-tool outcomes without stating what happens when policy requires a disabled or inapplicable check, a tool returns unknown coverage, or a nonrequired check fails. It also leaves the exit status of report-only runs with findings or execution errors unspecified.
+PROPOSAL: Record the policy and exit outcomes for report-only and enforced runs, including inconsistent profiles, optional failures and required checks that did not complete. Test those states explicitly, including that a missing required browser cannot produce a successful enforced run.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Background lines 30-32, Scope line 38, Design lines 42-43, Acceptance Criteria AC-01 and AC-02, Test Plan AC-01 and AC-02
+EVIDENCE: `observe.cjs` captures events for seven seconds after the load event. The design supplies no browser observation boundary, timeout outcome or rule for recognizing a required resource that was never requested. A correct visible heading can become ready before a delayed required asset fails, and a collector can close the page before it observes that failure.
+PROPOSAL: Define how each route identifies required resources, when its observation ends, and how timeout, absent required resources and assertions affect coverage. Prove a delayed failure and a required resource that is never requested.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary lines 22 and 24, Scope line 38, Design lines 42, 45 and 47, Acceptance Criteria AC-01 and AC-03, Test Plan AC-01 and AC-03, Open Questions
+EVIDENCE: Mode selection and the profile's origins do not bound redirect following or active adapter requests. MDN's local CLI accepts a host and can make unencrypted requests. A profile configured for an owned deployment can therefore check another origin or follow a downgrade under a reasonable implementation of the draft. [MDN HTTP Observatory CLI](https://github.com/mdn/mdn-http-observatory/blob/main/README.md#running-a-simple-scan-from-the-command-line)
+PROPOSAL: Define allowed origins and schemes for configured and tool-initiated requests, including how to record off-scope redirect destinations without treating them as covered. Test an off-scope redirect and the missing or unsupported deployment adapter path.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary lines 22 and 24, Design lines 43-46, Acceptance Criteria AC-02 to AC-04, Test Plan AC-02 to AC-04
+EVIDENCE: The design sanitizes the URL field and calls for original observations, browser error text, SEO HTML and tool outputs to be retained. `observe.cjs` demonstrates that sanitizing a location is a separate operation from retaining `m.text()` or `e.message`. MDN's local JSON can also contain response headers. AC-02 only checks sanitized URLs and does not detect the same sensitive data in adjacent fields or tool artifacts. [MDN HTTP Observatory CLI result](https://github.com/mdn/mdn-http-observatory/blob/main/README.md#running-a-simple-scan-from-the-command-line)
+PROPOSAL: Specify what the runner persists and what it removes from request evidence, free-text diagnostics and adapter output. Prove that a synthetic sensitive value in a query and mirrored diagnostic is absent from saved reports and skill output while the finding remains traceable.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 22, Design lines 46-47, Acceptance Criteria AC-04, Test Plan AC-03 and AC-04
+EVIDENCE: Separate directories protect parallel attempts, but the draft does not define how a reader recognizes an in-progress, interrupted, ambiguous or unsupported-version report. `tools/seo-evidence/README.md:152-169` already distinguishes partial capture from unfinished output and refuses unfinished artifacts. The skill proof only supplies a readable saved fixture.
+PROPOSAL: Define when a shared report becomes readable, how partial evidence is identified, and how the skill handles incomplete and unsupported reports. Use the existing completion convention where it fits and test interruption while a report is being read.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 22, Design lines 42, 44 and 47, Acceptance Criteria AC-01 to AC-03, Test Plan AC-01 to AC-03, Open Questions
+EVIDENCE: The document repeatedly says Stackweaver starts in report-only mode and declares what its deployed profile allows. All affected paths in `covers` are in vh-adlc, and none of the proof rows runs an actual Stackweaver profile. A shared-only implementation can meet every listed criterion without delivering the claimed first adoption.
+PROPOSAL: Name the Stackweaver adoption as a separate consumer change with its own verification, or include the exact consumer deliverable and a proof that its first build and deployed runs produce report-only results with the approved exception.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 22, Design lines 42 and 46-47, Acceptance Criteria AC-03, Test Plan AC-03
+EVIDENCE: Pinned `conventions/terminal-output.md` defines noninteractive plain output, status vocabulary, machine output streams and verification. The design only asks for JSON and a short human summary, and the proof does not check output behavior on a pipeline or separation between machine output and diagnostics.
+PROPOSAL: State the new command's streams, plain output and stable status contract using the pinned convention. Extend AC-03 proof to capture representative success, failure, skipped and partial outcomes with redirected output.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 24, Scope line 38, Design line 45, Test Plan AC-01 and AC-03, Open Questions, Sources line 86
+EVIDENCE: The design includes Lighthouse CI conditionally, but no acceptance test establishes its adapter or local-only operation. Lighthouse CI supports uploads to a server and temporary public storage as well as saving to the filesystem. The same draft excludes publication and hosted services. [Lighthouse CI upload configuration](https://googlechrome.github.io/lighthouse-ci/docs/configuration.html#upload)
+PROPOSAL: Treat Lighthouse CI as a separate optional adopter workflow, or explicitly scope a local-only integration and add proof for its included behavior.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design lines 42 and 46, Acceptance Criteria AC-03, Open Questions
+EVIDENCE: Pinned `conventions/feature-documents.md`, Open questions, requires introduced or changed user-facing terms in a glossary row held to by a criterion. The spec introduces `build`, `deployed`, `report only`, `skipped`, `not applicable` and `expected` as user-facing terms without a glossary or a criterion that holds the command, report and skill to their meanings.
+PROPOSAL: Record the user-visible mode and outcome names with their meanings. Require AC-03 to verify consistent meanings across the command and report.
+
+FINDING: F-14
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary line 26, Context / Background lines 30-32, Design line 47, Sources lines 80-81
+EVIDENCE: The captures reproduce the counts, and the build log shows successful build output. The draft links the current homepage instead of identifying the captured records by path or a reproducible evidence reference. `observe.cjs` removes query strings and does not record method or redirect history, so the capture alone cannot attest the entire proposed exception tuple. The companion draft is also named without a path or revision.
+PROPOSAL: Cite the captured artifacts and companion convention revision, and identify the method as supported by pinned source while the historical capture leaves query and redirect details unavailable.
+
 ## Sources
 
 - [Stackweaver homepage](https://stackweaver.sh/), observed deployed navigation and anonymous session response.
