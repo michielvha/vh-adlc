@@ -39,7 +39,7 @@ The mobile gap is keyboard and touch interaction. The current viewer creates a n
 The owner selected vh-adlc 0.26.1 for the CI follow-up and authorized the resizing merge after the required checks.
 Hosted run 44476411768 failed two real viewport scenarios after earlier sizes passed: Chromium retained the prior streamed framebuffer, and Firefox disconnected at the final extreme-size transition.
 Both unchanged local viewport suites passed with the host noVNC 1.5.0 assets and a temporary upstream 1.6.0 source fixture; another 312 diagnostic matrix transitions passed, including a run confined to one CPU.
-Those checks do not establish the hosted framebuffer failure's cause, which remains unresolved.
+Those initial checks did not establish the hosted framebuffer failure's cause.
 
 Hosted retry 44488921093 failed the existing reusable-profile no-key stop check before reaching the real viewer suite.
 A focused local run reproduced five failures in ten, and a deterministic stop/health overlap reproduced the same diagnostic at both the feature head and pre-sizing base f5bd3a49.
@@ -47,7 +47,30 @@ The supervisor could wait inside a health check while an ordinary stop ended the
 The repair rechecks cancellation after a failed health result; an active session still fails on genuine upstream ownership loss.
 The deterministic regression and focused native checks now pass.
 Fresh independent implementation review R-6 at 1f5efb97 returned all seven criteria met with no findings; model identity was not attested, and the observed unrelated shared-ref advancement remains recorded in its evidence.
-Hosted CI at the repaired pushed head remains required.
+Hosted run 44494806625 at 2e1a0a62 passed the native Go checks and the other jobs, including the full Linux framework checker, but both real viewport scenarios still failed.
+Merge remained blocked.
+
+### Native cursor follow-up
+
+An isolated Ubuntu 26.04 fixture reproduced the framebuffer failures with the hosted x11vnc 0.9.17-2, LibVNCServer 0.9.15+dfsg-3ubuntu0.2, noVNC 1.6.0-2 and Chrome 157.0.8103.78 versions.
+Geometry requests returned HTTP 200 `applied` promptly, and native dimensions and exported clips matched the request while the connected viewer retained its previous framebuffer.
+The server remained responsive, and a native refresh did not recover the view.
+Existing noVNC diagnostics found no pending render work; its parser was waiting for two more rectangle headers from an incomplete update.
+
+A bounded native trace observed an actual 96 by 96 rich cursor requiring 38,034 bytes against the installed library's 32,768-byte update buffer.
+The native cursor and update-completion callbacks, with their original behavior preserved, recorded the ensuing framebuffer-update failure and emptied request region.
+The installed library's cursor-size check matched the upstream failure path.
+Xcursor can select a larger themed cursor from the display height when no size is requested; the new 4096-pixel backing display exposed that native limit.
+
+A causal experiment kept the source and backend unchanged and requested `XCURSOR_SIZE=24` for the owned Chrome process.
+Both complete viewport scenarios passed, with 511 native update completions, zero failures and only 16, 18 and 24-pixel cursor images.
+The repair sets that native preference in the private GUI environment and removes an inherited size before adding it; cursor themes and cursor-shape updates remain enabled.
+This selects ordinary themed cursors and does not establish a cap for explicit CSS or custom cursor images.
+Fresh independent verification on the fixed source and reproduced Ubuntu backend, followed by hosted CI, remains required.
+
+One author Firefox menu capture in the causal experiment was mostly blank despite passing the existing pixel assertion.
+It is preserved as a menu-paint or clipping question, not visual approval of AC-06, and must be checked in the normal fixed-candidate run.
+The earlier owner-preview HTTP 503 remains separate; the cursor trace does not establish its cause.
 
 ### Background
 
@@ -160,7 +183,10 @@ Validate the package through its existing helper from a temporary install-shaped
       Evidence: TestViewportInactiveSequencePreventsOlderClaim first failed with B sequence 2 applied and backend calls increasing to 3 (/tmp/rg-adaptive-evidence/T7-replay-red.log). The full proxy race suite then passed, including lower/equal delayed claim refusal, legitimate later control and 17 unknown updates reserving no entries. Module vet, exact golangci-lint 2.15.0 config/run and tidy pass. A fresh package-helper static build passes all six controlled/real viewer tests in Chromium and Firefox (/tmp/rg-adaptive-evidence/T7-viewer-checks.log). Manual documentation review found no user-guidance drift; this implements the accepted sequence policy. R-4 is preserved as returned and a fresh review is required.
 
 - [x] T8 `plugins/remote-gui/internal/session/daemon.go`, `profile_test.go` - reproduce the normal-stop/health-check race, preserve active-session ownership refusal, and recheck cancellation after a blocked health result before classifying it as an upstream failure (AC-06, AC-07).
-      Evidence: The deterministic TestProfileStopDuringHealthCheck first failed its normal-stop case while its active ownership-loss control passed (/tmp/rg-ci-repair-native-stop/repo-red.log); both cases pass in three race-detected repetitions after the cancellation recheck. The existing native TestRealReusableProfileStopSendsNoKeys reproduced five failures in ten before repair and passes all ten after it (/tmp/rg-ci-repair-native-stop/focused-head.log and focused-green.log). The module build, ordinary full race suite, vet, tidy, exact golangci-lint 2.15.0 configuration/run and package checks pass. Manual documentation review found no user-guidance change; the existing stop and ownership contracts are preserved. R-6 independently returned all seven criteria met at 1f5efb97, including 13 passing real browser scenarios and a genuine active VNC-loss control. Its raw records preserve unknown model identity, procedural isolation, the unrelated shared-ref advancement and the separately unexplained hosted framebuffer failure.
+      Evidence: The deterministic TestProfileStopDuringHealthCheck first failed its normal-stop case while its active ownership-loss control passed (/tmp/rg-ci-repair-native-stop/repo-red.log); both cases pass in three race-detected repetitions after the cancellation recheck. The existing native TestRealReusableProfileStopSendsNoKeys reproduced five failures in ten before repair and passes all ten after it (/tmp/rg-ci-repair-native-stop/focused-head.log and focused-green.log). The module build, ordinary full race suite, vet, tidy, exact golangci-lint 2.15.0 configuration/run and package checks pass. Manual documentation review found no user-guidance change; the existing stop and ownership contracts are preserved. R-6 independently returned all seven criteria met at 1f5efb97, including 13 passing real browser scenarios and a genuine active VNC-loss control. Its raw records preserve unknown model identity, procedural isolation, the unrelated shared-ref advancement and the framebuffer failure that remained unexplained at that review; T9 records the later cursor diagnosis.
+
+- [ ] T9 `plugins/remote-gui/internal/browser/browser.go`, `browser_test.go`, `README.md` - observe the private cursor-size regression fail, request a normal native themed cursor size independently of backing-display and host settings, preserve cursor-shape/theme behavior, and verify the fixed candidate on the reproduced Ubuntu backend (AC-01, AC-02, AC-06, AC-07).
+      Evidence: Exact Ubuntu/Chrome reproduction and native callbacks identified the oversized 96-pixel cursor update failure (/tmp/rg-ubuntu-rfb-fixture/native-trace-attempt/result.md). With only a Chrome-scoped native size-24 preference, both complete viewport cases passed and 511 native completions returned no failure (/tmp/rg-ubuntu-rfb-fixture/cursor-size24-attempt/result.md). The new TestPrivateDisplayKeepsNormalCursorSize failed for default/empty and oversized inherited settings before the repair (/tmp/rg-rfb-source-fix/cursor-env-red.log). The regression passes after the repair; module build, ordinary race suite, vet, tidy, exact golangci-lint 2.15.0 configuration/run and package checks also pass. Fixed-source normal Ubuntu verification and fresh independent review remain pending. The mostly blank Firefox menu frame and earlier HTTP 503 remain explicitly separate observations.
 
 ## Open Questions
 
@@ -339,3 +365,5 @@ EVIDENCE: At 1f5efb97272ff49f975015f4e8b51b286bf1689d, both manifests report 0.4
 - [Managed dependency updates](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/knowledge/managed-renovate.md) and [Go release paths](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/knowledge/tag-driven-go-releases.md): retained dependency and release boundaries when extending the existing CI job.
 
 - [Artifact upload action](https://github.com/actions/upload-artifact/blob/cf430e030ddbb5b0abf93d22962f4752f3646cd9/action.yml): the verified v7.0.2 action retains only synthetic viewport evidence from the existing remote-gui CI job.
+
+- [Native Xcursor size selection](https://manpages.debian.org/unstable/libxcursor-dev/XcursorSetDefaultSize.3.en.html): desired cursor size and display-height fallback.

@@ -164,12 +164,13 @@ func cleanEnv(display, auth string) []string {
 	for _, entry := range os.Environ() {
 		key, _, _ := strings.Cut(entry, "=")
 		switch key {
-		case "DISPLAY", "XAUTHORITY", "CHROME_LOG_FILE", "CHROMIUM_FLAGS", "CHROME_FLAGS", "CHROMIUM_USER_FLAGS":
+		case "DISPLAY", "XAUTHORITY", "XCURSOR_SIZE", "CHROME_LOG_FILE", "CHROMIUM_FLAGS", "CHROME_FLAGS", "CHROMIUM_USER_FLAGS":
 			continue
 		}
 		out = append(out, entry)
 	}
-	return append(out, "DISPLAY="+display, "XAUTHORITY="+auth)
+	// Keep native themed cursors independent of the larger backing display.
+	return append(out, "DISPLAY="+display, "XAUTHORITY="+auth, "XCURSOR_SIZE=24")
 }
 
 func (r *runtime) spawn(role, binary string, args, env []string) (*child, error) {

@@ -8,7 +8,7 @@ New browser sessions adapt to the viewer's available space below its toolbar. Te
 
 When several viewers are open, a focus or connection request takes size control in the order the server accepts it. Other viewers scale the shared image. A delayed focus request can take control until you refocus the viewer you want.
 
-The exported size ranges from 320 by 240 to 4096 by 4096. Larger viewers scale proportionally within that bound. Smaller areas and extreme aspect ratios keep the last usable resolution and fit it proportionally. The backing display uses about 64 MiB for its main framebuffer, plus other session memory.
+The exported size ranges from 320 by 240 to 4096 by 4096. Larger viewers scale proportionally within that bound. Smaller areas and extreme aspect ratios keep the last usable resolution and fit it proportionally. The backing display uses about 64 MiB for its main framebuffer, plus other session memory. The private display requests 24-pixel themed cursors, independently of its larger backing size.
 
 If the viewer reports `Automatic sizing unavailable; fitting the shared browser.`, the connection remains available. Resize the viewer or refocus it to retry. Clipboard fields keep their keyboard focus during sizing. Existing supervisors keep their original behavior; updating the plugin changes new sessions only.
 
