@@ -1,43 +1,28 @@
 ---
 status: draft
-status_description: "R-4 found no issues in the revised baseline. The draft awaits owner acceptance before implementation."
+status_description: "The owner chose a Git reservation with start, resume and handoff checks. The revised draft awaits review and acceptance."
 issue: null
-goal: "One canonical repository work item has one verified agent writer across clones, worktrees and supported hosts, with an explicit, preserved handoff."
+goal: "Two sessions using vh-adlc cannot accidentally start or resume the same feature as its writer."
 covers:
   - AGENTS.md
-  - cmd/vh-adlc/**
-  - internal/ownership/**
-  - internal/fresh/**
-  - internal/gate/**
-  - plugins/vh-adlc/vh-adlc.lock.json
-  - plugins/vh-adlc/scripts/ensure-vh-adlc.sh
-  - scripts/release/lock-binary.sh
-  - .github/workflows/release.yml
-  - .goreleaser.yml
-  - plugins/vh-adlc/scripts/loop/**
-  - plugins/vh-adlc/scripts/branches/**
-  - plugins/vh-adlc/scripts/triage/execution-lock.ts
-  - plugins/vh-adlc/scripts/triage/controller*.ts
-  - plugins/vh-adlc/scripts/triage/check-boundary.ts
-  - plugins/vh-adlc/scripts/triage/owned-process.ts
   - plugins/vh-adlc/scripts/ownership/**
+  - plugins/vh-adlc/scripts/loop/**
   - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/references/branches.md
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/references/loop.md
   - plugins/vh-adlc/references/loop-settings.md
+  - plugins/vh-adlc/scripts/branches/**
   - plugins/vh-adlc/skills/**
-  - plugins/vh-adlc/agents/**
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
   - .agents/plugins/marketplace.json
   - .claude-plugin/marketplace.json
+  - .github/workflows/ci.yml
+  - .github/workflows/release.yml
   - tests/vh-adlc/ownership/**
   - tests/vh-adlc/branches/**
   - tests/vh-adlc/loop/**
-  - tests/vh-adlc/triage/controller*.ts
-  - tests/vh-adlc/triage/owned-process.test.ts
-  - tests/vh-adlc/triage/boundary-test.ts
   - tests/vh-adlc/worktree-handoff.test.ts
   - tests/vh-adlc/check.test.ts
   - docs/user-guides/workflows.md
@@ -50,276 +35,164 @@ covers:
 
 ### Owner summary
 
-Two sessions independently implemented the same consumer issue in separate Git clones.
-Both used the same feature branch name, so checking one clone's worktree list did not
-find the other implementation. The owner wants this prevented before another agent
-starts work, and wants a paused writer to receive a clear takeover notice.
+When you start an issue through vh-adlc, it reserves that issue for your session in Git.
+A second session starting or resuming the same issue sees who has it and where the work
+lives, even if it uses another clone. The current writer can resume without asking you
+again. An idle session or one that ran out of quota keeps its reservation. Reviews and
+work on other issues can continue.
 
-The current framework has a published feature claim and a required human handoff,
-but no shared ownership token. Its isolation helper checks one clone. A reproduction
-using the actual helper and binary admits two clean feature worktrees for the same
-synthetic issue: both isolation results are `continue`, and both in-progress gates pass.
-The desired second-writer refusal fails. No external Git remote was used by that probe.
+For a handoff, you confirm the old session has stopped and name the replacement.
+vh-adlc transfers the reservation and leaves the existing work intact. If the old
+session later resumes the feature through vh-adlc, it sees the transfer and stops.
+Editing, shell commands, builds and tests run as usual. This relies on agents entering
+work through vh-adlc and on your stop confirmation during a handoff. It cannot stop
+a session that is still running or an edit made outside the workflow.
 
-This feature adds an atomic writer record keyed by repository and work item. Every
-write-capable workflow checks it before mutation. A different branch name, clone,
-agent model or resumed session cannot establish another owner. Read-only review and
-owner-delegated assessment remain possible. An authorized handoff preserves unfinished
-work, advances the generation and leaves a durable notice for the former writer.
-Quota exhaustion and missing processes are not automatic ownership release.
+Repositories opt in once. If Git cannot verify the reservation, vh-adlc pauses the start
+or resume and explains what to check. The planned proof is a race between two clones,
+a normal resume, and a handoff with unfinished work. These are implementation checks
+still to run. Acceptance authorizes implementation and tests through the existing
+feature workflow. Publishing implementation or enabling the reservation in a live
+repository needs separate approval.
 
-The repository's Git remote holds the shared record. Adoption explicitly initializes a
-reserved ref, binds its identity in committed policy and confirms that existing writers
-have stopped or upgraded. If the established ref disappears, writing stops until an
-authorized recovery restores its history. Source publication still needs its own grant.
+### Background
 
-Release and takeover close admission, drain all admitted actions and invalidate the old
-token before making work available again. A supported Claude or Codex route must still
-refuse mutation when its checker fails after setup. Other routes remain read-only.
-Downgrading a client holds writing and preserves the coordination record.
+Two sessions worked independently on the same consumer issue in separate clones.
+The earlier draft records the incident and its private reproduction receipt.
+The current claim helper checks for a branch in one clone before editing and pushing
+the existing feature claim. Its worktree helper likewise reads one clone's list
+(`plugins/vh-adlc/scripts/loop/claim.ts:34-70`). The shared handoff procedure already
+asks the owner to confirm that the previous writer stopped
+(`plugins/vh-adlc/references/authority.md`, Handoff).
 
-Validation includes concurrent clones, admission racing with handoff, lost responses during
-initialization and action execution, stale-token publication after handoff and release, and actual native clients
-with separate controller, checker and hook failures. The release build must package the
-binary for all four supported OS and architecture combinations.
-The current result is a spec revision. Accepting it after independent review authorizes
-local implementation and tests. Release and consumer adoption have separate grants.
-
-### Owner decision
-
-On 19 November the owner selected Git-remote coordination as recommended and requested
-continued work, validation across Claude and Codex, takeover notification to the former
-Claude session, and continued consumer consolidation. The owner also explicitly requested
-publication of this draft so it is backed up remotely. Publication of the draft is distinct
-from releasing or adopting a working ownership runtime. The owner also accepted the
-same closing protocol for release and transfer, compatible writers before activation,
-and explicit initialization with no automatic authority reset (R-1 Q2A-Q4A).
-
-### Measured incident and current gaps
-
-- At `dae76bf9`, `claim()` checks only local `refs/heads/<featureBranch>` before its
-  default-branch claim push (`plugins/vh-adlc/scripts/loop/claim.ts:32-60`). Initial
-  claim pushes have rejection handling. Re-entering an already claimed feature has
-  no persistent session owner check.
-- `primaryWorktree()` reads the first local `git worktree list` result, and `isolation()`
-  accepts a linked worktree (`plugins/vh-adlc/scripts/loop/claim.ts:57-71`). Separate clones have separate lists.
-- The handoff rule explicitly says a claim is not a lock
-  (`plugins/vh-adlc/references/authority.md`, Preservation and Handoff).
-  `tests/vh-adlc/worktree-handoff.test.ts` grades the handoff question and preservation;
-  it does not arbitrate concurrent writers.
-- Triage already has a host-wide kernel lock keyed by repository
-  (`plugins/vh-adlc/scripts/triage/execution-lock.ts:6-25`). That protects a running triage
-  execution; it neither coordinates all lifecycle writers nor persists a paused feature's
-  owner across machines.
-- The private incident receipt `nov19-independent-clone-ownership-reproduction.json`
-  identifies the two-clone run and its observed results. The probe used synthetic review
-  and acceptance records to exercise gates.
-- The actual collision is Stackweaver issue #1079. The accepted consumer branch at
-  `3f3f7754` and the other clone at `db3a6a44` have independent implementation histories.
-  Both histories and the latter's two uncommitted files are preserved. The consumer's
-  selected scope, runtime policy and reconciliation remain consumer-local.
+The owner kept Git coordination and explicit adoption and handoff. For the duplicate
+start problem, the owner chose checks at workflow entry and removed the requirement to
+intercept writes or prove that a process stopped. Reviews R-1 through R-4 describe the
+earlier draft. Its unchecked criteria AC-01 through AC-09 are superseded and remain in
+Git history. Neither draft was accepted.
 
 ## Scope
 
-Provide one shared ownership procedure for write-capable lifecycle entry and re-entry,
-including feature authoring/implementation and selected maintenance, audit and documentation
-repairs. Reuse each operation's existing records and authority checks. Resolve an existing
-issue/spec/task identity before allocating a new work item. An unresolved alias or duplicate
-stops the writer instead of silently creating another feature.
+Add one shared reservation to feature writing in adopted repositories. Check at the
+start of work and when a session resumes it through vh-adlc. Include fresh implementation,
+re-entry to a claimed feature, and the feature spec and tasks routes when they start new
+writer work for an issue or tracked spec. Read-only discovery and review stay available. An independent reviewer can
+return findings while the current writer records or applies them through the feature workflow.
 
-Store one current writer plus ordered handoff and release history. Identify its session/host,
-canonical checkout and branch, accepted work item and generation. Keep private possession
-tokens outside Git and redact them from diagnostics. A status command reports the current writer and canonical location.
-
-Keep feature specs, task order, review records, test evidence and delivery policy in their
-existing consumer homes. This adds no task scheduler, PR queue, automatic merge, automatic
-quota takeover or claim that arbitrary programs are prevented from editing files.
+Keep the existing claim, branch, worktree and delivery procedures. The reservation
+does not authorize source publication, tracker writes, merge or release. Leave other
+workflows, including maintenance, audit and documentation repairs outside the feature
+loop, outside this change. There is no controller, hook requirement, per-write check,
+background polling, automatic takeover or session messaging.
 
 ## Design
 
-### D1: Canonical repository and work identity
+### Identify the same work
 
-Reuse existing repository identity parsing where its semantics match. The adopted identity
-is independent of checkout path and transport spelling. SSH and HTTPS references to the same
-repository resolve to the same key. Reject credentials in recorded identity and diagnostics.
+Use the adopted Git repository identity and the feature's canonical issue. Normalize
+HTTPS and SSH forms of the same origin. The remote used for reservation reads and updates
+must resolve to that repository. Resolve a linked spec to its issue, including
+when a session enters via its branch. An issue-less feature uses its tracked canonical
+spec path. A branch name, clone path or issue title is never a substitute for the
+canonical item. Use current default-branch associations and the reservation record
+when resolving aliases. If linking an issue or moving a spec would change an existing
+key, reconcile the aliases in the reservation first. Ambiguous or unresolved identity
+stops the start or resume with a reason rather than creating another reservation.
 
-Existing issue identity and canonical spec/task record are aliases of one work item. A
-resumed claimed document must resolve its existing item. Branch names alone are insufficient.
-Different features may have different owners; delegated read-only workers name the owning
-item and immutable target, and cannot inherit a source-writing token.
+### Store the reservation in Git
 
-### D2: Shared Git authority
+Use one reserved ref on the adopted Git remote, by default
+`refs/heads/vh-adlc/work-ownership`. A small shared helper in the vh-adlc plugin owns
+the Git operations. Use Git objects and an exact expected-tip push without touching
+the source index or branches. Each update is a child of the verified tip and records
+the work item, opaque writer and checkout identifiers, work location, and a unique
+operation ID. Keep local session state and absolute checkout paths outside the shared
+ref. Show a useful host label and branch or spec locator, and a local checkout path
+when it can be resolved safely.
 
-The Go binary owns authority initialization and the status, acquire, check, release and
-transfer transitions. Host adapters call the verified binary. Committed adoption policy
-names the canonical repository, remote, reserved ref (default
-`refs/heads/vh-adlc/work-ownership`), authority ID and genesis commit. Verify that the
-remote protects the established ref from deletion and history rewrites, and excludes it
-from branch cleanup and product release. First adoption has explicit authority for this
-ref and its policy binding. It grants no source or tracker publication privileges.
+Competing starts compare and update the same ref. If a push loses the race, reread the
+item and show its writer. Changes for another item can retry a bounded number of times.
+If a response disappears, reread and verify the exact operation and the current writer
+before reporting success. An uncertain outcome, missing adopted ref or unavailable Git
+remote stops entry and gives the next step. Cached state is available for diagnosis only.
 
-Initialization creates the ref with an expected absent tip and an adoption operation ID.
-The proposed genesis binds the repository and authority ID. Only one concurrent creation
-can succeed. On response loss, read back and verify the exact genesis and operation ID.
-A competing genesis stays held until the owner reconciles it. A created ref with a
-missing policy binding remains inactive. Activate only when the committed policy and
-remote history agree and D5's cutover is complete. Ordinary acquisition never initializes
-the ref. A missing, rewritten, mismatched or unverifiable established authority stays
-held. Recovery requires separate authorization and the verified established history.
+### Start, resume and hand off
 
-Each record binds the work aliases, state, generation, opaque writer/session and checkout
-identities, token digest and operation ID. Keep the possession token and private paths
-outside Git. Status reports the canonical source branch/spec and opaque remote location,
-with an absolute path only for a locally resolved checkout. Unknown schema, alias or
-remote state holds mutation. Cached state is diagnostic only.
+Use the same check in the feature writer paths for Codex and Claude. Before the chosen
+operation writes or claims a branch, check for another writer. An unreserved item is
+reserved once. Use the current client's session binding and a local checkout binding.
+Both must match on resume. Status output is informational. Opening the same checkout
+in a second session leaves the reservation with the first.
+A resume with no history of ownership stays held if the item already has a legacy claim
+until the owner reconciles it. A claim push rejected by the existing workflow leaves
+the reservation with the current writer so that retry cannot start another writer.
 
-Build each update as a child of the exact observed tip using Git plumbing outside the
-source index and branches. Require the remote to compare the old object ID with that tip
-when it installs the new one. Verify ancestry before submission, including when Git's
-explicit expected-tip lease is used. Reject any attempt to rewrite the authority history.
-On conflict, read back and classify the writer before a bounded retry. After ambiguous
-response, reconcile by operation ID and the intended transition before returning success.
-Use the same conditional update for admission, closing, drain receipts and finalization.
+A handoff requires the owner to confirm that the previous session has stopped and to
+select the incoming session and where it will work. Preserve both histories, indexes
+and unfinished files. Reuse the original checkout after the old writer has stopped,
+or have the owner provide an explicitly preserved handoff before changing the work
+location. Update the reservation only if the observed prior writer and record are
+still current. Stale and repeated requests cannot overwrite a later handoff. The
+former writer receives the current location and a transfer message at its next
+feature entry. Reservations have no expiry. A finished feature keeps its record and
+the usual lifecycle determines whether it can be worked on again.
 
-### D3: Enforce mutation at execution
+### Adopt and roll back
 
-Check ownership at lifecycle entry and re-entry and require a valid generation for each
-mutation, including commits and authorized publication. Keep existing worktree, preservation
-and delivery checks. A status result is informational and grants no action admission.
+An authorized setup creates the reserved ref only if it is absent and binds its
+genesis in committed repository policy. If the create response is lost, verify the
+same genesis and operation before binding. If another setup wins or the history
+vanishes, stop and ask the owner to reconcile it. Verify that the adopted remote
+protects this ref against deletion and history rewrites. Exclude it from feature branch
+cleanup and CI that can create product tags. The current CI takes pushes on all
+branches and invokes versioning (`.github/workflows/ci.yml:3-6,194-205`). The release
+workflow starts on version tags (`.github/workflows/release.yml:3-5`).
 
-Run the native Claude or Codex session in an enforced route that keeps the model read-only
-with respect to the worktree, Git refs and external mutation endpoints. Source mutation
-goes through a trusted controller outside that session. Reuse the existing confined
-controller and owned-process patterns where they enforce the required boundary
-(`plugins/vh-adlc/scripts/triage/controller.ts`, `owned-process.ts`). The controller owns
-the writer token and scoped mutation credentials. It authenticates the requesting session
-and binds each request to the work item, checkout, generation and exact proposed effect.
-It rejects out-of-scope targets and arbitrary shell forwarding. An unreachable controller,
-failed checker execution or invalid decision starts no action. Skipped hooks cannot change
-that result or make a mutation capability available to the native session.
-Verify native configuration, tool exposure and confinement on each supported route.
-If the host cannot enforce those limits, keep the route read-only. Claude SessionStart
-and Codex resume hooks may surface notices. PreToolUse may report a refusal early.
-Neither hooks nor their trust state grant access to mutation capabilities.
+Before adopting, identify existing claims and confirm that the writers using the
+feature workflow have updated. An ambiguous or duplicate claim stays held until
+the owner chooses one writer and work location. Preserve all other work. Repositories
+that have yet to adopt retain the existing workflow. A downgrade to a client without
+the check removes its duplicate-work protection. Keep the ref and its history,
+coordinate writers manually during rollback and reverify the same ref before
+restoring automated checks.
 
-Before execution, register an action ID against the active generation through the
-authority's conditional update. Registration and closing compete at that same point.
-A preliminary check followed by a delayed registration cannot grant admission after
-closing. If registration wins, closing includes that action until its result is settled.
-The controller tracks the registered ID before spawning any child and keeps it until the
-process and its descendants and input channels have stopped and external effects have been
-reconciled. Then it records settlement using the action ID. Keep publication guarded by
-both ownership and its separate grant.
-Never reuse an action ID to launch a second process after an ambiguous response. A controller
-restart with unknown activity keeps that ID outstanding until quiescence can be verified.
-
-Delegated reviewers use an independently scoped read-only route. A host-provided parent
-session ID grants no privilege, and tokens and action admission are inaccessible to the
-delegated actor. Long-lived shells and continuing input must be owned and tracked by the
-controller to run as writer. Codex write_stdin does not retrigger PreToolUse. Cover it in
-the drain or keep that channel unavailable for mutation. The contract covers the adopted
-routes and their declared enforceable boundaries.
-
-### D4: Resume, release and explicit handoff
-
-A matching writer resumes its record. A conflicting session sees the current writer and
-location and stays held. Process absence, timeout, quota failure and age grant no takeover.
-
-For release or transfer, atomically change the active generation to closing and reject new
-admissions. Track every action that won registration before closing. Drain or stop them
-through the controller and verify completion, child and input-channel shutdown and any
-pending remote effect. Preserve both histories and unfinished source/evidence for handoff.
-An outstanding action or uncertain outcome holds finalization. A transfer names the old
-writer and generation, the incoming writer and the canonical checkout.
-
-Once drained, conditionally advance the generation and invalidate the old token. Transfer
-activates exactly the named replacement. Release leaves a vacant record with its history
-and generation intact. Reacquisition advances that retained generation and uses a new
-token. Replay returns the prior transition outcome without repeating it. Release requires
-the current writer or explicit owner direction. Old tokens cannot acquire by resumption,
-admit mutation or publish, even with a valid separate publication grant.
-
-Retain a notice for the former session and known parent/delegator. Record queueing, delivery
-and acknowledgment independently. If direct messaging is unavailable, surface the durable
-notice on resume. The former writer remains held whether or not it acknowledges.
-
-### D5: Adoption, compatibility and bounded state
-
-Existing consumers first inventory claimed work and detect duplicates. Ambiguity produces a
-preserved conflict record and requires one selected canonical owner. Do not migrate both
-clones into separate records for the same issue. Never reset, stash, delete, rebase or amend
-another writer's history to establish ownership.
-
-Hold write access while inventorying active and paused clients across hosts. Stop or
-upgrade each known writer, account for in-flight actions and require verified compatible
-routes and binaries before enabling ownership. Unknown writers or control gaps hold
-activation. A rollback closes and drains active generations, preserves the bound authority
-and leaves writer access held, including for incompatible versions. To resume, restore
-compatible writers and reverify the same authority and its outstanding records. Old clients
-do not implement these checks themselves. Cutover and rollback must disable their adopted
-write access at the enforcing boundary, including existing sessions and credentials.
-
-Update shared references, skills and compatibility documentation together. Publish through
-both existing marketplace manifests and verify actual Codex/Claude adoption. The repository
-pin update to `0c983f6793bfe35eb96ae95ad0c361c6200af44f` supplies the required testing guide;
-the shipped plugin default pin is unchanged unless a separately reviewed change requires it.
-Private host/session details remain in runtime state, not product documentation or source.
-The artifacts are the existing signed Go binary and shared plugin. Before merge, run the
-Go and Bun checks and use GoReleaser in a disposable checkout at the candidate commit to
-build and package with `.goreleaser.yml`. Use snapshot mode with signing and publication
-disabled. Check all four Linux and Darwin amd64 and arm64 archives and their computed
-checksums. Release through the existing workflow after authorization and update the
-plugin lock only to an observed signed release with verified checksums.
-Candidate validation uses the built candidate explicitly; do not invent a future version,
-checksum or successful marketplace install. No new deployable service or satellite is added.
-
+The affected artifact is the existing shared vh-adlc plugin for both marketplaces.
+Use the existing Bun plugin checks and verify candidate packaging and feature entry
+on both client routes using disposable repositories. The installed Go binary still
+provides the existing lifecycle gates. It needs no change for this feature.
 
 ### Glossary
 
 | Term | Meaning |
 | --- | --- |
-| Owner | The human who authorizes adoption, takeover and delivery. |
-| Current writer | The session and checkout authorized to request admitted mutations for a work item. |
-| Work item | One canonical repository task resolved from its issue, spec or task aliases. |
-| Generation | The monotonic authority revision for writer identity, advanced on release, transfer and acquisition. |
-| Possession token | Private proof the controller uses for a writer generation. Diagnostics never display it. |
-| Held | Mutation is unavailable until ownership and the applicable execution or recovery prerequisites are verified. |
+| Reservation | The Git record assigning a work item to one current writer. |
+| Current writer | The session allowed to start or resume feature writing through vh-adlc. |
+| Work location | The writer's host label and branch or spec, with a checkout path when local. |
+| Handoff | An owner-approved change of writer after the previous session has stopped. |
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Two simultaneous claimants for the same work item in independent clones admit one current writer. The conflicting claimant stops before source mutation and receives the writer's canonical location.
-- [ ] AC-02: SSH/HTTPS repository aliases, issue/spec aliases and branch/session changes cannot create another owner for the same item, while separate work items may proceed independently.
-- [ ] AC-03: Resumption, unknown remote outcomes, network failure and quota/process absence cannot bypass ownership; stale generations cannot mutate or publish after release or handoff, and loss of an established authority holds mutation.
-- [ ] AC-04: An authorized handoff preserves both histories and unfinished files, drains or stops the former writer, activates one replacement and records notice delivery/acknowledgment accurately. Release shares that admission and drain guarantee before reacquisition.
-- [ ] AC-05: Existing lifecycle and selected repair writers share the same ownership check; delegated read-only reviews remain possible and cannot obtain source-writing authority.
-- [ ] AC-06: Source publication, issue/PR changes, merge, release and cleanup retain their separate gates; coordination state cannot trigger a product release or be removed as a stale feature branch.
-- [ ] AC-07: Actual supported Codex and Claude routes refuse a former owner/new conflicting writer before source changes, including when a checker or controller fails after successful setup. Unsupported routes remain read-only.
-- [ ] AC-08: Existing consumers with duplicate/incomplete claims receive a preserved migration conflict and one explicit reconciliation path, and marketplace installs expose the verified ownership capability. Adoption creates one explicitly bound authority and holds incompatible writers during cutover and rollback.
-- [ ] AC-09: Ownership command output distinguishes the human owner, current writer, work item, generation and held state using the glossary. It never discloses a possession token.
+- [ ] AC-10: Two sessions starting the same feature through vh-adlc in separate clones produce one reservation. The other session stops before feature writes and gets the current writer and work location. Separate items can proceed.
+- [ ] AC-11: A later workflow entry resolves the same item from its issue or spec, allows the current writer back in, and holds conflicting or unverified starts and resumes. Read-only review stays available. Normal editing and tests require no reservation checks.
+- [ ] AC-12: An explicit handoff after owner confirmation transfers the reservation once and preserves unfinished work and history. The old session sees the transfer at its next vh-adlc entry. Idle or quota-limited sessions keep their reservation.
+- [ ] AC-13: Adoption holds unresolved existing claims, preserves the reservation history across rollback and keeps coordination changes out of branch cleanup and product releases. Existing publication permissions remain separate.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | First retain the failing two-independent-clone reproduction. Add true concurrent claimant processes against one disposable Git authority and assert one winner, zero loser source/index/branch writes, exact owner diagnostics and bounded conflict retry. Repeat in separate Git common directories. |
-| AC-02 | Exercise SSH/HTTPS and `.git` spelling aliases, issue/spec association, different branch names, source paths containing spaces, resumed session IDs and two separate work items. Assert one canonical identity or an explicit ambiguity refusal. |
-| AC-03 | Inject response loss after successful claim, rejected update, missing authority, inaccessible remote, old generation, process death and quota failure. Read-back reconciles the same writer. Give the stale writer otherwise valid publication authority and attempt the same publication after transfer, after release while vacant, and after reacquisition. Assert no destination mutation in each case. The current writer succeeds with the same publication authority after transfer and after reacquisition. A deleted established ref cannot be recreated by a delayed update. |
-| AC-04 | Start with two dirty source files and committed review history. Transfer only after the old mutator is stopped/drained; replay it and attempt a stale-owner mutation. Compare exact hashes/history and ownership generation. Pause an action after preliminary check before registration and race transfer, then reverse which transition wins. Once an admitted action has launched, drop its response and retry the same action ID while the generation is active. Observe at most one launch and one effect. Restart the controller while the original action is unresolved, with an open input channel or an ambiguous external result. In separate release and transfer cases, refuse finalization until the original activity has stopped and its external outcome is reconciled. After settlement, finish the transition once. Assert increasing generations and stale-token refusal. Test unavailable direct messaging, queued notice, actual resume delivery and independent acknowledgment. |
-| AC-05 | Contract tests cover every shared write entry/re-entry and selected maintenance/audit/docs repair route. Each must reject a conflicting token. Delegate a read-only exact-head review, observe preserved source and prove it cannot claim/write under the parent's token. |
-| AC-06 | Recording Git/issue/PR endpoints observe no source push, PR, merge, release or cleanup without its separate grant. The reserved authority ref is excluded from release and stale-branch paths. Existing claim-push rejection, scope preservation and delivery tests remain passing. |
-| AC-07 | Run actual native Codex and Claude against two fixture clones through the declared adapters. Attempt writes from the former and conflicting sessions. Prove a permitted writer action and an unrelated item. After successful setup, independently test controller unavailability, checker execution failure, an invalid checker decision and skipped hooks. Keep the controller live for both checker tests and observe that it receives but refuses each request. In every negative case assert that source, refs and publication targets remain untouched. Exercise continuing input and unsupported tools in the actual clients. Native runs without observed mutation and refusal remain pending. |
-| AC-08 | Seed unclaimed, valid claimed, duplicated and unknown-owner consumer records. Migration preserves all dirty bytes/reviews, selects one canonical item and records unresolved cases. Race two initializers, lose the winning response and test missing/mismatched established state from a fresh clone. Start cutover and downgrade with an older paused client and prove it cannot resume mutation while held. Verify preserved history and compatible recovery. Run both marketplace install/discovery paths and the repository Go and Bun checks. At the same candidate commit run a nonpublishing GoReleaser snapshot using `.goreleaser.yml`, validate all four target archives and recompute each checksum. |
-| AC-09 | Run ownership status, acquire, release and transfer in the same fixture. Verify human authorization and current writer are distinct, work item and generation stay visible, held output explains the prerequisite, and neither stdout nor stderr contains the fixture token. |
+| AC-10 | Race two processes at the feature entry using independent clones of a disposable bare remote. Verify one reservation, byte-identical source, index and refs in the losing clone apart from remote reads, and the current writer and work location in the refusal. Repeat with separate items that both succeed. |
+| AC-11 | Enter through issue, spec and branch, with HTTPS and SSH spellings for the same repository. Include an issue-less spec, a changed or ambiguous alias, a matching resumed session, another session in the same checkout, a failed claim push, lost Git response, missing adopted ref and offline remote. Verify correct entry or a clear stop. Run a read-only review and observable local edit/test commands after a successful start. Count reservation calls at entry and assert no extra ones during the edit and test. Exercise shared start/resume wiring through the candidate plugin on Codex and Claude, with disposable repositories. |
+| AC-12 | Seed committed and dirty work in two clones, try a handoff without confirmation, then hand off as authorized. Compare file and index hashes and commit ancestry before and after. Race or replay the handoff and verify one transfer. Simulate a paused or quota-limited writer and confirm its reservation persists until explicit handoff. Resume from both the new and old sessions and check the new access decision and old session message. |
+| AC-13 | Use an unadopted fixture and fixtures with clean, duplicate and legacy claims, competing initialization and a lost create response. Test an unavailable or mismatched established ref and a downgrade followed by compatible recovery of the same history. Verify branch cleanup keeps the reserved ref and the release workflow cannot run from a coordination update. Verify a reservation does not grant a source push or tracker write. Run the repository plugin checks and check both marketplace candidate payloads. |
 
 ## Tasks
 
-Pending independent spec review and the implementation gate. The owner selected Git-remote coordination and requested continuation. No implementation task is complete.
+None yet. Break down implementation after acceptance.
 
 ## Open Questions
 
-None. The owner selected Git-remote coordination (Q1A), the common closing and
-fail-closed execution protocol (Q2A), compatible writers before cutover with a held
-rollback (Q3A), and explicit authority initialization with no automatic reset (Q4A).
+None. The owner selected the Git reservation, entry checks and explicit handoff.
 
 ## Review Log
 
@@ -440,11 +313,6 @@ NO FINDINGS
 
 ## Sources
 
-- Current vh-adlc main `dae76bf9eca4b99368819ca03c7db1fb4a136d24`, actual claim/isolation, handoff fixture and triage execution-lock source, read 19 November 2026.
-- Stackweaver incident comparison and private receipt `nov19-independent-clone-ownership-reproduction.json`, 19 November 2026. The receipt records both admissions in the two-clone collision probe.
-- [Claude Code hooks](https://code.claude.com/docs/en/hooks), read 19 November 2026: resume-context injection and pre-tool permission denial are distinct from acknowledgment or arbitrary filesystem isolation.
-- [Claude Code project instructions](https://code.claude.com/docs/en/memory), read 19 November 2026: instruction text is context, not enforced configuration.
-
-- [Codex hooks](https://learn.chatgpt.com/docs/hooks), read 19 November 2026:
-  native hook coverage, exact-hook trust, parent session identity and continuing stdin
-  channels constrain the supported fencing boundary. The installed CLI reports hooks enabled.
+- [Earlier draft and historical incident receipt reference](https://github.com/michielvha/vh-adlc/blob/289a043d21cdc76310d3d32a62322b5f4cab9637/docs/specs/single-writer-ownership.md#measured-incident-and-current-gaps).
+- [Claim and isolation helpers](../../plugins/vh-adlc/scripts/loop/claim.ts) and [existing handoff procedure](../../plugins/vh-adlc/references/authority.md#handoff).
+- [CI push and version routing](../../.github/workflows/ci.yml) and [tag release trigger](../../.github/workflows/release.yml).
