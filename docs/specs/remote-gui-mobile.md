@@ -189,6 +189,8 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-11 | spec | `f54bb1ad8854cfd80f03c73cdd12127a784e0f38` | unknown | procedural | Two should-fix test proof findings. Model identity was not attested. |
 | 2026-11-19 | R-12 | spec | `37ca8edd45f4d40bfd7ffd547f6a85b5abe648ed` | unknown | procedural | Two should-fix proof findings. Model identity was not attested. |
 | 2026-11-19 | R-13 | spec | `19f606adb87ed597d6bb5e472709129334debd62` | unknown | procedural | Three should-fix phase-path proof findings. Model identity was not attested. |
+| 2026-11-19 | R-14 | spec | `06f91bd54a0adb348f68fd27ac36928326df1894` | unknown | procedural | No findings. Model identity was not attested. |
+| 2026-11-19 | R-14 | spec | `06f91bd54a0adb348f68fd27ac36928326df1894` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -555,6 +557,10 @@ SEVERITY: should-fix
 WHERE: Design / Detect and show the prompt (lines 128, 130 and 134), Test Plan AC-10, AC-12 and AC-13
 EVIDENCE: The R-12 revision adds an independent phase request while a focus request is pending. Line 134 still says any newer request from a viewer supersedes its older request. Applied across both request types, an unchanged phase poll could invalidate a valid focus sample and prevent normal prompt display or lease renewal.
 PROPOSAL: Scope supersession to focus requests within one viewer and track phase reads independently. Hold a valid focus response while an unchanged phase reply arrives, then verify the focus response still displays the prompt or renews its lease.
+
+### R-14
+
+NO FINDINGS
 
 ## Sources
 
