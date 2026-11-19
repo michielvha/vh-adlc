@@ -15,6 +15,9 @@ ACCESSIBLE = "org.a11y.atspi.Accessible"
 ROOT = "/org/a11y/atspi/accessible/root"
 PREFIX = "/org/a11y/atspi/accessible/"
 MODES = {"text", "password", "email", "url", "tel", "search", "number"}
+# Chrome 157 can expose more than 256 native nodes on a single new tab.
+# Keep the same deadline while allowing the native search to finish.
+MAX_NODES = 384
 
 
 def interface(bus, destination, path, name):
@@ -110,7 +113,7 @@ def focused(address, pid, x, y, hint):
     seen = set()
     found = None
     while pending or documents:
-        if len(seen) >= 256 or time.monotonic() >= deadline:
+        if len(seen) >= MAX_NODES or time.monotonic() >= deadline:
             return None
         if not pending:
             # Finish the browser chrome first. A large New Tab Page must not
@@ -139,7 +142,7 @@ def focused(address, pid, x, y, hint):
                 return None
             found = match
         children = node.GetChildren(timeout=.08)
-        if len(pending) + len(children) > 256:
+        if len(pending) + len(children) > MAX_NODES:
             return None
         pending.extend(children)
     return found

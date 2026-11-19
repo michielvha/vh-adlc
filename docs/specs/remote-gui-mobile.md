@@ -46,6 +46,8 @@ The physical iPhone 15 Pro Max on iOS 27.2.1 subsequently tested Safari against 
 
 During daily-use testing, the owner reported that the sizing notice blocked the Chromium tab strip and typing was unreliable. A real noVNC session reproduced the overlap at a 393 CSS pixel viewport. Typing in the Chromium address bar also failed when replacing the last character or when the keyboard lost focus during a lookup. The repair keeps the notice in the viewer toolbar, retains recent local edits while typing, and checks the browser toolbar before searching page content. It retries transient lookup failures without extending an existing focus lease. In three fresh Chromium sessions with a touch-enabled viewer, opening a new tab worked with sizing fallback visible. Editing the full URL loaded `https://example.com/` and tapping the original tab switched back. The managed browser regression also checks the address bar and a page field against stock Chromium and noVNC. The repaired build still needs a native iPhone run and Android verification.
 
+The hosted mobile test exposed a separate difference in Chrome 157.0.8103.50. The helper found the focused address entry but reached the 256-node search limit before it could rule out another match. Raising the limit to 384 kept the same lookup deadline. The managed browser regression and the public URL and tab-switch workflow passed locally with the matching Chrome Stable build and noVNC 1.6.0.
+
 ### Evidence from the first design
 
 The first design passed the vh-adlc in-progress gate and stopped at its feasibility task. The following evidence describes that design and the probes preserved in Git.
