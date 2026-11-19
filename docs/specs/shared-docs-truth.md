@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "The owner accepted the spec after clean review R-4. Ready for implementation planning."
+status: in-progress
+status_description: "The owner accepted the spec after clean review R-4. Implementation is claimed."
 issue: https://github.com/michielvha/vh-adlc/issues/127
+branch: feat/shared-docs-truth
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-docs-truth/
