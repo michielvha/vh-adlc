@@ -81,7 +81,9 @@ The earlier owner-preview HTTP 503 remains separate; the cursor trace does not e
 
 [PR 121](https://github.com/michielvha/vh-adlc/pull/121) merged at [0708e3cb](https://github.com/michielvha/vh-adlc/commit/0708e3cb33dd1fe1e85f4e8da74b598ee32f96a0) from reviewed head [8ed05bb2](https://github.com/michielvha/vh-adlc/commit/8ed05bb2ac4f56256514b32a062ec1c66a1c3c2c) on 2026-11-19. Its [exact-head hosted run](https://github.com/michielvha/vh-adlc/actions/runs/44515120227) passed remote-gui, verify, macOS and paseo-hosts. The full native browser suite and all 13 viewer scenarios passed. The Linux framework checker was still running at merge time; its inputs were unchanged from the earlier complete passing run at 2e1a0a62. No branch-policy bypass was used.
 
-The 0.4.0 source package is available through the marketplace's local package paths on main. Installation was not updated in this run; an update affects new sessions. The merged feature branch and its tracking ref were removed, and its clean managed worktree was archived. Earlier failed runs and R-1 through R-7 remain preserved.
+The 0.4.0 source package is available through the marketplace's local package paths on main. No plugin installation command was run by this operation; updates affect new sessions. The merged feature branch and its tracking ref were removed, and its clean managed worktree was archived. Earlier failed runs and R-1 through R-7 remain preserved.
+
+The separate [merge-commit run](https://github.com/michielvha/vh-adlc/actions/runs/44517718745) passed module and package checks, then failed before its native/browser suites while Playwright installed Ubuntu dependencies. The libzvbi0t64 download encountered HTTP 503, connection failures and a resource-unavailable error. This is a recorded setup failure, not a browser-test result. The merged remote-gui code, tests and CI workflow are byte-identical to the fully passing feature head 8ed05bb2. No post-merge browser rerun has yet been observed. A single targeted job retry was refused because the workflow was still running; no rerun started.
 
 ### Background
 
