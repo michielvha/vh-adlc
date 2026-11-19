@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: Stackweaver cutover verified; final canonical review awaits an available reviewer
+status_description: Stackweaver cutover verified; final canonical Codex review pending
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -164,7 +164,8 @@ Fresh Claude Code Opus 5.5 attempt `canonical-implementation-claude-r11` reads
 source and original evidence but becomes unavailable before returning canonical
 criterion records. Both attempts preserve the source/index/refs and confirm
 owned-process cleanup. No R-139 row or verdict is stored. T129/T130 and the
-completion gate remain open; a different reviewer requires the owner's choice.
+completion gate remain open. The owner previously authorized Codex or Claude
+Code for this feature, so the remaining review can continue on Codex.
 The adopted routing and the stated GUI/phone, native Copilot and first-production
 limits remain unchanged.
 
