@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "The keyboard metadata boundary is revised and awaiting independent review."
+status: planned
+status_description: "The keyboard metadata boundary is accepted. Native phone feasibility remains open."
 branch: feat/remote-gui-mobile
 issue: null
 goal: "Use a remote-gui browser from a phone with selective first-tap native keyboard input, normal text editing and touch scrolling."
@@ -28,7 +28,7 @@ The implementation must reuse noVNC's existing gesture recognition, key transpor
 
 The candidate metadata source is a private, session-owned Linux accessibility adapter. It may publish safe editable geometry and input flags, never field contents, labels or URLs. Human mode keeps automation, CDP and extensions disabled. Installed libraries and upstream APIs establish possible routes; this work has proved neither sandboxed Chromium integration nor native phone-keyboard behavior. A later implementation must first pass the owned synthetic feasibility gate on actual iOS Safari and Android Chrome. Exact phone models, OS/browser versions and keyboard settings belong in that implementation evidence. The owner approved allowing the private Chromium adapter to receive the attribute map for an eligible control, keep the recognized input type and discard the rest. This is a host implementation detail. The phone viewer still runs in Safari and Chrome.
 
-Independent R-2 returned no findings on the revised baseline; its model identity was not attested and isolation was procedural. The owner accepted the brief in session on 2026-11-19 and requested upstream reuse. R-1 remains preserved as history. That acceptance settles scope and is recorded against R-2 without another preference question. It does not authorize mobile code or probes in this spec-only operation. The deterministic planning gate passed; no implementation proof is implied. A later implementation request, release, installation and any changed privacy/dependency boundary remain separate actions.
+Independent R-2 returned no findings on the revised baseline; its model identity was not attested and isolation was procedural. The owner accepted the brief in session on 2026-11-19 and requested upstream reuse. R-1 remains preserved as history. That acceptance applied to the original spec. Mobile feasibility work began after the owner separately requested implementation. The narrow metadata exception approved for this revision is recorded against R-5. Release and installation require their own authorization.
 
 ### First feasibility run
 
@@ -48,7 +48,7 @@ The same synthetic HTTPS viewer can exercise both phone browsers. On iPhone, an 
 
 [PR 121](https://github.com/michielvha/vh-adlc/pull/121) merged at [0708e3cb](https://github.com/michielvha/vh-adlc/commit/0708e3cb33dd1fe1e85f4e8da74b598ee32f96a0) on 2026-11-19. Both remote-gui manifests at that commit report 0.4.0, and both marketplace catalogs resolve to its local package. This establishes the prerequisite in the default-branch source; it does not establish an installed plugin update or any mobile capability.
 
-Independent R-3 rechecked this unchanged mobile baseline against the merged source with no findings. Model identity was not attested and isolation was procedural. The existing R-2 owner acceptance remains valid because Scope, Design, Acceptance Criteria, Test Plan and covers are unchanged. No mobile task breakdown, implementation or feasibility probe was started.
+Independent R-3 rechecked this unchanged mobile baseline against the merged source with no findings. Model identity was not attested and isolation was procedural. At that checkpoint, the normative baseline matched R-2 and its acceptance still applied. Mobile planning and feasibility work followed later.
 
 ### Background
 
@@ -189,6 +189,7 @@ None. The owner accepted keyboard/touch scope first, both platform targets and o
 | 2026-11-19 | R-3 | spec | `0708e3cb33dd1fe1e85f4e8da74b598ee32f96a0` | unknown | procedural | No findings after covered-source drift; model identity was not attested. |
 | 2026-11-19 | R-4 | spec | `d3fad7181862b2bee55f7cb981745b8057333b50` | gpt-6.2-sol | procedural | One blocking finding and two should-fix findings. Independent synthetic mode probe confirmed. |
 | 2026-11-19 | R-5 | spec | `5168c70da624c76d87a4de41dd39c744a61c53e0` | gpt-6.2-sol | procedural | No blocking or should-fix findings. One Context nit. |
+| 2026-11-19 | R-5 | spec | `5168c70da624c76d87a4de41dd39c744a61c53e0` | n/a | n/a | accepted by owner |
 
 ### R-1
 
