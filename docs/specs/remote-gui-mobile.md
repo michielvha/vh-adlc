@@ -188,6 +188,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-10 | spec | `ad01fed9eb16e0083875c61be063160e444cf3f6` | unknown | procedural | Four should-fix findings and one fixture wording nit. Model identity was not attested. |
 | 2026-11-19 | R-11 | spec | `f54bb1ad8854cfd80f03c73cdd12127a784e0f38` | unknown | procedural | Two should-fix test proof findings. Model identity was not attested. |
 | 2026-11-19 | R-12 | spec | `37ca8edd45f4d40bfd7ffd547f6a85b5abe648ed` | unknown | procedural | Two should-fix proof findings. Model identity was not attested. |
+| 2026-11-19 | R-13 | spec | `19f606adb87ed597d6bb5e472709129334debd62` | unknown | procedural | Three should-fix phase-path proof findings. Model identity was not attested. |
 
 ### R-1
 
@@ -531,6 +532,29 @@ SEVERITY: should-fix
 WHERE: Context / Owner summary (lines 25 and 29), Design / Detect and show the prompt (lines 124, 130 and 134), Design / Type and dismiss (line 140), Acceptance Criteria AC-10, AC-11, AC-13 and AC-14, Test Plan AC-11 through AC-14, Tasks T7-T8
 EVIDENCE: The R-11 revision adds a still-fresh old-phase success, but the separate viewer case does not require an active editor and pending composition before the phase change or require the production viewer to observe the phase through its actual connected path. Design allows one focus request at a time and leaves phase observation while a reply is held unspecified. The existing live handoff at `tests/remote-gui/browser.e2e.test.ts:374-380` keeps RFB connected and learns the new mode only after a separate Clipboard refresh. A deterministic test can inject a changed token into empty viewer state while the live test passes through lease expiry alone.
 PROPOSAL: Specify how the connected viewer observes a phase change while a focus response is pending. Drive that path in the deterministic check with a live editor and pending composition, assert that the observed change clears both before the lease expires, then deliver the still-fresh reply and late commit.
+
+### R-13
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Detect and show the prompt (lines 130 and 134), Design / Type and dismiss (line 140), Test Plan AC-13 and AC-14, Tasks T6-T8
+EVIDENCE: The R-12 revision requires the phase read to stay responsive during handoff. The existing viewer proxy calls `upstreamAlive` before dispatching browser routes (`plugins/remote-gui/internal/proxy/proxy.go:314-325`). That callback invokes `browserState.alive()` (`plugins/remote-gui/internal/session/daemon.go:559-569`), which takes a read lock on the same mutex the handoff holds through replacement browser startup (`plugins/remote-gui/internal/session/handoff.go:35-39,63-65,91-99`). AC-13 can pass with a substituted phase reply in the deterministic check and lease expiry in the real handoff check, even if the actual authenticated phase route waits until handoff completes.
+PROPOSAL: Hold a real handoff open after the phase advances and while the old focus sample is pending. Require the actual authenticated phase route to return the advanced number before either hold is released, and apply the route's method, origin, identity and expiry checks to that endpoint.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Detect and show the prompt (lines 128 and 130), Design / Type and dismiss (line 140), Test Plan AC-13
+EVIDENCE: AC-13 at `37ca8edd` required the old-phase success to reach the viewer within its lease. The R-12 revision requires the editor to clear before the lease expires and then delivers the held reply, with no deadline for that delivery. Lease expiry can still account for rejection of the reply and the absence of queued keys.
+PROPOSAL: Deliver the held success and late composition commit before the original lease deadline. Record the deadline and delivery times without renewing the old lease.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Detect and show the prompt (lines 128, 130 and 134), Test Plan AC-10, AC-12 and AC-13
+EVIDENCE: The R-12 revision adds an independent phase request while a focus request is pending. Line 134 still says any newer request from a viewer supersedes its older request. Applied across both request types, an unchanged phase poll could invalidate a valid focus sample and prevent normal prompt display or lease renewal.
+PROPOSAL: Scope supersession to focus requests within one viewer and track phase reads independently. Hold a valid focus response while an unchanged phase reply arrives, then verify the focus response still displays the prompt or renews its lease.
 
 ## Sources
 
