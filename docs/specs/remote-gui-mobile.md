@@ -187,6 +187,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-9 | spec | `39b5042cb63aa553818ee2fe56f9605b6cefff23` | unknown | procedural | Four should-fix findings and one evidence nit. Model identity was not attested. |
 | 2026-11-19 | R-10 | spec | `ad01fed9eb16e0083875c61be063160e444cf3f6` | unknown | procedural | Four should-fix findings and one fixture wording nit. Model identity was not attested. |
 | 2026-11-19 | R-11 | spec | `f54bb1ad8854cfd80f03c73cdd12127a784e0f38` | unknown | procedural | Two should-fix test proof findings. Model identity was not attested. |
+| 2026-11-19 | R-12 | spec | `37ca8edd45f4d40bfd7ffd547f6a85b5abe648ed` | unknown | procedural | Two should-fix proof findings. Model identity was not attested. |
 
 ### R-1
 
@@ -514,6 +515,22 @@ SEVERITY: should-fix
 WHERE: Context / Owner summary (lines 25 and 29), Design / Detect and show the prompt (lines 124, 130 and 134), Design / Type and dismiss (line 140), Acceptance Criteria AC-11, AC-13 and AC-14, Test Plan AC-11 through AC-14, Tasks T7-T8
 EVIDENCE: The R-10 revision checks server-side rejection when the generation changes before a helper result is released. That leaves the viewer untested against a successful old-generation reply that the server produced before the transition and that arrives after the viewer sees the change. The real handoff case releases a held reply without requiring it to remain within the 500 millisecond lease. The server check and lease expiry can make both cases pass even if the viewer accepts a still-fresh old-generation success.
 PROPOSAL: Retain the server rejection case. Add a deterministic viewer case that delivers a successful old-generation reply within its lease after the viewer observes the new generation, then delivers a late composition commit and asserts no prompt or editor restoration and no key traffic.
+
+### R-12
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 23), Scope (lines 115-116), Design / Detect and show the prompt (lines 128-130), Acceptance Criteria AC-10, Test Plan AC-10 and AC-12, Tasks T6-T7
+EVIDENCE: The R-11 revision requires measured snaps across the field boundary in both directions. When the raw repeat tap is outside and the dispatched point is inside, the preceding tap was already inside at the same dispatched point under noVNC 1.5.0 `core/rfb.js:1226-1254`. The test can count the preceding tap's prompt as success even if the viewer ignores the repeat tap. In the reverse case the preceding tap can leave the prompt hidden, so ignoring the repeat tap can pass both cases.
+PROPOSAL: Keep the measured two-direction snaps and prove that the repeat tap determines the result. Hold the preceding tap's metadata while preserving noVNC's tap history, then require the repeat tap's eligible response to produce the prompt in the inside-dispatch case.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 25 and 29), Design / Detect and show the prompt (lines 124, 130 and 134), Design / Type and dismiss (line 140), Acceptance Criteria AC-10, AC-11, AC-13 and AC-14, Test Plan AC-11 through AC-14, Tasks T7-T8
+EVIDENCE: The R-11 revision adds a still-fresh old-phase success, but the separate viewer case does not require an active editor and pending composition before the phase change or require the production viewer to observe the phase through its actual connected path. Design allows one focus request at a time and leaves phase observation while a reply is held unspecified. The existing live handoff at `tests/remote-gui/browser.e2e.test.ts:374-380` keeps RFB connected and learns the new mode only after a separate Clipboard refresh. A deterministic test can inject a changed token into empty viewer state while the live test passes through lease expiry alone.
+PROPOSAL: Specify how the connected viewer observes a phase change while a focus response is pending. Drive that path in the deterministic check with a live editor and pending composition, assert that the observed change clears both before the lease expires, then deliver the still-fresh reply and late commit.
 
 ## Sources
 
