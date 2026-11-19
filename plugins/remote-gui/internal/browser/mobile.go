@@ -26,6 +26,9 @@ type mobileFocus struct {
 	bus      *child
 	registry *child
 	address  string
+	// The query lock serializes access to the last verified reference.
+	hint      string
+	hintEpoch uint64
 }
 
 func (f *mobileFocus) live() bool {
@@ -131,14 +134,21 @@ func (r *runtime) editableAt(ctx context.Context, x, y int) (*mobile.Field, erro
 	}
 	ctx, cancel := context.WithTimeout(ctx, 370*time.Millisecond)
 	defer cancel()
+	hint := ""
+	if helper.hintEpoch == epoch {
+		hint = helper.hint
+	}
 	cmd := exec.CommandContext(ctx, "/usr/bin/python3", "-I", "-c", mobileFocusScript,
-		helper.address, strconv.Itoa(browser.identity.PID), strconv.Itoa(x), strconv.Itoa(y))
+		helper.address, strconv.Itoa(browser.identity.PID), strconv.Itoa(x), strconv.Itoa(y), hint)
 	result, err := cmd.Output()
 	if err != nil {
 		return nil, errors.New("mobile-focus-unavailable")
 	}
-	var field *mobile.Field
-	if len(result) > 512 || json.Unmarshal(result, &field) != nil {
+	var sample struct {
+		Field *mobile.Field `json:"field"`
+		Path  string        `json:"path"`
+	}
+	if len(result) > 512 || json.Unmarshal(result, &sample) != nil {
 		return nil, errors.New("mobile-focus-unavailable")
 	}
 	r.mu.Lock()
@@ -146,10 +156,11 @@ func (r *runtime) editableAt(ctx context.Context, x, y int) (*mobile.Field, erro
 	if r.stopped || !r.modeReady || r.chrome != browser || r.generation.Load() != phase || r.mobilePhase.Load() != epoch || !state.Alive(browser.identity) || !helper.live() {
 		return nil, errors.New("mobile-focus-unavailable")
 	}
-	if field != nil {
-		field.Phase = epoch
+	helper.hint, helper.hintEpoch = sample.Path, epoch
+	if sample.Field != nil {
+		sample.Field.Phase = epoch
 	}
-	return field, nil
+	return sample.Field, nil
 }
 
 // Verify the owned launch used a single explicit unit scale before treating

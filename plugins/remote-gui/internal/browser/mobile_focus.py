@@ -54,7 +54,27 @@ def keyboard_mode(bus, owner, path, node, states):
     return mode if mode in MODES else None
 
 
-def focused(address, pid, x, y):
+def read_field(bus, owner, path, states, x, y):
+    if not all(has(states, flag) for flag in ("EDITABLE", "FOCUSED", "VISIBLE", "SHOWING", "ENABLED")):
+        return None
+    if has(states, "READ_ONLY"):
+        return None
+    component = interface(bus, owner, path, "org.a11y.atspi.Component")
+    left, top, width, height = map(int, component.GetExtents(dbus.UInt32(0), timeout=.08))
+    if not (left <= x < left + width and top <= y < top + height):
+        return None
+    node = interface(bus, owner, path, ACCESSIBLE)
+    mode = keyboard_mode(bus, owner, path, node, states)
+    if not mode:
+        return None
+    token = hashlib.sha256(f"{owner}:{path}".encode()).hexdigest()[:24]
+    return {
+        "field": {"token":token, "mode":mode, "x":left, "y":top, "width":width, "height":height},
+        "path": path,
+    }
+
+
+def focused(address, pid, x, y, hint):
     deadline = time.monotonic() + .24
     bus = dbus.bus.BusConnection(address)
     registry = interface(bus, "org.a11y.atspi.Registry", ROOT, ACCESSIBLE)
@@ -69,6 +89,16 @@ def focused(address, pid, x, y):
     if len(candidates) != 1:
         return None
     owner = candidates[0]
+    if hint.startswith(PREFIX):
+        # A previously verified object reference is only a search hint. Its
+        # current state, bounds and mode still need to match the current tap.
+        try:
+            node = interface(bus, owner, hint, ACCESSIBLE)
+            match = read_field(bus, owner, hint, node.GetState(timeout=.08), x, y)
+            if match is not None:
+                return match
+        except dbus.DBusException:
+            pass
     pending = [(owner, ROOT)]
     seen = set()
     found = None
@@ -81,18 +111,11 @@ def focused(address, pid, x, y):
         seen.add(path)
         node = interface(bus, owner, path, ACCESSIBLE)
         states = node.GetState(timeout=.08)
-        eligible = all(has(states, flag) for flag in ("EDITABLE", "FOCUSED", "VISIBLE", "SHOWING", "ENABLED"))
-        if eligible and not has(states, "READ_ONLY"):
-            component = interface(bus, owner, path, "org.a11y.atspi.Component")
-            left, top, width, height = map(int, component.GetExtents(dbus.UInt32(0), timeout=.08))
-            if left <= x < left + width and top <= y < top + height:
-                if found is not None:
-                    return None
-                mode = keyboard_mode(bus, owner, path, node, states)
-                if not mode:
-                    return None
-                token = hashlib.sha256(f"{pid}:{owner}:{path}".encode()).hexdigest()[:24]
-                found = {"token":token, "mode":mode, "x":left, "y":top, "width":width, "height":height}
+        match = read_field(bus, owner, path, states, x, y)
+        if match is not None:
+            if found is not None:
+                return None
+            found = match
         children = node.GetChildren(timeout=.08)
         if len(pending) + len(children) > 256:
             return None
@@ -101,7 +124,7 @@ def focused(address, pid, x, y):
 
 
 try:
-    result = focused(sys.argv[1], *map(int, sys.argv[2:]))
+    result = focused(sys.argv[1], *map(int, sys.argv[2:5]), sys.argv[5])
 except (dbus.DBusException, IndexError, TypeError, ValueError):
     result = None
 print(json.dumps(result))
