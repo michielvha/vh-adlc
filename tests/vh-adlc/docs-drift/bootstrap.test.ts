@@ -1,5 +1,6 @@
+import * as filesystem from "node:fs";
 import { installedSettingsFixture } from "./settings-fixture";
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
 import { chmodSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
@@ -209,4 +210,229 @@ console.log(argument === "--version" ? "2.1.325 (Claude Code)" : "--plugin-dir")
   expect(calls()).toHaveLength(8);
   await bootstrap.inspectInstalledClient(options);
   expect(calls()).toHaveLength(10);
+});
+
+test.each(["manifest", "binding"] as const)("native install markers preserve shipped identity and bytes: %s", kind => {
+  const f = component(), directory = join(f.payload, ".in_use");
+  chmodSync(f.payload, 0o755); mkdirSync(directory);
+  const { plugin_version, source_commit, component_sha256 } = f.identity;
+  const expected = kind === "manifest" ? f.identity : { plugin_version, source_commit, component_sha256 };
+  const inspect = () => bootstrap.inspectInstalledPayload({ directory: f.payload, expected });
+  const marker = join(directory, "12345"), bytes = Buffer.from(JSON.stringify({ pid: 12345, procStart: "123456789" }));
+  writeFileSync(marker, bytes, { mode: 0o600 });
+  const before = { root: lstatSync(f.payload).mode, marker: lstatSync(marker).mode };
+  expect(inspect().files).toEqual(f.identity.files);
+  expect(readFileSync(marker)).toEqual(bytes);
+  expect({ root: lstatSync(f.payload).mode, marker: lstatSync(marker).mode }).toEqual(before);
+  chmodSync(f.payload, 0o700);
+  expect(() => inspectRetainedPayload({ directory: f.payload, expected: f.identity })).toThrow(/^docs-drift runtime setup required /u);
+  rmSync(marker);
+  expect(inspectRetainedPayload({ directory: f.payload, expected: f.identity }).files).toEqual(f.identity.files);
+  writeFileSync(marker, bytes, { mode: 0o600 });
+  chmodSync(f.payload, 0o755);
+  writeFileSync(marker, ' \r\n{\t"procStart":"123456789",\n"pid":12345}\r\n');
+  expect(inspect().files).toEqual(f.identity.files);
+  writeFileSync(marker, JSON.stringify({ procStart: "987654321", pid: 12345 }).padEnd(256, " "));
+  expect(inspect().component_sha256).toBe(component_sha256);
+  const stale = join(directory, "9007199254740991");
+  writeFileSync(stale, JSON.stringify({ pid: Number.MAX_SAFE_INTEGER, procStart: "0" }));
+  expect(inspect().files).toEqual(f.identity.files);
+  rmSync(marker); rmSync(stale);
+  expect(inspect().files).toEqual(f.identity.files);
+  writeFileSync(marker, bytes);
+  writeFileSync(join(f.payload, "scripts/runner.ts"), "// changed shipped code\n");
+  expect(inspect).toThrow(/^docs-drift runtime setup required /u);
+});
+
+test.each(["manifest", "binding", "retained"] as const)("empty directories preserve the existing payload policy: %s", kind => {
+  const f = component();
+  const { plugin_version, source_commit, component_sha256 } = f.identity;
+  const inspect = kind === "retained"
+    ? () => inspectRetainedPayload({ directory: f.payload, expected: f.identity })
+    : () => bootstrap.inspectInstalledPayload({ directory: f.payload,
+      expected: kind === "manifest" ? f.identity : { plugin_version, source_commit, component_sha256 } });
+  expect(inspect().files).toEqual(f.identity.files);
+  mkdirSync(join(f.payload, ".git"));
+  const nested = join(f.payload, "nested/.GiT"); mkdirSync(nested, { recursive: true });
+  expect(inspect().files).toEqual(f.identity.files);
+  writeFileSync(join(nested, "unexpected"), "Not a shipped file\n");
+  expect(inspect).toThrow(/^invalid docs-drift protocol path/u);
+});
+
+test("native install marker refusal stops runtime selection before client probes", async () => {
+  const f = component(), settings = installedSettingsFixture(), executable = join(f.root, "copilot"), trace = join(f.root, "probe-calls");
+  const { plugin_version, source_commit, component_sha256 } = f.identity;
+  settings.component = { plugin_version, source_commit, component_sha256 };
+  settings.clients.copilot.executable = executable;
+  writeFileSync(executable, `#!${process.execPath}
+import { appendFileSync } from "node:fs";
+const argument = process.argv.at(-1);
+appendFileSync(${JSON.stringify(trace)}, argument + "\\n");
+console.log(argument === "--version" ? "GitHub Copilot CLI 1.0.112." : "--plugin-dir --model --session-id --output-format --available-tools --no-custom-instructions --disable-builtin-mcps");
+`, { mode: 0o755 });
+  mkdirSync(join(f.repo, ".vh-adlc"), { recursive: true });
+  writeFileSync(join(f.repo, ".vh-adlc/docs-drift.yaml"), JSON.stringify(settings));
+  const source = commit(f.repo), select = () => bootstrap.selectInstalledRuntime({ repo: f.repo, source_commit: source, directory: f.payload, entry: "interactive" });
+  expect((await select()).complete).toBe(true);
+  expect(readFileSync(trace, "utf8")).toContain("--version");
+  rmSync(trace);
+  const directory = join(f.payload, ".in_use"), marker = join(directory, "12345"); mkdirSync(directory);
+  const bytes = '{"pid":12345,"procStart":"1","unexpected":true}'; writeFileSync(marker, bytes);
+  await expect(select()).rejects.toThrow(/^docs-drift runtime setup required invalid native process metadata/u);
+  expect(filesystem.existsSync(trace)).toBe(false);
+  expect(readFileSync(marker, "utf8")).toBe(bytes);
+});
+
+test.each(["unknown-file", "zero-pid", "leading-zero", "wrong-pid", "string-pid", "fractional-pid", "unsafe-pid", "empty-start", "invalid-start", "long-start", "numeric-start", "missing-field", "unknown-field", "duplicate-field", "escaped-key", "escaped-start", "temporary-name", "exponent-pid", "decimal-pid", "negative-zero", "bom", "hardlink", "invalid-json", "invalid-utf8", "oversized", "executable", "group-executable", "symlink", "linked-directory", "nested-directory", "nested-marker", "outside-directory", "directory-marker"] as const)(
+  "native install metadata refuses unsafe input: %s", fault => {
+    const f = component(), directory = join(f.payload, fault === "outside-directory" ? ".in_use_other" : ".in_use"); mkdirSync(directory);
+    let name = "12345", value: unknown = { pid: 12345, procStart: "123456789" };
+    if (fault === "unknown-file") name = "ambient.ts";
+    if (fault === "temporary-name") name = ".12345.tmp";
+    if (fault === "exponent-pid") name = "1000";
+    if (fault === "zero-pid") { name = "0"; value = { pid: 0, procStart: "1" }; }
+    if (fault === "leading-zero") name = "012345";
+    if (fault === "wrong-pid") value = { pid: 12346, procStart: "1" };
+    if (fault === "string-pid") value = { pid: "12345", procStart: "1" };
+    if (fault === "fractional-pid") value = { pid: 12345.5, procStart: "1" };
+    if (fault === "unsafe-pid") { name = "9007199254740992"; value = { pid: 9007199254740992, procStart: "1" }; }
+    if (fault === "empty-start") value = { pid: 12345, procStart: "" };
+    if (fault === "invalid-start") value = { pid: 12345, procStart: "arbitrary code" };
+    if (fault === "long-start") value = { pid: 12345, procStart: "1".repeat(33) };
+    if (fault === "numeric-start") value = { pid: 12345, procStart: 123456789 };
+    if (fault === "missing-field") value = { pid: 12345 };
+    if (fault === "unknown-field") value = { pid: 12345, procStart: "1", run: "unexpected" };
+    const marker = join(directory, name);
+    if (fault === "symlink") symlinkSync(join(f.plugin, "guide.md"), marker);
+    else if (fault === "hardlink") { const source = join(f.root, "native-marker-source"); writeFileSync(source, JSON.stringify(value)); linkSync(source, marker); }
+    else if (fault === "linked-directory") { rmSync(directory, { recursive: true }); symlinkSync(f.plugin, directory); }
+    else if (fault === "nested-directory") mkdirSync(join(directory, "nested"));
+    else if (fault === "nested-marker") { mkdirSync(join(directory, "nested")); writeFileSync(join(directory, "nested", "12345"), JSON.stringify(value)); }
+    else if (fault === "directory-marker") mkdirSync(marker);
+    else {
+      if (fault === "exponent-pid") name = "1000";
+      const lexical = fault === "duplicate-field" ? '{"pid":12345,"pid":12345,"procStart":"1"}'
+        : fault === "escaped-key" ? '{"\\u0070id":12345,"procStart":"1"}'
+        : fault === "escaped-start" ? '{"pid":12345,"procStart":"\\u0031"}'
+        : fault === "exponent-pid" ? '{"pid":1e3,"procStart":"1"}'
+        : fault === "decimal-pid" ? '{"pid":12345.0,"procStart":"1"}'
+        : fault === "negative-zero" ? '{"pid":-0,"procStart":"1"}' : JSON.stringify(value);
+      if (["duplicate-field", "escaped-key", "escaped-start", "exponent-pid", "decimal-pid"].includes(fault))
+        expect(JSON.parse(lexical)).toEqual({ pid: Number(name), procStart: "1" });
+      const bytes = fault === "bom" ? Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(lexical)])
+        : fault === "invalid-json" ? "{" : fault === "invalid-utf8" ? Buffer.from([0xff])
+        : fault === "oversized" ? JSON.stringify(value).padEnd(257, " ") : lexical;
+      writeFileSync(fault === "exponent-pid" ? join(directory, name) : marker, bytes, { mode: fault === "executable" ? 0o700 : fault === "group-executable" ? 0o610 : 0o600 });
+    }
+    if (fault === "executable") chmodSync(marker, 0o700);
+    if (fault === "group-executable") chmodSync(marker, 0o610);
+    const snapshot = () => [".", ...readdirSync(f.payload, { recursive: true }).map(String).sort()].map(relative => {
+      const path = join(f.payload, relative), stat = lstatSync(path);
+      return [relative, stat.mode, stat.nlink, stat.isSymbolicLink() ? filesystem.readlinkSync(path)
+        : stat.isFile() ? sha256(readFileSync(path)) : null];
+    });
+    const before = snapshot();
+    const { plugin_version, source_commit, component_sha256 } = f.identity;
+    for (const expected of [f.identity, { plugin_version, source_commit, component_sha256 }])
+      expect(() => bootstrap.inspectInstalledPayload({ directory: f.payload, expected })).toThrow(/^docs-drift runtime setup required /u);
+    expect(snapshot()).toEqual(before);
+  },
+);
+
+
+test.each(["file", "descendant"] as const)("release inventories refuse reserved native metadata: %s", kind => {
+  const f = component(), path = join(f.plugin, ".in_use");
+  if (kind === "descendant") { mkdirSync(path); writeFileSync(join(path, "12345"), '{"pid":12345,"procStart":"1"}'); }
+  else writeFileSync(path, "Reserved runtime metadata\n");
+  const source = commit(f.repo);
+  expect(() => computeComponentIdentity(f.repo, source)).toThrow(/^docs-drift runtime setup required native process metadata cannot be shipped/u);
+});
+
+test.each(["removal", "replacement"] as const)("native install marker races fail once and permit an explicit rerun: %s", async fault => {
+  const f = component(), directory = join(f.payload, ".in_use"), marker = join(directory, "12345"); mkdirSync(directory);
+  const bytes = '{"pid":12345,"procStart":"1"}'; writeFileSync(marker, bytes);
+  const replacement = join(f.root, "replacement-marker"); writeFileSync(replacement, bytes);
+  const originalList = filesystem.readdirSync, originalOpen = filesystem.openSync;
+  let injected = false, attempts = 0;
+  const listing = spyOn(filesystem, "readdirSync").mockImplementation(((...args: unknown[]) => {
+    const result = Reflect.apply(originalList, filesystem, args) as ReturnType<typeof filesystem.readdirSync>;
+    if (fault === "removal" && args[0] === directory) {
+      attempts++;
+      if (!injected) { injected = true; rmSync(marker); }
+    }
+    return result;
+  }) as typeof filesystem.readdirSync);
+  const opening = spyOn(filesystem, "openSync").mockImplementation((...args: unknown[]) => {
+    if (fault === "replacement" && args[0] === marker) {
+      attempts++;
+      if (!injected) { injected = true; filesystem.renameSync(replacement, marker); }
+    }
+    return Reflect.apply(originalOpen, filesystem, args) as number;
+  });
+  try {
+    await bootstrap.withRuntimeValidation(async () => {
+      expect(() => bootstrap.inspectInstalledPayload({ directory: f.payload, expected: f.identity }))
+        .toThrow(fault === "removal" ? /ENOENT/u : /^docs-drift runtime setup required runtime input changed during inspection/u);
+      expect(injected).toBe(true); expect(attempts).toBe(1);
+      if (fault === "removal") writeFileSync(marker, bytes);
+      expect(bootstrap.inspectInstalledPayload({ directory: f.payload, expected: f.identity }).files).toEqual(f.identity.files);
+      expect(attempts).toBe(2); expect(readFileSync(marker, "utf8")).toBe(bytes);
+    });
+  } finally { opening.mockRestore(); listing.mockRestore(); }
+});
+
+test.each(["growth", "shrink"] as const)("native install marker size races never request unbounded data: %s", fault => {
+  const f = component(), directory = join(f.payload, ".in_use"), marker = join(directory, "12345"); mkdirSync(directory);
+  const bytes = '{"pid":12345,"procStart":"1"}'; writeFileSync(marker, bytes);
+  const originalOpen = filesystem.openSync, originalStat = filesystem.fstatSync;
+  const originalRead = filesystem.readSync, originalWholeRead = filesystem.readFileSync;
+  let markerFd: number | null = null, grew = false, unbounded = 0;
+  const lengths: number[] = [];
+  const opening = spyOn(filesystem, "openSync").mockImplementation((...args: unknown[]) => {
+    const fd = Reflect.apply(originalOpen, filesystem, args) as number;
+    if (args[0] === marker) markerFd = fd;
+    return fd;
+  });
+  const stating = spyOn(filesystem, "fstatSync").mockImplementation(((...args: unknown[]) => {
+    const result = Reflect.apply(originalStat, filesystem, args) as ReturnType<typeof filesystem.fstatSync>;
+    if (args[0] === markerFd && !grew) { grew = true; if (fault === "growth") filesystem.appendFileSync(marker, " ".repeat(4096)); else writeFileSync(marker, "{"); }
+    return result;
+  }) as typeof filesystem.fstatSync);
+  const reading = spyOn(filesystem, "readSync").mockImplementation((...args: unknown[]) => {
+    if (args[0] === markerFd) lengths.push(typeof args[3] === "number" ? args[3] : (args[1] as Uint8Array).byteLength);
+    return Reflect.apply(originalRead, filesystem, args) as number;
+  });
+  const wholeReading = spyOn(filesystem, "readFileSync").mockImplementation(((...args: unknown[]) => {
+    if (args[0] === markerFd || args[0] === marker) unbounded++;
+    return Reflect.apply(originalWholeRead, filesystem, args) as ReturnType<typeof filesystem.readFileSync>;
+  }) as typeof filesystem.readFileSync);
+  try {
+    expect(() => bootstrap.inspectInstalledPayload({ directory: f.payload, expected: f.identity }))
+      .toThrow(/^docs-drift runtime setup required native process metadata changed during inspection/u);
+    expect(grew).toBe(true); expect(unbounded).toBe(0);
+    expect(lengths.length).toBeGreaterThan(0);
+    expect(lengths.every(length => length <= 257)).toBe(true);
+    expect(originalWholeRead(marker, "utf8")).toBe(fault === "growth" ? bytes + " ".repeat(4096) : "{");
+    writeFileSync(marker, bytes);
+    expect(bootstrap.inspectInstalledPayload({ directory: f.payload, expected: f.identity }).files).toEqual(f.identity.files);
+    expect(originalWholeRead(marker, "utf8")).toBe(bytes);
+  } finally { wholeReading.mockRestore(); reading.mockRestore(); stating.mockRestore(); opening.mockRestore(); }
+});
+
+
+test("native install marker FIFOs are refused without opening them", () => {
+  const f = component(), directory = join(f.payload, ".in_use"), marker = join(directory, "12345"); mkdirSync(directory);
+  const created = Bun.spawnSync(["mkfifo", marker], { stdout: "pipe", stderr: "pipe" });
+  expect(created.exitCode, created.stderr.toString()).toBe(0);
+  const originalOpen = filesystem.openSync;
+  let opened = 0;
+  const guard = spyOn(filesystem, "openSync").mockImplementation((...args: unknown[]) => {
+    if (args[0] === marker) { opened++; throw Error("Would open a blocking native metadata FIFO"); }
+    return Reflect.apply(originalOpen, filesystem, args) as number;
+  });
+  try {
+    expect(() => bootstrap.inspectInstalledPayload({ directory: f.payload, expected: f.identity }))
+      .toThrow(/^docs-drift runtime setup required unexpected or changed runtime input/u);
+    expect(opened).toBe(0);
+  } finally { guard.mockRestore(); }
 });

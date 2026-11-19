@@ -7,7 +7,7 @@ import { policyBinding, readVerifiedPlan, type CurrentSealedPlan, type PolicyBin
 import { executeOwnedProcess, ownedClientCompleted } from "./owned-process";
 import { loadCommittedSettings, parseInstalledClient, SetupRequired } from "./settings";
 import { readNativeContext, type PublicationIdentity } from "./transport";
-import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { mapGitBlobs, readGit } from "./git";
 import { canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
@@ -42,7 +42,9 @@ export function computeComponentIdentity(repo: string, sourceCommit: string): Co
     const fields = /^(100644|100755) blob ([a-f0-9]{40}(?:[a-f0-9]{24})?) +([0-9]+)$/u.exec(entry.slice(0, tab));
     const fullPath = entry.slice(tab + 1);
     if (tab < 0 || !fields || !fullPath.startsWith(prefix) || !Number.isSafeInteger(Number(fields[3]))) fail("unsupported component entry");
-    return { path: protocolPath(fullPath.slice(prefix.length)), mode: fields[1] as PayloadFile["mode"], oid: fields[2], size: Number(fields[3]) };
+    const path = protocolPath(fullPath.slice(prefix.length));
+    if (path === ".in_use" || path.startsWith(".in_use/")) fail("native process metadata cannot be shipped");
+    return { path, mode: fields[1] as PayloadFile["mode"], oid: fields[2], size: Number(fields[3]) };
   });
   let version: string | undefined;
   const files = mapGitBlobs(repo, selected.map(({ oid, size }) => ({ oid, size })), (bytes, index) => {
@@ -53,6 +55,20 @@ export function computeComponentIdentity(repo: string, sourceCommit: string): Co
   if (version === undefined) fail("plugin metadata missing");
   return freezeJSON({ schema_version: 1, source_commit: sourceCommit, plugin_version: version,
     component_sha256: componentDigest(files), files });
+}
+
+/** Native cache data never supplies code, process ownership or effect authority. */
+function inspectNativeMarker(bytes: Buffer, filename: string) {
+  let text: string, value: unknown;
+  try { text = decodeUTF8(bytes); value = JSON.parse(text); }
+  catch { fail("invalid native process metadata"); }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) fail("invalid native process metadata");
+  const record = value as Record<string, unknown>;
+  if (Object.keys(record).length !== 2 || !Object.hasOwn(record, "pid") || !Object.hasOwn(record, "procStart")
+    || typeof record.pid !== "number" || !Number.isSafeInteger(record.pid)
+    || record.pid < 1 || String(record.pid) !== filename || typeof record.procStart !== "string"
+    || !/^[0-9]{1,32}$/u.test(record.procStart)
+    || text.replace(/[ \t\r\n]/gu, "") !== JSON.stringify(record)) fail("invalid native process metadata");
 }
 
 function inspectRetainedFiles(directory: string, expected: { files?: PayloadFile[]; component_sha256: string },
@@ -73,19 +89,33 @@ function inspectRetainedFiles(directory: string, expected: { files?: PayloadFile
     for (const name of readdirSync(parent)) {
       const path = join(parent, name), stat = lstatSync(path);
       if (stat.isSymbolicLink() || policy === "retained" && stat.uid !== owner) fail("foreign or linked runtime input");
-      if (stat.isDirectory()) { walk(path); continue; }
-      const relative = protocolPath(path.slice(root.length + 1)), required = selected?.get(relative);
-      if (!stat.isFile() || policy === "retained" && stat.nlink !== 1 || selected && !required
+      const rawRelative = path.slice(root.length + 1);
+      const marker = policy === "installed" && rawRelative.startsWith(".in_use/");
+      if (stat.isDirectory()) {
+        if (marker) fail("nested native process metadata");
+        walk(path); continue;
+      }
+      const relative = protocolPath(rawRelative), required = selected?.get(relative);
+      if (!stat.isFile() || (policy === "retained" || marker) && stat.nlink !== 1 || selected && !required && !marker
         || !Number.isSafeInteger(stat.size) || stat.size < 0
-        || required && (!Number.isSafeInteger(required.size) || required.size < 0 || stat.size !== required.size)) fail("unexpected or changed runtime input");
+        || required && (!Number.isSafeInteger(required.size) || required.size < 0 || stat.size !== required.size)
+        || marker && (stat.size > 256 || (stat.mode & 0o111) !== 0)) fail("unexpected or changed runtime input");
       const mode = (stat.mode & 0o100) === 0 ? "100644" : "100755";
       if (required && mode !== required.mode) fail("runtime executable mode changed");
       const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
       try {
         const opened = fstatSync(fd);
         if (!opened.isFile() || opened.dev !== stat.dev || opened.ino !== stat.ino || opened.size !== stat.size
-          || policy === "retained" && (opened.uid !== owner || opened.nlink !== 1)
+          || policy === "retained" && opened.uid !== owner || (policy === "retained" || marker) && opened.nlink !== 1
           || opened.mode !== stat.mode) fail("runtime input changed during inspection");
+        if (marker) {
+          const buffer = Buffer.alloc(257), count = readSync(fd, buffer, 0, buffer.length, 0);
+          const after = fstatSync(fd);
+          if (count > 256 || count !== stat.size || after.size !== stat.size || after.mode !== stat.mode || after.nlink !== 1)
+            fail("native process metadata changed during inspection");
+          inspectNativeMarker(buffer.subarray(0, count), name);
+          continue;
+        }
         const bytes = readFileSync(fd), digest = sha256(bytes);
         if (bytes.length !== stat.size || required && digest !== required.sha256) fail("runtime input bytes changed");
         inspectBlob?.(relative, bytes);

@@ -144,6 +144,27 @@ the required shared-source environment value; its failed setup output remains
 retained. Integration/E2E and filesystem vulnerability checks are outside that
 ordinary local gate and are not claimed.
 
+### Marker correction implementation checkpoint on 2026-11-19
+
+R-136 has no blocking or should-fix finding at the accepted revision. The
+planned and implementation re-entry gates pass. In the owning branch, the
+reviewed tests first fail against original inspector `d3879e50`: 32 pass and
+11 fail, including both valid-marker binding forms. The corrected source then
+passes all 212 bootstrap, original-runtime, preflight, public-doc and package
+cases with 734 assertions. Strict TypeScript 7.0.2, uncached Go tests, vet,
+linter configuration/run, module consistency, reproducible ZIP, actionlint and
+34 registration cases pass. All owned process outcomes confirm cleanup and
+unchanged inputs. Exact commands, hashes and original outputs are retained under
+`t144-owner-*`; the original failed run remains separate.
+
+Manual documentation-impact review updates the canonical settings guide for the
+marker exception and old-release limits. Root AGENTS.md has no adoption marker,
+so this is the retained manual path. The runtime change is limited to bounded
+installed metadata inspection and reserved Git-path refusal. Source review at
+the committed implementation, publication/CI, actual corrected installs and the
+consumer migration checks still precede cutover. T156 remains open until its
+fresh source review returns; T130 retains release-bound native acceptance.
+
 ### Isolated marker prototype checkpoint on 2026-11-18
 
 The claimed feature tree still has no implementation change. An owned public-source
