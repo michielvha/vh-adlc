@@ -1,7 +1,7 @@
 ---
 status: complete
 branch: feat/remote-gui-adaptive-sizing
-status_description: "Implemented and independently reviewed locally; source publication and installation remain pending."
+status_description: "Implemented, independently reviewed and accepted in owner testing; source publication and installation remain pending."
 issue: null
 goal: "The shared browser fills the active viewer at a readable size and adapts automatically when that viewer changes size."
 covers:
@@ -25,6 +25,14 @@ On 2026-11-18, the owner selected automatic focus-based control, CSS pixels and 
 The work includes request validation, ordering concurrent updates, bounded dimensions, recovery when resizing fails, clipboard focus protection, browser tests and plugin documentation. Private transport, owner authorization and human/agent handoff rules remain in force. There are no host dependency installations or changes to existing sessions. New sessions receive the implementation after the plugin is updated. An older supervisor continues with its original fixed sizing.
 
 Scratch probes established that the installed x11vnc can change its exported dimensions and Chromium accepts narrow native window sizes. Complete viewer behavior remains unverified. The first independent review found one blocking and four should-fix findings, preserved in R-1. The next review found one missing scenario for a newly opened normal Chromium window, preserved in R-2. R-3 independently reviewed the corrected specification with no findings. The owner accepted it on 2026-11-18 and authorized implementation, vh-adlc 0.26.0 for this run and documentation-only pushes to the default branch. The version check now reports matching installed and running versions. Planned verification covers real noVNC, Chromium and Firefox viewers, responsive geometry, input, concurrent viewers, failure recovery and both handoff directions. Acceptance after a clean independent spec review authorizes task planning and local implementation. Merge, release, installation and changes to live sessions require separate authority.
+
+### Owner validation and follow-up
+
+On 2026-11-19, the owner tested the private candidate viewer and confirmed that it resizes automatically and looks good. The owner accepted the resizing outcome and requested that mobile usability be treated as a follow-up. This confirms the observed resizing behavior on the owner's device; it does not establish a complete mobile input experience. Publication, merge, release and installation remain pending.
+
+Before that handoff, a fresh Tailscale viewer passed asset, WebSocket, canvas, harmless marker input, portrait sizing and desktop sizing checks against the reviewed static candidate. One earlier session returned HTTP 503 `viewport-unavailable` and was stopped. Fresh disposable sessions and the handed-over session subsequently resized successfully with the configured tools unchanged. The earlier failure's cause remains unresolved; owner acceptance does not establish that every session starts without a sizing failure.
+
+The mobile gap is keyboard and touch interaction. The current viewer creates a noVNC RFB canvas and focuses it, but provides no phone keyboard control or local text-input bridge (`plugins/remote-gui/internal/proxy/viewer.go:201-207`). The installed noVNC application demonstrates a separate keyboard input element, a keyboard button and input-event forwarding (`app/ui.js`, `showVirtualKeyboard` and `keyInput`); the custom viewer imports the RFB core rather than that application. A follow-up should assess keyboard opening and dismissal, text composition and deletion, touch scrolling, reachable controls and keeping the focused remote field visible above the phone keyboard. Automatically opening the keyboard when a remote textbox is tapped needs a separate focus-detection design and real iPhone Safari and Android Chrome validation. These are proposed follow-up concerns, not implemented behavior or additional criteria for this completed feature.
 
 ### Background
 
