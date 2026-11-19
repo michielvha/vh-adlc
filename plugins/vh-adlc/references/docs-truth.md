@@ -10,8 +10,8 @@ Keep the assessment read-only and use isolated scratch for command output.
 Resolve `.vh-adlc/docs-truth.md` as a regular blob in the assessed commit. Read it and
 validate that it specifies eligible tracked paths, exclusions, a positive default batch size,
 selection and freshness procedures, and source checks. It may point to existing verification
-history. Missing or invalid setup ends the operation with that path and the declarations
-needed to configure it.
+history. Missing or invalid setup ends the operation with that path and the
+[runnable example](../examples/docs-truth/README.md).
 
 Run project checks from a clean caller-owned checkout at that commit or a disposable clone
 with independent Git metadata. Use read-only checks with no write credentials or delivery
