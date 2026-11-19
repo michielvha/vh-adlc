@@ -1,7 +1,7 @@
 import { test } from 'bun:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
@@ -71,6 +71,12 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
             httpCredentials: { username: 'viewer', password: access.access_code, origin: new URL(session.url).origin },
         });
         const page = await context.newPage();
+        async function captureFailure() {
+            const directory = process.env.REMOTE_GUI_ARTIFACT_DIR;
+            if (!directory) return;
+            mkdirSync(directory, { recursive: true });
+            await page.screenshot({ path: join(directory, 'mobile-address-bar.png'), timeout: 3000 }).catch(() => {});
+        }
         let lastSample;
         const focusReplies = [];
         page.on('response', async response => {
@@ -104,7 +110,7 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         const probes = [];
         let addressField;
         for (let attempt = 0; attempt < 3 && !addressField; attempt++) {
-            for (const y of [60, 70, 50, 80, 90]) {
+            for (const [x, y] of [[195, 60], [150, 60], [240, 60], [195, 70], [150, 70], [240, 70], [195, 50], [195, 80], [150, 90], [240, 90]]) {
                 const { status, field } = await page.evaluate(async point => {
                     const reply = await fetch('/__remote_gui/editable', {
                         method: 'POST',
@@ -112,8 +118,8 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
                         body: JSON.stringify(point),
                     });
                     return { status: reply.status, field: reply.ok ? await reply.json() : null };
-                }, { x: 195, y });
-                probes.push([y, status, field?.mode]);
+                }, { x, y });
+                probes.push([x, y, status, field?.mode]);
                 if (field?.mode === 'url') {
                     addressField = field;
                     break;
@@ -121,10 +127,12 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
             }
             if (!addressField) await delay(200);
         }
+        if (!addressField) await captureFailure();
         assert.ok(addressField, 'Chromium did not report a focused address bar: ' + JSON.stringify(probes));
         await page.route('**/__remote_gui/editable', route => route.fulfill({ status: 503 }), { times: 1 });
         await tap(Math.floor(addressField.x + addressField.width / 2), Math.floor(addressField.y + addressField.height / 2));
-        await prompt.waitFor({ timeout: 5500 }).catch(error => {
+        await prompt.waitFor({ timeout: 5500 }).catch(async error => {
+            await captureFailure();
             throw new Error('The address bar prompt did not appear. Focus replies: ' + JSON.stringify(focusReplies.slice(-8)), { cause: error });
         });
         assert.equal(await editorFocused(), false);
