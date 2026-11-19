@@ -15,6 +15,8 @@ invoking investigation never becomes permission to implement a repair.
 1. Identify the requested result and inspect the current repository or artifact.
    Separate the outcome, the actions authorized in the owner's request, and the
    existing task's actual state. A question may need only an answer.
+   For an ambiguous documentation audit, resolve its scope using the request,
+   Git metadata and applicable instructions before opening candidate documents.
 2. Identify persistent code-audit intent before its installer or knowledge call. Inspect only the request,
    local instructions and read-only repository evidence needed to choose the route. For code audit, use
    `scripts/audit/bootstrap.ts --offline` from the audit skill: verified cached binary, validated settings
@@ -91,7 +93,7 @@ with a fresh closure basis. The owner selects scope and effects. Configured
 settings never choose an operation or grant a write.
 
 An ambiguous “audit” or “audit the docs” gets one focused scope question
-before any scan or write. Ask whether the desired result is accumulated docs
+before reading candidate documents, scanning or writing. Ask whether the desired result is accumulated docs
 drift, selected-change docs impact, persistent code audit or factual claim
 review, using the context to keep the question short. An explicit rolling claim
 review follows docs truth. A specifically named project command follows its

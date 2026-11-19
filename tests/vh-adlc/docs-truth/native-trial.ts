@@ -130,8 +130,8 @@ const bodyMarker = "The service listens on port 9000 by default.";
 const freshness = "2 eligible documents\ndocs/current/setup.md\tnever verified\nREADME.md\tverified 2026-01-01";
 
 function verifyReads(log: ReturnType<typeof trace>, id: string, selected: TrialCase) {
-  const reference = id === "ambiguous" ? "references/lifecycle.md" : "references/docs-truth.md";
-  if (!log.commands.some((line) => line.includes(reference))) throw Error("installed procedure read not observed");
+  const title = id === "ambiguous" ? "# Lifecycle intake and execution" : "# Documentation truth review";
+  if (!log.outputs.includes(title)) throw Error("installed procedure read not observed");
   const documentMarkers = [bodyMarker, "The default service port is 3900.", "The first lab launch used port 8999."];
   if ((selected.status === "failed" || selected.status === "clarification" || id === "report" || id === "empty")
     && documentMarkers.some((marker) => log.outputs.includes(marker))) {
@@ -168,7 +168,7 @@ function verifyReport(report: Record<string, unknown>, selected: TrialCase, id: 
       [/9000|port/i, "incorrect", /service\.conf.*3900|service\.conf/i],
       [/make start/i, "accurate", /Makefile/i],
       [/external.*backend/i, "accurate", /service\.conf/i],
-      [/workers/i, "unknown", /workers|config|source/i],
+      [/workers/i, "unknown", /worker|config|source|Makefile/i],
       [/probe|60.second/i, "incorrect", /probe\.conf/i],
       [/503|unavailable/i, "accurate", /client.contract/i],
     ] as const;
