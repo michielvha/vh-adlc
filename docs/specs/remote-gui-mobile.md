@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Proposed mobile interaction; owner scope and device answers, independent spec review and native-keyboard feasibility remain pending."
+status_description: "Three review findings and owner scope, device and input-policy answers remain open; native-keyboard feasibility is unproven."
 issue: null
 goal: "Use a remote-gui browser from a phone with selective first-tap native keyboard input, normal text editing and touch scrolling."
 covers:
@@ -27,13 +27,13 @@ The candidate design uses a session-owned Linux accessibility adapter to publish
 
 This architecture is unproven. Installed accessibility libraries and upstream APIs establish a possible route, not working integration with the sandboxed Chromium or current phone browsers. After acceptance, the first implementation activity is an owned synthetic feasibility probe. It must demonstrate selective first-tap keyboard activation on real current iOS Safari and Android Chrome. Failure stops the work for an owner decision; it never silently enables CDP or substitutes a keyboard toggle.
 
-The draft has no independent spec review or acceptance. No mobile code or device proof exists from this work. Acceptance would authorize the synthetic probe and implementation within the accepted scope if that probe passes. It would not authorize package installation, relaxed privacy boundaries, release, deployment or unrelated browser activity. New sessions would receive the later installed implementation; existing running supervisors keep their original code.
+Independent review R-1 found three should-fix issues: competing viewers' ordinary input, native keyboard-mode proof and security checks across all new routes. The reviewer's model identity was not attested and is recorded as unknown. The draft is not accepted. Owner answers on scope, available devices and competing-viewer control remain pending. No mobile code or device proof exists from this work. Acceptance would authorize the synthetic probe and implementation within the accepted scope if that probe passes. It would not authorize package installation, relaxed privacy boundaries, release, deployment or unrelated browser activity. New sessions would receive the later installed implementation; existing running supervisors keep their original code.
 
 ### Background
 
 At default-branch commit [cdf8956](https://github.com/michielvha/vh-adlc/commit/cdf89564a5d079340922584c83f183ca4ffa8cc2), the viewer imports noVNC's RFB core and connects a canvas. Its local textarea belongs to the Clipboard panel; resize restores canvas focus except while that panel owns focus (`plugins/remote-gui/internal/proxy/viewer.go:30,39-45,118-128`). RFB canvas focus does not itself open an operating-system software keyboard. The installed noVNC 1.5.0 application separately implements a local input bridge and keyboard toggle (`app/ui.js:1439-1596`), which the custom viewer does not load.
 
-Adaptive sizing is separate prerequisite work. Its reviewed implementation at [e2ac2d7](https://github.com/michielvha/vh-adlc/commit/e2ac2d757750d3495a1167dfd5ea29674ad68ca1) and committed state at [417c4c4](https://github.com/michielvha/vh-adlc/commit/417c4c4e61bef22946b5e26e205c68e9ad1e77df) fit the viewer to the visual viewport and resize the owned X11 browser (`plugins/remote-gui/internal/proxy/viewer.go:122-207` at 417c4c4). Those commits do not establish native phone keyboard behavior. The resizing PR must exist before this draft is published; a PR does not establish merge, installation or release.
+Adaptive sizing is separate prerequisite work in [PR 121](https://github.com/michielvha/vh-adlc/pull/121), observed open at [d9849b1](https://github.com/michielvha/vh-adlc/commit/d9849b1be481b5bfea02f7b7e566f33ac3668cf2) on 2026-11-19. Its reviewed implementation at [e2ac2d7](https://github.com/michielvha/vh-adlc/commit/e2ac2d757750d3495a1167dfd5ea29674ad68ca1) and committed state at [417c4c4](https://github.com/michielvha/vh-adlc/commit/417c4c4e61bef22946b5e26e205c68e9ad1e77df) fit the viewer to the visual viewport and resize the owned X11 browser (`plugins/remote-gui/internal/proxy/viewer.go:122-207` at 417c4c4). Those commits do not establish native phone keyboard behavior. The PR is not merged, released or installed. At mobile implementation intake, verify the required adaptive-sizing backend exists in the selected implementation base; otherwise wait for its separately authorized merge. Do not infer its presence from this draft's publication on the default branch.
 
 Human Chromium launches with extensions disabled, and only agent mode adds automation and loopback debugging flags. Launch validation rejects those flags in human mode (`plugins/remote-gui/internal/browser/phase.go:20-58` at cdf8956). Existing X11 helpers handle clipboard, menus and native windows; they do not expose page-editable semantics (`plugins/remote-gui/internal/xclip/xclip.go:1-5`, `menus.go:1-16`). Owner identity and expiry checks precede viewer access (`plugins/remote-gui/internal/proxy/proxy.go:289-315`, `identity.go:17-67`).
 
@@ -149,6 +149,17 @@ None yet; written once the document is planned. The first implementation task mu
 | **B. Stage device evidence** | Draft/probe progress using whichever real device is available first. | The other platform remains an explicit delivery blocker; its evidence cannot be replaced by desktop emulation. |
 
 **Why this is yours:** Only the owner can confirm the devices and testers available. No device model or successful keyboard behavior has been inferred from the resizing walkthrough.
+
+### Q3: Should the most recently focused viewer control all remote input, or should viewers retain simultaneous control?
+
+**Recommendation:** A. Give one focused viewer control of pointer, hardware-keyboard and mobile-editing input together so a second viewer cannot move focus beneath an acknowledged mobile edit.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. One controlling viewer** | The most recently focused viewer controls all remote input; other connected viewers watch until control transfers. | Existing simultaneous pointer/hardware-keyboard control changes, and the implementation must arbitrate the actual RFB input path. |
+| **B. Simultaneous control** | Existing viewers keep sending ordinary pointer and hardware-keyboard input concurrently. | Any competing interaction must cancel or safely finish the bound mobile edit before remote focus changes; this requires proof on the actual RFB path. |
+
+**Why this is yours:** This changes what multiple connected people or devices can do. The current sizing controller only arbitrates viewport requests; it does not already arbitrate ordinary pointer or hardware-keyboard events. R-1/F-01 remains unresolved until this choice and the corresponding proof are incorporated in one revision with the other review findings.
 
 ## Review Log
 
