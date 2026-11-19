@@ -126,6 +126,19 @@ verification rungs, including 48 repository checks with zero skips. No product
 integration or browser rung applies. A normal revert of real D in an owned
 rehearsal restores C's entire tree exactly; the separately retained rollback
 restores the legacy companion and matching original component together.
+The server merge independently passes the same 92 consumer tests/752 assertions
+and all declared applicable rungs, including 48 repository checks with no skips.
+Its fresh complete scan still accounts for 875 documents, twelve units, 845
+findings and 63 suppressions; original JSON/console and normalized sets agree.
+The post-merge watch exits 0: GitVersion tags `5.122.6`, no satellite sync is
+selected, and no production docs sweep is dispatched. The actual weekly workflow
+is active with ID `299670320` at `.github/workflows/docs-drift-audit.yml`.
+Read-only native queries confirm all six existing audit PRs remain unchanged,
+both terminal trial receipts remain, and no production lease or receipt was
+created. Originals are `t145-gates-*-aa3980cc`,
+`t146-merged-corpus-results/result.json`, `t146-postmerge-preservation.json`
+and `t146-cutover-merge-watch.log`.
+
 Original artifacts are `t145-gates-*-f18f2627`, `t145-gates-*-234dd4ef`,
 `t145-adopted-preflight-guard-proof.json`, `t146-actual-D-rollback.json` and
 `t146-merged-preflight.json` in the local review archive. Private report bodies
