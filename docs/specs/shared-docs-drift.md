@@ -93,7 +93,8 @@ scoped Opus review are recorded below. T157 adds the missing ordinary-caller
 outcome proof without changing production code. All six exact-head checks pass,
 PR #120 is merged, and published 0.26.1 passes ordinary Codex/Claude fresh installs
 and upgrades plus an active registered Claude session. Stackweaver remains staged
-until the new hosted trial and final paired migration proof pass. GUI/phone and
+while final paired migration and activation checks remain. The corrected hosted
+trial has passed. GUI/phone and
 native Copilot execution stay deferred or unclaimed.
 Other agent migrations stay on their separate roadmap.
 
@@ -153,12 +154,34 @@ separate reverse-component mutation/restore and the exact refusal/argument recor
 No shared runtime, permission, identity, client or namespace change is made.
 
 [PR #1158](https://github.com/michielvha/stackweaver/pull/1158) merges that
-correction as `92f1c685f6b39abf0af83a5d63749f4a3492861a`. A fresh native run
-`44486848125` uses this source; its outcome remains pending here. T130 retains
-native success, fresh C/P parity, activation and rollback gates. The proposed
-activation settings derive from actual committed C and change only its mode,
-preserving linked selectors. Existing failed and earlier successful observations
-keep their original targets.
+correction as `92f1c685f6b39abf0af83a5d63749f4a3492861a`. Fresh native run
+`44486848125` attempt 1 passes at that source, including Secret Scan. All 71
+original exported files verify; Claude Code 2.1.325 returns actual Opus 5.5 worker
+and reviewer identities in distinct contexts, with confirmed cleanup. The one
+owned synthetic draft, PR #1159, is closed unmerged after the executor stops.
+Its exact candidate tip is deleted with a lease; old and new terminal receipts
+remain, and no lease is pending. No real backlog write or production sweep occurs.
+
+The frozen staged candidate is `d809d0c6a94f0eddc56e286e162ee7a9ecd81d29`.
+Current complete protection accounts for 4,910 source blobs and 875 documents
+without diagnostics. Original/current/installed collection agrees across all
+12 detectors, 845 findings and 63 suppressions, with identical original JSON,
+normalized console, stale counts and unchanged caller. The exact six-file
+proposal passes 17 routing cases/107 assertions; its missing checklist refuses
+production. A normal revert restores C's entire tree and all protected paths.
+A separate ordinary combined revert restores the original legacy companion and
+M1 binding together, preserving every other candidate path; the original helper
+then selects that committed definition through the existing matching ordinary
+marker-free Codex install (291 files), without roles or effects.
+
+The C/P target is `bc310bf1ef6fbac6e5af3d5b181d3bceb9bb9076eb8e7a9af35ccdea79758c36`.
+Its settings derive from actual committed C and change only the mode, preserving
+linked selectors. Current native-entry evidence retains original M1 interactive
+sources and component bindings, verifies their unchanged entry digests and real
+current publisher, and adds the new actual M2 hosted trial. Earlier observations
+are never retargeted as M2 executions. Final paired review, actual checklist/D,
+final consumer gates and publication remain open under T130/T155. GUI/phone and
+native Copilot remain deferred or unclaimed.
 
 ### Active ordinary Claude cache finding on 2026-11-18
 
