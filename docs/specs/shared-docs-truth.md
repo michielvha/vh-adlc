@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "The owner accepted the spec after clean review R-4. Implementation is claimed."
+status_description: "The owner accepted the spec after clean review R-4. The shared package is reviewed for in-progress publication. Published installs and Stackweaver cutover remain open."
 issue: https://github.com/michielvha/vh-adlc/issues/127
 branch: feat/shared-docs-truth
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
@@ -95,7 +95,8 @@ Review the exact candidate before publication and identify which criteria need p
 ## Acceptance Criteria
 
 - [ ] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
-- [ ] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+- [x] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+      Evidence: Independent R-7 inspected the exact candidate Codex evidence for source-backed claims, unsupported replacement, retained product contract, incomplete report and preserved source, refs and index.
 - [ ] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
 - [ ] AC-04: The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
 
@@ -136,6 +137,7 @@ None.
 | 2026-11-19 | R-4 | spec | `f06f8906ae4801b062c29957269b42f375ef442a` | n/a | n/a | accepted by owner |
 | 2026-11-19 | R-5 | implementation | `18d20daf80d86d3f3c7c604fd0fe6c879b77ae58` | unknown | procedural | One blocker in fixture isolation and four should-fix findings. |
 | 2026-11-19 | R-6 | implementation | `3698d2472244c6a13a6b0a2abdfd12cfaf50213e` | unknown | procedural | One blocker and two should-fix findings in native receipt checks. |
+| 2026-11-19 | R-7 | implementation | `8cda536e00bc5752fd17de860b05d2347b8fab9f` | unknown | procedural | No findings. AC-02 met. Released and consumer checks remain open. |
 
 ### R-1
 
@@ -362,6 +364,25 @@ SEVERITY: should-fix
 WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:85-119,121-159`, AC-01 and AC-02 proof
 EVIDENCE: The R-5 F-02 remedy adds checks for trace markers, freshness output and selection reasons. A generic failed response still passes a negative case without evidence of the intended refusal. The partial case need not show that the selector actually returned a path and exited with failure. In a sized full review, the six setup findings alone still pass even if all README claims are missing. The meta and historical cases accept an empty findings array.
 PROPOSAL: For each required refusal, attest the input and diagnostic that distinguish it from a generic failure. Assert the expected findings and evidence for every document in the sized, meta and historical cases.
+
+### R-7
+
+TARGET: 8cda536e00bc5752fd17de860b05d2347b8fab9f
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: not verified
+EVIDENCE: At 8cda536e, the focused Bun suite passed 74 tests and 337 assertions, and the feature document lint passed. On the identical 18d20daf package fingerprint, retained Codex trials show correct default and sized selection, meta and freshness modes, partial-inventory refusal, path replacement refusal and representative invalid-input refusals. Other modes and refusals were observed at the earlier 04d58a64 fingerprint. The entire accepted selection and intake matrix has not been observed on the exact package.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The retained exact-package Codex transcripts show the cited port and timeout corrections, accurate command and backend claims, the unknown worker count, and the HTTP 500 versus 503 product issue. The corrected runner accepted the targeted unsupported-retention flag. The paused native report identified the completed setup document and unfinished README, and the freshness trace shows no document-body reads. The completed trials preserved refs, HEAD, index and project files. The older regex rejections and forced cancellation remain separate diagnostic evidence.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 records operator-observed selector parity and rollback for Stackweaver 72e48ed5 and 22e5b96f. This review did not inspect private consumer files or observe native forwarding, authorized writes, recovery or cutover.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: I inspected both native local-catalog installation receipts and the Claude discovery inventory. The 304-file component fingerprint at 8cda536e matches the 18d20daf candidate receipt. Codex executed the installed procedure. Claude model execution remains pending after the reported HTTP 429 responses. Actual published installs, upgrades and the post-adoption record remain open.
 
 ## Sources
 
