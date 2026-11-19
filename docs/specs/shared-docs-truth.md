@@ -94,8 +94,8 @@ Review the exact candidate before publication and identify which criteria need p
 
 ## Acceptance Criteria
 
-- [ ] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
-      Evidence: R-10 found an early candidate read before the previous lifecycle-only guard was loaded. The generic entry now exposes the rule at discovery. Retain the R-9 and R-10 receipts at their original revisions.
+- [x] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+      Evidence: R-11 observed both exact installed intake cases at 0a07a791. The generic entry is read before the lifecycle reference, and the ambiguous request opens no candidate docs. R-10 retains its prior failed receipt.
 - [x] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
       Evidence: Independent R-7 inspected the exact candidate Codex evidence for source-backed claims, unsupported replacement, retained product contract, incomplete report and preserved source, refs and index.
 - [ ] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
@@ -123,6 +123,8 @@ Review the exact candidate before publication and identify which criteria need p
 - [ ] T4 Stackweaver's `.claude/commands/docs-truth.md`, `.vh-adlc/docs-truth.md` and `tests/agent-docs-truth/native-trial.ts` - prepare the unpublished routing and consumer proof, including legacy comparison, authorized writes, recovery and rollback in disposable clones (AC-03)
       Evidence: Operator trial compared Stackweaver baseline `72e48ed5` and local adapter `22e5b96f`. Default batch paths, reasons and the full freshness output matched, the selector and ledger-related blobs stayed identical, and rollback and reapplication reproduced both trees. The local hook passed six checks. The native command's model-driven write and recovery behavior needs its own proof before cutover.
 
+For the in-progress release, the R-11 exact source and 304-file package digest bind the generic entry too. The R-11 covers finding stays open for the completion review. A change to package bytes before merge needs a fresh installed-payload check.
+
 ## Open Questions
 
 None.
@@ -142,6 +144,7 @@ None.
 | 2026-11-19 | R-8 | implementation | `694458f7c6550ac630b09f4eef853f40ba4f7d26` | unknown | procedural | One blocker and one should-fix finding in generic intake proof. |
 | 2026-11-19 | R-9 | implementation | `bd1f6d0490254610fb17313fe053df4aadea49cc` | unknown | procedural | No findings. Shared behavior verified. Released and consumer checks remain open. |
 | 2026-11-19 | R-10 | implementation | `310a3b1146caa84a2c7f18526b3a383b0dcce5eb` | unknown | procedural | Adjacent checks pass. One blocker in early ambiguous intake. |
+| 2026-11-19 | R-11 | implementation | `a75063badddfcc8521a5896bf5f0ed4e3adbd5ac` | unknown | procedural | Shared behavior met. One should-fix on review coverage. |
 
 ### R-1
 
@@ -465,6 +468,32 @@ SEVERITY: blocking
 WHERE: `plugins/vh-adlc/skills/vh-adlc/SKILL.md:8-17`, `plugins/vh-adlc/references/lifecycle.md:15-21,95-100`, AC-01 clarification proof
 EVIDENCE: The R-10 wording restores the adjacent docs-drift assertions and retains the clarification rule. In the exact installed Codex trial, the generic entry led to a single shell command that opened both the lifecycle reference and the synthetic README. The read occurred before the model could apply the rule in the reference. The runner correctly refused the trial despite unchanged Git state and verified package identity.
 PROPOSAL: Surface the clarification-before-document-read rule in the generic skill entry so the model sees it before loading the lifecycle reference. Retain the lifecycle rule and the failed receipt, then rerun the installed ambiguity case.
+
+### R-11
+
+TARGET: a75063badddfcc8521a5896bf5f0ed4e3adbd5ac
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: met
+EVIDENCE: At a75063ba, the focused discovery and docs-drift authority suites passed 12 tests and 124 assertions, and feature lint passed. The 0a07a791 local-install receipt matches all 304 shipped files at a75063ba. Its Codex ambiguity trace read the revised generic entry before the lifecycle reference and asked for scope without opening candidate documents or running the selector. The explicit request selected docs truth and verified source. Earlier 18d20daf direct-mode and refusal receipts remain applicable to the unchanged direct skill, procedure and fixture. The failed 310a3b11 receipt remains attributed to the earlier package.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The matching 0a07a791 package's explicit intake reviewed committed source and preserved HEAD, refs, index and project files. R-7's 18d20daf direct-mode receipts establish the unsupported-replacement flag, product issue, full and targeted coverage, unfinished-work report, freshness-only read boundary. The current change leaves the direct procedure and fixture unchanged.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 records operator-observed selector parity and rollback for Stackweaver 72e48ed5 and 22e5b96f. This review did not inspect private consumer files or observe native forwarding, authorized writes, recovery or cutover.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: I inspected the Codex and Claude local-catalog install receipts and Claude discovery output. The 0a07a791 package fingerprint matches a75063ba, and Codex executed both intake cases. Ordinary published installs, upgrades, Claude claim review and adoption documentation remain open.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Feature `covers` (lines 7-23), `plugins/vh-adlc/skills/vh-adlc/SKILL.md:1-16`, AC-01 clarification proof
+EVIDENCE: The R-10 repair puts the clarification guard in the shipped generic skill before the lifecycle reference loads. That file is absent from `covers`. The covered discovery test can catch removal during verification, but a later change to the generic entry can leave the feature's recorded review fresh. The pinned feature-document standard requires coverage for paths whose changes can affect the feature.
+PROPOSAL: Add the generic skill file to `covers` through the feature's spec revision and review process.
 
 ## Sources
 
