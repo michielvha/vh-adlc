@@ -157,6 +157,7 @@ None. The owner accepted keyboard/touch scope first, both platform targets and o
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-19 | R-1 | spec | `363a6140f6c2a1383da8d9c1fee5f2d3c36fa0fa` | unknown | procedural | Three should-fix findings preserved; applied in the subsequent owner-directed revision, awaiting a new independent review. |
+| 2026-11-19 | R-2 | spec | `3fa0bae68d8c1d25d9255c2d90cd1ec0b9d06886` | unknown | procedural | No findings; model identity was not attested. |
 
 ### R-1
 
@@ -180,6 +181,10 @@ SEVERITY: should-fix
 WHERE: Design / Input and geometry boundaries (metadata and input access checks); Acceptance Criteria AC-05; Test Plan AC-05, AC-06 and AC-08
 EVIDENCE: Design line 81 applies session identity, origin, method, expiry and process ownership checks to both metadata and input access, and AC-05 covers all new routes. S5 explicitly exercises actual metadata routes with adversarial identities and headers, but does not exercise the actual input/binding routes under those conditions or include wrong-method requests. S6 uses deterministic adapter/transport fixtures for delivery races. An implementation that protects metadata correctly but omits a required check on an input or binding endpoint could therefore pass the specified security procedures.
 PROPOSAL: Apply the actual-route security matrix to every metadata, binding, input and controller endpoint the probe introduces, including wrong methods, wrong origins, forged ingress headers, foreign identities, expired sessions and changed process ownership. Assert both refusal and zero remote input or binding mutation for each rejected request.
+
+### R-2
+
+NO FINDINGS
 
 ## Sources
 
