@@ -187,6 +187,7 @@ None. The owner accepted keyboard/touch scope first, both platform targets and o
 | 2026-11-19 | R-2 | spec | `3fa0bae68d8c1d25d9255c2d90cd1ec0b9d06886` | unknown | procedural | No findings; model identity was not attested. |
 | 2026-11-19 | R-2 | spec | `3fa0bae68d8c1d25d9255c2d90cd1ec0b9d06886` | n/a | n/a | accepted by owner |
 | 2026-11-19 | R-3 | spec | `0708e3cb33dd1fe1e85f4e8da74b598ee32f96a0` | unknown | procedural | No findings after covered-source drift; model identity was not attested. |
+| 2026-11-19 | R-4 | spec | `d3fad7181862b2bee55f7cb981745b8057333b50` | gpt-6.2-sol | procedural | One blocking finding and two should-fix findings. Independent synthetic mode probe confirmed. |
 
 ### R-1
 
@@ -218,6 +219,29 @@ NO FINDINGS
 ### R-3
 
 NO FINDINGS
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context / First feasibility run, Design / Metadata, privacy and viewport behavior, Test Plan / AC-05 Scenario S5
+EVIDENCE: At d3fad718, Design permits the verified private helper to receive the raw Chromium attribute map over AT-SPI D-Bus. S5 requires that the raw reply and unrelated attributes never appear in IPC. The allowed D-Bus reply is IPC. The reviewed fixture calls GetAttributes, confirms that a synthetic page-authored attribute arrived, and then emits only the selected keyboard type. A correct implementation necessarily fails the unqualified IPC rule.
+PROPOSAL: Name the one allowed inbound Chromium-to-helper D-Bus exchange in S5. Require that the raw response and unrelated attributes never leave the helper, appear on other channels, or reach retained output, and verify the inbound recipient is the verified session helper.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / First feasibility run, Design / Metadata, privacy and viewport behavior, Test Plan / AC-05 Scenario S5
+EVIDENCE: Design limits GetAttributes to verified eligible controls whose role and state do not identify the required keyboard mode. S5 says to allow it for verified eligible controls and checks only the emitted result. An implementation that reads the full map for every eligible control would pass those checks even when safe metadata already supplies the mode. The reviewed fixture demonstrates a multiline control that can be classified without the map.
+PROPOSAL: Add a call-level assertion that GetAttributes is absent for an eligible control with sufficient role and state. Keep the synthetic unrelated-attribute check for a verified eligible control that actually needs the lookup.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / First feasibility run, Design / Reuse existing noVNC capabilities first, Design / Input ownership and field binding, Test Plan / AC-09 Scenario U9
+EVIDENCE: Design permits the smallest enforcing adapter if x11vnc cannot supply trusted client attribution or a transfer barrier. U9 requires proving native client attribution and a synchronous disable, drain and re-enable barrier without saying how that requirement changes when the native evaluation fails. Context records that the permission command leaves a held button down. A reviewer could read U9 as rejecting an enforcing adapter that proves the full transfer without relying on native client IDs.
+PROPOSAL: Require the native evaluation and its recorded result in every case. Require native client attribution where the chosen implementation relies on it, and test the complete transfer barrier through whichever enforcement path is delivered.
 
 ## Sources
 
