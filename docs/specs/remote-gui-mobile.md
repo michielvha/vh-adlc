@@ -48,7 +48,13 @@ The same synthetic HTTPS viewer can exercise both phone browsers. On iPhone, an 
 
 Xcode 27.0 ran `testSelectiveFirstTapOpensNativeKeyboard` on a wirelessly paired iPhone 15 Pro Max with iOS 27.2.1. XCTest reported one pass, zero failures and zero skips. In Safari, the keyboard started closed and stayed closed after the plain-area tap. It appeared after the first editable-area tap. The probe uses noVNC 1.5.0's stock gesture recognizer and focuses a real local input from the one-tap callback.
 
-The [reproducible fixture](../../tests/remote-gui/mobile-feasibility/keyboard-gesture/README.md) uses fixed hit regions on a synthetic canvas. It establishes the iPhone's native keyboard opening mechanism. It does not exercise live Chromium geometry, remote caret placement, typing or RFB controller transfer. The full T1 gate and AC-01 remain open. ADB reported no connected Android test device.
+The [reproducible fixture](../../tests/remote-gui/mobile-feasibility/keyboard-gesture/README.md) uses fixed hit regions on a synthetic canvas. It establishes the iPhone's native keyboard opening mechanism. It does not exercise live Chromium geometry, remote caret placement, typing or RFB controller transfer. The full T1 gate and AC-01 remain open.
+
+### Physical Android gesture probe
+
+ADB ran the same synthetic canvas and noVNC 1.5.0 gesture module over USB on a physical KB2003 running Android 12 and Chrome 146.0.7680.178. The temporary ADB reverse connection served matching fixture files. Android's input-method service reported the keyboard closed at the start and after one plain-area tap, then shown after the first editable-area tap. The window manager separately reported a visible IME inset. The runner removed its reverse mapping. One replay stopped when its ADB server exited before the taps. The saved runner repeated both assertions through the Mac's main ADB server.
+
+These two phone probes establish native keyboard opening for the synthetic regions on the tested devices. Current Android coverage, live remote field targeting, remote caret placement, typing and controller transfer still need evidence before T1 can pass.
 
 ### Resizing prerequisite after merge
 
