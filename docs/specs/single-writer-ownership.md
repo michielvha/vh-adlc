@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "The feature is claimed on feat/single-writer-ownership. The first task is the two-clone regression."
+status_description: "The reservation implementation passes local regression checks. Installed session validation remains open."
 issue: null
 branch: feat/single-writer-ownership
 goal: "Two sessions using vh-adlc cannot accidentally start or resume the same feature as its writer."
@@ -281,11 +281,13 @@ binary continues to supply the existing lifecycle gates.
 
 ## Acceptance Criteria
 
-- [ ] AC-10: Two sessions starting the same feature through vh-adlc in separate clones produce one reservation. The other session stops before feature writes and gets the current writer and work location. Separate items can proceed.
+- [x] AC-10: Two sessions starting the same feature through vh-adlc in separate clones produce one reservation. The other session stops before feature writes and gets the current writer and work location. Separate items can proceed.
+      Evidence: `bun test tests/vh-adlc/ownership` and the related plugin suite at `de1aebaa`. Two independent clones using the actual entry command raced one Git ref, one won, and the losing checkout, index and local refs were unchanged. New spec paths and separate issues passed the same disposable-remote checks.
 - [ ] AC-11: Each feature-writing entry resolves the same item from its issue or spec, allows the current writer back in, and holds conflicting or unverified writers before feature writes. Read-only review stays available. Normal editing and tests require no reservation checks.
 - [ ] AC-12: An explicit handoff transfers the reservation once after the owner stops the previous feature work and keeps it stopped until transfer is verified. The incoming writer can continue from the preserved work. The old session sees the transfer at its next vh-adlc entry. Idle or quota-limited sessions keep their reservation.
 - [ ] AC-13: Adoption holds unresolved existing claims or setup, preserves the reservation history across rollback and keeps coordination changes out of branch cleanup and product releases. Coordination updates require authorization for the reserved ref and grant no source or tracker publication permission.
-- [ ] AC-14: A conflict or a transfer message identifies the current writer and gives its host and branch or spec. Absolute checkout paths appear only when resolved locally. The shared Git history and remote diagnostics do not expose raw session IDs or absolute checkout paths.
+- [x] AC-14: A conflict or a transfer message identifies the current writer and gives its host and branch or spec. Absolute checkout paths appear only when resolved locally. The shared Git history and remote diagnostics do not expose raw session IDs or absolute checkout paths.
+      Evidence: `bun test tests/vh-adlc/ownership/handoff.test.ts` at `de1aebaa`. Conflict and transfer records named the writer, host and spec. Only the matching local checkout resolved an absolute path. Every fixture commit in the reservation history and the remote diagnostic lacked the planted raw session IDs and local path.
 
 ## Test Plan
 
@@ -314,6 +316,7 @@ binary continues to supply the existing lifecycle gates.
 - [x] T7 `plugins/vh-adlc/references/{authority,branches,lifecycle,loop,loop-settings}.md`, `docs/user-guides/workflows.md`, and `docs/{reference/compatibility,get-started/installation}.md` - document one-time opt-in, the writer check, handoff, diagnostics, supported clients and rollback against the implemented commands. Verify each documented procedure on a disposable repository and run `bun test tests/vh-adlc` (AC-11, AC-12, AC-13, AC-14).
       Evidence: The ownership, direct-route compatibility and plugin package checks passed all 93 tests. The documented initialization, adoption pause, entry, handoff, issue recovery and legacy enrollment were exercised on disposable repositories by the ownership fixtures.
 - [ ] T8 `tests/vh-adlc/ownership/native.test.ts`, the vh-adlc plugin manifests and both marketplace catalogs - install the exact candidate in isolated Codex and Claude Code profiles. Prove resume after restart, competing sessions, mixed markers and supported handoff behavior against disposable repositories, retaining native evidence. Run `bun test tests/vh-adlc` at the candidate. Keep Claude evidence pending until its use is authorized (AC-10, AC-11, AC-12, AC-13).
+      Evidence: The related suite passed 348 tests at `de1aebaa`. Codex CLI 0.167.2 installed the exact catalog package with matching bytes and file modes, exposed all six feature routes through native discovery, and used the installed helper to initialize a disposable remote. The isolated profile lacked a test credential for conversation scenarios. Claude Code was not started. T8 remains open, and these observations do not meet the compound native validation criteria.
 
 ## Open Questions
 
