@@ -228,31 +228,33 @@ those capabilities.
 
 ## Shared documentation drift
 
-Plugin 0.26.0 packages `vh-adlc-docs-drift`, strict consumer settings,
+Plugin 0.26.1 packages `vh-adlc-docs-drift`, strict consumer settings,
 source-accounted collection, selected correction/resolution preparation and
-native publication/recovery helpers. Release, native execution and consumer
-adoption retain separate evidence. The [feature document](../specs/shared-docs-drift.md)
-tracks exact sources, retained failures and the remaining migration gates.
+native publication/recovery helpers. Stackweaver adopts the published workflow
+through [migration #1160](https://github.com/michielvha/stackweaver/pull/1160).
+The [feature document](../specs/shared-docs-drift.md) records exact sources,
+retained failures and lifecycle completion separately from adoption.
 
-The setup reference lists implemented native client adapters. That configuration
-list is not a live backend-verification claim. Native Copilot execution is
-unclaimed for 0.26.0; Stackweaver selects Claude for every configured profile.
+The setup reference lists implemented native client adapters. That list does
+not establish live backend verification. Stackweaver selects Claude for every
+configured profile; native Copilot execution remains unclaimed.
 
-| Surface or capability | Current evidence |
+| Surface or capability | Observed evidence |
 | --- | --- |
-| Local shared source and owned Git/API fixtures | Exact-feature-head CI passes collection, protection, payload, recovery, resume, discovery and packaged command checks. Local fixtures remain labelled synthetic. |
-| Claude Code Opus 5.5 source review | R-130 returns no blocking or should-fix finding; its summary nit is corrected. All seven composite feature criteria remain unverified pending complete migration evidence. |
-| Actual Codex and Claude marketplace fresh installs/upgrades | Passed for plugin 0.26.0 at published source `18388bde`; all 291 payload files match in each of the four ordinary install paths. Earlier operations keep their original evidence scope. |
-| Copilot marketplace installation and native worker/reviewer execution | Unclaimed for this release. No new Copilot credential or backend operation is required by Stackweaver's Claude-only configuration. |
-| Actual Claude native worker/reviewer identities | Both configured interactive intake profiles pass synthetic repair preparation and independent verification through actual Claude Code 2.1.326, with separate Opus 5.5 contexts and installed skill discovery. Neither trial makes a real tracker write. Actual forwarded-command activation stays pending. |
-| Actual unattended hosted advisory and subsequent read-only history check | Pending. Rehearsal `44305915096` proves cold setup and synthetic native preparation/verification, not real publication or adopted hosted execution. |
-| Stackweaver paired source/scanner parity, operator originals, cutover and rollback | Preliminary paired review, installed checks and full-corpus parity are recorded. Real bounded bot publication, final released C/D review, activation and rollback stay pending; legacy publishing remains active. |
-| Codex desktop, VS Code Local and other GUI/phone entry | Owner-deferred for this operation. No live GUI/phone behavior is claimed. |
+| Local shared source and owned Git/API fixtures | Exact-source CI passes collection, protection, payload, recovery, resume, discovery and packaged command checks. Fixtures remain labelled synthetic. |
+| Independent Claude Code Opus 5.5 paired source review | Final C/P review r21 has no blocking or should-fix findings; both small follow-ups are addressed. Canonical criterion records and the lifecycle gate are tracked in the feature document. |
+| Actual Codex and Claude marketplace fresh installs/upgrades | All four ordinary paths pass for 0.26.1 at published source `dae76bf9`, matching all 291 files, modes and component fingerprint. The earlier 0.26.0 observations keep their original attribution. |
+| Active ordinary Claude installation | A real registered Claude Code 2.1.326 Opus 5.5 session loads 0.26.1 with its native process marker present. The checker matches all shipped files and preserves foreign metadata and notification settings. The earlier 0.26.0 active-cache refusal remains a recorded release limitation. |
+| Actual Claude native interactive worker/reviewer identities | Both intake profiles have passing synthetic preparation/verification observations at original 0.26.0 consumer `ded677aa`, with separate Opus 5.5 contexts. Their entry digests remain unchanged; the final checklist validates their original sources without relabelling them as 0.26.1 executions. |
+| Actual unattended installed synthetic publication | Actions run `44486848125` at consumer `92f1c685` passes with ordinary 0.26.1 installation, native Claude Code 2.1.325, distinct Opus 5.5 contexts and real owned bot publication. Its draft PR is closed unmerged after stopped execution; both terminal trial receipts remain. This does not establish a production weekly sweep. |
+| Stackweaver parity, cutover and rollback | Complete 875-document/twelve-unit parity and protection checks pass at staged C. The actual D and merged default branch pass installed preflight. The final feature passes 92 consumer tests and all 48 repository checks without skips; a real-D revert restores the whole staged tree. Local scanners, rules, schedule, accounts, credentials and notification routing are preserved. |
+| Copilot marketplace/native execution | Unclaimed for this operation. The named Copilot intake profile selects the authorized Claude backend. |
+| Codex desktop, VS Code Local and other GUI/phone entry | Owner-deferred. No live GUI/phone behavior is claimed. |
+| First production weekly sweep | Unobserved; the migration dispatches no real-backlog sweep. |
 
-Runtime selection checks the ordinary installed payload against the consumer's
-released component binding and flat preflight checklist. The checklist records
-operator/reviewer evidence for the staged candidate and its reviewed activation.
-Before cutover, the operator verifies original installed/native/review artifacts
-and their exact targets, models and outcomes. Missing or stale originals leave
-adoption pending. Follow the [setup and adoption reference](../../plugins/vh-adlc/references/docs-drift-settings.md)
+The ordinary installed payload must match the consumer's released component
+binding and flat checklist before production execution. The checklist records
+operator/reviewer attestations for C and the reviewed activation; it is not an
+OS-enforced trust boundary. Missing or stale original evidence blocks adoption.
+Follow the [setup and adoption reference](../../plugins/vh-adlc/references/docs-drift-settings.md)
 and [publication/recovery limits](../../plugins/vh-adlc/references/docs-drift-review.md).
