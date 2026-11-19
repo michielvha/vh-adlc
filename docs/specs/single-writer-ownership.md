@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The owner decided the R-1 questions. Coverage and the test plan address the R-2 and R-3 findings. The draft awaits a fresh review before implementation."
+status_description: "R-4 found no issues in the revised baseline. The draft awaits owner acceptance before implementation."
 issue: null
 goal: "One canonical repository work item has one verified agent writer across clones, worktrees and supported hosts, with an explicit, preserved handoff."
 covers:
@@ -328,6 +328,7 @@ rollback (Q3A), and explicit authority initialization with no automatic reset (Q
 | 2026-11-19 | R-1 | spec | `7e7ebe74c28f4071f20f3d963b2e54a6a24418c3` | gpt-6.1-sol | procedural | Two blocking and five should-fix findings; native failure refusal and ownership transitions need revision. |
 | 2026-11-19 | R-2 | spec | `c13b42da1e2bcf8ff80150320dc42a45b7ba56ad` | gpt-6.1-sol | procedural | Three should-fix findings and one nit on distinct native failures, release publication checks, cross-platform packaging and evidence references. |
 | 2026-11-19 | R-3 | spec | `b7fc9a58858df974f1959a805adb6b1f0a8da8c9` | gpt-6.1-sol | procedural | Two should-fix findings on branch cleanup coverage and recovering an admitted action. |
+| 2026-11-19 | R-4 | spec | `13b62cefb0cd4eff6388f4a9eb328f835172bff6` | gpt-6.1-sol | procedural | NO FINDINGS. |
 
 ### R-1
 
@@ -432,6 +433,10 @@ SEVERITY: should-fix
 WHERE: Context, Owner summary, admission and drain guarantee; Design D2, ambiguous updates; Design D3, action IDs and controller restart; Design D4, uncertain outcomes and replay; Design D5, outstanding records during recovery; AC-03, AC-04; Test Plan, AC-03, AC-04, AC-07, AC-08.
 EVIDENCE: D3:195-204 requires action registration, prohibits launching a second process for the same action after an ambiguous response, and preserves outstanding activity across controller restart. The proof plan loses responses during acquisition and initialization, replays a former mutator after transfer, and tests controller unavailability. It does not retry an already launched action while its generation remains active or restart the controller with that action unresolved. A controller that launches the action again, or forgets it during restart and prematurely permits finalization, can pass the stated scenarios.
 PROPOSAL: Add deterministic response-loss and controller-restart scenarios around an admitted action. Assert at most one launch/effect for its action ID and hold release or transfer until the original activity and external outcome are verified settled.
+
+### R-4
+
+NO FINDINGS
 
 ## Sources
 
