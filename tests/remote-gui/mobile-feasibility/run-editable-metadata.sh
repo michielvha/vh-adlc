@@ -56,4 +56,9 @@ AT_SPI_BUS_ADDRESS="$bus_address" DBUS_SESSION_BUS_ADDRESS="$bus_address" \
   /usr/libexec/at-spi2-registryd >"$work/registry.log" 2>&1 &
 registry=$!
 wait_for_bus_name "$registry" org.a11y.atspi.Registry --address "$bus_address"
-/usr/bin/python3 "$here/editable-metadata.py" "$work" >"$work/observed.json" 2>"$work/probe.stderr"
+case "${REMOTE_GUI_METADATA_PROBE:-chromium}" in
+  chromium) probe=editable-metadata.py ;;
+  firefox) probe=firefox-editable-probe.py ;;
+  *) printf 'Unknown metadata probe\n' >&2; exit 2 ;;
+esac
+/usr/bin/python3 "$here/$probe" "$work" >"$work/observed.json" 2>"$work/probe.stderr"
