@@ -115,6 +115,7 @@ Review the exact candidate before publication and identify which criteria need p
 - [ ] T2 `plugins/vh-adlc/examples/docs-truth/` and `tests/vh-adlc/docs-truth/` - a runnable fixture covers selected paths, complete and partial selection, and the expected evidence and verdicts without writing the assessed checkout (AC-01, AC-02)
       Evidence: The example and selector are implemented locally. The selector fixture passes ordering, freshness, committed inputs, invalid arguments and unavailable history checks. Native incomplete-batch and claim checks remain open.
 - [ ] T3 `tests/vh-adlc/docs-truth/native-trial.ts` and compatibility and marketplace guides - run the committed shared fixture through both candidate catalog paths and retain the exact package, native discovery and report transcripts (AC-01, AC-02, AC-04)
+      Evidence: The exact local candidate at `87c076a8` installed through both native marketplace catalogs in isolated Codex CLI 0.167.2 and Claude Code 2.1.326 profiles. Both discovered `vh-adlc-docs-truth` and matched all 304 package files and modes. The combined package and selector checks passed 77 tests and 422 assertions. The committed rerun, native claim report, published installs and upgrade checks remain open.
 - [ ] T4 Stackweaver's `.claude/commands/docs-truth.md`, `.vh-adlc/docs-truth.md` and `tests/agent-docs-truth/native-trial.ts` - prepare the unpublished routing and consumer proof, including legacy comparison, authorized writes, recovery and rollback in disposable clones (AC-03)
 
 ## Open Questions
