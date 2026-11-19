@@ -19,6 +19,22 @@ node tests/remote-gui/mobile-feasibility/focus-race.cjs --during-key
 
 Each command starts its own loopback session, confirms the first key reached A, then checks where a second key goes. The page moves focus after the acknowledgement in the first scenario. In the second, the page moves focus in the keydown handler. With unrestricted RFB key delivery, both runs should report `F1: global RFB input reached B after the binding acknowledged A` and exit 1. An earlier setup or timeout error is not that result.
 
+### x11vnc controller transfer
+
+Run each mode on a new Xvfb display. These commands use the configured x11vnc binary, libX11, libXtst and Python's `cryptography` package for the fixture's RFB authentication.
+
+```sh
+. /home/m/.config/remote-gui/runtime.env
+export PATH="$(dirname "$REMOTE_GUI_XVFB"):$PATH"
+probe=$(mktemp -d)
+for mode in disable disconnect release; do
+  xvfb-run -a -s '-screen 0 960x800x24 -nolisten tcp' \
+    python3 tests/remote-gui/mobile-feasibility/vnc-controller-probe.py "$probe/$mode" "$mode"
+done
+```
+
+The first two modes should exit 1 when transfer leaves the first client's button or Shift held or fails to move the pointer. The third mode closes the old transport and releases the fixture's known button and Shift before opening the new client's input permissions. It verifies that the old socket closes and that the new client can move the pointer, press both inputs and release them. This probe uses direct RFB connections and does not establish viewer WebSocket attribution, queued input behavior for every message type, keyboard target binding or Clipboard authorization.
+
 ### Firefox edit comparison
 
 On a host with stock Firefox and the native X11 tools, run the private accessibility harness using a different new artifact directory each time.

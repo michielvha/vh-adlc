@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Synthetic keyboard mode detection passed. Physical phone and input transfer feasibility remain open."
+status_description: "The iPhone live-stream fixture passed. The stock Chromium path still lacks safe field-bound editing."
 branch: feat/remote-gui-mobile
 issue: null
 goal: "Use a remote-gui browser from a phone with selective first-tap native keyboard input, normal text editing and touch scrolling."
@@ -74,7 +74,11 @@ In a separate synthetic Chromium document, `setRangeText` rejected email and num
 
 The [real stream fixture](../../tests/remote-gui/mobile-feasibility/live-stream/README.md) ran stock x11vnc, websockify and noVNC with a fresh sandboxed Chromium browser and a cooperating page. With the desktop touch test, the first tap selected the live remote field and one edit reached it. When the page changed focus before applying a second edit, it cancelled the edit and the second field stayed empty. A synthetic page supplies the geometry and guards the edit inside the same document. This does not establish an unmodified browser integration, login-site coverage, browser address edits or the controller transfer guarantee.
 
-The integrated Android run lost its original ADB backend, then reached the lock screen over the replacement USB connection. It did not run the live-stream taps. The iOS test built successfully against the physical-device SDK. The iPhone was paired but its developer tunnel was disconnected, so that integrated test did not run. The earlier physical first-tap keyboard results remain valid for their synthetic canvas fixture.
+The physical iPhone 15 Pro Max on iOS 27.2.1 ran the [live-stream XCTest](../../tests/remote-gui/mobile-feasibility/live-stream/LiveStreamTests.swift) over a verified private HTTPS and WebSocket route. A plain tap kept Safari's keyboard closed. The first tap on live field A opened it and focused A. Typing emitted one edit in A. A second edit queued before the fixture switched focus to B was cancelled and B stayed empty. XCTest recorded one pass with zero failures or skips. The first integrated Android run lost its ADB backend. The USB connection recovered, but the physical Android still showed its lock screen and could not run the live-stream taps. Its earlier first-tap result covers the standalone native keyboard fixture.
+
+On x11vnc 0.9.17, the [two-client Xvfb probe](../../tests/remote-gui/mobile-feasibility/README.md#x11vnc-controller-transfer) matched two owned loopback source ports to distinct x11vnc client IDs. Disabling the old client blocked its next pointer move. With its button and Shift held, synchronous disable and client disconnection both left those inputs held. Closing the old connection, explicitly releasing those inputs on the disposable display and waiting for X11 to process the release let the successor move, press and release those inputs. This result covers the two raw RFB clients and known test inputs. WebSocket attribution and the full input transfer contract remain open.
+
+The [Chromium 156 Linux adapter](https://chromium.googlesource.com/chromium/src/+/refs/tags/156.0.8078.79/ui/accessibility/platform/ax_platform_node_auralinux.cc#2431) has text selection and range value interfaces. It does not expose the editor's range replacement operation. Chromium has separate internal actions for [Blink range replacement](https://chromium.googlesource.com/chromium/src/+/refs/tags/156.0.8078.79/third_party/blink/renderer/modules/accessibility/ax_object.cc#8073) and [omnibox selection replacement](https://chromium.googlesource.com/chromium/src/+/refs/tags/156.0.8078.79/chrome/browser/ui/views/omnibox/omnibox_view_views.cc#1695). Those paths suggest where a native implementation could attach. Neither establishes a Linux API that verifies the target at commit time or a safe behavior when site code changes focus during the edit.
 
 T1 remains open. For general browser use, the target identity and focus check need to reach an edit operation inside the browser rather than a later global input event. No production browser path was changed.
 
