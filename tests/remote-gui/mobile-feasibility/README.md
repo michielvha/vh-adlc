@@ -55,3 +55,17 @@ With the same installed Chromium and Playwright module, run `node tests/remote-g
 For the extension comparison, pass a new private directory to `node tests/remote-gui/mobile-feasibility/extension-probe.cjs`. Its temporary extension runs only on the fixture's exact loopback origin, sends the synthetic marker, and reports the intended edit and rejected stale edit. Never load it into an existing browser profile.
 
 The [live stream fixture](live-stream/README.md) adds an actual noVNC framebuffer and a cooperating page with a guarded editor. The cooperating page is a test double for a browser integration, separate from remote-gui's production browser.
+
+### Linux input method
+
+Use an isolated session bus and Xvfb. The fixture needs the installed Chromium, IBus with its GTK 3 module, and Python with the IBus GI bindings.
+
+```sh
+. /home/m/.config/remote-gui/runtime.env
+export PATH="$(dirname "$REMOTE_GUI_XVFB"):$PATH"
+probe=$(mktemp -d)
+dbus-run-session -- xvfb-run -a -s '-screen 0 960x720x24 -nolisten tcp' \
+  bash tests/remote-gui/mobile-feasibility/native-ime/run.sh "$probe"
+```
+
+The engine sends a fixed synthetic edit over its private IBus instance. The page reports booleans and event targets for its own two fields. Context identifiers are reduced to local test numbers. On Chromium 156, expect the control edit in A, the same input context after switching to B, and exit 1 with `F1: native IBus commit reached B in the same context after A lost focus`. A setup failure does not establish that result.
