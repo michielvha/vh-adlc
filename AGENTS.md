@@ -1,10 +1,11 @@
 # Repository instructions
 
 Read the personal conventions at
-https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/AGENTS.md
+https://github.com/vhco-pro/docs/blob/0c983f6793bfe35eb96ae95ad0c361c6200af44f/AGENTS.md
 and follow the task routes there before implementation.
 
-For all code, read conventions/coding.md at that revision.
+For all code, read conventions/coding.md at that revision. Before diagnosing a failure,
+writing or changing a test, or claiming test evidence, read conventions/testing.md.
 To specify, plan or implement a feature, read conventions/feature-documents.md.
 For Go, also read conventions/go.md; for CI and releases, conventions/delivery.md and
 knowledge/shared-delivery.md. For TypeScript, read conventions/typescript.md.
