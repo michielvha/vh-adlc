@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Independent spec review R-4 returned no findings. The draft awaits owner acceptance."
+status: planned
+status_description: "The owner accepted the spec after clean review R-4. Ready for implementation planning."
 issue: null
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
 covers:
@@ -123,6 +123,7 @@ None.
 | 2026-11-19 | R-2 | spec | `15108beb46ba30de104af0c46212f162738d8834` | unknown | procedural | One blocking and five should-fix findings. |
 | 2026-11-19 | R-3 | spec | `0f910f12b9473d7956c5dc1fcedd9a873986e44b` | unknown | procedural | Two should-fix findings. |
 | 2026-11-19 | R-4 | spec | `f06f8906ae4801b062c29957269b42f375ef442a` | unknown | procedural | No findings. |
+| 2026-11-19 | R-4 | spec | `f06f8906ae4801b062c29957269b42f375ef442a` | n/a | n/a | accepted by owner |
 
 ### R-1
 
