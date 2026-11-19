@@ -9,6 +9,16 @@ uses the verified binary and knowledge. Clean calls `vh-adlc` from `PATH` withou
 its allow rule matches, and it skips `knowledge`, because `clean` and `env` read no conventions. The
 binary it runs is therefore not checked against the lock.
 
+## Link the work you refer to
+
+In updates, approval requests and handoffs, name the kind of artifact and link it the first time
+you refer to it. Use a Markdown link with the official URL for a published document, issue, pull
+request, project board, release or CI run. For example, call a roadmap a Markdown file and link
+directly to the file or relevant section. Link commits and review evidence at the exact revision when
+it matters. For unpublished work, label it local and link the actual file using its absolute path.
+When a link is unavailable, give the repository and exact path or identifier. Use links the reader is
+authorized to open.
+
 ## Check host capacity before any fan-out
 
 Before you create a worktree, start another session or sub-agent, or launch parallel or long local
