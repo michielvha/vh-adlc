@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The owner decided the R-1 questions. The revised Git coordination and writer fencing design awaits a fresh independent review. Implementation and native validation are pending."
+status_description: "The owner decided the R-1 questions. The test plan addresses the R-2 findings and awaits a fresh independent review. Implementation and native validation are pending."
 issue: null
 goal: "One canonical repository work item has one verified agent writer across clones, worktrees and supported hosts, with an explicit, preserved handoff."
 covers:
@@ -69,7 +69,9 @@ refuse mutation when its checker fails after setup. Other routes remain read-onl
 Downgrading a client holds writing and preserves the coordination record.
 
 Validation includes concurrent clones, admission racing with handoff, initialization
-response loss, stale-token publication and actual native clients with their checker broken.
+response loss, stale-token publication after handoff and release, and actual native clients
+with separate controller, checker and hook failures. The release build must package the
+binary for all four supported OS and architecture combinations.
 The current result is a spec revision. Accepting it after independent review authorizes
 local implementation and tests. Release and consumer adoption have separate grants.
 
@@ -99,8 +101,9 @@ and explicit initialization with no automatic authority reset (R-1 Q2A-Q4A).
   (`plugins/vh-adlc/scripts/triage/execution-lock.ts:6-25`). That protects a running triage
   execution; it neither coordinates all lifecycle writers nor persists a paused feature's
   owner across machines.
-- The incident's two-clone receipt and probe are retained with the consumer's private
-  evidence. The probe used synthetic review and acceptance records to exercise gates.
+- The private incident receipt `nov19-independent-clone-ownership-reproduction.json`
+  identifies the two-clone run and its observed results. The probe used synthetic review
+  and acceptance records to exercise gates.
 - The actual collision is Stackweaver issue #1079. The accepted consumer branch at
   `3f3f7754` and the other clone at `db3a6a44` have independent implementation histories.
   Both histories and the latter's two uncommitted files are preserved. The consumer's
@@ -181,8 +184,9 @@ controller and owned-process patterns where they enforce the required boundary
 (`plugins/vh-adlc/scripts/triage/controller.ts`, `owned-process.ts`). The controller owns
 the writer token and scoped mutation credentials. It authenticates the requesting session
 and binds each request to the work item, checkout, generation and exact proposed effect.
-It rejects out-of-scope targets and arbitrary shell forwarding. Failure to reach the
-controller or obtain a valid admission starts no action.
+It rejects out-of-scope targets and arbitrary shell forwarding. An unreachable controller,
+failed checker execution or invalid decision starts no action. Skipped hooks cannot change
+that result or make a mutation capability available to the native session.
 Verify native configuration, tool exposure and confinement on each supported route.
 If the host cannot enforce those limits, keep the route read-only. Claude SessionStart
 and Codex resume hooks may surface notices. PreToolUse may report a refusal early.
@@ -250,9 +254,12 @@ both existing marketplace manifests and verify actual Codex/Claude adoption. The
 pin update to `0c983f6793bfe35eb96ae95ad0c361c6200af44f` supplies the required testing guide;
 the shipped plugin default pin is unchanged unless a separately reviewed change requires it.
 Private host/session details remain in runtime state, not product documentation or source.
-The artifacts are the existing signed Go binary and shared plugin. Run the binary's Go
-checks and the plugin's Bun checks, publish the binary through the existing release
-workflow, and update the plugin lock only to an observed signed/checksummed release.
+The artifacts are the existing signed Go binary and shared plugin. Before merge, run the
+Go and Bun checks and use GoReleaser in a disposable checkout at the candidate commit to
+build and package with `.goreleaser.yml`. Use snapshot mode with signing and publication
+disabled. Check all four Linux and Darwin amd64 and arm64 archives and their computed
+checksums. Release through the existing workflow after authorization and update the
+plugin lock only to an observed signed release with verified checksums.
 Candidate validation uses the built candidate explicitly; do not invent a future version,
 checksum or successful marketplace install. No new deployable service or satellite is added.
 
@@ -286,12 +293,12 @@ checksum or successful marketplace install. No new deployable service or satelli
 | --- | --- |
 | AC-01 | First retain the failing two-independent-clone reproduction. Add true concurrent claimant processes against one disposable Git authority and assert one winner, zero loser source/index/branch writes, exact owner diagnostics and bounded conflict retry. Repeat in separate Git common directories. |
 | AC-02 | Exercise SSH/HTTPS and `.git` spelling aliases, issue/spec association, different branch names, source paths containing spaces, resumed session IDs and two separate work items. Assert one canonical identity or an explicit ambiguity refusal. |
-| AC-03 | Inject response loss after successful claim, rejected update, missing authority, inaccessible remote, old generation, process death and quota failure. Read-back reconciles the same writer. With an otherwise valid delivery grant, a stale token reaches no destination mutation after transfer; the current token succeeds with the same grant. A deleted established ref cannot be recreated by a delayed update. |
+| AC-03 | Inject response loss after successful claim, rejected update, missing authority, inaccessible remote, old generation, process death and quota failure. Read-back reconciles the same writer. Give the stale writer otherwise valid publication authority and attempt the same publication after transfer, after release while vacant, and after reacquisition. Assert no destination mutation in each case. The current writer succeeds with the same publication authority after transfer and after reacquisition. A deleted established ref cannot be recreated by a delayed update. |
 | AC-04 | Start with two dirty source files and committed review history. Transfer only after the old mutator is stopped/drained; replay it and attempt a stale-owner mutation. Compare exact hashes/history and ownership generation. Pause an action after preliminary check before registration and race transfer, then reverse which transition wins. Hold a registered process/input channel across a release and attempt reacquisition before and after confirmed drain. Assert increasing generations and stale-token refusal. Test unavailable direct messaging, queued notice, actual resume delivery and independent acknowledgment. |
 | AC-05 | Contract tests cover every shared write entry/re-entry and selected maintenance/audit/docs repair route. Each must reject a conflicting token. Delegate a read-only exact-head review, observe preserved source and prove it cannot claim/write under the parent's token. |
 | AC-06 | Recording Git/issue/PR endpoints observe no source push, PR, merge, release or cleanup without its separate grant. The reserved authority ref is excluded from release and stale-branch paths. Existing claim-push rejection, scope preservation and delivery tests remain passing. |
-| AC-07 | Run actual native Codex and Claude against two fixture clones through the declared adapters. Attempt writes from the former and conflicting sessions. Prove a permitted writer action and an unrelated item. After successful setup, kill the controller or break the checker and submit invalid decisions or skip the hook; verify that source, refs and publication targets remain untouched. Exercise continuing input and unsupported tools in the actual clients. Native runs without observed mutation and refusal remain pending. |
-| AC-08 | Seed unclaimed, valid claimed, duplicated and unknown-owner consumer records. Migration preserves all dirty bytes/reviews, selects one canonical item and records unresolved cases. Race two initializers, lose the winning response and test missing/mismatched established state from a fresh clone. Start cutover and downgrade with an older paused client and prove it cannot resume mutation while held. Verify preserved history and compatible recovery. Run both marketplace install/discovery paths and the required repository Go and Bun checks on the final implementation head. |
+| AC-07 | Run actual native Codex and Claude against two fixture clones through the declared adapters. Attempt writes from the former and conflicting sessions. Prove a permitted writer action and an unrelated item. After successful setup, independently test controller unavailability, checker execution failure, an invalid checker decision and skipped hooks. Keep the controller live for both checker tests and observe that it receives but refuses each request. In every negative case assert that source, refs and publication targets remain untouched. Exercise continuing input and unsupported tools in the actual clients. Native runs without observed mutation and refusal remain pending. |
+| AC-08 | Seed unclaimed, valid claimed, duplicated and unknown-owner consumer records. Migration preserves all dirty bytes/reviews, selects one canonical item and records unresolved cases. Race two initializers, lose the winning response and test missing/mismatched established state from a fresh clone. Start cutover and downgrade with an older paused client and prove it cannot resume mutation while held. Verify preserved history and compatible recovery. Run both marketplace install/discovery paths and the repository Go and Bun checks. At the same candidate commit run a nonpublishing GoReleaser snapshot using `.goreleaser.yml`, validate all four target archives and recompute each checksum. |
 | AC-09 | Run ownership status, acquire, release and transfer in the same fixture. Verify human authorization and current writer are distinct, work item and generation stay visible, held output explains the prerequisite, and neither stdout nor stderr contains the fixture token. |
 
 ## Tasks
@@ -402,7 +409,7 @@ PROPOSAL: Give the private evidence a stable receipt identifier that its owner c
 ## Sources
 
 - Current vh-adlc main `dae76bf9eca4b99368819ca03c7db1fb4a136d24`, actual claim/isolation, handoff fixture and triage execution-lock source, read 19 November 2026.
-- Stackweaver local incident comparison and the two-clone probe receipts named in Context, read/run 19 November 2026. These are incident evidence, not shared implementation completion.
+- Stackweaver incident comparison and private receipt `nov19-independent-clone-ownership-reproduction.json`, 19 November 2026. The receipt records both admissions in the two-clone collision probe.
 - [Claude Code hooks](https://code.claude.com/docs/en/hooks), read 19 November 2026: resume-context injection and pre-tool permission denial are distinct from acknowledgment or arbitrary filesystem isolation.
 - [Claude Code project instructions](https://code.claude.com/docs/en/memory), read 19 November 2026: instruction text is context, not enforced configuration.
 
