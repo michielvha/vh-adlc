@@ -28,6 +28,12 @@ without asking, and `references/review-protocol.md` for the review mode.
 
 ## Loop routes
 
+Before writing or recording a spec, or bringing default-branch changes into its owning
+checkout, follow [feature writer entry](../../references/authority.md#feature-writer-entry). Resolve the issue or final
+spec path first. In an adopted repository, pass `--ownership-spec <document>` when filing an
+issue from the approved preview. After an uncertain or held tracker result, follow the
+recovery steps in the same reference before retrying or continuing the draft.
+
 This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
 host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction

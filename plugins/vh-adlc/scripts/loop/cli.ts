@@ -9,7 +9,7 @@
 //   bun scripts/loop/cli.ts delivery --repo <dir> --merge <sha> --feature-root <dir> --docs-revision <sha>
 //   bun scripts/loop/cli.ts isolation --repo <dir> --host-worktree-tool true|false
 //   bun scripts/loop/cli.ts claim    --repo <dir> --document <doc> --feature-branch <b> --default-branch <b> --status-description <text>
-//                                    --message <text> [--owned <branch>[,<branch>...]]
+//                                    --message <text> [--owned <branch>[,<branch>...]] [--client codex|claude] [--no-push true]
 //   bun scripts/loop/cli.ts review --repo <dir> --document <doc> --commit <sha> --kind spec|implementation
 //                                  --docs-revision <sha> --binary <path> --plugin-pin <pin> [--timeout-ms <n>]
 //
@@ -88,6 +88,7 @@ export async function main(argv: string[]): Promise<number> {
   if (command === "claim") {
     const document = need(options, "document"), featureBranch = need(options, "feature-branch"), description = need(options, "status-description");
     const result = await claim(repo, { document, featureBranch, defaultBranch: need(options, "default-branch"), message: need(options, "message"),
+      client: options.client, noPush: options["no-push"] === "true",
       ownedBranches: options.owned ? options.owned.split(",") : [],
       edit: root => {
         const path = join(root, document), text = readFileSync(path, "utf8");

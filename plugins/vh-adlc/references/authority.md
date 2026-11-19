@@ -99,6 +99,40 @@ separate request is needed. Another session continues a feature only after the o
 earlier writer has stopped and hands it over; a pushed claim advertises the branch, it is not a lock.
 Missing committed state blocks the feature; it is never a reason to restart it.
 
+## Feature writer entry
+
+For spec, tasks, implement, review recording or ship, first resolve the canonical issue
+or spec and select the writing checkout under the existing worktree rules. Run the shared
+reservation check once before the first feature mutation:
+
+```sh
+bun <plugin>/scripts/ownership/cli.ts enter --repo <checkout> --spec <document>
+```
+
+Use exactly one of `--spec`, `--issue` or `--branch`. Pass `--no-push true` if the current
+request forbids pushes. For a new explicitly private draft without a remote, pass
+`--local-draft true` only with the final new spec path and that owner authority.
+Continue on `entered` or `legacy`. Use `local-draft` only for private draft authoring.
+On `held`, a failed command or an unreadable result, show the reason and returned
+writer location, then stop that writing operation. Use `status` to inspect the
+reservation without claiming it. Independent read-only discovery and review need no reservation.
+
+A direct `scripts/loop/cli.ts claim` performs the same check. In an adopted repo, pass
+`--client codex` or `--client claude` to match the current native session. Resume invokes the
+check through the selected writer operation. Ordinary edits and tests after entry
+require no reservation checks. Authority to push source, create issues, merge or release
+still comes from their own procedures.
+
+For a planned spec move in an adopted repository, use `link` to bind the new path before
+publishing it. For an adopted draft's approved tracker create, pass its final path as
+`--ownership-spec` to the labels command. Verify its `ownership.status` is `linked` before
+publishing the issue link or assigning that number to a writer. A lost tracker result leaves
+the draft held. Check the preserved approved preview and lookup in the target repository,
+have the owner confirm the issue number and run `issue-recover` with `--alias-issue`. If
+the owner confirms no issue exists, use `--not-created true`. Use a new approval for any
+future create. On an alias conflict, keep both histories and stop both writers until the
+owner selects one reservation through `resolve-alias`.
+
 ## Handoff
 
 A session cannot see whether another session is still writing a feature. So once a feature has a claim (a

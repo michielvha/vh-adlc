@@ -6,9 +6,12 @@
 // `implement_worktree: isolated`, it asks the host's own worktree tool for one.
 import { realpathSync } from "node:fs";
 import type { LoopSettings } from "./settings";
+import { enter } from "../ownership/entry";
+import type { Writer } from "../ownership/identity";
 
 export type ClaimRequest = {
   document: string; featureBranch: string; defaultBranch: string; message: string;
+  client?: string; noPush?: boolean;
   /** Branches this session created or was handed over; any other non-default branch is refused. */
   ownedBranches: string[];
   /** Writes the claim into the document (status, status_description, branch). */
@@ -18,7 +21,7 @@ export type ClaimRequest = {
 };
 export type ClaimResult =
   | { status: "claimed"; branch: string; commit: string }
-  | { status: "refused"; reason: string }
+  | { status: "refused"; reason: string; writer?: Writer; localPath?: string; item?: string }
   | { status: "pending"; reason: string; commit: string };
 
 function run(repo: string, args: string[]) {
@@ -33,6 +36,7 @@ function git(repo: string, args: string[]): string {
 
 export async function claim(repo: string, request: ClaimRequest): Promise<ClaimResult> {
   const { defaultBranch } = request;
+  if (request.noPush) return { status: "refused", reason: "the feature claim needs permission to push its documentation commit" };
   if (!run(repo, ["fetch", "-q", "origin", defaultBranch]).ok) return { status: "refused", reason: `fetching origin/${defaultBranch} failed` };
   const head = git(repo, ["rev-parse", "HEAD"]), tip = git(repo, ["rev-parse", `origin/${defaultBranch}`]);
   if (head !== tip) return { status: "refused", reason: `this worktree is not at the tip of origin/${defaultBranch}; start from a worktree at ${tip.slice(0, 7)}` };
@@ -43,6 +47,11 @@ export async function claim(repo: string, request: ClaimRequest): Promise<ClaimR
     return { status: "refused", reason: `HEAD is on ${branch}, which this session neither created nor was handed; never advance an unrelated branch` };
   if (run(repo, ["rev-parse", "--verify", "--quiet", `refs/heads/${request.featureBranch}`]).ok)
     return { status: "refused", reason: `${request.featureBranch} already exists; re-enter it instead of claiming again` };
+  const reservation = enter({ repo, spec: request.document, client: request.client, defaultBranch, explicitClient: true });
+  if (reservation.status !== "entered" && reservation.status !== "legacy") {
+    return { status: "refused", reason: reservation.reason ?? "feature writer entry was refused", writer: reservation.writer,
+      localPath: reservation.localPath, item: reservation.item };
+  }
   request.edit(repo);
   git(repo, ["add", "--", request.document]);
   git(repo, ["commit", "-q", "-m", request.message, "--", request.document]);

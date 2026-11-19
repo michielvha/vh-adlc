@@ -7,7 +7,7 @@ import { associate, privateDraft, validAlias, validHost, validLocator, verifyDes
 export type RecordState = { aliases: string[]; writer: Writer; operation: string; previous?: string; pending?: string; conflict?: string };
 export type State = { schema_version: 1; repository: string; operation: string; items: RecordState[] };
 export type Binding = { repository: string; genesis: string };
-export type EntryRequest = Item & { repo: string; env?: Environment; client?: string; noPush?: boolean; localDraft?: boolean };
+export type EntryRequest = Item & { repo: string; env?: Environment; client?: string; noPush?: boolean; localDraft?: boolean; explicitClient?: boolean; defaultBranch?: string };
 export type Result = { status: "held" | "entered" | "legacy" | "local-draft" | "initialized" | "reserved" | "vacant" | "transferred" | "pending" | "linked" | "conflict"; reason?: string; writer?: Writer; item?: string; operation?: string; genesis?: string; tip?: string; localPath?: string; pending?: string; conflict?: string; preview?: string };
 export type Snapshot = { tip: RemoteTip & { reservation: string }; state: State; binding: Binding };
 export const OPERATION = /^[a-zA-Z0-9_-]{1,128}$/;
@@ -194,6 +194,8 @@ export function enter(request: EntryRequest): Result {
         }
         throw Error("no origin; only an explicitly authorized new private draft can proceed without a remote");
       }
+      if (request.explicitClient && !request.client) throw Error("an adopted claim requires an explicit native client");
+      if (request.defaultBranch && view.tip.defaultBranch !== request.defaultBranch) throw Error("claim default branch differs from the canonical remote");
       const branch = git.text("rev-parse", "--abbrev-ref", "HEAD");
       const association = associate(git, view.tip.main, view.binding.repository, request, branch);
       const env = request.env ?? process.env;
