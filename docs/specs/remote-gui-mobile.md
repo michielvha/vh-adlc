@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted after clean independent review; implementation must first prove upstream reuse and native-phone feasibility."
+status: in-progress
+status_description: "Implementation starts with the noVNC reuse and native phone feasibility checks."
+branch: feat/remote-gui-mobile
 issue: null
 goal: "Use a remote-gui browser from a phone with selective first-tap native keyboard input, normal text editing and touch scrolling."
 covers:
