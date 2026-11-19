@@ -72,11 +72,12 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         });
         const page = await context.newPage();
         let lastSample;
+        const focusReplies = [];
         page.on('response', async response => {
-            if (response.ok() && response.url().endsWith('/__remote_gui/editable')) {
-                const field = await response.json();
-                if (field) lastSample = { field, started: response.request().timing().startTime };
-            }
+            if (!response.url().endsWith('/__remote_gui/editable')) return;
+            const field = response.ok() ? await response.json().catch(() => null) : null;
+            focusReplies.push([response.status(), field?.mode]);
+            if (field) lastSample = { field, started: response.request().timing().startTime };
         });
         await page.goto(session.url);
         await page.getByRole('link', { name: 'Open session' }).click();
@@ -92,12 +93,40 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
             });
             await page.touchscreen.tap(left + x * scaleX, top + y * scaleY);
         };
+        await page.waitForFunction(() => document.querySelector('#screen canvas')?.width === 390);
+        // Establish focus on the owned X11 window before sending Chromium shortcuts.
+        await canvas.click({ position: { x: 18, y: 140 } });
         await canvas.focus();
         await page.keyboard.press('Control+t');
-        await page.waitForFunction(() => document.querySelector('#screen canvas')?.width === 390);
+        await page.keyboard.press('Control+l');
+        // Read the focused native entry once to place the tap at its actual
+        // position. Chromium's toolbar dimensions vary with runner builds.
+        const probes = [];
+        let addressField;
+        for (let attempt = 0; attempt < 3 && !addressField; attempt++) {
+            for (const y of [60, 70, 50, 80, 90]) {
+                const { status, field } = await page.evaluate(async point => {
+                    const reply = await fetch('/__remote_gui/editable', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-Remote-Gui-Editable': '1' },
+                        body: JSON.stringify(point),
+                    });
+                    return { status: reply.status, field: reply.ok ? await reply.json() : null };
+                }, { x: 195, y });
+                probes.push([y, status, field?.mode]);
+                if (field?.mode === 'url') {
+                    addressField = field;
+                    break;
+                }
+            }
+            if (!addressField) await delay(200);
+        }
+        assert.ok(addressField, 'Chromium did not report a focused address bar: ' + JSON.stringify(probes));
         await page.route('**/__remote_gui/editable', route => route.fulfill({ status: 503 }), { times: 1 });
-        await tap(195, 60);
-        await prompt.waitFor({ timeout: 5500 });
+        await tap(Math.floor(addressField.x + addressField.width / 2), Math.floor(addressField.y + addressField.height / 2));
+        await prompt.waitFor({ timeout: 5500 }).catch(error => {
+            throw new Error('The address bar prompt did not appear. Focus replies: ' + JSON.stringify(focusReplies.slice(-8)), { cause: error });
+        });
         assert.equal(await editorFocused(), false);
         await prompt.tap();
         assert.equal(await editorFocused(), true);
