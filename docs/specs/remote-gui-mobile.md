@@ -172,6 +172,7 @@ None. The owner chose stock Chromium, ordinary current-focus typing, a second ta
 | 2026-11-19 | R-4 | spec | `d3fad7181862b2bee55f7cb981745b8057333b50` | gpt-6.2-sol | procedural | One blocking finding and two should-fix findings. Independent synthetic mode probe confirmed. |
 | 2026-11-19 | R-5 | spec | `5168c70da624c76d87a4de41dd39c744a61c53e0` | gpt-6.2-sol | procedural | No blocking or should-fix findings. One Context nit. |
 | 2026-11-19 | R-5 | spec | `5168c70da624c76d87a4de41dd39c744a61c53e0` | n/a | n/a | accepted by owner |
+| 2026-11-19 | R-6 | spec | `77d28a4e94817bd1e51113c5839736f784cc3f30` | unknown | procedural | Eight should-fix findings and one Context nit. Model identity was not attested. |
 
 ### R-1
 
@@ -235,6 +236,71 @@ SEVERITY: nit
 WHERE: Context / Owner summary, Context / Resizing prerequisite after merge
 EVIDENCE: At 5168c70d, lines 31 and 51 describe the R-2 acceptance as still settling the scope and the normative baseline as unchanged. Those were true when R-3 ran. The document is now draft and revises Design, AC-05, and the Test Plan. The same historical paragraphs describe the work as spec-only and say no feasibility probe had started, while the First feasibility run records one.
 PROPOSAL: Frame both paragraphs as historical checkpoints before the metadata revision. State that R-2 acceptance applied to the baseline R-3 checked and that the revised baseline awaits acceptance.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 23); Scope (lines 109-110); Design / Detect and show the prompt (lines 118, 122); Acceptance Criteria AC-10; Test Plan AC-10 and AC-11
+EVIDENCE: Sending a click on the RFB WebSocket before making a metadata request does not establish that Chromium processed the click before the helper sampled focus. An already-focused field can also retain focus beneath a nonfocusable overlay. AT-SPI's VISIBLE and SHOWING states describe potential exposure, so focus and bounds containment can still match that covered field. Installed noVNC 1.5.0 core/rfb.js:1226-1254 can also snap a rapid nearby tap to the previous tap's position, so the viewer's raw tap and the dispatched click can differ. The delayed-response case checks ordering between viewer requests and does not cover these paths. [AT-SPI state definitions](https://gnome.pages.gitlab.gnome.org/at-spi2-core/libatspi/enum.StateType.html)
+PROPOSAL: Specify how the helper confirms that its sample follows the dispatched click and matches the actual hit, and suppress the prompt if it cannot make that determination. Exercise an already-focused field under an overlay, a click delayed on the RFB path, and rapid taps on adjacent targets while preserving stock gesture behavior.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 25-27); Scope (lines 109-112); Design / Detect and show the prompt (lines 118-124); Design / Type and dismiss (lines 128-130); Acceptance Criteria AC-10, AC-11 and AC-13; Test Plan AC-10, AC-11 and AC-13
+EVIDENCE: Line 124 defines a request for a tap. Line 130 requires dismissal when Chromium reports a focus change, but does not specify how the viewer observes it after that request completes. Line 122 also omits remote focus and eligibility changes from the prompt invalidation list, even though it requires a still-current prompt. At 77d28a4e, plugins/remote-gui/internal/proxy/viewer.go:198-207 has no remote-focus notification path. A page or another authorized viewer can change focus while the prompt is open, and a focused node can change from text to password without changing its identity. The current test plan checks stale replies and a change while composing but leaves those prompt and mode transitions untested.
+PROPOSAL: Define bounded content-free invalidation while the prompt or editor is active, including what happens when monitoring fails or a phase changes during a pending check. Test a page-driven focus move between taps, a sensitivity change on the same node, and a second authorized viewer moving focus during composition, preserving the owner's ordinary current-focus typing rule for keys already sent.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 27); Context / Evidence from the first design (lines 37-39); Scope (line 109); Design / Detect and show the prompt (lines 118-120); Acceptance Criteria AC-10; Test Plan AC-10 and AC-11
+EVIDENCE: Scope requires contenteditable and the native address bar while Design suppresses the prompt when it cannot classify the input safely. The metadata probe at tests/remote-gui/mobile-feasibility/editable-metadata.py:141-164,191-209 classifies seven HTML inputs and one textarea. It supplies no allowed signature for either required target. Chromium 156.0.8078.79 omnibox_view_views.cc:236-250 configures a generic editable text-field role and adds a URL HTML attribute. AXPlatformNodeBase uses a separate kInputType string attribute for text-input-type. The source and existing probe do not establish which allowed metadata safely classifies those targets in the installed Linux browser. [Chromium omnibox](https://raw.githubusercontent.com/chromium/chromium/156.0.8078.79/chrome/browser/ui/views/omnibox/omnibox_view_views.cc), [Chromium platform attributes](https://raw.githubusercontent.com/chromium/chromium/156.0.8078.79/ui/accessibility/platform/ax_platform_node_base.cc)
+PROPOSAL: Require an early stock Chromium check of the actual allowed signatures for native address and contenteditable controls before building the phone flow. Identify the safe classification for each or return the uncovered case to the owner without broadening the allowed reads.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 27); Context / Evidence from the first design (line 39); Design / Detect and show the prompt (lines 118-124); Acceptance Criteria AC-13; Test Plan AC-13
+EVIDENCE: Line 120 permits GetAttributes only when role and state are insufficient and bans text-bearing subscriptions and bulk tree exports. AC-13 inspects calls and one marker, but does not explicitly require the negative assertions that distinguish these limits. The existing probe at tests/remote-gui/mobile-feasibility/editable-metadata.py:191-209 reads the map for password and number even though line 37 records distinguishable signatures. It can pass its marker assertion with those extra reads. A generic AT-SPI client can also obtain names and descriptions through the cache, without calling a direct name or description method. [AT-SPI cache adaptor](https://raw.githubusercontent.com/GNOME/at-spi2-core/main/atk-adaptor/adaptors/cache-adaptor.c)
+PROPOSAL: Require call and subscription assertions during startup, lookup, invalidation and failure. Check that an unambiguous field and rejected candidates cause no GetAttributes call, that only a verified eligible ambiguous field can supply the sentinel-bearing map on the private bus, and that no text-bearing cache traffic reaches the helper or sentinel data leaves it.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 23, 29); Design / Detect and show the prompt (line 122); Design / Packaging and recovery (line 134); Acceptance Criteria AC-10 and AC-14; Test Plan AC-10 through AC-12 and AC-14; Tasks T8
+EVIDENCE: The Owner summary promises the actual packaged viewer on both phones. AC-10 starts a source-built session and AC-14 runs the installed-copy checks separately, so the two passes could exercise different runtime artifacts. AC-10 also does not count pointer delivery or explicitly inspect the toolbar. A viewer could click the remote field again when the prompt is tapped or retain a toolbar keyboard control and still produce the named keyboard and text observations.
+PROPOSAL: Run the physical Safari and Chrome procedures against the independently installed package built from the reviewed implementation, and retain the package identity and device/browser versions with the results. Explicitly verify one remote click on the first tap, zero on the prompt tap, and absence of a toolbar keyboard control.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 25); Design / Type and dismiss (lines 128-130); Acceptance Criteria AC-11; Test Plan AC-11 and AC-12
+EVIDENCE: AC-11 requires exactly one operation but the proof calls for an exact event and value without saying whether it counts a local commit, an RFB key pair, or a remote input event. Installed noVNC core/rfb.js:459-484 sends one keysym at a time. A committed multi-codepoint value can legitimately yield multiple remote events. The proof also names an observed focus cancellation and a reconnect but never requires a disconnect during a pending composition or checks that the pending input is absent after reconnect.
+PROPOSAL: Define expected final text and key or input sequences for the named operations, including a specified multi-codepoint string, so the check detects loss and duplication without requiring a remote IME transaction. Exercise disconnection with a composition pending and require no late input or replay on reconnect.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Packaging and recovery (line 134); Acceptance Criteria AC-14; Test Plan AC-14; Tasks T8
+EVIDENCE: AC-14 requires cleanup on rollback. Its proof covers partial failure, stop, expiry and an older supervisor continuing beside a new session, but never reverts the package. The existing compatibility fixture in tests/remote-gui/legacy.e2e.test.ts:12-41 starts 0.3.0 under its own runtime and accesses it with the current CLI. It does not exercise reverting the new package with the new helper present.
+PROPOSAL: Add a disposable upgrade and rollback case from the supported prior package. State which supervisor owns a still-running helper across the rollback, then check that stopping or expiring that session removes only its resources and that new sessions use the prior behavior.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-10 through AC-14; Tasks T6-T8; frontmatter covers
+EVIDENCE: The pinned frontend-testing standard requires applicable automated browser checks in CI, and the pinned feature-document standard orders tasks with the failing test first. T6 and T7 put code and proof in the same task and do not name a failing-first check. No task or proof names the browser CI path. At 77d28a4e, .github/workflows/ci.yml:137-159 enumerates existing browser suites and the GUI prerequisites. Adding a new opt-in mobile suite or depending on an optional helper would leave that suite or its real helper path unexecuted unless the affected CI path changes.
+PROPOSAL: Plan failing-first checks for the new helper and viewer behavior and name how the applicable automated cases and prerequisites enter the existing browser CI job. Keep native OS keyboard proof on the two physical phones.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Physical iPhone gesture probe (line 49); Context / Physical Android gesture probe (line 55); Context / Remote field binding feasibility (line 63); Context / Existing mobile viewers (line 87); Sources (line 250)
+EVIDENCE: These passages refer to open T1, AC-01, controller transfer and accepted first-tap field binding in the present tense. Scope at line 112 retires those requirements and line 89 describes the first design as historical. The current tasks and criteria start at T6 and AC-10.
+PROPOSAL: Date or otherwise mark the old gate references and conclusions as historical, preserving their observed results and limits.
 
 ## Sources
 
