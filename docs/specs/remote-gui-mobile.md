@@ -183,6 +183,7 @@ None. The owner chose stock Chromium, ordinary current-focus typing, a second ta
 | 2026-11-19 | R-5 | spec | `5168c70da624c76d87a4de41dd39c744a61c53e0` | gpt-6.2-sol | procedural | No blocking or should-fix findings. One Context nit. |
 | 2026-11-19 | R-5 | spec | `5168c70da624c76d87a4de41dd39c744a61c53e0` | n/a | n/a | accepted by owner |
 | 2026-11-19 | R-6 | spec | `77d28a4e94817bd1e51113c5839736f784cc3f30` | unknown | procedural | Eight should-fix findings and one Context nit. Model identity was not attested. |
+| 2026-11-19 | R-7 | spec | `a03bf98503d8c377eaed65e2ebf51577c4483a39` | unknown | procedural | Six should-fix findings and one evidence-link nit. Model identity was not attested. |
 
 ### R-1
 
@@ -311,6 +312,57 @@ SEVERITY: nit
 WHERE: Context / Physical iPhone gesture probe (line 49); Context / Physical Android gesture probe (line 55); Context / Remote field binding feasibility (line 63); Context / Existing mobile viewers (line 87); Sources (line 250)
 EVIDENCE: These passages refer to open T1, AC-01, controller transfer and accepted first-tap field binding in the present tense. Scope at line 112 retires those requirements and line 89 describes the first design as historical. The current tasks and criteria start at T6 and AC-10.
 PROPOSAL: Date or otherwise mark the old gate references and conclusions as historical, preserving their observed results and limits.
+
+### R-7
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 23, 27); Context / Two-tap feasibility fixture (lines 33-35); Scope (lines 115-116); Design / Detect and show the prompt (lines 124, 128); Acceptance Criteria AC-10; Test Plan AC-10; Tasks T6
+EVIDENCE: The R-6 revision adds a fresh AT-SPI call as evidence that the click hit the focused field. Chromium 156.0.8078.79 routes the Linux component hit through `HitTestSync`, which uses `CachingAsyncHitTest` for web content. Chromium documents that the synchronous result can be an approximate bounds match or a previous renderer hit while the new renderer request is outstanding. A newly covered, still-focused field can therefore match immediately after a fresh D-Bus call. The successful static fixture and the single overlay scenario do not distinguish a current renderer result from an old one. [Linux component implementation](https://github.com/chromium/chromium/blob/156.0.8078.79/ui/accessibility/platform/ax_platform_node_auralinux.cc#L4155) [Browser hit-test delegate](https://github.com/chromium/chromium/blob/156.0.8078.79/ui/accessibility/platform/browser_accessibility.cc#L1135) [Chromium hit-testing design](https://chromium.googlesource.com/chromium/src/+/90f68b6bda019ed49895b274cbb151bb6b3cc541/docs/accessibility/browser/how_a11y_works_3.md#hit-testing)
+PROPOSAL: Make a warm-cache test with a newly overlaid, still-focused field part of T6. Define how the stock-browser check establishes current hit evidence and suppresses the prompt if freshness remains uncertain.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 23); Design / Detect and show the prompt (lines 128, 132); Acceptance Criteria AC-10 and AC-12; Test Plan AC-10 and AC-12; Tasks T6
+EVIDENCE: The R-6 revision accepts an already-focused field based on an X11 pointer snapshot and a matching accessibility hit. When the pointer starts at the tapped coordinate with Button 1 released, those checks can pass before the RFB press or release arrives. For example, the caret can move by keyboard while the pointer remains at the spot the user taps again. Installed noVNC 1.5.0 `core/rfb.js:1226-1254` emits a move, press and release, while line 128 checks the resulting pointer state and explicitly allows unchanged focus. AC-10 delays a click only to a new field, where the new-focus requirement can hide the defect.
+PROPOSAL: Require a delayed-RFB repeat tap with the pointer already at the intended coordinate and the caret initially elsewhere in the same field. Establish that the first tap places the caret before the prompt becomes usable, or return the limitation to the owner if the stock stack cannot establish that order.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 23, 27); Scope (line 116); Design / Detect and show the prompt (lines 126, 130, 132); Acceptance Criteria AC-10 and AC-12; Test Plan AC-10 and AC-12
+EVIDENCE: The refreshed association expires on focus, eligibility, mode, window, phase or identity changes. A page can move or scroll a focused field without changing any of those values or the connected canvas geometry. One viewer can also scroll the remote page while a second viewer has a prompt open. A viewer that keeps renewing the original placement can satisfy the listed checks and still offer the prompt over a different region. AC-12 scrolls to a field but does not move that field with its prompt already visible.
+PROPOSAL: Specify that a refresh repositions or dismisses a prompt whose remote field extent changes. Add a layout-only move or scroll while the same field keeps focus and the canvas retains its size.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 25, 27); Design / Detect and show the prompt (lines 130-132); Design / Type and dismiss (lines 138-140); Acceptance Criteria AC-10, AC-11 and AC-12; Test Plan AC-10 through AC-13; Tasks T7
+EVIDENCE: The 500 ms lease starts from the latest valid sample. The Test Plan checks reordered replies, expired prompts, disconnects and current focus changes, but does not hold an otherwise valid response past the sample deadline or stall monitoring during composition while RFB stays connected. Starting the lease at response receipt or continuing to send newly committed input after the editor lease expired could pass these checks.
+PROPOSAL: State how the viewer enforces the sample deadline across HTTP delay and checks it before opening the editor or sending newly committed input. Exercise delayed valid replies, interruption of monitoring during composition with RFB still connected, and a late reply after invalidation.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope (line 115); Design / Detect and show the prompt (lines 124, 126); Acceptance Criteria AC-10; Test Plan AC-10; Tasks T6
+EVIDENCE: The scope covers contenteditable, but the feasibility gate and phone proof leave its markup unspecified. A fixture can add `role="textbox"` and multiline semantics, which Chromium serializes differently from an ordinary contenteditable editing host. The existing metadata probe at `tests/remote-gui/mobile-feasibility/editable-metadata.py:141-164` exercises neither form. A helper that only accepts an explicit text-box role could pass the proposed proof while leaving ordinary editing hosts unsupported. [Chromium accessibility state serialization](https://github.com/chromium/chromium/blob/156.0.8078.79/third_party/blink/renderer/modules/accessibility/ax_object.cc#L2202)
+PROPOSAL: Require an ordinary `contenteditable` host without a fixture-added ARIA role in T6 and AC-10. Record the covered forms and return any required unsupported form to the owner through the existing feasibility gate.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Packaging and recovery (line 144); Acceptance Criteria AC-14; Test Plan AC-14; Tasks T8
+EVIDENCE: The rollback procedure starts an old session before upgrade but only verifies the candidate session and the new sessions started after rollback. It never verifies that the original prior-package session remained usable across the upgrade. The existing `tests/remote-gui/legacy.e2e.test.ts:15-54` uses 0.3.0, while `tests/remote-gui/package.test.ts:11-16` identifies the current package at this target as 0.4.0. That older regression cannot establish the stated upgrade behavior for the immediately preceding package.
+PROPOSAL: Check the original prior-package session still provides its browser and existing viewer behavior after the candidate starts. Include the original supervisor identity and session state in the assertions.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Two-tap feasibility fixture (lines 33-35); Sources
+EVIDENCE: The new fixture, source and XCTest observations have no evidence pointer in the exact target. `git ls-files '*two-tap*'` returned no fixture or artifact. A reader can distinguish the limited feasibility claim from the planned package proof, but cannot reproduce or inspect the stated run from its citations.
+PROPOSAL: Link the disposable fixture source and a sanitized retained result or reproducible command for the desktop, hit-test and iPhone observations.
 
 ## Sources
 
