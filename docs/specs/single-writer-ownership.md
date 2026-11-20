@@ -341,6 +341,7 @@ None. The owner selected the Git reservation, entry checks and explicit handoff.
 | 2026-11-19 | R-13 | spec | `014299049c45051a2d4f8e3b40ba33e3de4ba51f` | unknown | procedural | No blocking findings. One should-fix on exercising already-specified pending behavior through both move paths. Model identity was not attested. |
 | 2026-11-19 | R-13 | spec | `014299049c45051a2d4f8e3b40ba33e3de4ba51f` | n/a | n/a | accepted by owner |
 | 2026-11-20 | R-14 | spec | `9f8b6b4f5ca3723304e7d5a7705c0a41a724417b` | unknown | procedural | Two factual nits on validation wording and citations to the pre-feature baseline. Model identity was not attested. |
+| 2026-11-20 | R-15 | spec | `11ac06ce45d3748cda6d0e6c5a18ad97717be522` | unknown | procedural | No blocking findings. One should-fix finding on the mixed-marker check and two wording nits. Model identity was not attested. |
 
 ### R-1
 
@@ -742,6 +743,29 @@ SEVERITY: nit
 WHERE: Context, Background, claim and worktree helpers at lines 73-75. Design, Adopt and roll back, CI routing at lines 250-253.
 EVIDENCE: The citations describe the baseline on `84e59c89`. At the reviewed commit, `plugins/vh-adlc/scripts/loop/claim.ts:50-54` checks the reservation before editing. `.github/workflows/ci.yml:5,197` excludes the reserved ref from push triggers and versioning, and `.github/workflows/preview.yml:12` excludes it from preview dispatch.
 PROPOSAL: Pin the description of pre-feature behavior to the default-branch baseline so readers can distinguish it from the changes under review.
+
+### R-15
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Start, resume and hand off, mixed client markers at lines 187-195. Test Plan, AC-11. Tasks, T8.
+EVIDENCE: AC-11's installed-client proof supplies mixed markers and expects a hold. `tests/vh-adlc/ownership/native-trial.ts:143-155` starts that conversation against the already-reserved item. The clean-marker scenario immediately above is held for the same item in the same checkout. The mixed-marker check would pass if the launcher discarded the injected marker or the entry ignored it.
+PROPOSAL: In each installed client, attempt mixed-marker entry on a vacant item and show that a clean-marker control can enter it. Check the ambiguity refusal so the trial establishes why entry was held.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary, validation at lines 60-62. Frontmatter, `status_description`. Tasks, T8 evidence at line 319. Sources, installed-client proof at line 751.
+EVIDENCE: The summary says the clone race, resume and handoff checks are still to run. The status description and Sources also say installed-client proof is pending. AC-10 and T8 record the clone race and installed sessions on earlier candidates. T8 still leaves the full suite open on the combined candidate.
+PROPOSAL: Name the earlier checks and their targets, then state which exact-candidate checks remain open.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background, claim and worktree helpers at lines 73-75. Design, Adopt and roll back, CI routing at lines 250-253.
+EVIDENCE: These citations describe pre-feature behavior. On the reviewed commit, `plugins/vh-adlc/scripts/loop/claim.ts:50-54` checks the reservation before editing. `.github/workflows/ci.yml:5,197` excludes the reserved ref from push triggers and versioning. `.github/workflows/preview.yml:12` excludes it from preview dispatch.
+PROPOSAL: Pin the pre-feature citations to the default-branch baseline and describe them as baseline behavior.
 
 ## Sources
 
