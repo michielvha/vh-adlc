@@ -15,7 +15,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     let phaseTimer = 0;
     let phaseRequest = null;
     let observedPhase = 0;
-    let phaseReady = false;
+    let verifiedPhase = 0;
     let request = null;
     let target = null;
     let framebuffer = '';
@@ -41,7 +41,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
         clearTimeout(keyboardCloseTimer);
         phaseRequest?.abort();
         phaseRequest = null;
-        phaseReady = false;
+        verifiedPhase = 0;
         awaiting = false;
         request?.abort();
         request = null;
@@ -83,7 +83,16 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     const metadataHeaders = { 'Content-Type': 'application/json', 'X-Remote-Gui-Editable': '1' };
 
     function canSend() {
-        return phaseReady && performance.now() < lease;
+        return target?.phase === verifiedPhase && performance.now() < lease;
+    }
+
+    function updatePrompt() {
+        if (editing || !target) return;
+        prompt.disabled = !canSend();
+        if (!prompt.disabled) {
+            position(target);
+            prompt.hidden = false;
+        }
     }
 
     function updateEditingStatus() {
@@ -108,8 +117,8 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     }
 
     function phaseUnavailable(generation) {
-        if (!editing) { clear(); return; }
-        phaseReady = false;
+        verifiedPhase = 0;
+        updatePrompt();
         updateEditingStatus();
         phaseTimer = setTimeout(() => void watchPhase(generation), 100);
     }
@@ -133,7 +142,8 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
             }
             observedPhase = phase;
             if (target && target.phase !== phase) { clear(); return; }
-            phaseReady = true;
+            verifiedPhase = phase;
+            updatePrompt();
             updateEditingStatus();
             phaseTimer = setTimeout(() => void watchPhase(generation), 100);
         } catch (error) {
@@ -185,19 +195,21 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
                 clear();
                 return;
             }
+            if (target && !editing && performance.now() >= lease) { clear(); return; }
+            // Keep an unopened prompt on its original deadline while phase verification retries.
+            const renew = !target || editing || verifiedPhase === field.phase;
             observedPhase = field.phase;
             target = field;
             awaiting = false;
-            lease = started + 500;
-            clearTimeout(expiryTimer);
-            expiryTimer = setTimeout(() => {
-                if (editing) updateEditingStatus();
-                else clear();
-            }, Math.max(0, Math.ceil(lease - performance.now())));
-            if (!editing) {
-                position(field);
-                prompt.hidden = false;
+            if (renew) {
+                lease = started + 500;
+                clearTimeout(expiryTimer);
+                expiryTimer = setTimeout(() => {
+                    if (editing) updateEditingStatus();
+                    else clear();
+                }, Math.max(0, Math.ceil(lease - performance.now())));
             }
+            updatePrompt();
             updateEditingStatus();
             timer = setTimeout(() => void sample(point, generation, attempt), Math.max(0, 170 - (performance.now() - started)));
         } catch (error) {
@@ -265,6 +277,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
 
     prompt.addEventListener('click', event => {
         if (!event.isTrusted || !target || performance.now() >= lease) { clear(); return; }
+        if (!canSend()) return;
         const mode = target.mode;
         editor.type = mode === 'password' ? 'password' : 'text';
         editor.inputMode = mode === 'number' ? 'numeric' : mode === 'password' ? 'text' : mode;

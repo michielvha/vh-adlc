@@ -25,6 +25,7 @@ button:focus-visible,textarea:focus-visible,#clipboard-remote:focus-visible{outl
 #clipboard{position:absolute;top:36px;right:8px;z-index:1;width:min(30rem,calc(100% - 16px));max-height:calc(100% - 48px);overflow:auto;box-sizing:border-box;padding:12px;background:#1f232b;border:1px solid #4a5160;border-radius:6px;display:flex;flex-direction:column;gap:8px}
 #clipboard[hidden]{display:none}
 #mobile-type{position:fixed;z-index:3;min-width:112px;min-height:44px;font-size:16px}
+#mobile-type:disabled{opacity:.6;cursor:default}
 #mobile-editor{position:fixed;top:6px;left:8px;width:8px;height:20px;opacity:.01;pointer-events:none;font-size:16px;z-index:3}
 
 #clipboard p{margin:0}

@@ -54,6 +54,8 @@ The owner also saw empty space above and below Chromium after submitting a URL o
 
 The owner tried the repaired private iPhone preview built from `17ea67e3` on 2026-11-20, reported that it was much better, and approved shipping the work. This covers the owner's use of the preview after the keyboard and sizing fixes. The remaining acceptance checks stay open.
 
+A temporary failure from the browser phase endpoint canceled the first tap even when the separate focus endpoint returned the correct address bar. A stock Chromium and noVNC regression reproduced that failure with a single HTTP 503. The viewer now retries the phase check for the same tap. A visible prompt dims and rejects activation while phase verification is unavailable. It can recover within its original lease once both checks agree. Expiry or a confirmed phase change still clears the prompt. The browser regression passed with the repair. A separate Chromium check also verified the disabled prompt, recovery on the same tap, and expiry without revival.
+
 ### Evidence from the first design
 
 The first design passed the vh-adlc in-progress gate and stopped at its feasibility task. The following evidence describes that design and the probes preserved in Git.

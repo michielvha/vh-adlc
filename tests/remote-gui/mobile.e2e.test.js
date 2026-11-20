@@ -130,6 +130,7 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         if (!addressField) await captureFailure();
         assert.ok(addressField, 'Chromium did not report a focused address bar: ' + JSON.stringify(probes));
         await page.route('**/__remote_gui/editable', route => route.fulfill({ status: 503 }), { times: 1 });
+        await page.route('**/__remote_gui/editable-phase', route => route.fulfill({ status: 503 }), { times: 1 });
         await tap(Math.floor(addressField.x + addressField.width / 2), Math.floor(addressField.y + addressField.height / 2));
         await prompt.waitFor({ timeout: 5500 }).catch(async error => {
             await captureFailure();

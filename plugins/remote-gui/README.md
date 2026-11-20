@@ -6,6 +6,8 @@ Share a task-local app through private Tailscale HTTPS, or give a human control 
 
 Tap the remote field and then tap **Tap to type**. The second tap opens the phone’s own keyboard. The viewer puts the prompt within the editable bounds Chromium reports. If a site covers a field while leaving it focused, the prompt can appear over that cover. Keys follow Chromium’s current focus, as they do with a hardware keyboard.
 
+If the prompt dims, wait for the viewer to verify the field again. If it disappears, tap the field to request a new prompt.
+
 New browser sessions use this flow when the host has `dbus-daemon`, `at-spi2-registryd`, and Python 3 with the D-Bus and AT-SPI GI bindings. These are optional. Install them through the host’s package manager if they are missing. Stock Chromium registers with a private per-session accessibility bus. Desktop viewing and control stay available when the mobile helper is unavailable.
 
 ## Viewer sizing
