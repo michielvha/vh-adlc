@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "The tag and detached checkout fixes passed their regression tests. A second independent implementation review is pending."
+status_description: "The tag and detached checkout fixes passed their regression tests. The second independent review found all five criteria met."
 issue: null
 branch: feat/single-writer-ownership
 goal: "Two sessions using vh-adlc cannot accidentally start or resume the same feature as its writer."
@@ -285,18 +285,23 @@ binary continues to supply the existing lifecycle gates.
       Evidence: R-16 returned not met because a conflict advertised an invalid branch for a detached writer.
       Evidence: `bun test tests/vh-adlc/ownership` and the related plugin suite at `de1aebaa`. Two independent clones using the actual entry command raced one Git ref, one won, and the losing checkout, index and local refs were unchanged. New spec paths and separate issues passed the same disposable-remote checks.
       Evidence: After R-16 F-02, the detached competitor received the named writer's actual branch. The failed detached entry and handoff left the reservation ref unchanged. The two-clone race and separate-item tests passed again.
+      Evidence: R-17 returned met at `2fc3784f`.
 - [x] AC-11: Each feature-writing entry resolves the same item from its issue or spec, allows the current writer back in, and holds conflicting or unverified writers before feature writes. Read-only review stays available. Normal editing and tests require no reservation checks.
       Evidence: The ownership and loop fixtures passed at `11ac06ce`, including direct claim refusal before mutation, alias recovery and the read-only review route. Both installed clients resumed after restart and refused a competitor in the same checkout or a second clone. The vacant-item trial isolated the mixed-marker refusal. Ordinary source and test commands have no reservation hook.
+      Evidence: R-17 returned met at `2fc3784f`.
 - [x] AC-12: An explicit handoff transfers the reservation once after the owner stops the previous feature work and keeps it stopped until transfer is verified. The incoming writer can continue from the preserved work. The old session sees the transfer at its next vh-adlc entry. Idle or quota-limited sessions keep their reservation.
       Evidence: The exact handoff, replay and pending issue fixtures passed at `11ac06ce`. Both installed trials let the incoming session continue after the approved fixture handoff, held the old writer and preserved both checkouts. Exiting and restarting a client preserved its original reservation until the explicit transfer.
+      Evidence: R-17 returned met at `2fc3784f`.
 - [x] AC-13: Adoption holds unresolved existing claims or setup, preserves the reservation history across rollback and keeps coordination changes out of branch cleanup and product releases. Coordination updates require authorization for the reserved ref and grant no source or tracker publication permission.
       Evidence: R-16 returned not met because Git tag following could publish a tag during a reservation update.
       Evidence: The policy, adoption, and branch tests passed at `11ac06ce`. They exercised interrupted setup, known-adoption recovery, legacy claim selection, rollback to the bound history, Git protections on a disposable remote, and refusal without coordination authority. Workflow and cleanup checks confirmed the reserved ref is excluded. No live adoption was exercised.
       Evidence: The R-16 F-01 regression first sent the planted annotated tag to the disposable remote. With tag following disabled on reservation pushes, all nine policy tests passed. The reservation advanced, the default branch and remote tags stayed unchanged, and the tag stayed local.
+      Evidence: R-17 returned met at `2fc3784f`.
 - [x] AC-14: A conflict or a transfer message identifies the current writer and gives its host and branch or spec. Absolute checkout paths appear only when resolved locally. The shared Git history and remote diagnostics do not expose raw session IDs or absolute checkout paths.
       Evidence: R-16 returned not met because acquisition and handoff could record an invalid branch for a detached writer.
       Evidence: `bun test tests/vh-adlc/ownership/handoff.test.ts` at `de1aebaa`. Conflict and transfer records named the writer, host and spec. Only the matching local checkout resolved an absolute path. Every fixture commit in the reservation history and the remote diagnostic lacked the planted raw session IDs and local path.
       Evidence: The R-16 F-02 regressions first showed `branch:HEAD` on acquisition and transfer. After the fix, the detached status and conflict reported `branch:feat/unlinked`, and the linked issue transferred with its spec path. The existing local path and session ID checks passed again.
+      Evidence: R-17 returned met at `2fc3784f`.
 
 ## Test Plan
 
@@ -359,6 +364,7 @@ None. The owner selected the Git reservation, entry checks and explicit handoff.
 | 2026-11-20 | R-14 | spec | `9f8b6b4f5ca3723304e7d5a7705c0a41a724417b` | unknown | procedural | Two factual nits on validation wording and citations to the pre-feature baseline. Model identity was not attested. |
 | 2026-11-20 | R-15 | spec | `11ac06ce45d3748cda6d0e6c5a18ad97717be522` | unknown | procedural | No blocking findings. One should-fix finding on the mixed-marker check and two wording nits. Model identity was not attested. |
 | 2026-11-21 | R-16 | implementation | `d6aa50a4828b5e2ab3933c9bb80b918efc50a506` | unknown | procedural | Two blocking findings: unexpected tag publication and a false branch locator on detached checkouts. Model identity was not attested. |
+| 2026-11-21 | R-17 | implementation | `2fc3784fde66d75fbaefda78e3c3c6048e470d1e` | unknown | procedural | All five criteria met. One nit about outdated validation wording. Model identity was not attested. |
 
 ### R-1
 
@@ -819,6 +825,35 @@ SEVERITY: blocking
 WHERE: `plugins/vh-adlc/scripts/ownership/identity.ts:147`, `plugins/vh-adlc/scripts/ownership/entry.ts:201`, `plugins/vh-adlc/scripts/ownership/handoff.ts:9`, `plugins/vh-adlc/scripts/ownership/issue-link.ts:10`, Design, Store the reservation in Git and Start, resume and hand off, the Work location glossary entry, AC-10, AC-14 and their Test Plan rows.
 EVIDENCE: Starting an unlinked issue in a detached checkout and handing an unlinked issue to a detached checkout both succeeded and put `branch:HEAD` in the resulting writer record. Conflict and transfer messages then advertised a branch that Git cannot resolve as a branch name.
 PROPOSAL: Resolve an actual branch or a validated spec before storing a writer location. When a detached writer has neither, hold acquisition or transfer with a next step. Keep status and competing entry able to report the existing writer, and exercise both detached paths in a disposable fixture.
+
+### R-17
+
+CRITERION: AC-10 Two sessions starting the same feature through vh-adlc in separate clones produce one reservation. The other session stops before feature writes and gets the current writer and work location. Separate items can proceed.
+VERDICT: met
+EVIDENCE: I ran the ownership, direct-operation compatibility and loop claim suites at `2fc3784f`. All 43 tests passed. The two-clone race admitted one writer for the same issue or spec and kept tracked files, the index and local refs unchanged. The uncreated spec race and independent-item starts passed. A detached checkout held for an unlinked issue, and a detached competitor received the existing writer's real branch. The exact installed Codex and Claude Code scenario outputs also showed the remote competitor held and a separate item entered.
+
+CRITERION: AC-11 Each feature-writing entry resolves the same item from its issue or spec, allows the current writer back in, and holds conflicting or unverified writers before feature writes. Read-only review stays available. Normal editing and tests require no reservation checks.
+VERDICT: met
+EVIDENCE: The exact-commit suite passed the alias, pending tracker recovery, claim rejection and retry, and writer route checks. I inspected the shared entry instructions for spec, tasks, implementation, review recording and ship, and the resume route into them. The independent read-only review remains available. The standalone claim held a competitor and missing or mismatched client identities before editing, committing or pushing. Both native clients resumed the original conversation in a new process, held a fresh conversation in the same checkout, and held mixed markers on a vacant item that a clean session could enter. The native runs used exact installed packages with scripted local providers.
+
+CRITERION: AC-12 An explicit handoff transfers the reservation once after the owner stops the previous feature work and keeps it stopped until transfer is verified. The incoming writer can continue from the preserved work. The old session sees the transfer at its next vh-adlc entry. Idle or quota-limited sessions keep their reservation.
+VERDICT: met
+EVIDENCE: In the exact-commit fixtures, handoff held without the required confirmation, refused a destination missing pending issue evidence, preserved unfinished work, and replayed an accepted transfer without another ref update. A stale request could not overwrite the replacement. The pending issue was recovered in the destination. Both exact native runs showed that a process exit and resume preserved ownership and that, after handoff, the old conversation held and the incoming conversation entered. The source has no expiry path. The owner stop and preservation confirmations are procedural. No live quota event was exercised.
+
+CRITERION: AC-13 Adoption holds unresolved existing claims or setup, preserves the reservation history across rollback and keeps coordination changes out of branch cleanup and product releases. Coordination updates require authorization for the reserved ref and grant no source or tracker publication permission.
+VERDICT: met
+EVIDENCE: The exact policy and adoption tests covered unresolved claims and setup, no-push, missing authority, append-only protection and recovery of the original history. The R-16 tag regression showed that a reservation update with `push.followTags=true` left the reachable release-shaped tag local. I inspected the cleanup case in the 168-test exact-commit run, the branch exclusion on CI push, the version-job guard on dispatch and the preview guard. Both catalog installs recorded `2fc3784f` and the same payload digest. These checks used disposable remotes and inspected workflow rules. No live adoption or release was exercised.
+
+CRITERION: AC-14 A conflict or a transfer message identifies the current writer and gives its host and branch or spec. Absolute checkout paths appear only when resolved locally. The shared Git history and remote diagnostics do not expose raw session IDs or absolute checkout paths.
+VERDICT: met
+EVIDENCE: The exact-commit handoff tests verified the writer identity and host, a local path only in the matching checkout, and the absence of the planted raw IDs and absolute checkout path from shared reservation blobs and remote diagnostics. Detached entry and handoff held without a branch or linked spec and left the reservation unchanged. For a linked issue, a detached checkout could acquire and receive a handoff with the spec locator. The exact native clients' remote refusal and transfer outputs reported the linked spec and current writer.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary, and Sources.
+EVIDENCE: The Owner summary says the clone race, resume and handoff checks are still to run. The last client-observation source says the Claude route still needs its installed-client proof. The exact-commit race and both installed-client receipts now record those checks.
+PROPOSAL: Update the summary and source note to reflect the observed disposable Git and installed-client results and their fixture limits.
 
 ## Sources
 
