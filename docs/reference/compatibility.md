@@ -234,12 +234,17 @@ writers. See [adoption and handoff](../../plugins/vh-adlc/references/authority.m
 
 ## Documentation truth review
 
-The 0.27.0 candidate installed through both native CLI catalog paths in isolated
-profiles. Both clients discovered the skill and matched the exact candidate
-payload. Codex CLI also exercised the synthetic report through the installed
-skill. The Claude Code model trial requires available account capacity.
-See the [feature evidence](../specs/shared-docs-truth.md) for the exact reviewed
-commits and the released install and adoption checks.
+Codex CLI and Claude Code both discovered `vh-adlc-docs-truth` after a fresh
+marketplace install and after upgrading from 0.26.1 to 0.27.0. All four installs
+matched the released package at commit `84e59c89`. Both clients passed the
+synthetic claim review and freshness report through the installed skill.
+[Release and acceptance evidence](../specs/shared-docs-truth.md#tasks)
+
+Stackweaver kept its `/docs-truth` command, selector and existing verification
+history. The native Claude trials exercised read-only reports, authorized fixes,
+ledger updates and delivery recovery in disposable repositories. The
+post-merge report used the merged command and the installed skill.
+[Stackweaver migration #1162](https://github.com/michielvha/stackweaver/pull/1162)
 
 <a name="shared-documentation-drift-candidate"></a>
 
