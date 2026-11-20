@@ -1,10 +1,11 @@
 ---
-status: in-progress
-status_description: "The shared package is published and marketplace installs and upgrades passed on both CLIs. Claude Code reached its account spending limit during the native trial. Stackweaver cutover remains open."
+status: draft
+status_description: "The shared package is published and both native freshness reports passed. Review coverage now includes the generic entry that routes docs-truth. Stackweaver acceptance is in progress."
 issue: https://github.com/michielvha/vh-adlc/issues/127
 branch: feat/shared-docs-truth
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
 covers:
+  - plugins/vh-adlc/skills/vh-adlc/SKILL.md
   - plugins/vh-adlc/skills/vh-adlc-docs-truth/
   - plugins/vh-adlc/references/docs-truth.md
   - plugins/vh-adlc/references/lifecycle.md
@@ -35,7 +36,9 @@ The shared entry runs only on request. By default it reviews the next batch and 
 
 Stackweaver's native command keeps its authorized fixes, ledger updates and docs-only delivery. An explicit read-only request leaves the checkout and ledger untouched. A complete review can advance freshness with unknown claims visibly flagged. Targeted reviews keep their own ledger mode. An interrupted review or pending correction leaves that document's completed history alone.
 
-The shared skill is available in vh-adlc 0.27.0. Fresh installs and upgrades from 0.26.1 passed in Codex CLI and Claude Code. Codex ran claim review and freshness reporting from the installed plugin. Stackweaver's local rehearsal preserved the default batch and freshness output and exercised Git delivery and rollback. Claude Code hit its account spending limit, so the native report and Stackweaver command checks still gate cutover.
+The shared skill is available in vh-adlc 0.27.0. Fresh installs, upgrades from 0.26.1 and the released freshness report passed in Codex CLI and Claude Code. Stackweaver's local rehearsal preserved the default batch and freshness output and exercised Git delivery and rollback. The native Stackweaver command checks still gate cutover.
+
+The review now covers the generic vh-adlc entry that asks for scope before opening documentation in an ambiguous request. This revision records that existing file in the feature's coverage so future changes to it invalidate stale review evidence.
 
 ### Background
 
@@ -94,10 +97,8 @@ Review the exact candidate before publication and identify which criteria need p
 
 ## Acceptance Criteria
 
-- [x] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
-      Evidence: R-11 observed both exact installed intake cases at 0a07a791. The generic entry is read before the lifecycle reference, and the ambiguous request opens no candidate docs. R-10 retains its prior failed receipt.
-- [x] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
-      Evidence: Independent R-7 inspected the exact candidate Codex evidence for source-backed claims, unsupported replacement, retained product contract, incomplete report and preserved source, refs and index.
+- [ ] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+- [ ] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
 - [ ] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
 - [ ] AC-04: The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
 
@@ -121,11 +122,12 @@ Review the exact candidate before publication and identify which criteria need p
       Evidence: The committed native runner now retains the exact payload, assessed state, report and process result. Codex executed the core fixture above. Claude's signed-in default and Haiku routes returned HTTP 429 usage_limit_reached. Native Claude report behavior remains unverified. The shared package can be reviewed for a separately tracked in-progress delivery while the consumer stays on its native command.
       Evidence: Both isolated native catalogs installed the package from `18d20daf`. The strict check matched 304 files and modes with component SHA-256 `ca01ed832dc4724a9e23515615657fe69daa97cbb4fbff24ee4e446d3daa4543`. Later runner and spec edits keep the shipped package digest. The earlier Codex trial ran 19 synthetic cases at `04d58a64`. The strengthened trial separately observed the changed-path and interrupted-report cases at `18d20daf`. The covered package, triage discovery and docs-truth fixture suite passed 74 tests and 337 assertions, without relying on the maintenance discovery suite.
       Evidence: [Merged PR #129](https://github.com/michielvha/vh-adlc/pull/129) published 0.27.0 at `84e59c898cbdb0bd4e76bd207b30a5356b495b32` after [all PR checks passed](https://github.com/michielvha/vh-adlc/actions/runs/44572858217). Both native CLIs discovered the skill after fresh installation and upgrade from 0.26.1 through the default GitHub marketplace. All four isolated installs matched the 304 reviewed files and modes with component SHA-256 `53842de6ccae44cc5b587d712d3ddcc8edd08573f43bb1650c27620c14ac0e91`. Codex passed the default claim-review and freshness-report fixtures with identical checkout, index and ref snapshots. Claude Code returned HTTP 429 `usage_limit_reached` before completing a report.
+      Evidence: The released package at `84e59c89` passed the freshness report in Claude Code 2.1.326 with `claude-opus-5-5`. The report matched the exact selector output and the fixture tree, index and refs stayed unchanged. The optional full-batch rerun rejected Claude's evidence-backed unknown verdict for the package's probe default, since the earlier assertion treated a configured override as proof of the default. The published freshness acceptance case is recorded separately.
 - [ ] T4 Stackweaver's `.claude/commands/docs-truth.md`, `.vh-adlc/docs-truth.md` and `tests/agent-docs-truth/native-trial.ts` - prepare the unpublished routing and consumer proof, including legacy comparison, authorized writes, recovery and rollback in disposable clones (AC-03)
       Evidence: Operator trial compared Stackweaver baseline `72e48ed5` and local adapter `22e5b96f`. Default batch paths, reasons and the full freshness output matched, the selector and ledger-related blobs stayed identical, and rollback and reapplication reproduced both trees. The local hook passed six checks. The native command's model-driven write and recovery behavior needs its own proof before cutover.
       Evidence: Unpublished consumer revision `2d3bca4f` exercises a coupled docs and ledger commit against a synthetic local bare remote. The rehearsal preserves pending changes and the index, rejects a competing push and recognizes an already landed commit before retrying. The native Stackweaver command's routing, write and recovery checks remain open.
 
-For the published package, the R-11 reviewed source and verified 304-file package digest also bind the generic entry. The R-11 finding on the feature's declared path coverage stays open for the completion review.
+The declared path coverage now includes the generic entry, addressing the R-11 finding. The reviewed published package already contained that entry and its verified bytes.
 
 ## Open Questions
 
