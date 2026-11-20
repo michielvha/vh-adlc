@@ -395,6 +395,15 @@ The shared skill returns evidence and proposed corrections in the session. Repos
 declare their own sources, selection and exemptions. See the
 [procedure](../../plugins/vh-adlc/references/docs-truth.md).
 
+The 0.27.0 skill was verified on fresh installs and upgrades from 0.26.1 in
+Codex CLI and Claude Code. Both passed the synthetic claim review and freshness
+report. [Compatibility and test evidence](../reference/compatibility.md#documentation-truth-review)
+
+In Stackweaver, continue to use `/docs-truth` for the next 15 documents or
+`/docs-truth report` for recorded freshness. The repository still owns its
+selection, ledger and rules for applying and publishing verified fixes.
+[Stackweaver migration #1162](https://github.com/michielvha/stackweaver/pull/1162)
+
 ## Documentation drift
 
 The released `vh-adlc-docs-drift` operation handles accumulated documentation
