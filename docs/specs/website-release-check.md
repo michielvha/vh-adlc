@@ -95,14 +95,11 @@ None. The owner selected report mode first and approved explicit run outcomes an
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
-
 | 2026-11-19 | R-1 | spec | `24e61d66d71bbc1562f8208edb9bb41035ffaa0f` | unknown | procedural | One blocking, twelve should-fix and one nit |
-
 | 2026-11-20 | R-2 | spec | `1069bcf989934141d80b610bd387d2c60f9fdd49` | unknown | procedural | One blocking and seven should-fix findings |
-
 | 2026-11-20 | R-3 | spec | `e896b1047cfbc109f9211adb4bd1972584e6802d` | unknown | procedural | One blocking and three should-fix findings |
-
 | 2026-11-20 | R-4 | spec | `f2dfa03f9fdf0eab4a00eb649f47b90a4a855145` | unknown | procedural | Two should-fix findings |
+| 2026-11-20 | R-5 | spec | `754c9507ebae9a4045dbfa72045ef15f97a274ba` | unknown | procedural | One should-fix finding |
 
 ### R-1
 
@@ -307,6 +304,15 @@ SEVERITY: should-fix
 WHERE: Context / Owner summary lines 27 and 29, Design lines 48 and 49, Terms lines 64 to 66, Acceptance Criteria AC-02 and AC-03, Test Plan AC-02 and AC-03
 EVIDENCE: The R-3 revision requires real terminal events but still ends collection after the first terminal outcome for each required method and URL. If two matching attempts have already started, the first can succeed while the second is still downloading. The current proof only holds open the sole matching response, so it cannot distinguish a run that silently passes with a known pending attempt from one that waits for it.
 PROPOSAL: Define how a matching attempt already in flight at the early completion point affects coverage while keeping the existing deadline. Prove the selected behavior with overlapping attempts where one succeeds and the other remains pending.
+
+### R-5
+
+FINDING: F-01  
+KIND: factual  
+SEVERITY: should-fix  
+WHERE: Context / Owner summary line 27, Scope line 43, Design line 50, Acceptance Criteria AC-03, Test Plan AC-03  
+EVIDENCE: The R-4 revision adds case-insensitive presence and exact-value rules without defining the observed value for repeated headers. Playwright's `headerValue()` combines repeated values, `headerValues()` returns the values separately where available, and `headers()` omits some security-related headers. A fixture with one ordinary header can pass while implementations disagree on presence or exact-value matches against real deployments. [Playwright Response API](https://playwright.dev/docs/api/class-response#response-header-value)  
+PROPOSAL: Define a single case-insensitive lookup and exact-value comparison using Playwright's documented observed representation. Prove the verdict for a security-related header and a repeated header containing an additional value, while retaining the no-extra-requests check.
 
 ## Sources
 
