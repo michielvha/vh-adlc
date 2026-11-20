@@ -15,6 +15,8 @@ invoking investigation never becomes permission to implement a repair.
 1. Identify the requested result and inspect the current repository or artifact.
    Separate the outcome, the actions authorized in the owner's request, and the
    existing task's actual state. A question may need only an answer.
+   For an ambiguous documentation audit, resolve its scope using the request,
+   Git metadata and applicable instructions before opening candidate documents.
 2. Identify persistent code-audit intent before its installer or knowledge call. Inspect only the request,
    local instructions and read-only repository evidence needed to choose the route. For code audit, use
    `scripts/audit/bootstrap.ts --offline` from the audit skill: verified cached binary, validated settings
@@ -56,6 +58,7 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Article authoring, revision or promotion drafts | Use `skills/vh-adlc-blog/SKILL.md`; promotion mode prepares article-linked social copy only on request. Writing an article needs no software feature document. A request for implementing a blog or changing application behavior stays in the feature procedure. |
 | Review documentation affected by a code change | Use `skills/vh-adlc-docs-impact/SKILL.md`, for example “which docs need updating for this patch?”. A mixed feature-code request retains its underlying feature procedure and integrated docs check. |
 | Whole-corpus documentation drift or selected stale documentation-audit PRs | Use `skills/vh-adlc-docs-drift/SKILL.md` in audit or resolve mode; an explicitly selected post-merge resolve entry freshly reviews a merged consolidation before its scoped closure effects. |
+| Rolling factual documentation review | Use `skills/vh-adlc-docs-truth/SKILL.md` for an explicitly requested claim-by-claim review or recorded freshness. |
 | Documentation or a convention | Edit the authoritative requested artifact using the resolved engineering rules, check the result and report it. No feature spec is needed solely to store prose. |
 | Host cleanup, or a session blocked by a full `/tmp` | Use `skills/vh-adlc-clean/SKILL.md`. It needs no feature document; `--compose` and `--kind` only on the user's request. |
 | Dependency or security sweep | Use `skills/vh-adlc-maintenance/SKILL.md` for inventory, evidence, durable reporting and selected follow-up; publish reports only through its exact current/adopted authority. |
@@ -94,11 +97,11 @@ with a fresh closure basis. The owner selects scope and effects. Configured
 settings never choose an operation or grant a write.
 
 An ambiguous “audit” or “audit the docs” gets one focused scope question
-before any scan or write. Ask whether the desired result is accumulated docs
-drift, selected-change docs impact, persistent code audit or the selected
-local truth workflow, using the context to keep the question short. A request
-for exhaustive claim verification follows its selected local truth procedure
-or receives an unsupported-operation handoff. Plain doc edits keep artifact
+before any scan or write and before reading candidate documents. Ask whether the desired result is accumulated docs
+drift, selected-change docs impact, persistent code audit or factual claim
+review, using the context to keep the question short. An explicit rolling claim
+review follows docs truth. A project command that names a local truth workflow
+follows its own entry and authority. Plain doc edits keep artifact
 editing. A mixed feature request keeps its feature procedure and docs-impact
 obligation.
 

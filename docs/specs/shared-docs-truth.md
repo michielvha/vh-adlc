@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "The owner accepted the spec after clean review R-4. Implementation is claimed."
+status_description: "The owner accepted the spec after clean review R-4. The shared package is reviewed for in-progress publication. Published installs and Stackweaver cutover remain open."
 issue: https://github.com/michielvha/vh-adlc/issues/127
 branch: feat/shared-docs-truth
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
@@ -94,8 +94,10 @@ Review the exact candidate before publication and identify which criteria need p
 
 ## Acceptance Criteria
 
-- [ ] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
-- [ ] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+- [x] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+      Evidence: R-11 observed both exact installed intake cases at 0a07a791. The generic entry is read before the lifecycle reference, and the ambiguous request opens no candidate docs. R-10 retains its prior failed receipt.
+- [x] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+      Evidence: Independent R-7 inspected the exact candidate Codex evidence for source-backed claims, unsupported replacement, retained product contract, incomplete report and preserved source, refs and index.
 - [ ] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
 - [ ] AC-04: The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
 
@@ -110,10 +112,18 @@ Review the exact candidate before publication and identify which criteria need p
 
 ## Tasks
 
-- [ ] T1 `plugins/vh-adlc/skills/vh-adlc-docs-truth/SKILL.md`, `plugins/vh-adlc/references/{docs-truth,lifecycle}.md`, package manifests, discovery tests and installation guides - the package discovers and routes the on-demand skill through one shared read-only procedure, and the existing docs routes still pass discovery checks (AC-01, AC-02, AC-04)
-- [ ] T2 `plugins/vh-adlc/examples/docs-truth/` and `tests/vh-adlc/docs-truth/` - a runnable fixture covers selected paths, complete and partial selection, and the expected evidence and verdicts without writing the assessed checkout (AC-01, AC-02)
+- [x] T1 `plugins/vh-adlc/skills/vh-adlc-docs-truth/SKILL.md`, `plugins/vh-adlc/references/{docs-truth,lifecycle}.md`, package manifests, discovery tests and installation guides - the package discovers and routes the on-demand skill through one shared read-only procedure, and the existing docs routes still pass discovery checks (AC-01, AC-02, AC-04)
+      Evidence: The new discovery test failed on the missing skill and route before implementation. After the change, the package checker and docs-truth, triage and maintenance discovery suites pass 76 tests and 410 assertions. The skill metadata validator passes. This proves source packaging and routing checks. Native behavior and installed acceptance remain open.
+- [x] T2 `plugins/vh-adlc/examples/docs-truth/` and `tests/vh-adlc/docs-truth/` - a runnable fixture covers selected paths, complete and partial selection, and the expected evidence and verdicts without writing the assessed checkout (AC-01, AC-02)
+      Evidence: The sample selector passes ordering, freshness, committed inputs, invalid arguments and unavailable history checks. The native Codex rerun of `04d58a64` passed the default full review, partial selector failure, and targeted sweep against the installed candidate. It preserved the Git HEAD, index and working files in all three cases. The first full attempt found a false description of the sample Makefile, which was corrected before these runs.
 - [ ] T3 `tests/vh-adlc/docs-truth/native-trial.ts` and compatibility and marketplace guides - run the committed shared fixture through both candidate catalog paths and retain the exact package, native discovery and report transcripts (AC-01, AC-02, AC-04)
+      Evidence: The exact local candidate at `87c076a8` installed through both native marketplace catalogs in isolated Codex CLI 0.167.2 and Claude Code 2.1.326 profiles. Both discovered `vh-adlc-docs-truth` and matched all 304 package files and modes. The combined package and selector checks passed 77 tests and 422 assertions. The committed rerun, native claim report, published installs and upgrade checks remain open.
+      Evidence: The committed native runner now retains the exact payload, assessed state, report and process result. Codex executed the core fixture above. Claude's signed-in default and Haiku routes returned HTTP 429 usage_limit_reached. Native Claude report behavior remains unverified. The shared package can be reviewed for a separately tracked in-progress delivery while the consumer stays on its native command.
+      Evidence: Both isolated native catalogs installed the package from `18d20daf`. The strict check matched 304 files and modes with component SHA-256 `ca01ed832dc4724a9e23515615657fe69daa97cbb4fbff24ee4e446d3daa4543`. Later runner and spec edits keep the shipped package digest. The earlier Codex trial ran 19 synthetic cases at `04d58a64`. The strengthened trial separately observed the changed-path and interrupted-report cases at `18d20daf`. The covered package, triage discovery and docs-truth fixture suite passed 74 tests and 337 assertions, without relying on the maintenance discovery suite.
 - [ ] T4 Stackweaver's `.claude/commands/docs-truth.md`, `.vh-adlc/docs-truth.md` and `tests/agent-docs-truth/native-trial.ts` - prepare the unpublished routing and consumer proof, including legacy comparison, authorized writes, recovery and rollback in disposable clones (AC-03)
+      Evidence: Operator trial compared Stackweaver baseline `72e48ed5` and local adapter `22e5b96f`. Default batch paths, reasons and the full freshness output matched, the selector and ledger-related blobs stayed identical, and rollback and reapplication reproduced both trees. The local hook passed six checks. The native command's model-driven write and recovery behavior needs its own proof before cutover.
+
+For the in-progress release, the R-11 exact source and 304-file package digest bind the generic entry too. The R-11 covers finding stays open for the completion review. A change to package bytes before merge needs a fresh installed-payload check.
 
 ## Open Questions
 
@@ -128,6 +138,13 @@ None.
 | 2026-11-19 | R-3 | spec | `0f910f12b9473d7956c5dc1fcedd9a873986e44b` | unknown | procedural | Two should-fix findings. |
 | 2026-11-19 | R-4 | spec | `f06f8906ae4801b062c29957269b42f375ef442a` | unknown | procedural | No findings. |
 | 2026-11-19 | R-4 | spec | `f06f8906ae4801b062c29957269b42f375ef442a` | n/a | n/a | accepted by owner |
+| 2026-11-19 | R-5 | implementation | `18d20daf80d86d3f3c7c604fd0fe6c879b77ae58` | unknown | procedural | One blocker in fixture isolation and four should-fix findings. |
+| 2026-11-19 | R-6 | implementation | `3698d2472244c6a13a6b0a2abdfd12cfaf50213e` | unknown | procedural | One blocker and two should-fix findings in native receipt checks. |
+| 2026-11-19 | R-7 | implementation | `8cda536e00bc5752fd17de860b05d2347b8fab9f` | unknown | procedural | No findings. AC-02 met. Released and consumer checks remain open. |
+| 2026-11-19 | R-8 | implementation | `694458f7c6550ac630b09f4eef853f40ba4f7d26` | unknown | procedural | One blocker and one should-fix finding in generic intake proof. |
+| 2026-11-19 | R-9 | implementation | `bd1f6d0490254610fb17313fe053df4aadea49cc` | unknown | procedural | No findings. Shared behavior verified. Released and consumer checks remain open. |
+| 2026-11-19 | R-10 | implementation | `310a3b1146caa84a2c7f18526b3a383b0dcce5eb` | unknown | procedural | Adjacent checks pass. One blocker in early ambiguous intake. |
+| 2026-11-19 | R-11 | implementation | `a75063badddfcc8521a5896bf5f0ed4e3adbd5ac` | unknown | procedural | Shared behavior met. One should-fix on review coverage. |
 
 ### R-1
 
@@ -260,6 +277,223 @@ PROPOSAL: Treat failed or incomplete selection as a failed batch, distinct from 
 ### R-4
 
 NO FINDINGS
+
+### R-5
+
+TARGET: 18d20daf80d86d3f3c7c604fd0fe6c879b77ae58
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: untested
+EVIDENCE: At 18d20daf, the package checker, example selector and three discovery suites passed 77 tests and 422 assertions. I inspected the 19 retained Codex case results at 04d58a64 and the tool traces for representative modes and rejections. The partial selector exited 17 after returning a path, and that trace contains no document-body read or write handoff. The committed runner lacks the required on-disk path replacement case and does not check selection reasons or the full read boundary.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: untested
+EVIDENCE: The retained Codex default and targeted transcripts at 04d58a64 cite committed source, propose port 3900, flag the HTTP 500 versus 503 contract discrepancy, and leave the worker count unresolved. The freshness transcript shows the ledger and selector reads without document-body reads. Receipt snapshots match. The committed trial has no interrupted report case and no contradicted claim whose replacement is unsupported.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: At 18d20daf, the public feature document leaves the consumer adapter and proof task open. The dispatcher supplied selector parity and rollback as operator observations. I did not inspect or run the private consumer's forwarding, write, recovery or cutover checks.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: The dual-catalog receipt covers local candidate 87c076a8. The Codex scenario receipts cover 04d58a64. I recomputed distinct component fingerprints for those revisions and 18d20daf. The dispatcher reports Claude's native model attempts returned HTTP 429. Ordinary published installs, upgrades and post-adoption documentation were not observed.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:40-44,117-118,137-142`, AC-01 and AC-02 proof
+EVIDENCE: The native client receives an environment with `GIT_*` removed. The runner's own Git helper inherits the original environment. An inherited `GIT_DIR`, `GIT_WORK_TREE` or `GIT_INDEX_FILE` can redirect the fixture's `git init`, `git add` or `git commit` outside the disposable repository before the preservation snapshot. The neighboring example test strips repository overrides from those commands.
+PROPOSAL: Use an isolated Git environment for all fixture setup and snapshot commands. Test inherited Git overrides with a second disposable repository and verify that its refs, index and worktree stay intact.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:11-14,49-65,80-106,154-162`, AC-01 and AC-02 proof
+EVIDENCE: The verifier checks the model's final status, paths and coverage. It does not verify selection reasons, freshness output, installed procedure use, or whether the model opened document bodies before refusing a request. A generic failure answer passes the negative cases. A generic complete answer with an empty findings array passes freshness mode. Full review uses subset matching, so a report can omit some claims and still pass. The preservation check skips Git metadata other than the index and current HEAD.
+PROPOSAL: Bind the trial verdict to observed procedure and source reads, exact selection reasons and expected findings. Assert the refusal and freshness-only read boundary and compare repository refs as well as the existing state snapshot.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:16-36,121-161`, `plugins/vh-adlc/examples/docs-truth/project/docs/current/setup.md:3-9`, AC-01 and AC-02 proof
+EVIDENCE: No case replaces a tracked document on disk after validation. No case interrupts a review after some work is done, and the runner rejects process failure before checking unfinished work. The fixture's contradicted port and timeout both have supported replacements. Its unresolved worker count is an unknown claim, so it cannot show that the verifier flags an incorrect claim whose replacement is unsupported.
+PROPOSAL: Add the path replacement and interrupted-report cases and assert their accepted outcomes. Add a contradicted claim for which the evidence cannot support replacement wording.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Stackweaver adoption (line 78), AC-04 proof (line 109), Task T3 (lines 117-119)
+EVIDENCE: The accepted pre-merge check requires installing the exact candidate through both catalogs. The dual-catalog receipt is for 87c076a8 and component fingerprint `88716ecc0cdf`. The Codex transcripts use 04d58a64 and `f7d706eaeb54`. I computed `ca01ed832dc4` for 18d20daf. Its installed package includes a revised example README. Matching the count of 304 files is insufficient to reconcile these identities.
+PROPOSAL: Repeat ordinary local candidate installation and discovery through both catalogs at the exact publishable package fingerprint before merge. Preserve the earlier receipts against their original revisions and keep the separate published-marketplace checks open.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Feature `covers` (lines 7-23), Task T1 (lines 113-114), `tests/vh-adlc/maintenance/discovery.test.ts:12`
+EVIDENCE: This candidate changes the maintenance discovery test's fixed skill count to a check for the maintenance skill. The prior assertion fails when the docs-truth skill is installed in the source tree. The feature cites the maintenance suite as discovery evidence, but its coverage excludes this changed test, so later edits to that test do not stale the review.
+PROPOSAL: Cover the changed discovery test through the accepted spec revision and review process, or establish the same discovery proof through the already covered tests without depending on the uncovered change.
+
+### R-6
+
+TARGET: 3698d2472244c6a13a6b0a2abdfd12cfaf50213e
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: not verified
+EVIDENCE: At 3698d247, the focused Bun suite passed 74 tests and 337 assertions, including the inherited Git context regression. On the identical shipped component from 18d20daf, I inspected Codex traces showing the default selection and reason, refusal after a partial selector returned one path, and refusal after a tracked file changed on disk. The remaining mode, intake and refusal cases ran at the earlier 04d58a64 fingerprint. The revised runner has not established the whole criterion on the exact candidate.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: untested
+EVIDENCE: The 18d20daf Codex transcripts show source-backed verdicts, the HTTP 500 versus 503 product discrepancy, a source-backed refusal to invent the configured retention duration, and a freshness-only report. Git HEAD, refs, index and project files match in the completed report receipts. The runner rejects the correct unsupported-replacement responses. The interruption trace establishes cancellation before the second document and preservation, but contains no native unfinished-review report.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 at 3698d247 records operator-observed selector parity and rollback between Stackweaver baseline 72e48ed5 and adapter 22e5b96f. I did not inspect private consumer files or observe native forwarding, authorized writes, delivery recovery or cutover. Those checks remain open.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: I inspected both local catalog install receipts and the Claude discovery inventory, and recomputed matching fingerprints for the 304 shipped files at 18d20daf and 3698d247. Codex executed the exact installed skill in the retained local trial. The dispatcher reports that Claude's model attempts returned HTTP 429. Ordinary published marketplace installs, upgrades, Claude claim review and post-adoption documentation remain unverified.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:12-16,156-159`, AC-02 proof
+EVIDENCE: The R-5 F-03 remedy added an unsupported-replacement case. Both retained runs correctly mark the exact 30-day claim incorrect and cite the 14-day maximum and operator-set duration. The rerun says "No fixed-duration replacement is supported." The verifier rejects that correct disposition because its wording is absent from the regular expression. This blocks the fixture proof.
+PROPOSAL: Have the fixture request a structured unsupported-replacement disposition and assert it alongside the verdict and source. Preserve both failed receipts and check that the verifier accepts the observed correct outcome and rejects a proposed unverified duration.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:214-225,231-251`, AC-02 proof and Task T3
+EVIDENCE: The R-5 F-03 remedy cancels the process after the first document-body read. The retained run exited 143 with no native final report. The runner marks the case successful and populates `unfinished` with both expected paths itself. This verifies cancellation and unchanged state, but cannot prove that the review exposes unfinished work.
+PROPOSAL: Retain the hard-cancellation case as preservation evidence. Add a controlled interruption that lets the installed procedure return unfinished work, and verify the completed and unfinished paths from that output.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:85-119,121-159`, AC-01 and AC-02 proof
+EVIDENCE: The R-5 F-02 remedy adds checks for trace markers, freshness output and selection reasons. A generic failed response still passes a negative case without evidence of the intended refusal. The partial case need not show that the selector actually returned a path and exited with failure. In a sized full review, the six setup findings alone still pass even if all README claims are missing. The meta and historical cases accept an empty findings array.
+PROPOSAL: For each required refusal, attest the input and diagnostic that distinguish it from a generic failure. Assert the expected findings and evidence for every document in the sized, meta and historical cases.
+
+### R-7
+
+TARGET: 8cda536e00bc5752fd17de860b05d2347b8fab9f
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: not verified
+EVIDENCE: At 8cda536e, the focused Bun suite passed 74 tests and 337 assertions, and the feature document lint passed. On the identical 18d20daf package fingerprint, retained Codex trials show correct default and sized selection, meta and freshness modes, partial-inventory refusal, path replacement refusal and representative invalid-input refusals. Other modes and refusals were observed at the earlier 04d58a64 fingerprint. The entire accepted selection and intake matrix has not been observed on the exact package.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The retained exact-package Codex transcripts show the cited port and timeout corrections, accurate command and backend claims, the unknown worker count, and the HTTP 500 versus 503 product issue. The corrected runner accepted the targeted unsupported-retention flag. The paused native report identified the completed setup document and unfinished README, and the freshness trace shows no document-body reads. The completed trials preserved refs, HEAD, index and project files. The older regex rejections and forced cancellation remain separate diagnostic evidence.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 records operator-observed selector parity and rollback for Stackweaver 72e48ed5 and 22e5b96f. This review did not inspect private consumer files or observe native forwarding, authorized writes, recovery or cutover.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: I inspected both native local-catalog installation receipts and the Claude discovery inventory. The 304-file component fingerprint at 8cda536e matches the 18d20daf candidate receipt. Codex executed the installed procedure. Claude model execution remains pending after the reported HTTP 429 responses. Actual published installs, upgrades and the post-adoption record remain open.
+
+### R-8
+
+TARGET: 694458f7c6550ac630b09f4eef853f40ba4f7d26
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: not verified
+EVIDENCE: At 694458f7, the focused Bun suite passed 74 tests and 337 assertions, and feature lint passed. The shipped fingerprint matches 18d20daf. The new same-package Codex transcripts passed the structured duplicate-path, outside-scope and incomplete-inventory cases with unchanged state. Earlier same-package transcripts establish the remaining selection modes and input refusals. The installed intake proof still has the two gaps below.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The shipped component is unchanged since R-7. I inspected the retained same-package evidence showing the source-backed verdicts, the product contract conflict, the targeted unsupported-replacement flag, the native unfinished-work report, and the freshness-only path. The completed and paused trial snapshots preserve HEAD, refs, index and project files. The reason-code change applies only to refusal assertions.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 records operator-observed selector parity and rollback for Stackweaver 72e48ed5 and 22e5b96f. This review did not inspect private consumer files or observe native forwarding, authorized writes, recovery or cutover.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: The native local-catalog installation receipts apply to the same 304 shipped files at 18d20daf and 694458f7. Codex executed the installed procedure. Claude discovery was observed locally, while model execution remains open after the reported HTTP 429 responses. Ordinary published installs, upgrades and adoption documentation remain unverified.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:167-178`, AC-01 intake proof
+EVIDENCE: The exact-package generic-intake transcript correctly marks the worker count unknown. It cites a search of the assessed commit for worker references and explains that the Makefile only prints a message. The existing source regex requires `workers`, `config` or `source`, so the runner rejects this valid evidence. The reason-code correction leaves this independent assertion unchanged.
+PROPOSAL: Accept the observed source description and retain a requirement for independent source evidence. Keep the rejected receipt and rerun generic intake.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: `tests/vh-adlc/docs-truth/native-trial.ts:132-139`, `plugins/vh-adlc/references/lifecycle.md` ambiguous documentation intake, AC-01 clarification proof
+EVIDENCE: The exact-package ambiguity transcript read the installed lifecycle reference through a brace-expanded shell path. The verifier's literal command substring missed the read. The transcript also shows that the agent opened the synthetic README before asking for scope, so the case does not establish clarification before document collection.
+PROPOSAL: Verify the observed lifecycle reference without relying on shell command spelling. State that the ambiguous intake branch asks for scope before opening candidate documents, then rerun it and verify the read boundary.
+
+### R-9
+
+TARGET: bd1f6d0490254610fb17313fe053df4aadea49cc
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: met
+EVIDENCE: At bd1f6d04, the focused suite passed 74 tests and 337 assertions, and feature lint passed. Both native Codex intake cases passed on the 78e6da7b package, whose 304-file fingerprint matches bd1f6d04. The traces contain the revised installed lifecycle body. Explicit intake selected docs truth and verified source. Ambiguous intake asked for scope without opening candidate documents or running the selector. Earlier 18d20daf transcripts establish the direct modes, refusals and interrupted-selection behavior. The direct skill, procedure and fixture bytes are unchanged.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The 78e6da7b generic-intake transcript cites committed source for the verdicts, including the unresolved worker count, and preserves HEAD, refs, index and project files. R-7's 18d20daf direct-mode receipts establish the unsupported-replacement flag, product issue, full and targeted coverage, unfinished-work report and freshness-only read boundary. The R-8 remedies and current intake change leave the direct procedure and fixture unchanged.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 records operator-observed selector parity and rollback for Stackweaver 72e48ed5 and 22e5b96f. This review did not inspect private consumer files or observe native forwarding, authorized writes, recovery or cutover.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: I inspected the two native local-catalog installation receipts and the Claude discovery inventory for the 78e6da7b payload, and recomputed its matching fingerprint at bd1f6d04. Codex ran both revised intake cases through the installed package. Published marketplace fresh installs and upgrades, Claude claim review, and the adoption record remain open.
+
+### R-10
+
+TARGET: 310a3b1146caa84a2c7f18526b3a383b0dcce5eb
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: not met
+EVIDENCE: At 310a3b11, the focused docs-drift authority suite passed 9 tests and 112 assertions. The exact installed Codex ambiguity trial loaded the intended lifecycle text and asked for scope, but opened the synthetic README first. The runner correctly failed the clarification-before-collection check. The earlier direct-mode and explicit-intake evidence retains its original package attribution.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The current lifecycle edit changes intake clarification and adjacent routing wording. R-7's 18d20daf direct-mode receipts still establish the source-backed verdicts, unsupported-replacement flag, product issue, full and targeted coverage, unfinished-work report, freshness-only path and preserved state. The direct skill, procedure and fixture bytes remain unchanged.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 records operator-observed selector parity and rollback for Stackweaver 72e48ed5 and 22e5b96f. This review did not inspect private consumer files or observe native forwarding, authorized writes, recovery or cutover.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: The native local-catalog install receipts and Claude discovery inventory apply to 310a3b11. I recomputed the matching fingerprint for its 304 shipped files. Ordinary published installs, upgrades, Claude claim review and adoption documentation remain open.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: `plugins/vh-adlc/skills/vh-adlc/SKILL.md:8-17`, `plugins/vh-adlc/references/lifecycle.md:15-21,95-100`, AC-01 clarification proof
+EVIDENCE: The R-10 wording restores the adjacent docs-drift assertions and retains the clarification rule. In the exact installed Codex trial, the generic entry led to a single shell command that opened both the lifecycle reference and the synthetic README. The read occurred before the model could apply the rule in the reference. The runner correctly refused the trial despite unchanged Git state and verified package identity.
+PROPOSAL: Surface the clarification-before-document-read rule in the generic skill entry so the model sees it before loading the lifecycle reference. Retain the lifecycle rule and the failed receipt, then rerun the installed ambiguity case.
+
+### R-11
+
+TARGET: a75063badddfcc8521a5896bf5f0ed4e3adbd5ac
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: met
+EVIDENCE: At a75063ba, the focused discovery and docs-drift authority suites passed 12 tests and 124 assertions, and feature lint passed. The 0a07a791 local-install receipt matches all 304 shipped files at a75063ba. Its Codex ambiguity trace read the revised generic entry before the lifecycle reference and asked for scope without opening candidate documents or running the selector. The explicit request selected docs truth and verified source. Earlier 18d20daf direct-mode and refusal receipts remain applicable to the unchanged direct skill, procedure and fixture. The failed 310a3b11 receipt remains attributed to the earlier package.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The matching 0a07a791 package's explicit intake reviewed committed source and preserved HEAD, refs, index and project files. R-7's 18d20daf direct-mode receipts establish the unsupported-replacement flag, product issue, full and targeted coverage, unfinished-work report, freshness-only read boundary. The current change leaves the direct procedure and fixture unchanged.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: not verified
+EVIDENCE: Task T4 records operator-observed selector parity and rollback for Stackweaver 72e48ed5 and 22e5b96f. This review did not inspect private consumer files or observe native forwarding, authorized writes, recovery or cutover.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not verified
+EVIDENCE: I inspected the Codex and Claude local-catalog install receipts and Claude discovery output. The 0a07a791 package fingerprint matches a75063ba, and Codex executed both intake cases. Ordinary published installs, upgrades, Claude claim review and adoption documentation remain open.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Feature `covers` (lines 7-23), `plugins/vh-adlc/skills/vh-adlc/SKILL.md:1-16`, AC-01 clarification proof
+EVIDENCE: The R-10 repair puts the clarification guard in the shipped generic skill before the lifecycle reference loads. That file is absent from `covers`. The covered discovery test can catch removal during verification, but a later change to the generic entry can leave the feature's recorded review fresh. The pinned feature-document standard requires coverage for paths whose changes can affect the feature.
+PROPOSAL: Add the generic skill file to `covers` through the feature's spec revision and review process.
 
 ## Sources
 

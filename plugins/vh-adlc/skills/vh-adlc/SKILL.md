@@ -1,6 +1,6 @@
 ---
 name: vh-adlc
-description: Enter the shared vh-adlc lifecycle when a request says Use vh-adlc without choosing an operation. Select and continue the existing procedure using the repository's pinned engineering rules.
+description: Enter the shared vh-adlc lifecycle when the request names vh-adlc without choosing an operation. For an ambiguous documentation audit, ask for scope before opening candidate documents.
 ---
 
 # vh-adlc
@@ -8,6 +8,10 @@ description: Enter the shared vh-adlc lifecycle when a request says Use vh-adlc 
 Use this entry for a request that names the framework without selecting an operation.
 The plugin root is two directories above this skill's directory. Resolve the links below
 relative to this skill's directory.
+
+For an ambiguous documentation audit, ask for scope before opening candidate documents.
+Read the lifecycle reference and use only the request, Git metadata and applicable
+repository instructions to frame that question.
 
 Read the canonical [lifecycle intake](../../references/lifecycle.md),
 [authority rules](../../references/authority.md) and

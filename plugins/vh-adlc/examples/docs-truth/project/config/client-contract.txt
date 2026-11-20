@@ -1,0 +1,1 @@
+Unavailable service responses must use HTTP 503 so the client retries.

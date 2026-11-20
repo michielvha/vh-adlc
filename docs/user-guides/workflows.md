@@ -13,8 +13,8 @@ Use vh-adlc to repair this regression and finish locally.
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
 repository and selects a procedure. The candidate package combines this entry,
-eleven engineering operations, four content operations and one host-cleanup
-operation, giving seventeen skills. Check
+eleven engineering operations, five content operations and one host-cleanup
+operation, giving eighteen skills. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -28,6 +28,7 @@ on your host.
 | Diagnosis | Investigate and report. A report-only request does not authorize a fix. |
 | Documentation | Edit the requested document and check it. A prose edit does not need a feature spec. |
 | Accumulated documentation drift | Assess the configured corpus and selected stale documentation-audit proposals through the released docs-drift operation. |
+| Documentation truth review | Check claims in a bounded batch against source and record the evidence in the report. |
 | Article or social draft | Read the project's evidence and the site's voice rules, draft or revise the requested prose, and obtain a source-comparing editorial pass. Publication is separate. |
 | Small maintenance | Preserve the public contract, keep a short task record, run appropriate checks, and obtain an independent review. |
 | A new feature or a wider change | Use a feature document with acceptance, tests, reviews, and binary status gates. |
@@ -56,6 +57,7 @@ see [installation](../get-started/installation.md).
 | Architecture diagram | `vh-adlc-diagram` | Create and verify repository-grounded draw.io architecture diagrams. |
 | Documentation impact | `vh-adlc-docs-impact` | Find and review docs affected by selected code changes. |
 | Documentation drift | `vh-adlc-docs-drift` | Audit the configured corpus, resolve selected stale docs-audit PRs and freshly review selected post-merge closures. |
+| Documentation truth review | `vh-adlc-docs-truth` | Review factual claims in selected docs or agent instructions, or show recorded verification freshness. |
 | Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
 | Clean | `vh-adlc-clean` | Plan and remove what killed runs left in `/tmp` and the project's temp root; Compose projects and kind clusters only on request. |
 
@@ -404,6 +406,15 @@ from source paths. Ordinary mapping upkeep stays here; standard feature-spec
 coverage revisions go through the spec operation. Project generators and visual
 checks remain local. See the [procedure](../../plugins/vh-adlc/references/docs-impact.md)
 and [complete runnable example](../../plugins/vh-adlc/examples/docs-impact/README.md).
+
+## Documentation truth review
+
+Ask to verify claims in the next batch of documents or name the docs or sections to check.
+Use `vh-adlc-docs-truth` with no arguments for the project's default batch, `sweep` for
+specific paths, `meta` for repository instructions, or `report` for recorded freshness.
+The shared skill returns evidence and proposed corrections in the session. Repositories
+declare their own sources, selection and exemptions. See the
+[procedure](../../plugins/vh-adlc/references/docs-truth.md).
 
 ## Documentation drift
 

@@ -224,8 +224,6 @@ Claude docs-impact model execution, GUI/phone entry and live Stackweaver screens
 capture remain unclaimed. Other operations' compatibility rows do not establish
 those capabilities.
 
-<a name="shared-documentation-drift-candidate"></a>
-
 ## Feature reservations
 
 The reservation workflow targets ordinary Codex and Claude Code sessions in opted-in repositories.
@@ -233,6 +231,17 @@ Other clients may inspect or review there. Unadopted repositories retain their e
 A nested client must start without its parent's session markers so it can supply its own identity.
 Native resume and adoption must be verified against the installed package before an adopter enables
 writers. See [adoption and handoff](../../plugins/vh-adlc/references/authority.md#reservation-adoption).
+
+## Documentation truth review
+
+The 0.27.0 candidate installed through both native CLI catalog paths in isolated
+profiles. Both clients discovered the skill and matched the exact candidate
+payload. Codex CLI also exercised the synthetic report through the installed
+skill. The Claude Code model trial requires available account capacity.
+See the [feature evidence](../specs/shared-docs-truth.md) for the exact reviewed
+commits and the released install and adoption checks.
+
+<a name="shared-documentation-drift-candidate"></a>
 
 ## Shared documentation drift
 
