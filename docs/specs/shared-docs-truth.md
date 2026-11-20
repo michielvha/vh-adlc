@@ -152,6 +152,7 @@ None.
 | 2026-11-19 | R-10 | implementation | `310a3b1146caa84a2c7f18526b3a383b0dcce5eb` | unknown | procedural | Adjacent checks pass. One blocker in early ambiguous intake. |
 | 2026-11-19 | R-11 | implementation | `a75063badddfcc8521a5896bf5f0ed4e3adbd5ac` | unknown | procedural | Shared behavior met. One should-fix on review coverage. |
 | 2026-11-20 | R-12 | spec | `ca2240da144c51064686141a1bf0ae14b0c361ef` | unknown | procedural | One should-fix on final delivery of the native-runner correction. |
+| 2026-11-20 | R-13 | spec | `21b19f02cd752baad43176161c01c1c7c946a588` | unknown | procedural | No findings. |
 
 ### R-1
 
@@ -510,6 +511,10 @@ SEVERITY: should-fix
 WHERE: Design, Stackweaver adoption (lines 83-85), Task T3 (lines 120-125), Open Questions (lines 132-134)
 EVIDENCE: The coverage correction adds the generic skill to `covers` and leaves the published package unchanged. The same commit changes `tests/vh-adlc/docs-truth/native-trial.ts`. The diff from merged `84e59c89` to `ca2240da` therefore includes a test file, while the delivery sequence names only a docs-only completion fast-forward. The pinned `conventions/delivery.md` applies normal CI when the outgoing range contains a test change.
 PROPOSAL: Record the authorized normal-CI delivery step for the corrected runner before the docs-only completion record, or have the owner select a normal-CI completion delivery that includes the runner change.
+
+### R-13
+
+NO FINDINGS
 
 ## Sources
 
