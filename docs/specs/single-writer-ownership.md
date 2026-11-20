@@ -340,6 +340,7 @@ None. The owner selected the Git reservation, entry checks and explicit handoff.
 | 2026-11-19 | R-12 | spec | `1844e72a74c9b7065e443b631375b542642e6307` | unknown | procedural | Two should-fix findings on pending draft entry and preservation of its marker. Model identity was not attested. |
 | 2026-11-19 | R-13 | spec | `014299049c45051a2d4f8e3b40ba33e3de4ba51f` | unknown | procedural | No blocking findings. One should-fix on exercising already-specified pending behavior through both move paths. Model identity was not attested. |
 | 2026-11-19 | R-13 | spec | `014299049c45051a2d4f8e3b40ba33e3de4ba51f` | n/a | n/a | accepted by owner |
+| 2026-11-20 | R-14 | spec | `9f8b6b4f5ca3723304e7d5a7705c0a41a724417b` | unknown | procedural | Two factual nits on validation wording and citations to the pre-feature baseline. Model identity was not attested. |
 
 ### R-1
 
@@ -725,6 +726,22 @@ SEVERITY: should-fix
 WHERE: Context, Owner summary, interrupted issue creation. Design, Identify the same work, pending creation. Design, Start, resume and hand off, same-session moves and handoffs. AC-11 and AC-12. Test Plan, AC-11 and AC-12.
 EVIDENCE: The R-12 follow-up at `docs/specs/single-writer-ownership.md:132-139,192-206` requires pending draft entry to stay held after either kind of move. AC-11 checks the hold after a restart and exercises an ordinary same-session move. AC-12 checks that an incoming writer can recover the issue after moving. Both rows can pass if the same-session move drops the marker or if the incoming writer can enter before recovery.
 PROPOSAL: Exercise a pending issue creation through both move paths. At each destination, try direct writer entry before recovery, verify that it holds with read-only lookup available, then complete recovery and verify that the writer can resume without creating a second issue.
+
+### R-14
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary, validation at lines 60-62. Tasks, T8 evidence at line 319.
+EVIDENCE: The summary says the clone race, resume and handoff checks are still to run. The evidence records earlier runs of the clone race in AC-10 and both client trials in T8. T8 identifies the outstanding rerun on the combined package.
+PROPOSAL: Name the earlier checks that ran and the combined-package verification that remains open.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background, claim and worktree helpers at lines 73-75. Design, Adopt and roll back, CI routing at lines 250-253.
+EVIDENCE: The citations describe the baseline on `84e59c89`. At the reviewed commit, `plugins/vh-adlc/scripts/loop/claim.ts:50-54` checks the reservation before editing. `.github/workflows/ci.yml:5,197` excludes the reserved ref from push triggers and versioning, and `.github/workflows/preview.yml:12` excludes it from preview dispatch.
+PROPOSAL: Pin the description of pre-feature behavior to the default-branch baseline so readers can distinguish it from the changes under review.
 
 ## Sources
 
