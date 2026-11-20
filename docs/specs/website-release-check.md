@@ -85,7 +85,16 @@ Check explicitly configured routes on two targets: the adopter's locally served 
 
 ## Tasks
 
-None yet. Task breakdown follows acceptance.
+- [ ] T1 `tests/vh-adlc/website-check/confinement.test.ts` and `tests/vh-adlc/website-check/fixtures/` - run the same route proof in local and deployed modes, with real responses from both a minimal project and an existing-suite fixture. The checks fail before the runner exists and include the accepted destination-log confinement proofs (AC-01)
+- [ ] T2 `plugins/vh-adlc/scripts/website-check/profile.ts` and `plugins/vh-adlc/scripts/website-check/runner.ts` - make T1 pass with the minimum pinned Chromium runner, accepted transport isolation and scoped upgrade check. Record the runner prerequisites and observed coverage in the fixture results (AC-01)
+- [ ] T3 `tests/vh-adlc/website-check/observations.test.ts` - exercise the exact anonymous exception, CSP dispositions, delayed and overlapping requests, body errors and deadline cases in the Test Plan. Observe the missing observations or incorrect rule outcomes before adding the collector (AC-02)
+- [ ] T4 `plugins/vh-adlc/scripts/website-check/observations.ts` and `plugins/vh-adlc/scripts/website-check/runner.ts` - make T3 pass with typed terminal observations, independent console records and target-specific exception matching (AC-02)
+- [ ] T5 `tests/vh-adlc/website-check/report.test.ts` and `tests/vh-adlc/website-check/adapters.test.ts` - run the accepted output, policy, interruption, sanitization and non-SEO tool fixtures. Observe failures for missing report behaviors and unsupported adapters (AC-02, AC-03)
+- [ ] T6 `plugins/vh-adlc/scripts/website-check/report.ts`, `cli.ts` and `adapters.ts` in the same directory - make T5 pass with the plain and JSON streams, local completion marker, gate behavior and selected accessibility, built-file and deployed checks (AC-02, AC-03)
+- [ ] T7 `tests/vh-adlc/website-check/installation.test.ts` - observe missing discovery and failed installed entry-point checks using both marketplace routes with the source checkout absent. Exercise completed, partial, altered and unsupported reports (AC-04)
+- [ ] T8 `plugins/vh-adlc/skills/vh-adlc-website-check/SKILL.md`, `plugins/vh-adlc/references/website-check.md`, and the covered manifests - make T7 pass through both installed entry points. Document the minimum setup and verify the base release reports SEO unavailable if selected without its dependency (AC-01, AC-04)
+- [ ] T9 `tests/vh-adlc/website-check/seo.test.ts` - for the SEO-enabled delivery only, after the analyzer is available in the supported marketplace package, exercise the installed two-target bundle, incomplete analysis and analyzer failure proofs. Observe failure without the adapter (AC-03, AC-04)
+- [ ] T10 `plugins/vh-adlc/scripts/website-check/adapters.ts` and `plugins/vh-adlc/references/website-check.md` - for the SEO-enabled delivery only, consume the installed canonical analyzer and make T9 pass without a source checkout (AC-03, AC-04)
 
 ## Open Questions
 
