@@ -102,6 +102,8 @@ None. The owner selected report mode first and approved explicit run outcomes an
 
 | 2026-11-20 | R-3 | spec | `e896b1047cfbc109f9211adb4bd1972584e6802d` | unknown | procedural | One blocking and three should-fix findings |
 
+| 2026-11-20 | R-4 | spec | `f2dfa03f9fdf0eab4a00eb649f47b90a4a855145` | unknown | procedural | Two should-fix findings |
+
 ### R-1
 
 FINDING: F-01
@@ -289,6 +291,22 @@ SEVERITY: should-fix
 WHERE: Context / Owner summary line 27, Design lines 50 and 53, Acceptance Criteria AC-03 and AC-04, Test Plan AC-03 and AC-04
 EVIDENCE: The R-2 revision defines different mappings for partial SEO analysis and analyzer failure. The installed proof checks a finding and an uncollected destination, but unknown link coverage does not by itself prove the analyzer returned a partial result or that an execution failure maps to a tool error. AC-03's named execution-error fixture covers Gitleaks.
 PROPOSAL: Add SEO-enabled cases that exercise an actual partial analysis and a failed analyzer invocation. Assert distinct report outcomes and the required-coverage exit behavior.
+
+### R-4
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 27, Scope line 43, Design lines 50 and 51, Acceptance Criteria AC-01 and AC-03, Test Plan AC-01 and AC-03
+EVIDENCE: The preferred stock MDN CLI initiates both HTTP and HTTPS requests, then automatically requests `/robots.txt` and sends a CORS preflight. The draft permits HTTP only through a separate one-request probe and limits coverage to explicitly configured routes. An origin allowlist alone still permits the extra same-origin requests. The draft lets the adapter skip when it cannot comply, but leaves the working path for the now-required positive header proof unspecified. [MDN Observatory retriever](https://github.com/mdn/mdn-http-observatory/blob/main/src/retriever/retriever.js#L36-L84)
+PROPOSAL: Define a header check that evaluates the confined HTTPS response from a configured route. Include the stock CLI only if it can honor the request boundary, and verify the enabled path's request footprint and named rule outcome in the same fixture.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary lines 27 and 29, Design lines 48 and 49, Terms lines 64 to 66, Acceptance Criteria AC-02 and AC-03, Test Plan AC-02 and AC-03
+EVIDENCE: The R-3 revision requires real terminal events but still ends collection after the first terminal outcome for each required method and URL. If two matching attempts have already started, the first can succeed while the second is still downloading. The current proof only holds open the sole matching response, so it cannot distinguish a run that silently passes with a known pending attempt from one that waits for it.
+PROPOSAL: Define how a matching attempt already in flight at the early completion point affects coverage while keeping the existing deadline. Prove the selected behavior with overlapping attempts where one succeeds and the other remains pending.
 
 ## Sources
 
