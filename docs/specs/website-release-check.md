@@ -100,6 +100,8 @@ None. The owner selected report mode first and approved explicit run outcomes an
 
 | 2026-11-20 | R-2 | spec | `1069bcf989934141d80b610bd387d2c60f9fdd49` | unknown | procedural | One blocking and seven should-fix findings |
 
+| 2026-11-20 | R-3 | spec | `e896b1047cfbc109f9211adb4bd1972584e6802d` | unknown | procedural | One blocking and three should-fix findings |
+
 ### R-1
 
 FINDING: F-01
@@ -257,6 +259,36 @@ SEVERITY: should-fix
 WHERE: Design lines 50 and 54, Acceptance Criteria AC-04, Test Plan AC-04
 EVIDENCE: Pinned `conventions/delivery.md:111-117` requires naming the build and publication paths and exercising each affected artifact as built for release. The draft names both marketplace manifests but says to install the package in one unspecified supported environment. The install routes documented in `docs/get-started/installation.md:53-85` use distinct marketplace clients. A fixture that exercises one manifest can pass while the second manifest has a missing discovery entry or incorrect version.
 PROPOSAL: Name the supported marketplace install paths and the repository checks that establish the final package and manifest contents. Require package discovery and the installed smoke entry point to be verified along each supported path the change affects.
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Scope line 43, Design lines 47 and 51, Acceptance Criteria AC-01, Test Plan AC-01
+EVIDENCE: The R-2 confinement revision permits an explicit HTTP-to-HTTPS probe and requires the proxy to block HTTPS downgrades. A static scheme, host and port allowlist that permits both origins admits the initial HTTP probe and a downgrade to that same HTTP origin. The test can pass by trying a downgrade with HTTP disabled throughout, leaving the combined case unverified.
+PROPOSAL: Give the explicit upgrade probe a separate HTTP-only initial request and validate its Location before continuing through an HTTPS-only boundary. Verify a successful upgrade followed by a downgrade back to the same HTTP origin, using destination logs to prove the downgrade did not reach it.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design lines 48-49, Terms line 65, Acceptance Criteria AC-02, Test Plan AC-02
+EVIDENCE: The R-2 revision waits for one terminal outcome per required request, but its listed Playwright listeners observe response headers and failures without establishing completed downloads. A required fetch issued after page load can return 200 headers, satisfy an implementation's completion condition, and then fail while downloading the body. The 503-then-200 proof can pass with header-only tracking. [Playwright Request lifecycle](https://playwright.dev/docs/api/class-request)
+PROPOSAL: Define terminal outcomes using request completion or failure, with HTTP status attached to the corresponding completed request. Prove that a required response whose body fails after 200 headers produces a failure and that an unfinished required response at the deadline leaves coverage incomplete.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 27, Scope line 43, Design lines 47 and 50-51, Acceptance Criteria AC-01 and AC-03, Test Plan AC-01 and AC-03
+EVIDENCE: The test plan asks for real tool output and deployed-only observations, but gives no pass condition for automated accessibility, certificate validation or header rule verdicts. It can pass with an axe invocation that discards violations or a deployed adapter that records a generic reachability result without distinguishing certificate and header findings.
+PROPOSAL: Require the enabled adapters to report a known axe violation, a certificate validation failure and a named header rule outcome against controlled fixtures. Confirm that disabling each adapter produces its documented coverage result.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 27, Design lines 50 and 53, Acceptance Criteria AC-03 and AC-04, Test Plan AC-03 and AC-04
+EVIDENCE: The R-2 revision defines different mappings for partial SEO analysis and analyzer failure. The installed proof checks a finding and an uncollected destination, but unknown link coverage does not by itself prove the analyzer returned a partial result or that an execution failure maps to a tool error. AC-03's named execution-error fixture covers Gitleaks.
+PROPOSAL: Add SEO-enabled cases that exercise an actual partial analysis and a failed analyzer invocation. Assert distinct report outcomes and the required-coverage exit behavior.
 
 ## Sources
 
