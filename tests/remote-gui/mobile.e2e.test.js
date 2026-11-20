@@ -8,17 +8,31 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
+import { checkMobileBus, monitorMobileBus } from './fixtures/mobile-bus.js';
 
 const enabled = process.env.REMOTE_GUI_MOBILE_E2E === '1';
 const requireModule = createRequire(import.meta.url);
 
+const fields = [
+    ['<div contenteditable="true">Editable text</div>', 'text'],
+    ['<textarea></textarea>', 'text'],
+    ['<input type="email" name="synthetic-name" placeholder="synthetic-placeholder">', 'email'],
+    ['<input type="tel">', 'tel'],
+    ['<input type="url">', 'url'],
+    ['<input type="search">', 'search'],
+    ['<input type="number">', 'number'],
+    ['<input type="password">', 'password'],
+    ['<input readonly value="synthetic-readonly">', null],
+    ['<input disabled value="synthetic-disabled">', null],
+];
+
 test.skipIf(!enabled)('two inline taps edit a URL and a field through stock Chromium and noVNC', async () => {
     const { chromium } = requireModule(process.env.REMOTE_GUI_PLAYWRIGHT_MODULE);
     const root = mkdtempSync(join(tmpdir(), 'rg-mobile-e2e-'));
-    const observations = { geometry: null, edit: null };
+    const observations = { geometry: null, edit: null, cover: null };
     const fixture = createServer(async (request, response) => {
         const path = new URL(request.url, 'http://127.0.0.1').pathname;
-        if (request.method === 'POST' && (path === '/geometry' || path === '/edit')) {
+        if (request.method === 'POST' && (path === '/geometry' || path === '/edit' || path === '/cover')) {
             let body = '';
             for await (const part of request) {
                 body += part;
@@ -35,8 +49,12 @@ test.skipIf(!enabled)('two inline taps edit a URL and a field through stock Chro
         response.setHeader('Content-Type', 'text/html');
         response.end(`<!doctype html><meta charset="utf-8"><title>Remote keyboard fixture</title>
 <style>body{margin:0}#entry{position:absolute;left:35px;top:120px;width:250px;height:55px;font:18px sans-serif}
-#plain{position:absolute;left:40px;top:310px}</style>
-<input id="entry" aria-label="Synthetic text"><p id="plain">Plain area</p>
+#plain{position:absolute;left:40px;top:310px}
+#cover{position:absolute;left:235px;top:120px;width:45px;height:55px;background:#ddd}
+#fields{position:absolute;left:35px;top:380px;display:grid;grid-template-columns:150px 150px;gap:10px}
+#fields>*{width:100%;height:50px;box-sizing:border-box}</style>
+<input id="entry" aria-label="Synthetic text"><div id="cover"></div><p id="plain">Plain area</p>
+<div id="fields">${fields.map(([html]) => html).join('')}</div>
 <script>
 const field=document.querySelector('#entry');
 let count=0;
@@ -44,6 +62,9 @@ function post(path,value){fetch(path,{method:'POST',body:JSON.stringify(value)})
 function geometry(){post('/geometry',{top:outerHeight-innerHeight})}
 setTimeout(geometry,600);
 addEventListener('resize',geometry);
+const cover=document.getElementById('cover');
+cover.addEventListener('mousedown',event=>event.preventDefault());
+cover.addEventListener('click',()=>post('/cover',{keptFocus:document.activeElement===field}));
 field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:++count}));
 </script>`);
     });
@@ -51,12 +72,14 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         [...args, '--home', root, '--transport', 'loopback'], { encoding: 'utf8', timeout: 40000 }));
     let session;
     let browser;
+    let stopMonitor;
     let safe = false;
     try {
         await new Promise(resolve => fixture.listen(0, '127.0.0.1', resolve));
         session = cli('start', '--browser-mode', 'human', '--ttl', '4m');
         assert.equal(session.browser_mode, 'human');
         assert.equal(session.local_cdp ?? '', '');
+        stopMonitor = await monitorMobileBus(session.id);
         const access = cli('access', session.id, '--reveal');
         browser = await chromium.launch({
             executablePath: process.env.REMOTE_GUI_CHROMIUM,
@@ -221,8 +244,38 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         await tap(120, top + 340);
         await delay(550);
         assert.equal(await prompt.count(), 0);
+
+        for (const [index, [html, mode]] of fields.entries()) {
+            const point = { x: index % 2 === 0 ? 105 : 265, y: top + 405 + Math.floor(index / 2) * 60 };
+            const reply = page.waitForResponse(async response => {
+                if (!response.url().endsWith('/__remote_gui/editable') || !response.ok()) return false;
+                const { x, y } = response.request().postDataJSON();
+                if (Math.abs(x - point.x) > 2 || Math.abs(y - point.y) > 2) return false;
+                return mode === null || await response.json() !== null;
+            }, { timeout: 5500 });
+            await tap(point.x, point.y);
+            const field = await (await reply).json();
+            assert.equal(field?.mode ?? null, mode, html);
+            if (field) {
+                assert.deepEqual(Object.keys(field).sort(), ['height', 'mode', 'phase', 'token', 'width', 'x', 'y']);
+                assert.match(field.token, /^[a-f0-9]{24}$/);
+                await prompt.waitFor({ timeout: 4000 });
+                assert.equal(await editorFocused(), false);
+            } else {
+                await delay(500);
+                assert.equal(await prompt.count(), 0);
+            }
+            await tap(120, top + 340);
+        }
+
         await tap(130, top + 145);
         await prompt.waitFor({ timeout: 5500 });
+        const focusedField = lastSample.field.token;
+        await tap(264, top + 145);
+        for (let i = 0; i < 40 && !observations.cover; i++) await delay(50);
+        assert.deepEqual(observations.cover, { keptFocus: true });
+        await prompt.waitFor({ timeout: 5500 });
+        assert.equal(lastSample.field.token, focusedField);
         assert.equal(await editor.evaluate(node => document.activeElement === node), false);
         await delay(800);
         await prompt.tap({ timeout: 2000 });
@@ -231,6 +284,10 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         await page.keyboard.insertText('z');
         for (let i = 0; i < 70 && !observations.edit; i++) await delay(100);
         assert.deepEqual(observations.edit, { exact: true, count: 1 });
+
+        const collected = await stopMonitor();
+        stopMonitor = undefined;
+        checkMobileBus(collected);
 
         let nextPhase = null;
         await page.route('**/__remote_gui/editable-phase', route => nextPhase === null
@@ -302,6 +359,7 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         assert.equal(await page.getByText('Shared browser connected').count(), 1);
     } finally {
         try {
+            if (stopMonitor) await stopMonitor().catch(() => {});
             if (browser) await browser.close();
             if (session) {
                 const stopped = cli('stop', session.id);

@@ -37,6 +37,8 @@ The `internal/xclip` tests start their own Xvfb display and check the clipboard 
 
 Ubuntu CI runs the real browser lifecycle and noVNC fixtures with the runner's sandboxed Google Chrome, distribution GUI tools and the locked Playwright core package. Browser tests remain opt-in locally. The runtime itself never installs these tools.
 
+Run the mobile browser fixture with `REMOTE_GUI_MOBILE_E2E=1 bun test tests/remote-gui/mobile.e2e.test.js`. It also needs `dbus-monitor` and the optional accessibility tools listed in the plugin README. Use the same browser and viewer settings as above. The fixture checks editable modes and monitors method names on its disposable browser's private bus during field lookup. It verifies the helper's method allowlist without retaining message bodies. The phone's native keyboard is checked separately on physical devices.
+
 The bounded native cases require an existing signed-in Copilot CLI. `REMOTE_GUI_NATIVE_CLI` can select that executable. They load the plugin through its native `--plugin-dir` option and the persistent remote-mode instruction, with isolated native state and shell/write tools denied:
 
 ```sh
