@@ -29,10 +29,10 @@ const fields = [
 test.skipIf(!enabled)('two inline taps edit a URL and a field through stock Chromium and noVNC', async () => {
     const { chromium } = requireModule(process.env.REMOTE_GUI_PLAYWRIGHT_MODULE);
     const root = mkdtempSync(join(tmpdir(), 'rg-mobile-e2e-'));
-    const observations = { geometry: null, edit: null, cover: null };
+    const observations = { geometry: null, edit: null, cover: null, mode: null };
     const fixture = createServer(async (request, response) => {
         const path = new URL(request.url, 'http://127.0.0.1').pathname;
-        if (request.method === 'POST' && (path === '/geometry' || path === '/edit' || path === '/cover')) {
+        if (request.method === 'POST' && ['/geometry', '/edit', '/cover', '/mode'].includes(path)) {
             let body = '';
             for await (const part of request) {
                 body += part;
@@ -65,6 +65,12 @@ addEventListener('resize',geometry);
 const cover=document.getElementById('cover');
 cover.addEventListener('mousedown',event=>event.preventDefault());
 cover.addEventListener('click',()=>post('/cover',{keptFocus:document.activeElement===field}));
+field.addEventListener('keydown',event=>{
+ if(event.key!=='F8')return;
+ event.preventDefault();
+ field.type=field.type==='text'?'password':'text';
+ post('/mode',{type:field.type,keptFocus:document.activeElement===field});
+});
 field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:++count}));
 </script>`);
     });
@@ -277,6 +283,45 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         await prompt.waitFor({ timeout: 5500 });
         assert.equal(lastSample.field.token, focusedField);
         assert.equal(await editor.evaluate(node => document.activeElement === node), false);
+
+        const oldField = lastSample.field;
+        let markHeld;
+        const focusHeld = new Promise(resolve => { markHeld = resolve; });
+        let releaseLateReply;
+        const lateReply = new Promise(resolve => { releaseLateReply = resolve; });
+        let markReplySettled;
+        const replySettled = new Promise(resolve => { markReplySettled = resolve; });
+        const holdFocus = async route => {
+            markHeld();
+            await lateReply;
+            await route.fulfill({ json: oldField }).catch(() => {});
+            markReplySettled();
+        };
+        await page.route('**/__remote_gui/editable', holdFocus);
+        try {
+            await focusHeld;
+            await prompt.waitFor({ state: 'hidden', timeout: 2500 });
+        } finally {
+            releaseLateReply();
+            await page.unroute('**/__remote_gui/editable', holdFocus);
+        }
+        await replySettled;
+        assert.equal(await prompt.count(), 0, 'late focus metadata restored an expired prompt');
+        assert.equal(await editorFocused(), false);
+        await tap(130, top + 145);
+        await prompt.waitFor({ timeout: 5500 });
+
+        for (const type of ['password', 'text']) {
+            await canvas.focus();
+            await page.keyboard.press('F8');
+            for (let i = 0; i < 40 && observations.mode?.type !== type; i++) await delay(50);
+            assert.deepEqual(observations.mode, { type, keptFocus: true });
+            await prompt.waitFor({ state: 'hidden', timeout: 2500 });
+            assert.equal(await editorFocused(), false);
+            await tap(130, top + 145);
+            await prompt.waitFor({ timeout: 5500 });
+            assert.equal(lastSample.field.mode, type);
+        }
         await delay(800);
         await prompt.tap({ timeout: 2000 });
         assert.equal(await editor.evaluate(node => document.activeElement === node), true);
