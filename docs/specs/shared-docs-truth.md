@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "The owner accepted the revised spec after R-13. The marketplace and Stackweaver adoption trials passed. The completion follow-up is in final verification."
+status: complete
+status_description: "Published 0.27.0 and verified Stackweaver adoption. Final independent review R-15 met all four criteria and the completion gate passed."
 issue: https://github.com/michielvha/vh-adlc/issues/127
 branch: feat/shared-docs-truth
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
