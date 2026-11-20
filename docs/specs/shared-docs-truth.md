@@ -105,8 +105,8 @@ Publish the final record and native test-runner correction together in one autho
       Evidence: R-14 inspected native claim, targeted, unfinished and freshness evidence, including the corrected probe-default assertion.
 - [x] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
       Evidence: R-14 verified the Stackweaver cutover, native delivery and recovery transcripts, and rollback at the reviewed consumer head.
-- [ ] AC-04: The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
-      Evidence: R-14 was not met. The installed fixtures passed, but compatibility and workflow documentation still described incomplete testing.
+- [x] AC-04: The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+      Evidence: R-15 verified all four ordinary marketplace installs, both native fixtures and the updated compatibility and workflow guides.
 
 ## Test Plan
 
@@ -162,6 +162,7 @@ None.
 | 2026-11-20 | R-13 | spec | `21b19f02cd752baad43176161c01c1c7c946a588` | unknown | procedural | No findings. |
 | 2026-11-20 | R-13 | spec | `21b19f02cd752baad43176161c01c1c7c946a588` | n/a | n/a | accepted by owner |
 | 2026-11-20 | R-14 | implementation | `689c5c9c7858e7ea52587f2fd810013167e8309b` | unknown | procedural | The workflow and adoption checks met their criteria. The guides still describe candidate evidence. |
+| 2026-11-20 | R-15 | implementation | `df4493bc166e9d4b1584bc4534e73c935fee02d8` | unknown | procedural | All four acceptance criteria met. |
 
 ### R-1
 
@@ -549,6 +550,24 @@ SEVERITY: should-fix
 WHERE: `docs/reference/compatibility.md:229-236`, `docs/user-guides/workflows.md:389-396`, AC-04 Test Plan
 EVIDENCE: The accepted proof requires the compatibility entry and workflow guide to describe the observed run. At 689c5c9c, the compatibility section describes the candidate and only Codex execution. The workflow guide gives usage instructions without the released host evidence or the verified Stackweaver adoption. The exact published install and native trial receipts establish both host outcomes.
 PROPOSAL: Update both sections with the verified 0.27.0 fresh installs, upgrades, native fixture runs and Stackweaver adoption, linking to the exact evidence. Keep the synthetic and production evidence boundaries visible.
+
+### R-15
+
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: met
+EVIDENCE: At df4493bc, pinned Bun passed 79 tests and 428 assertions, and feature lint passed. Git shows identical plugin and test-runner bytes across the R-14 and R-15 targets. The inspected 0a07a791 intake receipts match the published fingerprint and show clarification before candidate reads. The retained direct-mode, refusal and path-replacement receipts apply to the unchanged direct procedure. Both released clients passed the default and freshness fixtures.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: Both released 84e59c89 claim runs returned source-backed verdicts, including the unknown package probe default and the HTTP 500 versus 503 product issue. The unchanged direct-mode evidence covers targeted review, unsupported replacement, unfinished work and the freshness-only read boundary. The released receipt snapshots preserve HEAD, refs, index and project files.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: met
+EVIDENCE: The retained selector, rollback and native acceptance packet still matches its checksums. Stackweaver merge 0fbbf091 has the same tree as reviewed head 5eb57e4c. The observed file and Git evidence establishes coupled docs and ledger commits, full and targeted rows, stale-input refusal, interrupted-state preservation and exact landed-commit reconciliation. The tested rollback preserved the ledger, and the post-merge synthetic report reproduced freshness.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: met
+EVIDENCE: The four marketplace install receipts and native discovery results bind to published 84e59c89. Its version 0.27.0 and 304-file fingerprint match df4493bc. Both released clients completed the default claim and freshness fixtures with unchanged state. The compatibility entry and workflow guide now record the observed fresh installs, upgrades, synthetic runs and Stackweaver adoption, with links to the evidence.
 
 ## Sources
 
