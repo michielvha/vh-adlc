@@ -130,7 +130,7 @@ async function trial(client: Client, repository: string, commit: string, output:
       const argv = client === "codex"
         ? [client, "exec", "-c", 'shell_environment_policy.inherit="all"', "--sandbox", "workspace-write", "--add-dir", f.root,
           "--json", ...(resume ? ["resume", resume] : []), prompt]
-        : [client, "-p", "--output-format", "stream-json", "--verbose", "--allowedTools", "Bash", ...(resume ? ["--resume", resume] : []), prompt];
+        : [client, "-p", "--output-format", "stream-json", "--verbose", "--allowedTools", "Bash", ...(resume ? ["--resume", resume] : []), "--", prompt];
       const raw = await invoke(id, argv, cwd, { ...nativeEnv, ...extra });
       const decision = JSON.parse(readFileSync(result, "utf8")) as Reply;
       if (decision.status !== expectedStatus || sourceState(cwd) !== before.get(cwd) ||
