@@ -98,6 +98,8 @@ None. The owner selected report mode first and approved explicit run outcomes an
 
 | 2026-11-19 | R-1 | spec | `24e61d66d71bbc1562f8208edb9bb41035ffaa0f` | unknown | procedural | One blocking, twelve should-fix and one nit |
 
+| 2026-11-20 | R-2 | spec | `1069bcf989934141d80b610bd387d2c60f9fdd49` | unknown | procedural | One blocking and seven should-fix findings |
+
 ### R-1
 
 FINDING: F-01
@@ -197,6 +199,64 @@ SEVERITY: nit
 WHERE: Context / Owner summary line 26, Context / Background lines 30-32, Design line 47, Sources lines 80-81
 EVIDENCE: The captures reproduce the counts, and the build log shows successful build output. The draft links the current homepage instead of identifying the captured records by path or a reproducible evidence reference. `observe.cjs` removes query strings and does not record method or redirect history, so the capture alone cannot attest the entire proposed exception tuple. The companion draft is also named without a path or revision.
 PROPOSAL: Cite the captured artifacts and companion convention revision, and identify the method as supported by pinned source while the historical capture leaves query and redirect details unavailable.
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Scope line 43, Design lines 47 and 51, Acceptance Criteria AC-01, Test Plan AC-01
+EVIDENCE: R-1 F-07's revision requires preventing contact with every off-scope redirect hop, while the real-response design says release scenarios cannot inherit route interception. Playwright request listeners observe traffic. The page route handler is called only for the first URL in a redirect chain, and service-worker-handled requests can bypass browser context routing. A browser check built from the specified listeners and ordinary route handling can contact a destination the owner excluded. [Playwright page routing](https://playwright.dev/docs/api/class-page#page-route) [Playwright browser context routing](https://playwright.dev/docs/api/class-browsercontext#browser-context-route)
+PROPOSAL: Specify a pre-request enforcement boundary supported by each enabled browser, distinguish that boundary from inherited fixture mocks, and make failure to establish confinement incomplete required coverage. Prove from destination logs that navigation redirects, subresource redirects and service-worker traffic cannot contact an excluded origin.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 27, Design lines 50 and 54, frontmatter covers, Test Plan AC-04
+EVIDENCE: R-1 F-03's revision links `seo-assessment.md` as the owner of the installed `scripts/seo/evidence.js` contract. That file at the reviewed commit contains no such packaging contract. The contract exists under Packaged evidence analysis at `774ce7fa59b99bc8c82c583091121226c86a7a7f:docs/specs/seo-assessment.md:175-185`. The revised design allows base-only delivery, while AC-04's proof unconditionally requires an enabled SEO run with the installed bundle.
+PROPOSAL: Cite the exact dependency revision and make the release and proof gates explicit for base-only and SEO-enabled delivery. Enable the SEO adapter only after the supported marketplace release contains the dependency, and retain the fresh-installed enabled proof for that change.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope line 43, Design lines 50 and 52, Test Plan AC-03 and AC-04
+EVIDENCE: The revised design supplies anonymous HTML in scratch and invokes the installed analyzer. `tools/seo-evidence/README.md:36-68` requires a validated native bundle with URL scope, requested and final URLs, actual status, media type, selected headers and body digests. AC-03 can exercise real tool output from a prepared bundle, and AC-04 can exercise the installed analyzer, without proving that the release collector supplies correct observations for the two targets.
+PROPOSAL: Require the release collector to build valid native bundle inputs from its recorded observations and map the analyzer's incomplete and failed outcomes into the shared report. Use an end-to-end fixture with target-specific HTML, a known metadata or link finding, and an uncollected destination whose coverage remains unknown.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary lines 27 and 29, Design lines 48, 49 and 53, Terms lines 64-68, Acceptance Criteria AC-02 and AC-03, Test Plan AC-02 and AC-03
+EVIDENCE: R-1 F-06's revision defines a deadline but neither selects which browser milestone completes navigation nor defines how to aggregate multiple terminal observations for one required method and URL. For example, a 503 followed by a successful retry before the visible assertion can produce a required failure or a required pass. The current proof exercises a delayed failure and an absent request separately, which allows either implementation.
+PROPOSAL: Define navigation completion, required observation identity, and aggregation for repeated or retried matching requests. Include a fixture that returns a failed response and then a successful response for the same required request before the observation boundary, and assert both the retained observations and final rule verdict.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 27, Design lines 48 and 49, Acceptance Criteria AC-02, Test Plan AC-02
+EVIDENCE: The R-1 revisions make CSP violations typed required failures, while the four listed listeners only cover console, page errors, requests and HTTP responses. AC-02's fixture uses a CSP refusal but does not require an enforced CSP block to be distinguished from a report-only CSP violation or an unrelated network error. Both an enforced policy and a report-only policy can emit a security policy violation event. [MDN SecurityPolicyViolationEvent disposition](https://developer.mozilla.org/en-US/docs/Web/API/SecurityPolicyViolationEvent/disposition)
+PROPOSAL: Define a typed source and the verdict for enforced versus report-only policy observations, including when no request reaches the network. Prove both cases without relying on console wording.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design lines 48 and 52-53, Acceptance Criteria AC-02 and AC-04, Test Plan AC-02 through AC-04
+EVIDENCE: R-1 F-08 and F-09's revisions sanitize saved observations and retain interrupted run directories. Raw HTML goes to per-run scratch, but the design does not define whether interrupted scratch is part of a retained run directory or prevent a tool's raw diagnostics from escaping through stderr. The sensitive-value proof checks markers, reports and retained artifacts but omits the command streams and skill output.
+PROPOSAL: Define the raw scratch lifecycle and retention boundary for interruption, and apply the evidence projection to every report and diagnostic stream the runner or skill exposes. Exercise a tool error and interruption during processing, and check both streams, retained output and skill output for the synthetic value.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design line 53, Terms lines 64-68, Acceptance Criteria AC-03, Test Plan AC-03
+EVIDENCE: R-1 F-11's revision adds labelled statuses, piped plain output and stream separation. The pinned `conventions/terminal-output.md` additionally requires the shared status glyphs, stream-specific terminal behavior and nonempty `NO_COLOR` handling, with coverage for absent, empty and `0` values. A CLI can meet the revised proof while always ignoring `NO_COLOR` on a terminal.
+PROPOSAL: Apply the pinned terminal output contract explicitly and extend the proof to the status labels and glyphs, terminal and redirected streams, and the specified `NO_COLOR` cases.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design lines 50 and 54, Acceptance Criteria AC-04, Test Plan AC-04
+EVIDENCE: Pinned `conventions/delivery.md:111-117` requires naming the build and publication paths and exercising each affected artifact as built for release. The draft names both marketplace manifests but says to install the package in one unspecified supported environment. The install routes documented in `docs/get-started/installation.md:53-85` use distinct marketplace clients. A fixture that exercises one manifest can pass while the second manifest has a missing discovery entry or incorrect version.
+PROPOSAL: Name the supported marketplace install paths and the repository checks that establish the final package and manifest contents. Require package discovery and the installed smoke entry point to be verified along each supported path the change affects.
 
 ## Sources
 
