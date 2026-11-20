@@ -115,10 +115,16 @@ async function trial(client: Client, repository: string, commit: string, output:
     }
 
     const a = f.clone("first"), b = f.clone("second");
+    if (client === "codex") {
+      for (const [name, checkout] of [["first", a], ["second", b]] as const) {
+        f.git(checkout, "init", "--separate-git-dir", join(f.root, `${name}-git`));
+      }
+    }
     const sourceState = (path: string) => {
       const head = git(path, f.env, "rev-parse", "HEAD");
       const index = git(path, f.env, "rev-parse", "--path-format=absolute", "--git-path", "index");
-      return `${head}:${createHash("sha256").update(readFileSync(index)).digest("hex")}`;
+      const refs = git(path, f.env, "for-each-ref", "--format=%(objectname) %(refname)", "refs/heads", "refs/tags");
+      return JSON.stringify([head, createHash("sha256").update(readFileSync(index)).digest("hex"), refs]);
     };
     const before = new Map([a, b].map(path => [path, sourceState(path)]));
     const nativeEnv = { ...fixtureEnv, CODEX_THREAD_ID: undefined, CODEX_SESSION_ID: undefined, CLAUDECODE: undefined, CLAUDE_CODE_SESSION_ID: undefined };
@@ -129,6 +135,7 @@ async function trial(client: Client, repository: string, commit: string, output:
       const prompt = "Run this one Bash command. It performs a disposable ownership fixture check. Return its result and make no other changes.\n" + shell;
       const argv = client === "codex"
         ? [client, "exec", "-c", 'shell_environment_policy.inherit="all"', "--sandbox", "workspace-write", "--add-dir", f.root,
+          "--add-dir", logs, "--add-dir", f.git(cwd, "rev-parse", "--absolute-git-dir"),
           "--json", ...(resume ? ["resume", resume] : []), prompt]
         : [client, "-p", "--output-format", "stream-json", "--verbose", "--allowedTools", "Bash", ...(resume ? ["--resume", resume] : []), "--", prompt];
       const raw = await invoke(id, argv, cwd, { ...nativeEnv, ...extra });
@@ -151,12 +158,17 @@ async function trial(client: Client, repository: string, commit: string, output:
     }
     const other = await entry("competing", b, "held", ["enter", ...target]);
     const mixed = client === "codex" ? { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: "fixture-parent" } : { CODEX_THREAD_ID: "fixture-parent" };
-    await entry("mixed", a, "held", ["enter", ...target], undefined, mixed);
+    const vacant = ["enter", "--issue", "88"];
+    const refused = await entry("mixed", a, "held", vacant, undefined, mixed);
+    if (refused.decision.reason !== "use an ordinary Codex or Claude Code session with an unambiguous session identity") {
+      throw Error("the vacant item was not held for an ambiguous native identity");
+    }
     if (f.git(f.bare, "rev-parse", REF) !== tip || !started.decision.operation || started.id === other.id) throw Error("resume or a conflicting session changed the reservation");
     await entry("handoff", b, "transferred", ["handoff", ...target, "--expected-operation", started.decision.operation,
       "--operation", "native-handoff", "--approved", "true", "--stopped", "true", "--preserved", "true"], other.id);
     await entry("old-writer", a, "held", ["enter", ...target], started.id);
     await entry("new-writer", b, "entered", ["enter", ...target], other.id);
+    await entry("separate-item", a, "entered", vacant, started.id);
     receipt.scenario = "passed";
     persist();
     return receipt;
