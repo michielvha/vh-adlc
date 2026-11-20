@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "The two-tap flow is implemented locally. Packaged physical tests and remaining acceptance proofs are open."
+status_description: "The owner approved shipping the iPhone preview. Android and remaining acceptance proofs are open."
 branch: feat/remote-gui-mobile
 issue: null
 goal: "Tap a remote Chromium field, then tap its inline prompt to type using the phone keyboard."
@@ -51,6 +51,8 @@ The hosted mobile test exposed a separate difference in Chrome 157.0.8103.50. Th
 The owner then reported that the phone keyboard sometimes closed while typing a URL. In the stock Chromium address-bar test, interrupting focus checks past the 500 ms lease reproduced the dismissal. The viewer now keeps the local editor open for up to three seconds during a temporary loss of verification. It pauses remote keys and discards unsent input and composition. Verification of the same field and phase resumes typing without reopening the keyboard. A reported focus or phase change still closes the editor immediately. The browser test interrupts both types of check and requires the exact URL to load after recovery.
 
 The owner also saw empty space above and below Chromium after submitting a URL on iPhone. The browser test reproduced a resize request at keyboard height when the editor blurred before the visual viewport expanded. Holding back that request kept the framebuffer at full height. The test then reproduced a separate scaling problem: noVNC kept fitting the canvas to the short viewport after the container returned to its expected size. The viewer now reclaims remote sizing after the viewport expands and reapplies noVNC's public scaling setting when the container changes dimensions. The Chromium test checks the requested size, framebuffer size and actual canvas height.
+
+The owner tried the repaired private iPhone preview built from `17ea67e3` on 2026-11-20, reported that it was much better, and approved shipping the work. This covers the owner's use of the preview after the keyboard and sizing fixes. The remaining acceptance checks stay open.
 
 ### Evidence from the first design
 
