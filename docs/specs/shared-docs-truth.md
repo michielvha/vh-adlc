@@ -1,10 +1,11 @@
 ---
-status: in-progress
-status_description: "The owner accepted the spec after clean review R-4. The shared package is reviewed for in-progress publication. Published installs and Stackweaver cutover remain open."
+status: complete
+status_description: "Published 0.27.0 and verified Stackweaver adoption. Final independent review R-15 met all four criteria and the completion gate passed."
 issue: https://github.com/michielvha/vh-adlc/issues/127
 branch: feat/shared-docs-truth
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
 covers:
+  - plugins/vh-adlc/skills/vh-adlc/SKILL.md
   - plugins/vh-adlc/skills/vh-adlc-docs-truth/
   - plugins/vh-adlc/references/docs-truth.md
   - plugins/vh-adlc/references/lifecycle.md
@@ -35,7 +36,9 @@ The shared entry runs only on request. By default it reviews the next batch and 
 
 Stackweaver's native command keeps its authorized fixes, ledger updates and docs-only delivery. An explicit read-only request leaves the checkout and ledger untouched. A complete review can advance freshness with unknown claims visibly flagged. Targeted reviews keep their own ledger mode. An interrupted review or pending correction leaves that document's completed history alone.
 
-The native selector returned its expected batch. The owner confirmed the write and ledger rules. Independent spec review R-4 returned no findings. The next proof compares the ordinary installed plugin with the current Stackweaver command, exercises the existing ledger and rehearses rollback. The shared package will ship first. Its feature stays open until the published install and Stackweaver cutover pass. Acceptance authorizes building and testing this scope. Publication, release and cutover need their own authorization.
+The shared skill is available in vh-adlc 0.27.0. Fresh installs, upgrades from 0.26.1, claim review and freshness reports passed in Codex CLI and Claude Code. Stackweaver switched its existing command in [PR #1162](https://github.com/michielvha/stackweaver/pull/1162) after passing native synthetic read-only, correction, ledger and delivery trials. The post-merge smoke test confirmed the command still reports the expected freshness without editing the fixture.
+
+The review now covers the generic vh-adlc entry that asks for scope before opening documentation in an ambiguous request. This revision records that existing file in the feature's coverage so future changes to it invalidate stale review evidence.
 
 ### Background
 
@@ -79,7 +82,9 @@ The Codex catalog `.agents/plugins/marketplace.json` and Claude catalog `.claude
 
 Use a committed rerun script at `tests/vh-adlc/docs-truth/native-trial.ts` for the shared example, intake and installed CLI scenarios. Stackweaver keeps its parity and write scenarios at `tests/agent-docs-truth/native-trial.ts`. Each runner records the assessed commit, skill or legacy command, selected mode, actual execution transcript, and pass conditions defined below. Keep private consumer inputs and transcripts with the consumer's authorized evidence. Revert and reapply the routing changes in a disposable clone to check both entries with the original ledger.
 
-Review the exact candidate before publication and identify which criteria need published or adopted evidence. Use one separately authorized in-progress implementation PR from `feat/shared-docs-truth` into vh-adlc `main`. After merge, run the branch helper with `--worktrees false` to retain the clean local `feat/shared-docs-truth` checkout for the completion gate and retire the merged remote head. Fast-forward that local branch to the fetched merged `main`. Record released install and exact consumer observations there after the approved cutover. Run independent review and `vh-adlc gate complete` on the retained branch. Publish the reviewed docs-only completion record as an authorized fast-forward to `main` and verify its containment. That ends feature delivery. The advanced local branch goes through the ordinary approved cleanup plan when eligible. Report a branch the helper retains. A branch protection refusal leaves the completion record local for the owner.
+Review the exact candidate before publication and identify which criteria need published or adopted evidence. Publish the runtime through the authorized in-progress implementation PR from `feat/shared-docs-truth` into vh-adlc `main`. After merge, run the branch helper with `--worktrees false` to retain the clean local feature checkout for the completion gate and retire the merged remote head. Fast-forward the retained branch to the fetched merged `main`. Record released install and exact consumer observations there after the approved cutover. Run independent review and `vh-adlc gate complete` on the retained branch.
+
+Publish the final record and native test-runner correction together in one authorized follow-up PR with ordinary CI. The correction distinguishes a package default from a committed override in the fixture assertions. Verify the published plugin bytes and version remain identical, and verify that the reviewed completion record reaches `main`. Run the ordinary approved cleanup when eligible. Report a branch the helper retains or a completion record held by branch protection.
 
 ### Terms
 
@@ -95,11 +100,13 @@ Review the exact candidate before publication and identify which criteria need p
 ## Acceptance Criteria
 
 - [x] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
-      Evidence: R-11 observed both exact installed intake cases at 0a07a791. The generic entry is read before the lifecycle reference, and the ambiguous request opens no candidate docs. R-10 retains its prior failed receipt.
+      Evidence: R-14 inspected the installed entry, bounded selection and refusal traces and repeated the focused package checks.
 - [x] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
-      Evidence: Independent R-7 inspected the exact candidate Codex evidence for source-backed claims, unsupported replacement, retained product contract, incomplete report and preserved source, refs and index.
-- [ ] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
-- [ ] AC-04: The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+      Evidence: R-14 inspected native claim, targeted, unfinished and freshness evidence, including the corrected probe-default assertion.
+- [x] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+      Evidence: R-14 verified the Stackweaver cutover, native delivery and recovery transcripts, and rollback at the reviewed consumer head.
+- [x] AC-04: The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+      Evidence: R-15 verified all four ordinary marketplace installs, both native fixtures and the updated compatibility and workflow guides.
 
 ## Test Plan
 
@@ -116,14 +123,20 @@ Review the exact candidate before publication and identify which criteria need p
       Evidence: The new discovery test failed on the missing skill and route before implementation. After the change, the package checker and docs-truth, triage and maintenance discovery suites pass 76 tests and 410 assertions. The skill metadata validator passes. This proves source packaging and routing checks. Native behavior and installed acceptance remain open.
 - [x] T2 `plugins/vh-adlc/examples/docs-truth/` and `tests/vh-adlc/docs-truth/` - a runnable fixture covers selected paths, complete and partial selection, and the expected evidence and verdicts without writing the assessed checkout (AC-01, AC-02)
       Evidence: The sample selector passes ordering, freshness, committed inputs, invalid arguments and unavailable history checks. The native Codex rerun of `04d58a64` passed the default full review, partial selector failure, and targeted sweep against the installed candidate. It preserved the Git HEAD, index and working files in all three cases. The first full attempt found a false description of the sample Makefile, which was corrected before these runs.
-- [ ] T3 `tests/vh-adlc/docs-truth/native-trial.ts` and compatibility and marketplace guides - run the committed shared fixture through both candidate catalog paths and retain the exact package, native discovery and report transcripts (AC-01, AC-02, AC-04)
+- [x] T3 `tests/vh-adlc/docs-truth/native-trial.ts` and compatibility and marketplace guides - run the committed shared fixture through both candidate catalog paths and retain the exact package, native discovery and report transcripts (AC-01, AC-02, AC-04)
       Evidence: The exact local candidate at `87c076a8` installed through both native marketplace catalogs in isolated Codex CLI 0.167.2 and Claude Code 2.1.326 profiles. Both discovered `vh-adlc-docs-truth` and matched all 304 package files and modes. The combined package and selector checks passed 77 tests and 422 assertions. The committed rerun, native claim report, published installs and upgrade checks remain open.
       Evidence: The committed native runner now retains the exact payload, assessed state, report and process result. Codex executed the core fixture above. Claude's signed-in default and Haiku routes returned HTTP 429 usage_limit_reached. Native Claude report behavior remains unverified. The shared package can be reviewed for a separately tracked in-progress delivery while the consumer stays on its native command.
       Evidence: Both isolated native catalogs installed the package from `18d20daf`. The strict check matched 304 files and modes with component SHA-256 `ca01ed832dc4724a9e23515615657fe69daa97cbb4fbff24ee4e446d3daa4543`. Later runner and spec edits keep the shipped package digest. The earlier Codex trial ran 19 synthetic cases at `04d58a64`. The strengthened trial separately observed the changed-path and interrupted-report cases at `18d20daf`. The covered package, triage discovery and docs-truth fixture suite passed 74 tests and 337 assertions, without relying on the maintenance discovery suite.
-- [ ] T4 Stackweaver's `.claude/commands/docs-truth.md`, `.vh-adlc/docs-truth.md` and `tests/agent-docs-truth/native-trial.ts` - prepare the unpublished routing and consumer proof, including legacy comparison, authorized writes, recovery and rollback in disposable clones (AC-03)
+      Evidence: [Merged PR #129](https://github.com/michielvha/vh-adlc/pull/129) published 0.27.0 at `84e59c898cbdb0bd4e76bd207b30a5356b495b32` after [all PR checks passed](https://github.com/michielvha/vh-adlc/actions/runs/44572858217). Both native CLIs discovered the skill after fresh installation and upgrade from 0.26.1 through the default GitHub marketplace. All four isolated installs matched the 304 reviewed files and modes with component SHA-256 `53842de6ccae44cc5b587d712d3ddcc8edd08573f43bb1650c27620c14ac0e91`. Codex passed the default claim-review and freshness-report fixtures with identical checkout, index and ref snapshots. Claude Code returned HTTP 429 `usage_limit_reached` before completing a report.
+      Evidence: The released package at `84e59c89` passed the freshness report in Claude Code 2.1.326 with `claude-opus-5-5`. The report matched the exact selector output and the fixture tree, index and refs stayed unchanged. The optional full-batch rerun rejected Claude's evidence-backed unknown verdict for the package's probe default, since the earlier assertion treated a configured override as proof of the default. The published freshness acceptance case is recorded separately.
+      Evidence: After correcting the full-batch assertion, both native CLIs passed the claim review using the same released payload at `84e59c89`. Both reported the unproven package default as unknown with the committed override as evidence and preserved the fixture's files, index, HEAD and refs. The focused package and discovery tests passed 79 tests and 428 assertions.
+- [x] T4 Stackweaver's `.claude/commands/docs-truth.md`, `.vh-adlc/docs-truth.md` and `tests/agent-docs-truth/native-trial.ts` - prepare the unpublished routing and consumer proof, including legacy comparison, authorized writes, recovery and rollback in disposable clones (AC-03)
       Evidence: Operator trial compared Stackweaver baseline `72e48ed5` and local adapter `22e5b96f`. Default batch paths, reasons and the full freshness output matched, the selector and ledger-related blobs stayed identical, and rollback and reapplication reproduced both trees. The local hook passed six checks. The native command's model-driven write and recovery behavior needs its own proof before cutover.
+      Evidence: Unpublished consumer revision `2d3bca4f` exercises a coupled docs and ledger commit against a synthetic local bare remote. The rehearsal preserves pending changes and the index, rejects a competing push and recognizes an already landed commit before retrying. The native Stackweaver command's routing, write and recovery checks remain open.
+      Evidence: Stackweaver rehearsal base `02a4da28` and adoption `1e51e9dc` matched default batch and freshness output on the real local corpus. The rollback and reapplication reproduced both trees while preserving protected blobs. The test-only correction in `fc009b6a` excludes merge commits from the rollback sequence, and the six local hook checks passed. The native Opus 5.5 synthetic comparison matched legacy and migrated report and sweep behavior. The migrated route used installed 0.27.0, fixed the port and wrote the expected full and targeted rows, preserved historical rows, and flagged the unproved worker count. Explicit no-push, candidate-only authority and an absent plugin caused no unauthorized delivery. Source and ledger advances stopped writes. A forced cancellation preserved staged changes on retry, and a lost response left one accepted exact push that Claude verified from the bare remote. The actual structural scanner reported zero findings for the separate well-formed setup fixture, while the installed claim review found its wrong port.
+      Evidence: [Stackweaver PR #1162](https://github.com/michielvha/stackweaver/pull/1162) merged at `0fbbf091c9d2c7d021f8be18af52dcef2b5ea370`, identical to reviewed head `5eb57e4c2c0ff2f63246d822ee0658da1440d21a` from baseline `21c4df7d99f66c7e7a80eb74a01be38e80719e53`. Exact-candidate selector and rollback comparison passed. The independent reviewer, attested as Codex CLI 0.170.0 with `gpt-6.2-sol`, returned no findings after inspecting the revised packet with exact before/after state and recovery evidence. The merged command invoked installed 0.27.0 from a synthetic repository in a native Claude post-merge report, returned the exact freshness output, and preserved the fixture's docs, ledger, index and tips. The merge preserved Stackweaver's real selector, coverage, corrections and ledger bytes.
 
-For the in-progress release, the R-11 exact source and 304-file package digest bind the generic entry too. The R-11 covers finding stays open for the completion review. A change to package bytes before merge needs a fresh installed-payload check.
+The declared path coverage now includes the generic entry, addressing the R-11 finding. The reviewed published package already contained that entry and its verified bytes.
 
 ## Open Questions
 
@@ -145,6 +158,11 @@ None.
 | 2026-11-19 | R-9 | implementation | `bd1f6d0490254610fb17313fe053df4aadea49cc` | unknown | procedural | No findings. Shared behavior verified. Released and consumer checks remain open. |
 | 2026-11-19 | R-10 | implementation | `310a3b1146caa84a2c7f18526b3a383b0dcce5eb` | unknown | procedural | Adjacent checks pass. One blocker in early ambiguous intake. |
 | 2026-11-19 | R-11 | implementation | `a75063badddfcc8521a5896bf5f0ed4e3adbd5ac` | unknown | procedural | Shared behavior met. One should-fix on review coverage. |
+| 2026-11-20 | R-12 | spec | `ca2240da144c51064686141a1bf0ae14b0c361ef` | unknown | procedural | One should-fix on final delivery of the native-runner correction. |
+| 2026-11-20 | R-13 | spec | `21b19f02cd752baad43176161c01c1c7c946a588` | unknown | procedural | No findings. |
+| 2026-11-20 | R-13 | spec | `21b19f02cd752baad43176161c01c1c7c946a588` | n/a | n/a | accepted by owner |
+| 2026-11-20 | R-14 | implementation | `689c5c9c7858e7ea52587f2fd810013167e8309b` | unknown | procedural | The workflow and adoption checks met their criteria. The guides still describe candidate evidence. |
+| 2026-11-20 | R-15 | implementation | `df4493bc166e9d4b1584bc4534e73c935fee02d8` | unknown | procedural | All four acceptance criteria met. |
 
 ### R-1
 
@@ -494,6 +512,62 @@ SEVERITY: should-fix
 WHERE: Feature `covers` (lines 7-23), `plugins/vh-adlc/skills/vh-adlc/SKILL.md:1-16`, AC-01 clarification proof
 EVIDENCE: The R-10 repair puts the clarification guard in the shipped generic skill before the lifecycle reference loads. That file is absent from `covers`. The covered discovery test can catch removal during verification, but a later change to the generic entry can leave the feature's recorded review fresh. The pinned feature-document standard requires coverage for paths whose changes can affect the feature.
 PROPOSAL: Add the generic skill file to `covers` through the feature's spec revision and review process.
+
+### R-12
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stackweaver adoption (lines 83-85), Task T3 (lines 120-125), Open Questions (lines 132-134)
+EVIDENCE: The coverage correction adds the generic skill to `covers` and leaves the published package unchanged. The same commit changes `tests/vh-adlc/docs-truth/native-trial.ts`. The diff from merged `84e59c89` to `ca2240da` therefore includes a test file, while the delivery sequence names only a docs-only completion fast-forward. The pinned `conventions/delivery.md` applies normal CI when the outgoing range contains a test change.
+PROPOSAL: Record the authorized normal-CI delivery step for the corrected runner before the docs-only completion record, or have the owner select a normal-CI completion delivery that includes the runner change.
+
+### R-13
+
+NO FINDINGS
+
+### R-14
+
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: met
+EVIDENCE: At 689c5c9c, the pinned Bun suite passed 79 tests and 428 assertions, and feature lint passed. I inspected the 0a07a791 intake receipts on the same shipped fingerprint, including clarification before candidate reads. The retained 18d20daf direct-mode, refusal, and path-replacement receipts apply to the unchanged direct procedure and fixture. The corrected released Codex and Claude runs both verified default selection and freshness against 84e59c89 without changing the fixture.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The corrected Codex and Claude claim transcripts on released 84e59c89 show the source-backed port correction, accurate command and backend claims, unknown worker count and package probe default, and the HTTP 500 versus 503 product issue. Both preserve the fixture. The earlier direct procedure receipts establish the targeted unsupported-replacement flag and the native partial report that identifies unfinished work. The released freshness traces return recorded freshness without reading candidate bodies.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: met
+EVIDENCE: I verified the 15 retained native transcript hashes, inspected the local synthetic write commits, and inspected the interrupted index and exact bare-remote tip after the lost push response. The evidence shows coupled docs and ledger commits, full and targeted rows, no-push and candidate-policy refusal, stale-input refusal, and preserved pending changes. The exact selector and rollback receipt binds baseline 21c4df7d and reviewed head 5eb57e4c. Merge 0fbbf091 has the reviewed tree and preserves the selector, coverage, corrections and ledger blobs. The post-merge native synthetic report reproduces freshness. Production content and writes were outside this review.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not met
+EVIDENCE: I independently checked all four ordinary fresh and upgrade installs against the 304-file 84e59c89 payload, which matches 689c5c9c. The native discovery receipts and both released default and freshness trials passed. The compatibility entry still describes 0.27.0 as a candidate and presents the Claude trial as awaiting capacity. The workflow guide omits the observed native outcomes and Stackweaver adoption.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: `docs/reference/compatibility.md:229-236`, `docs/user-guides/workflows.md:389-396`, AC-04 Test Plan
+EVIDENCE: The accepted proof requires the compatibility entry and workflow guide to describe the observed run. At 689c5c9c, the compatibility section describes the candidate and only Codex execution. The workflow guide gives usage instructions without the released host evidence or the verified Stackweaver adoption. The exact published install and native trial receipts establish both host outcomes.
+PROPOSAL: Update both sections with the verified 0.27.0 fresh installs, upgrades, native fixture runs and Stackweaver adoption, linking to the exact evidence. Keep the synthetic and production evidence boundaries visible.
+
+### R-15
+
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: met
+EVIDENCE: At df4493bc, pinned Bun passed 79 tests and 428 assertions, and feature lint passed. Git shows identical plugin and test-runner bytes across the R-14 and R-15 targets. The inspected 0a07a791 intake receipts match the published fingerprint and show clarification before candidate reads. The retained direct-mode, refusal and path-replacement receipts apply to the unchanged direct procedure. Both released clients passed the default and freshness fixtures.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: Both released 84e59c89 claim runs returned source-backed verdicts, including the unknown package probe default and the HTTP 500 versus 503 product issue. The unchanged direct-mode evidence covers targeted review, unsupported replacement, unfinished work and the freshness-only read boundary. The released receipt snapshots preserve HEAD, refs, index and project files.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: met
+EVIDENCE: The retained selector, rollback and native acceptance packet still matches its checksums. Stackweaver merge 0fbbf091 has the same tree as reviewed head 5eb57e4c. The observed file and Git evidence establishes coupled docs and ledger commits, full and targeted rows, stale-input refusal, interrupted-state preservation and exact landed-commit reconciliation. The tested rollback preserved the ledger, and the post-merge synthetic report reproduced freshness.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: met
+EVIDENCE: The four marketplace install receipts and native discovery results bind to published 84e59c89. Its version 0.27.0 and 304-file fingerprint match df4493bc. Both released clients completed the default claim and freshness fixtures with unchanged state. The compatibility entry and workflow guide now record the observed fresh installs, upgrades, synthetic runs and Stackweaver adoption, with links to the evidence.
 
 ## Sources
 
