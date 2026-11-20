@@ -99,6 +99,28 @@ test("recovers an accepted update with a lost response and holds a rejected upda
   }
 });
 
+test("an ownership push excludes reachable annotated tags even with push.followTags enabled", async () => {
+  const f = fixture();
+  try {
+    await adopt(f);
+    const clone = f.clone("follow-tags");
+    const genesis = f.git(f.bare, "rev-parse", REF);
+    const main = f.git(f.bare, "rev-parse", "refs/heads/main");
+    f.git(clone, "config", "push.followTags", "true");
+    f.git(clone, "tag", "-a", "v0.99.0", "-m", "fixture release-shaped tag", genesis);
+    expect(f.git(f.bare, "for-each-ref", "--format=%(refname)", "refs/tags")).toBe("");
+
+    expect((await enter(clone, f.env, "--issue", "42")).status).toBe("entered");
+
+    expect(f.git(f.bare, "rev-parse", REF)).not.toBe(genesis);
+    expect(f.git(f.bare, "rev-parse", "refs/heads/main")).toBe(main);
+    expect(f.git(f.bare, "for-each-ref", "--format=%(refname)", "refs/tags")).toBe("");
+    expect(f.git(clone, "cat-file", "-t", "refs/tags/v0.99.0")).toBe("tag");
+  } finally {
+    f.cleanup();
+  }
+});
+
 test("a checkout with committed adoption cannot downgrade to a private draft before first verification", async () => {
   const f = fixture();
   try {

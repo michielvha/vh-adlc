@@ -98,7 +98,7 @@ export class OwnershipGit {
   }
 
   install(expected: string, commit: string): boolean {
-    return this.ok("push", "--quiet", `--force-with-lease=${REF}:${expected}`, "origin", `${commit}:${REF}`);
+    return this.ok("push", "--quiet", "--no-follow-tags", `--force-with-lease=${REF}:${expected}`, "origin", `${commit}:${REF}`);
   }
 }
 
