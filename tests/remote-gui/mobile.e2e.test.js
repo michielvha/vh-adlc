@@ -190,13 +190,31 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
         for (const character of address) await page.keyboard.insertText(character);
         await page.keyboard.press('Shift+ArrowLeft');
         await page.keyboard.insertText('s');
+        const viewportAfterSubmit = [];
+        const recordViewport = request => {
+            if (request.url().endsWith('/__remote_gui/viewport')) viewportAfterSubmit.push(request.postDataJSON());
+        };
+        page.on('request', recordViewport);
         await page.keyboard.press('Enter');
         for (let attempt = 0; attempt < 35 && !observations.geometry; attempt++) await delay(100);
         assert.ok(observations.geometry, 'the corrected address did not load the expected page');
+        // Safari can end the native input session before its visual viewport
+        // reports that the keyboard has finished moving off screen.
+        await editor.waitFor({ state: 'hidden', timeout: 3000 });
+        await delay(350);
+        assert.equal(await canvas.evaluate(node => node.height), 812, 'the remote framebuffer shrank during keyboard dismissal');
+        assert.ok(viewportAfterSubmit.every(size => size.height === 812), 'the viewer resized the remote browser to the closing keyboard');
+        const restore = page.waitForRequest(request => request.url().endsWith('/__remote_gui/viewport') && request.postDataJSON().height === 812);
         await page.evaluate(() => {
             delete window.visualViewport.height;
             window.visualViewport.dispatchEvent(new Event('resize'));
         });
+        assert.equal((await restore).postDataJSON().claim, true, 'the restored viewport did not reclaim sizing');
+        await page.waitForFunction(() => {
+            const node = document.querySelector('#screen canvas');
+            return node?.width === 390 && node.height === 812 && Math.abs(node.getBoundingClientRect().height - 812) < 1;
+        });
+        page.off('request', recordViewport);
         await delay(350);
         const { top } = observations.geometry;
         await tap(120, top + 340);

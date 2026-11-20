@@ -50,6 +50,8 @@ The hosted mobile test exposed a separate difference in Chrome 157.0.8103.50. Th
 
 The owner then reported that the phone keyboard sometimes closed while typing a URL. In the stock Chromium address-bar test, interrupting focus checks past the 500 ms lease reproduced the dismissal. The viewer now keeps the local editor open for up to three seconds during a temporary loss of verification. It pauses remote keys and discards unsent input and composition. Verification of the same field and phase resumes typing without reopening the keyboard. A reported focus or phase change still closes the editor immediately. The browser test interrupts both types of check and requires the exact URL to load after recovery.
 
+The owner also saw empty space above and below Chromium after submitting a URL on iPhone. The browser test reproduced a resize request at keyboard height when the editor blurred before the visual viewport expanded. Holding back that request kept the framebuffer at full height. The test then reproduced a separate scaling problem: noVNC kept fitting the canvas to the short viewport after the container returned to its expected size. The viewer now reclaims remote sizing after the viewport expands and reapplies noVNC's public scaling setting when the container changes dimensions. The Chromium test checks the requested size, framebuffer size and actual canvas height.
+
 ### Evidence from the first design
 
 The first design passed the vh-adlc in-progress gate and stopped at its feasibility task. The following evidence describes that design and the probes preserved in Git.

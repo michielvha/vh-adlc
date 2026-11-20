@@ -132,10 +132,13 @@ window.addEventListener('pagehide',forget);
 const sizingNotice=$('viewport-status'),screen=$('screen');
 const viewerID=Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,'0')).join('');
 let sizingConnected=false,controlsSize=false,sequence=0,generation=0;
-let pendingSize=null,sizeTimer=0,sizeInFlight=false,sizeAbort=null,lastSize='';
+let pendingSize=null,sizeTimer=0,sizeInFlight=false,sizeAbort=null,lastSize='',keyboardViewport=null;
 const sizingEligible=()=>sizingConnected&&document.visibilityState==='visible'&&document.hasFocus();
+const viewerHeight=()=>Math.floor(window.visualViewport?.height??window.innerHeight);
+const keyboardAffectsSize=()=>phone?.editing||
+ (keyboardViewport&&innerWidth===keyboardViewport.width&&viewerHeight()<keyboardViewport.height-90);
 function fitViewerHeight(){
- const height=Math.floor(window.visualViewport?window.visualViewport.height:window.innerHeight);
+ const height=viewerHeight();
  screen.style.height=Math.max(0,height-32)+'px';
  panel.style.maxHeight=Math.max(0,height-48)+'px';
 }
@@ -150,8 +153,16 @@ function pauseSizing(){
  generation++;clearTimeout(sizeTimer);sizeTimer=0;pendingSize=null;controlsSize=false;
  if(sizeAbort)sizeAbort.abort();
 }
+function beginMobileEditing(){
+ keyboardViewport={width:innerWidth,height:viewerHeight()};
+ pauseSizing();
+}
 function queueSize(claim=false){
- if(phone?.editing||!sizingEligible()||(!claim&&!controlsSize))return;
+ if(keyboardAffectsSize()||!sizingEligible())return;
+ // The editor can blur before the native keyboard finishes closing.
+ // Reclaim sizing once the original viewport has returned.
+ if(keyboardViewport)claim=true;
+ if(!claim&&!controlsSize)return;
  const size=measuredSize();
  if(!size){clearTimeout(sizeTimer);sizeTimer=0;pendingSize=null;return}
  const key=size.width+'x'+size.height;
@@ -161,7 +172,8 @@ function queueSize(claim=false){
  clearTimeout(sizeTimer);sizeTimer=setTimeout(()=>{sizeTimer=0;void flushSize()},150);
 }
 async function flushSize(){
- if(sizeInFlight||!pendingSize||!sizingEligible())return;
+ if(sizeInFlight||!pendingSize||keyboardAffectsSize()||!sizingEligible())return;
+ keyboardViewport=null;
  const request=pendingSize;pendingSize=null;sizeInFlight=true;
  const controller=new AbortController();sizeAbort=controller;
  const deadline=setTimeout(()=>controller.abort(),5000);
@@ -199,7 +211,11 @@ async function flushSize(){
  }
 }
 fitViewerHeight();
-new ResizeObserver(()=>queueSize()).observe(screen);
+new ResizeObserver(()=>{
+ // noVNC can skip rescaling when the container returns to its expected size.
+ if(remote)remote.scaleViewport=true;
+ queueSize();
+}).observe(screen);
 window.addEventListener('resize',()=>{fitViewerHeight();queueSize()});
 if(window.visualViewport)window.visualViewport.addEventListener('resize',()=>{fitViewerHeight();queueSize()});
 window.addEventListener('focus',()=>queueSize(true));
@@ -216,7 +232,7 @@ try{
  canvas.setAttribute('role','img');
  canvas.setAttribute('aria-label','Shared browser screen');
  if(navigator.maxTouchPoints>0)void import('/__remote_gui/mobile.js').then(({mobileKeyboard})=>{
-  phone=mobileKeyboard(remote,screen,panel,pauseSizing,()=>{
+  phone=mobileKeyboard(remote,screen,panel,beginMobileEditing,()=>{
    remote.focusOnClick=true;
    if(panel.hidden){focusRemote();queueSize(true)}
   });
