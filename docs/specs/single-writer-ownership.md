@@ -350,7 +350,6 @@ None. The owner selected the Git reservation, entry checks and explicit handoff.
 | 2026-11-19 | R-13 | spec | `014299049c45051a2d4f8e3b40ba33e3de4ba51f` | n/a | n/a | accepted by owner |
 | 2026-11-20 | R-14 | spec | `9f8b6b4f5ca3723304e7d5a7705c0a41a724417b` | unknown | procedural | Two factual nits on validation wording and citations to the pre-feature baseline. Model identity was not attested. |
 | 2026-11-20 | R-15 | spec | `11ac06ce45d3748cda6d0e6c5a18ad97717be522` | unknown | procedural | No blocking findings. One should-fix finding on the mixed-marker check and two wording nits. Model identity was not attested. |
-
 | 2026-11-21 | R-16 | implementation | `d6aa50a4828b5e2ab3933c9bb80b918efc50a506` | unknown | procedural | Two blocking findings: unexpected tag publication and a false branch locator on detached checkouts. Model identity was not attested. |
 
 ### R-1
