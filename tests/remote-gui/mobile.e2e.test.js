@@ -154,6 +154,38 @@ field.addEventListener('input',()=>post('/edit',{exact:field.value==='z',count:+
             resize(baseline - 235);
         });
         assert.equal(await editorFocused(), true, 'the keyboard animation dismissed the editor');
+        // A slow check must not dismiss the local keyboard. No character
+        // typed while the remote focus is unverified may be sent or replayed.
+        const paused = page.getByText('Typing paused. Checking connection…');
+        const resumed = page.getByText('Typing resumed. Re-enter missed keys.');
+        const focusUnavailable = route => route.fulfill({ status: 503 });
+        await page.route('**/__remote_gui/editable', focusUnavailable);
+        try {
+            await delay(700);
+            assert.equal(await editorFocused(), true, 'the keyboard closed on a missed focus renewal');
+            await paused.waitFor({ timeout: 1500 });
+            const notice = await paused.boundingBox();
+            const screen = await page.locator('#screen').boundingBox();
+            assert.ok(notice && screen && notice.y + notice.height <= screen.y, 'the typing status covers the remote controls');
+            await page.keyboard.insertText('x');
+        } finally {
+            await page.unroute('**/__remote_gui/editable', focusUnavailable);
+        }
+        await resumed.waitFor({ timeout: 1500 });
+        assert.equal(await editorFocused(), true);
+        const phaseUnavailable = async route => {
+            await delay(450);
+            await route.continue().catch(() => {});
+        };
+        await page.route('**/__remote_gui/editable-phase', phaseUnavailable);
+        try {
+            await paused.waitFor({ timeout: 1500 });
+            assert.equal(await editorFocused(), true, 'a phase timeout closed the keyboard');
+            await page.keyboard.insertText('q');
+        } finally {
+            await page.unroute('**/__remote_gui/editable-phase', phaseUnavailable);
+        }
+        await resumed.waitFor({ timeout: 1500 });
         const address = 'http://127.0.0.1:' + fixture.address().port + '/t';
         for (const character of address) await page.keyboard.insertText(character);
         await page.keyboard.press('Shift+ArrowLeft');

@@ -15,9 +15,10 @@ const viewerPage = `<!doctype html><html><head><meta name="viewport" content="wi
 html,body{margin:0;height:100%;overflow:hidden;background:#15171c;color:#eee;font:14px system-ui}
 header{position:relative;height:32px;padding:3px 8px;box-sizing:border-box;display:flex;align-items:center;gap:12px}
 .viewer-status{flex:1;min-width:0}
-#status,#viewport-status{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#viewport-status{margin:0;color:#ffcf70}
-#viewport-status[hidden],#viewport-status:not([hidden])+#status{display:none}
+#status,#viewport-status,#mobile-hint{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#viewport-status,#mobile-hint{margin:0;color:#ffcf70}
+#viewport-status[hidden],#mobile-hint[hidden],#viewport-status:not([hidden])+#status,
+#mobile-hint:not([hidden])~#viewport-status,#mobile-hint:not([hidden])~#status{display:none}
 #screen{height:calc(100% - 32px);width:100%}
 button{font:inherit;color:#eee;background:#2b303b;border:1px solid #4a5160;border-radius:4px;padding:2px 10px;min-height:26px;cursor:pointer}
 button:focus-visible,textarea:focus-visible,#clipboard-remote:focus-visible{outline:2px solid #7aa7ff;outline-offset:1px}
@@ -25,7 +26,6 @@ button:focus-visible,textarea:focus-visible,#clipboard-remote:focus-visible{outl
 #clipboard[hidden]{display:none}
 #mobile-type{position:fixed;z-index:3;min-width:112px;min-height:44px;font-size:16px}
 #mobile-editor{position:fixed;top:6px;left:8px;width:8px;height:20px;opacity:.01;pointer-events:none;font-size:16px;z-index:3}
-#mobile-hint{position:fixed;left:8px;bottom:4px;z-index:2;margin:0;padding:5px 8px;color:#eee;background:#202735;border-radius:4px;pointer-events:none}
 
 #clipboard p{margin:0}
 #clipboard-warning{color:#ffcf70}
@@ -33,7 +33,7 @@ textarea{font:inherit;color:#eee;background:#15171c;border:1px solid #4a5160;bor
 #clipboard-remote{margin:0;min-height:3em;max-height:12em;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#15171c;border:1px solid #4a5160;border-radius:4px;padding:4px;font:13px ui-monospace,monospace}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 </style></head><body>
-<header><div class="viewer-status"><p id="viewport-status" role="status" aria-live="polite" hidden></p><span id="status">Connecting to shared browser</span></div><button id="clipboard-toggle" type="button" aria-expanded="false" aria-controls="clipboard">Clipboard</button></header>
+<header><div class="viewer-status"><p id="mobile-hint" role="status" hidden>Typing follows the shared browser’s focus.</p><p id="viewport-status" role="status" aria-live="polite" hidden></p><span id="status">Connecting to shared browser</span></div><button id="clipboard-toggle" type="button" aria-expanded="false" aria-controls="clipboard">Clipboard</button></header>
 <section id="clipboard" aria-label="Clipboard panel" hidden>
 <p id="clipboard-mode">Opening the panel shows who controls the shared browser.</p>
 <p id="clipboard-warning" hidden>Text you send now is readable by the agent.</p>
@@ -48,7 +48,6 @@ textarea{font:inherit;color:#eee;background:#15171c;border:1px solid #4a5160;bor
 <div id="screen"></div>
 <button id="mobile-type" type="button" hidden>Tap to type</button>
 <input id="mobile-editor" aria-label="Shared browser keyboard" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text" tabindex="-1" hidden>
-<p id="mobile-hint" hidden>Typing follows the shared browser’s focus.</p>
 <script type="module">
 import RFB from '/core/rfb.js';
 const $=id=>document.getElementById(id);

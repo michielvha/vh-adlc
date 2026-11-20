@@ -48,6 +48,8 @@ During daily-use testing, the owner reported that the sizing notice blocked the 
 
 The hosted mobile test exposed a separate difference in Chrome 157.0.8103.50. The helper found the focused address entry but reached the 256-node search limit before it could rule out another match. Raising the limit to 384 kept the same lookup deadline. The managed browser regression and the public URL and tab-switch workflow passed locally with the matching Chrome Stable build and noVNC 1.6.0.
 
+The owner then reported that the phone keyboard sometimes closed while typing a URL. In the stock Chromium address-bar test, interrupting focus checks past the 500 ms lease reproduced the dismissal. The viewer now keeps the local editor open for up to three seconds during a temporary loss of verification. It pauses remote keys and discards unsent input and composition. Verification of the same field and phase resumes typing without reopening the keyboard. A reported focus or phase change still closes the editor immediately. The browser test interrupts both types of check and requires the exact URL to load after recovery.
+
 ### Evidence from the first design
 
 The first design passed the vh-adlc in-progress gate and stopped at its feasibility task. The following evidence describes that design and the probes preserved in Git.

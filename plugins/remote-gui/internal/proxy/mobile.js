@@ -6,6 +6,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     const prompt = document.getElementById('mobile-type');
     const editor = document.getElementById('mobile-editor');
     const hint = document.getElementById('mobile-hint');
+    const editingHint = hint.textContent;
     const canvas = screen.querySelector('canvas');
     let epoch = 0;
     let timer = 0;
@@ -14,13 +15,17 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     let phaseTimer = 0;
     let phaseRequest = null;
     let observedPhase = 0;
+    let phaseReady = false;
     let request = null;
     let target = null;
     let framebuffer = '';
     let lease = 0;
     let editing = false;
     let composing = false;
+    let discardComposition = false;
     let committed = '';
+    let missedInput = false;
+    let recoveryTimer = 0;
     let baseHeight = 0;
     let keyboardSeen = false;
     let keyboardCloseTimer = 0;
@@ -31,9 +36,12 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
         clearTimeout(timer);
         clearTimeout(expiryTimer);
         clearTimeout(phaseTimer);
+        clearTimeout(recoveryTimer);
+        recoveryTimer = 0;
         clearTimeout(keyboardCloseTimer);
         phaseRequest?.abort();
         phaseRequest = null;
+        phaseReady = false;
         awaiting = false;
         request?.abort();
         request = null;
@@ -41,7 +49,9 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
         framebuffer = '';
         lease = 0;
         composing = false;
+        discardComposition = false;
         committed = '';
+        missedInput = false;
         const wasEditing = editing;
         editing = false;
         prompt.hidden = true;
@@ -72,6 +82,38 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
 
     const metadataHeaders = { 'Content-Type': 'application/json', 'X-Remote-Gui-Editable': '1' };
 
+    function canSend() {
+        return phaseReady && performance.now() < lease;
+    }
+
+    function updateEditingStatus() {
+        if (!editing) return;
+        let message = editingHint;
+        if (canSend()) {
+            clearTimeout(recoveryTimer);
+            recoveryTimer = 0;
+            if (missedInput) message = 'Typing resumed. Re-enter missed keys.';
+        } else {
+            if (!recoveryTimer) {
+                if (composing) {
+                    discardComposition = true;
+                    missedInput = true;
+                    editor.value = committed;
+                }
+                recoveryTimer = setTimeout(clear, 3000);
+            }
+            message = 'Typing paused. Checking connection…';
+        }
+        if (hint.textContent !== message) hint.textContent = message;
+    }
+
+    function phaseUnavailable(generation) {
+        if (!editing) { clear(); return; }
+        phaseReady = false;
+        updateEditingStatus();
+        phaseTimer = setTimeout(() => void watchPhase(generation), 100);
+    }
+
     async function watchPhase(generation) {
         const controller = new AbortController();
         phaseRequest = controller;
@@ -81,6 +123,8 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
                 method: 'POST', credentials: 'same-origin', cache: 'no-store',
                 headers: metadataHeaders, signal: controller.signal,
             });
+            if (generation !== epoch) return;
+            if (reply.status === 503) { phaseUnavailable(generation); return; }
             const phase = await reply.json();
             if (generation !== epoch) return;
             if (!reply.ok || !Number.isSafeInteger(phase) || phase < 1 || phase < observedPhase) {
@@ -89,9 +133,14 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
             }
             observedPhase = phase;
             if (target && target.phase !== phase) { clear(); return; }
+            phaseReady = true;
+            updateEditingStatus();
             phaseTimer = setTimeout(() => void watchPhase(generation), 100);
-        } catch {
-            if (generation === epoch) clear();
+        } catch (error) {
+            if (generation === epoch) {
+                if (error.name === 'AbortError' || error instanceof TypeError) phaseUnavailable(generation);
+                else clear();
+            }
         } finally {
             clearTimeout(timeout);
             if (phaseRequest === controller) phaseRequest = null;
@@ -100,7 +149,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
 
     function retrySample(point, generation, attempt) {
         // A temporary failure never extends a verified association.
-        if (target ? performance.now() < lease : attempt < 4) {
+        if (target ? editing || performance.now() < lease : attempt < 4) {
             const delay = target ? 20 : 75 * (attempt + 1);
             timer = setTimeout(() => void sample(point, generation, attempt + 1), delay);
         } else clear();
@@ -123,7 +172,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
             if (!response.ok) throw Error('editable focus unavailable');
             const field = await response.json();
             if (generation !== epoch) return;
-            if (performance.now() >= started + 500) { clear(); return; }
+            if (performance.now() >= started + 500) { retrySample(point, generation, attempt); return; }
             if (!field && !target) {
                 retrySample(point, generation, attempt);
                 return;
@@ -141,15 +190,19 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
             awaiting = false;
             lease = started + 500;
             clearTimeout(expiryTimer);
-            expiryTimer = setTimeout(clear, Math.max(0, lease - performance.now()));
+            expiryTimer = setTimeout(() => {
+                if (editing) updateEditingStatus();
+                else clear();
+            }, Math.max(0, Math.ceil(lease - performance.now())));
             if (!editing) {
                 position(field);
                 prompt.hidden = false;
             }
+            updateEditingStatus();
             timer = setTimeout(() => void sample(point, generation, attempt), Math.max(0, 170 - (performance.now() - started)));
         } catch (error) {
             if (generation === epoch) {
-                if (error.name === 'AbortError') retrySample(point, generation, attempt);
+                if (error.name === 'AbortError' || error instanceof TypeError) retrySample(point, generation, attempt);
                 else clear();
             }
         } finally {
@@ -160,8 +213,10 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
 
     function validEdit() {
         if (!editing) return false;
-        if (performance.now() < lease) return true;
-        clear();
+        if (canSend()) return true;
+        missedInput = true;
+        editor.value = committed;
+        updateEditingStatus();
         return false;
     }
 
@@ -214,6 +269,7 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
         editor.type = mode === 'password' ? 'password' : 'text';
         editor.inputMode = mode === 'number' ? 'numeric' : mode === 'password' ? 'text' : mode;
         editing = true;
+        updateEditingStatus();
         onEditingStart();
         keyboardSeen = false;
         baseHeight = viewportHeight();
@@ -226,9 +282,18 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     });
 
     editor.addEventListener('blur', () => { if (editing) clear(); });
-    editor.addEventListener('compositionstart', () => { composing = true; });
+    editor.addEventListener('compositionstart', () => {
+        composing = true;
+        discardComposition = !canSend();
+    });
     editor.addEventListener('compositionend', () => {
         composing = false;
+        if (discardComposition) {
+            missedInput = true;
+            editor.value = committed;
+            updateEditingStatus();
+            return;
+        }
         syncInput();
     });
     editor.addEventListener('beforeinput', event => {
@@ -243,6 +308,11 @@ export function mobileKeyboard(rfb, screen, panel, onEditingStart, onFocusReturn
     });
     editor.addEventListener('input', event => {
         if (composing || event.isComposing) return;
+        if (discardComposition && (event.inputType === 'insertFromComposition' || event.inputType === 'insertCompositionText')) {
+            editor.value = committed;
+            return;
+        }
+        discardComposition = false;
         syncInput();
     });
     editor.addEventListener('keydown', event => {
