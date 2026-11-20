@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "The tag and detached checkout fixes passed their regression tests. The second independent review found all five criteria met."
+status: complete
+status_description: "Local verification passed in both installed clients, and the independent review found all five criteria met."
 issue: null
 branch: feat/single-writer-ownership
 goal: "Two sessions using vh-adlc cannot accidentally start or resume the same feature as its writer."
@@ -57,11 +57,10 @@ a session that is still running or an edit made outside the workflow.
 Repositories opt in once and authorize updates to the reservation ref. Pause feature
 writers during setup or a remote restore, and choose the writer for any existing claim. vh-adlc checks
 the current remote policy at entry. If Git cannot verify it or the reservation, vh-adlc
-pauses the start or resume and explains what to check. The planned proof is a race between two clones,
-a normal resume, and a handoff with unfinished work. These are implementation checks
-still to run. Acceptance authorizes implementation and tests through the existing
-feature workflow. Publishing implementation or enabling the reservation in a live
-repository needs separate approval.
+pauses the start or resume and explains what to check. A race between two clones on a
+disposable remote admitted one writer. Installed Codex and Claude Code resumed after
+restart and verified handoff with scripted local providers. Publishing implementation
+or enabling the reservation in a live repository needs separate approval.
 
 If creation of a tracking issue is interrupted, the draft stays paused while you identify the
 result. Read-only lookup and recovery remain available.
@@ -860,5 +859,5 @@ PROPOSAL: Update the summary and source note to reflect the observed disposable 
 - [Earlier draft and historical incident receipt reference](https://github.com/michielvha/vh-adlc/blob/289a043d21cdc76310d3d32a62322b5f4cab9637/docs/specs/single-writer-ownership.md#measured-incident-and-current-gaps).
 - [Claim and isolation helpers](../../plugins/vh-adlc/scripts/loop/claim.ts) and [existing handoff procedure](../../plugins/vh-adlc/references/authority.md#handoff).
 - [CI push and version routing](../../.github/workflows/ci.yml), [preview dispatch](../../.github/workflows/preview.yml) and [tag release trigger](../../.github/workflows/release.yml).
-- [Recorded CLI session ID observations](session-retrospective.md). This checkout exposes the Codex variable names. The current Claude route still needs its installed-client proof.
+- [Earlier CLI session ID observations](session-retrospective.md). R-17 records the installed Codex and Claude Code checks on the repaired implementation.
 - [Marketplace source layout](../reference/marketplace.md) and [client installation paths](../get-started/installation.md).
