@@ -100,6 +100,7 @@ None. The owner selected report mode first and approved explicit run outcomes an
 | 2026-11-20 | R-3 | spec | `e896b1047cfbc109f9211adb4bd1972584e6802d` | unknown | procedural | One blocking and three should-fix findings |
 | 2026-11-20 | R-4 | spec | `f2dfa03f9fdf0eab4a00eb649f47b90a4a855145` | unknown | procedural | Two should-fix findings |
 | 2026-11-20 | R-5 | spec | `754c9507ebae9a4045dbfa72045ef15f97a274ba` | unknown | procedural | One should-fix finding |
+| 2026-11-20 | R-6 | spec | `e7a9d2857b490a6fd5bdaecdee8e3f5c42927388` | unknown | procedural | One blocking finding |
 
 ### R-1
 
@@ -313,6 +314,15 @@ SEVERITY: should-fix
 WHERE: Context / Owner summary line 27, Scope line 43, Design line 50, Acceptance Criteria AC-03, Test Plan AC-03
 EVIDENCE: The R-4 revision adds case-insensitive presence and exact-value rules without defining the observed value for repeated headers. Playwright's `headerValue()` combines repeated values, `headerValues()` returns the values separately where available, and `headers()` omits some security-related headers. A fixture with one ordinary header can pass while implementations disagree on presence or exact-value matches against real deployments. [Playwright Response API](https://playwright.dev/docs/api/class-response#response-header-value)
 PROPOSAL: Define a single case-insensitive lookup and exact-value comparison using Playwright's documented observed representation. Prove the verdict for a security-related header and a repeated header containing an additional value, while retaining the no-extra-requests check.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context / Owner summary line 27, Scope line 43, Design lines 47 and 50, Acceptance Criteria AC-03, Test Plan AC-03, Sources line 326
+EVIDENCE: The R-5 revision selects `headersArray()` so repeated entries remain separate. Playwright documents that some browser network stacks combine values before exposing them, so a repeated header at the server does not guarantee two observed entries. AC-03 requires proof based on two matching entries without setting an observation precondition, while the design permits multiple browser engines. [Playwright Response API](https://playwright.dev/docs/api/class-response#response-headers-array)
+PROPOSAL: Define exact matching on the entries and values the selected browser reports, and state that the rule cannot establish wire-level multiplicity. Prove the duplicate path with a fixture and engine confirmed to expose two entries, and cover a single comma-delimited observed value without splitting it.
 
 ## Sources
 
