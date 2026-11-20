@@ -326,6 +326,9 @@ binary continues to supply the existing lifecycle gates.
       Evidence: The installed package at `11ac06ce45d3748cda6d0e6c5a18ad97717be522` passed both scripted local trials. For R-15 F-01, each client refused entry on a vacant issue with the ambiguity message when both clients' markers were present. A clean session then reserved that issue. The committed trial checks both results and gives Codex access to the disposable checkout's Git metadata.
       Evidence: All 4,256 cases from `bun test tests/vh-adlc` passed across 274 files at `11ac06ce45d3748cda6d0e6c5a18ad97717be522` on Linux with Bun 1.4.4. The runs were split into isolated batches and reconciled against Bun's registered tests. The earlier timeout and interruption logs were retained. The final audit and resolution retries passed separately at their original deadlines. Go tests, race checks, vet, lint and module verification passed at the same commit. The installed payload remained byte-identical after the test-runner correction at `0ec44721`, where the focused catalog check passed.
 
+- [ ] T9 `plugins/vh-adlc/scripts/ownership/git.ts` and `tests/vh-adlc/ownership/policy.test.ts` - fix R-16 F-01. Run `bun test tests/vh-adlc/ownership/policy.test.ts` with a reachable annotated tag and configured tag following. The reservation advances and the remote receives no tag (AC-13).
+- [ ] T10 `plugins/vh-adlc/scripts/ownership/{identity,entry,handoff,issue-link}.ts`, `plugins/vh-adlc/references/authority.md` and `tests/vh-adlc/ownership/handoff.test.ts` - fix R-16 F-02. Run `bun test tests/vh-adlc/ownership` to verify detached acquisition and transfer hold without a real locator, while detached competitors still see the writer and a linked spec permits entry and handoff (AC-10, AC-14).
+
 ## Open Questions
 
 None. The owner selected the Git reservation, entry checks and explicit handoff.
