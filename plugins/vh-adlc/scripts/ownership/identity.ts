@@ -6,7 +6,7 @@ import type { Environment, OwnershipGit } from "./git";
 
 export type Writer = { fingerprint: string; host: string; locator: string; checkout: string };
 export type Item = { issue?: string; spec?: string; branch?: string };
-export type Association = { aliases: string[]; locator: string; claimed: boolean };
+export type Association = { aliases: string[]; locator?: string; claimed: boolean };
 
 export function repositoryURL(raw: string): string {
   const scp = /^git@([a-z0-9.-]+):([^/][^?#]*)$/i.exec(raw);
@@ -35,7 +35,7 @@ export function verifyDestination(git: OwnershipGit): string {
   return repositoryURL(fetch[0]!);
 }
 
-export function writer(env: Environment, locator: string, client?: string, host = hostname()): Omit<Writer, "checkout"> {
+export function writerIdentity(env: Environment, client?: string, host = hostname()): Pick<Writer, "fingerprint" | "host"> {
   const codex = Boolean(env.CODEX_THREAD_ID || env.CODEX_SESSION_ID);
   const claude = Boolean(env.CLAUDECODE || env.CLAUDE_CODE_SESSION_ID);
   const kind = codex && !claude ? "codex" : claude && !codex ? "claude" : undefined;
@@ -43,8 +43,15 @@ export function writer(env: Environment, locator: string, client?: string, host 
   if (!kind || !id || (client !== undefined && client !== kind) || !/^[a-z0-9_-]{1,200}$/i.test(id)) {
     throw Error("use an ordinary Codex or Claude Code session with an unambiguous session identity");
   }
-  if (!validHost(host) || !validLocator(locator)) throw Error("work location is invalid");
-  return { fingerprint: createHash("sha256").update(`${kind}:\0${id}`).digest("hex"), host, locator };
+  if (!validHost(host)) throw Error("work location is invalid");
+  return { fingerprint: createHash("sha256").update(`${kind}:\0${id}`).digest("hex"), host };
+}
+
+export function writer(env: Environment, locator: string | undefined, client?: string): Omit<Writer, "checkout"> {
+  const identity = writerIdentity(env, client);
+  if (!locator) throw Error("detached checkout needs a branch or a linked spec to reserve this issue");
+  if (!validLocator(locator)) throw Error("work location is invalid");
+  return { ...identity, locator };
 }
 
 export function validHost(host: string): boolean { return /^[a-z0-9][a-z0-9.-]{0,252}$/i.test(host); }
@@ -111,7 +118,7 @@ export function privateDraft(git: OwnershipGit, path: string): void {
   if (head && git.file(head, path) !== undefined) throw Error("private draft must be a new file in this checkout");
 }
 
-export function associate(git: OwnershipGit, main: string, repository: string, item: Item, branch: string): Association {
+export function associate(git: OwnershipGit, main: string, repository: string, item: Item): Association {
   if ([item.issue, item.spec, item.branch].filter(value => value !== undefined).length !== 1) {
     throw Error("select exactly one issue, spec or feature branch");
   }
@@ -144,6 +151,7 @@ export function associate(git: OwnershipGit, main: string, repository: string, i
   const issue = match?.issue ?? number;
   const aliases = [...(issue ? [`issue:${issue}`] : []), ...(spec ? [`spec:${spec}`] : [])];
   if (!aliases.length || aliases.some(alias => !validAlias(alias))) throw Error("feature has no canonical identity");
-  const locator = match?.branch ? `branch:${match.branch}` : spec ? `spec:${spec}` : `branch:${branch}`;
+  const branch = match?.branch ?? (spec ? "" : git.text("branch", "--show-current"));
+  const locator = branch ? `branch:${branch}` : spec ? `spec:${spec}` : undefined;
   return { aliases, locator, claimed: Boolean(match?.branch) };
 }

@@ -6,7 +6,7 @@ import { currentWriter, describeRecord, matching, OPERATION, publish, snapshot, 
 type Transfer = EntryRequest & { approved: boolean; stopped: boolean; preserved: boolean; expected: string; operation: string };
 
 function select(git: OwnershipGit, view: Snapshot, request: EntryRequest) {
-  const association = associate(git, view.tip.main, view.binding.repository, request, git.text("rev-parse", "--abbrev-ref", "HEAD"));
+  const association = associate(git, view.tip.main, view.binding.repository, request);
   const matches = matching(view.state, association.aliases);
   if (matches.length > 1) throw Error("feature aliases have conflicting reservations; ask the owner to reconcile them");
   return { association, current: matches[0] };

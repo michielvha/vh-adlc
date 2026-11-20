@@ -7,7 +7,7 @@ type Action = "link" | "issue-pending" | "issue-recover" | "resolve-alias";
 type Link = EntryRequest & { operation: string; alias?: Item; preview?: string | Buffer; confirmed?: boolean; notCreated?: boolean; conflict?: string; choose?: string; approved?: boolean; stopped?: boolean; preserved?: boolean };
 
 function itemAt(git: OwnershipGit, view: Snapshot, item: Item) {
-  const association = associate(git, view.tip.main, view.binding.repository, item, git.text("rev-parse", "--abbrev-ref", "HEAD"));
+  const association = associate(git, view.tip.main, view.binding.repository, item);
   return { association, records: matching(view.state, association.aliases) };
 }
 

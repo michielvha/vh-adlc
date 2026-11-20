@@ -6,6 +6,55 @@ import { adopt, enter, fixture, invoke, REF, SPEC } from "./fixture";
 const issue = ["--issue", "42"];
 const approve = ["--approved", "true", "--stopped", "true", "--preserved", "true"];
 
+test("a detached checkout needs a branch or linked spec to reserve an issue", async () => {
+  const f = fixture();
+  try {
+    await adopt(f);
+    const checkout = f.clone("detached");
+    f.git(checkout, "checkout", "--quiet", "--detach", "HEAD");
+    const start = f.git(f.bare, "rev-parse", REF);
+    const unlinked = ["--issue", "7"];
+    expect(await invoke(checkout, f.env, "status", ...unlinked)).toMatchObject({ status: "vacant", item: "issue:7" });
+    expect(await enter(checkout, f.env, ...unlinked)).toMatchObject({
+      status: "held", reason: "detached checkout needs a branch or a linked spec to reserve this issue",
+    });
+    expect(f.git(f.bare, "rev-parse", REF)).toBe(start);
+    expect(await enter(checkout, f.env, ...issue)).toMatchObject({ status: "entered", writer: { locator: `spec:${SPEC}` } });
+  } finally {
+    f.cleanup();
+  }
+});
+
+test("a detached competitor can see the writer but needs a real location to take over", async () => {
+  const f = fixture();
+  try {
+    await adopt(f);
+    const original = f.clone("writer");
+    f.git(original, "switch", "--quiet", "-c", "feat/unlinked");
+    const destination = f.clone("incoming");
+    f.git(destination, "checkout", "--quiet", "--detach", "HEAD");
+    const incoming = { ...f.env, CODEX_THREAD_ID: "fixture-incoming-session" };
+    const unlinked = ["--issue", "7"];
+    const current = await enter(original, f.env, ...unlinked);
+    expect(current).toMatchObject({ status: "entered", writer: { locator: "branch:feat/unlinked" } });
+    const tip = f.git(f.bare, "rev-parse", REF);
+    expect(await invoke(destination, incoming, "status", ...unlinked)).toMatchObject({ status: "reserved", writer: current.writer });
+    expect(await enter(destination, incoming, ...unlinked)).toMatchObject({ status: "held", writer: current.writer });
+    expect(await invoke(destination, incoming, "handoff", ...unlinked, "--expected-operation", current.operation!, "--operation", "detached-transfer", ...approve)).toMatchObject({
+      status: "held", reason: "detached checkout needs a branch or a linked spec to reserve this issue",
+    });
+    expect(f.git(f.bare, "rev-parse", REF)).toBe(tip);
+
+    const linked = await enter(original, f.env, ...issue);
+    expect(linked.status).toBe("entered");
+    const transferred = await invoke(destination, incoming, "handoff", ...issue, "--expected-operation", linked.operation!, "--operation", "linked-transfer", ...approve);
+    expect(transferred).toMatchObject({ status: "transferred", writer: { locator: `spec:${SPEC}` } });
+    expect(await enter(destination, incoming, ...issue)).toMatchObject({ status: "entered", writer: transferred.writer });
+  } finally {
+    f.cleanup();
+  }
+});
+
 test("only an exact owner-approved handoff transfers work, and replay does not rewrite it", async () => {
   const f = fixture();
   try {

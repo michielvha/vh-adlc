@@ -110,8 +110,11 @@ bun <plugin>/scripts/ownership/cli.ts enter --repo <checkout> --spec <document>
 ```
 
 Use exactly one of `--spec`, `--issue` or `--branch`. Pass `--no-push true` if the current
-request forbids pushes. For a new explicitly private draft without a remote, pass
-`--local-draft true` only with the final new spec path and that owner authority.
+request forbids pushes. To reserve or take over an unlinked issue, use a named branch
+checkout. A detached checkout can resume or take over an issue with a linked spec,
+and can still read the current writer of an unlinked issue. For a new explicitly
+private draft without a remote, pass `--local-draft true` only with the final new
+spec path and that owner authority.
 Continue on `entered` or `legacy`. Use `local-draft` only for private draft authoring.
 On `held`, a failed command or an unreadable result, show the reason and returned
 writer location, then stop that writing operation. Use `status` to inspect the

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { OID, OwnershipGit, POLICY, REF, STATE, type Environment, type RemoteTip } from "./git";
-import { associate, privateDraft, validAlias, validHost, validLocator, verifyDestination, writer, type Item, type Writer } from "./identity";
+import { associate, privateDraft, validAlias, validHost, validLocator, verifyDestination, writer, writerIdentity, type Item, type Writer } from "./identity";
 
 export type RecordState = { aliases: string[]; writer: Writer; operation: string; previous?: string; pending?: string; conflict?: string };
 export type State = { schema_version: 1; repository: string; operation: string; items: RecordState[] };
@@ -165,7 +165,7 @@ function localCheckout(git: OwnershipGit, create: boolean): string | undefined {
   return localCheckout(git, false);
 }
 
-export function currentWriter(git: OwnershipGit, env: Environment, locator: string, client?: string): Writer {
+export function currentWriter(git: OwnershipGit, env: Environment, locator: string | undefined, client?: string): Writer {
   const identity = writer(env, locator, client);
   const checkout = localCheckout(git, true);
   if (!checkout) throw Error("could not bind this checkout as the work location");
@@ -198,10 +198,9 @@ export function enter(request: EntryRequest): Result {
       }
       if (request.explicitClient && !request.client) throw Error("an adopted claim requires an explicit native client");
       if (request.defaultBranch && view.tip.defaultBranch !== request.defaultBranch) throw Error("claim default branch differs from the canonical remote");
-      const branch = git.text("rev-parse", "--abbrev-ref", "HEAD");
-      const association = associate(git, view.tip.main, view.binding.repository, request, branch);
+      const association = associate(git, view.tip.main, view.binding.repository, request);
       const env = request.env ?? process.env;
-      const identity = writer(env, association.locator, request.client);
+      const identity = writerIdentity(env, request.client);
       const matches = matching(view.state, association.aliases);
       if (matches.length > 1) throw Error("feature aliases have conflicting reservations; ask the owner to reconcile them");
       const current = matches[0];
@@ -214,7 +213,7 @@ export function enter(request: EntryRequest): Result {
       if (pending && JSON.stringify(current) !== JSON.stringify(prior)) throw Error("attempted reservation was superseded; inspect the current writer before retrying");
       if (!current && association.claimed) throw Error("existing claim has no reservation; ask the owner to reconcile it");
       const aliases = [...new Set([...(current?.aliases ?? []), ...association.aliases])];
-      if (current && current.writer.host === identity.host && current.writer.locator === identity.locator &&
+      if (current && current.writer.host === identity.host && current.writer.locator === association.locator &&
           current.writer.checkout === localCheckout(git, false) && aliases.length === current.aliases.length) {
         return describeRecord(git, current, "entered", view.tip.reservation);
       }

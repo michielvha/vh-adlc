@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "The reservation passed the full regression suite and both installed-client trials. Independent review found excess tag publication and an invalid detached checkout location."
+status_description: "The tag and detached checkout fixes passed their regression tests. A second independent implementation review is pending."
 issue: null
 branch: feat/single-writer-ownership
 goal: "Two sessions using vh-adlc cannot accidentally start or resume the same feature as its writer."
@@ -281,9 +281,10 @@ binary continues to supply the existing lifecycle gates.
 
 ## Acceptance Criteria
 
-- [ ] AC-10: Two sessions starting the same feature through vh-adlc in separate clones produce one reservation. The other session stops before feature writes and gets the current writer and work location. Separate items can proceed.
+- [x] AC-10: Two sessions starting the same feature through vh-adlc in separate clones produce one reservation. The other session stops before feature writes and gets the current writer and work location. Separate items can proceed.
       Evidence: R-16 returned not met because a conflict advertised an invalid branch for a detached writer.
       Evidence: `bun test tests/vh-adlc/ownership` and the related plugin suite at `de1aebaa`. Two independent clones using the actual entry command raced one Git ref, one won, and the losing checkout, index and local refs were unchanged. New spec paths and separate issues passed the same disposable-remote checks.
+      Evidence: After R-16 F-02, the detached competitor received the named writer's actual branch. The failed detached entry and handoff left the reservation ref unchanged. The two-clone race and separate-item tests passed again.
 - [x] AC-11: Each feature-writing entry resolves the same item from its issue or spec, allows the current writer back in, and holds conflicting or unverified writers before feature writes. Read-only review stays available. Normal editing and tests require no reservation checks.
       Evidence: The ownership and loop fixtures passed at `11ac06ce`, including direct claim refusal before mutation, alias recovery and the read-only review route. Both installed clients resumed after restart and refused a competitor in the same checkout or a second clone. The vacant-item trial isolated the mixed-marker refusal. Ordinary source and test commands have no reservation hook.
 - [x] AC-12: An explicit handoff transfers the reservation once after the owner stops the previous feature work and keeps it stopped until transfer is verified. The incoming writer can continue from the preserved work. The old session sees the transfer at its next vh-adlc entry. Idle or quota-limited sessions keep their reservation.
@@ -292,9 +293,10 @@ binary continues to supply the existing lifecycle gates.
       Evidence: R-16 returned not met because Git tag following could publish a tag during a reservation update.
       Evidence: The policy, adoption, and branch tests passed at `11ac06ce`. They exercised interrupted setup, known-adoption recovery, legacy claim selection, rollback to the bound history, Git protections on a disposable remote, and refusal without coordination authority. Workflow and cleanup checks confirmed the reserved ref is excluded. No live adoption was exercised.
       Evidence: The R-16 F-01 regression first sent the planted annotated tag to the disposable remote. With tag following disabled on reservation pushes, all nine policy tests passed. The reservation advanced, the default branch and remote tags stayed unchanged, and the tag stayed local.
-- [ ] AC-14: A conflict or a transfer message identifies the current writer and gives its host and branch or spec. Absolute checkout paths appear only when resolved locally. The shared Git history and remote diagnostics do not expose raw session IDs or absolute checkout paths.
+- [x] AC-14: A conflict or a transfer message identifies the current writer and gives its host and branch or spec. Absolute checkout paths appear only when resolved locally. The shared Git history and remote diagnostics do not expose raw session IDs or absolute checkout paths.
       Evidence: R-16 returned not met because acquisition and handoff could record an invalid branch for a detached writer.
       Evidence: `bun test tests/vh-adlc/ownership/handoff.test.ts` at `de1aebaa`. Conflict and transfer records named the writer, host and spec. Only the matching local checkout resolved an absolute path. Every fixture commit in the reservation history and the remote diagnostic lacked the planted raw session IDs and local path.
+      Evidence: The R-16 F-02 regressions first showed `branch:HEAD` on acquisition and transfer. After the fix, the detached status and conflict reported `branch:feat/unlinked`, and the linked issue transferred with its spec path. The existing local path and session ID checks passed again.
 
 ## Test Plan
 
@@ -329,7 +331,8 @@ binary continues to supply the existing lifecycle gates.
 
 - [x] T9 `plugins/vh-adlc/scripts/ownership/git.ts` and `tests/vh-adlc/ownership/policy.test.ts` - fix R-16 F-01. Run `bun test tests/vh-adlc/ownership/policy.test.ts` with a reachable annotated tag and configured tag following. The reservation advances and the remote receives no tag (AC-13).
       Evidence: Before the fix the test received `refs/tags/v0.99.0` on a tag-free disposable remote. After adding `--no-follow-tags`, the exact regression and all eight other policy tests passed.
-- [ ] T10 `plugins/vh-adlc/scripts/ownership/{identity,entry,handoff,issue-link}.ts`, `plugins/vh-adlc/references/authority.md` and `tests/vh-adlc/ownership/handoff.test.ts` - fix R-16 F-02. Run `bun test tests/vh-adlc/ownership` to verify detached acquisition and transfer hold without a real locator, while detached competitors still see the writer and a linked spec permits entry and handoff (AC-10, AC-14).
+- [x] T10 `plugins/vh-adlc/scripts/ownership/{identity,entry,handoff,issue-link}.ts`, `plugins/vh-adlc/references/authority.md` and `tests/vh-adlc/ownership/handoff.test.ts` - fix R-16 F-02. Run `bun test tests/vh-adlc/ownership` to verify detached acquisition and transfer hold without a real locator, while detached competitors still see the writer and a linked spec permits entry and handoff (AC-10, AC-14).
+      Evidence: Both regressions failed before the correction. After it, all 168 tests in the ownership, branches, direct-operation compatibility, feature lifecycle, claim and catalog checks passed. The regressions confirmed detached status and conflict still show the existing writer and a linked spec supports entry and transfer.
 
 ## Open Questions
 
