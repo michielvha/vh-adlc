@@ -99,10 +99,14 @@ Publish the final record and native test-runner correction together in one autho
 
 ## Acceptance Criteria
 
-- [ ] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
-- [ ] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
-- [ ] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+- [x] AC-01: A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+      Evidence: R-14 inspected the installed entry, bounded selection and refusal traces and repeated the focused package checks.
+- [x] AC-02: The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+      Evidence: R-14 inspected native claim, targeted, unfinished and freshness evidence, including the corrected probe-default assertion.
+- [x] AC-03: Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+      Evidence: R-14 verified the Stackweaver cutover, native delivery and recovery transcripts, and rollback at the reviewed consumer head.
 - [ ] AC-04: The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+      Evidence: R-14 was not met. The installed fixtures passed, but compatibility and workflow documentation still described incomplete testing.
 
 ## Test Plan
 
@@ -157,6 +161,7 @@ None.
 | 2026-11-20 | R-12 | spec | `ca2240da144c51064686141a1bf0ae14b0c361ef` | unknown | procedural | One should-fix on final delivery of the native-runner correction. |
 | 2026-11-20 | R-13 | spec | `21b19f02cd752baad43176161c01c1c7c946a588` | unknown | procedural | No findings. |
 | 2026-11-20 | R-13 | spec | `21b19f02cd752baad43176161c01c1c7c946a588` | n/a | n/a | accepted by owner |
+| 2026-11-20 | R-14 | implementation | `689c5c9c7858e7ea52587f2fd810013167e8309b` | unknown | procedural | The workflow and adoption checks met their criteria. The guides still describe candidate evidence. |
 
 ### R-1
 
@@ -519,6 +524,31 @@ PROPOSAL: Record the authorized normal-CI delivery step for the corrected runner
 ### R-13
 
 NO FINDINGS
+
+### R-14
+
+CRITERION: AC-01 A repository can run the installed operation against its own selected documentation, repository instructions and source through a harness-neutral procedure. Selection stays within the requested mode, rejects invalid paths and stops an incomplete batch before review or delivery.
+VERDICT: met
+EVIDENCE: At 689c5c9c, the pinned Bun suite passed 79 tests and 428 assertions, and feature lint passed. I inspected the 0a07a791 intake receipts on the same shipped fingerprint, including clarification before candidate reads. The retained 18d20daf direct-mode, refusal, and path-replacement receipts apply to the unchanged direct procedure and fixture. The corrected released Codex and Claude runs both verified default selection and freshness against 84e59c89 without changing the fixture.
+
+CRITERION: AC-02 The review distinguishes accurate, incorrect and unknown claims using observed evidence. It exposes unsupported corrections and possible product issues, records full and targeted coverage accurately, and leaves the checkout and history intact in a report run.
+VERDICT: met
+EVIDENCE: The corrected Codex and Claude claim transcripts on released 84e59c89 show the source-backed port correction, accurate command and backend claims, unknown worker count and package probe default, and the HTTP 500 versus 503 product issue. Both preserve the fixture. The earlier direct procedure receipts establish the targeted unsupported-replacement flag and the native partial report that identifies unfinished work. The released freshness traces return recorded freshness without reading candidate bodies.
+
+CRITERION: AC-03 Stackweaver's existing entry keeps its selection, evidence, authorized corrections and docs-only delivery with old verification history. Complete reviews retain visible flags, targeted reviews retain their mode, and pending or interrupted work leaves prior rows intact. Competing or stale inputs stop delivery, and an exact landed commit is recognized before retrying. Reverting the consumer adoption restores the previous entry without rewriting the history.
+VERDICT: met
+EVIDENCE: I verified the 15 retained native transcript hashes, inspected the local synthetic write commits, and inspected the interrupted index and exact bare-remote tip after the lost push response. The evidence shows coupled docs and ledger commits, full and targeted rows, no-push and candidate-policy refusal, stale-input refusal, and preserved pending changes. The exact selector and rollback receipt binds baseline 21c4df7d and reviewed head 5eb57e4c. Merge 0fbbf091 has the reviewed tree and preserves the selector, coverage, corrections and ledger blobs. The post-merge native synthetic report reproduces freshness. Production content and writes were outside this review.
+
+CRITERION: AC-04 The published marketplace payload supports ordinary Codex CLI and Claude Code installation, upgrade and discovery. Each native entry completes the declared read-only fixture through the same canonical procedure. The adoption and its verified surfaces are documented.
+VERDICT: not met
+EVIDENCE: I independently checked all four ordinary fresh and upgrade installs against the 304-file 84e59c89 payload, which matches 689c5c9c. The native discovery receipts and both released default and freshness trials passed. The compatibility entry still describes 0.27.0 as a candidate and presents the Claude trial as awaiting capacity. The workflow guide omits the observed native outcomes and Stackweaver adoption.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: `docs/reference/compatibility.md:229-236`, `docs/user-guides/workflows.md:389-396`, AC-04 Test Plan
+EVIDENCE: The accepted proof requires the compatibility entry and workflow guide to describe the observed run. At 689c5c9c, the compatibility section describes the candidate and only Codex execution. The workflow guide gives usage instructions without the released host evidence or the verified Stackweaver adoption. The exact published install and native trial receipts establish both host outcomes.
+PROPOSAL: Update both sections with the verified 0.27.0 fresh installs, upgrades, native fixture runs and Stackweaver adoption, linking to the exact evidence. Keep the synthetic and production evidence boundaries visible.
 
 ## Sources
 
