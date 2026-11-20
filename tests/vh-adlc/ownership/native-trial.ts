@@ -135,13 +135,20 @@ async function trial(client: Client, repository: string, commit: string, output:
       const decision = JSON.parse(readFileSync(result, "utf8")) as Reply;
       if (decision.status !== expectedStatus || sourceState(cwd) !== before.get(cwd) ||
           git(cwd, f.env, "status", "--porcelain=v1")) throw Error(`unexpected native writer result or fixture mutation at ${id}`);
-      return { id: transcriptId(client, raw), decision };
+      const sessionId = transcriptId(client, raw);
+      if (resume && sessionId !== resume) throw Error(`native resume changed the session at ${id}`);
+      return { id: sessionId, decision };
     }
 
     const target = ["--spec", SPEC];
     const started = await entry("start", a, "entered", ["enter", ...target]);
     const tip = f.git(f.bare, "rev-parse", REF);
     await entry("resume", a, "entered", ["enter", ...target], started.id);
+    const sameCheckout = await entry("same-checkout", a, "held", ["enter", ...target]);
+    if (sameCheckout.id === started.id || !started.decision.writer ||
+        sameCheckout.decision.writer?.fingerprint !== started.decision.writer.fingerprint) {
+      throw Error("a fresh native session in the original checkout did not find the current writer");
+    }
     const other = await entry("competing", b, "held", ["enter", ...target]);
     const mixed = client === "codex" ? { CLAUDECODE: "1", CLAUDE_CODE_SESSION_ID: "fixture-parent" } : { CODEX_THREAD_ID: "fixture-parent" };
     await entry("mixed", a, "held", ["enter", ...target], undefined, mixed);
