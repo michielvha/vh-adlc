@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "The shared package is published at 0.27.0 and Stackweaver adopted it. The revised spec awaits owner acceptance before the final record and test correction go through normal CI."
+status: planned
+status_description: "The owner accepted the revised spec after R-13. The shared package is published at 0.27.0 and Stackweaver has adopted it."
 issue: https://github.com/michielvha/vh-adlc/issues/127
 branch: feat/shared-docs-truth
 goal: "Run a bounded, evidence-backed documentation truth review through vh-adlc and preserve Stackweaver's existing command and verification history."
@@ -156,6 +156,7 @@ None.
 | 2026-11-19 | R-11 | implementation | `a75063badddfcc8521a5896bf5f0ed4e3adbd5ac` | unknown | procedural | Shared behavior met. One should-fix on review coverage. |
 | 2026-11-20 | R-12 | spec | `ca2240da144c51064686141a1bf0ae14b0c361ef` | unknown | procedural | One should-fix on final delivery of the native-runner correction. |
 | 2026-11-20 | R-13 | spec | `21b19f02cd752baad43176161c01c1c7c946a588` | unknown | procedural | No findings. |
+| 2026-11-20 | R-13 | spec | `21b19f02cd752baad43176161c01c1c7c946a588` | n/a | n/a | accepted by owner |
 
 ### R-1
 
