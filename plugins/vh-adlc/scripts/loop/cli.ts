@@ -2,7 +2,7 @@
 //
 //   bun scripts/loop/cli.ts route   --repo <dir> --operation <op> [--continues <op>]
 //   bun scripts/loop/cli.ts context --repo <dir>
-//   bun scripts/loop/cli.ts rungs   --repo <dir> (--base <branch> | --merge <sha>) [--allow <rung>[,<rung/subcheck>...]] [--run true]
+//   bun scripts/loop/cli.ts rungs   --repo <dir> (--base <branch> | --merge <sha>) [--stage task|completion] [--allow <rung>[,<rung/subcheck>...]] [--run true]
 //                                   [--record <rung>=passed|failed:<what was observed>[;<rung>=...]]
 //   bun scripts/loop/cli.ts ci       --repo <dir>
 //   bun scripts/loop/cli.ts skip     --repo <dir> --base <branch> --remote-branch <ref> --feature-root <dir> --docs-revision <sha>
@@ -23,7 +23,7 @@ import { runReviewRoute } from "./review-route";
 import { loopContext, type LoopContext } from "./procedure";
 import { cacheReviewPages } from "./pages";
 import { pluginStatus } from "./plugin-version";
-import { applicableRungs, featureDelta, mayAdvance, runRungs } from "./rungs";
+import { applicableRungs, deferredRungs, featureDelta, mayAdvance, RUNG_STAGES, runRungs, type RungStage } from "./rungs";
 import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, repositoryVisibility, skipMarker } from "./delivery";
 import { claim, isolation } from "./claim";
 import { diffPaths, rangePaths } from "./git-paths";
@@ -118,9 +118,15 @@ export async function main(argv: string[]): Promise<number> {
     console.log(JSON.stringify(verdict)); return verdict.delivered ? 0 : 3;
   }
   if (command === "rungs") {
+    // Without --stage the command checks every applicable rung, so a caller that forgets it never checks less.
+    const stage = (options.stage ?? "completion") as RungStage;
+    if (!RUNG_STAGES.includes(stage)) throw Error(`--stage must be task or completion, got ${options.stage}`);
+    if (stage === "task" && options.merge) throw Error("--stage task does not apply after a merge: delivery is a completion-stage check");
     const declared = settings.verification_rungs.length > 0;
     const delta = featureDelta(repo, options.merge ? { merge: options.merge } : { base: need(options, "base") });
-    const applicable = applicableRungs(settings, delta.paths);
+    const applicable = applicableRungs(settings, delta.paths, stage);
+    // Reported with or without --run, so implement's Finish can learn what ship still has to run.
+    const deferred = deferredRungs(settings, delta.paths, stage).map(rung => rung.name);
     // A procedure rung's result is recorded by the operation that performed it, at the current head.
     // Each --record holds one record or several joined by ";". A ";" splits only where another
     // <rung>=passed|failed: follows, so a record's own text may contain one.
@@ -140,12 +146,13 @@ export async function main(argv: string[]): Promise<number> {
     const head = execFileSync("git", ["rev-parse", "--verify", `${options.merge ?? "HEAD"}^{commit}`], { cwd: repo }).toString().trim();
     const verdict = options.run === "true" ? mayAdvance(results, { head, declared, allowances: options.allow ? options.allow.split(",") : [] })
       : { advance: !declared, lookup: declared ? "rungs" : "agents-md", blocking: applicable.map(r => r.name) };
-    // Every declared rung is reported; one whose path condition does not hold is listed as not run with
-    // that reason, and takes no part in the verdict above.
+    // Every declared rung is reported; one held back for the completion stage, or whose path condition does
+    // not hold, is listed as not run with that reason, and takes no part in the verdict above.
     const report = options.run === "true" ? settings.verification_rungs.map(rung => results.find(result => result.name === rung.name) ?? {
       name: rung.name, state: "not run" as const, commit: head,
-      reason: `its path condition does not hold for this feature (${rung.when === "always" ? "always" : rung.when.paths.join(", ")})` }) : [];
-    console.log(JSON.stringify({ declared, range: delta.range, paths: delta.paths, applicable: applicable.map(r => r.name), results: report, ...verdict }));
+      reason: deferred.includes(rung.name) ? "it runs at the completion stage only"
+        : `its path condition does not hold for this feature (${rung.when === "always" ? "always" : rung.when.paths.join(", ")})` }) : [];
+    console.log(JSON.stringify({ declared, stage, range: delta.range, paths: delta.paths, applicable: applicable.map(r => r.name), deferred, results: report, ...verdict }));
     return verdict.advance ? 0 : 3;
   }
   if (command === "review") {
