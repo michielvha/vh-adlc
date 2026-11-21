@@ -54,7 +54,7 @@ The owner also saw empty space above and below Chromium after submitting a URL o
 
 The owner tried the repaired private iPhone preview built from `17ea67e3` on 2026-11-20, reported that it was much better, and approved shipping the work. This covers the owner's use of the preview after the keyboard and sizing fixes. The remaining acceptance checks stay open.
 
-A temporary failure from the browser phase endpoint canceled the first tap even when the separate focus endpoint returned the correct address bar. A stock Chromium and noVNC regression reproduced that failure with a single HTTP 503. The viewer now retries the phase check for the same tap. A visible prompt dims and rejects activation while phase verification is unavailable. It can recover within its original lease once both checks agree. Expiry or a confirmed phase change still clears the prompt. The browser regression passed with the repair. A separate Chromium check also verified the disabled prompt, recovery on the same tap, and expiry without revival.
+A temporary failure from the browser phase endpoint canceled the first tap even when the separate focus endpoint returned the correct address bar. The stock Chromium and noVNC regression injects one HTTP 503 on each route before the same tap. The viewer now retries the phase check for the same tap. A visible prompt dims and rejects activation while phase verification is unavailable. It can recover within its original lease once both checks agree. Expiry or a confirmed phase change still clears the prompt. The browser regression passed with the repair. A separate Chromium check also verified the disabled prompt, recovery on the same tap, and expiry without revival.
 
 ### Evidence from the first design
 
@@ -217,6 +217,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-13 | spec | `19f606adb87ed597d6bb5e472709129334debd62` | unknown | procedural | Three should-fix phase-path proof findings. Model identity was not attested. |
 | 2026-11-19 | R-14 | spec | `06f91bd54a0adb348f68fd27ac36928326df1894` | unknown | procedural | No findings. Model identity was not attested. |
 | 2026-11-19 | R-14 | spec | `06f91bd54a0adb348f68fd27ac36928326df1894` | n/a | n/a | accepted by owner |
+| 2026-11-21 | R-15 | spec | `cb08d97a3c436b8c4ea9f61f0120e3acb2544781` | unknown | procedural | Covered drift review found one factual nit in test evidence. Model identity was not attested. |
 
 ### R-1
 
@@ -605,3 +606,12 @@ NO FINDINGS
 - [noVNC release history](https://github.com/novnc/noVNC/releases) and [1.7.0 application input bridge](https://github.com/novnc/noVNC/blob/v1.7.0/app/ui.js): upstream version context and continued local-input/focus pattern; not local installation or native-device proof.
 
 - Installed x11vnc manual, read with `gzip -dc /home/m/.local/share/remote-gui/host-tools/usr/share/man/man1/x11vnc.1.gz`, decompressed lines 918-929,3713-3717,5925-5929: input categories, disabled VNC selection exchange and native per-client input permissions. The documented controls are candidates, not verified client attribution or transfer guarantees.
+
+### R-15
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Packaged implementation checks (line 57)
+EVIDENCE: The post-R-14 evidence describes a single HTTP 503 from the phase route. `git show d607a7b1 -- tests/remote-gui/mobile.e2e.test.js` adds a phase-route 503 immediately after an existing focus-route 503 before the same field tap. Both one-shot failures remain at `tests/remote-gui/mobile.e2e.test.js:161-163` in the reviewed commit.
+PROPOSAL: Say that the tracked browser test injects one 503 on each route before the same tap. If a separate phase-only reproduction was run, identify that procedure separately.
