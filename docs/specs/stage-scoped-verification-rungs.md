@@ -301,6 +301,7 @@ None.
 | 2026-11-21 | R-7 | spec | `40983b5b` | claude-opus-5-5 | procedural | Two should-fix findings and two nits; no blocking finding |
 | 2026-11-21 | R-8 | spec | `66a2976f` | claude-opus-5-5 | procedural | Two nits; clean |
 | 2026-11-21 | R-8 | spec | `66a2976f` | n/a | n/a | accepted by owner |
+| 2026-11-21 | R-9 | spec | `6caddb3b` | claude-opus-5-5 | procedural | One nit; clean (re-review after default-branch drift) |
 
 ### R-1
 
@@ -527,3 +528,12 @@ SEVERITY: nit
 WHERE: Acceptance Criteria AC-09 ("with a non-empty `deferred` does not set `complete` but reports the deferred rungs and the step `vh-adlc next` returns"); Design, Procedures (Implement, Finish: "it reports the deferred rungs, says the completion stage runs in ship, and reports the step `vh-adlc next` returns")
 EVIDENCE: The Design's Finish bullet says Finish states that the completion stage runs in ship, and the Owner summary says "ship completes the feature". AC-09 lists everything else in that bullet but not this statement, so the reviewer's written check in Test Plan row AC-09 never confirms it. An implementer who reports only the deferred rungs and the `next` step still meets AC-09.
 PROPOSAL: Add "says the completion stage runs in ship" to AC-09's list of implement Finish behaviours, or drop it from the Design bullet.
+
+### R-9
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (fourth paragraph, "Reviews R-1 to R-3 and R-5 to R-7 found should-fix issues and nits and R-4 one blocking proof flaw, all applied here; a new review is pending")
+EVIDENCE: At 6caddb3b the Review Log has R-8 at `66a2976f` with outcome "Two nits; clean" and an R-8 "accepted by owner" row, and `status_description` reads "Review R-8 is clean; waiting for the owner's acceptance." The summary still says a new review is pending and does not mention R-8 or its two unapplied nits. conventions/feature-documents.md (Owner summary in Context) asks for the summary's validation state to be refreshed when proof or decisions change. The section is outside the normative baseline, so this changes nothing an implementer builds. Other checks at this commit found nothing new: `git diff 66a2976f 6caddb3b` changes only the Review Log and `status_description` in the document. PR #140 moved both manifests to 0.28.1, so the Scope's "0.29.0 if nothing else lands first" and AC-08's next-minor rule still hold. The direct-operation test still strips Loop routes before comparing the implement and ship bodies with their unchanged baselines (`bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 7 pass, 0 fail). The Background greps (`--record` in skills, `rungs` in the review and resume skills and review-protocol.md, `verification_rungs` in internal and cmd) still print nothing. `vh-adlc lint` passes. `vh-adlc fresh` reports R-8 stale only for covered-drift on the two manifests and the compatibility test.
+PROPOSAL: Update the Owner summary's review sentence to say R-8 was clean with two nits and the owner accepted it, or drop the review history from the summary.
