@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Implementing on feat/stage-scoped-rungs."
+status_description: "Tasks done on feat/stage-scoped-rungs; waiting for the implementation review."
 issue: null
 branch: feat/stage-scoped-rungs
 goal: "Each task's verification runs only the rungs declared for the task stage, while push, completion and delivery still require every applicable rung."
@@ -228,23 +228,28 @@ rolling back the procedure changes needs the previous plugin version.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: A rung may declare `stages`; settings with an unknown stage value, an empty list, a duplicate
+- [x] AC-01: A rung may declare `stages`; settings with an unknown stage value, an empty list, a duplicate
       value or a list without `completion` are refused with a message naming
       `verification_rungs[<i>].stages`, and a rung without the field resolves to both stages.
-- [ ] AC-02: `cli.ts rungs --stage task --run true` executes only the applicable rungs whose stages include
+      Evidence: `bun test tests/vh-adlc/loop/rungs.test.ts` at 600220f9: 28 pass, 0 fail, including the five refused `stages` values naming `verification_rungs[0].stages` and the default `["task", "completion"]`.
+- [x] AC-02: `cli.ts rungs --stage task --run true` executes only the applicable rungs whose stages include
       `task`; a completion-only rung is not executed, is reported `not run` with a reason naming the
       completion stage, is listed in `deferred`, and does not block the verdict. Without `--run`, the same
       command reports the same `deferred`, executes nothing, exits 3 with `advance` false, and lists in
       `blocking` only the task-stage rungs.
-- [ ] AC-03: `cli.ts rungs --stage completion --run true`, and the same command without `--stage`,
+      Evidence: `bun test tests/vh-adlc/loop/cli.test.ts` at 600220f9: the two task-stage "rung stages" cases pass (exit 0 and no marker with `--run true`; exit 3, same `deferred`, `blocking` `["unit"]` and no marker without it).
+- [x] AC-03: `cli.ts rungs --stage completion --run true`, and the same command without `--stage`,
       execute every applicable rung whatever its stages, and a failing completion-only rung blocks with exit
       3 and is named in `blocking`.
-- [ ] AC-04: `--stage` with a value other than `task` or `completion`, or `--stage task` together with
+      Evidence: `bun test tests/vh-adlc/loop/cli.test.ts` at 600220f9: the completion-stage cases with `--stage completion` and with no `--stage` pass (exit 3, marker written, `heavy` in `blocking`).
+- [x] AC-04: `--stage` with a value other than `task` or `completion`, or `--stage task` together with
       `--merge`, exits 2 with an error reason and runs no rung.
-- [ ] AC-05: For settings without any `stages` field, the `rungs` output at stage `task` and at stage
+      Evidence: `bun test tests/vh-adlc/loop/cli.test.ts` at 600220f9: `--stage push --run true` and `--stage task --merge <sha> --run true` exit 2 with `status: "error"` and no marker.
+- [x] AC-05: For settings without any `stages` field, the `rungs` output at stage `task` and at stage
       `completion` has the same `applicable`, `results`, `advance` and `blocking` as the plugin produced
       before this feature.
-- [ ] AC-06: The Loop routes section of the implement skill contains the per-task command
+      Evidence: `bun test tests/vh-adlc/loop/cli.test.ts` at 600220f9: the stage-less fixture matches the literal pre-feature output at `--stage task`, `--stage completion` and no `--stage`; the case passed before T4 as well.
+- [x] AC-06: The Loop routes section of the implement skill contains the per-task command
       `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task --run true` and the
       Finish lookup `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task` with no
       `--run`; the ship skill's Loop routes section contains
@@ -252,12 +257,14 @@ rolling back the procedure changes needs the previous plugin version.
       `--merge <merge commit> --stage completion --run true`; neither skill contains the stage-less
       `rungs --repo <dir> --base <default branch> --run true`; and both operation bodies still match their
       owner-approved baselines.
+      Evidence: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts` at 600220f9: 8 pass, 0 fail; the exact commands are present, the stage-less command is absent, and both body baselines are unchanged.
 - [ ] AC-07: The loop settings reference documents `verification_rungs[].stages`, its default, the
       `completion` requirement, the `--stage` flag with its default, `deferred`, the commit rule for pushed
       and delivered commits with its completion-commit exemption, and, as the minimum plugin version, the version both manifests carry; the workflows guide
       says rungs can be limited to the completion stage.
-- [ ] AC-08: Both vh-adlc plugin manifests carry the same version, a minor version above the default
+- [x] AC-08: Both vh-adlc plugin manifests carry the same version, a minor version above the default
       branch's at implementation time.
+      Evidence: `bun test tests/vh-adlc/check.test.ts` at 600220f9: 65 pass, 0 fail; `origin/main` is 0.28.1 and both manifests are 0.29.0.
 - [ ] AC-09: The Loop routes sections say, in the implement skill, that each task performs its task-stage
       procedure rungs and passes them with `--record`, and that Finish reads only `deferred`, does not treat
       the lookup's exit 3 as a failure, and with a non-empty `deferred` does not set `complete` but reports
