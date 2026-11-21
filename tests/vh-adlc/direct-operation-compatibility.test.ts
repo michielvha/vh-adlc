@@ -32,6 +32,11 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     if (name === "investigate") for (const phrase of ["findings_document: always", "extend a covering document", "only copy of the findings", "act now, track", "primary sources"]) expect(loop).toContain(phrase);
     if (name === "spec") expect(loop).toContain("lenses");
     if (name === "implement" || name === "ship") for (const phrase of ["verification rungs", "scripts/loop/cli.ts rungs"]) expect(loop).toContain(phrase);
+    // Stage-scoped rungs (docs/specs/stage-scoped-verification-rungs.md): exact commands, never the stage-less one.
+    const rungs = "`bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch>";
+    if (name === "implement") for (const command of [`${rungs} --stage task --run true\``, `${rungs} --stage task\``]) expect(loop).toContain(command);
+    if (name === "ship") for (const command of [`${rungs} --stage completion --run true\``, "--merge <merge commit> --stage completion --run true"]) expect(loop).toContain(command);
+    if (name === "implement" || name === "ship") expect(current).not.toContain("rungs --repo <dir> --base <default branch> --run true");
     if (name === "ship") for (const phrase of ["--merge", "cli.ts ci", "cli.ts skip", "cli.ts delivery"]) expect(loop).toContain(phrase);
     if (name === "spec" || name === "review") for (const phrase of ["scripts/loop/cli.ts review", "references/review-protocol.md", "pending", "requested model"]) expect(loop).toContain(phrase);
     current = (current.slice(0, loopStart) + current.slice(loopEnd)).replace(/\n+$/, "\n");
@@ -92,4 +97,10 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
   const oldImpact = previous.indexOf("## Documentation impact\n");
   if (oldImpact > 0) previous = previous.slice(0, oldImpact) + previous.slice(previous.indexOf("## Start\n", oldImpact));
   expect(body(current)).toBe(body(previous));
+});
+
+test("the loop settings reference documents rung stages", () => {
+  const reference = readFileSync(join(root, "plugins/vh-adlc/references/loop-settings.md"), "utf8");
+  expect(reference.split("\n").some(line => line.startsWith("| `verification_rungs[].stages` |"))).toBe(true);
+  expect(reference).toContain("--stage");
 });
