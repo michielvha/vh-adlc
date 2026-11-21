@@ -353,6 +353,7 @@ sides, and the recommended resolution of the remaining judgement findings of rev
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-21 | R-1 | spec | `35b30950` | claude-opus-5-5 | procedural | 1 blocking, 20 should-fix, 4 nits |
 | 2026-11-21 | R-2 | spec | `630c3d2a` | claude-opus-5-5 | procedural | 1 blocking, 11 should-fix, 1 nit |
+| 2026-11-21 | R-3 | spec | `b8be9f60` | claude-opus-5-5 | procedural | 2 blocking, 10 should-fix, 3 nits |
 
 ### R-1
 
@@ -625,6 +626,115 @@ SEVERITY: nit
 WHERE: Design > Command step 5 (committed links "at the merge-base and HEAD SHAs")
 EVIDENCE: Committed-screenshot links point at the local HEAD and merge base, but the command never checks that either commit is on `origin`. Ship pushes first (Design > Ship step 1), so only a standalone `--run true` before a push produces links that 404 while `state` reads `complete`.
 PROPOSAL: Note that the links assume HEAD has been pushed, or have the command check `git branch -r --contains HEAD` and report a missing item when the check fails.
+
+### R-3
+
+TARGET: b8be9f601aa140ffbf1e9e958393c4fc3d578074
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design > Command, "Owner and repository" paragraph (the closed list of accepted forms); Design > Command, State paragraph (missing reason "the remote URL is not recognised"); Scope, out of scope ("Remotes other than GitHub"); AC-06 ("only the three listed GitHub URL forms produce links"); Test Plan row AC-06 (must-link and must-not-link examples)
+EVIDENCE: `git -C /home/m/code/stackweaver config --get remote.origin.url` prints `https://michielvha@github.com/michielvha/stackweaver.git`. That is the repository of the Background probe and of the Sources example (stackweaver#1177, "the shape this feature automates"). An https URL with a user name is none of the three accepted forms, and the design says "Anything else ... is a missing item with the reason 'remote is not a recognised GitHub URL' and no links". An implementer following the document builds a command that gives the motivating adopter an `incomplete` record with no links on every ship. The closed list came in with the previous revision (630c3d2a, for R-1 F-01) and is unchanged.
+PROPOSAL: Accept an optional user-info part (`https://<user>@github.com/<owner>/<repo>`, with or without `.git`) and never copy it into links. Add `https://user@github.com/acme/app.git` to the AC-06 must-link examples.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan row AC-08, statement (1) (`visuals --run true --pr` and its must-pass example); Design > Ship step 2 (`visuals --run true --pr <number> --out <dir>`); Design > Command synopsis (`visuals --repo <dir> --base <default branch> --pr <number> --out <dir> [--run true]`) and its exit-2 list ("`--base` or `--pr` is missing"); AC-08
+EVIDENCE: Statement (1) needs the literal substring `visuals --run true --pr`. A Deliver paragraph that copies the Design synopsis, for example "run `cli.ts visuals --repo <dir> --base <default branch> --pr <number> --out <dir> --run true`", has no such substring and fails the check, so the proof fails a correct implementation. The only passing example, and Design > Ship step 2, leave out `--base` (and `--repo`). The Command section makes a missing `--base` exit 2, and `need(options, "repo")` throws for a missing `--repo` (`plugins/vh-adlc/scripts/loop/cli.ts:45-48`, `:78`). A skill written to pass the check would tell ship to run a command that always exits 2. The row was rewritten in this revision for R-2 F-06 and has not passed review.
+PROPOSAL: Give Design > Ship step 2 the full invocation with `--repo` and `--base`. Change statement (1) to require each flag (`visuals`, `--run true`, `--pr`, `--base`, `--out`) in one paragraph in any order, and make the must-pass example the full command.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command synopsis (`--base <default branch>`); Design > Command steps 1 and 2 (`<merge-base>`); Design > Ship step 2; Owner summary ("links changed committed screenshots at the base and head commits")
+EVIDENCE: The document never says whether `--base` is the local default branch or `origin/<default>`. In this very worktree the local `main` is an ancestor of `origin/main` and `git rev-list --count main..origin/main` prints 234. With a stale local `main`, the merge base is older than the PR's real base. Other features' UI paths then make the delivery applicable, other features' screenshot changes appear as pairs, and the before side is built from an old main. Ship's own CI policy compares against `origin/<default>` (`plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:90-92`), which is what GitHub's PR diff shows.
+PROPOSAL: State that ship passes `origin/<default branch>` after `git fetch origin <default branch>`, and say so in Design > Ship step 2 and the AC-08 statement (1) example.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship (opening line "only when the committed settings declare `visual_record`", steps 2 to 4 and 7); Design > Command (exit-2 list); AC-08; Test Plan row AC-08; frontmatter `goal` ("or says which images are missing and why")
+EVIDENCE: Ship's handling of three outcomes is undefined. (1) Exit 2: no JSON, no section, so the PR says nothing about missing images, against the goal. The design does not say whether ship reports it, blocks, or writes a placeholder section. (2) The command is killed. Its default limit is 60 minutes for the whole run, and ship runs it like any other command, so a host's foreground command limit can stop it first. Ship then has no output at all. (3) `not-applicable`, or an exit 2, on a re-ship whose PR body already holds a `## Before and after` section from an earlier ship. Step 4 replaces the section only when a new one is written, so a stale record can stay. The document also does not say how ship decides that the committed settings declare `visual_record` (reading `git show HEAD:.vh-adlc/loop.yaml`, or running the command and treating "visual_record is not declared" as a skip). No AC-08 statement covers any of these.
+PROPOSAL: State what ship does for exit 2, a missing result and `not-applicable`. For example, an exit 2 or missing result becomes a `## Before and after` section holding one missing line with the reason, an earlier section is removed on `not-applicable`, and the "not declared" exit is the skip signal. Add a statement for each to the AC-08 row.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Concurrency, failure, retry, upgrade ("Killed runs": "leaves only its `--out` directory and, possibly, unpushed objects"); Design > Command step 3 ("The time limit, process-group kill and 126 or 127 handling follow the rung runner")
+EVIDENCE: The rung runner starts the command in its own process group (`detached: true`, `plugins/vh-adlc/scripts/loop/rungs.ts:47`) and kills that group only from its timeout handler (`rungs.ts:49`). When the CLI itself is stopped from outside, nothing signals the capture group, so the capture command keeps running. So do any servers, builds or checkouts it made ("builds each commit however its project needs"), and they can hold ports that make the next ship's capture fail. The previous revision (630c3d2a) said a killed run "can leave a temporary worktree or a capture process". This revision changed that to the narrower claim.
+PROPOSAL: Restore an accurate statement: a killed run can leave the capture process group and whatever the adopter's command created. Either have the command kill its capture group on SIGINT and SIGTERM, or require the adopter's command to tolerate leftovers, and document it.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 3 (the capture contract); AC-04; AC-10 (the documentation list); Test Plan rows AC-04 and AC-10; Owner summary ("the command writes `before/` and `after/` images however its project builds")
+EVIDENCE: The previous revision said "HEAD means the committed head; uncommitted work is never captured". This revision hands building to the adopter and drops that sentence. Nothing now tells the adopter that the after side must be built from `VH_ADLC_VISUAL_HEAD` and not from the working tree. The command runs at the feature checkout's root, which may hold unrelated dirty work that ship never stages (`SKILL.md:81-82`), and a cheap script would capture the running checkout as "after". The command also runs the working-tree version of any script it calls, so the sentence "an uncommitted edit to `.vh-adlc/loop.yaml` never changes what it runs" does not cover the script itself. AC-10 asks the guides for the variables, the layout and "builds no checkouts". It does not ask for: build each side from its SHA, do not change the feature checkout, only `.png`, `.webp` and `.jpg` files directly in each directory count, and pairing by stem. Whether `.PNG` or `.jpeg` counts is also unstated, so two implementers differ.
+PROPOSAL: State in step 3 that each side must show its given commit, never the working tree, and that extension matching is case-sensitive or not. Add these points, the accepted extensions and stem pairing to AC-10's list and the AC-10 row's phrases.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command, State paragraph ("it produced no images"; "`complete` when at least one image is linked and nothing is missing"); Design > Command step 3; AC-04; AC-06; Test Plan rows AC-04 and AC-06
+EVIDENCE: The design does not say whether "it produced no images" means both directories are empty or either one. Suppose the after build fails inside an adopter script that still exits 0, so `before/` holds images and `after/` is empty. One reading gives a missing item. The other gives captured pairs whose after side is `null`, with nothing missing and `state: complete`, which hides the failed capture. The design also does not say whether a captured stem present on one side only is a missing item or a legitimate added or removed screen. For committed screenshots the design says so explicitly.
+PROPOSAL: Define both cases: an empty side is a missing item, and a stem on one side only is either a missing item or a stated one-sided screen. Add each case to the AC-04 or AC-06 row.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Setting (the `capture.command` row, "Optional shell command"; "At least one of `committed` and `capture` is required"); AC-01 ("an optional `capture` with `command` and `timeout_minutes`"); Test Plan row AC-01
+EVIDENCE: The field table marks `capture.command` optional, so `capture: { timeout_minutes: 5 }` is a valid block that also meets "at least one of `committed` and `capture`". With `--run true`, nothing then says what runs or which missing reason applies. One implementer rejects the block and another accepts it, and the AC-01 row lists no such case.
+PROPOSAL: Make `command` required whenever `capture` is present, and add a `capture` block without `command` to the AC-01 rejections.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Setting ("reads the block as committed at HEAD through `loadLoopSettingsAt`, so an uncommitted edit to `.vh-adlc/loop.yaml` never changes what it runs"); Design > Command exit-2 list ("the settings can't be read"); AC-01; Test Plan row AC-01
+EVIDENCE: `main` loads working-tree settings for every command except `review` before it dispatches (`plugins/vh-adlc/scripts/loop/cli.ts:79-80`). `settingsFile` also fails when a leftover `.vh-adlc/loop.yml` or `.json` exists (`plugins/vh-adlc/scripts/settings-file.ts:20-23`). A `visuals` branch added like the other commands therefore exits 2 when the working-tree file is invalid, even though the committed block is valid, so an uncommitted edit does change the outcome. The AC-01 fixture uses a valid working-tree file with a different capture command, which does not tell the two implementations apart. The document does not say which settings "can't be read" refers to.
+PROPOSAL: State that `visuals` is exempt from the working-tree load, like `review`, and that "the settings can't be read" means the committed ones. Add a fixture with an invalid working-tree `.vh-adlc/loop.yaml` and a valid committed one to the AC-01 row.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 5 ("has a table row per screen", "Every link has the form ..."); Output table (`markdown`); AC-07; Test Plan row AC-07; AC-11
+EVIDENCE: The problem is that a reviewer cannot see the old and new look side by side. Step 5 defines link URLs but not whether the cells embed images (`![before](url)`) or plain links (`[before](url)`), what the table's columns are, or what a cell shows for a `null` side. A section of plain hyperlinks passes AC-07 ("parse every link") and every fixture test, and only the manual AC-11 at the end would show that no image renders inline.
+PROPOSAL: Specify the table's columns (screen name, before, after), the image syntax for each cell and the text for a missing side. Assert the image syntax in the AC-07 row.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 2 ("Each side is written from its object (`git show <sha>:<path>`)"); AC-03; AC-07 ("matches the pair's local file byte for byte"); Test Plan rows AC-03 and AC-07
+EVIDENCE: Repositories often commit screenshots through Git LFS. For an LFS-tracked path, `git show <sha>:<path>` returns the text pointer, not the image. Ship would then "look at" a pointer file, and AC-07's byte comparison passes because both sides are the same pointer. The document neither handles nor excludes this case, so ship could write "No visible change" without having seen an image.
+PROPOSAL: Write each side with the path's filters applied (`git cat-file --filters <sha>:<path>`), or detect an LFS pointer and report it as a named missing reason. State which one, and add an LFS-pointer fixture to the AC-03 row.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-10 (the required tokens `committed` and `60`); AC-10
+EVIDENCE: Read as plain substrings, these tokens already appear in both documents today. "committed" occurs on 3 lines of `plugins/vh-adlc/references/loop-settings.md` and 5 lines of `docs/user-guides/workflows.md`. "60" occurs in `loop-settings.md:52`, the rung default. So the check passes on `loop-settings.md` without the `committed` field or the 60-minute capture default being documented, which lets a wrong implementation pass. The row was rewritten in this revision for R-2 F-10 and has not passed review.
+PROPOSAL: Require qualified tokens that cannot match existing text, such as `visual_record.committed` or a phrase like "`capture.timeout_minutes` ... default 60" within the `visual_record` section. Add a must-fail example that drops the `committed` field.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter `goal` ("Every pull request vh-adlc ships for a visible UI change carries before and after images")
+EVIDENCE: The feature is opt-in: "Nothing changes for an adopter without the block" (Owner summary) and Design > Ship acts "only when the committed settings declare `visual_record`". A UI pull request in a repository without the block gets no images and no disclosure.
+PROPOSAL: Scope the goal to repositories that declare `visual_record`.
+
+FINDING: F-14
+KIND: factual
+SEVERITY: nit
+WHERE: Design > Ship (closing paragraph, "The ref push is part of the ship request's push authority"); Test Plan row AC-08, statement (8)
+EVIDENCE: The ship skill's Input paragraph lists its authority as "to push the feature branch, create or update its one PR and update the linked issue" (`plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:16-18`). The design adds the ref push only to the Deliver section, so the skill would state its authority in two places that disagree.
+PROPOSAL: Name the `refs/pr-visuals/<number>` push in the Input authority sentence as well.
+
+FINDING: F-15
+KIND: judgement
+SEVERITY: nit
+WHERE: Design > Terms (the Record state row); Design > Command, Output table (`state`)
+EVIDENCE: Two Record state values, `planned` and `complete`, are also feature document statuses throughout the loop references (`conventions/feature-documents.md`, Statuses). A ship report that says a record is `planned` or `complete` next to a document that is `planned` or `complete` can be misread.
+PROPOSAL: Use distinct values, such as `preview` and `full`, or have reports always write "record state `complete`".
 
 ## Sources
 
