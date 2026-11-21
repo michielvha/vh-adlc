@@ -329,6 +329,7 @@ on both sides, and the recommended resolution of review R-1's remaining judgemen
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-21 | R-1 | spec | `35b30950` | claude-opus-5-5 | procedural | 1 blocking, 20 should-fix, 4 nits |
+| 2026-11-21 | R-2 | spec | `630c3d2a` | claude-opus-5-5 | procedural | 1 blocking, 11 should-fix, 1 nit |
 
 ### R-1
 
@@ -508,6 +509,99 @@ SEVERITY: nit
 WHERE: Design > Command (synopsis and step 4)
 EVIDENCE: The synopsis `visuals --repo <dir> --base <default branch> [--run true]` takes no branch, yet the ref is `refs/pr-visuals/<branch>`. Where `<branch>` comes from, and what happens on a detached HEAD, is unstated.
 PROPOSAL: State that the branch is the checkout's current branch and that a detached HEAD exits 2, or add a `--branch` flag.
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design > Command step 3 (`VH_ADLC_VISUAL_HEAD`, "adds a detached worktree at the merge base, runs the capture command, removes that worktree, and does the same at HEAD; the sides never overlap"); Owner summary (second paragraph, and the decision "Both sides run the head's capture script, so the first PR that adds capture still gets a before side"); Open Questions ("the head's capture script on both sides"); AC-04; Test Plan row AC-04
+EVIDENCE: Step 3 defines `VH_ADLC_VISUAL_HEAD` as "the HEAD worktree's path, so a script the feature adds resolves on both sides". The same step runs the before side first and creates the HEAD worktree only after the base worktree is removed, so while the before side runs, the path in `VH_ADLC_VISUAL_HEAD` does not exist yet. A capture command such as `"$VH_ADLC_VISUAL_HEAD/scripts/capture.sh"` then exits 127 on the before side whenever the script exists only at HEAD, which is exactly the case AC-04 requires ("including when the script exists only at HEAD") and the AC-04 proof tests ("a capture script added only at HEAD ... assert both sides ran, in order, without overlap"). An implementation that follows step 3 fails the criterion; one that passes it must depart from step 3 (create the HEAD worktree first, or point the variable at the feature checkout), and the two choices differ. This revision introduced both the variable and the strict ordering in answer to R-1 F-03 and F-11.
+PROPOSAL: Say where the head's script is read from during the before side, for example create the HEAD worktree first and keep it, read-only, until both sides finish, while still running the two capture commands one after the other. Or point `VH_ADLC_VISUAL_HEAD` at a separate export of HEAD made before either side runs, and state that in step 3, the owner summary and AC-04.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 3 ("removes any registered worktree under its own prefix, `<git common dir>/vh-adlc-visuals/`, left by an earlier killed run, and runs `git worktree prune`"); Design > Concurrency, failure, retry, upgrade ("Killed runs", "Concurrent ships"); AC-04; Test Plan row AC-04
+EVIDENCE: Every linked worktree of a repository shares one common directory. In a scratch repository, `git rev-parse --git-common-dir` run inside a linked worktree printed the main checkout's `.git`. Ship runs in the feature's owning worktree (`plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:65-66`), so two ships of different features in one repository share the prefix. When the second run starts, its cleanup removes the first run's live capture worktree in the middle of a capture, because nothing tells a leftover from a worktree another run is still using. The Concurrency section covers only two ships of one feature racing on the ref. This cleanup rule is new in this revision, added for R-1 F-11.
+PROPOSAL: Remove only leftovers whose owning run is gone, for example a per-run subdirectory holding the owner's PID and a lock, or key the prefix by the owning worktree. Add a fixture to the AC-04 row where a second run starts while a first run's capture is still going, and assert that the first run's worktree survives.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Setting (`capture.command`, "read from the head's settings"); Design > Command step 3 ("HEAD means the committed head; uncommitted work is never captured"); Design > Command step 1 (`when.paths`); Owner summary (second paragraph)
+EVIDENCE: Every non-review loop command reads settings from the working tree: `loadLoopSettings(repo)` at `plugins/vh-adlc/scripts/loop/cli.ts:79-80`. Only `review` reads the committed policy through `loadLoopSettingsAt` (`plugins/vh-adlc/scripts/loop/settings.ts:238-251`). Ship leaves unrelated dirty work in place (`vh-adlc-ship/SKILL.md:81-82`), so `.vh-adlc/loop.yaml` can be dirty. The document says the capture command comes from "the head's settings" without saying whether that means the committed HEAD or the working tree, and it does not say where `when.paths` and `committed` come from. One implementer copies the other commands and reads the working tree, which can run an uncommitted capture command or apply an uncommitted block. Another reads HEAD. Nothing in the Test Plan separates the two.
+PROPOSAL: State that `visuals` reads the whole `visual_record` block as committed at HEAD (for example through `loadLoopSettingsAt`), or name the working tree on purpose. Add a dirty `.vh-adlc/loop.yaml` fixture to the AC-01 or AC-04 row.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command, Output table (`pairs`: `before_url`, `after_url`); Design > Command step 3 (`VH_ADLC_VISUAL_OUT`); Design > Ship steps 3 and 5 ("it looks at every pair", "When it inspected every pair"); Owner summary ("Ship then looks at the pairs"); AC-08
+EVIDENCE: The decision that "Nothing compares images automatically: ship inspects the pairs" depends on ship seeing the images. The output gives each image only as a `https://github.com/<owner>/<repo>/blob/<sha>/<path>?raw=true` URL, which in a private repository needs a signed-in browser or a token, and for a failed push there is no URL at all. The output directories are temporary and the document does not say they outlive the run. It does not say how ship gets the image bytes: by fetching URLs, by `git cat-file` on local objects, or from a kept directory. So two implementers would build different inspection steps, and one of them may not be able to look at any image, which leaves "No visible change" impossible to justify.
+PROPOSAL: Add a local handle to each pair side, such as the object name `<sha>:<path>` or the blob ID that `hash-object -w` wrote, and state in Design > Ship that ship extracts each image to a temporary file and views it from there. Require that wording in the AC-08 skill-text check.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship step 3 ("replacing an earlier one from its `## Before and after` heading up to the next `## ` heading or the end"), step 4 ("adds one line per changed state it knows no capture shows") and step 5 ("writes `No visible change`"); AC-08; Test Plan row AC-08
+EVIDENCE: Steps 4 and 5 do not say where ship writes its own lines: inside the section, under its table, or elsewhere in the body. Lines written outside the section survive the next re-ship's replacement and leave a stale "No visible change" or stale uncaptured-state notes beside a new record. The document also does not say where the section goes in the body. Ship writes `Closes #N` or `Refs #N` there (`vh-adlc-ship/SKILL.md:98-100`), so if that line or any other text without a heading follows the section, the "up to the next `## ` heading or the end" rule deletes it on the next ship.
+PROPOSAL: State that ship's uncaptured-state lines and the "No visible change" line go inside the section, and that the section is placed last in the body or ends with a fixed closing marker. Then add a must-pass and must-fail example for that to the AC-08 row.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-08; AC-08 ("names uncaptured changed states"); Design > Ship steps 4 and 6 ("The report repeats every missing item")
+EVIDENCE: The row requires five patterns but none for the uncaptured-state line that AC-08 names, and none for the report repeating missing items, so a Deliver text without either passes. Its only must-pass example is "the revised Deliver text", which does not exist yet and so accepts whatever the implementer writes. The standard says a free-text proof "lists its must-pass and must-fail examples in the row" (`conventions/feature-documents.md`, Test plan). "near `incomplete`" and "in a sentence" give no measurable distance or boundary. The row was rewritten in this revision for R-1 F-16 and has not passed a clean review, so widening it is not limited to a nit.
+PROPOSAL: Add patterns for the uncaptured-state line and for the report repeating missing items. Give at least one concrete must-pass sentence and one must-fail sentence for each pattern, and replace "near" with a stated window, such as the same sentence or paragraph.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command (synopsis paragraph: "Every other outcome exits 0"); Design > Command, State paragraph (the list of missing reasons); AC-02; AC-06; Test Plan rows AC-02 and AC-06
+EVIDENCE: Several outcomes have neither an exit code nor a state. These are: settings that declare no `visual_record` block (ship skips the command then, but the command itself is undefined), a missing `--base`, a `git merge-base` that fails, a temporary worktree that cannot be removed after a side, and a failure of `hash-object`, `mktree` or `commit-tree`. "Every other outcome exits 0" puts them all at exit 0 but gives no `state` or missing reason, while a thrown error from these same git helpers exits 2 in the other commands (`cli.ts:176-178`, `rungs.ts:12-16`). Two implementers would emit different JSON, and the AC-06 "one case per missing reason" row cannot cover reasons the list does not name. AC-02 and its row also test only `--pr` for exit 2, not the stated "unreadable settings file or a directory that is not a Git checkout".
+PROPOSAL: Classify each of these outcomes as exit 2 or as a named missing reason, and say what the command prints when no `visual_record` is declared. Extend the AC-02 or AC-06 row to cover them.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 4 ("Every captured image is stored"); Design > Concurrency, failure, retry, upgrade ("Retry and replay": "Each ship appends a commit on top of the previous tip"); Owner summary ("A repeated ship appends to the ref"); Output table (`ref_commit`); AC-05
+EVIDENCE: The document does not say what step 4 does when no image was captured: no `capture` block, both sides failed, or both sides produced nothing. One reading of "each ship appends a commit" pushes an empty-tree commit on every ship and reports its SHA in `ref_commit`. The other skips the push and reports `null`. AC-05 and its row test only runs that capture images, so either choice passes.
+PROPOSAL: State that the command pushes nothing and reports `ref_commit: null` when no image was captured (or the opposite), and add that case to the AC-05 row.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Terms (the three rows and their `Not` column); Design > Command, Output table (`state`); AC-10 ("The Terms table holds the three new rows"); Test Plan row AC-10 (`glossary.test.ts` for the three Terms rows)
+EVIDENCE: The Terms table in `plugins/vh-adlc/references/loop-settings.md:10` has two columns, `| Term | Meaning |`. Rejected synonyms live only in the `TERMS` map of `tests/vh-adlc/loop/glossary.test.ts:8-17`, which fails on any lowercase substring match in `loop-settings.md`, `review-protocol.md`, `loop.md`, `authority.md` and every file in `scripts/loop/`. The new rows bring a third `Not` column that the table lacks, so an implementer either rebuilds the whole table or drops the column. If the rejected synonyms are held the way every existing term is, "pass" and "fail" for Record state fail at once: a lowercase grep of those files found "pass" on 31 lines and "fail" on 90, for example `fail(` throughout `settings.ts` and "passed" in `rungs.ts`. The Record state row also lists three values, while the `state` field has a fourth, `planned`.
+PROPOSAL: Write the rows in the table's two-column shape and list each term's rejected synonyms as the `TERMS` entries the glossary test will hold. Choose synonyms that the existing text does not contain as substrings (drop bare "pass" and "fail"), and add `planned` to the Record state row or explain why it is not a record state.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-10; AC-10
+EVIDENCE: AC-10 requires the loop settings reference and the workflows guide to document every field, its defaults, the three environment variables, the ref name, retention, visibility and the upgrade order. The row says only "`tests/vh-adlc/settings-references.test.ts` extended for the new fields". That file tests only `triage-settings.md` and `maintenance-settings.md` (`tests/vh-adlc/settings-references.test.ts:20-23`), and nothing reads `docs/user-guides/workflows.md`. The row names no assertions and no must-pass or must-fail examples, so a reference that omits retention, visibility or the upgrade order passes. The equal-manifest check it adds already exists: `tests/vh-adlc/check.test.ts:166-176` requires `plugin.json` to equal the `.claude-plugin` manifest plus `$schema`.
+PROPOSAL: Name what the extended test asserts in each of the two documents (for example each field name, `refs/pr-visuals/`, the three variable names, and stated phrases for retention, visibility and upgrade order), with a must-pass and a must-fail example. Cite the existing manifest test instead of adding a new one.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 3 (the prefix `<git common dir>/vh-adlc-visuals/`, `VH_ADLC_VISUAL_OUT` "an empty directory"); AC-10 (the documentation list); Owner summary ("screens, fixture data and capture script belong to the adopter")
+EVIDENCE: The capture runs in a fresh detached checkout, which holds no ignored or untracked files such as `node_modules`, local env files or built assets. A UI capture usually needs these. In a scratch repository, `git worktree add --detach .git/vh-adlc-visuals/before HEAD~1` worked. Because that path sits inside the feature checkout's `.git`, tools that walk up parent directories, such as Node module resolution or `package.json` lookup, reach the feature checkout's own files from the before side. The document also does not say where the output directory lives. If it sits inside the side's worktree, it is deleted when step 3 removes the worktree, before step 4 stores the images. AC-10 does not ask the guides to explain any of this to the adopters who write the scripts.
+PROPOSAL: State that each side is a clean checkout, say whether the prefix stays inside the common directory or moves to a temporary directory outside the repository, and require the output directories to be outside the worktrees. Add the capture environment to AC-10's documentation list.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command, Output table (`pairs.name`, `missing`, `markdown`); Design > Command step 1 ("Without `--run`, `state` is `planned` and `pairs` lists the committed screenshots it would link"); AC-02; AC-03
+EVIDENCE: For captured images the screen name is the file stem (step 3). For committed screenshots the document never says whether `name` is the full path, the base name or the stem, and two committed files with one base name in different directories would collide under the last two choices. The output says `markdown` is `""` only for `not-applicable`. It does not say whether `planned` output carries URLs, a section or `missing` entries. AC-02 and AC-03 assert neither, so implementations that differ here all pass.
+PROPOSAL: Define `name` for committed screenshots (for example the repository path) and the `markdown`, `missing` and URL fields in `planned` output, and assert them in the AC-02 and AC-03 rows.
+
+FINDING: F-13
+KIND: judgement
+SEVERITY: nit
+WHERE: Design > Command step 5 (committed links "at the merge-base and HEAD SHAs")
+EVIDENCE: Committed-screenshot links point at the local HEAD and merge base, but the command never checks that either commit is on `origin`. Ship pushes first (Design > Ship step 1), so only a standalone `--run true` before a push produces links that 404 while `state` reads `complete`.
+PROPOSAL: Note that the links assume HEAD has been pushed, or have the command check `git branch -r --contains HEAD` and report a missing item when the check fails.
 
 ## Sources
 
