@@ -263,6 +263,7 @@ None.
 | 2026-11-21 | R-1 | spec | `21057d50` | claude-opus-5-5 | procedural | Five should-fix findings and one nit; no blocking finding |
 | 2026-11-21 | R-2 | spec | `51881bc3` | claude-opus-5-5 | procedural | Four should-fix findings and one nit; no blocking finding |
 | 2026-11-21 | R-3 | spec | `b8681c9a` | claude-opus-5-5 | procedural | Three should-fix findings; no blocking finding |
+| 2026-11-21 | R-4 | spec | `807a31ba` | claude-opus-5-5 | procedural | One blocking and four should-fix findings |
 
 ### R-1
 
@@ -367,3 +368,40 @@ SEVERITY: should-fix
 WHERE: Design, The completion commit; Design, Concurrency, failure and upgrade; Design, Procedures (third bullet, "Ship, Verify")
 EVIDENCE: The exemption says ship pushes C without a second run "when `git diff --name-only V C` lists only that document", where V is the commit of ship's Verify run. Rung results are never stored between invocations (Scope, Out of scope, second bullet; cli.ts:133-149 only prints them). If ship stops after committing C and before the push succeeds (an interrupted session, or a rejected push that ship reports as partial and stops on, plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:95-97), a later ship or resume run sees a local completion commit whose parent differs only by the document. Nothing records whether a completion run advanced at that parent. One implementer would take V as C's parent and push C with no observed result. Another would run the completion stage again. The Concurrency, failure and upgrade section covers a blocking run and a timeout but not this retry path, which crosses the push boundary.
 PROPOSAL: State that the exemption applies only within the same ship run that observed the completion stage advance at V, and that any retried or resumed push runs the completion stage again at the head before pushing. Add that case to AC-06.
+
+### R-4
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Test Plan row AC-06 ("its Finish section contains `--stage task`, `deferred`, `vh-adlc next` and `ship` and no `--run`"); Acceptance Criteria AC-06 ("its Finish step runs the command with `--stage task` and no `--run`"); Design, Procedures (second bullet, "run `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task` without `--run`")
+EVIDENCE: The Design's own Finish instruction says to run the command "without `--run`". A Finish section written to that instruction will naturally contain the literal `--run`, for example "run `... --stage task` without `--run`". The AC-06 proof fails any Finish section that contains `--run` anywhere, so it fails an implementation that copies the Design's wording, which meets AC-06. The row changed since R-3 reviewed b8681c9a (`git diff b8681c9a 807a31ba` shows the AC-06 row rewritten), so it has not passed review. A pattern that rejects a correct output is blocking under the Test plan rule.
+PROPOSAL: Check what matters instead: the Finish section contains the exact command `rungs --repo <dir> --base <default branch> --stage task` and contains no `--run true`. Alternatively, have the Design and AC-06 forbid naming `--run` in Finish and say so in the row.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan rows AC-06 and AC-07
+EVIDENCE: conventions/feature-documents.md at 0c983f6, Test plan: "A proof that judges free text with a pattern lists its must-pass and must-fail examples in the row." The AC-06 row judges the implement and ship skills by literal phrases (`only the feature document`, `same ship run`, `retried or resumed`, `--record`, the negative `may advance at HEAD` and stage-less command checks), and the AC-07 row judges the reference and the workflows guide by phrases (`completion commit`, `completion stage`). Neither row lists a must-pass or must-fail example, so a reader cannot tell which wordings the test should accept or reject, and F-01 shows a correct wording the AC-06 pattern rejects.
+PROPOSAL: Add to each row at least one must-pass example sentence and one must-fail example sentence for each phrase group, including for AC-06 a Finish sentence that names `--run` only to forbid it.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Procedures (Implement Finish bullet and Ship Verify bullet); Acceptance Criteria AC-06; Test Plan row AC-06; Scope (third in-scope bullet, "The implement and ship procedures")
+EVIDENCE: tests/vh-adlc/direct-operation-compatibility.test.ts:14 runs "direct %s keeps its approved operation body" for implement and ship. It strips only Loop routes, Documentation impact, ship's Article and promotion handoff and After an authorized merge, then asserts `expect(body(current)).toBe(body(previous))` against owner-approved baselines (`implementBaseline` 8d5a639b at line 13, `baseline` b313327b at line 6; comments at lines 7-12 say the baselines record owner approvals). It passes at HEAD (`bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 7 pass, 0 fail). The AC-06 proof requires new text in implement's `## Finish` section, and the Design rewrites ship's Verify step in "Make the feature shippable" (SKILL.md:79). Both sit in the compared body, so the existing test fails unless the baselines are moved. The skills' existing pattern instead puts loop overrides in Loop routes ("these instructions replace Enter steps 1 and 6", implement SKILL.md:57). The document never names this test or says whether the change goes into Loop routes, which would then fail the AC-06 Finish-section check, or into the body with re-approved baselines. Two implementers would build different things, and moving an owner-approved baseline is an owner decision the document does not record.
+PROPOSAL: State where the new procedure text goes. Either put it in each skill's Loop routes section as an override of Finish and Verify, and point the AC-06 proof at that section, or state that the implement and ship baselines move to the feature's commit as an owner-approved change and add that to Scope and AC-06.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Concurrency, failure and upgrade ("If the completion run blocks, ship sets no status and pushes nothing, and the fix goes back to implement"); Design, Procedures (Ship, Verify bullet); Acceptance Criteria AC-06; Context, Owner summary
+EVIDENCE: With completion-only rungs, ship's Verify run becomes the first place an expensive rung executes, so a failure there is an expected path, not a rare one. At that point every task is ticked. Implement takes "the first unchecked task" (plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:109) and has none to take. The rules block at 0c983f6 returns `ship` for an in-progress document with no open tasks, a clean tree, a fresh clean implementation review and `all_met` (next rules for `tasks_open`, `feature_tree_clean`, `impl_review_fresh`, `impl_review_clean`, `all_met`, then `ship`), so `vh-adlc next` sends the feature straight back to ship, which blocks again. The document does not say how the fix gets a task (for example a new task appended by `/vh-adlc-tasks`), whether implement may fix without a task, or what ship reports as the next step. AC-06 and the Owner summary are silent on it.
+PROPOSAL: Name the route for a blocked completion run: for example, ship reports the blocking rungs and names `/vh-adlc-tasks` to append a new task for the fix, then implement and a fresh review. Add the reported next step to the ship bullet and to AC-06.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-04; Acceptance Criteria AC-04 ("runs no rung")
+EVIDENCE: The AC-04 row runs `--stage push` and `--stage task --merge <sha>` and checks that a marker-writing rung has not run, but it does not pass `--run true`. Without `--run true` the command never executes a rung (plugins/vh-adlc/scripts/loop/cli.ts:133, `options.run === "true" ? ... : []`), so the marker check holds even for an implementation that validates `--stage` only after running every rung. The proof could pass on a wrong implementation.
+PROPOSAL: Run both invalid cases with `--run true` and keep the marker-file and exit 2 checks.
