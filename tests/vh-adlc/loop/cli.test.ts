@@ -162,3 +162,78 @@ describe("recorded procedure rungs", () => {
     expect(reasons(run.json)).toEqual({ browser: "recorded: Chromium; Firefox both clean", "live-slot": "recorded: slot 4" });
   });
 });
+
+describe("rung stages", () => {
+  // A cheap task rung and an expensive completion-only rung that leaves a marker when it runs and then fails.
+  function staged() {
+    const marker = join(realpathSync(mkdtempSync(join(tmpdir(), "vh-loop-cli-marker-"))), "heavy-ran");
+    made.push(dirname(marker));
+    const { root } = repo({ ".vh-adlc/loop.yaml": `schema_version: 1\nverification_rungs:\n  - name: unit\n    when: always\n    command: "true"\n  - name: heavy\n    when: always\n    stages: [completion]\n    command: "touch '${marker}'; exit 1"\n` });
+    return { root, marker };
+  }
+  type Result = { name: string; state: string; reason: string };
+
+  test("the task stage runs only task rungs and holds a completion-only rung back without running it", () => {
+    const { root, marker } = staged();
+    const run = cli("rungs", "--repo", root, "--base", "main", "--stage", "task", "--run", "true");
+    expect(run.code).toBe(0);
+    expect(existsSync(marker)).toBe(false);
+    expect(run.json).toMatchObject({ stage: "task", deferred: ["heavy"], advance: true, blocking: [] });
+    const heavy = (run.json.results as Result[]).find(result => result.name === "heavy")!;
+    expect(heavy.state).toBe("not run");
+    expect(heavy.reason).toContain("completion stage");
+  });
+
+  test("the task-stage lookup without --run reports the deferred rungs and runs nothing", () => {
+    const { root, marker } = staged();
+    const run = cli("rungs", "--repo", root, "--base", "main", "--stage", "task");
+    expect(run.code).toBe(3);
+    expect(existsSync(marker)).toBe(false);
+    expect(run.json).toMatchObject({ stage: "task", deferred: ["heavy"], advance: false, blocking: ["unit"] });
+  });
+
+  for (const flags of [["--stage", "completion"], []])
+    test(`the completion stage${flags.length ? "" : ", the default without --stage,"} runs every applicable rung and a failing completion-only rung blocks`, () => {
+      const { root, marker } = staged();
+      const run = cli("rungs", "--repo", root, "--base", "main", ...flags, "--run", "true");
+      expect(run.code).toBe(3);
+      expect(existsSync(marker)).toBe(true);
+      expect(run.json).toMatchObject({ stage: "completion", deferred: [], advance: false });
+      expect(run.json.blocking).toContain("heavy");
+    });
+
+  test("an unknown stage, or the task stage after a merge, is refused before any rung runs", () => {
+    const marker = join(realpathSync(mkdtempSync(join(tmpdir(), "vh-loop-cli-marker-"))), "probe-ran");
+    made.push(dirname(marker));
+    const { root, commit } = repo({ ".vh-adlc/loop.yaml": `schema_version: 1\nverification_rungs:\n  - name: probe\n    when: always\n    command: "touch '${marker}'"\n` });
+    for (const args of [["--base", "main", "--stage", "push"], ["--merge", commit, "--stage", "task"]]) {
+      const run = cli("rungs", "--repo", root, ...args, "--run", "true");
+      expect(run.code).toBe(2);
+      expect(run.json.status).toBe("error");
+      expect(existsSync(marker)).toBe(false);
+    }
+  });
+
+  test("settings without stages give today's applicable rungs, results and verdict at either stage", () => {
+    const { root } = repo({ ".vh-adlc/loop.yaml": "schema_version: 1\nverification_rungs:\n  - name: verify\n    when: always\n    command: \"echo 'passed 5 failed 0 skipped 0'\"\n    skipped_pattern: \"^skipped: (.+)$\"\n  - name: integration\n    when: { paths: [\"backend/**\", \"core/**\"] }\n    command: \"true\"\n  - name: kind\n    when: { paths: [\"e2e/**\"] }\n    command: \"true\"\n", "backend/app.go": "package app\n" });
+    git(root, "switch", "-q", "-c", "feat/x");
+    writeFileSync(join(root, "backend/app.go"), "package app\n// changed\n");
+    git(root, "commit", "-q", "-am", "backend change");
+    // Written down from the plugin before stages existed.
+    const today = {
+      applicable: ["verify", "integration"],
+      results: [
+        { name: "verify", state: "passed", reason: "exit 0" },
+        { name: "integration", state: "passed", reason: "exit 0" },
+        { name: "kind", state: "not run", reason: "its path condition does not hold for this feature (e2e/**)" },
+      ],
+      advance: true, blocking: [],
+    };
+    for (const flags of [["--stage", "task"], ["--stage", "completion"], []]) {
+      const run = cli("rungs", "--repo", root, "--base", "main", ...flags, "--run", "true");
+      expect(run.code).toBe(0);
+      expect({ applicable: run.json.applicable, results: (run.json.results as Result[]).map(({ name, state, reason }) => ({ name, state, reason })),
+        advance: run.json.advance, blocking: run.json.blocking }).toEqual(today);
+    }
+  });
+});

@@ -1,11 +1,16 @@
-// Verification rungs (references/loop-settings.md): declared checks with a path condition or `always`.
-// Every applicable rung must pass at the commit being pushed, completed or delivered. A failed rung
+// Verification rungs (references/loop-settings.md): declared checks with a path condition or `always`,
+// and the stages they run at. Each task's verification runs the task-stage rungs; every applicable rung must
+// pass at the commit being pushed or delivered, apart from the document-only completion commit ship pushes
+// in the run that verified its parent. A failed rung
 // always blocks; a rung that could not run, timed out included, blocks unless the owner allowed that exact rung,
 // or that exact skipped subcheck, for this run.
 import type { LoopSettings } from "./settings";
 import { diffPaths, statusEntries } from "./git-paths";
 
-export type Rung = { name: string; when: "always" | { paths: string[] }; command?: string; procedure?: string; skipped_pattern?: string; timeout_minutes?: number };
+/** Where a rung runs: at each task's verification, and at push, completion and delivery. */
+export const RUNG_STAGES = ["task", "completion"] as const;
+export type RungStage = typeof RUNG_STAGES[number];
+export type Rung = { name: string; when: "always" | { paths: string[] }; stages: RungStage[]; command?: string; procedure?: string; skipped_pattern?: string; timeout_minutes?: number };
 export type RungState = "passed" | "failed" | "not run";
 export type RungResult = { name: string; state: RungState; reason: string; commit: string; exit_code?: number; skipped?: string[]; timed_out?: true; output?: string };
 
@@ -32,9 +37,16 @@ export function featureDelta(repo: string, from: { base?: string; merge?: string
   return { paths: [...new Set([...committed, ...uncommitted])], range: `${mergeBase}..HEAD+worktree` };
 }
 
-export function applicableRungs(settings: LoopSettings, paths: string[]): Rung[] {
-  return settings.verification_rungs.filter(rung => rung.when === "always" ||
-    rung.when.paths.some(pattern => { const glob = new Bun.Glob(pattern); return paths.some(path => glob.match(path)); }));
+/** The rungs whose path condition holds; at the task stage, only those that also run at the task stage. */
+export function applicableRungs(settings: LoopSettings, paths: string[], stage: RungStage): Rung[] {
+  return settings.verification_rungs.filter(rung => (stage === "completion" || rung.stages.includes("task")) && (rung.when === "always" ||
+    rung.when.paths.some(pattern => { const glob = new Bun.Glob(pattern); return paths.some(path => glob.match(path)); })));
+}
+
+/** At the task stage: the rungs whose path condition holds but which run at the completion stage only. */
+export function deferredRungs(settings: LoopSettings, paths: string[], stage: RungStage): Rung[] {
+  if (stage === "completion") return [];
+  return applicableRungs(settings, paths, "completion").filter(rung => !rung.stages.includes("task"));
 }
 
 export async function runRungs(repo: string, rungs: Rung[], options: { timeoutMs?: number } = {}): Promise<RungResult[]> {
@@ -68,7 +80,7 @@ export async function runRungs(repo: string, rungs: Rung[], options: { timeoutMs
   return results;
 }
 
-/** Whether the results let the feature push, complete or deliver at `head`. */
+/** Whether the results let the stage advance at `head`: a task tick, or a push, completion or delivery. */
 export function mayAdvance(results: RungResult[], options: { head: string; declared: boolean; allowances?: string[] }): { advance: boolean; lookup: "rungs" | "agents-md"; blocking: string[] } {
   if (!options.declared) return { advance: true, lookup: "agents-md", blocking: [] };
   const allowed = new Set(options.allowances ?? []);
