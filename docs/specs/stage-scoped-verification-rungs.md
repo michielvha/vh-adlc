@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementation review R-10 met every criterion; ready to ship."
+status: complete
+status_description: "Complete: every criterion met at implementation review R-10; PR open for the owner to merge."
 issue: null
 branch: feat/stage-scoped-rungs
 goal: "Each task's verification runs only the rungs declared for the task stage, while push, completion and delivery still require every applicable rung."
