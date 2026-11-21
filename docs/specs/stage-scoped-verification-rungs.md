@@ -295,6 +295,7 @@ None.
 | 2026-11-21 | R-3 | spec | `b8681c9a` | claude-opus-5-5 | procedural | Three should-fix findings; no blocking finding |
 | 2026-11-21 | R-4 | spec | `807a31ba` | claude-opus-5-5 | procedural | One blocking and four should-fix findings |
 | 2026-11-21 | R-5 | spec | `e59f9154` | claude-opus-5-5 | procedural | Two should-fix findings and one nit; no blocking finding |
+| 2026-11-21 | R-6 | spec | `e2b27b37` | claude-opus-5-5 | procedural | One should-fix finding and one nit; no blocking finding |
 
 ### R-1
 
@@ -459,3 +460,19 @@ SEVERITY: nit
 WHERE: Context, Owner summary ("Planned checks: unit tests for settings validation and rung selection")
 EVIDENCE: The AC-01 row unit tests settings validation. No Test Plan row unit tests `applicableRungs` with a stage. Selection is proved only through the CLI rows AC-02, AC-03 and AC-05 in tests/vh-adlc/loop/cli.test.ts.
 PROPOSAL: Say the selection is proved by CLI tests, or add a unit case for `applicableRungs(settings, paths, "task")` to a Test Plan row.
+
+### R-6
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Concurrency, failure and upgrade ("If the document is still `in-progress`, ship sets no status ... If the run was a rerun after ship's own unpushed completion commit, the document is already `complete` ... ship then stops"); Design, The completion commit ("implement's Finish sets it only when no rung was deferred ... either way a push still goes through ship's completion run"); Design, Procedures (Implement, Finish: "With an empty `deferred`, Finish is unchanged"; Ship, Verify bullet); Context, Owner summary ("in the rare case where that run is a rerun after its own unpushed completion commit, ship stops" and, later, "with an owner stop when the document is already `complete` locally"); Acceptance Criteria AC-09 ("or, when its own unpushed completion commit already exists, stops and names the owner decision")
+EVIDENCE: The Design defines the blocked completion run for two states only: an `in-progress` document, and a rerun after ship's own unpushed completion commit. A third state is the normal path whenever `deferred` is empty, which includes every adopter whose rungs have no `stages`: implement's Finish sets `complete` and commits it (plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:129-131), and implement never pushes (SKILL.md:120-122). Ship's first Verify run then sees a document that is already `complete`, with no completion commit of ship's own. That run can block: a flaky or environment-dependent rung, a procedure rung such as a browser pass that ship must perform again, or a covered doc-impact fix ship committed after the task runs. In that state `/vh-adlc-tasks` refuses, because it runs `vh-adlc gate in-progress <doc>` and accepts only a `planned` or `in-progress` document (plugins/vh-adlc/skills/vh-adlc-tasks/SKILL.md:41-49). The rules block at 0c983f6 lets `complete` move only to `archived` or `superseded`. The Design's text routes this case to `/vh-adlc-tasks`, which cannot run, while the Owner summary's last paragraph ("an owner stop when the document is already `complete` locally") routes it to the owner. Two implementers would write different ship text. The previous revision introduced this when it applied R-5 F-01 (owner stop limited to ship's own commit) and R-5 F-02 (implement's Finish still sets `complete` with an empty `deferred`).
+PROPOSAL: Define the blocked completion run by the document's status rather than by who made the commit: whenever the document is already `complete` locally and unpushed, whether implement or ship set it, ship stops, reports the blocking rungs and the unpushed commit, and names the owner decision. State it the same way in the Design, the Owner summary and AC-09.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary ("Rungs without `stages` keep today's flow" and "Removing the field restores today's behaviour, which is also the rollback"); Design, Concurrency, failure and upgrade ("Rollback is removing the field")
+EVIDENCE: The new Loop routes text applies whenever rungs are declared, not only when a rung has `stages`. For stage-less settings, ship still changes: it runs the completion stage at its Verify step instead of under the current "before pushing ... may advance at HEAD" rule (plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:51-54), pushes the document-only completion commit under the new exemption, and performs and records procedure rungs. Implement now performs and records procedure rungs at every task. The CLI output is unchanged for stage-less settings (AC-05), but the flow is not, and removing `stages` does not restore the old procedures.
+PROPOSAL: Say that stage-less rungs keep today's selection and verdict, while the implement and ship procedure changes (Verify-step run, completion-commit exemption, recorded procedure rungs) apply to every adopter with declared rungs, and that rollback of those needs the previous plugin version.
