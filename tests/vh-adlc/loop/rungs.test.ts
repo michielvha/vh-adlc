@@ -53,14 +53,14 @@ describe("which rungs apply", () => {
     const { root } = feature();
     const delta = featureDelta(root, { base: "main" });
     expect(delta.paths.sort()).toEqual(["backend/app.go", "docs/a.md"]);
-    expect(applicableRungs(loadLoopSettings(root, { overridePath: null }), delta.paths).map(r => r.name)).toEqual(["verify", "integration"]);
+    expect(applicableRungs(loadLoopSettings(root, { overridePath: null }), delta.paths, "completion").map(r => r.name)).toEqual(["verify", "integration"]);
   });
 
   test("uncommitted changes the feature owns count too", () => {
     const { root } = feature();
     write(root, { "e2e/spec.ts": "x\n" });
     const delta = featureDelta(root, { base: "main" });
-    expect(applicableRungs(loadLoopSettings(root, { overridePath: null }), delta.paths).map(r => r.name)).toContain("kind");
+    expect(applicableRungs(loadLoopSettings(root, { overridePath: null }), delta.paths, "completion").map(r => r.name)).toContain("kind");
   });
 
   test("after a merge, the merge commit against its first parent still requires the backend rung", () => {
@@ -70,14 +70,14 @@ describe("which rungs apply", () => {
     const merge = git(root, "rev-parse", "HEAD");
     expect(featureDelta(root, { base: "main" }).paths).toEqual([]);
     const landed = featureDelta(root, { merge });
-    expect(applicableRungs(loadLoopSettings(root, { overridePath: null }), landed.paths).map(r => r.name)).toContain("integration");
+    expect(applicableRungs(loadLoopSettings(root, { overridePath: null }), landed.paths, "completion").map(r => r.name)).toContain("integration");
   });
 
   test("without declared rungs the operation keeps its current command lookup", () => {
     const { root } = feature("schema_version: 1\n");
     const settings = loadLoopSettings(root, { overridePath: null });
     expect(settings.verification_rungs).toEqual([]);
-    expect(applicableRungs(settings, ["backend/app.go"])).toEqual([]);
+    expect(applicableRungs(settings, ["backend/app.go"], "completion")).toEqual([]);
     expect(mayAdvance([], { head: "x", declared: false })).toEqual({ advance: true, lookup: "agents-md", blocking: [] });
   });
 });
@@ -86,7 +86,7 @@ describe("running rungs", () => {
   test("passing rungs at the head let the feature advance", async () => {
     const { root, head } = feature();
     const settings = loadLoopSettings(root, { overridePath: null });
-    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths));
+    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths, "completion"));
     expect(results.map(r => [r.name, r.state, r.commit])).toEqual([["verify", "passed", head], ["integration", "passed", head]]);
     expect(mayAdvance(results, { head, declared: true }).advance).toBe(true);
   });
@@ -94,7 +94,7 @@ describe("running rungs", () => {
   test("a failed rung blocks push, completion and delivery even with an owner allowance", async () => {
     const { root, head } = feature(loop.replace('command: "true"\n  - name: kind', 'command: "exit 1"\n  - name: kind'));
     const settings = loadLoopSettings(root, { overridePath: null });
-    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths));
+    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths, "completion"));
     expect(results.find(r => r.name === "integration")?.state).toBe("failed");
     expect(mayAdvance(results, { head, declared: true, allowances: ["integration"] })).toMatchObject({ advance: false, blocking: ["integration"] });
   });
@@ -102,7 +102,7 @@ describe("running rungs", () => {
   test("a rung that could not run blocks unless the owner allowed that exact rung", async () => {
     const { root, head } = feature(loop.replace('command: "true"\n  - name: kind', 'command: "no-such-tool-anywhere --check"\n  - name: kind'));
     const settings = loadLoopSettings(root, { overridePath: null });
-    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths));
+    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths, "completion"));
     expect(results.find(r => r.name === "integration")?.state).toBe("not run");
     expect(mayAdvance(results, { head, declared: true }).advance).toBe(false);
     expect(mayAdvance(results, { head, declared: true, allowances: ["kind"] }).advance).toBe(false);
@@ -112,7 +112,7 @@ describe("running rungs", () => {
   test("a written procedure rung is not run by the script and blocks until its result is recorded", async () => {
     const { root, head } = feature(loop + "  - name: browser\n    when: always\n    procedure: Open every changed page and record the summary table.\n");
     const settings = loadLoopSettings(root, { overridePath: null });
-    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths));
+    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths, "completion"));
     expect(results.find(r => r.name === "browser")).toMatchObject({ state: "not run", reason: "a written procedure; record its result" });
     expect(mayAdvance(results, { head, declared: true }).blocking).toEqual(["browser"]);
     const recorded = results.map(r => r.name === "browser" ? { ...r, state: "passed" as const, reason: "summary table recorded" } : r);
@@ -122,7 +122,7 @@ describe("running rungs", () => {
   test("an exit-0 run that reports a skipped mandatory subcheck stops advancement unless the allowance names that subcheck", async () => {
     const { root, head } = feature(loop.replace(`command: "echo 'passed 5 failed 0 skipped 0'"`, `command: "printf 'passed 4 failed 0 skipped 1\\\\nskipped: gofumpt (not installed)\\\\n'"`));
     const settings = loadLoopSettings(root, { overridePath: null });
-    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths));
+    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths, "completion"));
     const verify = results.find(r => r.name === "verify")!;
     expect(verify).toMatchObject({ state: "not run", exit_code: 0, skipped: ["gofumpt (not installed)"] });
     expect(mayAdvance(results, { head, declared: true }).advance).toBe(false);
@@ -133,7 +133,7 @@ describe("running rungs", () => {
   test("a pass recorded on an earlier commit does not count for a later one", async () => {
     const { root } = feature();
     const settings = loadLoopSettings(root, { overridePath: null });
-    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths));
+    const results = await runRungs(root, applicableRungs(settings, featureDelta(root, { base: "main" }).paths, "completion"));
     write(root, { "backend/app.go": "package app\n// again\n" });
     const later = commitAll(root, "later");
     expect(mayAdvance(results, { head: later, declared: true })).toMatchObject({ advance: false, blocking: ["verify", "integration"] });
@@ -157,7 +157,7 @@ describe("status parsing", () => {
     write(root, { "backend/app.go": "package app\n// unstaged\n" });
     const delta = featureDelta(root, { base: "main" });
     expect(delta.paths).toContain("backend/app.go");
-    expect(applicableRungs(loadLoopSettings(root, { overridePath: null }), delta.paths).map(r => r.name)).toEqual(["integration"]);
+    expect(applicableRungs(loadLoopSettings(root, { overridePath: null }), delta.paths, "completion").map(r => r.name)).toEqual(["integration"]);
   });
 
   test("a path Git quotes is matched by its real name", () => {
@@ -235,4 +235,23 @@ describe("rung time limits", () => {
       const { root } = feature(`schema_version: 1\nverification_rungs:\n  - name: x\n    when: always\n    command: "true"\n    timeout_minutes: ${bad}\n`);
       expect(() => loadLoopSettings(root, { overridePath: null })).toThrow("timeout_minutes");
     });
+});
+
+describe("rung stages", () => {
+  const withStages = (stages: string) => `schema_version: 1\nverification_rungs:\n  - name: x\n    when: always\n    command: "true"\n    stages: ${stages}\n`;
+  for (const bad of ["[bogus]", "[]", "[completion, completion]", "[task]", "completion"])
+    test(`stages ${bad} is refused, naming the field`, () => {
+      const { root } = feature(withStages(bad));
+      expect(() => loadLoopSettings(root, { overridePath: null })).toThrow("verification_rungs[0].stages");
+    });
+
+  test("a rung without stages runs at both stages", () => {
+    const { root } = feature();
+    expect(loadLoopSettings(root, { overridePath: null }).verification_rungs.map(rung => rung.stages)).toEqual([["task", "completion"], ["task", "completion"], ["task", "completion"]]);
+  });
+
+  test("a completion-only rung keeps its declared stages", () => {
+    const { root } = feature(withStages("[completion]"));
+    expect(loadLoopSettings(root, { overridePath: null }).verification_rungs[0].stages).toEqual(["completion"]);
+  });
 });
