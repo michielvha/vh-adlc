@@ -1,14 +1,15 @@
 ---
 status: draft
-status_description: "Revised after review R-2; awaiting a new independent review."
+status_description: "Revised after review R-3; awaiting a new independent review."
 issue: null
-goal: "Every pull request vh-adlc ships for a visible UI change carries before and after images linked at fixed commits, or says which images are missing and why."
+goal: "In a repository that declares visual_record, every pull request vh-adlc ships for a visible UI change carries before and after images linked at fixed commits, or says which images are missing and why."
 covers:
   - plugins/vh-adlc/scripts/loop/visuals.ts
   - plugins/vh-adlc/scripts/loop/settings.ts
   - plugins/vh-adlc/scripts/loop/cli.ts
   - plugins/vh-adlc/scripts/loop/rungs.ts
   - plugins/vh-adlc/scripts/loop/git-paths.ts
+  - plugins/vh-adlc/scripts/settings-file.ts
   - plugins/vh-adlc/scripts/branches/
   - plugins/vh-adlc/references/loop-settings.md
   - plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md
@@ -24,45 +25,47 @@ covers:
 # Plan: Visual record in shipped pull requests
 
 The ship operation adds a "Before and after" section to the pull request of any feature that changes
-visible UI. The images come from screenshots the repository already commits, or from a capture command
-the adopter declares, and new captures are stored on a per-PR ref outside `refs/heads`.
+visible UI. The adopter's capture command produces the images, and they are stored on a per-PR ref
+outside `refs/heads`.
 
 ## Context
 
 ### Owner summary
 
 A UI pull request today describes its change in text only. A reviewer can't see the old and new look
-side by side, and the history keeps no visual record. The owner asked for this record on 2026-11-21,
-and the shared rule is proposed as "Visual record in the pull request" in the frontend testing standard
+side by side, and the history keeps no visual record. vh-adlc does nothing with screenshots yet. The
+owner asked for this on 2026-11-21, for every project that ships through vh-adlc, and the shared rule is
+proposed as "Visual record in the pull request" in the frontend testing standard
 ([vhco-pro/docs#53](https://github.com/vhco-pro/docs/pull/53)).
 
-This feature makes ship produce that section. An adopter opts in with a `visual_record` block in
-`.vh-adlc/loop.yaml`: path globs that mark a delivery as UI-affecting, globs of screenshots the
-repository already commits, and an optional capture command. When a committed change in the feature
-matches, ship opens or updates the PR, then runs a new `cli.ts visuals` command. It links changed
-committed screenshots at the base and head commits. It runs the adopter's capture command once, giving
-it both commits and an output folder; the command writes `before/` and `after/` images however its
-project builds. The command pushes those images to `refs/pr-visuals/<PR number>`. Ship looks at every
-pair from local copies and writes the section last in the PR body, replacing any earlier one.
+Each project opts in with two things: a `visual_record` block in `.vh-adlc/loop.yaml` naming the paths
+that count as UI changes, and a capture command. When a committed change in the feature matches, ship
+opens or updates the PR, then runs a new `cli.ts visuals` command. It runs the capture command once,
+giving it the base and head commits and an output folder. The command writes `before/` and `after/`
+images however its project builds, including copies of any screenshots the repository already commits
+(one `git show` line each, shown in the guide). vh-adlc pushes the images to `refs/pr-visuals/<PR
+number>` and prints a table of embedded images. Ship looks at every pair from local copies and writes the
+section last in the PR body, replacing any earlier one.
 
-The owner made six decisions on 2026-11-21. A missing record is disclosed and never blocks a delivery.
-A repeated ship appends to the ref, so earlier images stay. Nothing compares images automatically: ship
-inspects the pairs and says "No visible change" only when it sees none. The ref is named by PR number.
-The adopter's command captures both sides, so vh-adlc builds no checkouts of its own. Review R-2's
-remaining findings take their recommended fixes.
+The owner's decisions on 2026-11-21: a missing record is disclosed and never blocks a delivery; a
+repeated ship appends to the ref, so earlier images stay; nothing compares images automatically, so ship
+inspects the pairs and says "No visible change" only when it sees none; the ref is named by PR number;
+the project's command captures both sides, so vh-adlc builds no checkouts; the capture command is the
+only image source, so vh-adlc has no separate path for committed screenshots; the GitHub owner and
+repository come from the PR ship created, not from parsing the remote URL; and review findings take
+their recommended fixes.
 
-The extra push to `refs/pr-visuals/*` is part of ship's existing push authority and goes through its
-repository and account confirmation. Ordinary clones don't fetch that ref; GitHub serves its files to
-anyone who can read the repository, so in a public repository the images are public, like the PR.
+The extra push to `refs/pr-visuals/*` is part of ship's push authority and goes through its repository
+and account confirmation. Ordinary clones don't fetch that ref; GitHub serves its files to anyone who
+can read the repository, so in a public repository the images are public, like the PR.
 
-Nothing changes for an adopter without the block. vh-adlc stays project-neutral: screens, fixture data,
-how the base commit gets built, and the capture script belong to the adopter. An adopter has to upgrade
-the plugin before adding the block, because older settings readers reject unknown keys.
+Nothing changes for a project without the block. An adopter has to upgrade the plugin before adding the
+block, because older settings readers reject unknown keys.
 
 Planned proof is fixture tests against local Git repositories, text checks with stated examples, and one
 manual check that the images render in a private GitHub PR. Observed so far: one probe showed GitHub
-serving a file from a commit that only a custom ref holds. Reviews R-1 and R-2 found 25 and 13 issues;
-this revision applies R-2 and needs a new independent review.
+serving a file from a commit that only a custom ref holds. Reviews R-1 to R-3 found 25, 13 and 15 issues;
+this revision applies R-3 and needs a new independent review.
 
 Acceptance authorizes implementing this design on a feature branch. Merging, releasing and changing the
 docs pin each need their own approval.
@@ -71,27 +74,29 @@ docs pin each need their own approval.
 
 - Ship builds the PR body in its Deliver step with no image step:
   `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:98-101`, where it also writes `Closes #N` or `Refs #N`.
-  It confirms the repository and account before any GitHub write (`SKILL.md:67-68`) and never stages
-  unrelated dirty work (`SKILL.md:81-82`).
+  Its Input paragraph names its push authority (`SKILL.md:16-18`). It confirms the repository and account
+  before any GitHub write (`SKILL.md:67-68`), never stages unrelated dirty work (`SKILL.md:81-82`), and
+  compares against `origin/<default>` for CI policy (`SKILL.md:90-92`).
 - Loop settings accept a fixed key list and reject anything else:
   `plugins/vh-adlc/scripts/loop/settings.ts:54` defines `LOOP_SETTINGS_KEYS`, and
   `plugins/vh-adlc/scripts/loop/settings.ts:208` enforces it. A rung timeout must be a positive whole
-  number of minutes (`settings.ts:131`). Non-review commands read settings from the working tree
-  (`plugins/vh-adlc/scripts/loop/cli.ts:79-80`); `loadLoopSettingsAt` reads them as committed
-  (`settings.ts:238-251`).
-- `featureDelta` (`plugins/vh-adlc/scripts/loop/rungs.ts:23`) returns committed paths plus every
-  uncommitted and untracked path (`rungs.ts:29-32`). Committed paths come from
-  `plugins/vh-adlc/scripts/loop/git-paths.ts:29-31`, which reads `diff --no-renames --name-only -z`.
-  Rung commands run with a time limit and a process-group kill (`rungs.ts:40-60`), and exits 126 and
-  127 count as "could not run" (`rungs.ts:59`).
-- Loop commands exit 2 on a thrown error (`plugins/vh-adlc/scripts/loop/cli.ts:176-178`), including a
-  failed Git call (`rungs.ts:12-16`), and 3 for some verdicts (`cli.ts:118`, `:149`, `:170`).
+  number of minutes (`settings.ts:131`). Every command except `review` loads working-tree settings before
+  it dispatches (`plugins/vh-adlc/scripts/loop/cli.ts:79-80`), and `settingsFile` fails when a leftover
+  `.vh-adlc/loop.yml` or `.json` exists (`plugins/vh-adlc/scripts/settings-file.ts:20-23`).
+  `loadLoopSettingsAt` reads settings as committed (`settings.ts:238-251`). Required flags throw through
+  `need` (`cli.ts:45-48`).
+- `plugins/vh-adlc/scripts/loop/git-paths.ts:29-31` reads committed paths with
+  `diff --no-renames --name-only -z`. Rung commands run in their own process group with a time limit
+  (`plugins/vh-adlc/scripts/loop/rungs.ts:40-60`); the group is killed only by the timeout handler
+  (`rungs.ts:47-49`), and exits 126 and 127 count as "could not run" (`rungs.ts:59`).
+- Loop commands exit 2 on a thrown error (`cli.ts:176-178`), including a failed Git call
+  (`rungs.ts:12-16`), and 3 for some verdicts (`cli.ts:118`, `:149`, `:170`).
 - After-merge cleanup "touches only that PR's head branch" (remote branch, tracking ref and local
   branches) and its worktree: `plugins/vh-adlc/references/branches.md:87-99`.
 - The loop's Terms table has two columns, `| Term | Meaning |`
   (`plugins/vh-adlc/references/loop-settings.md:10`). Rejected synonyms live in the `TERMS` map of
   `tests/vh-adlc/loop/glossary.test.ts:8-17`, which fails on any lowercase substring match in the loop
-  references and `scripts/loop/`.
+  references and `scripts/loop/`. "planned" and "complete" are also feature document statuses.
 - `tests/vh-adlc/check.test.ts:166-176` already requires `plugin.json` to equal the `.claude-plugin`
   manifest plus `$schema`.
 - The frontend testing standard at the repository's pin requires captures to be taken and inspected and
@@ -106,6 +111,8 @@ docs pin each need their own approval.
   `gh api repos/michielvha/stackweaver/contents/probe.png?ref=721b0569...` returned size 34604. No branch
   contained the commit. The ref was deleted afterwards. Rendering of the `github.com/.../blob/<sha>`
   link form in a PR body for such a commit was not observed.
+- That repository's `remote.origin.url` is `https://michielvha@github.com/michielvha/stackweaver.git`
+  (R-3 F-01), one of many URL forms; the PR itself names its repository unambiguously.
 - `docs/specs/stage-scoped-verification-rungs.md` is in progress on `feat/stage-scoped-rungs` and changes
   `rungs.ts`, `settings.ts`, `cli.ts`, the ship skill and the plugin version too.
 
@@ -114,22 +121,23 @@ docs pin each need their own approval.
 In scope:
 
 - The optional `visual_record` loop setting and its validation.
-- A `cli.ts visuals` command that decides applicability, pairs committed screenshots, runs the capture
-  command once, stores captured images on `refs/pr-visuals/<PR number>` and prints the PR section.
-- The ship skill's Deliver step: open or update the PR, run the command, inspect the pairs from local
-  files, write or replace the section, name uncaptured changed states, and say "No visible change" only
-  after inspection.
-- New Terms rows, the loop settings reference, the workflows user guide and a minor plugin version
-  bump.
+- A `cli.ts visuals` command that decides applicability, runs the capture command once, stores its
+  images on `refs/pr-visuals/<PR number>` and prints the PR section.
+- The ship skill: its authority sentence, and a Deliver step that opens or updates the PR, runs the
+  command, inspects the pairs from local files, writes, replaces or removes the section, names uncaptured
+  changed states, and says "No visible change" only after inspection.
+- New Terms rows, the loop settings reference, the workflows user guide with a copyable example for
+  committed screenshots, and a minor plugin version bump.
 
 Out of scope:
 
-- Choosing screens, building the base commit, writing capture scripts or seeding fixtures. Those stay
-  with each adopter (owner decision, 2026-11-21).
+- Choosing screens, building either commit, writing capture scripts or seeding fixtures. Those stay with
+  each adopter (owner decision, 2026-11-21).
+- A separate source for screenshots the repository commits, or a shared helper for them; the capture
+  command copies them (owner decision, 2026-11-21).
 - Automatic image comparison of any kind, by bytes or pixels (owner decision, 2026-11-21).
-- Image upload to GitHub's attachment store, which has no API.
+- Parsing remote URLs; image upload to GitHub's attachment store, which has no API.
 - Pruning old `refs/pr-visuals/*` refs. They are the record and are kept.
-- Remotes other than GitHub. The command reports them as a missing item.
 - Moving vh-adlc's own docs pin to the revision that holds the new rule. That is a separate reviewed
   change after [vhco-pro/docs#53](https://github.com/vhco-pro/docs/pull/53) merges.
 
@@ -144,9 +152,10 @@ in the `TERMS` map of `tests/vh-adlc/loop/glossary.test.ts`:
 | --- | --- | --- |
 | Visual record | The before and after images of a UI delivery, linked at fixed commits. | `screenshot diff`, `visual diff` |
 | Before and after section | The PR body section headed `## Before and after` that holds the visual record. | `screenshots section`, `visual section` |
-| Record state | `complete`, `incomplete`, `planned` or `not-applicable`, as the `visuals` command reports it. | `visual verdict`, `record verdict` |
+| Record state | `full`, `partial`, `preview` or `not-applicable`, as the `visuals` command reports it. | `visual verdict`, `record verdict` |
 
-The third column is not added to the table; it lists what goes into `TERMS`.
+The third column is not added to the table; it lists what goes into `TERMS`. Reports write "record state
+`full`" and so on, never the bare value.
 
 ### Setting
 
@@ -155,123 +164,116 @@ The third column is not added to the table; it lists what goes into `TERMS`.
 | Field | Meaning |
 | --- | --- |
 | `when.paths` | Required, non-empty list of string globs. A delivery is UI-affecting when a committed path in the feature matches one. |
-| `committed` | Optional list of string globs of screenshots the repository commits. |
-| `capture.command` | Optional shell command that captures both sides in one run. |
+| `capture.command` | Required shell command that captures both sides in one run. |
 | `capture.timeout_minutes` | Optional positive whole number, default 60, for the whole run. |
 
-At least one of `committed` and `capture` is required. Invalid shapes fail with a message naming the
-field, like the rung validation. The `visuals` command reads the block as committed at HEAD through
-`loadLoopSettingsAt`, so an uncommitted edit to `.vh-adlc/loop.yaml` never changes what it runs.
+Invalid shapes, including a missing `capture` or `capture.command`, fail with a message naming the field,
+like the rung validation. The `visuals` command is exempt from the working-tree settings load, like
+`review`, and reads the block only as committed at HEAD through `loadLoopSettingsAt`; an uncommitted or
+invalid working-tree `.vh-adlc/loop.yaml` changes nothing it does.
 
 ### Command
 
-`bun scripts/loop/cli.ts visuals --repo <dir> --base <default branch> --pr <number> --out <dir> [--run true]`
+`bun scripts/loop/cli.ts visuals --repo <dir> --base <ref> --pr <number> --github <owner>/<repo> --out <dir> [--run true]`
 prints one JSON object.
 
 It exits 2, like a thrown error in the other commands, when: the committed settings declare no
-`visual_record` (message "visual_record is not declared"); `--base` or `--pr` is missing, or `--pr` is
-not a positive whole number; `--run true` is given and `--out` is missing, not empty, or inside the
-repository's working tree; the settings can't be read; the directory is not a Git checkout; or
-`git merge-base` fails. Every other outcome exits 0 with a `state`.
+`visual_record` (message exactly "visual_record is not declared"); `--repo`, `--base`, `--pr` or
+`--github` is missing; `--pr` is not a positive whole number; `--github` is not `<owner>/<repo>`; `--run
+true` is given and `--out` is missing, not empty, or inside the repository's working tree; the committed
+settings can't be read; the directory is not a Git checkout; or `git merge-base` fails. Every other
+outcome exits 0 with a `state`. On SIGINT or SIGTERM it kills the capture's process group before
+exiting.
 
 Output, in every case where it exits 0:
 
 | Field | Value |
 | --- | --- |
-| `state` | `not-applicable`, `planned` (without `--run`), `complete` or `incomplete`. |
+| `state` | `not-applicable`, `preview` (without `--run`), `full` or `partial`. |
 | `base`, `head` | Full SHAs of the merge base and HEAD. |
 | `ref` | `refs/pr-visuals/<number>`. |
 | `ref_commit` | The pushed commit's full SHA, or `null` when nothing was pushed. |
-| `pairs` | One object per screen: `name`, `source` (`committed` or `captured`), `before_url`, `after_url`, `before_file`, `after_file`. Each URL or file is `null` for a missing side. |
-| `missing` | One object per gap: `item` and `reason`. |
-| `markdown` | The section text, or `""` when `not-applicable` or `planned`. |
-
-A committed screenshot's `name` is its repository path; a captured image's `name` is its file stem.
+| `pairs` | One object per screen: `name` (the file stem), `before_url`, `after_url`, `before_file`, `after_file`. Each is `null` for an absent side. Empty in `preview`. |
+| `missing` | One object per gap: `item` and `reason`. Empty in `preview`. |
+| `markdown` | The section text, or `""` when `not-applicable` or `preview`. |
 
 Steps:
 
 1. **Applicability.** Paths come from the committed range only, `git diff --no-renames --name-only -z
    <merge-base> HEAD`; uncommitted and untracked files never count. When none matches `when.paths`,
-   `state` is `not-applicable` and the command stops. Without `--run`, `state` is `planned`: `pairs` lists
-   the committed screenshots with their URLs and `null` files, and `missing` holds only a remote URL
-   problem, if any.
-2. **Committed screenshots.** From `git diff --no-renames --name-status -z <merge-base> HEAD`, paths
-   matching `committed`: a modified file is a pair at the merge-base and HEAD SHAs, an added file an
-   after image only, a deleted file a before image only. A rename counts as a delete plus an add. Each
-   side is written from its object (`git show <sha>:<path>`) to `<out>/committed/before/<path>` or
-   `<out>/committed/after/<path>`, the pair's local files.
-3. **Captured images.** The command creates the empty directories `<out>/captured/before/` and
-   `<out>/captured/after/`, then runs `capture.command` once, with its working directory at the feature
-   checkout's root and these variables: `VH_ADLC_VISUAL_BASE` and `VH_ADLC_VISUAL_HEAD` (the merge-base and
-   HEAD SHAs) and `VH_ADLC_VISUAL_OUT` (`<out>/captured`). The command builds each commit however its
-   project needs and writes images into the two directories; it must not change the feature checkout.
-   Files directly in each directory with a `.png`, `.webp` or `.jpg` extension are the captures, the file
-   stem is the screen name, and sides pair by stem. Two files with one stem on one side are a missing
-   item, and neither is used. The time limit, process-group kill and 126 or 127 handling follow the rung
-   runner.
-4. **Storage.** Every captured image is stored; nothing is compared. When no image was captured, the
-   command pushes nothing and `ref_commit` is `null`. Otherwise it reads the remote tip with
+   `state` is `not-applicable` and the command stops. Without `--run`, `state` is `preview` and the
+   command stops without running anything.
+2. **Capture.** The command creates the empty directories `<out>/before/` and `<out>/after/`, then runs
+   `capture.command` once, with its working directory at the feature checkout's root and these
+   variables: `VH_ADLC_VISUAL_BASE` and `VH_ADLC_VISUAL_HEAD` (the merge-base and HEAD SHAs) and
+   `VH_ADLC_VISUAL_OUT` (`<out>`). Each side must show its given commit, never the working tree, and the
+   command must not change the feature checkout; building each commit is the adopter's job. Files
+   directly in each directory whose extension is `.png`, `.webp`, `.jpg` or `.jpeg`, in any letter case,
+   are the captures; the file stem is the screen name, and sides pair by stem. A stem on one side only is
+   a one-sided screen, added or removed. Two files with one stem on one side are a missing item, and
+   neither is used. The time limit and 126 or 127 handling follow the rung runner.
+3. **Storage.** Nothing is compared. When no image was captured, the command pushes nothing and
+   `ref_commit` is `null`. Otherwise it reads the remote tip with
    `git ls-remote origin refs/pr-visuals/<number>`, fetches that commit when it exists, and builds a commit
    whose tree holds `before/<file>` and `after/<file>` with plumbing only (`hash-object -w`, `mktree`,
    `commit-tree`), with the remote tip as parent when it exists. It pushes with
    `git push origin <commit>:refs/pr-visuals/<number>`, never forced. Its own Git operations never create
    or move a local ref and never change the checkout's index, HEAD, branches or working files; Git may
    write `FETCH_HEAD`. A push rejected because the ref moved is rebuilt on the new tip and retried once.
-5. **Section.** `markdown` is headed `## Before and after` and has a table row per screen. Committed
-   screenshots link at the merge-base and HEAD SHAs, captured images at `ref_commit` under `before/` or
-   `after/`. Every link has the form `https://github.com/<owner>/<repo>/blob/<sha>/<path>?raw=true`, with
-   each path segment percent-encoded. A `### Missing` list follows when `missing` is not empty. Committed
-   links assume HEAD is on the remote, which ship ensures by pushing first.
+4. **Section.** `markdown` is headed `## Before and after`, followed by a table with the columns
+   `Screen`, `Before` and `After`, one row per screen. Each image cell is
+   `![<name> before](<url>)` or `![<name> after](<url>)`, and an absent side's cell is `none`. Every URL
+   has the form `https://github.com/<owner>/<repo>/blob/<ref_commit>/<before|after>/<file>?raw=true`, with
+   `<owner>/<repo>` from `--github` and each path segment percent-encoded. A `### Missing` list follows
+   when `missing` is not empty.
 
-**Owner and repository.** They come from the raw `git config --get remote.origin.url`, never from
-`git remote get-url`, which applies `insteadOf` rewrites. Accepted forms, each with or without `.git`:
-`https://github.com/<owner>/<repo>`, `git@github.com:<owner>/<repo>` and
-`ssh://git@github.com/<owner>/<repo>`. Anything else, including an SSH host alias such as
-`git@gh-work:<owner>/<repo>`, is a missing item with the reason "remote is not a recognised GitHub URL"
-and no links.
-
-**State.** `complete` when at least one image is linked and nothing is missing. `incomplete` when
-anything is missing. Missing reasons, the full list: no screenshot changed and no capture command is
-declared; the capture exited non-zero (with the code); it could not run (126 or 127); it timed out; it
-produced no images; it produced two files with one stem; the remote URL is not recognised; `ls-remote`
-or `fetch` failed; building the commit failed (`hash-object`, `mktree` or `commit-tree`); the push failed
-or was rejected twice. A failed capture doesn't discard committed pairs, and images captured but not
-pushed are reported missing with their local files kept.
+**State.** `full` when at least one image is linked and nothing is missing; `partial` when anything is
+missing. Missing reasons, the full list: the capture exited non-zero (with the code); it could not run
+(126 or 127); it timed out; it wrote no images at all; it wrote no before images; it wrote no after
+images; it wrote two files with one stem on one side; `ls-remote` or `fetch` failed; building the commit
+failed (`hash-object`, `mktree` or `commit-tree`); the push failed or was rejected twice. Images captured
+but not pushed are reported missing with their local files kept.
 
 ### Ship
 
-Deliver changes as follows, only when the committed settings declare `visual_record`:
+The Input paragraph's authority sentence adds the push of `refs/pr-visuals/<number>` to the pushes a
+ship request authorizes; that push happens after ship's repository and account confirmation and needs no
+separate approval. Deliver then changes as follows:
 
 1. After pushing the feature branch, ship creates or updates the PR as today.
-2. It runs `visuals --run true --pr <number> --out <dir>` with a new empty directory outside the
-   repository.
-3. On `complete` or `incomplete`, it looks at each pair's `before_file` and `after_file`.
-4. It puts the command's section last in the PR body, replacing an earlier one from its
-   `## Before and after` heading to the end of the body. `Closes` or `Refs` and every other part of the
-   body stay above it. Earlier records stay reachable through the ref's history.
-5. Inside the section, under the table, it adds one line per changed state no capture shows, such as an
+2. It runs `git fetch origin <default branch>`, then
+   `bun scripts/loop/cli.ts visuals --repo <owning worktree> --base origin/<default branch> --pr <number> --github <owner>/<repo> --out <new empty directory outside the repository> --run true`,
+   taking `<owner>/<repo>` from the PR with `gh pr view <number> --json url`.
+3. On exit 2 with "visual_record is not declared", it removes any earlier `## Before and after` section
+   and does nothing else. On `not-applicable`, it removes any earlier section. On any other exit 2, or
+   when the command produced no output, it writes a section holding one line, "Visual record missing:",
+   with the reason.
+4. On `full` or `partial`, it looks at each pair's `before_file` and `after_file`.
+5. It puts the section last in the PR body, replacing an earlier one from its `## Before and after`
+   heading to the end of the body. `Closes` or `Refs` and every other part of the body stay above it.
+   Earlier records stay reachable through the ref's history.
+6. Inside the section, under the table, it adds one line per changed state no capture shows, such as an
    open dialog, and says why.
-6. Also inside the section, when it inspected every pair and saw no visible difference, it writes
+7. Also inside the section, when it inspected every pair and saw no visible difference, it writes
    `No visible change` with the number of screens it inspected.
-7. An `incomplete` record never blocks the delivery (owner decision, 2026-11-21). The report repeats
-   every missing item.
-
-The ref push is part of the ship request's push authority and happens after ship's repository and
-account confirmation; it needs no separate approval.
+8. A `partial` record or a missing record never blocks the delivery (owner decision, 2026-11-21). The
+   report repeats every missing item.
 
 ### Concurrency, failure, retry, upgrade
 
 - **Concurrent ships.** Each run writes only to its own `--out` directory and its PR's ref. Where
   reservations are adopted, they keep two writers off one feature. In every case a ref push that loses a
   race is rebuilt on the new tip and retried once; a second rejection is a missing item.
-- **Killed runs.** A run stopped from outside leaves only its `--out` directory and, possibly, unpushed
-  objects that Git's garbage collection removes. The command registers nothing in the repository that a
-  later run must clean.
+- **Killed runs.** On SIGINT or SIGTERM the command kills the capture's process group. A run killed with
+  SIGKILL can leave the capture's processes and whatever the adopter's command created, such as servers
+  or build output, so the guide tells adopters to make their command tolerate leftovers from an earlier
+  run. The command itself registers nothing in the repository that a later run must clean.
 - **Retry and replay.** Each ship that captured images appends a commit on top of the previous tip (owner
   decision, 2026-11-21). The PR links the newest commit, and pushes stay fast-forward.
 - **Upgrade and rollback.** Settings without `visual_record` parse to the same object as today. A plugin
   older than this feature rejects the new key (`settings.ts:54`, `:208`), so adopters upgrade first.
-  Rolling back means removing the block; existing refs stay and harm nothing.
+  Rolling back means removing the block; the next ship removes the section, and existing refs stay and
+  harm nothing.
 - **Visibility.** The ref has the repository's visibility. Captures follow the pinned redaction rules
   above, and the proposed rule in vhco-pro/docs#53 adds that they show fixture data only.
 
@@ -282,60 +284,59 @@ branch starts after that one merges, or merges the default branch in once it doe
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Loop settings accept `visual_record` with a non-empty `when.paths`, optional `committed`
-  globs and an optional `capture` with `command` and `timeout_minutes`. A block with neither `committed`
-  nor `capture`, an empty `when.paths`, a non-string glob, or a non-positive or fractional timeout is
-  rejected with a message naming the field. Settings without the key parse to the same object as before
-  this feature. `visuals` uses the block as committed at HEAD, not an uncommitted edit.
-- [ ] AC-02: `cli.ts visuals` reports `state: not-applicable` when no committed path in the feature
+- [ ] AC-01: Loop settings accept `visual_record` with a non-empty `when.paths` and a `capture` with a
+  `command` and an optional `timeout_minutes`. A block without `capture` or `capture.command`, an empty
+  `when.paths`, a non-string glob, or a non-positive or fractional timeout is rejected with a message
+  naming the field. Settings without the key parse to the same object as before this feature. `visuals`
+  uses the block as committed at HEAD, and an invalid or different working-tree settings file changes
+  nothing it does.
+- [ ] AC-02: `cli.ts visuals` reports record state `not-applicable` when no committed path in the feature
   matches `when.paths`, even when uncommitted or untracked files would match. Otherwise, without `--run`,
-  it reports `state: planned` with committed pairs carrying URLs and `null` files and an empty
-  `markdown`, and runs no command. Each exit-2 condition in the design exits 2.
-- [ ] AC-03: A committed screenshot modified in the feature links at the merge-base and HEAD SHAs, an
-  added one as an after image only, a deleted one as a before image only, and a renamed one as a delete
-  plus an add, each named by its repository path, with local files written under `<out>/committed/`.
-  Paths with spaces are handled.
-- [ ] AC-04: With `--run true`, the capture command runs once from the feature checkout's root with
-  `VH_ADLC_VISUAL_BASE`, `VH_ADLC_VISUAL_HEAD` and `VH_ADLC_VISUAL_OUT` set, and its images in `before/`
-  and `after/` pair by file stem, each with a local file. Two files with one stem on one side are a
-  missing item.
-- [ ] AC-05: Captured images are pushed to `refs/pr-visuals/<number>` without force, in a commit whose
+  it reports record state `preview` with empty `pairs`, `missing` and `markdown`, and runs nothing. Each
+  exit-2 condition in the design exits 2.
+- [ ] AC-03: With `--run true`, the capture command runs once from the feature checkout's root with
+  `VH_ADLC_VISUAL_BASE`, `VH_ADLC_VISUAL_HEAD` and `VH_ADLC_VISUAL_OUT` set. Images in `before/` and
+  `after/` with the four accepted extensions in any case pair by stem, each with a local file; a stem on
+  one side only is a one-sided screen; other files are ignored.
+- [ ] AC-04: Captured images are pushed to `refs/pr-visuals/<number>` without force, in a commit whose
   parent is the previous remote tip when the ref exists. A push rejected because the ref moved is rebuilt
   on the new tip and retried once. When no image was captured, nothing is pushed and `ref_commit` is
   `null`. The command's own operations leave the checkout's `git status --porcelain`,
-  `git rev-parse HEAD` and local refs unchanged.
-- [ ] AC-06: Each missing reason in the design's full list yields `state: incomplete` with that reason in
-  `missing` and in the section, and exit 0. Owner and repository come from the raw `remote.origin.url`,
-  and only the three listed GitHub URL forms produce links.
-- [ ] AC-07: Every link in the section points at the right commit and path: committed screenshots at the
-  merge-base and HEAD SHAs, captured images at `ref_commit` under `before/` or `after/`, with path
-  segments percent-encoded. Each `<sha>:<path>` exists and matches the pair's local file byte for byte.
-- [ ] AC-08: The ship skill's Deliver section contains each statement the AC-08 Test Plan row lists.
-- [ ] AC-09: `branches/cli.ts after-merge` leaves every `refs/pr-visuals/*` ref in place.
-- [ ] AC-10: The loop settings reference and the workflows guide each document every `visual_record`
-  field, its defaults, the three environment variables, the `before/` and `after/` output layout, that
-  the command builds no checkouts, the ref name, retention, visibility and the upgrade order. The Terms
-  table holds the three new rows, `TERMS` holds their rejected synonyms, and both plugin manifests carry
-  the same version, one minor version above the merge base's.
-- [ ] AC-11: On a private GitHub repository, a shipped fixture change shows the PR body's images to a
-  signed-in reader with access, including at least one image from a `refs/pr-visuals/*` commit that no
-  branch contains.
+  `git rev-parse HEAD` and local refs unchanged. SIGTERM during a capture leaves no process of the
+  capture's group running.
+- [ ] AC-05: Each missing reason in the design's full list yields record state `partial` with that reason
+  in `missing` and in the section, and exit 0.
+- [ ] AC-06: The section is a `Screen | Before | After` table of embedded images whose URLs use the
+  `--github` owner and repository, `ref_commit` and `before/` or `after/`, with path segments
+  percent-encoded and `none` for an absent side. Each `<ref_commit>:<path>` exists and matches the pair's
+  local file byte for byte.
+- [ ] AC-07: The ship skill contains each statement the AC-07 Test Plan row lists.
+- [ ] AC-08: `branches/cli.ts after-merge` leaves every `refs/pr-visuals/*` ref in place.
+- [ ] AC-09: The loop settings reference and the workflows guide each document every `visual_record`
+  field and default, the three environment variables, the output layout, the accepted extensions, stem
+  pairing, that each side shows its given commit, that the command builds no checkouts, tolerance of
+  leftovers, the ref name, retention, visibility and the upgrade order; the guide also gives a copyable
+  example that copies a committed screenshot for each side. The Terms table holds the three new rows,
+  `TERMS` holds their rejected synonyms, and both plugin manifests carry the same version, one minor
+  version above the merge base's.
+- [ ] AC-10: On a private GitHub repository, a shipped fixture change shows the PR body's images inline
+  to a signed-in reader with access, including at least one image from a `refs/pr-visuals/*` commit that
+  no branch contains.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | `tests/vh-adlc/loop/settings.test.ts`: valid and invalid `visual_record` shapes, each rejection's field name; for settings without the key, `loadLoopSettings` and `loadLoopSettingsAt` return no `visual_record` key while the existing expectations in `settings.test.ts`, `cli.test.ts` and `rungs.test.ts` pass unchanged. `tests/vh-adlc/loop/visuals.test.ts`: a fixture whose working-tree `.vh-adlc/loop.yaml` names a different capture command from the committed one; the committed one runs. |
-| AC-02 | `visuals.test.ts`: fixtures whose committed range does and doesn't match; one with a matching file only uncommitted and one only untracked, both `not-applicable`; a `planned` run asserting URLs, `null` files and `markdown: ""`, with a capture command that writes a marker file to prove it did not run. Exit 2 for: no `visual_record` committed, missing `--base`, missing `--pr`, `--pr x`, `--run true` without `--out`, a non-empty `--out`, an `--out` inside the repository, unreadable settings, a non-Git directory, and a `--base` with no merge base. |
-| AC-03 | `visuals.test.ts`: one modified, one added, one deleted and one renamed committed screenshot, one with a space in its path; assert each link shape, SHA, `name` and local file. |
-| AC-04 | `visuals.test.ts`: a capture script that records its working directory and the three variables and writes side-specific images; assert both pairs and their files. A script that writes `home.png` and `home.jpg` into `before/` yields the stem missing item. |
-| AC-05 | `visuals.test.ts`: origin is a local bare repository. Run twice and assert the second commit's parent and a fast-forward without force; move the remote ref between `ls-remote` and push and assert one rebuilt retry; a run with only committed screenshots asserts no push and `ref_commit: null`; with staged and unstaged unrelated changes present, `git status --porcelain`, `git rev-parse HEAD` and `git for-each-ref` are identical before and after a run whose capture script writes only to its output directory. |
-| AC-06 | `visuals.test.ts`: one case per missing reason in the design's list, each asserting `state`, the `missing` entry, the section text and exit 0; the timeout case passes a sub-minute limit to the function under test. URL forms, via `remote.origin.url` with `url.<bare>.insteadOf` routing fetch and push to the local bare repository: must link for `https://github.com/acme/app`, `https://github.com/acme/app.git`, `git@github.com:acme/app.git` and `ssh://git@github.com/acme/app`; must not link for `git@gh-work:acme/app.git`, `https://gitlab.com/acme/app.git` and a local path. |
-| AC-07 | `visuals.test.ts`: parse every link in the section; assert committed links use `base` or `head`, captured links use `ref_commit` with `before/` or `after/`, a path with a space is encoded as `%20`, and `git cat-file -p <sha>:<path>` in the bare repository equals the pair's local file. |
-| AC-08 | `tests/vh-adlc/loop/visuals-docs.test.ts` splits the Deliver section of `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` into paragraphs (blank-line separated, list items each a paragraph) and requires, case-insensitively, one paragraph matching each statement. (1) `visuals --run true --pr`: passes "run `cli.ts visuals --run true --pr <number> --out <dir>`", fails "run the visuals command". (2) `## Before and after` with `last` and `replac`: passes "Put the `## Before and after` section last, replacing an earlier one", fails "Add a `## Before and after` section". (3) `before_file` and `after_file` with `look`: passes "Look at each pair's `before_file` and `after_file`", fails "Look at the pairs". (4) `No visible change` with `inspected`: passes "Write `No visible change` only when you inspected every pair", fails "Write `No visible change` when nothing changed". (5) `no capture shows`: passes "Add a line for each changed state no capture shows", fails "Mention other states". (6) `incomplete` with `never blocks` or `does not block`: passes "An `incomplete` record never blocks the delivery", fails "An `incomplete` record blocks the delivery". (7) `report` with `missing item`: passes "The report repeats every missing item", fails "The report summarizes the delivery". (8) `push authority`: passes "The ref push falls under the ship request's push authority", fails "Push the ref". Each fail sentence, substituted alone into otherwise passing text, makes the check fail. `tests/vh-adlc/direct-operation-compatibility.test.ts` still passes. |
-| AC-09 | `tests/vh-adlc/branches/branches.test.ts`: a merged-PR fixture with `refs/pr-visuals/7` on the remote; after `after-merge`, the ref resolves to the same commit. |
-| AC-10 | `visuals-docs.test.ts` reads `plugins/vh-adlc/references/loop-settings.md` and `docs/user-guides/workflows.md` and requires in each: `when.paths`, `committed`, `capture.command`, `capture.timeout_minutes`, `60`, `VH_ADLC_VISUAL_BASE`, `VH_ADLC_VISUAL_HEAD`, `VH_ADLC_VISUAL_OUT`, `before/`, `after/`, `refs/pr-visuals/`, and the phrases `builds no checkouts`, `kept after merge`, `repository's visibility` and `upgrade the plugin before`. Must pass: a text with all of them; must fail: the same text without `kept after merge`. `tests/vh-adlc/loop/glossary.test.ts` holds the three rows and their `TERMS` entries; `tests/vh-adlc/check.test.ts:166-176` holds manifest equality; at review, `git show $(git merge-base origin/main HEAD):plugins/vh-adlc/plugin.json` compared with HEAD shows a minor bump, recorded in the review. |
-| AC-11 | Manual procedure: in a private GitHub repository the owner selects, adopt `visual_record` with a capture command that writes one image per side, ship a one-line UI change, open the PR signed in as a reader with access, and record that every image renders, naming one from a `refs/pr-visuals/*` commit and confirming with `git branch -r --contains <sha>` that no branch holds it. |
+| AC-01 | `tests/vh-adlc/loop/settings.test.ts`: valid and invalid `visual_record` shapes, each rejection's field name; for settings without the key, `loadLoopSettings` and `loadLoopSettingsAt` return no `visual_record` key while the existing expectations in `settings.test.ts`, `cli.test.ts` and `rungs.test.ts` pass unchanged. `tests/vh-adlc/loop/visuals.test.ts`: a fixture whose working-tree `.vh-adlc/loop.yaml` names a different capture command from the committed one, where the committed one runs; and one whose working-tree file is invalid YAML while the committed block is valid, where the run succeeds. |
+| AC-02 | `visuals.test.ts`: fixtures whose committed range does and doesn't match; one with a matching file only uncommitted and one only untracked, both `not-applicable`; a `preview` run asserting empty `pairs`, `missing` and `markdown`, with a capture command that writes a marker file to prove it did not run. Exit 2 for: no `visual_record` committed (asserting the exact message), each of `--repo`, `--base`, `--pr` and `--github` missing, `--pr x`, `--github acme`, `--run true` without `--out`, a non-empty `--out`, an `--out` inside the repository, unreadable committed settings, a non-Git directory, and a `--base` with no merge base. |
+| AC-03 | `visuals.test.ts`: a capture script that records its working directory and the three variables and writes `home.png`, `list.WEBP`, `card.jpeg` and `notes.txt` to `before/`, and `home.png`, `list.webp` and `new.jpg` to `after/`; assert pairs for `home` and `list`, one-sided `card` and `new`, `notes.txt` ignored, and every local file present. |
+| AC-04 | `visuals.test.ts`: origin is a local bare repository. Run twice and assert the second commit's parent and a fast-forward without force; move the remote ref between `ls-remote` and push and assert one rebuilt retry; a script that writes nothing yields no push and `ref_commit: null`; with staged and unstaged unrelated changes present, `git status --porcelain`, `git rev-parse HEAD` and `git for-each-ref` are identical before and after; a script that starts a child sleeping for minutes and writes its PID, then SIGTERM to the command, after which that PID no longer exists. |
+| AC-05 | `visuals.test.ts`: one case per missing reason in the design's list, each asserting record state `partial`, the `missing` entry, the section text and exit 0; the timeout case passes a sub-minute limit to the function under test; a script that writes `home.png` and `home.jpg` into `before/` yields the one-stem reason. |
+| AC-06 | `visuals.test.ts` with `--github acme/app`: parse the section; assert the header row `| Screen | Before | After |`, that every image cell matches `!\[[^\]]+ (before|after)\]\(https://github\.com/acme/app/blob/<ref_commit>/(before|after)/[^)]+\?raw=true\)`, that an absent side's cell is `none`, that a file named `my screen.png` appears as `my%20screen.png`, and that `git cat-file -p <ref_commit>:<path>` in the bare repository equals the pair's local file. |
+| AC-07 | `tests/vh-adlc/loop/visuals-docs.test.ts` splits `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` into paragraphs (blank-line separated, each list item its own paragraph) and requires, case-insensitively, one paragraph matching each statement; each fail sentence, substituted alone into otherwise passing text, makes the check fail. (1) In the Deliver section, one paragraph containing `visuals`, `--run true`, `--pr`, `--base origin/`, `--github` and `--out` in any order: passes "run `bun scripts/loop/cli.ts visuals --repo <owning worktree> --base origin/<default branch> --pr <number> --github <owner>/<repo> --out <dir> --run true`", fails "run `cli.ts visuals --run true --pr <number> --out <dir>`". (2) `## Before and after` with `last` and `replac`: passes "Put the section last in the PR body, replacing an earlier `## Before and after` section", fails "Add a `## Before and after` section". (3) `before_file` and `after_file` with `look`: passes "Look at each pair's `before_file` and `after_file`", fails "Look at the pairs". (4) `No visible change` with `inspected`: passes "Write `No visible change` only when you inspected every pair", fails "Write `No visible change` when nothing changed". (5) `no capture shows`: passes "Add a line for each changed state no capture shows", fails "Mention other states". (6) `partial` with `never blocks` or `does not block`: passes "A `partial` record never blocks the delivery", fails "A `partial` record blocks the delivery". (7) `report` with `missing item`: passes "The report repeats every missing item", fails "The report summarizes the delivery". (8) `visual_record is not declared` with `remov`: passes "On \"visual_record is not declared\", remove any earlier section", fails "On \"visual_record is not declared\", stop". (9) `Visual record missing`: passes "write a section holding \"Visual record missing:\" and the reason", fails "report the error". (10) In the Input paragraph, `refs/pr-visuals/`: passes "authority to push the feature branch and `refs/pr-visuals/<number>`", fails "authority to push the feature branch". `tests/vh-adlc/direct-operation-compatibility.test.ts` still passes. |
+| AC-08 | `tests/vh-adlc/branches/branches.test.ts`: a merged-PR fixture with `refs/pr-visuals/7` on the remote; after `after-merge`, the ref resolves to the same commit. |
+| AC-09 | `visuals-docs.test.ts` reads `plugins/vh-adlc/references/loop-settings.md` and `docs/user-guides/workflows.md` and requires in each: `visual_record.when.paths`, `visual_record.capture.command`, `visual_record.capture.timeout_minutes`, `default 60 minutes`, `VH_ADLC_VISUAL_BASE`, `VH_ADLC_VISUAL_HEAD`, `VH_ADLC_VISUAL_OUT`, `<out>/before/`, `<out>/after/`, `.jpeg`, `refs/pr-visuals/`, and the phrases `paired by file stem`, `never the working tree`, `builds no checkouts`, `tolerate leftovers`, `kept after merge`, `repository's visibility` and `upgrade the plugin before`; and in the guide, `git show "$VH_ADLC_VISUAL_BASE:`. Must pass: a text with all of them; must fail: the same text without `visual_record.capture.timeout_minutes`, and without `kept after merge`. `tests/vh-adlc/loop/glossary.test.ts` holds the three rows and their `TERMS` entries; `tests/vh-adlc/check.test.ts:166-176` holds manifest equality; at review, `git show $(git merge-base origin/main HEAD):plugins/vh-adlc/plugin.json` compared with HEAD shows a minor bump, recorded in the review. |
+| AC-10 | Manual procedure: in a private GitHub repository the owner selects, adopt `visual_record` with a capture command that writes one image per side, ship a one-line UI change, open the PR signed in as a reader with access, and record that every image renders inline, naming one from a `refs/pr-visuals/*` commit and confirming with `git branch -r --contains <sha>` that no branch holds it. |
 
 ## Tasks
 
@@ -344,8 +345,9 @@ None yet; written once the document is planned.
 ## Open Questions
 
 None. The owner settled every judgement call on 2026-11-21: disclose a missing record and ship, append
-to the ref, no automatic comparison, a ref named by PR number, the adopter's command captures both
-sides, and the recommended resolution of the remaining judgement findings of reviews R-1 and R-2.
+to the ref, no automatic comparison, a ref named by PR number, the project's command captures both sides
+and is the only image source, the GitHub owner and repository come from the PR, and the recommended
+resolution of the remaining judgement findings of reviews R-1 to R-3.
 
 ## Review Log
 
