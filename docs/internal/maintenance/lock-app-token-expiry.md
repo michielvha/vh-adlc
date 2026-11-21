@@ -25,3 +25,30 @@ The edited workflow passed actionlint. A local mock ran the polling and merge sh
 ## State
 
 Independent review pending. Local candidate.
+
+## Independent review
+
+### R-1
+
+Target: `530d05b13ac798608eef6e5f5bafb96e4b727392`.
+Model: gpt-6.2-sol. Isolation: procedural.
+
+```text
+FINDING: F-01  
+KIND: factual  
+SEVERITY: blocking  
+WHERE: `.github/workflows/lock.yml:65`  
+EVIDENCE: The polling step starts after any check registers. `gh pr checks --watch` exits successfully when its current rollup has no pending or failed contexts. The live #144 rollup initially omitted the downstream `version` job, and `main` has no ruleset to enforce its completion. The mock accepts a partial rollup and cannot show that the full CI run passed. [GitHub CLI source](https://github.com/cli/cli/blob/trunk/pkg/cmd/pr/checks/checks.go#L191-L239)  
+PROPOSAL: Wait for the `ci.yml` push run that matches the recorded head SHA and branch to complete successfully. Use `actions: read` for that lookup and preserve the fresh installation token and expected head check at merge.
+```
+
+### R-2
+
+Target: `adba610f9ef0c3cf6e8d35b2c53ccd8a8c6af767`.
+Model: gpt-6.2-sol. Isolation: procedural.
+
+```text
+NO FINDINGS
+```
+
+Local verification and independent review are complete. Publication and a hosted release workflow run are pending.
