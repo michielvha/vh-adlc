@@ -235,6 +235,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-21 | R-1 | spec | `21057d50` | claude-opus-5-5 | procedural | Five should-fix findings and one nit; no blocking finding |
+| 2026-11-21 | R-2 | spec | `51881bc3` | claude-opus-5-5 | procedural | Four should-fix findings and one nit; no blocking finding |
 
 ### R-1
 
@@ -279,3 +280,40 @@ SEVERITY: nit
 WHERE: Design, Command (first paragraph)
 EVIDENCE: "Without the flag the stage is `completion`" has no closing period, so it runs straight into "Any other value, or `--stage task` together with `--merge`, prints ...".
 PROPOSAL: End the sentence with a period.
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Procedures (third bullet "Ship, Verify: perform each applicable written-procedure rung that `deferred` would hold back at the task stage", fourth bullet "Ship, after the merge: ... perform those procedure rungs again", first bullet "A task is not ticked unless every task-stage rung passed"); Context, Owner summary ("Ship also performs each applicable completion-only written-procedure rung"); Acceptance Criteria AC-06 ("performs each completion-only procedure rung"); Test Plan row AC-06
+EVIDENCE: Design, Selection says stage `completion` keeps every rung that passes the path filter, whatever its `stages`. So ship's completion run at V also includes procedure rungs that have no `stages` field, which resolve to `[task, completion]`. runRungs reports every procedure rung `not run` unless a `--record` is given (plugins/vh-adlc/scripts/loop/rungs.ts:44, cli.ts:133-137). mayAdvance blocks it (rungs.ts:80), and a record made at an earlier commit does not count (rungs.ts:76). Ship only records the procedure rungs `deferred` would hold back, so a default-stage procedure rung, such as the `browser` rung in tests/vh-adlc/loop/cli.test.ts:141, is never recorded at V. The completion run then can never advance, and ship can never push or set `complete`. The same applies at the task stage: `grep -rn -- "--record" plugins/vh-adlc/skills` prints nothing, so a default-stage procedure rung blocks every task tick. This scope came from how the previous revision applied R-1 F-04.
+PROPOSAL: Have ship perform and `--record` every applicable procedure rung on its completion-stage run and on the post-merge run, not only the completion-only ones. Then say how implement records a task-stage procedure rung, or state that a procedure rung must declare `stages: [completion]`. Update the Owner summary, AC-06 and its proof to match.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-06; Acceptance Criteria AC-06; Design, Procedures (first and second bullets)
+EVIDENCE: The AC-06 proof only checks that the implement skill contains `--stage task` somewhere and, in Finish, `deferred`, `vh-adlc next` and `ship`. The Finish section already contains `vh-adlc next` today (plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:129). Suppose an implementation keeps the per-task command as `rungs --repo <dir> --base <default branch> --run true` (SKILL.md:49-51) and adds `--stage task` only in Finish. That still passes. Without the flag the stage is `completion` (Design, Command), so that skill would keep running every expensive rung at every task, which is the problem the feature exists to remove.
+PROPOSAL: Have the proof require the exact per-task command `rungs --repo <dir> --base <default branch> --stage task --run true` in the per-task verification text. It should also require that no stage-less `rungs ... --run true` command remains in the implement skill, and that the Finish command carries `--stage task` without `--run`.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope (fourth in-scope bullet, "a plugin minor version bump to 0.29.0"); Design, Concurrency, failure and upgrade ("a plugin older than 0.29.0"); Acceptance Criteria AC-07 ("the minimum plugin version") and AC-08; Test Plan rows AC-07 (`0.29.0`) and AC-08; Context, Owner summary ("a plugin minor version bump")
+EVIDENCE: Both manifests are at 0.28.0 (plugins/vh-adlc/plugin.json:4, plugins/vh-adlc/.claude-plugin/plugin.json:3). docs/specs/website-release-check.md is `in-progress` on `feat/website-release-check` and lists both manifests in its covers (lines 2-12), so it will also bump the version. Whichever lands second has to change its number. If the other feature takes 0.29.0 first, this document's reference text would name a minimum version that still refuses `stages`. AC-08 would also need a revision before it can be met. docs/specs/seo-search-ai-discovery.md:102 shows this repository's existing pattern: "select the next version from the then-current main branch". The proposed AC-08 test pins the literal `0.29.0` in `tests/vh-adlc`, so the next release bump of the package also breaks that test. tests/vh-adlc/check.test.ts:224-232 already checks that the version differs from main.
+PROPOSAL: State the version as the next minor version above main at implementation time. The reference names that release as the minimum, and AC-08 rests on the existing differs-from-main check rather than a hard-coded literal. Alternatively, make sequencing against website-release-check an explicit decision.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Procedures (second bullet, Implement, Finish); Design, Command (`deferred` reported without `--run`); Acceptance Criteria AC-02; Test Plan row AC-02
+EVIDENCE: Without `--run true`, the command sets `advance: !declared` and `blocking` to every applicable rung, and exits 3 whenever rungs are declared (plugins/vh-adlc/scripts/loop/cli.ts:141-149). Finish's new lookup therefore always exits 3 in a repository that uses this feature. The Design does not say Finish expects exit 3 and reads only `deferred`. It also does not say what `advance` and `blocking` hold at stage `task` without `--run`. The AC-02 proof does not check the exit code or `blocking` for that case. One implementer may stop Finish on exit 3 as a blocked check, and another may read `deferred` and continue.
+PROPOSAL: State the exit code and the `advance` and `blocking` values for a run without `--run` at stage `task`, or make that lookup exit 0. Say in the Finish bullet that the step reads `deferred` and does not treat the verdict as a check failure. Add the exit code to the AC-02 proof.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (first paragraph, "The rule that a result recorded at another commit does not count is unchanged"); Design, The completion commit ("with one exemption: ship's completion commit")
+EVIDENCE: The Design adds an exemption to exactly that rule: ship pushes commit C with no result recorded at C, and "The reference states this exemption next to the commit rule". The Owner summary's second paragraph describes the push without a second run, but the first paragraph still calls the rule unchanged. The contradiction came in when the previous revision applied R-1 F-01.
+PROPOSAL: Say the commit rule is unchanged except for the document-only completion commit ship pushes after its Verify run.
