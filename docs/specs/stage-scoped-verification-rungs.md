@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Reviews R-1 to R-5 and the owner's answers applied; waiting for a new spec review."
+status_description: "Reviews R-1 to R-6 and the owner's answers applied; waiting for a new spec review."
 issue: null
 goal: "Each task's verification runs only the rungs declared for the task stage, while push, completion and delivery still require every applicable rung."
 covers:
@@ -31,7 +31,7 @@ Today every applicable verification rung runs at every task. An adopter whose ru
 task, and several sessions on one host multiply it until the machine is overloaded.
 
 This feature adds an optional `stages` list to each rung in `.vh-adlc/loop.yaml`. A rung without it
-behaves exactly as today. A rung with `stages: [completion]` is skipped at the task verification step
+is selected exactly as today. A rung with `stages: [completion]` is skipped at the task verification step
 and still required before push, completion and delivery. The `rungs` command gains a `--stage task |
 completion` flag. Without the flag it behaves as the completion stage, so a caller that forgets it never
 checks less than today. The rule that a result recorded at another commit does not count is unchanged
@@ -48,10 +48,12 @@ applicable one at completion and after the merge. No procedure says this today, 
 currently blocks every run. When any applicable rung skips the task
 stage, implement's Finish step does not set `complete`; it reports those rungs and the next step
 `vh-adlc next` returns, and ship completes the feature. If ship's completion run blocks, ship reports the
-blocking rungs and names `/vh-adlc-tasks` to append a fix task; in the rare case where that run is a
-rerun after its own unpushed completion commit, ship stops and names the owner decision instead. All new procedure text goes into each
+blocking rungs and names `/vh-adlc-tasks` to append a fix task; when the document is already `complete`
+locally and unpushed, whether implement or ship set it, ship stops and names the owner decision instead. All new procedure text goes into each
 skill's Loop routes section as overrides, so the owner-approved operation bodies stay unchanged. Rungs
-without `stages` keep today's flow.
+without `stages` keep today's selection and verdict; the implement and ship procedure changes (the
+Verify-step run, the completion-commit exemption and recorded procedure rungs) apply to every adopter with
+declared rungs.
 
 Out of scope: per-rung stages beyond `task` and `completion` (such as separating push from delivery),
 caching rung results between invocations, and any change to how the implementation reviewer works. The
@@ -59,7 +61,7 @@ review operation does not call the `rungs` command today and stays unchanged.
 
 Compatibility: an older plugin refuses a settings file that uses `stages`, because rung keys are
 checked strictly. Adopters update the plugin before adding the field. Removing the field restores today's
-behaviour, which is also the rollback.
+rung selection; rolling back the procedure changes needs the previous plugin version.
 
 Planned checks: unit tests for settings validation, CLI tests for rung selection that prove a
 completion-only rung is not executed at the task stage and blocks at the completion stage, and procedure
@@ -70,8 +72,8 @@ command checks for implement and ship, the next minor plugin version above main 
 (its mention in the reference checked once, not by a permanent test), and the document-only exemption
 holding only within the ship run that observed the pass, automated checks limited to exact command strings
 with the rest judged by the implementation reviewer, procedure text placed in the Loop routes sections, and
-`/vh-adlc-tasks` as the route after a blocked completion run, with an owner stop when the document is
-already `complete` locally. Reviews R-1 to R-3 and R-5 found should-fix issues and nits and R-4 one blocking
+`/vh-adlc-tasks` as the route after a blocked completion run, with an owner stop whenever the document is
+already `complete` locally and unpushed. Reviews R-1 to R-3, R-5 and R-6 found should-fix issues and nits and R-4 one blocking
 proof flaw, all applied here; a new review is pending. Acceptance
 authorizes implementing this document on a feature branch and opening one PR with that version bump;
 merging stays with the owner.
@@ -215,12 +217,13 @@ The command reads settings and runs checks; it writes no shared state, so concur
 today. A rung that times out or cannot run blocks its stage exactly as today. If the completion run blocks,
 ship pushes nothing. If the document is still `in-progress`, ship sets no status; every task is ticked at
 that point, so ship reports the blocking rungs and names `/vh-adlc-tasks` as the next step, to append a task
-for the fix; implement and a fresh implementation review follow, then ship again. If the run was a rerun
-after ship's own unpushed completion commit, the document is already `complete`, which the feature-document
-rules do not let move back; ship then stops, reports the blocking rungs and that unpushed commit, and names
-the owner decision. It rewrites nothing. Upgrade: a plugin older than
+for the fix; implement and a fresh implementation review follow, then ship again. If the document is
+already `complete` locally and unpushed, whether implement's Finish or ship's own Gate set it, the
+feature-document rules do not let it move back; ship then stops, reports the blocking rungs and the unpushed
+completion commit, and names the owner decision. It rewrites nothing. Upgrade: a plugin older than
 the release that ships this feature refuses settings that use `stages` (strict key check), so the reference
-names that release as the minimum plugin version. Rollback is removing the field.
+names that release as the minimum plugin version. Removing the field restores today's rung selection;
+rolling back the procedure changes needs the previous plugin version.
 
 ## Acceptance Criteria
 
@@ -261,8 +264,9 @@ names that release as the minimum plugin version. Rollback is removing the field
       applicable procedure rung with `--record`, replaces the "before pushing ... may advance at HEAD" rule
       with the Verify-step run, pushes the document-only completion commit without a second run only within
       the same ship run, reruns the completion stage before a retried or resumed push, and after a blocked
-      completion run reports the blocking rungs and names `/vh-adlc-tasks`, or, when its own unpushed
-      completion commit already exists, stops and names the owner decision without rewriting anything.
+      completion run reports the blocking rungs and names `/vh-adlc-tasks`, or, when the document is
+      already `complete` locally and unpushed, stops and names the owner decision without rewriting
+      anything.
 
 ## Test Plan
 
