@@ -285,6 +285,7 @@ None.
 | 2026-11-21 | R-2 | spec | `51881bc3` | claude-opus-5-5 | procedural | Four should-fix findings and one nit; no blocking finding |
 | 2026-11-21 | R-3 | spec | `b8681c9a` | claude-opus-5-5 | procedural | Three should-fix findings; no blocking finding |
 | 2026-11-21 | R-4 | spec | `807a31ba` | claude-opus-5-5 | procedural | One blocking and four should-fix findings |
+| 2026-11-21 | R-5 | spec | `e59f9154` | claude-opus-5-5 | procedural | Two should-fix findings and one nit; no blocking finding |
 
 ### R-1
 
@@ -426,3 +427,26 @@ SEVERITY: should-fix
 WHERE: Test Plan row AC-04; Acceptance Criteria AC-04 ("runs no rung")
 EVIDENCE: The AC-04 row runs `--stage push` and `--stage task --merge <sha>` and checks that a marker-writing rung has not run, but it does not pass `--run true`. Without `--run true` the command never executes a rung (plugins/vh-adlc/scripts/loop/cli.ts:133, `options.run === "true" ? ... : []`), so the marker check holds even for an implementation that validates `--stage` only after running every rung. The proof could pass on a wrong implementation.
 PROPOSAL: Run both invalid cases with `--run true` and keep the marker-file and exit 2 checks.
+
+### R-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The completion commit ("If C changes anything else, another commit follows V, or the push is retried or resumed in a later run ... ship runs the completion stage again at the head before pushing"); Design, Concurrency, failure and upgrade ("If the completion run blocks, ship sets no status and pushes nothing. Every task is ticked at that point, so ship reports the blocking rungs and names `/vh-adlc-tasks`"); Context, Owner summary ("A retried or resumed push runs the completion stage again first" and "If ship's completion run blocks, ship reports the blocking rungs and names `/vh-adlc-tasks` to append a fix task"); Acceptance Criteria AC-09 ("reruns the completion stage before a retried or resumed push, and after a blocked completion run reports the blocking rungs and names `/vh-adlc-tasks`")
+EVIDENCE: On a retried or resumed push, the local completion commit C already exists, so the document is `complete` when the rerun happens. That covers a session interrupted after Gate, or a rejected push (plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:95-97) followed by integrating the remote branch, which adds commits after C. If that rerun blocks, the Design's blocked-run route assumes an `in-progress` document: "ship sets no status" when the status is already set, and `/vh-adlc-tasks` starts with `vh-adlc gate in-progress <doc>` and accepts only a `planned` or `in-progress` document (plugins/vh-adlc/skills/vh-adlc-tasks/SKILL.md:42-46). The rules block at 0c983f6 allows `complete` to move only to `archived` or `superseded`, and the convention calls `complete` terminal for its scope. Nothing says whether ship reverts or drops the unpushed completion commit, sets the status back to `in-progress`, or stops for the owner. The rerun rule came in when the previous revisions applied R-3 F-03 and the `/vh-adlc-tasks` route when they applied R-4 F-04. Neither revision defined the case where both apply.
+PROPOSAL: Define the blocked rerun when an unpushed completion commit exists. For example, ship adds a new commit that sets the document back to `in-progress` (never rewriting anything), reports the blocking rungs and names `/vh-adlc-tasks`. Or ship stops and names the owner decision. State it in the Design, the Owner summary and AC-09.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, The completion commit ("Every applicable rung must pass at the commit being completed, pushed or delivered, with one exemption: ship's completion commit"); Design, Procedures (Implement, Finish: "With an empty `deferred`, Finish is unchanged"); Context, Owner summary (first paragraph, "except for the document-only completion commit ship pushes after its Verify run"); Acceptance Criteria AC-07 ("the completion-commit exemption"); Context, Background (fourth bullet, Finish "sets `complete` after `vh-adlc gate complete` without running rungs")
+EVIDENCE: The Background notes that implement's Finish sets `complete` without running rungs (plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:129-131), and the Design leaves that path unchanged when `deferred` is empty. Implement runs its rungs at the verification step, before the task commit (SKILL.md:113-122), and the results carry `git rev-parse HEAD` from that moment (plugins/vh-adlc/scripts/loop/rungs.ts:41, :76). So implement's completion commit is completed with no result at that commit. The rule the reference will state, "with one exemption: ship's completion commit", is therefore false. One implementer would write it as stated, leaving a reference that contradicts implement. Another would add a completion-stage run to implement's Finish to honour it, which repeats every rung at the end of implement.
+PROPOSAL: Say which commits the rule actually covers. Either have the reference state that implement's Finish may also set `complete` without a run, because ship's completion stage runs before any push, or restrict the rule to the commits that are pushed and delivered. Make the Owner summary and AC-07 say the same.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary ("Planned checks: unit tests for settings validation and rung selection")
+EVIDENCE: The AC-01 row unit tests settings validation. No Test Plan row unit tests `applicableRungs` with a stage. Selection is proved only through the CLI rows AC-02, AC-03 and AC-05 in tests/vh-adlc/loop/cli.test.ts.
+PROPOSAL: Say the selection is proved by CLI tests, or add a unit case for `applicableRungs(settings, paths, "task")` to a Test Plan row.
