@@ -38,6 +38,11 @@ within scope or hand it off. Undeclared repositories retain their existing flow.
 
 ## Loop routes
 
+Follow [feature writer entry](../../references/authority.md#feature-writer-entry) in the selected writing checkout
+after checking worktree ownership and before the first feature write. The standalone
+claim command performs the check itself. Pass the native client on an adopted claim
+and use its result for that entry.
+
 This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
 host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction

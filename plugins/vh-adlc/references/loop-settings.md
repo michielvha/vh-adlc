@@ -124,6 +124,10 @@ A command route runs its CLI in its own PID namespace (`unshare --user --pid`), 
 started, even one that left its group and cleared its environment, stops when the CLI exits. On a host
 without that boundary, a command-route review stays pending.
 
+Feature reservations use the adopted remote's committed `.vh-adlc/work-ownership.yaml`,
+independent of local loop overrides or a stale feature checkout. See
+[reservation adoption](authority.md#reservation-adoption) before enabling them.
+
 ## Per-user override
 
 The executable path in `argv` is machine-specific. A file outside every repository,

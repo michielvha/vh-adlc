@@ -30,6 +30,10 @@ Input: an issue, a feature document, a branch, or "continue". Follow `references
 
 ## Loop routes
 
+Resume is read-only until the selected writer operation runs the reservation check.
+For a claim retry through the standalone command, pass the native client in an adopted
+repository and follow the feature writer entry in `references/authority.md`.
+
 This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
 host default. Resume takes the route of the operation it continues

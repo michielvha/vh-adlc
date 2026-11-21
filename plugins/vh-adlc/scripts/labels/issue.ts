@@ -57,7 +57,7 @@ export function filingPreview(root: string, gh: LabelsGitHub, request: FilingReq
 }
 
 /** Create the approved issue; refuses when anything in the preview changed or a label is missing. */
-export function fileIssue(root: string, gh: LabelsGitHub, text: string, approvedDigest: string): { number: number; url: string } {
+export function fileIssue(root: string, gh: LabelsGitHub, text: string, approvedDigest: string, beforeCreate?: (approved: Preview) => void): { number: number; url: string } {
   if (!/^[0-9a-f]{64}$/.test(approvedDigest) || digest(text) !== approvedDigest) throw new Error("exact preview approval digest is missing or changed");
   const approved = JSON.parse(text) as Preview;
   if (approved.missing.length) throw new Error(`file nothing: missing labels ${approved.missing.join(", ")}. ${PLAN_STEP}`);
@@ -65,5 +65,6 @@ export function fileIssue(root: string, gh: LabelsGitHub, text: string, approved
     ...(approved.verdict === null ? {} : { verdict: approved.verdict as FilingRequest["verdict"] }),
     ...(approved.waiting_on === null ? {} : { waiting_on: approved.waiting_on as FilingRequest["waiting_on"] }) };
   if (filingPreview(root, gh, request).text !== text) throw new Error("the repository, account or labels changed since this preview was approved; preview again");
+  beforeCreate?.(approved);
   return gh.createIssue(approved.repository, { title: approved.title, body: approved.body, labels: approved.labels });
 }

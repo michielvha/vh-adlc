@@ -2,7 +2,11 @@
 // Labels helper: plan compares a repository with the standard label set; apply makes only approved writes.
 import { existsSync, readFileSync, writeFileSync, writeSync } from "node:fs";
 import { parseArgs } from "node:util";
+import { randomUUID } from "node:crypto";
 import { origin } from "../triage/settings";
+import { snapshot, type Result } from "../ownership/entry";
+import { OwnershipGit } from "../ownership/git";
+import { updateAliases } from "../ownership/issue-link";
 import { apply } from "./apply";
 import { fileIssue, filingPreview, type FilingRequest } from "./issue";
 import { LabelsGitHub } from "./github";
@@ -14,6 +18,7 @@ try {
     repo: { type: "string", default: "." }, output: { type: "string" }, plan: { type: "string" }, "approved-digest": { type: "string" },
     operation: { type: "string" }, type: { type: "string" }, verdict: { type: "string" }, "waiting-on": { type: "string" },
     title: { type: "string" }, "body-file": { type: "string" }, preview: { type: "string" },
+    "ownership-spec": { type: "string" }, "ownership-no-push": { type: "boolean" },
   } });
   const mode = parsed.positionals[0];
   if (parsed.positionals.length !== 1 || !["plan", "apply", "file"].includes(mode)) throw new Error(USAGE);
@@ -24,7 +29,28 @@ try {
   const v = parsed.values;
   if (mode === "file" && v.preview) {
     if (!v["approved-digest"] || v.output) throw new Error(USAGE);
-    writeSync(1, JSON.stringify(fileIssue(checkout, gh, readFileSync(v.preview, "utf8"), v["approved-digest"]), null, 2) + "\n");
+    const text = readFileSync(v.preview, "utf8");
+    const spec = v["ownership-spec"];
+    let prepared = false;
+    const created = fileIssue(checkout, gh, text, v["approved-digest"], approved => {
+      if (approved.operation !== "spec") return;
+      const view = snapshot(new OwnershipGit(checkout), false);
+      if (view === "legacy") return;
+      if (view === "no-remote" || !spec) throw Error("spec issue creation needs the adopted draft path (--ownership-spec)");
+      const pending = updateAliases("issue-pending", { repo: checkout, spec, operation: randomUUID(), preview: Buffer.from(text), noPush: v["ownership-no-push"] });
+      if (pending.status !== "pending") throw Error("could not verify pending issue creation; nothing was sent to the tracker");
+      prepared = true;
+    });
+    let ownership: Result | undefined;
+    if (prepared) {
+      try {
+        ownership = updateAliases("issue-recover", { repo: checkout, spec, operation: randomUUID(), alias: { issue: created.url }, confirmed: true });
+      } catch (error) {
+        ownership = { status: "held", reason: error instanceof Error ? error.message : "recover the created issue before continuing" };
+      }
+      if (ownership.status !== "linked") process.exitCode = 1;
+    }
+    writeSync(1, JSON.stringify({ ...created, ...(ownership ? { ownership } : {}) }, null, 2) + "\n");
   } else if (mode === "file") {
     if (v["approved-digest"] || !v.output || !v.operation || !v.type || !v.title || !v["body-file"]) throw new Error(USAGE);
     if (existsSync(v.output)) throw new Error("preview output already exists; choose a new file");

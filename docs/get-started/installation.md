@@ -87,6 +87,14 @@ Inside a Claude Code session, the equivalents are:
 
 Type `/vh-adlc` and choose an operation from the suggestions.
 
+## Feature reservations
+
+Repository owners can opt in to a shared Git reservation for feature writing after preparing
+their remote. See [reserve a feature while you work](../user-guides/workflows.md#reserve-a-feature-while-you-work)
+for the start, resume and handoff behavior, and the
+[setup procedure](../../plugins/vh-adlc/references/authority.md#reservation-adoption)
+for adoption and rollback.
+
 ## Antigravity
 
 With the [Antigravity CLI](https://antigravity.google/docs/cli/install/) (`agy`) installed, run:

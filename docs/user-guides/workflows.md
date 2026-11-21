@@ -285,6 +285,27 @@ connector run; consult the [compatibility record](../reference/compatibility.md)
 
 The complete procedure is in the [article reference](../../plugins/vh-adlc/references/blog.md).
 
+## Reserve a feature while you work
+
+A repository that enables feature reservations uses its Git remote to remember who is
+working on each issue or spec. Start or resume through vh-adlc in an ordinary Codex or
+Claude Code session. If another session has the item, vh-adlc shows the writer's host and
+branch or spec. Ask to continue in the existing session or arrange a handoff. The same
+session can move into its usual isolated worktree without asking for a handoff.
+
+Edits, builds and tests run without further reservation checks. Read-only review and
+independent work on other issues can continue. An idle session or one that runs out of
+quota keeps its reservation.
+
+For a handoff, stop the old writer and keep it stopped until the transfer is verified.
+Use the existing checkout when possible. If the work moves, preserve the commits, index
+and unfinished files first. The old session sees the current writer when it next tries
+to resume through vh-adlc. The workflow relies on agents entering through vh-adlc and
+on the owner's stop confirmation.
+
+The [setup and handoff procedure](../../plugins/vh-adlc/references/authority.md#reservation-adoption)
+covers adoption, rollback and the exact commands.
+
 ## Reviews
 
 Reviews use an independent agent context. A host may register the reviewer

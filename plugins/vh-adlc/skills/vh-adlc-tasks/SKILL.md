@@ -17,6 +17,9 @@ and `references/authority.md` for what you may do without asking.
 
 ## Loop routes
 
+Before changing the task list, follow [feature writer entry](../../references/authority.md#feature-writer-entry)
+in the owning checkout. Read-only eligibility checks can run first.
+
 This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
 host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction

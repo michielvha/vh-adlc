@@ -99,6 +99,115 @@ separate request is needed. Another session continues a feature only after the o
 earlier writer has stopped and hands it over; a pushed claim advertises the branch, it is not a lock.
 Missing committed state blocks the feature; it is never a reason to restart it.
 
+## Feature writer entry
+
+For spec, tasks, implement, review recording or ship, first resolve the canonical issue
+or spec and select the writing checkout under the existing worktree rules. Run the shared
+reservation check once before the first feature mutation:
+
+```sh
+bun <plugin>/scripts/ownership/cli.ts enter --repo <checkout> --spec <document>
+```
+
+Use exactly one of `--spec`, `--issue` or `--branch`. Pass `--no-push true` if the current
+request forbids pushes. To reserve or take over an unlinked issue, use a named branch
+checkout. A detached checkout can resume or take over an issue with a linked spec,
+and can still read the current writer of an unlinked issue. For a new explicitly
+private draft without a remote, pass `--local-draft true` only with the final new
+spec path and that owner authority.
+Continue on `entered` or `legacy`. Use `local-draft` only for private draft authoring.
+On `held`, a failed command or an unreadable result, show the reason and returned
+writer location, then stop that writing operation. Use `status` to inspect the
+reservation without claiming it. Independent read-only discovery and review need no reservation.
+
+A direct `scripts/loop/cli.ts claim` performs the same check. In an adopted repo, pass
+`--client codex` or `--client claude` to match the current native session. Resume invokes the
+check through the selected writer operation. Ordinary edits and tests after entry
+require no reservation checks. Authority to push source, create issues, merge or release
+still comes from their own procedures.
+
+For a planned spec move in an adopted repository, use `link` to bind the new path before
+publishing it. For an adopted draft's approved tracker create, pass its final path as
+`--ownership-spec` to the labels command. Verify its `ownership.status` is `linked` before
+publishing the issue link or assigning that number to a writer. A lost tracker result leaves
+the draft held. Check the preserved approved preview and lookup in the target repository,
+have the owner confirm the issue number and run `issue-recover` with `--alias-issue`. If
+the owner confirms no issue exists, use `--not-created true`. Use a new approval for any
+future create. On an alias conflict, keep both histories and stop both writers until the
+owner selects one reservation through `resolve-alias`.
+
+## Reservation adoption
+
+Use this procedure only for a repository and remote the owner selected. Pause feature
+writers, record existing claims and keep their history and uncommitted work. Verify
+that installed Codex and Claude Code routes recognize their own sessions and that
+other writer routes will remain paused or read-only.
+
+Inspect the adopting remote's effective rules for `refs/heads/vh-adlc/work-ownership`.
+They must allow ordinary append updates by the selected writers and forbid deletion
+and history rewrites. Inspect the consumer's branch cleanup and release workflows,
+including push, manual dispatch and PR preview. Each must exclude this branch from
+destructive cleanup and tag-capable execution. Use read-only rules inspection for the
+real remote and a disposable remote to test prohibited pushes. Keep writers paused
+when you cannot verify one of these controls.
+
+With explicit owner approval to initialize the remote ref, choose a stable operation
+ID and run:
+
+```sh
+bun <plugin>/scripts/ownership/cli.ts initialize --repo <checkout> --approved true --operation <id>
+```
+
+Keep the returned genesis. If the result is lost, retry only with the same operation
+ID. A different existing genesis needs owner reconciliation. Add a binding to the
+consumer's default branch under `.vh-adlc/work-ownership.yaml`:
+
+```yaml
+schema_version: 1
+repository: github.com/example/project
+genesis: <verified genesis>
+ready: false
+```
+
+Apply the consumer's existing authority rules to publishing that policy. Set `ready`
+to `true` only after checking remote policy, genesis, protection and release routes.
+Keep general entry paused while you enroll existing claims. For each claim, follow
+the handoff command below with `--expected-operation absent` from the selected
+writer's checkout. Resume general writers after you verify the bindings and enrollment.
+Routine feature entry can then update the reserved ref under the adopted policy.
+Publication of code and issues still needs its own authority.
+
+For rollback, pause writers and use `ready: false` while retaining the bound ref and
+genesis. Coordinate any temporarily incompatible clients manually. Before restoring
+automatic entry, verify the same history and compatible clients. If a remote restore
+can remove both records, pause all feature writer entry first and keep it paused until
+you restore and verify them. A fresh clone may have no local evidence that the old
+remote was adopted.
+
+## Transfer a reservation
+
+Inspect the item with the `status` command and keep the returned operation. Confirm
+the previous writer has stopped and keep it stopped until the transfer is verified.
+Select the incoming session and its checkout. Keep the existing checkout or verify
+that the destination contains the commits, staged, unstaged and untracked work
+required to continue. If issue creation was pending, copy its marker and preview
+together from `vh-adlc-reservation-pending` below the checkout's Git directory to
+the same place at the destination. Verify both files, then keep draft entry held
+until issue recovery completes.
+
+From the incoming session and chosen checkout, run:
+
+```sh
+bun <plugin>/scripts/ownership/cli.ts handoff --repo <checkout> --spec <document> \
+  --expected-operation <observed operation> --operation <new id> \
+  --approved true --stopped true --preserved true
+```
+
+If Git reports an uncertain outcome, keep the old writer stopped and inspect status.
+Retry with the same inputs only while the prior record is still current or the original
+transfer is already verified. A different writer or operation requires fresh owner
+direction. The previous writer sees the transfer on its next feature entry.
+
 ## Handoff
 
 A session cannot see whether another session is still writing a feature. So once a feature has a claim (a

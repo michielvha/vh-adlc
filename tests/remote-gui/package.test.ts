@@ -38,8 +38,9 @@ describe('independent remote-gui package', () => {
  },120000);
  test('version publication depends on the plugin checks', () => {
   const ci=read('.github/workflows/ci.yml');
-  expect(ci).toContain('remote-gui:');
-  expect(ci.match(/  version:\n\s+needs: \[([^\]]+)\]/)?.[1]).toContain('remote-gui');
+  const workflow = Bun.YAML.parse(ci);
+  expect(workflow).toHaveProperty('jobs.remote-gui');
+  expect(workflow).toHaveProperty('jobs.version.needs', expect.arrayContaining(['remote-gui']));
   expect(ci).toContain('bun test tests/remote-gui');
  });
  test('documents persistent remote activation and authentication ownership', () => {

@@ -142,6 +142,10 @@ A `malformed` result means the document must be fixed, never bypassed. `local-fo
 repository keeps its own format: run the gate procedurally, as that repository does, and say the binary
 did not decide it.
 
+Read-only checks can run before writer entry. When the chosen operation writes a
+feature, follow [feature writer entry](authority.md#feature-writer-entry) once in the
+owning checkout. The standalone claim command checks entry itself in adopted repositories.
+
 ## 4. Write prose a reader sees
 
 Before committing or posting any prose a reader will see (document sections, commit messages, PR and
