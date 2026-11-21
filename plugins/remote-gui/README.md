@@ -91,7 +91,11 @@ A profile has one writer. A second start on a profile that is in use fails at on
 
 ### Human sign-in
 
-A session with `--profile` starts in human mode. `--browser-mode agent` additionally needs `--agent-start-approved`, which the owner gives for that one session; without it the start fails with `profile-requires-human-start`. The approval is recorded on the session, never on the profile. Credential entry stays human: a sign-in or MFA challenge in agent mode needs `handoff <id> --browser-mode human` first.
+A session with `--profile` starts in human mode. `--browser-mode agent` additionally needs `--agent-start-approved`; without it the start fails with `profile-requires-human-start`. The flag is recorded on that runtime session, never on the profile.
+
+Explicit owner approval may be given in the current request or in standing owner instructions active in the task. When standing approval covers the owner, named profile and requested work, the agent passes the flag on later session starts without requesting approval again. Viewer expiry or a new task does not cancel that standing instruction. A later restriction or revocation takes precedence. The runtime has no permission database and does not infer approval from a saved login or an example file.
+
+[Example standing instruction](examples/standing-agent-approval.md) shows an opt-in block an owner can adopt in their agent startup instructions. The block grants nothing before adoption. Browser-control approval still grants no unrelated provider action. Credential entry stays human: a sign-in or MFA challenge in agent mode needs `handoff <id> --browser-mode human` first.
 
 ### What carries over
 
