@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { accessSync, constants, existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
+import { REF as RESERVATION_REF } from "../ownership/git";
+
+const RESERVATION_BRANCH = RESERVATION_REF.slice("refs/heads/".length);
 
 export type Result = { code: number; stdout: string; stderr: string; timedOut?: boolean };
 export type Run = (argv: string[]) => Result;
@@ -334,6 +337,7 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
 
   for (const [branch, oid] of [...remote].sort()) {
     if (branch === defaultBranch || (only && !only(branch))) continue;
+    if (branch === RESERVATION_BRANCH) { keep("remote", branch, "vh-adlc reservation history"); continue; }
     const head = open.find(p => p.head === branch && p.repository.toLowerCase() === checkout.repository.toLowerCase()), base = open.find(p => p.base === branch);
     if (protectedNames.has(branch)) keep("remote", branch, "protected");
     else if (head) keep("remote", branch, `head of open PR #${head.number}`);
@@ -346,7 +350,11 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
   }
 
   const tracking = refs(checkout, "refs/remotes/origin/");
-  for (const [branch, oid] of [...tracking].sort()) if (!remote.has(branch) && (!only || only(branch))) plan.operations.push({ kind: "prune-tracking", ref: `refs/remotes/origin/${branch}`, oid });
+  for (const [branch, oid] of [...tracking].sort()) {
+    if (branch !== RESERVATION_BRANCH && !remote.has(branch) && (!only || only(branch))) {
+      plan.operations.push({ kind: "prune-tracking", ref: `refs/remotes/origin/${branch}`, oid });
+    }
+  }
 
   let format: string | undefined;
   /** Design item 3: the rules that keep a detached worktree; a `prunable` one needs no minimum age (item 4). */
@@ -400,6 +408,14 @@ export function observe(options: Options, only?: (branch: string) => boolean, me
     const upstream = checkout.git(["for-each-ref", "--format=%(upstream)", `refs/heads/${branch}`]).trim();
     const name = upstream.startsWith("refs/remotes/origin/") ? upstream.slice("refs/remotes/origin/".length) : branch;
     if (branch === defaultBranch || (only && !only(branch) && !only(name))) continue;
+    if (branch === RESERVATION_BRANCH || name === RESERVATION_BRANCH) {
+      keep("local", branch, "vh-adlc reservation history");
+      for (const tree of trees.filter(tree => tree.branch === branch)) {
+        seen.add(tree);
+        keepTree(tree, ["its branch contains vh-adlc reservation history"]);
+      }
+      continue;
+    }
     // `git worktree add --force` can check one branch out in several worktrees.
     const r = proof(oid, name, branch), on = trees.filter(t => t.branch === branch);
     for (const tree of on) seen.add(tree);

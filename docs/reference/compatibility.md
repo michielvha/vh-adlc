@@ -173,6 +173,15 @@ a factual nit and turns a judgement nit into an Open Question, as before. The fa
 pass for every finding, one revision per pass and the ban on rewriting a reviewed commit apply on any
 pin.
 
+Plugin 0.28.1 limits a drift re-review of an accepted spec to one revision and one follow-up review.
+If the follow-up still finds a blocker, the skill pauses for an owner decision. See the
+[spec skill](../../plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md#drift-re-reviews).
+
+Plugin 0.29.0 lets a verification rung declare `stages`. A rung with `stages: [completion]` is skipped at
+each task and runs once when ship verifies the feature, before push, completion and delivery. Older plugins
+refuse the field, so update the plugin before adding it to `.vh-adlc/loop.yaml`. See the
+[loop settings reference](../../plugins/vh-adlc/references/loop-settings.md#verification-rungs).
+
 ## Article operation
 
 The article and promotion procedure is packaged as `vh-adlc-blog`. Its source
@@ -223,6 +232,28 @@ inventory, rollback and paired review before merge, plus post-merge route checks
 Claude docs-impact model execution, GUI/phone entry and live Stackweaver screenshot
 capture remain unclaimed. Other operations' compatibility rows do not establish
 those capabilities.
+
+## Feature reservations
+
+The reservation workflow targets ordinary Codex and Claude Code sessions in opted-in repositories.
+Other clients may inspect or review there. Unadopted repositories retain their existing routes.
+A nested client must start without its parent's session markers so it can supply its own identity.
+Native resume and adoption must be verified against the installed package before an adopter enables
+writers. See [adoption and handoff](../../plugins/vh-adlc/references/authority.md#reservation-adoption).
+
+## Documentation truth review
+
+Codex CLI and Claude Code both discovered `vh-adlc-docs-truth` after a fresh
+marketplace install and after upgrading from 0.26.1 to 0.27.0. All four installs
+matched the released package at commit `84e59c89`. Both clients passed the
+synthetic claim review and freshness report through the installed skill.
+[Release and acceptance evidence](../specs/shared-docs-truth.md#tasks)
+
+Stackweaver kept its `/docs-truth` command, selector and existing verification
+history. The native Claude trials exercised read-only reports, authorized fixes,
+ledger updates and delivery recovery in disposable repositories. The
+post-merge report used the merged command and the installed skill.
+[Stackweaver migration #1162](https://github.com/michielvha/stackweaver/pull/1162)
 
 <a name="shared-documentation-drift-candidate"></a>
 

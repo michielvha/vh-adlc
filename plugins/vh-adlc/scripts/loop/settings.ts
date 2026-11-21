@@ -7,7 +7,7 @@ import { homedir, tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { readYAML, settingsFile } from "../settings-file";
 import { resolveInside } from "../triage/settings";
-import type { Rung } from "./rungs";
+import { RUNG_STAGES, type Rung, type RungStage } from "./rungs";
 
 export const LOOP_ROLES = ["author", "implementer", "spec_reviewer", "implementation_reviewer"] as const;
 export type LoopRole = typeof LOOP_ROLES[number];
@@ -110,7 +110,7 @@ function rungs(value: unknown): Rung[] {
   if (!Array.isArray(value)) fail("verification_rungs");
   const out = value.map((item, index): Rung => {
     const field = `verification_rungs[${index}]`, rung = object(item, field);
-    keys(rung, ["name", "when", "command", "procedure", "skipped_pattern", "timeout_minutes"], field);
+    keys(rung, ["name", "when", "command", "procedure", "skipped_pattern", "timeout_minutes", "stages"], field);
     const name = text(rung.name, `${field}.name`);
     if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) fail(`${field}.name`);
     let when: Rung["when"];
@@ -130,7 +130,15 @@ function rungs(value: unknown): Rung[] {
       if (rung.command === undefined) fail(`${field}.timeout_minutes needs a command`);
       if (!Number.isInteger(rung.timeout_minutes) || (rung.timeout_minutes as number) <= 0) fail(`${field}.timeout_minutes must be a positive whole number of minutes`);
     }
-    return { name, when,
+    // Every declared rung gates push, completion and delivery, so a rung may leave out only the task stage.
+    let stages: RungStage[] = [...RUNG_STAGES];
+    if (rung.stages !== undefined) {
+      const list = rung.stages;
+      if (!Array.isArray(list) || !list.length || list.some(stage => !RUNG_STAGES.includes(stage as RungStage)) ||
+          new Set(list).size !== list.length || !list.includes("completion")) fail(`${field}.stages must be a list of task and completion that includes completion`);
+      stages = list as RungStage[];
+    }
+    return { name, when, stages,
       ...(rung.command === undefined ? { procedure: text(rung.procedure, `${field}.procedure`) } : { command: text(rung.command, `${field}.command`) }),
       ...(rung.skipped_pattern === undefined ? {} : { skipped_pattern: rung.skipped_pattern as string }),
       ...(rung.timeout_minutes === undefined ? {} : { timeout_minutes: rung.timeout_minutes as number }) };

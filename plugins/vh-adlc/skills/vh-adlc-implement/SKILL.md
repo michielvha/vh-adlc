@@ -38,12 +38,24 @@ within scope or hand it off. Undeclared repositories retain their existing flow.
 
 ## Loop routes
 
+Follow [feature writer entry](../../references/authority.md#feature-writer-entry) in the selected writing checkout
+after checking worktree ownership and before the first feature write. The standalone
+claim command performs the check itself. Pass the native client on an adopted claim
+and use its result for that entry.
+
 This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
 host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
-files and its project procedure, whose local rules apply alongside this procedure. If its `plugin.stale` is true, stop before any write and report its `warning`: the session runs an older plugin than the host has installed. If it reports `plugin.binary_warning`, run only the binary `scripts/ensure-vh-adlc.sh` prints, never a `vh-adlc` found on PATH. With declared verification rungs, each task's verification step runs
-`bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` in place of the `AGENTS.md`
-command lookup, and a task is not ticked unless every applicable rung passed at its commit. A `host` route that names a model runs with it as a requested model. To claim, first run `bun scripts/loop/cli.ts isolation --repo <dir> --host-worktree-tool <true|false>`:
+files and its project procedure, whose local rules apply alongside this procedure. If its `plugin.stale` is true, stop before any write and report its `warning`: the session runs an older plugin than the host has installed. If it reports `plugin.binary_warning`, run only the binary `scripts/ensure-vh-adlc.sh` prints, never a `vh-adlc` found on PATH. With declared verification rungs, each task's verification step first performs every applicable
+written-procedure rung of the task stage, then runs
+`bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task --run true` in place of the `AGENTS.md`
+command lookup, passing each performed procedure rung's result with `--record <rung>=passed|failed:<what was observed>`;
+a task is not ticked unless every task-stage rung passed at its commit. These instructions also replace Finish:
+before `vh-adlc gate complete`, run `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task`
+without `--run` and read only its `deferred` list; its exit 3 and its verdict are not a check failure. When
+`deferred` is not empty, do not run the gate or set `complete`: report the deferred rungs, say that the
+completion stage runs in ship, and report the step `vh-adlc next` returns. With an empty `deferred`, Finish
+is unchanged. A `host` route that names a model runs with it as a requested model. To claim, first run `bun scripts/loop/cli.ts isolation --repo <dir> --host-worktree-tool <true|false>`:
 on `enter-host-worktree`, enter a worktree with the host's own worktree tool and continue there; on `stop`,
 report its reason and stop. A planned feature may then be claimed from a worktree at the default-branch
 tip that is detached or on a branch this session created or was handed, with

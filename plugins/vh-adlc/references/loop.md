@@ -9,6 +9,16 @@ uses the verified binary and knowledge. Clean calls `vh-adlc` from `PATH` withou
 its allow rule matches, and it skips `knowledge`, because `clean` and `env` read no conventions. The
 binary it runs is therefore not checked against the lock.
 
+## Link the work you refer to
+
+In updates, approval requests and handoffs, name the kind of artifact and link it the first time
+you refer to it. Use a Markdown link with the official URL for a published document, issue, pull
+request, project board, release or CI run. For example, call a roadmap a Markdown file and link
+directly to the file or relevant section. Link commits and review evidence at the exact revision when
+it matters. For unpublished work, label it local and link the actual file using its absolute path.
+When a link is unavailable, give the repository and exact path or identifier. Use links the reader is
+authorized to open.
+
 ## Check host capacity before any fan-out
 
 Before you create a worktree, start another session or sub-agent, or launch parallel or long local
@@ -132,6 +142,10 @@ A `malformed` result means the document must be fixed, never bypassed. `local-fo
 repository keeps its own format: run the gate procedurally, as that repository does, and say the binary
 did not decide it.
 
+Read-only checks can run before writer entry. When the chosen operation writes a
+feature, follow [feature writer entry](authority.md#feature-writer-entry) once in the
+owning checkout. The standalone claim command checks entry itself in adopted repositories.
+
 ## 4. Write prose a reader sees
 
 Before committing or posting any prose a reader will see (document sections, commit messages, PR and
@@ -169,6 +183,18 @@ Clean up once, when the work this session was started for is finished and the se
 archived or handed back: a feature merged and its branch removed, a maintenance or audit batch delivered,
 an investigation or review reported with nothing left to run. Do not clean up between operations of the
 same work, because the next step would have to check out, build and download everything again.
+
+A failed run is not the end of the work when a retry is planned. While you or the owner still intend to
+retry, keep what the retry reuses (pulled images, build and dependency caches, a kept cluster, a
+restore target) and say in the report that you kept it and for which retry. Remove it as soon as no
+retry is planned or wanted, and at the latest when the session's work is done. Never let leftovers of
+failed runs pile up across retries: a retry reuses the earlier run's kept state or removes it first.
+
+A script or tool you write that creates per-run scratch (a temporary container engine, a restore target,
+a fixture checkout) removes that scratch on every exit, success or failure, through a trap or `finally`,
+unless the run was started with an explicit keep-for-retry option. It pulls images and dependencies into
+a reusable cache it can find again, not into a fresh per-run directory, so a retry does not download the
+same gigabytes again.
 
 1. Remove what this session created and no longer needs: scratch directories, temporary worktrees and
    their branches, worktree slots, Compose projects and clusters it started for itself, and background

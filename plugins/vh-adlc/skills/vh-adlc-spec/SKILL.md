@@ -28,6 +28,12 @@ without asking, and `references/review-protocol.md` for the review mode.
 
 ## Loop routes
 
+Before writing or recording a spec, or bringing default-branch changes into its owning
+checkout, follow [feature writer entry](../../references/authority.md#feature-writer-entry). Resolve the issue or final
+spec path first. In an adopted repository, pass `--ownership-spec <document>` when filing an
+issue from the approved preview. After an uncertain or held tracker result, follow the
+recovery steps in the same reference before retrying or continuing the draft.
+
 This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
 host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
@@ -55,6 +61,9 @@ reports missing labels, create nothing and give its next step.
 3. If the document has a `branch` field, work only on that branch in its owning worktree, and apply the
    handoff rule in `references/authority.md` before the first write. Otherwise work on the default branch
    in a worktree that holds it, without disturbing anyone's changes.
+4. When resuming spec work after acceptance, check Git and the Review Log since the last acceptance
+   before editing or dispatching a review. If the work began with a [drift re-review](#drift-re-reviews),
+   continue from the recorded pass and keep the same revision limit, even if the spec is now in draft.
 
 ## Author mode
 
@@ -84,7 +93,9 @@ reports missing labels, create nothing and give its next step.
    branch in its owning worktree; without one, run `git merge --ff-only origin/<default branch>` on the
    default branch. Git keeps unrelated uncommitted work through either. Let Git decide whether it can: if
    it refuses, report its message and stop, never stash or discard anything to get past it. If the merge
-   changes the normative baseline, revise instead, as below. X is then the resulting commit.
+   changes the normative baseline, revise instead, as below. X is then the resulting commit. If drift
+   alone prompted the re-review of a `planned` or `in-progress` spec, follow the
+   [drift re-review limit](#drift-re-reviews).
 2. Dispatch `vh-adlc-reviewer` as `references/review-protocol.md` describes, with the document, X, kind
    `spec`, the docs revision, the binary path and the plugin pin. If dispatch is impossible, write the handoff and leave
    the review pending.
@@ -94,9 +105,10 @@ reports missing labels, create nothing and give its next step.
    session. If the protocol leaves the review pending, store nothing. Otherwise store the records
    after the header under the next `### R-<n>`, with a Review Log row at X naming the reported model,
    before changing anything. Then run `vh-adlc review check` against the same text.
-4. Apply the pass's findings as one revision. First list the behaviors the design touches and every
-   test, scenario and fixture the criteria and Test Plan name. Walk each finding, and every change it
-   implies, through all of them, and re-read each named test or scenario before changing what it checks.
+4. Check the [drift re-review limit](#drift-re-reviews) before applying findings. Apply the eligible
+   findings as one revision. First list the behaviors the design touches and every test, scenario and
+   fixture the criteria and Test Plan name. Walk each eligible finding and every change it implies
+   through all of them, and re-read each named test or scenario before changing what it checks.
    Turn judgement findings into Open Questions for the owner first, without changing the baseline; when
    the nit rule below applies, nits are the exception. Once the owner has answered, apply every factual finding to be applied and every answer in
    one commit. Where a finding can be met by removing a mechanism or by adding one with the same
@@ -114,11 +126,33 @@ reports missing labels, create nothing and give its next step.
    not in the document. When the resolved page does not state it, apply a factual nit like any other factual
    finding and turn a judgement nit into an Open Question, as before the rule, and say in the report that
    the nit rule needs the plugin's own pin from `knowledge.md`.
-5. When a clean review at X exists and Open Questions is empty, present the owner-facing summary below,
-   then ask the owner to accept. On acceptance in session, append the acceptance row at X, run
-   `vh-adlc gate planned`, and on a pass move the status and commit with the gate's line.
+5. When a clean review at X exists, Open Questions is empty and acceptance is needed, present the
+   owner-facing summary below, then ask the owner to accept. On acceptance in session, append the
+   acceptance row at X, run `vh-adlc gate planned`, and on a pass move the status and commit with the
+   gate's line.
+
+## Drift re-reviews
+
+If a clean re-review leaves the accepted baseline intact, keep the acceptance and finish the review.
+When a blocking finding requires a revision, revise once against the accepted scope. Limit edits to
+what the default-branch changes affect and to defects a finding shows in the feature's behavior or
+proof. Apply the same limit to nits.
+
+If a finding calls for a new mechanism or guidance beyond the feature, leave it out of the revision.
+This includes new release or publication checks, tool pins and extra procedures. Ask the owner one
+question about the extra work and recommend dropping or deferring it. If there is no fix within scope
+for a blocking finding, wait for the owner before requesting another review.
+
+After the revision, request one independent follow-up. If it is clean, follow the acceptance step for
+any changed baseline. If it still has a blocking finding, record the pass and stop. Wait for the owner
+before revising or requesting another review. Say what the feature does, why it is blocked and what
+you propose. Usually that means returning to the accepted text with only the fixes the feature needs.
+Use plain feature terms in this report, without review IDs, finding codes or convention names.
 
 ## Owner-facing summary
+
+Write every owner question in terms of the feature and the decision the owner needs to make. Keep
+review IDs, finding codes and convention names with the review details.
 
 Whenever you finish spec work, summarize the current spec in the conversation. Before each acceptance
 or renewed acceptance request, give the owner enough information to decide without reading the document

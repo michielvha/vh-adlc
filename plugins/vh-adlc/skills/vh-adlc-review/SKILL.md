@@ -17,6 +17,10 @@ Input: a feature document, its issue, or its slug, and optionally the model to r
 
 ## Loop routes
 
+Before recording findings or editing the feature document, follow
+[feature writer entry](../../references/authority.md#feature-writer-entry) in its owning checkout.
+Independent read-only review does not acquire a reservation.
+
 This operation's loop role and route come from `.vh-adlc/loop.yaml` through
 `bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
 host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction

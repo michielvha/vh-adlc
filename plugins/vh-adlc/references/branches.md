@@ -22,6 +22,10 @@ When it is off, ask the owner whether to enable it, and pass `--enable` only aft
 GitHub copies no settings from a template repository, so a repository created from a template starts
 with the setting off.
 
+The branch helper keeps `vh-adlc/work-ownership` in the remote, local and tracking namespaces,
+including when ordinary merged-branch rules would select it. Preserve this Git history
+during cleanup and recovery.
+
 ## What counts as merged
 
 A branch is removed only when its current tip is proven merged:

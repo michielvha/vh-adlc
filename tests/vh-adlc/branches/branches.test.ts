@@ -869,3 +869,24 @@ test("a locked worktree is kept with its lock reason, and once unlocked the next
   git(f.work, "worktree", "unlock", old);
   expect(removals(f.plan())).toEqual([old]);
 }, 120000);
+
+test("cleanup preserves reservation refs even when an ordinary merged branch would be removed", () => {
+  const f = fixture();
+  const reserved = "vh-adlc/work-ownership";
+  try {
+    const reservedTip = branch(f.work, reserved);
+    const ordinaryTip = branch(f.work, "feat/ordinary");
+    f.setPulls();
+    f.write({ pulls: [pr(81, reserved, reservedTip), pr(82, "feat/ordinary", ordinaryTip)] });
+    const plan = observe(f.options).plan;
+    expect(summary(plan.operations)).toContain("delete-remote:feat/ordinary");
+    expect(summary(plan.operations)).toContain("delete-local:feat/ordinary");
+    expect(summary(plan.operations).filter(value => value.includes(reserved))).toEqual([]);
+    expect(plan.kept).toContainEqual({ scope: "remote", branch: reserved, reason: "vh-adlc reservation history" });
+
+    bare(f.origin, "update-ref", "-d", `refs/heads/${reserved}`);
+    expect(summary(observe(f.options).plan.operations)).not.toContain(`prune-tracking:refs/remotes/origin/${reserved}`);
+  } finally {
+    rmSync(f.dir, { recursive: true, force: true });
+  }
+});

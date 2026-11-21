@@ -13,8 +13,8 @@ Use vh-adlc to repair this regression and finish locally.
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
 repository and selects a procedure. The candidate package combines this entry,
-eleven engineering operations, four content operations and one host-cleanup
-operation, giving seventeen skills. Check
+eleven engineering operations, five content operations and one host-cleanup
+operation, giving eighteen skills. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -28,6 +28,7 @@ on your host.
 | Diagnosis | Investigate and report. A report-only request does not authorize a fix. |
 | Documentation | Edit the requested document and check it. A prose edit does not need a feature spec. |
 | Accumulated documentation drift | Assess the configured corpus and selected stale documentation-audit proposals through the released docs-drift operation. |
+| Documentation truth review | Check claims in a bounded batch against source and record the evidence in the report. |
 | Article or social draft | Read the project's evidence and the site's voice rules, draft or revise the requested prose, and obtain a source-comparing editorial pass. Publication is separate. |
 | Small maintenance | Preserve the public contract, keep a short task record, run appropriate checks, and obtain an independent review. |
 | A new feature or a wider change | Use a feature document with acceptance, tests, reviews, and binary status gates. |
@@ -56,6 +57,7 @@ see [installation](../get-started/installation.md).
 | Architecture diagram | `vh-adlc-diagram` | Create and verify repository-grounded draw.io architecture diagrams. |
 | Documentation impact | `vh-adlc-docs-impact` | Find and review docs affected by selected code changes. |
 | Documentation drift | `vh-adlc-docs-drift` | Audit the configured corpus, resolve selected stale docs-audit PRs and freshly review selected post-merge closures. |
+| Documentation truth review | `vh-adlc-docs-truth` | Review factual claims in selected docs or agent instructions, or show recorded verification freshness. |
 | Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
 | Clean | `vh-adlc-clean` | Plan and remove what killed runs left in `/tmp` and the project's temp root; Compose projects and kind clusters only on request. |
 
@@ -283,6 +285,27 @@ connector run; consult the [compatibility record](../reference/compatibility.md)
 
 The complete procedure is in the [article reference](../../plugins/vh-adlc/references/blog.md).
 
+## Reserve a feature while you work
+
+A repository that enables feature reservations uses its Git remote to remember who is
+working on each issue or spec. Start or resume through vh-adlc in an ordinary Codex or
+Claude Code session. If another session has the item, vh-adlc shows the writer's host and
+branch or spec. Ask to continue in the existing session or arrange a handoff. The same
+session can move into its usual isolated worktree without asking for a handoff.
+
+Edits, builds and tests run without further reservation checks. Read-only review and
+independent work on other issues can continue. An idle session or one that runs out of
+quota keeps its reservation.
+
+For a handoff, stop the old writer and keep it stopped until the transfer is verified.
+Use the existing checkout when possible. If the work moves, preserve the commits, index
+and unfinished files first. The old session sees the current writer when it next tries
+to resume through vh-adlc. The workflow relies on agents entering through vh-adlc and
+on the owner's stop confirmation.
+
+The [setup and handoff procedure](../../plugins/vh-adlc/references/authority.md#reservation-adoption)
+covers adoption, rollback and the exact commands.
+
 ## Reviews
 
 Reviews use an independent agent context. A host may register the reviewer
@@ -328,7 +351,8 @@ A repository may commit `.vh-adlc/loop.yaml` to tune the feature loop. It can:
 - route each role (author, implementer, spec reviewer, implementation reviewer) to the
   host, optionally with a model, or route a reviewer role to an external command;
 - name a project procedure, instruction files and review lenses every operation reads;
-- declare verification rungs that must pass before push, completion and delivery;
+- declare verification rungs that must pass before push, completion and delivery, and limit an
+  expensive rung to the completion stage so it runs once per feature instead of at every task;
 - set manual CI, a post-merge watch and extra skip-CI paths for delivery;
 - have implement continue in an isolated worktree, and have investigate always write
   a findings document.
@@ -383,6 +407,24 @@ from source paths. Ordinary mapping upkeep stays here; standard feature-spec
 coverage revisions go through the spec operation. Project generators and visual
 checks remain local. See the [procedure](../../plugins/vh-adlc/references/docs-impact.md)
 and [complete runnable example](../../plugins/vh-adlc/examples/docs-impact/README.md).
+
+## Documentation truth review
+
+Ask to verify claims in the next batch of documents or name the docs or sections to check.
+Use `vh-adlc-docs-truth` with no arguments for the project's default batch, `sweep` for
+specific paths, `meta` for repository instructions, or `report` for recorded freshness.
+The shared skill returns evidence and proposed corrections in the session. Repositories
+declare their own sources, selection and exemptions. See the
+[procedure](../../plugins/vh-adlc/references/docs-truth.md).
+
+The 0.27.0 skill was verified on fresh installs and upgrades from 0.26.1 in
+Codex CLI and Claude Code. Both passed the synthetic claim review and freshness
+report. [Compatibility and test evidence](../reference/compatibility.md#documentation-truth-review)
+
+In Stackweaver, continue to use `/docs-truth` for the next 15 documents or
+`/docs-truth report` for recorded freshness. The repository still owns its
+selection, ledger and rules for applying and publishing verified fixes.
+[Stackweaver migration #1162](https://github.com/michielvha/stackweaver/pull/1162)
 
 ## Documentation drift
 
