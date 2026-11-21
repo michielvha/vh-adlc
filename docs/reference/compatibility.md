@@ -173,6 +173,10 @@ a factual nit and turns a judgement nit into an Open Question, as before. The fa
 pass for every finding, one revision per pass and the ban on rewriting a reviewed commit apply on any
 pin.
 
+Plugin 0.28.1 limits a drift re-review of an accepted spec to one revision and one follow-up review.
+If the follow-up still finds a blocker, the skill pauses for an owner decision. See the
+[spec skill](../../plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md#drift-re-reviews).
+
 ## Article operation
 
 The article and promotion procedure is packaged as `vh-adlc-blog`. Its source
