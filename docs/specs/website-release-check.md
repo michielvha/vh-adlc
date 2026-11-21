@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Owner accepted the R-7-reviewed design. Tasks are populated and R-8 found no issues after the default branch advanced."
+status: in-progress
+status_description: "Implementation claimed. Starting with the confined Chromium report-mode smoke test."
+branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
 covers:
