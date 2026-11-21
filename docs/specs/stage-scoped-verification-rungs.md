@@ -1,6 +1,6 @@
 ---
 status: planned
-status_description: "Accepted by the owner at R-8 (re-reviewed clean at R-9); waiting for tasks."
+status_description: "Accepted at R-8 (re-reviewed clean at R-9); tasks written, ready to implement."
 issue: null
 goal: "Each task's verification runs only the rungs declared for the task stage, while push, completion and delivery still require every applicable rung."
 covers:
@@ -283,7 +283,14 @@ rolling back the procedure changes needs the previous plugin version.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/loop/rungs.test.ts` - settings cases for `stages` (unknown value, empty list, duplicate, no `completion`, default resolves to both); `bun test tests/vh-adlc/loop/rungs.test.ts` fails on the new cases because `stages` is refused as an unknown key (AC-01)
+- [ ] T2 `plugins/vh-adlc/scripts/loop/settings.ts`, `plugins/vh-adlc/scripts/loop/rungs.ts` - accept and validate `stages`, resolve the default on the parsed `Rung`; T1 passes (AC-01)
+- [ ] T3 `tests/vh-adlc/loop/cli.test.ts` - CLI cases for `--stage task` with and without `--run`, `--stage completion` and no `--stage`, invalid `--stage` values with `--run true`, and the stage-less three-rung fixture with literal expected output; the stage cases fail because `--stage` and `deferred` do not exist, and the stage-less case stands as a regression guard (AC-02, AC-03, AC-04, AC-05)
+- [ ] T4 `plugins/vh-adlc/scripts/loop/rungs.ts`, `plugins/vh-adlc/scripts/loop/cli.ts` - stage parameter on `applicableRungs`, `--stage` parsing and errors, `stage` and `deferred` output, the stage-scoped verdict without `--run`, and the updated rule and usage comments; T1 and T3 pass (AC-02, AC-03, AC-04, AC-05)
+- [ ] T5 `tests/vh-adlc/direct-operation-compatibility.test.ts` - literal command checks for the implement and ship Loop routes and the reference's `verification_rungs[].stages` row and `--stage`; fails because the texts do not exist yet, while the body baseline cases still pass (AC-06, AC-07)
+- [ ] T6 `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` - Loop routes overrides for the per-task run, the Finish lookup, the Verify-step completion run, procedure-rung records, the completion-commit exemption and the post-merge run; T5's skill checks pass with unchanged baselines (AC-06, AC-09)
+- [ ] T7 `plugins/vh-adlc/references/loop-settings.md`, `docs/user-guides/workflows.md` - document `stages`, `--stage`, `deferred`, the commit rule with its exemption and the minimum plugin version; T5 passes in full (AC-07)
+- [ ] T8 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - bump both to the next minor version above `origin/main`; `bun test tests/vh-adlc/check.test.ts` passes and the AC-08 written procedure holds (AC-08)
 
 ## Open Questions
 
