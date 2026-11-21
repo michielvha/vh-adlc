@@ -1,6 +1,6 @@
 ---
 status: planned
-status_description: "Owner accepted the R-7-reviewed design. Ready for task breakdown."
+status_description: "Owner accepted the R-7-reviewed design. Tasks are populated and R-8 found no issues after the default branch advanced."
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
 covers:
@@ -112,6 +112,7 @@ None. The owner selected report mode first and approved explicit run outcomes an
 | 2026-11-20 | R-6 | spec | `e7a9d2857b490a6fd5bdaecdee8e3f5c42927388` | unknown | procedural | One blocking finding |
 | 2026-11-20 | R-7 | spec | `ffe3077c7269d14ebe45781cd1a2e2eed9ae95f5` | unknown | procedural | NO FINDINGS |
 | 2026-11-20 | R-7 | spec | `ffe3077c7269d14ebe45781cd1a2e2eed9ae95f5` | n/a | n/a | accepted by owner |
+| 2026-11-21 | R-8 | spec | `46249c1b7f9232cd5afa999301da044b06960795` | unknown | procedural | NO FINDINGS |
 
 ### R-1
 
@@ -336,6 +337,10 @@ EVIDENCE: The R-5 revision selects `headersArray()` so repeated entries remain s
 PROPOSAL: Define exact matching on the entries and values the selected browser reports, and state that the rule cannot establish wire-level multiplicity. Prove the duplicate path with a fixture and engine confirmed to expose two entries, and cover a single comma-delimited observed value without splitting it.
 
 ### R-7
+
+NO FINDINGS
+
+### R-8
 
 NO FINDINGS
 
