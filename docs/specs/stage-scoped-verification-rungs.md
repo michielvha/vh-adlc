@@ -300,6 +300,7 @@ None.
 | 2026-11-21 | R-4 | spec | `807a31ba` | claude-opus-5-5 | procedural | One blocking and four should-fix findings |
 | 2026-11-21 | R-5 | spec | `e59f9154` | claude-opus-5-5 | procedural | Two should-fix findings and one nit; no blocking finding |
 | 2026-11-21 | R-6 | spec | `e2b27b37` | claude-opus-5-5 | procedural | One should-fix finding and one nit; no blocking finding |
+| 2026-11-21 | R-7 | spec | `40983b5b` | claude-opus-5-5 | procedural | Two should-fix findings and two nits; no blocking finding |
 
 ### R-1
 
@@ -480,3 +481,33 @@ SEVERITY: nit
 WHERE: Context, Owner summary ("Rungs without `stages` keep today's flow" and "Removing the field restores today's behaviour, which is also the rollback"); Design, Concurrency, failure and upgrade ("Rollback is removing the field")
 EVIDENCE: The new Loop routes text applies whenever rungs are declared, not only when a rung has `stages`. For stage-less settings, ship still changes: it runs the completion stage at its Verify step instead of under the current "before pushing ... may advance at HEAD" rule (plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:51-54), pushes the document-only completion commit under the new exemption, and performs and records procedure rungs. Implement now performs and records procedure rungs at every task. The CLI output is unchanged for stage-less settings (AC-05), but the flow is not, and removing `stages` does not restore the old procedures.
 PROPOSAL: Say that stage-less rungs keep today's selection and verdict, while the implement and ship procedure changes (Verify-step run, completion-commit exemption, recorded procedure rungs) apply to every adopter with declared rungs, and that rollback of those needs the previous plugin version.
+
+### R-7
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Concurrency, failure and upgrade ("If the completion run blocks, ship pushes nothing. If the document is still `in-progress`, ship sets no status; ... ship reports the blocking rungs and names `/vh-adlc-tasks` as the next step"); Design, Procedures (Ship, Verify bullet); Context, Owner summary ("If ship's completion run blocks, ship reports the blocking rungs and names `/vh-adlc-tasks` to append a fix task"); Acceptance Criteria AC-09 ("after a blocked completion run reports the blocking rungs and names `/vh-adlc-tasks`")
+EVIDENCE: The ship operation body, which the Design keeps byte-identical, already lets ship fix a failing check itself: Make the feature shippable step 1 says a covered fix needs a fresh implementation review "in this run" and ends "The same applies to any covered change verification requires" (plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:72-77). With completion-only rungs, ship's Verify run is the first place an expensive rung executes, so a covered fix that verification requires becomes a common path. The Design routes every blocked completion run out of ship to `/vh-adlc-tasks`, but never says whether its Loop routes override replaces that body clause. One implementer writes an override that forbids ship from committing a covered fix after a blocked completion run; another leaves the body's in-run fix plus fresh review in place and uses `/vh-adlc-tasks` only when ship does not fix it. AC-09's written check passes either text.
+PROPOSAL: State in the ship Procedures bullet, the failure section and AC-09 whether the Loop routes override replaces the body's "any covered change verification requires" path after a blocked completion run, or keeps it and names `/vh-adlc-tasks` only when ship does not make the fix in the same run.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Concurrency, failure and upgrade ("If the document is still `in-progress` ... If the document is already `complete` locally and unpushed ... ship then stops"); Context, Owner summary ("when the document is already `complete` locally and unpushed, whether implement or ship set it, ship stops and names the owner decision instead"); Acceptance Criteria AC-09 ("or, when the document is already `complete` locally and unpushed, stops and names the owner decision")
+EVIDENCE: The blocked completion run is defined for two states: `in-progress`, and `complete` locally and unpushed. A third state is reachable: the completion commit is already pushed and the open PR takes further commits, for example after the owner asks ship to integrate the default branch into the feature branch. Ship's Deliver step updates an existing PR (plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:98), and its Gate step runs only "whenever you mean to set the document `complete`" (SKILL.md:79), so ship runs on an already `complete` document. Before that push the completion stage runs again at the head (Design, The completion commit). If it blocks, the `in-progress` route does not apply, and `/vh-adlc-tasks` refuses because it requires `vh-adlc gate in-progress` to fail on nothing but `tasks_populated` (plugins/vh-adlc/skills/vh-adlc-tasks/SKILL.md:42-49), while the rules block at 0c983f6 lets `complete` move only to `archived` or `superseded`. The "and unpushed" qualifier that leaves this state out came in when the previous revision applied R-6 F-01.
+PROPOSAL: Define the blocked run by status alone: whenever the document is `complete`, pushed or not, ship pushes nothing, reports the blocking rungs and any unpushed commits, and names the owner decision. State it the same way in the Design, the Owner summary and AC-09.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan row AC-06 (Finish lookup check); Acceptance Criteria AC-06 ("the Finish lookup `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task` with no `--run`")
+EVIDENCE: The row checks only that the implement Loop routes contain the lookup string with its closing backtick. A Finish sentence such as "run `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task` with `--run true`" passes it, although AC-06 requires no `--run`, and AC-09's reviewer check does not list the absence of `--run`. This only widens a free-text pattern row that has passed review: the row's text is unchanged since e59f9154, and neither R-5 (at e59f9154) nor R-6 (at e2b27b37) has a finding whose WHERE names it or the Test Plan.
+PROPOSAL: Leave the row as it is, or add "Finish runs the lookup without `--run`" to the items the AC-09 reviewer confirms.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, The completion commit ("The reference states the rule for pushed and delivered commits, not for every commit that sets `complete`"); covers (`plugins/vh-adlc/scripts/loop/rungs.ts`)
+EVIDENCE: The covered source restates the old rule in comments: plugins/vh-adlc/scripts/loop/rungs.ts:2 "Every applicable rung must pass at the commit being pushed, completed or delivered" and rungs.ts:71 "Whether the results let the feature push, complete or deliver at `head`". The cli.ts usage comment (plugins/vh-adlc/scripts/loop/cli.ts:5-6) lists the `rungs` flags without `--stage`. The Design updates only the reference, so these comments would contradict it after implementation.
+PROPOSAL: Add a line saying the rungs.ts comments and the cli.ts usage comment are updated to match the reference.
