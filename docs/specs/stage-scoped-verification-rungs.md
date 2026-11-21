@@ -298,7 +298,8 @@ rolling back the procedure changes needs the previous plugin version.
       Evidence: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 7 pass, 1 fail (the reference row, T7); the implement and ship body-baseline cases pass with unchanged baselines. `bun test tests/vh-adlc/check.test.ts`: 64 pass, 1 fail (the version check, T8).
 - [x] T7 `plugins/vh-adlc/references/loop-settings.md`, `docs/user-guides/workflows.md` - document `stages`, `--stage`, `deferred`, the commit rule with its exemption and the minimum plugin version; T5 passes in full (AC-07)
       Evidence: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 8 pass, 0 fail.
-- [ ] T8 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - bump both to the next minor version above `origin/main`; `bun test tests/vh-adlc/check.test.ts` passes and the AC-08 written procedure holds (AC-08)
+- [x] T8 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - bump both to the next minor version above `origin/main`; `bun test tests/vh-adlc/check.test.ts` passes and the AC-08 written procedure holds (AC-08)
+      Evidence: `bun test tests/vh-adlc/check.test.ts`: 65 pass, 0 fail; `origin/main` carries 0.28.1 and both manifests 0.29.0 (minor one above, patch 0); `references/loop-settings.md` names 0.29.0 as the minimum for `stages`.
 
 ## Open Questions
 
