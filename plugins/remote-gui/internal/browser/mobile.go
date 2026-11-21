@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -25,18 +24,28 @@ var mobileFocusScript string
 type mobileFocus struct {
 	bus      *child
 	registry *child
+	worker   *child
+	conn     net.Conn
 	address  string
-	// The query lock serializes access to the last verified reference.
-	hint      string
-	hintEpoch uint64
+	// The query lock serializes requests.
+	sequence uint64
 }
 
+type mobileSample struct {
+	Sequence uint64        `json:"sequence"`
+	Field    *mobile.Field `json:"field"`
+}
+
+const mobilePacketSize = 512
+
+var errMobileFocusUnavailable = errors.New("mobile-focus-unavailable")
+
 func (f *mobileFocus) live() bool {
-	return f != nil && state.Alive(f.bus.identity) && state.Alive(f.registry.identity)
+	return f != nil && state.Alive(f.bus.identity) && state.Alive(f.registry.identity) && state.Alive(f.worker.identity)
 }
 
 func mobileResource(role string) bool {
-	return role == "mobile-accessibility-bus" || role == "mobile-accessibility-registry"
+	return role == "mobile-accessibility-bus" || role == "mobile-accessibility-registry" || role == "mobile-accessibility-worker"
 }
 
 func accessibilityRegistry() string {
@@ -52,15 +61,9 @@ func accessibilityRegistry() string {
 // The private bus has no services or activation directories. Its abstract
 // socket needs no on-disk lease and only accepts the host user's credentials.
 func (r *runtime) startMobileFocus(ctx context.Context) {
-	const python = "/usr/bin/python3"
 	daemon, err := exec.LookPath("dbus-daemon")
 	registry := accessibilityRegistry()
 	if err != nil || registry == "" {
-		return
-	}
-	probe, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
-	if exec.CommandContext(probe, python, "-I", "-c", "import dbus, gi; gi.require_version('Atspi', '2.0')").Run() != nil {
 		return
 	}
 	address := "unix:abstract=remote-gui-a11y-" + r.id
@@ -75,11 +78,11 @@ func (r *runtime) startMobileFocus(ctx context.Context) {
 	if err != nil {
 		return
 	}
-	var helper *child
+	var registryProcess *child
 	defer func() {
 		if r.mobile == nil {
-			if helper != nil {
-				_ = state.Signal(helper.identity, syscall.SIGTERM)
+			if registryProcess != nil {
+				_ = state.Signal(registryProcess.identity, syscall.SIGTERM)
 			}
 			_ = state.Signal(bus.identity, syscall.SIGTERM)
 		}
@@ -89,10 +92,14 @@ func (r *runtime) startMobileFocus(ctx context.Context) {
 		conn, err := net.DialTimeout("unix", socket, 20*time.Millisecond)
 		if err == nil {
 			_ = conn.Close()
-			helper, err = r.spawn("mobile-accessibility-registry", registry, nil,
+			registryProcess, err = r.spawn("mobile-accessibility-registry", registry, nil,
 				append(append([]string(nil), r.env...), "DBUS_SESSION_BUS_ADDRESS="+address, "AT_SPI_BUS_ADDRESS="+address))
-			if err == nil && registryReady(ctx, address) {
-				r.mobile = &mobileFocus{bus: bus, registry: helper, address: address}
+			if err != nil {
+				return
+			}
+			focus := &mobileFocus{bus: bus, registry: registryProcess, address: address}
+			if r.startMobileWorker(ctx, focus) == nil {
+				r.mobile = focus
 				r.mobilePhase.Store(1)
 			}
 			return
@@ -104,63 +111,118 @@ func (r *runtime) startMobileFocus(ctx context.Context) {
 	}
 }
 
-func registryReady(ctx context.Context, address string) bool {
-	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+// A connected packet socket keeps requests private to the two owned processes.
+// Packet boundaries keep a canceled read from consuming part of the next reply.
+func (r *runtime) startMobileWorker(ctx context.Context, focus *mobileFocus) error {
+	pair, err := syscall.Socketpair(syscall.AF_UNIX, syscall.SOCK_SEQPACKET|syscall.SOCK_CLOEXEC, 0)
+	if err != nil {
+		return errMobileFocusUnavailable
+	}
+	parent := os.NewFile(uintptr(pair[0]), "focus-supervisor")
+	peer := os.NewFile(uintptr(pair[1]), "focus-worker")
+	conn, err := net.FileConn(parent)
+	_ = parent.Close()
+	if err != nil {
+		_ = peer.Close()
+		return errMobileFocusUnavailable
+	}
+	cmd := exec.Command("/usr/bin/python3", "-I", "-c", mobileFocusScript, focus.address)
+	cmd.ExtraFiles = []*os.File{peer}
+	worker, err := r.startChild("mobile-accessibility-worker", cmd, r.env)
+	_ = peer.Close()
+	if err != nil {
+		_ = conn.Close()
+		return err
+	}
+	go func() {
+		<-worker.done
+		_ = conn.Close()
+	}()
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
-	// The registry must own its name before Chromium tries to register.
-	const check = `import dbus, sys, time
-bus = dbus.bus.BusConnection(sys.argv[1])
-for _ in range(20):
-    if bus.name_has_owner("org.a11y.atspi.Registry"):
-        sys.exit(0)
-    time.sleep(.02)
-sys.exit(1)
-`
-	return exec.CommandContext(ctx, "/usr/bin/python3", "-I", "-c", check, address).Run() == nil
+	deadline, _ := ctx.Deadline()
+	if conn.SetReadDeadline(deadline) == nil {
+		var ready [1]byte
+		if n, err := conn.Read(ready[:]); err == nil && n == 1 && ready[0] == 1 && ctx.Err() == nil {
+			focus.conn, focus.worker = conn, worker
+			return nil
+		}
+	}
+	_ = state.Signal(worker.identity, syscall.SIGTERM)
+	_ = conn.Close()
+	return errMobileFocusUnavailable
+}
+
+func (f *mobileFocus) sample(ctx context.Context, pid, x, y int) (mobileSample, error) {
+	var sample mobileSample
+	ctx, cancel := context.WithTimeout(ctx, 370*time.Millisecond)
+	defer cancel()
+	deadline, _ := ctx.Deadline()
+	if ctx.Err() != nil || f.conn.SetDeadline(deadline) != nil {
+		return sample, errMobileFocusUnavailable
+	}
+	interrupted := make(chan struct{})
+	stop := context.AfterFunc(ctx, func() {
+		_ = f.conn.SetDeadline(time.Now())
+		close(interrupted)
+	})
+	defer func() {
+		if !stop() {
+			<-interrupted
+		}
+	}()
+	f.sequence++
+	request, err := json.Marshal([4]uint64{f.sequence, uint64(pid), uint64(x), uint64(y)})
+	if err != nil {
+		return sample, errMobileFocusUnavailable
+	}
+	if _, err := f.conn.Write(request); err != nil {
+		return sample, errMobileFocusUnavailable
+	}
+	// A query can outlive its HTTP request. Discard its reply before trying
+	// to use a newer one, within the newer query's own deadline.
+	for {
+		var packet [mobilePacketSize + 1]byte
+		n, err := f.conn.Read(packet[:])
+		if err != nil || n > mobilePacketSize || ctx.Err() != nil {
+			return mobileSample{}, errMobileFocusUnavailable
+		}
+		sample = mobileSample{}
+		if json.Unmarshal(packet[:n], &sample) != nil || sample.Sequence == 0 || sample.Sequence > f.sequence {
+			return mobileSample{}, errMobileFocusUnavailable
+		}
+		if sample.Sequence == f.sequence {
+			return sample, nil
+		}
+	}
 }
 
 func (r *runtime) editableAt(ctx context.Context, x, y int) (*mobile.Field, error) {
 	if !r.mobileQuery.TryLock() {
-		return nil, errors.New("mobile-focus-unavailable")
+		return nil, errMobileFocusUnavailable
 	}
 	defer r.mobileQuery.Unlock()
 	if !r.mu.TryLock() {
-		return nil, errors.New("mobile-focus-unavailable")
+		return nil, errMobileFocusUnavailable
 	}
 	browser, phase, helper := r.chrome, r.generation.Load(), r.mobile
 	epoch := r.mobilePhase.Load()
 	ready := !r.stopped && r.modeReady && browser != nil && helper.live() && r.mobileScalePhase == phase
 	r.mu.Unlock()
 	if !ready || !state.Alive(browser.identity) {
-		return nil, errors.New("mobile-focus-unavailable")
+		return nil, errMobileFocusUnavailable
 	}
-	ctx, cancel := context.WithTimeout(ctx, 370*time.Millisecond)
-	defer cancel()
-	hint := ""
-	if helper.hintEpoch == epoch {
-		hint = helper.hint
-	}
-	cmd := exec.CommandContext(ctx, "/usr/bin/python3", "-I", "-c", mobileFocusScript,
-		helper.address, strconv.Itoa(browser.identity.PID), strconv.Itoa(x), strconv.Itoa(y), hint)
-	result, err := cmd.Output()
+	sample, err := helper.sample(ctx, browser.identity.PID, x, y)
 	if err != nil {
-		return nil, errors.New("mobile-focus-unavailable")
-	}
-	var sample struct {
-		Field *mobile.Field `json:"field"`
-		Path  string        `json:"path"`
-	}
-	if len(result) > 512 || json.Unmarshal(result, &sample) != nil {
-		return nil, errors.New("mobile-focus-unavailable")
+		return nil, err
 	}
 	if !r.mu.TryLock() {
-		return nil, errors.New("mobile-focus-unavailable")
+		return nil, errMobileFocusUnavailable
 	}
 	defer r.mu.Unlock()
 	if r.stopped || !r.modeReady || r.chrome != browser || r.generation.Load() != phase || r.mobilePhase.Load() != epoch || !state.Alive(browser.identity) || !helper.live() {
-		return nil, errors.New("mobile-focus-unavailable")
+		return nil, errMobileFocusUnavailable
 	}
-	helper.hint, helper.hintEpoch = sample.Path, epoch
 	if sample.Field != nil {
 		sample.Field.Phase = epoch
 	}

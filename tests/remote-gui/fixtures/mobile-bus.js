@@ -12,6 +12,7 @@ const allowed = new Set([
     'org.a11y.atspi.Accessible.GetRoleName',
     'org.a11y.atspi.Accessible.GetState',
     'org.a11y.atspi.Accessible.GetAttributes',
+    'org.a11y.atspi.Collection.GetMatches',
     'org.a11y.atspi.Component.GetExtents',
 ]);
 
@@ -42,7 +43,9 @@ export function checkMobileBus(calls) {
     const helperSenders = new Set(calls.filter(call => pidQueries.has(call.sender)
         && call.path === '/org/a11y/atspi/accessible/root'
         && call.method === 'org.a11y.atspi.Accessible.GetChildren').map(call => call.sender));
+    assert.equal(helperSenders.size, 1, 'focus renewals must reuse one private D-Bus connection');
     const methods = calls.filter(call => helperSenders.has(call.sender)).map(call => call.method);
+    assert.ok(methods.includes('org.a11y.atspi.Collection.GetMatches'), 'no native focus search was observed');
     assert.ok(methods.includes('org.a11y.atspi.Accessible.GetAttributes'), 'no editable attribute lookup was observed');
     assert.deepEqual([...new Set(methods.filter(method => !allowed.has(method)))], [],
         'the focus helper made an unexpected accessibility call or subscription');

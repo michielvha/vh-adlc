@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import socket
 import sys
 import time
 
@@ -15,9 +16,14 @@ ACCESSIBLE = "org.a11y.atspi.Accessible"
 ROOT = "/org/a11y/atspi/accessible/root"
 PREFIX = "/org/a11y/atspi/accessible/"
 MODES = {"text", "password", "email", "url", "tel", "search", "number"}
-# Chrome 157 can expose more than 256 native nodes on a single new tab.
-# Keep the same deadline while allowing the native search to finish.
-MAX_NODES = 384
+PACKET_SIZE = 512
+ELIGIBLE = ("EDITABLE", "FOCUSED", "VISIBLE", "SHOWING", "ENABLED")
+MATCH_ALL = int(Atspi.CollectionMatchType.ALL)
+CANONICAL = int(Atspi.CollectionSortOrder.CANONICAL)
+ELIGIBLE_BITS = sum(1 << int(getattr(Atspi.StateType, name)) for name in ELIGIBLE)
+# This AT-SPI match rule filters only on states. Empty attribute, role and
+# interface lists make them unconstrained.
+FOCUSED_EDITABLE = ([ELIGIBLE_BITS, 0], MATCH_ALL, {}, MATCH_ALL, [0, 0, 0, 0], MATCH_ALL, [], MATCH_ALL, False)
 
 
 def interface(bus, destination, path, name):
@@ -63,7 +69,7 @@ def keyboard_mode(bus, owner, path, node, states):
 
 
 def read_field(bus, owner, path, states, x, y):
-    if not all(has(states, flag) for flag in ("EDITABLE", "FOCUSED", "VISIBLE", "SHOWING", "ENABLED")):
+    if not all(has(states, flag) for flag in ELIGIBLE):
         return None
     if has(states, "READ_ONLY"):
         return None
@@ -76,15 +82,10 @@ def read_field(bus, owner, path, states, x, y):
     if not mode:
         return None
     token = hashlib.sha256(f"{owner}:{path}".encode()).hexdigest()[:24]
-    return {
-        "field": {"token":token, "mode":mode, "x":left, "y":top, "width":width, "height":height},
-        "path": path,
-    }
+    return {"token": token, "mode": mode, "x": left, "y": top, "width": width, "height": height}
 
 
-def focused(address, pid, x, y, hint):
-    deadline = time.monotonic() + .24
-    bus = dbus.bus.BusConnection(address)
+def focused(bus, pid, x, y):
     registry = interface(bus, "org.a11y.atspi.Registry", ROOT, ACCESSIBLE)
     daemon = interface(bus, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus")
     applications = registry.GetChildren(timeout=.08)
@@ -97,59 +98,43 @@ def focused(address, pid, x, y, hint):
     if len(candidates) != 1:
         return None
     owner = candidates[0]
-    if hint.startswith(PREFIX):
-        # A previously verified object reference is only a search hint. Its
-        # current state, bounds and mode still need to match the current tap.
+    collection = interface(bus, owner, ROOT, "org.a11y.atspi.Collection")
+    # Two references suffice to detect ambiguity. GetMatches returns only
+    # object references, even for a browser with a large accessibility tree.
+    references = collection.GetMatches(FOCUSED_EDITABLE, CANONICAL, 2, True,
+                                       signature="(aiia{ss}iaiiasib)uib", timeout=.08)
+    if len(references) != 1:
+        return None
+    name, path = map(str, references[0])
+    if name != owner or not path.startswith(PREFIX):
+        return None
+    node = interface(bus, owner, path, ACCESSIBLE)
+    return read_field(bus, owner, path, node.GetState(timeout=.08), x, y)
+
+
+def serve(channel, bus):
+    # Chromium must find the registry when the owned browser starts.
+    for _ in range(20):
+        if bus.name_has_owner("org.a11y.atspi.Registry"):
+            channel.sendall(b"\x01")
+            break
+        time.sleep(.02)
+    else:
+        return
+
+    while packet := channel.recv(PACKET_SIZE + 1):
+        if len(packet) > PACKET_SIZE:
+            return
+        sequence, pid, x, y = json.loads(packet)
         try:
-            node = interface(bus, owner, hint, ACCESSIBLE)
-            match = read_field(bus, owner, hint, node.GetState(timeout=.08), x, y)
-            if match is not None:
-                return match
-        except dbus.DBusException:
-            pass
-    pending = [(owner, ROOT)]
-    documents = []
-    searching_web = False
-    seen = set()
-    found = None
-    while pending or documents:
-        if len(seen) >= MAX_NODES or time.monotonic() >= deadline:
-            return None
-        if not pending:
-            # Finish the browser chrome first. A large New Tab Page must not
-            # consume the address bar's search budget. If a document reports
-            # that it covers the tap, still check it for ambiguous focus.
-            pending = documents
-            documents = []
-            searching_web = True
-            if not pending:
-                break
-        name, path = map(str, pending.pop())
-        if name != owner or not path.startswith(PREFIX) or path in seen:
-            continue
-        node = interface(bus, owner, path, ACCESSIBLE)
-        if not searching_web and str(node.GetRoleName(timeout=.08)) == "document web":
-            component = interface(bus, owner, path, "org.a11y.atspi.Component")
-            bounds = map(int, component.GetExtents(dbus.UInt32(0), timeout=.08))
-            if contains_point(bounds, x, y):
-                documents.append((name, path))
-            continue
-        seen.add(path)
-        states = node.GetState(timeout=.08)
-        match = read_field(bus, owner, path, states, x, y)
-        if match is not None:
-            if found is not None:
-                return None
-            found = match
-        children = node.GetChildren(timeout=.08)
-        if len(pending) + len(children) > MAX_NODES:
-            return None
-        pending.extend(children)
-    return found
+            result = focused(bus, pid, x, y)
+        except (dbus.DBusException, IndexError, TypeError, ValueError):
+            result = None
+        reply = json.dumps({"sequence": sequence, "field": result}).encode()
+        if len(reply) > PACKET_SIZE:
+            return
+        channel.sendall(reply)
 
 
-try:
-    result = focused(sys.argv[1], *map(int, sys.argv[2:5]), sys.argv[5])
-except (dbus.DBusException, IndexError, TypeError, ValueError):
-    result = None
-print(json.dumps(result))
+with socket.socket(fileno=3) as channel:
+    serve(channel, dbus.bus.BusConnection(sys.argv[1]))

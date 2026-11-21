@@ -178,7 +178,10 @@ func cleanEnv(display, auth string) []string {
 }
 
 func (r *runtime) spawn(role, binary string, args, env []string) (*child, error) {
-	cmd := exec.Command(binary, args...)
+	return r.startChild(role, exec.Command(binary, args...), env)
+}
+
+func (r *runtime) startChild(role string, cmd *exec.Cmd, env []string) (*child, error) {
 	cmd.Env = env
 	cmd.Stdin = nil
 	cmd.Stdout = nil
