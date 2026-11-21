@@ -18,6 +18,7 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
       checks: read
       pull-requests: read
@@ -54,23 +55,27 @@ jobs:
           pr=$(gh pr create --base main --head "$branch" --title "chore(vh-adlc): lock the $VERSION binary" \
             --body "Automated by .github/workflows/lock.yml: v$VERSION changed the binary. checksums.txt is signed by the release key and every archive matches it. Merges itself when CI passes.")
           head=$(git rev-parse HEAD)
-          printf 'url=%s\nhead=%s\n' "$pr" "$head" >> "$GITHUB_OUTPUT"
+          printf 'url=%s\nhead=%s\nbranch=%s\n' "$pr" "$head" "$branch" >> "$GITHUB_OUTPUT"
       # The installation token expires after one hour. Use the job token for polling.
       - name: Wait for pull request checks
         if: steps.lock.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ steps.pull.outputs.url }}
+          PR_HEAD: ${{ steps.pull.outputs.head }}
+          PR_BRANCH: ${{ steps.pull.outputs.branch }}
         run: |
           for _ in $(seq 30); do
-            count=$(gh pr view "$PR" --json statusCheckRollup -q '.statusCheckRollup | length')
-            if [ "$count" -gt 0 ]; then
+            run=$(gh run list --workflow ci.yml --branch "$PR_BRANCH" --commit "$PR_HEAD" \
+              --event push --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            if [ -n "$run" ]; then
+              gh run watch "$run" --exit-status
               gh pr checks "$PR" --watch --fail-fast
-              exit
+              exit 0
             fi
             sleep 20
           done
-          echo 'The lock pull request checks did not start within ten minutes.' >&2
+          echo 'The lock branch CI run did not start within ten minutes.' >&2
           exit 1
       - id: merge-token
         if: steps.lock.outputs.changed == 'true'

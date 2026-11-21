@@ -12,7 +12,7 @@ Affected path: `.github/workflows/lock.yml`.
 
 Verification inputs: the lock workflow, existing release helper, CI workflow and GitHub App token action pin.
 
-Proposed change: poll checks with a read-only job token. Mint a fresh installation token just before merging and pass the original PR head to GitHub.
+Proposed change: poll checks with a read-only job token. Wait for the push-triggered CI workflow for the exact branch and commit to succeed, then check the PR rollup. Mint a fresh installation token before merging and pass the original PR head to GitHub.
 
 Required checks: actionlint and shell syntax. Exercise passing and failing checks, missing checks and the final expected-head argument with fake credentials. Confirm actual GitHub behavior on a subsequent release before declaring the automation restored.
 
@@ -20,7 +20,7 @@ Required checks: actionlint and shell syntax. Exercise passing and failing check
 
 The [v0.40.1 lock run](https://github.com/michielvha/vh-adlc/actions/runs/44934947091) opened PR #144 successfully, then received HTTP 401 while polling. The job cleanup reported an expired installation token.
 
-The edited workflow passed actionlint. A local mock ran the polling and merge shell blocks. Passing checks reached the merge path, failed checks and a startup timeout returned nonzero, and the merge command used the fresh credential and expected head. The hosted lock workflow still needs a real run after delivery.
+The edited workflow passed actionlint. A local mock ran the polling and merge shell blocks. Passing CI and PR checks reached the merge path. A failed run, failed PR checks, or a startup timeout returned nonzero. The merge command used the fresh credential and expected head. The hosted lock workflow still needs a real run after delivery.
 
 ## State
 
