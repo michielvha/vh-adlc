@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Reviews R-1 and R-2 and the owner's answers applied; waiting for a new spec review."
+status_description: "Reviews R-1 to R-3 and the owner's answers applied; waiting for a new spec review."
 issue: null
 goal: "Each task's verification runs only the rungs declared for the task stage, while push, completion and delivery still require every applicable rung."
 covers:
@@ -38,8 +38,9 @@ checks less than today. The rule that a result recorded at another commit does n
 except for the document-only completion commit ship pushes after its Verify run.
 
 Implement runs `--stage task` at each task. Ship runs `--stage completion` once, at its Verify step, just
-before it commits the `complete` status update; it then pushes that completion commit without a second
-run, because the commit changes only the feature document. After the merge, ship runs the completion stage
+before it commits the `complete` status update; in that same ship run it then pushes the completion commit
+without a second run, because the commit changes only the feature document. A retried or resumed push runs
+the completion stage again first. After the merge, ship runs the completion stage
 at the merge commit, as today. Each stage performs its own written-procedure rungs, such as a browser
 pass, and records their results with `--record`: implement those of the task stage at each task, ship every
 applicable one at completion and after the merge. No procedure says this today, so a procedure rung
@@ -60,8 +61,10 @@ completion-only rung is not executed at the task stage and blocks at the complet
 and reference text checks. None has run yet. The owner chose a `stages` list, a completion default for the
 flag, completion left to ship, one completion run before the document-only completion commit, a cheap
 `deferred` lookup for Finish that keeps today's exit 3, each stage recording its own procedure rungs, exact
-command checks for implement, and the next minor plugin version above main at implementation time. Reviews
-R-1 and R-2 found only should-fix issues and nits, all applied here; a new review is pending. Acceptance
+command checks for implement and ship, the next minor plugin version above main at implementation time
+(its mention in the reference checked once, not by a permanent test), and the document-only exemption
+holding only within the ship run that observed the pass. Reviews R-1 to R-3 found only should-fix issues
+and nits, all applied here; a new review is pending. Acceptance
 authorizes implementing this document on a feature branch and opening one PR with that version bump;
 merging stays with the owner.
 
@@ -159,8 +162,11 @@ as today, apart from the added `stage` and `deferred` keys.
 Every applicable rung must pass at the commit being completed, pushed or delivered, with one exemption:
 ship's completion commit. Ship runs the completion stage at its Verify step, at commit V. Its Gate step then
 commits the `complete` status update as commit C, staging only the feature document, and ship pushes C
-without a second run when `git diff --name-only V C` lists only that document. If C changes anything else,
-or another commit follows V, ship runs the completion stage again at the new head before pushing. The
+without a second run when `git diff --name-only V C` lists only that document and the push happens in the
+same ship run that observed the completion stage advance at V. If C changes anything else, another commit
+follows V, or the push is retried or resumed in a later run (after an interruption or a rejected push),
+ship runs the completion stage again at the head before pushing, because results are never stored between
+runs. The
 reference states this exemption next to the commit rule. A delivery check after the merge has no exemption:
 it runs at the merge commit, as today.
 
@@ -178,7 +184,10 @@ it runs at the merge commit, as today.
 - Ship, Verify: perform every applicable written-procedure rung, then run
   `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage completion --run true`,
   passing each performed procedure rung's result with `--record`. Ship sets `complete` and pushes only when
-  that run may advance, under the completion-commit exemption above.
+  that run may advance, under the completion-commit exemption above. This replaces the skill's opening rule
+  that ship runs the rungs "before pushing" and pushes only when they "may advance at HEAD"; no stage-less
+  `rungs --repo <dir> --base <default branch> --run true` command and no `may advance at HEAD` remain in the
+  ship procedure.
 - Ship, after the merge: from a checkout of the merge commit, perform every applicable written-procedure
   rung again and run `--merge <merge commit> --stage completion --run true` with their `--record` results.
 
@@ -215,8 +224,10 @@ names that release as the minimum plugin version. Rollback is removing the field
       `complete`, says the completion stage runs in ship and reports the step `vh-adlc next` returns. The
       ship procedure performs every applicable procedure rung and passes its result with `--record`, runs
       the command with `--stage completion` at its Verify step and with
-      `--merge <merge commit> --stage completion` after the merge, and pushes its completion commit without
-      a second run only when that commit changes nothing but the feature document.
+      `--merge <merge commit> --stage completion` after the merge, pushes its completion commit without a
+      second run only when that commit changes nothing but the feature document and the push is in the same
+      ship run that observed the pass, runs the completion stage again before a retried or resumed push, and
+      keeps no stage-less `rungs ... --run true` command or `may advance at HEAD` rule.
 - [ ] AC-07: The loop settings reference documents `verification_rungs[].stages`, its default, the
       `completion` requirement, the `--stage` flag with its default, `deferred`, the completion-commit
       exemption and, as the minimum plugin version, the version both manifests carry; the workflows guide
@@ -233,9 +244,9 @@ names that release as the minimum plugin version. Rollback is removing the field
 | AC-03 | `bun test tests/vh-adlc/loop/cli.test.ts`: the same fixture with `--stage completion --run true` and with no `--stage` each exits 3, the marker file exists, and `blocking` contains the completion-only rung. |
 | AC-04 | `bun test tests/vh-adlc/loop/cli.test.ts`: `--stage push` and `--stage task --merge <sha>` each exit 2 with `status: "error"`, and a rung command that writes a marker file has not run. |
 | AC-05 | `bun test tests/vh-adlc/loop/cli.test.ts`: a new fixture with the three rungs of `tests/vh-adlc/loop/rungs.test.ts` (`verify` always, `integration` on `backend/**`, `kind` on `e2e/**`) and a feature that changes `backend/`; at `--stage task` and at `--stage completion` the output has `applicable` equal to the literal `["verify", "integration"]`, `results` equal to literal name, state and reason triples (`verify` passed `exit 0`, `integration` passed `exit 0`, `kind` not run with the path-condition reason), `advance` true and `blocking` `[]`, values written down from the plugin before this feature. |
-| AC-06 | `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: the implement skill contains `rungs --repo <dir> --base <default branch> --stage task --run true` and `--record`, contains no match for `rungs --repo <dir> --base <default branch> --run true`, and its Finish section contains `--stage task`, `deferred`, `vh-adlc next` and `ship` and no `--run`; the ship skill contains `--stage completion`, `--merge <merge commit> --stage completion`, `--record` and `only the feature document`. |
-| AC-07 | `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: `references/loop-settings.md` contains a `verification_rungs[].stages` table row, `--stage`, `deferred`, `completion commit` and the `version` read from `plugins/vh-adlc/.claude-plugin/plugin.json`; `docs/user-guides/workflows.md` contains `completion stage`. |
-| AC-08 | `bun test tests/vh-adlc/check.test.ts`: the existing "portable and Claude metadata describe one shared package" check proves the two manifests are equal and the existing "a package change comes with a version change" check proves the version differs from `origin/main`; then the written procedure: compare `version` in `git show origin/main:plugins/vh-adlc/.claude-plugin/plugin.json` with the branch's, and pass only when the branch's has the minor component one above and the patch at 0. No test pins a literal version, so later lock bumps do not break it. |
+| AC-06 | `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: the implement skill contains `rungs --repo <dir> --base <default branch> --stage task --run true` and `--record`, contains no match for `rungs --repo <dir> --base <default branch> --run true`, and its Finish section contains `--stage task`, `deferred`, `vh-adlc next` and `ship` and no `--run`; the ship skill contains `--stage completion`, `--merge <merge commit> --stage completion`, `--record`, `only the feature document`, `same ship run` and `retried or resumed`, and contains no match for `rungs --repo <dir> --base <default branch> --run true` and no `may advance at HEAD`. |
+| AC-07 | `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: `references/loop-settings.md` contains a `verification_rungs[].stages` table row, `--stage`, `deferred` and `completion commit`; `docs/user-guides/workflows.md` contains `completion stage`. The minimum plugin version the reference names is checked once by the written procedure in the AC-08 row, not by a permanent test. |
+| AC-08 | `bun test tests/vh-adlc/check.test.ts`: the existing "portable and Claude metadata describe one shared package" check proves the two manifests are equal and the existing "a package change comes with a version change" check proves the version differs from `origin/main`; then the written procedure: compare `version` in `git show origin/main:plugins/vh-adlc/.claude-plugin/plugin.json` with the branch's, and pass only when the branch's has the minor component one above and the patch at 0, and when `references/loop-settings.md` names exactly that version as the minimum for `stages`. No test pins a literal version, so later lock bumps do not break it. |
 
 ## Tasks
 
