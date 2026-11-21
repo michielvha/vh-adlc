@@ -180,6 +180,18 @@ archived or handed back: a feature merged and its branch removed, a maintenance 
 an investigation or review reported with nothing left to run. Do not clean up between operations of the
 same work, because the next step would have to check out, build and download everything again.
 
+A failed run is not the end of the work when a retry is planned. While you or the owner still intend to
+retry, keep what the retry reuses (pulled images, build and dependency caches, a kept cluster, a
+restore target) and say in the report that you kept it and for which retry. Remove it as soon as no
+retry is planned or wanted, and at the latest when the session's work is done. Never let leftovers of
+failed runs pile up across retries: a retry reuses the earlier run's kept state or removes it first.
+
+A script or tool you write that creates per-run scratch (a temporary container engine, a restore target,
+a fixture checkout) removes that scratch on every exit, success or failure, through a trap or `finally`,
+unless the run was started with an explicit keep-for-retry option. It pulls images and dependencies into
+a reusable cache it can find again, not into a fresh per-run directory, so a retry does not download the
+same gigabytes again.
+
 1. Remove what this session created and no longer needs: scratch directories, temporary worktrees and
    their branches, worktree slots, Compose projects and clusters it started for itself, and background
    processes it launched. Keep what open work still depends on, and never touch what another session
