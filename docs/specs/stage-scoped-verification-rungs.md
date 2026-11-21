@@ -300,6 +300,7 @@ None.
 | 2026-11-21 | R-6 | spec | `e2b27b37` | claude-opus-5-5 | procedural | One should-fix finding and one nit; no blocking finding |
 | 2026-11-21 | R-7 | spec | `40983b5b` | claude-opus-5-5 | procedural | Two should-fix findings and two nits; no blocking finding |
 | 2026-11-21 | R-8 | spec | `66a2976f` | claude-opus-5-5 | procedural | Two nits; clean |
+| 2026-11-21 | R-8 | spec | `66a2976f` | n/a | n/a | accepted by owner |
 
 ### R-1
 
