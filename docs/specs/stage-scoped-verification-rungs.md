@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Reviews R-1 to R-7 and the owner's answers applied; waiting for a new spec review."
+status_description: "Review R-8 is clean; waiting for the owner's acceptance."
 issue: null
 goal: "Each task's verification runs only the rungs declared for the task stage, while push, completion and delivery still require every applicable rung."
 covers:
@@ -299,6 +299,7 @@ None.
 | 2026-11-21 | R-5 | spec | `e59f9154` | claude-opus-5-5 | procedural | Two should-fix findings and one nit; no blocking finding |
 | 2026-11-21 | R-6 | spec | `e2b27b37` | claude-opus-5-5 | procedural | One should-fix finding and one nit; no blocking finding |
 | 2026-11-21 | R-7 | spec | `40983b5b` | claude-opus-5-5 | procedural | Two should-fix findings and two nits; no blocking finding |
+| 2026-11-21 | R-8 | spec | `66a2976f` | claude-opus-5-5 | procedural | Two nits; clean |
 
 ### R-1
 
@@ -509,3 +510,19 @@ SEVERITY: nit
 WHERE: Design, The completion commit ("The reference states the rule for pushed and delivered commits, not for every commit that sets `complete`"); covers (`plugins/vh-adlc/scripts/loop/rungs.ts`)
 EVIDENCE: The covered source restates the old rule in comments: plugins/vh-adlc/scripts/loop/rungs.ts:2 "Every applicable rung must pass at the commit being pushed, completed or delivered" and rungs.ts:71 "Whether the results let the feature push, complete or deliver at `head`". The cli.ts usage comment (plugins/vh-adlc/scripts/loop/cli.ts:5-6) lists the `rungs` flags without `--stage`. The Design updates only the reference, so these comments would contradict it after implementation.
 PROPOSAL: Add a line saying the rungs.ts comments and the cli.ts usage comment are updated to match the reference.
+
+### R-8
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Concurrency, failure and upgrade ("the failure is handled by ship's existing rules for a failed verification in its operation body (`plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:72-83`), which this feature does not change: a covered fix in the same run with a fresh implementation review, or a report that names the blocking rungs and stops"); Context, Owner summary ("follows its existing rules for a failed verification"); Acceptance Criteria AC-09 ("pushes nothing and sets no status after a blocked completion run")
+EVIDENCE: The ship operation body at 66a2976f has no rule for a failed verification that reports blocking rungs and stops. Step 2 Verify says only "Run the repository's own verification commands and note what they printed" (SKILL.md:78). Step 1's "report the review and stop" applies to a fresh implementation review that does not return every criterion `met`, and its last sentence, "The same applies to any covered change verification requires" (SKILL.md:72-77), covers only the covered-fix path. Today the stop after blocked rungs comes from the Loop routes sentence "never pushes or reports the feature complete unless it may advance at HEAD" (SKILL.md:51-54). The Design replaces that sentence, so after this feature the stop comes from the new override's "pushes only when that run may advance", not from the body. Whether ship names the blocking rungs is left to the Report section's "anything partial". This changes little, because AC-09 checks only that ship pushes nothing and sets no status.
+PROPOSAL: Say that ship's body allows a covered fix in the same run with a fresh review, and that otherwise ship stops under the override's "pushes only when that run may advance" rule. Drop the claim that the body names blocking rungs, or add naming them to the ship override and to AC-09.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-09 ("with a non-empty `deferred` does not set `complete` but reports the deferred rungs and the step `vh-adlc next` returns"); Design, Procedures (Implement, Finish: "it reports the deferred rungs, says the completion stage runs in ship, and reports the step `vh-adlc next` returns")
+EVIDENCE: The Design's Finish bullet says Finish states that the completion stage runs in ship, and the Owner summary says "ship completes the feature". AC-09 lists everything else in that bullet but not this statement, so the reviewer's written check in Test Plan row AC-09 never confirms it. An implementer who reports only the deferred rungs and the `next` step still meets AC-09.
+PROPOSAL: Add "says the completion stage runs in ship" to AC-09's list of implement Finish behaviours, or drop it from the Design bullet.
