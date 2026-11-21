@@ -17,7 +17,8 @@ const reportFormat = "Finish with a single JSON object containing status (comple
   + "in a freshness string. For refused input, include a message explaining what failed and a reasonCode from: "
   + "invalid-arguments, duplicate-path, noncanonical-path, outside-scope (including excluded or non-document paths), "
   + "untracked-path, dirty-checkout, non-regular-document, non-regular-policy, missing-policy, incomplete-inventory. "
-  + "Use the installed procedure and actual repository evidence before giving the result. Keep the project read-only.";
+  + "Use the installed procedure and actual repository evidence before giving the result. "
+  + "Distinguish a committed setting from a package default. Keep the project read-only.";
 
 const cases = {
   default: { ask: "Review the next batch at its default size.", mode: "next", paths: [setup], coverage: "full" },
@@ -169,7 +170,7 @@ function verifyReport(report: Record<string, unknown>, selected: TrialCase, id: 
       [/make start/i, "accurate", /Makefile/i],
       [/external.*backend/i, "accurate", /service\.conf/i],
       [/workers/i, "unknown", /worker|config|source|Makefile/i],
-      [/probe|60.second/i, "incorrect", /probe\.conf/i],
+      [/probe|60.second/i, "unknown", /probe\.conf/i],
       [/503|unavailable/i, "accurate", /client.contract/i],
     ] as const;
     for (const [claim, verdict, source] of expected) {
