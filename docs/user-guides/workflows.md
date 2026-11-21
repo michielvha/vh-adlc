@@ -328,6 +328,13 @@ the rest are listed in the conversation. The agent applies each pass's findings 
 revision, after asking you about any judgement finding, so one pass's fixes do not
 seed the next pass's findings.
 
+Every investigation and spec states the harm a fix prevents and the simplest
+alternative without new machinery, such as a process rule or a manual step. The
+reviewer flags a missing harm statement, and machinery out of proportion to the
+harm. When two spec reviews in a row are blocking and the blocking count does not
+fall, the agent stops revising. It asks whether to keep going, narrow the scope,
+replace the feature with the simpler alternative, or park it.
+
 An implementation review never skips a check it is able to run. When a criterion depends on what an
 agent does in a session, the implementer proves it with a committed script that reruns that session and
 keeps its transcript, so the reviewer can rerun it; a subagent's own report does not count as evidence.
