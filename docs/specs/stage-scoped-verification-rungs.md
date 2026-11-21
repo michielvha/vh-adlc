@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Reviews R-1 to R-6 and the owner's answers applied; waiting for a new spec review."
+status_description: "Reviews R-1 to R-7 and the owner's answers applied; waiting for a new spec review."
 issue: null
 goal: "Each task's verification runs only the rungs declared for the task stage, while push, completion and delivery still require every applicable rung."
 covers:
@@ -47,9 +47,9 @@ pass, and records their results with `--record`: implement those of the task sta
 applicable one at completion and after the merge. No procedure says this today, so a procedure rung
 currently blocks every run. When any applicable rung skips the task
 stage, implement's Finish step does not set `complete`; it reports those rungs and the next step
-`vh-adlc next` returns, and ship completes the feature. If ship's completion run blocks, ship reports the
-blocking rungs and names `/vh-adlc-tasks` to append a fix task; when the document is already `complete`
-locally and unpushed, whether implement or ship set it, ship stops and names the owner decision instead. All new procedure text goes into each
+`vh-adlc next` returns, and ship completes the feature. A blocked completion run is handled exactly like
+any failed check in ship today: ship pushes nothing, sets no status, and follows its existing rules for a
+failed verification. All new procedure text goes into each
 skill's Loop routes section as overrides, so the owner-approved operation bodies stay unchanged. Rungs
 without `stages` keep today's selection and verdict; the implement and ship procedure changes (the
 Verify-step run, the completion-commit exemption and recorded procedure rungs) apply to every adopter with
@@ -72,9 +72,8 @@ command checks for implement and ship, the next minor plugin version above main 
 (its mention in the reference checked once, not by a permanent test), and the document-only exemption
 holding only within the ship run that observed the pass, automated checks limited to exact command strings
 with the rest judged by the implementation reviewer, procedure text placed in the Loop routes sections, and
-`/vh-adlc-tasks` as the route after a blocked completion run, with an owner stop whenever the document is
-already `complete` locally and unpushed. Reviews R-1 to R-3, R-5 and R-6 found should-fix issues and nits and R-4 one blocking
-proof flaw, all applied here; a new review is pending. Acceptance
+no new route for a blocked completion run beyond ship's existing failed-check rules. Reviews R-1 to R-3 and
+R-5 to R-7 found should-fix issues and nits and R-4 one blocking proof flaw, all applied here; a new review is pending. Acceptance
 authorizes implementing this document on a feature branch and opening one PR with that version bump;
 merging stays with the owner.
 
@@ -215,14 +214,14 @@ baseline.
 
 The command reads settings and runs checks; it writes no shared state, so concurrent invocations behave as
 today. A rung that times out or cannot run blocks its stage exactly as today. If the completion run blocks,
-ship pushes nothing. If the document is still `in-progress`, ship sets no status; every task is ticked at
-that point, so ship reports the blocking rungs and names `/vh-adlc-tasks` as the next step, to append a task
-for the fix; implement and a fresh implementation review follow, then ship again. If the document is
-already `complete` locally and unpushed, whether implement's Finish or ship's own Gate set it, the
-feature-document rules do not let it move back; ship then stops, reports the blocking rungs and the unpushed
-completion commit, and names the owner decision. It rewrites nothing. Upgrade: a plugin older than
+ship pushes nothing and sets no status, and the failure is handled by ship's existing rules for a failed
+verification in its operation body (`plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:72-83`), which this
+feature does not change: a covered fix in the same run with a fresh implementation review, or a report that
+names the blocking rungs and stops. This feature adds no route of its own for that case. Upgrade: a plugin older than
 the release that ships this feature refuses settings that use `stages` (strict key check), so the reference
-names that release as the minimum plugin version. Removing the field restores today's rung selection;
+names that release as the minimum plugin version. The comments in `plugins/vh-adlc/scripts/loop/rungs.ts`
+that restate the commit rule and the `rungs` usage comment in `plugins/vh-adlc/scripts/loop/cli.ts` are
+updated to match the reference and the `--stage` flag. Removing the field restores today's rung selection;
 rolling back the procedure changes needs the previous plugin version.
 
 ## Acceptance Criteria
@@ -263,10 +262,9 @@ rolling back the procedure changes needs the previous plugin version.
       the deferred rungs and the step `vh-adlc next` returns; and, in the ship skill, that ship performs every
       applicable procedure rung with `--record`, replaces the "before pushing ... may advance at HEAD" rule
       with the Verify-step run, pushes the document-only completion commit without a second run only within
-      the same ship run, reruns the completion stage before a retried or resumed push, and after a blocked
-      completion run reports the blocking rungs and names `/vh-adlc-tasks`, or, when the document is
-      already `complete` locally and unpushed, stops and names the owner decision without rewriting
-      anything.
+      the same ship run, reruns the completion stage before a retried or resumed push, and pushes nothing
+      and sets no status after a blocked completion run; and that implement's Finish runs its lookup without
+      `--run`.
 
 ## Test Plan
 
