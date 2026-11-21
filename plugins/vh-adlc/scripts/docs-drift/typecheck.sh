@@ -3,8 +3,9 @@
 set -euo pipefail
 component_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 bun_bin=${BUN_BIN:-bun}
-if [[ $("$bun_bin" --version) != 1.4.4 ]]; then
-  printf '%s\n' 'Use the declared Bun 1.4.4 toolchain' >&2
+package_manager=$("$bun_bin" --eval 'console.log((await Bun.file(process.argv[1]).json()).packageManager)' "$component_dir/package.json")
+if [[ "bun@$("$bun_bin" --version)" != "$package_manager" ]]; then
+  printf 'Use the declared %s toolchain\n' "$package_manager" >&2
   exit 1
 fi
 compiler_work=$(mktemp -d "${TMPDIR:-/tmp}/vh-docs-drift-types.XXXXXX")

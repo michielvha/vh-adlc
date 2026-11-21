@@ -2,10 +2,11 @@ import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-if (Bun.version !== "1.4.4") throw new Error("Build with the declared Bun 1.4.4 toolchain");
+const component = import.meta.dir;
+const { packageManager } = await Bun.file(join(component, "package.json")).json();
+if (`bun@${Bun.version}` !== packageManager) throw new Error(`Build with the declared ${packageManager} toolchain`);
 const args = process.argv.slice(2);
 if (args.length > 1 || (args.length === 1 && args[0] !== "--check")) throw new Error("usage: bun build-zip.ts [--check]");
-const component = import.meta.dir;
 const originalDirectory = process.cwd();
 const work = mkdtempSync(join(tmpdir(), "vh-docs-drift-bundle-"));
 try {

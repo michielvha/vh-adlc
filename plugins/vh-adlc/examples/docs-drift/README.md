@@ -5,7 +5,7 @@ version-2 settings run an actual local-link scanner through the shared helper.
 The repository starts staged. Its model is a placeholder and its component
 binding is unset. Collection uses no provider credentials.
 
-Install Bun 1.4.4, Node, Git and Bash. Acquire the verified binary through the
+Install Bun 1.4.5, Node, Git and Bash. Acquire the verified binary through the
 installed plugin's `scripts/ensure-vh-adlc.sh`, then resolve the knowledge pages
 listed in `references/docs-drift.md`. Select a fresh private external run
 directory. The helper creates it with owner-only permissions and records ownership.
