@@ -437,6 +437,7 @@ R-1 to R-6.
 | 2026-11-21 | R-4 | spec | `baf9eba0` | claude-opus-5-5 | procedural | 1 blocking, 5 should-fix, 3 nits |
 | 2026-11-21 | R-5 | spec | `fdfe84c7` | claude-opus-5-5 | procedural | 0 blocking, 9 should-fix, 1 nit |
 | 2026-11-21 | R-6 | spec | `10298ec8` | claude-opus-5-5 | procedural | 1 blocking, 7 should-fix, 4 nits |
+| 2026-11-21 | R-7 | spec | `e7bac6a4` | claude-opus-5-5 | procedural | 0 blocking, 6 should-fix, 2 nits |
 
 ### R-1
 
@@ -1043,6 +1044,66 @@ SEVERITY: nit
 WHERE: Context > Owner summary (second paragraph); Design > Setting (`capture.timeout_minutes`, default 60)
 EVIDENCE: The summary does not mention the 60-minute default limit on the capture run, during which ship waits, or that leftover background processes are killed when the capture exits. Both are defaults an owner would want to know. The sentence "When a committed change in the feature matches, ship opens or updates the PR" also reads as if opening the PR depends on the match.
 PROPOSAL: Add one sentence on the 60-minute default and the cleanup, and reword so that only the visual record step depends on the match.
+
+### R-7
+
+TARGET: e7bac6a4b3fb675eda85e9cfa68cef21142494ca
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command (synopsis, "prints one JSON object"; step 2, the capture step); Design > Ship steps 2 to 8; AC-03; AC-04; Test Plan rows AC-03 and AC-04
+EVIDENCE: Ship parses the command's single JSON object in steps 3 to 8. Step 2 says the result is decided at exit, "not when its output pipes close". It never says whether the capture's stdout and stderr are inherited, piped or discarded, or what stdin the capture gets. The rung runner pipes both streams, sets stdin to ignore (`plugins/vh-adlc/scripts/loop/rungs.ts:59`) and keeps the output, which `cli.ts rungs` returns as `output_tail` (`cli.ts:142`). If an implementation inherits stdout, the adopter's build and browser logs land before the JSON and ship cannot parse the result. If it inherits stdin from an interactive host, a prompt in the capture waits until the 60-minute limit. The missing reason for a non-zero exit carries only the exit code, so neither ship nor the owner can see why a capture failed. No Test Plan row checks any of this: the AC-04 background-process case asserts only timing and PIDs.
+PROPOSAL: State that the capture's stdin is ignored, that its stdout and stderr are captured and never written to the command's stdout, and that a bounded output tail goes into the output and into the failed-capture missing reason. Add a capture script that prints to stdout to the AC-03 row, and assert that stdout is exactly one JSON object.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 2 ("an empty side is allowed: a broken build shows up as a failed capture, not as a missing side"; "the command must not change the feature checkout"); AC-05 ("a side with no images next to a side with images is not a missing item"); AC-09; Test Plan rows AC-05 and AC-09
+EVIDENCE: This revision applied R-6 F-06. It removed the reasons "it wrote no before images" and "it wrote no after images" and added that "a broken build shows up as a failed capture". That holds only when the adopter's command exits non-zero after failing to build or capture a side. Take a script that builds HEAD, fails to start the server, catches the error and exits 0 with an empty `after/`. It now yields record state `full`, with every screen shown as removed and nothing in `missing`, which goes against the goal ("or says which images are missing and why"). Step 2 also says the command "must not change the feature checkout". That checkout is the owning worktree, where unrelated dirty work may sit and must never be staged or discarded (`plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:88-89`). A capture script that checks out the base commit there switches the feature branch. Neither obligation is in AC-09's list or among the AC-09 row's required phrases (`never the working tree`, `builds no checkouts`, `tolerate leftovers`), so the guide adopters copy from can leave out both.
+PROPOSAL: Add both obligations to AC-09, with required phrases in its row (for example `exit non-zero` when either side cannot be built or captured, and `must not change the feature checkout`) and a must-fail example that lacks each.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-07, statement (11); AC-07; Design > Ship steps 4 and 8
+EVIDENCE: Statement (11) requires only the token `Visual record missing`. Step 4's withheld line, "Visual record missing: ship withheld the images after inspection", already holds that token in its own paragraph. So a skill that keeps steps 1 to 7, 9 and 10 but drops step 8 (any other exit 2, or a step with no output) passes (11) and every other statement. That skill writes nothing to the PR when the command errors, so the record is silently absent. A scratch script confirmed that every pass example contains its tokens and every fail example lacks one, so the gap is coverage, not a broken example. The row's text changed in this revision (statement (6), the paragraph rule, (16) and (17)) and has had no clean pass, so this is not a widening nit on a passed row.
+PROPOSAL: Make (11) require `Visual record missing` together with `exit 2` and `no output`. Use the pass example "On any other exit 2, or when a step produced no output, write a marked section holding \"Visual record missing:\" and the reason", and add the fail example "If a file can't be viewed, write \"Visual record missing: ship withheld the images\"".
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-02; AC-02 ("Each exit-2 condition in the design exits 2"); Design > Command (exit-2 list, "`<out>/capture.json` is missing or was written for another base, head or PR")
+EVIDENCE: The Design exits 2 when `capture.json` was written for another base, head or PR. The AC-02 row tests only "a `capture.json` for another PR". The realistic mismatch is a new commit on the feature branch, or a merge of the default branch, between the capture and push steps. Without the check, the push step would push images captured at one commit and link them as the record of another. An implementation that compares only the PR number passes the row.
+PROPOSAL: Add to the AC-02 row a `--push` after a new commit on the feature branch (head mismatch) and one with a `--base` whose merge base differs from the capture's (base mismatch), each exiting 2.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship steps 2 and 4; Design > Command, State paragraph ("Images not pushed keep their local files"); Design > Concurrency, failure, retry, upgrade ("Concurrent ships", "Visibility")
+EVIDENCE: Every ship creates a new `--out` "outside the repository", and the command keeps images it did not push. Nothing says whether ship removes that directory after the push step, keeps it, or names it in its report. In the withheld case (step 4), the directory holds an image ship judged to show a credential, a session or real user data. The pinned standard keeps screenshots in "an ignored artifact directory" and says "Redact credentials and session material before sharing artifacts" (`conventions/frontend-testing.md:175`, `:177` at 0c983f6). One implementer deletes the directory. Another leaves an unnamed temporary directory behind on every ship, holding whatever was withheld.
+PROPOSAL: State where ship creates `--out` and that its report names it. Say whether the directory is removed after a verified push and whether it is kept or removed after a withheld record. Add that as a statement in the AC-07 row.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship, lead paragraph ("replaces the earlier marked text") and steps 3 and 6; Design > Terms (Before and after section row); Test Plan row AC-07, statements (4) and (8)
+EVIDENCE: vh-adlc's section is "the text from its start marker through its end marker". A PR body is free text that people edit, and some bodies have no defined section: a start marker with no end marker after it, an end marker alone, or two start markers from a pasted copy. One implementer treats everything after the start marker as the section and deletes a reviewer's later text. Another appends a second section and leaves the stray marker. Steps 3 and 6 remove or replace the section on every ship, so this decides whether ship deletes text it did not write, which the design otherwise rules out ("A `## Before and after` section without the markers is never touched").
+PROPOSAL: State that ship removes or replaces only a complete start-to-end pair. When the markers are unpaired, it leaves the existing body text alone, appends its section last and reports the stray marker. Add this as a statement in the AC-07 row.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Owner summary, second paragraph ("when a committed change in the feature matches, it then runs a new `cli.ts visuals` command in two steps"); Design > Ship steps 2 and 3
+EVIDENCE: Ship step 2 runs the command after every Deliver. The command decides applicability itself (Command step 1) and reports `not-applicable`, and ship then removes its section (Ship step 3). The summary still reads as if ship checks the match before running anything. This wording came from applying R-6 F-12 in this revision.
+PROPOSAL: Say that ship runs `cli.ts visuals` after every PR create or update, and that the command captures only when a committed change matches.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design > Setting (`when.paths`); Design > Command step 1; AC-02
+EVIDENCE: `when.paths` is a "list of string globs" with no matcher named. The rung path condition matches with `Bun.Glob` (`plugins/vh-adlc/scripts/loop/rungs.ts:43`), while `covers` patterns use a separate matcher held to shared cases (`tests/vh-adlc/loop/covers-cases.json`). The two agree on simple patterns, so this rarely changes a result.
+PROPOSAL: Say that `when.paths` matches the same way as `verification_rungs[].when.paths`.
 
 ## Sources
 
