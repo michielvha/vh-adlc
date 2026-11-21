@@ -4,16 +4,14 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "../..");
 const baseline = "b313327b134bc5ecfa7167856d4b567f8701ba06";
-// The owner requested a conversational summary before accepting a completed spec, and later accepted
-// docs/specs/spec-review-convergence.md, which changes author mode and review step 4 (last at R-20). Keep that
-// intentional text as the spec baseline; other operation bodies retain theirs.
-const specSummaryBaseline = "8a07bb287b2b07b990630dd384cadeacec0949c2";
+// Keep the owner summary, finding rules and drift re-review limit in the spec baseline.
+const specBaseline = "d0861dcc0f214e8fec984e05f6b7349ad21a2670";
 // The owner approved the rule that an agent-behavior proof needs a committed script that reruns it
 // (docs/specs/reproducible-agent-proofs.md, parked in favour of this short rule). Keep it as the implement baseline.
 const implementBaseline = "8d5a639bf3626a95901a125c0aeeff3e24b0f335";
 test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resume"])("direct %s keeps its approved operation body", (name) => {
   const path = `plugins/vh-adlc/skills/vh-adlc-${name}/SKILL.md`;
-  const revision = name === "spec" ? specSummaryBaseline : name === "implement" ? implementBaseline : baseline;
+  const revision = name === "spec" ? specBaseline : name === "implement" ? implementBaseline : baseline;
   const old = Bun.spawnSync(["git", "show", `${revision}:${path}`], { cwd: root, stdout: "pipe", stderr: "pipe" });
   expect(old.exitCode).toBe(0);
   const body = (text: string) => text.slice(text.indexOf("The plugin directory is two levels"));
@@ -82,12 +80,13 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
   }
   const prefix = current.slice(current.indexOf("## Generic intake"), current.indexOf("The plugin directory is two levels"));
   expect(prefix).toBe("## Generic intake\n\nFor generic vh-adlc requests without an operation name, follow `references/lifecycle.md`; then continue here.\n\n");
-  // A baseline taken after loop settings landed carries the same section; compare both without it.
+  // A newer baseline can include sections the test checks separately above.
   let previous = old.stdout.toString();
-  const oldLoop = previous.indexOf("## Loop routes\n");
-  if (oldLoop > 0) {
-    const next = previous.indexOf("\n## ", oldLoop + 1);
-    previous = (previous.slice(0, oldLoop) + previous.slice(next < 0 ? previous.length : next + 1)).replace(/\n+$/, "\n");
+  for (const heading of ["Loop routes", "Issue labels"]) {
+    const start = previous.indexOf(`## ${heading}\n`);
+    if (start < 0) continue;
+    const next = previous.indexOf("\n## ", start + 1);
+    previous = (previous.slice(0, start) + previous.slice(next < 0 ? previous.length : next + 1)).replace(/\n+$/, "\n");
   }
   // A baseline taken after documentation impact landed carries that section too.
   const oldImpact = previous.indexOf("## Documentation impact\n");
