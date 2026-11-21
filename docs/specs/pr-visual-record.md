@@ -400,6 +400,7 @@ R-1 to R-4.
 | 2026-11-21 | R-2 | spec | `630c3d2a` | claude-opus-5-5 | procedural | 1 blocking, 11 should-fix, 1 nit |
 | 2026-11-21 | R-3 | spec | `b8be9f60` | claude-opus-5-5 | procedural | 2 blocking, 10 should-fix, 3 nits |
 | 2026-11-21 | R-4 | spec | `baf9eba0` | claude-opus-5-5 | procedural | 1 blocking, 5 should-fix, 3 nits |
+| 2026-11-21 | R-5 | spec | `fdfe84c7` | claude-opus-5-5 | procedural | 0 blocking, 9 should-fix, 1 nit |
 
 ### R-1
 
@@ -846,6 +847,80 @@ SEVERITY: nit
 WHERE: Scope (documentation bullet); AC-09
 EVIDENCE: Per-version upgrade notes for new loop settings live in `docs/reference/compatibility.md:180-183` ("Plugin 0.29.0 lets a verification rung declare `stages` ... Older plugins refuse the field, so update the plugin before adding it"), added by the sibling feature at 0ebf5bef. This feature has the same upgrade order but names only the loop settings reference and the workflows guide.
 PROPOSAL: Add a compatibility reference note for the new key to Scope, or leave it to ship's documentation impact step and say so.
+
+### R-5
+
+TARGET: fdfe84c71d8ee7ca710a4becee19700ef5407e8a
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship steps 4, 5, 6 and 8; Design > Command, State paragraph (missing reason "ship withheld the images after inspection"); AC-05; Test Plan row AC-05 ("the withheld case writes it through the capture result as ship would"); Test Plan row AC-07 statement (6)
+EVIDENCE: Ship step 4 says that on a withheld image ship "pushes nothing, reports that to the owner and records the missing reason", and step 5 runs `--push true` only "Otherwise". The State paragraph lists the withheld reason among the push step's reasons that yield record state `partial` and a `### Missing` list, but the push step is never run in that case and has no flag or documented `capture.json` field that tells it about a withholding. The AC-05 proof writes the reason "through the capture result as ship would", yet no ship step writes `capture.json`, and the `capture.json` format is not defined. If ship did edit it and then ran the push step, the push step "reads `<out>/capture.json` and the images it lists" and would push the withheld images unless ship also removed them. One implementer has ship write a step-8 "Visual record missing:" section, another adds a field to `capture.json` and runs the push step. The withheld path came in with this revision, applying R-4 F-03.
+PROPOSAL: Define one mechanism: either ship writes the step-8 marked section with the withheld reason and the push step never sees it (and drop the reason from the push step's list and AC-05), or the push step takes a defined input (for example `--withheld true`) that pushes nothing and reports the reason. Make the AC-05 and AC-07 rows test that mechanism.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 4 (the section "starts with `## Before and after` and the line `<!-- vh-adlc:visual-record -->`"); Design > Ship steps 3, 6 and 8; Design > Terms (Before and after section row); Owner summary ("inside markers, replacing only the section it wrote before"); AC-06; Test Plan row AC-07 statements (4), (5) and (8)
+EVIDENCE: The heading line comes before the start marker, so it lies outside the markers. Ship step 6 replaces "an earlier section between vh-adlc's markers" and says "every other part of the body stay outside the markers"; step 3 "removes an earlier section between vh-adlc's markers". Read literally, a re-ship leaves the old `## Before and after` heading in place and appends a new section with its own heading, so headings pile up with each ship. A removal on `not-applicable` or rollback leaves an orphan `## Before and after` heading, which statement (5) then protects as a section "without the markers" that is "never touched". Another implementer treats the heading directly above the start marker as part of the section. The marker scheme came in with this revision, applying R-4 F-02.
+PROPOSAL: Put the start marker before the heading, or state that vh-adlc's section runs from the `## Before and after` line directly above the start marker to the end marker. Add a re-ship case and a removal case to a Test Plan row that assert exactly one heading, or none, remains.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Command step 2 ("The time limit and 126 or 127 handling follow the rung runner"; "Images count only when the command exited 0"); Design > Concurrency, failure, retry, upgrade ("Killed runs"); AC-04; Test Plan row AC-04; AC-09 ("tolerance of leftovers")
+EVIDENCE: The rung runner waits on `Promise.all` of the stdout text, the stderr text and `child.exited`, and clears its timer only after all three resolve (`plugins/vh-adlc/scripts/loop/rungs.ts:59-63`). In a scratch Bun script, `Bun.spawn(["bash","-c","sleep 4 & echo started; exit 0"], {stdout:"pipe", stderr:"pipe", detached:true})` printed "exited 0 1 ms" and then "pipes closed after 4002 ms". A capture command that starts a dev server or a compose stack in the background and exits 0, which the document itself expects ("such as servers or build output"), therefore holds the run until the time limit (60 minutes by default). The run is then reported as timed out and, under step 2, every image is discarded. The document only covers killed runs. It does not say whether the command waits for exit or for the output pipes, or whether it kills processes the capture leaves running after a normal exit.
+PROPOSAL: State that the capture's result is decided at the command's exit, after which the command kills the capture's process group (or stops reading its output), and add a fixture to the AC-04 row whose script leaves a background sleeper and exits 0, asserting the images are used and the sleeper is gone.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Ship step 1 ("The ship request's push authority covers `refs/pr-visuals/<number>`"); Owner summary, third paragraph ("part of ship's push authority"); Scope (the ship skill bullet, "Deliver and the Input paragraph stay as they are"); frontmatter `covers`
+EVIDENCE: The ship skill tells the agent to "Follow `references/loop.md` and `references/authority.md`" (`plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:15-16`). The authority table grants an explicit ship request only "Push the feature branch, create or update its PR, update the linked issue" (`plugins/vh-adlc/references/authority.md:27`), and its Input paragraph repeats that list (`SKILL.md:16-18`). The design adds a push to a new ref namespace but changes neither, and `references/authority.md` is not in Scope or `covers`. The skill would then claim an authority that the table it defers to does not list.
+PROPOSAL: Add the `refs/pr-visuals/<number>` push to the ship row of `references/authority.md`, put that file in Scope and `covers`, and have AC-07 or a new criterion check the row.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner summary, third paragraph ("Deleting a ref that holds an image it shouldn't needs the owner's explicit request"); Design > Ship step 10; Scope, out of scope (the pruning bullet); Context > Background (the probe bullet, "The ref was deleted afterwards"); AC-09 ("retention and deletion on the owner's request"); Test Plan row AC-09 (`owner's explicit request`)
+EVIDENCE: `git ls-remote origin 'refs/pr-visuals/*'` in /home/m/code/stackweaver printed nothing today, so the probe ref is gone. Yet `gh api repos/michielvha/stackweaver/commits/721b0569fae72c29695d11c2c8af9fbafb24665a` still returned the commit (0 parents, files ["probe.png"]), and `gh api "repos/michielvha/stackweaver/contents/probe.png?ref=721b0569..."` returned size 34604. GitHub keeps serving a commit by SHA after its only ref is deleted, and the PR body's edit history keeps the links. Step 10 only says deletion "can't recall copies others already fetched", and the guide (AC-09) will present deletion as the remedy. An adopter who deletes the ref after a leak would believe the image is gone when every reader can still open it.
+PROPOSAL: State in Design > Ship step 10, the Owner summary and the guide that deleting the ref does not stop GitHub serving the commit by SHA, and that removing a leaked image needs GitHub support or other steps. Add a required phrase for that to the AC-09 row.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope (the workflows guide's copyable example for committed screenshots); Owner summary ("one `git show` line each, shown in the guide"); Design > Command step 2 (any file with an accepted extension is a capture); Design > Ship step 4; AC-09; Test Plan row AC-09 (`git show "$VH_ADLC_VISUAL_BASE:`)
+EVIDENCE: The required guide example copies committed screenshots with `git show "$VH_ADLC_VISUAL_BASE:<path>"`. For a path tracked by Git LFS, `git show` writes the pointer text, not the image, so the capture holds a `.png` that is not an image. The command accepts it by extension alone. Ship step 4 withholds only for "a credential, a session or real user data" and says nothing about a file it cannot view, so it runs the push step and the PR shows broken images with record state `full`. R-3 F-11 raised this for vh-adlc's own copy; moving the copy into the adopter's command, with vh-adlc supplying the example, leaves the case undefined.
+PROPOSAL: Make the guide example use `git cat-file --filters "$VH_ADLC_VISUAL_BASE:<path>"` (which applies LFS smudge filters) and require that phrase in the AC-09 row. Also state in Ship step 4 that a file ship cannot view as an image is withheld with a named missing reason.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 2 ("Two files with one stem on one side are a missing item, and neither is used"; "A stem on one side only is a one-sided screen, added or removed"); AC-03; AC-05; Test Plan row AC-05
+EVIDENCE: With `before/home.png`, `before/home.webp` and `after/home.png`, both before files are dropped. The document does not say what happens to `after/home.png`: one implementer drops the whole stem, another keeps it as a one-sided screen, so the PR shows `home` as an added screen when it existed before. No Test Plan row covers the other side of a duplicate.
+PROPOSAL: State that a duplicate stem on one side drops that stem from both sides, or that the other side is kept and marked, and assert it in the AC-05 duplicate-stem case.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-07 statements (3) and (6); AC-07; Design > Ship steps 2 and 4
+EVIDENCE: Statement (3) requires the token `--github` but not where its value comes from. A skill that says `--github github.com/<owner>/<repo>`, or takes it from `origin`, passes, although the owner decided that host, owner and repository come from the PR (`gh pr view <number> --json url`, Ship step 2). Statement (6) requires `before_file`, `after_file` and `withheld`, and its passing example names only "a credential". A skill that withholds only for credentials passes, while step 4 also withholds for "a session or real user data", the privacy check R-4 F-03 asked for. The row was rewritten in this revision for R-4 F-01 and F-06 and has not passed review.
+PROPOSAL: Add to statement (3) a requirement for `gh pr view` with `url`, and to statement (6) `session` and `user data`, each with a must-fail example that lacks them.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-09 (the required token `.jpeg`); AC-09 ("the accepted extensions"); Design > Command step 2 (`.png`, `.webp`, `.jpg` or `.jpeg`, "in any letter case")
+EVIDENCE: The row requires only `.jpeg` among the extensions, and nothing about letter case. A reference or guide that lists `.jpeg` alone passes, so the check passes docs that omit three of the four accepted extensions and the case rule AC-09 asks for. The row changed in this revision (the `docs/reference/compatibility.md` requirement was added), so it has not passed review.
+PROPOSAL: Require `.png`, `.webp`, `.jpg`, `.jpeg` and a phrase such as `any letter case`, with a must-fail example that drops `.webp`.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Background (the `direct-operation-compatibility.test.ts` bullet, "Loop routes, Issue labels and Documentation impact (`:40-60`, `:90-95`)")
+EVIDENCE: For the ship body the test also strips Article and promotion handoff and After an authorized merge (`tests/vh-adlc/direct-operation-compatibility.test.ts:64-85`). The Loop routes strip is at `:20-43`, not `:40-60`.
+PROPOSAL: List all five stripped sections and cite `:20-43`, `:44-63`, `:64-85` and `:89-98`.
 
 ## Sources
 
