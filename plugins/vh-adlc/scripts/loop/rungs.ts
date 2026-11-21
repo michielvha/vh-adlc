@@ -5,7 +5,10 @@
 import type { LoopSettings } from "./settings";
 import { diffPaths, statusEntries } from "./git-paths";
 
-export type Rung = { name: string; when: "always" | { paths: string[] }; command?: string; procedure?: string; skipped_pattern?: string; timeout_minutes?: number };
+/** Where a rung runs: at each task's verification, and at push, completion and delivery. */
+export const RUNG_STAGES = ["task", "completion"] as const;
+export type RungStage = typeof RUNG_STAGES[number];
+export type Rung = { name: string; when: "always" | { paths: string[] }; stages: RungStage[]; command?: string; procedure?: string; skipped_pattern?: string; timeout_minutes?: number };
 export type RungState = "passed" | "failed" | "not run";
 export type RungResult = { name: string; state: RungState; reason: string; commit: string; exit_code?: number; skipped?: string[]; timed_out?: true; output?: string };
 
