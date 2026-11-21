@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Review R-8 is clean; waiting for the owner's acceptance."
+status: planned
+status_description: "Accepted by the owner at R-8 (re-reviewed clean at R-9); waiting for tasks."
 issue: null
 goal: "Each task's verification runs only the rungs declared for the task stage, while push, completion and delivery still require every applicable rung."
 covers:
@@ -72,8 +72,9 @@ command checks for implement and ship, the next minor plugin version above main 
 (its mention in the reference checked once, not by a permanent test), and the document-only exemption
 holding only within the ship run that observed the pass, automated checks limited to exact command strings
 with the rest judged by the implementation reviewer, procedure text placed in the Loop routes sections, and
-no new route for a blocked completion run beyond ship's existing failed-check rules. Reviews R-1 to R-3 and
-R-5 to R-7 found should-fix issues and nits and R-4 one blocking proof flaw, all applied here; a new review is pending. Acceptance
+no new route for a blocked completion run beyond ship's existing failed-check rules. Reviews R-1 to R-7 found
+should-fix issues, nits and, in R-4, one blocking proof flaw, all applied. R-8 was clean with two nits, and
+the owner accepted it; R-9, a re-review after default-branch drift, was clean with one nit. Acceptance
 authorizes implementing this document on a feature branch and opening one PR with that version bump;
 merging stays with the owner.
 
