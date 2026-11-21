@@ -351,7 +351,8 @@ A repository may commit `.vh-adlc/loop.yaml` to tune the feature loop. It can:
 - route each role (author, implementer, spec reviewer, implementation reviewer) to the
   host, optionally with a model, or route a reviewer role to an external command;
 - name a project procedure, instruction files and review lenses every operation reads;
-- declare verification rungs that must pass before push, completion and delivery;
+- declare verification rungs that must pass before push, completion and delivery, and limit an
+  expensive rung to the completion stage so it runs once per feature instead of at every task;
 - set manual CI, a post-merge watch and extra skip-CI paths for delivery;
 - have implement continue in an isolated worktree, and have investigate always write
   a findings document.

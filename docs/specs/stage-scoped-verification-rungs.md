@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing on feat/stage-scoped-rungs."
+status: complete
+status_description: "Complete: every criterion met at implementation review R-10; PR open for the owner to merge."
 issue: null
 branch: feat/stage-scoped-rungs
 goal: "Each task's verification runs only the rungs declared for the task stage, while push, completion and delivery still require every applicable rung."
@@ -228,23 +228,28 @@ rolling back the procedure changes needs the previous plugin version.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: A rung may declare `stages`; settings with an unknown stage value, an empty list, a duplicate
+- [x] AC-01: A rung may declare `stages`; settings with an unknown stage value, an empty list, a duplicate
       value or a list without `completion` are refused with a message naming
       `verification_rungs[<i>].stages`, and a rung without the field resolves to both stages.
-- [ ] AC-02: `cli.ts rungs --stage task --run true` executes only the applicable rungs whose stages include
+      Evidence: `bun test tests/vh-adlc/loop/rungs.test.ts` at 600220f9: 28 pass, 0 fail, including the five refused `stages` values naming `verification_rungs[0].stages` and the default `["task", "completion"]`.
+- [x] AC-02: `cli.ts rungs --stage task --run true` executes only the applicable rungs whose stages include
       `task`; a completion-only rung is not executed, is reported `not run` with a reason naming the
       completion stage, is listed in `deferred`, and does not block the verdict. Without `--run`, the same
       command reports the same `deferred`, executes nothing, exits 3 with `advance` false, and lists in
       `blocking` only the task-stage rungs.
-- [ ] AC-03: `cli.ts rungs --stage completion --run true`, and the same command without `--stage`,
+      Evidence: `bun test tests/vh-adlc/loop/cli.test.ts` at 600220f9: the two task-stage "rung stages" cases pass (exit 0 and no marker with `--run true`; exit 3, same `deferred`, `blocking` `["unit"]` and no marker without it).
+- [x] AC-03: `cli.ts rungs --stage completion --run true`, and the same command without `--stage`,
       execute every applicable rung whatever its stages, and a failing completion-only rung blocks with exit
       3 and is named in `blocking`.
-- [ ] AC-04: `--stage` with a value other than `task` or `completion`, or `--stage task` together with
+      Evidence: `bun test tests/vh-adlc/loop/cli.test.ts` at 600220f9: the completion-stage cases with `--stage completion` and with no `--stage` pass (exit 3, marker written, `heavy` in `blocking`).
+- [x] AC-04: `--stage` with a value other than `task` or `completion`, or `--stage task` together with
       `--merge`, exits 2 with an error reason and runs no rung.
-- [ ] AC-05: For settings without any `stages` field, the `rungs` output at stage `task` and at stage
+      Evidence: `bun test tests/vh-adlc/loop/cli.test.ts` at 600220f9: `--stage push --run true` and `--stage task --merge <sha> --run true` exit 2 with `status: "error"` and no marker.
+- [x] AC-05: For settings without any `stages` field, the `rungs` output at stage `task` and at stage
       `completion` has the same `applicable`, `results`, `advance` and `blocking` as the plugin produced
       before this feature.
-- [ ] AC-06: The Loop routes section of the implement skill contains the per-task command
+      Evidence: `bun test tests/vh-adlc/loop/cli.test.ts` at 600220f9: the stage-less fixture matches the literal pre-feature output at `--stage task`, `--stage completion` and no `--stage`; the case passed before T4 as well.
+- [x] AC-06: The Loop routes section of the implement skill contains the per-task command
       `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task --run true` and the
       Finish lookup `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task` with no
       `--run`; the ship skill's Loop routes section contains
@@ -252,13 +257,16 @@ rolling back the procedure changes needs the previous plugin version.
       `--merge <merge commit> --stage completion --run true`; neither skill contains the stage-less
       `rungs --repo <dir> --base <default branch> --run true`; and both operation bodies still match their
       owner-approved baselines.
-- [ ] AC-07: The loop settings reference documents `verification_rungs[].stages`, its default, the
+      Evidence: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts` at 600220f9: 8 pass, 0 fail; the exact commands are present, the stage-less command is absent, and both body baselines are unchanged.
+- [x] AC-07: The loop settings reference documents `verification_rungs[].stages`, its default, the
       `completion` requirement, the `--stage` flag with its default, `deferred`, the commit rule for pushed
       and delivered commits with its completion-commit exemption, and, as the minimum plugin version, the version both manifests carry; the workflows guide
       says rungs can be limited to the completion stage.
-- [ ] AC-08: Both vh-adlc plugin manifests carry the same version, a minor version above the default
+      Evidence: R-10 at e18df125 returned met: the reviewer's written procedure confirmed each listed item in `references/loop-settings.md` and the workflows guide.
+- [x] AC-08: Both vh-adlc plugin manifests carry the same version, a minor version above the default
       branch's at implementation time.
-- [ ] AC-09: The Loop routes sections say, in the implement skill, that each task performs its task-stage
+      Evidence: `bun test tests/vh-adlc/check.test.ts` at 600220f9: 65 pass, 0 fail; `origin/main` is 0.28.1 and both manifests are 0.29.0.
+- [x] AC-09: The Loop routes sections say, in the implement skill, that each task performs its task-stage
       procedure rungs and passes them with `--record`, and that Finish reads only `deferred`, does not treat
       the lookup's exit 3 as a failure, and with a non-empty `deferred` does not set `complete` but reports
       the deferred rungs and the step `vh-adlc next` returns; and, in the ship skill, that ship performs every
@@ -267,6 +275,7 @@ rolling back the procedure changes needs the previous plugin version.
       the same ship run, reruns the completion stage before a retried or resumed push, and pushes nothing
       and sets no status after a blocked completion run; and that implement's Finish runs its lookup without
       `--run`.
+      Evidence: R-10 at e18df125 returned met: the reviewer's written procedure quoted each listed behaviour from both Loop routes sections.
 
 ## Test Plan
 
@@ -284,14 +293,22 @@ rolling back the procedure changes needs the previous plugin version.
 
 ## Tasks
 
-- [ ] T1 `tests/vh-adlc/loop/rungs.test.ts` - settings cases for `stages` (unknown value, empty list, duplicate, no `completion`, default resolves to both); `bun test tests/vh-adlc/loop/rungs.test.ts` fails on the new cases because `stages` is refused as an unknown key (AC-01)
-- [ ] T2 `plugins/vh-adlc/scripts/loop/settings.ts`, `plugins/vh-adlc/scripts/loop/rungs.ts` - accept and validate `stages`, resolve the default on the parsed `Rung`; T1 passes (AC-01)
-- [ ] T3 `tests/vh-adlc/loop/cli.test.ts` - CLI cases for `--stage task` with and without `--run`, `--stage completion` and no `--stage`, invalid `--stage` values with `--run true`, and the stage-less three-rung fixture with literal expected output; the stage cases fail because `--stage` and `deferred` do not exist, and the stage-less case stands as a regression guard (AC-02, AC-03, AC-04, AC-05)
-- [ ] T4 `plugins/vh-adlc/scripts/loop/rungs.ts`, `plugins/vh-adlc/scripts/loop/cli.ts` - stage parameter on `applicableRungs`, `--stage` parsing and errors, `stage` and `deferred` output, the stage-scoped verdict without `--run`, and the updated rule and usage comments; T1 and T3 pass (AC-02, AC-03, AC-04, AC-05)
-- [ ] T5 `tests/vh-adlc/direct-operation-compatibility.test.ts` - literal command checks for the implement and ship Loop routes and the reference's `verification_rungs[].stages` row and `--stage`; fails because the texts do not exist yet, while the body baseline cases still pass (AC-06, AC-07)
-- [ ] T6 `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` - Loop routes overrides for the per-task run, the Finish lookup, the Verify-step completion run, procedure-rung records, the completion-commit exemption and the post-merge run; T5's skill checks pass with unchanged baselines (AC-06, AC-09)
-- [ ] T7 `plugins/vh-adlc/references/loop-settings.md`, `docs/user-guides/workflows.md` - document `stages`, `--stage`, `deferred`, the commit rule with its exemption and the minimum plugin version; T5 passes in full (AC-07)
-- [ ] T8 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - bump both to the next minor version above `origin/main`; `bun test tests/vh-adlc/check.test.ts` passes and the AC-08 written procedure holds (AC-08)
+- [x] T1 `tests/vh-adlc/loop/rungs.test.ts` - settings cases for `stages` (unknown value, empty list, duplicate, no `completion`, default resolves to both); `bun test tests/vh-adlc/loop/rungs.test.ts` fails on the new cases because `stages` is refused as an unknown key (AC-01)
+      Evidence: `bun test tests/vh-adlc/loop/rungs.test.ts` at the T1 commit: 21 pass, 7 fail; the 7 new stage cases fail with "verification_rungs[0] contains unsupported fields"; existing calls now pass a stage.
+- [x] T2 `plugins/vh-adlc/scripts/loop/settings.ts`, `plugins/vh-adlc/scripts/loop/rungs.ts` - accept and validate `stages`, resolve the default on the parsed `Rung`; T1 passes (AC-01)
+      Evidence: `bun test tests/vh-adlc/loop/rungs.test.ts`: 28 pass, 0 fail; `bun test tests/vh-adlc/loop`: 164 pass, 0 fail.
+- [x] T3 `tests/vh-adlc/loop/cli.test.ts` - CLI cases for `--stage task` with and without `--run`, `--stage completion` and no `--stage`, invalid `--stage` values with `--run true`, and the stage-less three-rung fixture with literal expected output; the stage cases fail because `--stage` and `deferred` do not exist, and the stage-less case stands as a regression guard (AC-02, AC-03, AC-04, AC-05)
+      Evidence: `bun test tests/vh-adlc/loop/cli.test.ts -t "rung stages"`: 1 pass (the stage-less guard), 5 fail; the task run exits 3 having run `heavy`, the output has no `stage` or `deferred`, and `--stage push` is accepted.
+- [x] T4 `plugins/vh-adlc/scripts/loop/rungs.ts`, `plugins/vh-adlc/scripts/loop/cli.ts` - stage parameter on `applicableRungs`, `--stage` parsing and errors, `stage` and `deferred` output, the stage-scoped verdict without `--run`, and the updated rule and usage comments; T1 and T3 pass (AC-02, AC-03, AC-04, AC-05)
+      Evidence: `bun test tests/vh-adlc/loop`: 170 pass, 0 fail, including the six "rung stages" CLI cases and the 28 rung cases.
+- [x] T5 `tests/vh-adlc/direct-operation-compatibility.test.ts` - literal command checks for the implement and ship Loop routes and the reference's `verification_rungs[].stages` row and `--stage`; fails because the texts do not exist yet, while the body baseline cases still pass (AC-06, AC-07)
+      Evidence: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 5 pass, 3 fail; implement and ship fail on the missing `--stage task --run true` and `--stage completion --run true` commands, and the reference lacks the `stages` row.
+- [x] T6 `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` - Loop routes overrides for the per-task run, the Finish lookup, the Verify-step completion run, procedure-rung records, the completion-commit exemption and the post-merge run; T5's skill checks pass with unchanged baselines (AC-06, AC-09)
+      Evidence: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 7 pass, 1 fail (the reference row, T7); the implement and ship body-baseline cases pass with unchanged baselines. `bun test tests/vh-adlc/check.test.ts`: 64 pass, 1 fail (the version check, T8).
+- [x] T7 `plugins/vh-adlc/references/loop-settings.md`, `docs/user-guides/workflows.md` - document `stages`, `--stage`, `deferred`, the commit rule with its exemption and the minimum plugin version; T5 passes in full (AC-07)
+      Evidence: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 8 pass, 0 fail.
+- [x] T8 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - bump both to the next minor version above `origin/main`; `bun test tests/vh-adlc/check.test.ts` passes and the AC-08 written procedure holds (AC-08)
+      Evidence: `bun test tests/vh-adlc/check.test.ts`: 65 pass, 0 fail; `origin/main` carries 0.28.1 and both manifests 0.29.0 (minor one above, patch 0); `references/loop-settings.md` names 0.29.0 as the minimum for `stages`.
 
 ## Open Questions
 
@@ -311,6 +328,7 @@ None.
 | 2026-11-21 | R-8 | spec | `66a2976f` | claude-opus-5-5 | procedural | Two nits; clean |
 | 2026-11-21 | R-8 | spec | `66a2976f` | n/a | n/a | accepted by owner |
 | 2026-11-21 | R-9 | spec | `6caddb3b` | claude-opus-5-5 | procedural | One nit; clean (re-review after default-branch drift) |
+| 2026-11-21 | R-10 | implementation | `e18df125` | claude-opus-5-5 | procedural | Every criterion met |
 
 ### R-1
 
@@ -546,3 +564,41 @@ SEVERITY: nit
 WHERE: Context, Owner summary (fourth paragraph, "Reviews R-1 to R-3 and R-5 to R-7 found should-fix issues and nits and R-4 one blocking proof flaw, all applied here; a new review is pending")
 EVIDENCE: At 6caddb3b the Review Log has R-8 at `66a2976f` with outcome "Two nits; clean" and an R-8 "accepted by owner" row, and `status_description` reads "Review R-8 is clean; waiting for the owner's acceptance." The summary still says a new review is pending and does not mention R-8 or its two unapplied nits. conventions/feature-documents.md (Owner summary in Context) asks for the summary's validation state to be refreshed when proof or decisions change. The section is outside the normative baseline, so this changes nothing an implementer builds. Other checks at this commit found nothing new: `git diff 66a2976f 6caddb3b` changes only the Review Log and `status_description` in the document. PR #140 moved both manifests to 0.28.1, so the Scope's "0.29.0 if nothing else lands first" and AC-08's next-minor rule still hold. The direct-operation test still strips Loop routes before comparing the implement and ship bodies with their unchanged baselines (`bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 7 pass, 0 fail). The Background greps (`--record` in skills, `rungs` in the review and resume skills and review-protocol.md, `verification_rungs` in internal and cmd) still print nothing. `vh-adlc lint` passes. `vh-adlc fresh` reports R-8 stale only for covered-drift on the two manifests and the compatibility test.
 PROPOSAL: Update the Owner summary's review sentence to say R-8 was clean with two nits and the owner accepted it, or drop the review history from the summary.
+
+### R-10
+
+CRITERION: AC-01 A rung may declare `stages`; settings with an unknown stage value, an empty list, a duplicate value or a list without `completion` are refused with a message naming `verification_rungs[<i>].stages`, and a rung without the field resolves to both stages.
+VERDICT: met
+EVIDENCE: `bun test tests/vh-adlc/loop/rungs.test.ts`, e18df125, 28 pass 0 fail. The "rung stages" cases load `[bogus]`, `[]`, `[completion, completion]`, `[task]` and the bare scalar `completion`, and each expects a throw containing `verification_rungs[0].stages`. A rung without the field parses to `["task", "completion"]`. I also read settings.ts: `stages` was added to the accepted keys, and the check fails `${field}.stages ...` for a non-array, an empty list, an unknown value, a duplicate or a missing `completion`. No limitations.
+
+CRITERION: AC-02 `cli.ts rungs --stage task --run true` executes only the applicable rungs whose stages include `task`; a completion-only rung is not executed, is reported `not run` with a reason naming the completion stage, is listed in `deferred`, and does not block the verdict. Without `--run`, the same command reports the same `deferred`, executes nothing, exits 3 with `advance` false, and lists in `blocking` only the task-stage rungs.
+VERDICT: met
+EVIDENCE: `bun test tests/vh-adlc/loop/cli.test.ts`, e18df125, 17 pass 0 fail. In the "rung stages" fixture (task rung `unit`, plus completion-only `heavy` that touches a marker and exits 1), `--stage task --run true` exits 0, the marker is absent, the output has `deferred: ["heavy"]`, `advance` true, `blocking` [], and `heavy` is `not run` with a reason containing `completion stage`. Without `--run` it exits 3 with `deferred: ["heavy"]`, `advance` false, `blocking: ["unit"]`, and the marker is still absent. I read cli.ts and rungs.ts: `applicableRungs(..., "task")` drops rungs without `task`, and `deferredRungs` is computed and printed whether or not `--run` is given. No limitations.
+
+CRITERION: AC-03 `cli.ts rungs --stage completion --run true`, and the same command without `--stage`, execute every applicable rung whatever its stages, and a failing completion-only rung blocks with exit 3 and is named in `blocking`.
+VERDICT: met
+EVIDENCE: `bun test tests/vh-adlc/loop/cli.test.ts`, e18df125. Both completion-stage cases pass, one with `--stage completion` and one with no `--stage`. Each exits 3, writes the marker, reports `stage: "completion"` and `deferred: []`, and puts `heavy` in `blocking`. cli.ts defaults `options.stage ?? "completion"`. No limitations.
+
+CRITERION: AC-04 `--stage` with a value other than `task` or `completion`, or `--stage task` together with `--merge`, exits 2 with an error reason and runs no rung.
+VERDICT: met
+EVIDENCE: `bun test tests/vh-adlc/loop/cli.test.ts`, e18df125. The case "an unknown stage, or the task stage after a merge, is refused before any rung runs" passes. `--base main --stage push --run true` and `--merge <commit> --stage task --run true` each exit 2 with `status: "error"`, and the probe marker is never written. In cli.ts both checks throw before `featureDelta` and `runRungs`. No limitations.
+
+CRITERION: AC-05 For settings without any `stages` field, the `rungs` output at stage `task` and at stage `completion` has the same `applicable`, `results`, `advance` and `blocking` as the plugin produced before this feature.
+VERDICT: met
+EVIDENCE: The `bun test tests/vh-adlc/loop/cli.test.ts` stage-less literal case passes at e18df125. I also ran my own comparison: I extracted `git archive origin/main plugins/vh-adlc` (0.28.1, pre-feature) and `git archive e18df125 plugins/vh-adlc` into a temp dir and ran both CLIs on a scratch three-rung fixture (verify always, integration on backend/**, kind on e2e/**) with a backend change. With `--run true`, the old output and the new output at `--stage task`, `--stage completion` and no `--stage` were byte-identical apart from the added `stage` and `deferred` keys. After removing those keys they were also identical without `--run` (exit 3, `blocking` ["verify","integration"]) and with a failing `integration` rung. Limitation: these are representative fixtures, not every possible settings file. By code reading, the default stages `[task, completion]` make the task filter a no-op for stage-less settings.
+
+CRITERION: AC-06 The Loop routes section of the implement skill contains the per-task command `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task --run true` and the Finish lookup `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task` with no `--run`; the ship skill's Loop routes section contains `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage completion --run true` and `--merge <merge commit> --stage completion --run true`; neither skill contains the stage-less `rungs --repo <dir> --base <default branch> --run true`; and both operation bodies still match their owner-approved baselines.
+VERDICT: met
+EVIDENCE: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`, e18df125, 8 pass 0 fail. The new checks match the backticked implement commands, including the closing backtick for the Finish lookup, and the ship completion and `--merge` commands, all inside the `## Loop routes` slice. They also assert that the whole implement and ship files lack the stage-less command. The body-baseline cases for implement and ship pass with no baseline files changed in the branch diff. Reading the files confirms the text sits in Loop routes (implement lines 39 to 66, ship lines 42 to 66), and the Finish lookup is followed by "without `--run`". No limitations.
+
+CRITERION: AC-07 The loop settings reference documents `verification_rungs[].stages`, its default, the `completion` requirement, the `--stage` flag with its default, `deferred`, the commit rule for pushed and delivered commits with its completion-commit exemption, and, as the minimum plugin version, the version both manifests carry; the workflows guide says rungs can be limited to the completion stage.
+VERDICT: met
+EVIDENCE: The `bun test tests/vh-adlc/direct-operation-compatibility.test.ts` reference case passes at e18df125 (the table row and `--stage` are present). I then did the written procedure against plugins/vh-adlc/references/loop-settings.md. Field: the row "| `verification_rungs[].stages` | Optional list of `task` and `completion`, default both, with no duplicates. It must include `completion`." Minimum version: "Needs plugin 0.29.0 or later; older versions refuse the field." Both manifests carry 0.29.0. Flag and default: "Without `--stage`, the command runs the completion stage, so a caller that leaves it out never checks less." Deferred: "`deferred` lists the rungs whose path condition holds but which run at the completion stage only, reported as not run without being executed." Commit rule: "must pass at the commit being pushed or delivered; a result recorded at another commit does not count. The one exemption is ship's completion commit: ... pushes the completion commit that follows without a second run when that commit changes only the feature document and the push happens in the same ship run." Workflows guide (docs/user-guides/workflows.md:354-355): "limit an expensive rung to the completion stage so it runs once per feature instead of at every task". No limitations.
+
+CRITERION: AC-08 Both vh-adlc plugin manifests carry the same version, a minor version above the default branch's at implementation time.
+VERDICT: met
+EVIDENCE: `bun test tests/vh-adlc/check.test.ts`, e18df125, 65 pass 0 fail. Written procedure: `git show origin/main:plugins/vh-adlc/.claude-plugin/plugin.json` gives 0.28.1. origin/main is be10e05d, which matches `git ls-remote`, and the merge base 5f42863c is also 0.28.1. Both plugins/vh-adlc/plugin.json and plugins/vh-adlc/.claude-plugin/plugin.json carry 0.29.0, so the minor is one above and the patch is 0. references/loop-settings.md names exactly 0.29.0 as the minimum for `stages`. No limitations.
+
+CRITERION: AC-09 The Loop routes sections say, in the implement skill, that each task performs its task-stage procedure rungs and passes them with `--record`, and that Finish reads only `deferred`, does not treat the lookup's exit 3 as a failure, and with a non-empty `deferred` does not set `complete` but reports the deferred rungs and the step `vh-adlc next` returns; and, in the ship skill, that ship performs every applicable procedure rung with `--record`, replaces the "before pushing ... may advance at HEAD" rule with the Verify-step run, pushes the document-only completion commit without a second run only within the same ship run, reruns the completion stage before a retried or resumed push, and pushes nothing and sets no status after a blocked completion run; and that implement's Finish runs its lookup without `--run`.
+VERDICT: met
+EVIDENCE: Written procedure: I read both Loop routes sections at e18df125. Implement procedure rungs: "each task's verification step first performs every applicable written-procedure rung of the task stage, then runs ... passing each performed procedure rung's result with `--record <rung>=passed|failed:<what was observed>`". Finish reads only `deferred` and runs without `--run`: "run `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task` without `--run` and read only its `deferred` list". Exit 3: "its exit 3 and its verdict are not a check failure." Non-empty `deferred`: "When `deferred` is not empty, do not run the gate or set `complete`: report the deferred rungs, say that the completion stage runs in ship, and report the step `vh-adlc next` returns." Ship procedure rungs: "ship performs every applicable written-procedure rung, then runs ... passing each performed procedure rung's result with `--record ...`". Replaced rule: "these instructions replace Verify: ... sets `complete` and pushes only when that run may advance". The old "before pushing ... may advance at HEAD" sentence is gone, and grep finds neither phrase in either skill. Same-run exemption: "ship pushes it without a second run when it is the only commit after the verified one and the push happens in the same ship run that observed the completion stage advance." Retry: "Before a retried or resumed push, or after any other commit, ship runs the completion stage again at the head." Blocked run: "A blocked run pushes nothing and sets no status." No limitations.
