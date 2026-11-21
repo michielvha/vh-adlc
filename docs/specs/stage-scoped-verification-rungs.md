@@ -296,7 +296,8 @@ rolling back the procedure changes needs the previous plugin version.
       Evidence: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 5 pass, 3 fail; implement and ship fail on the missing `--stage task --run true` and `--stage completion --run true` commands, and the reference lacks the `stages` row.
 - [x] T6 `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` - Loop routes overrides for the per-task run, the Finish lookup, the Verify-step completion run, procedure-rung records, the completion-commit exemption and the post-merge run; T5's skill checks pass with unchanged baselines (AC-06, AC-09)
       Evidence: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 7 pass, 1 fail (the reference row, T7); the implement and ship body-baseline cases pass with unchanged baselines. `bun test tests/vh-adlc/check.test.ts`: 64 pass, 1 fail (the version check, T8).
-- [ ] T7 `plugins/vh-adlc/references/loop-settings.md`, `docs/user-guides/workflows.md` - document `stages`, `--stage`, `deferred`, the commit rule with its exemption and the minimum plugin version; T5 passes in full (AC-07)
+- [x] T7 `plugins/vh-adlc/references/loop-settings.md`, `docs/user-guides/workflows.md` - document `stages`, `--stage`, `deferred`, the commit rule with its exemption and the minimum plugin version; T5 passes in full (AC-07)
+      Evidence: `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 8 pass, 0 fail.
 - [ ] T8 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - bump both to the next minor version above `origin/main`; `bun test tests/vh-adlc/check.test.ts` passes and the AC-08 written procedure holds (AC-08)
 
 ## Open Questions

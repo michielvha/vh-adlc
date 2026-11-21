@@ -12,7 +12,7 @@ no settings file, every loop role keeps the host default and no binary is needed
 | Loop role | One of `author`, `implementer`, `spec_reviewer` and `implementation_reviewer`; each has a route. |
 | Route | How a role runs: `host` (in the current harness, optionally with a named model) or `command` (an external CLI, reviewer roles only). |
 | Enrolled spec | A spec whose Review Log uses the shared header; a consumer's adapted commands send it to the vh-adlc operations. |
-| Verification rung | A declared check with a path condition or `always`, which must pass before push, completion and delivery. |
+| Verification rung | A declared check with a path condition or `always` and the stages it runs at: each task's verification, and push, completion and delivery. |
 | Project procedure | The consumer's file of local rules that every SDD operation reads, named by `project_procedure`. |
 | Primary worktree | The first entry of `git worktree list`; with `implement_worktree: isolated`, implement never writes there. |
 | No publication path | The delivery verdict for a merge commit that carries the skip marker and touches only skip-eligible paths. |
@@ -47,6 +47,7 @@ Resume takes the route of the operation it continues.
 | --- | --- |
 | `verification_rungs[].name` | Lowercase name, unique. |
 | `verification_rungs[].when` | `always`, or `{paths: [glob, ...]}` matched against the whole feature delta. |
+| `verification_rungs[].stages` | Optional list of `task` and `completion`, default both, with no duplicates. It must include `completion`. A rung with `stages: [completion]` is skipped at each task's verification and still runs before push, completion and delivery. Needs plugin 0.29.0 or later; older versions refuse the field. |
 | `verification_rungs[].command` | A shell command run from the worktree. Exit 0 passes; exit 126 or 127 means it could not run; any other exit fails. |
 | `verification_rungs[].procedure` | Instead of a command: a written procedure the operation performs and records. |
 | `verification_rungs[].timeout_minutes` | Optional whole number of minutes a command may run, default 60. A command that runs longer is stopped with every process it started and reported as not run, with a reason that says it timed out. |
@@ -54,14 +55,24 @@ Resume takes the route of the operation it continues.
 
 Before merge the feature delta is the branch against its merge base with the default branch, plus every
 uncommitted change; after merge it is the merge commit against its first parent. Every applicable rung
-must pass at the commit being pushed, completed or delivered; a result recorded at another commit does
-not count. A failed rung always blocks. A rung that could not run, or that reported a skipped mandatory
+must pass at the commit being pushed or delivered; a result recorded at another commit does not count. The
+one exemption is ship's completion commit: ship runs the completion stage just before its Gate step, and
+pushes the completion commit that follows without a second run when that commit changes only the feature
+document and the push happens in the same ship run. A retried or resumed push runs the completion stage
+again at the head. Implement's Finish sets `complete` only when no rung was deferred, every rung having
+passed at its task commits; a push still goes through ship's completion run. A failed rung always blocks. A rung that could not run, or that reported a skipped mandatory
 subcheck, blocks unless the owner allows that exact rung (`<rung>`) or subcheck (`<rung>/<subcheck>`) for
 that run, and the report records the allowance. With rungs or a post-merge watch declared, a feature
 lands by merge commit only. Without rungs, operations keep reading verification commands from
-`AGENTS.md`. `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` reports the
-delta, the applicable rungs, a result for every declared rung and whether the feature may advance; a
-rung whose path condition does not hold is listed as not run with that reason and does not block. A written procedure rung
+`AGENTS.md`. `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task|completion --run true`
+reports the stage, the delta, the applicable rungs, `deferred`, a result for every declared rung and whether
+the stage may advance; a rung whose path condition does not hold is listed as not run with that reason and
+does not block. `--stage task` selects the rungs whose `stages` include `task`; `deferred` lists the rungs
+whose path condition holds but which run at the completion stage only, reported as not run without being
+executed. `--stage completion` selects every applicable rung, and `deferred` is empty. Without `--stage`,
+the command runs the completion stage, so a caller that leaves it out never checks less. `--stage task`
+with `--merge` is refused, as is any other value. Without `--run true`, the command still reports
+`deferred` and exits 3 when rungs are declared, with `blocking` listing the stage's applicable rungs. A written procedure rung
 counts only through `--record <rung>=passed|failed:<what was observed>`, given by the operation that
 performed it, at the current head. Repeat `--record` for each procedure rung, or join records with `;`; a `;` inside a record's own text
 stays in it.
