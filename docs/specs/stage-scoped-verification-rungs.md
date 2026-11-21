@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted at R-8 (re-reviewed clean at R-9); tasks written, ready to implement."
+status: in-progress
+status_description: "Implementing on feat/stage-scoped-rungs."
 issue: null
+branch: feat/stage-scoped-rungs
 goal: "Each task's verification runs only the rungs declared for the task stage, while push, completion and delivery still require every applicable rung."
 covers:
   - plugins/vh-adlc/scripts/loop/rungs.ts
