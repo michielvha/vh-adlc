@@ -200,3 +200,48 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-21 | R-1 | spec | `21057d50` | claude-opus-5-5 | procedural | Five should-fix findings and one nit; no blocking finding |
+
+### R-1
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary: "ship runs the completion stage once, right before push and completion at the same commit"); Design, Procedures (third bullet, "Ship, before pushing and before setting `complete`"); frontmatter `goal` ("at the exact commit"); Acceptance Criteria AC-06
+EVIDENCE: plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:72-83 orders Doc impact (may add commits), Verify, then Gate, which commits the completion update, and only then Push (SKILL.md:95). That completion commit moves HEAD after any rung run made "before setting complete". plugins/vh-adlc/scripts/loop/rungs.ts:76 blocks every result whose commit differs from the head, and cli.ts:140 takes the head from `git rev-parse HEAD`. So one run cannot cover both completion and push at the same commit. The Design does not say whether ship runs the completion stage before the completion commit, after it, or both. Running it twice doubles the 90-minute suite this feature exists to run once, and running it once leaves either completion or push at a commit with no result.
+PROPOSAL: State the exact point in ship's order where `--stage completion` runs, and say how the push relates to the completion commit. For example: one run after the completion commit, at the commit that is pushed, with the gate's `complete` withdrawn if that run blocks. Or: one run before it, with a document-only completion commit explicitly accepted. Then make the Owner summary and AC-06 say the same thing.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Procedures (second bullet, "when the last task-stage run at `HEAD` reported a non-empty `deferred`"); Design, Command (`deferred`); Acceptance Criteria AC-06; Test Plan row AC-06
+EVIDENCE: Implement runs rungs at the verification step and commits afterwards (plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:115-123, steps 3 and 4). The last task-stage run's results therefore carry the commit before the last task commit, so no task-stage run "at `HEAD`" exists when Finish starts. A resumed session at Finish also has no record of any earlier run's output. The Command section does not say whether `deferred` is computed when `--run` is not `true`. Today the report is `[]` without `--run` (cli.ts:145), so Finish has no defined cheap way to learn the deferred set.
+PROPOSAL: Have Finish run `cli.ts rungs --repo <dir> --base <default branch> --stage task` without `--run`, and state that `deferred` is reported whether or not `--run` is given. Add that case to AC-02 and its Test Plan row.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Procedures (second bullet, "It reports the held-back rungs and names ship as the next step"); Acceptance Criteria AC-06 ("naming ship as the next step instead"); Test Plan row AC-06
+EVIDENCE: The rules block in conventions/feature-documents.md at 0c983f6 returns `review` for an in-progress feature whose implementation review is not fresh, and `tasks` when that review is not clean. It returns `ship` only after both hold and `all_met` holds. Implement's Finish today reaches the gate before any implementation review exists, and its usual next step is `/vh-adlc-review` (vh-adlc-implement/SKILL.md:129-132). AC-06 requires Finish to name ship unconditionally, which then contradicts `vh-adlc next`. The Design's own clause limits ship to features "whose implementation review is clean".
+PROPOSAL: Have Finish report the step `vh-adlc next` returns, plus the held-back rungs that ship will run. Reword AC-06 and its proof to match, for example by checking that Finish names `deferred` and says the completion stage runs in ship.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary, "a browser pass"); Design, Procedures (ship bullet); Acceptance Criteria AC-06
+EVIDENCE: The Owner summary names a browser pass as a motivating rung. In adopters' settings that is a `procedure` rung (tests/vh-adlc/loop/cli.test.ts:141 uses `browser` with `procedure: Record the browser pass.`). A procedure rung counts only through `--record`, "given by the operation that performed it" (references/loop-settings.md:64-66), and runRungs reports it `not run` until then (rungs.ts:44). `grep -rn -- "--record" plugins/vh-adlc/skills` prints nothing, so the ship procedure has no instruction to perform a procedure rung or pass `--record`. With `stages: [completion]`, ship becomes the only operation that meets that rung, so it would block every push. Implementers would differ on whether ship performs it.
+PROPOSAL: Add to the ship procedure bullet and AC-06 that ship performs each applicable completion-only procedure rung and passes its result with `--record` on the completion-stage run, including after the merge. Add the phrase to the AC-06 text check.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-05; Acceptance Criteria AC-05 ("matches today's output")
+EVIDENCE: The row names "the existing three-rung fixture without `stages`" in tests/vh-adlc/loop/cli.test.ts. That file has no such fixture. Its rung fixtures have two rungs (cli.test.ts:141, :149), and the three-rung `verify`/`integration`/`kind` fixture is in tests/vh-adlc/loop/rungs.test.ts:22-33. The proof compares the new code at `--stage task` and `--stage completion` with the new code run without `--stage`, which defaults to completion. An implementation that changes today's `applicable`, `results`, `advance` or `blocking` for stage-less settings at every stage alike still passes, so the row does not establish "today's output".
+PROPOSAL: Name the fixture's real location or say the row creates it. Compare against fixed expected values taken from today's behaviour, such as the applicable names, each result's state and reason, `advance` and `blocking` written as literals, rather than against the no-flag run of the new code.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Command (first paragraph)
+EVIDENCE: "Without the flag the stage is `completion`" has no closing period, so it runs straight into "Any other value, or `--stage task` together with `--merge`, prints ...".
+PROPOSAL: End the sentence with a period.
