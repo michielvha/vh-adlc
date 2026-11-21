@@ -25,3 +25,16 @@ On the candidate, docs-drift typecheck passed, the frozen ZIP reader rebuild was
 ## State
 
 Independent review pending. Local candidate.
+
+## Independent review
+
+### R-1
+
+Target: `ba429d72f0863b3df34a950a707ab1a39394533a`.
+Model: gpt-6.2-sol. Isolation: procedural.
+
+```text
+NO FINDINGS
+```
+
+Local verification and independent review are complete. Applying the repair to PR #125 and its hosted Linux and macOS CI are pending.
