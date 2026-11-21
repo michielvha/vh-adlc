@@ -424,6 +424,7 @@ R-1 to R-5.
 | 2026-11-21 | R-3 | spec | `b8be9f60` | claude-opus-5-5 | procedural | 2 blocking, 10 should-fix, 3 nits |
 | 2026-11-21 | R-4 | spec | `baf9eba0` | claude-opus-5-5 | procedural | 1 blocking, 5 should-fix, 3 nits |
 | 2026-11-21 | R-5 | spec | `fdfe84c7` | claude-opus-5-5 | procedural | 0 blocking, 9 should-fix, 1 nit |
+| 2026-11-21 | R-6 | spec | `10298ec8` | claude-opus-5-5 | procedural | 1 blocking, 7 should-fix, 4 nits |
 
 ### R-1
 
@@ -944,6 +945,92 @@ SEVERITY: nit
 WHERE: Context > Background (the `direct-operation-compatibility.test.ts` bullet, "Loop routes, Issue labels and Documentation impact (`:40-60`, `:90-95`)")
 EVIDENCE: For the ship body the test also strips Article and promotion handoff and After an authorized merge (`tests/vh-adlc/direct-operation-compatibility.test.ts:64-85`). The Loop routes strip is at `:20-43`, not `:40-60`.
 PROPOSAL: List all five stripped sections and cite `:20-43`, `:44-63`, `:64-85` and `:89-98`.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan row AC-07, statement (6); AC-07; Design > Ship step 4
+EVIDENCE: Statement (6) requires the token `never runs the push step`, but its must-pass example says "...or a file can't be viewed as an image, never run the push step and write the marked section saying ship withheld the images". A case-insensitive substring check of the listed tokens against that example (node, scratch script) reported the one missing token as [ 'never runs the push step' ]. The Design step 4 text ("it never runs the push step") passes. So the row's own must-pass example fails the check it defines, and so would a skill written in the imperative voice the other examples use. The token and the example's wording came in with this revision. At fdfe84c7, statement (6) required only `before_file`, `after_file` and `withheld`, and this revision added `session`, `user data`, `viewed` and `never runs the push step` when it applied R-5 F-01 and F-08.
+PROPOSAL: Require `never run` together with `push step`, which matches both "never run" and "never runs", or rewrite the must-pass example to "never runs the push step". Then check every other statement's pass example against its tokens.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-07 ("split into paragraphs ... one paragraph per statement"); Design > Ship, the lead paragraph and steps 2, 3, 7 and 9
+EVIDENCE: The row can be read two ways. Either each statement's tokens must all appear within some one paragraph, or each statement needs a paragraph of its own. The Design's own list items each carry several statements: step 2 holds (2), (3) and (3a), step 3 holds (4) and (5), step 7 holds (9) and (10), and step 9 holds (12) and (13). Under the second reading, a skill that copies the Design fails. The row changed in this revision, so it has not passed review.
+PROPOSAL: Say that each statement passes when at least one paragraph contains all of its tokens, and that one paragraph may satisfy several statements.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command (the exit paragraph, "On SIGINT or SIGTERM during a capture it kills the capture's process group"); Design > Concurrency, failure, retry, upgrade ("Killed runs", "On SIGINT or SIGTERM"); AC-04; Test Plan row AC-04
+EVIDENCE: The Design requires the process-group kill for both SIGINT and SIGTERM. AC-04 says only "Neither SIGTERM during a capture nor...", and the AC-04 proof sends only SIGTERM. An implementation that handles SIGTERM alone meets every criterion, yet when a host interrupts a foreground command with Ctrl-C or SIGINT, the capture's servers are left running.
+PROPOSAL: Name SIGINT in AC-04 next to SIGTERM, and add a SIGINT case with the same PID assertion to the AC-04 row.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 4 (the table and image cells, "each path segment percent-encoded"); Design > Command output table (`pairs.name`); AC-06; Test Plan row AC-06
+EVIDENCE: The Design never says what the Screen cell holds or how the stem is escaped in that cell and in the alt text `![<name> before](<url>)`. It also does not say which characters "percent-encoded" covers. A stem containing `|` splits the table row. A `]` in a stem ends the alt text early. `encodeURIComponent` leaves `(` and `)` unencoded, and an unbalanced `)` in a file name ends a CommonMark link destination early. The AC-06 proof checks only `my screen.png`, so two implementations that escape differently both pass, and one of them breaks the table for legal file names.
+PROPOSAL: Say that the Screen cell holds the stem, give the escaping for table cells and alt text (at least `|`, `[`, `]` and backslash), and say that URL segments encode every byte outside the unreserved set, including `(` and `)`. Add a stem containing `|` and `)` to the AC-06 row.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-09 ("a copyable example that copies a committed screenshot for each side with Git's filters applied"); Test Plan row AC-09 (`git cat-file --filters "$VH_ADLC_VISUAL_BASE:`); Scope (the workflows guide bullet); Owner summary ("one `git cat-file --filters` line each")
+EVIDENCE: AC-09 asks for an example that copies a screenshot for each side, but the row requires only the base-side form. A guide whose example copies the after side with `git show "$VH_ADLC_VISUAL_HEAD:..."`, which writes the LFS pointer text, or leaves the after side out, passes. The row changed in this revision, when it applied R-5 F-06, so it has not passed review.
+PROPOSAL: Also require `git cat-file --filters "$VH_ADLC_VISUAL_HEAD:` in the guide, with a must-fail example that copies the after side some other way.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 2 ("A stem on one side only is a one-sided screen, added or removed"); Design > Command, State paragraph (the reasons "it wrote no before images" and "it wrote no after images"); AC-05; AC-09
+EVIDENCE: Take a feature that adds a new page, where the adopter captures only that page. The after side holds `newpage.png` and the before side is empty. Step 2 treats the screen as a legitimately added one-sided screen, but the State list turns the empty before side into the missing reason "it wrote no before images", so the record is `partial` and the PR shows a Missing item although nothing is missing. The Design gives no rationale for this, and the guide (AC-09) is not required to tell adopters how to avoid it.
+PROPOSAL: Either state the rule and its reason, that each side must hold at least one screen so a broken build is caught, and require the guide to tell adopters to capture at least one screen present at both commits, or drop the one-side reasons when the other side's screens are all one-sided. Add the chosen case to the AC-05 row.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command, State paragraph ("it wrote no images at all (this replaces the two one-side reasons)"); Design > Command step 2 ("after a non-zero exit, a command that could not run, or a timeout, no image is used"); AC-05; Test Plan row AC-05
+EVIDENCE: When the capture exits 1 after writing images, or times out, step 2 uses no image. The Design does not say whether `missing` then holds only the exit or timeout reason, or also "it wrote no images at all", or the one-side reasons. The AC-05 proof checks that each reason is present, not that the list holds nothing else, so both behaviours pass, and two implementers would put different Missing lists in the PR.
+PROPOSAL: State that a non-zero exit, a command that could not run, or a timeout yields exactly that one reason, and assert in the AC-05 exit-1 case that `missing` holds only that entry.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship steps 6, 8 and 9; Design > Concurrency, failure, retry, upgrade ("Concurrent ships", "Retry and replay"); Test Plan row AC-07
+EVIDENCE: Step 6 reads the PR body, replaces the marked text and writes the body back. The Design does not cover the body write failing after the ref push succeeded: the record is then stored but not linked, and step 8 covers only an exit 2 or a step with no output. It also does not cover a concurrent body edit between the read and the write, whether a second ship of the same PR without reservations or a person editing the body; the "Concurrent ships" bullet covers only the ref. One implementer reports a failed body write as a missing record and another reports nothing.
+PROPOSAL: State that a failed body write is reported as a missing record naming the pushed `ref_commit`, and that ship reads the body again just before writing it. Add the reporting requirement to a statement in the AC-07 row.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Background (the `direct-operation-compatibility.test.ts` bullet)
+EVIDENCE: The bullet cites Issue labels at `:44-63`, but `tests/vh-adlc/direct-operation-compatibility.test.ts:44-54` strips Issue labels and `:55-63` strips the current body's Documentation impact. The bullet says only that Documentation impact is "handled in the baseline (`:89-98`)". These citations came from the proposal of R-5 F-10, applied in this revision.
+PROPOSAL: Cite Issue labels at `:44-54` and say that Documentation impact is stripped from the current body at `:55-63` and from the baseline at `:96-98`.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: Design > Ship, lead paragraph ("requires each statement in the AC-07 Test Plan row inside it"); Test Plan row AC-07, statement (15)
+EVIDENCE: Statement (15) is checked against the ship row of `plugins/vh-adlc/references/authority.md`, not inside the skill's `## Visual record` section, so "each statement ... inside it" is not accurate for that one.
+PROPOSAL: Say "each of statements (1) to (14) inside it, and statement (15) in the authority table".
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: nit
+WHERE: Design > Ship steps 4, 6 and 8
+EVIDENCE: Step 6 says only the push step's section goes last and replaces the earlier marked text. Steps 4 (withheld) and 8 (other exit 2 or no output) say ship "writes the marked section" or "writes a marked section", without saying where it goes or that it replaces an earlier one. Step 3's definition implies replacement but does not say so.
+PROPOSAL: State once that every section ship writes between vh-adlc's markers goes last in the body and replaces the earlier marked text.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: nit
+WHERE: Context > Owner summary (second paragraph); Design > Setting (`capture.timeout_minutes`, default 60)
+EVIDENCE: The summary does not mention the 60-minute default limit on the capture run, during which ship waits, or that leftover background processes are killed when the capture exits. Both are defaults an owner would want to know. The sentence "When a committed change in the feature matches, ship opens or updates the PR" also reads as if opening the PR depends on the match.
+PROPOSAL: Add one sentence on the 60-minute default and the cleanup, and reword so that only the visual record step depends on the match.
 
 ## Sources
 
