@@ -251,6 +251,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-21 | R-1 | spec | `21057d50` | claude-opus-5-5 | procedural | Five should-fix findings and one nit; no blocking finding |
 | 2026-11-21 | R-2 | spec | `51881bc3` | claude-opus-5-5 | procedural | Four should-fix findings and one nit; no blocking finding |
+| 2026-11-21 | R-3 | spec | `b8681c9a` | claude-opus-5-5 | procedural | Three should-fix findings; no blocking finding |
 
 ### R-1
 
@@ -332,3 +333,26 @@ SEVERITY: nit
 WHERE: Context, Owner summary (first paragraph, "The rule that a result recorded at another commit does not count is unchanged"); Design, The completion commit ("with one exemption: ship's completion commit")
 EVIDENCE: The Design adds an exemption to exactly that rule: ship pushes commit C with no result recorded at C, and "The reference states this exemption next to the commit rule". The Owner summary's second paragraph describes the push without a second run, but the first paragraph still calls the rule unchanged. The contradiction came in when the previous revision applied R-1 F-01.
 PROPOSAL: Say the commit rule is unchanged except for the document-only completion commit ship pushes after its Verify run.
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The completion commit; Design, Procedures (third bullet, "Ship, Verify"); Acceptance Criteria AC-06 (ship sentence); Test Plan row AC-06 (ship skill checks); Context, Owner summary (second paragraph, "it then pushes that completion commit without a second run")
+EVIDENCE: The ship skill's preamble today says ship runs `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --run true` "before pushing and never pushes or reports the feature complete unless it may advance at HEAD" (plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:51-54). After the Gate step commits C, HEAD is C, and the results from V carry commit V, which mayAdvance blocks (plugins/vh-adlc/scripts/loop/rungs.ts:76). That sentence therefore directs a second completion run at C, which is exactly the doubled expensive run the exemption exists to avoid. Neither the Procedures nor AC-06 say that this preamble sentence is replaced or reworded. The AC-06 proof checks only that the ship skill contains `--stage completion`, `--merge <merge commit> --stage completion`, `--record` and `only the feature document`. A ship skill that keeps the "before pushing ... may advance at HEAD" sentence and adds a Verify-step run passes that proof while still telling the agent to run the completion stage twice. For implement, the previous revision added a negative check for this kind of leftover text (no stage-less `rungs ... --run true`). Ship has no equivalent.
+PROPOSAL: State in the ship Procedures bullet and in AC-06 that the preamble's "before pushing ... may advance at HEAD" rule is replaced by the Verify-step run plus the completion-commit exemption. Add a negative check to the AC-06 proof, for example that the ship skill no longer contains `may advance at HEAD` or a stage-less `rungs --repo <dir> --base <default branch> --run true`.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-07 ("the `version` read from `plugins/vh-adlc/.claude-plugin/plugin.json`"); Acceptance Criteria AC-07 ("as the minimum plugin version, the version both manifests carry"); Test Plan row AC-08 ("No test pins a literal version, so later lock bumps do not break it"); Design, Concurrency, failure and upgrade ("the reference names that release as the minimum plugin version")
+EVIDENCE: The AC-07 proof is a permanent test in tests/vh-adlc/direct-operation-compatibility.test.ts that requires references/loop-settings.md to contain whatever version the manifest carries now. The minimum version that accepts `stages` is fixed at the release that ships this feature. tests/vh-adlc/check.test.ts:224-232 requires a version change with every later change under plugins/vh-adlc, so the very next package change moves the manifest to a version the reference does not contain, and this test fails. The only way to make it pass again is to raise the stated minimum to a later release, which makes the reference wrong. That contradicts the AC-08 row's own claim that no test pins a version. The previous revision introduced this when it applied R-2 F-03 by replacing the literal `0.29.0` with the manifest read.
+PROPOSAL: Prove the minimum version in the reference once, at implementation time, through the written procedure in the AC-08 row: compare it with the branch's manifest version. Alternatively, have the test check that the reference names a version no later than the manifest's and above origin/main's at the time of the feature, rather than equal to the current manifest.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The completion commit; Design, Concurrency, failure and upgrade; Design, Procedures (third bullet, "Ship, Verify")
+EVIDENCE: The exemption says ship pushes C without a second run "when `git diff --name-only V C` lists only that document", where V is the commit of ship's Verify run. Rung results are never stored between invocations (Scope, Out of scope, second bullet; cli.ts:133-149 only prints them). If ship stops after committing C and before the push succeeds (an interrupted session, or a rejected push that ship reports as partial and stops on, plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:95-97), a later ship or resume run sees a local completion commit whose parent differs only by the document. Nothing records whether a completion run advanced at that parent. One implementer would take V as C's parent and push C with no observed result. Another would run the completion stage again. The Concurrency, failure and upgrade section covers a blocking run and a timeout but not this retry path, which crosses the push boundary.
+PROPOSAL: State that the exemption applies only within the same ship run that observed the completion stage advance at V, and that any retried or resumed push runs the completion stage again at the head before pushing. Add that case to AC-06.
