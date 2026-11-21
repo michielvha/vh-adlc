@@ -356,6 +356,7 @@ resolution of the remaining judgement findings of reviews R-1 to R-3.
 | 2026-11-21 | R-1 | spec | `35b30950` | claude-opus-5-5 | procedural | 1 blocking, 20 should-fix, 4 nits |
 | 2026-11-21 | R-2 | spec | `630c3d2a` | claude-opus-5-5 | procedural | 1 blocking, 11 should-fix, 1 nit |
 | 2026-11-21 | R-3 | spec | `b8be9f60` | claude-opus-5-5 | procedural | 2 blocking, 10 should-fix, 3 nits |
+| 2026-11-21 | R-4 | spec | `baf9eba0` | claude-opus-5-5 | procedural | 1 blocking, 5 should-fix, 3 nits |
 
 ### R-1
 
@@ -737,6 +738,71 @@ SEVERITY: nit
 WHERE: Design > Terms (the Record state row); Design > Command, Output table (`state`)
 EVIDENCE: Two Record state values, `planned` and `complete`, are also feature document statuses throughout the loop references (`conventions/feature-documents.md`, Statuses). A ship report that says a record is `planned` or `complete` next to a document that is `planned` or `complete` can be misread.
 PROPOSAL: Use distinct values, such as `preview` and `full`, or have reports always write "record state `complete`".
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan row AC-07 (statements (1) to (10), and "`tests/vh-adlc/direct-operation-compatibility.test.ts` still passes"); AC-07; Design > Ship (the Input paragraph's authority sentence and Deliver steps 1 to 8); Scope (the ship skill bullet); frontmatter `covers` (lists the test)
+EVIDENCE: `tests/vh-adlc/direct-operation-compatibility.test.ts:12-17` and `:85-100` require the ship skill body, from "The plugin directory is two levels" onward, to equal the body at baseline `b313327b`. Only the Loop routes, Issue labels, Documentation impact, Article and After an authorized merge sections are stripped first. The Input paragraph (`plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:15-18`) and the Deliver section (`SKILL.md:95-113`) are in the compared body, yet the AC-07 row requires statement (10) "In the Input paragraph" and statements (1) to (9) in or alongside Deliver. In a scratch clone at baf9eba the test printed 8 pass, 0 fail. After the row's own statement (10) pass text ("authority to push the feature branch and `refs/pr-visuals/<number>`") was put into the Input sentence, it printed "(fail) direct ship keeps its approved operation body", 7 pass, 1 fail. Any Deliver edit fails the same way. So an implementation that meets the row's ten statements fails the row's last requirement unless the guard changes, and the document never says how it changes. The sibling feature avoided this by putting its ship text in Loop routes and extending the test (merge 40015896 changes the test by 11 lines). The Deliver conflict dates from R-1. This revision added the Input statement (10) in answer to R-3 F-14.
+PROPOSAL: State how the compatibility test changes. For example, put the visual record steps in their own ship section that the test strips and checks for required phrases, like Issue labels, and name the allowed authority-sentence change. Then make the AC-07 statements name that section instead of Deliver and the Input paragraph, or say the ship baseline moves and to which commit.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship step 3 (removal on "visual_record is not declared" and on `not-applicable`) and step 5 (replacement "from its `## Before and after` heading to the end of the body"); Owner summary ("Nothing changes for a project without the block"); Design > Concurrency, failure, retry, upgrade ("Upgrade and rollback": "the next ship removes the section"); Test Plan row AC-07 statement (8)
+EVIDENCE: Step 3 makes ship remove "any earlier `## Before and after` section" when the committed settings declare no `visual_record`, and step 5 defines a section as running from that heading to the end of the body. So in every project without the block, each ship now deletes a hand-written `## Before and after` section and all text after it. That contradicts the Owner summary's "Nothing changes for a project without the block". The proposed shared rule (vhco-pro/docs#53) asks every UI PR for such a record, so a project that has not adopted `visual_record` is the likeliest to write one by hand, as michielvha/stackweaver#1177 did in a comment. A section written by hand for a change outside `when.paths` is removed on `not-applicable` in the same way. The removal on "not declared" came in with this revision, applying R-3 F-04.
+PROPOSAL: Remove or replace only a section vh-adlc wrote, identified by a fixed marker the command emits (for example an HTML comment line under the heading), and leave the body untouched otherwise. Or state the deletion in the Owner summary and the guide, and add the marker check to the AC-07 row.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 3 (Storage) and the State paragraph; Design > Ship steps 2 and 4; Design > Concurrency, failure, retry, upgrade ("Visibility", "Retry and replay"); Scope, out of scope ("Pruning old `refs/pr-visuals/*` refs. They are the record and are kept."); Owner summary (third paragraph, "in a public repository the images are public")
+EVIDENCE: The pinned standard says "Redact credentials and session material before sharing artifacts" and "Do not put runtime secrets, private user data or captured sessions into Git" (`conventions/frontend-testing.md:177-178`, `:77` at 0c983f6, confirmed). In the design, `visuals --run true` pushes the images (step 3) before ship looks at any of them (Ship step 4), and the ref only ever grows: pushes are never forced and old refs are kept. Nothing between the capture and the push checks for secrets or real user data, and the document gives no way to take a leaked image back. Deleting the ref is not a defined operation and needs authority ship does not have. So the one step that inspects the images comes after they are shared, which in a public repository means published.
+PROPOSAL: Split capture from storage: `--run true` captures and writes local files only, ship inspects them, and a second call (for example `--push true`) stores them only after that inspection passes. Also define an owner-approved removal path for a ref that holds an image it should not.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command synopsis (`--github <owner>/<repo>`) and step 4 (URL form `https://github.com/<owner>/<repo>/blob/...`); Design > Command step 3 (`git ls-remote origin`, `git push origin`); Design > Ship step 2 (`gh pr view <number> --json url`); Owner summary (decision "the GitHub owner and repository come from the PR ship created"); Scope, out of scope ("Parsing remote URLs"); AC-06; Test Plan row AC-06
+EVIDENCE: The images are pushed to `origin`, but the links name the PR's repository, and nothing checks that the two are the same. When they differ, every link points at a repository that may not hold the commit while `state` reads `full`. That happens with a clone whose `origin` is a fork while `gh` creates the PR on the parent, or with a `gh` default repository set elsewhere. The PR URL also carries the host, but `--github` keeps only `<owner>/<repo>` and the links hard-code `github.com`, so a GitHub Enterprise repository gets broken links. Elsewhere the plugin handles both cases: maintenance settings say the repository identity "must match origin" and "A nonstandard GitHub hostname requires an explicit matching hostname" (`plugins/vh-adlc/references/maintenance-settings.md:16`). This decoupling came in with this revision's answer to R-3 F-01. The AC-06 proof checks `github.com/acme/app` only, so either reading passes.
+PROPOSAL: Take the host as well as owner and repository from the PR. Require that the PR's repository is the one `origin` pushes to, or else report a named missing reason with no links. Add a must-fail case for a mismatch to the AC-05 or AC-06 row.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command, State paragraph (the full list of missing reasons and "Images captured but not pushed are reported missing with their local files kept"); Design > Command step 2 ("The time limit and 126 or 127 handling follow the rung runner"), step 3 and step 4 ("an absent side's cell is `none`"); Output table (`pairs`, "Each is `null` for an absent side"); AC-05; Test Plan row AC-05
+EVIDENCE: Three outcomes are left open. (1) Whether images left in `<out>` by a capture that exited non-zero, could not run or timed out are pushed and linked. The rung runner stops a timed-out group with SIGKILL (`plugins/vh-adlc/scripts/loop/rungs.ts:61`), so a file being written can be truncated and still match an image extension. (2) When the capture writes nothing, whether `missing` holds only "it wrote no images at all" or also the two one-side reasons. (3) When the push fails, each pair has `before_file` and `after_file` but no URL. One implementer then renders a table of `none` cells, which reads as screens added or removed. Another omits the table. The AC-05 row asserts "the `missing` entry" and "the section text" per reason, which either choice passes.
+PROPOSAL: State whether images from a failed, unrunnable or timed-out capture are stored, that "no images at all" replaces the two one-side reasons, and what the table shows when nothing was pushed. Assert each in the AC-05 row.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-07, statements (1), (6) and (8); AC-07; Design > Ship steps 2, 3 and 8
+EVIDENCE: Statement (1) requires `visuals`, `--run true`, `--pr`, `--base origin/`, `--github` and `--out`, but not `--repo`. `main` calls `need(options, "repo")` before anything else (`plugins/vh-adlc/scripts/loop/cli.ts:78`, `:45-48`), so a skill text without `--repo` passes the check while every run exits 2 and ship writes "Visual record missing". The row does not check the `git fetch origin <default branch>` that Design > Ship step 2 runs first, so a stale `origin/<default>` can widen the merge base. No statement covers step 3's removal of an earlier section on `not-applicable`. Statement (6) holds only a `partial` record, while step 8 says "A `partial` record or a missing record never blocks the delivery". The row was rewritten in this revision for R-3 F-02 and F-04 and has not passed review, so these gaps are not limited to nits.
+PROPOSAL: Add `--repo` to statement (1) and a statement for the fetch before the run. Add a statement for the `not-applicable` removal, and make statement (6) cover a missing record too, each with a must-pass and a must-fail example.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Background (the ship skill bullet `SKILL.md:98-101`, `:67-68`, `:81-82`, `:90-92`; the settings bullet `settings.ts:208`, `settings.ts:238-251`; the rung bullets `rungs.ts:40-60`, `:47-49`, `:59`, `rungs.ts:12-16`, `cli.ts:176-178`, `cli.ts:149`; the last bullet, "is in progress on `feat/stage-scoped-rungs`"); Design > Concurrency, failure, retry, upgrade ("Upgrade and rollback", `settings.ts:54`, `:208`); Design > Coordination
+EVIDENCE: Merge 40015896 (PR #147, stage-scoped rungs) is an ancestor of baf9eba, and `docs/specs/stage-scoped-verification-rungs.md` there has `status: complete`. The cited lines moved. At baf9eba: the PR step with `Closes`/`Refs` is `SKILL.md:105-107`, the repository and account confirmation is `:74-75`, unrelated dirty work is `:88-89` and the CI policy is `:97-98`. `keys(input, LOOP_SETTINGS_KEYS, ...)` is `settings.ts:216` and `loadLoopSettingsAt` is `:246-259`. The rung process group and timer are `rungs.ts:59-61`, 126/127 is `:71` and the git throw is `:17-21`. The thrown-error exit is `cli.ts:182-186`, and rungs returns 3 at `cli.ts:156`. The Coordination condition is already met.
+PROPOSAL: Refresh the line citations, say the sibling feature has merged, and reduce Coordination to branching from the current default branch.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design > Command (exit-2 list, "`--out` is missing, not empty, or inside the repository's working tree") and step 2 ("creates the empty directories `<out>/before/` and `<out>/after/`"); Test Plan row AC-02
+EVIDENCE: A `--out` path that does not exist is neither "missing" nor "not empty". One implementer creates it and another exits 2. Ship always passes "a new empty directory", so nothing ship observes changes.
+PROPOSAL: Say whether a nonexistent `--out` is created or exits 2.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Scope (documentation bullet); AC-09
+EVIDENCE: Per-version upgrade notes for new loop settings live in `docs/reference/compatibility.md:180-183` ("Plugin 0.29.0 lets a verification rung declare `stages` ... Older plugins refuse the field, so update the plugin before adding it"), added by the sibling feature at 0ebf5bef. This feature has the same upgrade order but names only the loop settings reference and the workflows guide.
+PROPOSAL: Add a compatibility reference note for the new key to Scope, or leave it to ship's documentation impact step and say so.
 
 ## Sources
 
