@@ -177,6 +177,11 @@ Plugin 0.28.1 limits a drift re-review of an accepted spec to one revision and o
 If the follow-up still finds a blocker, the skill pauses for an owner decision. See the
 [spec skill](../../plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md#drift-re-reviews).
 
+Plugin 0.29.0 lets a verification rung declare `stages`. A rung with `stages: [completion]` is skipped at
+each task and runs once when ship verifies the feature, before push, completion and delivery. Older plugins
+refuse the field, so update the plugin before adding it to `.vh-adlc/loop.yaml`. See the
+[loop settings reference](../../plugins/vh-adlc/references/loop-settings.md#verification-rungs).
+
 ## Article operation
 
 The article and promotion procedure is packaged as `vh-adlc-blog`. Its source
