@@ -35,30 +35,34 @@ type child struct {
 	done     chan struct{}
 }
 type runtime struct {
-	geometry       *geometryController
-	geometryCtx    context.Context
-	geometryCancel context.CancelFunc
-	mu             sync.Mutex
-	current        session.BrowserHandle
-	profile        string
-	downloads      string
-	reusable       bool
-	env            []string
-	vncAddress     string
-	chrome         *child
-	modeReady      bool
-	stopped        bool
-	generation     atomic.Uint64
-	loaded         atomic.Bool
-	automated      atomic.Bool
-	inputChecked   atomic.Bool
-	markerServer   *http.Server
-	home, id       string
-	children       []*child
-	display        *state.Display
-	once           sync.Once
-	cleanupErr     error
-	clip           clipboardHelper
+	mobile           *mobileFocus
+	mobileQuery      sync.Mutex
+	mobileScalePhase uint64
+	mobilePhase      atomic.Uint64
+	geometry         *geometryController
+	geometryCtx      context.Context
+	geometryCancel   context.CancelFunc
+	mu               sync.Mutex
+	current          session.BrowserHandle
+	profile          string
+	downloads        string
+	reusable         bool
+	env              []string
+	vncAddress       string
+	chrome           *child
+	modeReady        bool
+	stopped          bool
+	generation       atomic.Uint64
+	loaded           atomic.Bool
+	automated        atomic.Bool
+	inputChecked     atomic.Bool
+	markerServer     *http.Server
+	home, id         string
+	children         []*child
+	display          *state.Display
+	once             sync.Once
+	cleanupErr       error
+	clip             clipboardHelper
 	// clipMu guards the switch mark and the clipboard's own copy of the
 	// browser mode. Health checks never take it, and the handoff holds it
 	// only to mark and unmark a switch.
@@ -203,7 +207,7 @@ func (r *runtime) spawn(role, binary string, args, env []string) (*child, error)
 
 func (r *runtime) alive() bool {
 	for _, c := range r.children {
-		if !state.Alive(c.identity) {
+		if !mobileResource(c.role) && !state.Alive(c.identity) {
 			return false
 		}
 	}
@@ -275,7 +279,7 @@ func (r *runtime) stop() {
 			r.cleanupErr = state.ReleaseDisplay(r.display)
 		}
 		if r.cleanupErr == nil {
-			for _, name := range []string{"profile", "downloads", "Xauthority", "vnc.passwd"} {
+			for _, name := range []string{"profile", "downloads", "Xauthority", "vnc.passwd", "mobile-bus.xml"} {
 				if err := os.RemoveAll(filepath.Join(r.home, r.id, name)); err != nil {
 					r.cleanupErr = errors.New("browser-private-cleanup-pending")
 				}
@@ -563,6 +567,7 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 	initial := "http://" + markerListener.Addr().String() + "/"
 	r.current = session.BrowserHandle{Target: "http://" + bridgeAddress + "/vnc.html", Marker: marker, MarkerURL: initial, Password: password, Assets: app.Tool("REMOTE_GUI_NOVNC", "/usr/share/novnc")}
 	r.env, r.vncAddress = env, vncAddress
+	r.startMobileFocus(ctx)
 	r.markerServer = &http.Server{ReadHeaderTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second, Handler: http.HandlerFunc(r.serveMarker)}
 	go func() { _ = r.markerServer.Serve(markerListener) }()
 	handle, err := r.launch(ctx, c.Mode())
@@ -622,7 +627,16 @@ func (r *runtime) launch(ctx context.Context, mode string) (session.BrowserHandl
 	if err != nil {
 		return empty, err
 	}
-	chrome, err := r.spawn("browser", app.Tool("REMOTE_GUI_CHROMIUM", "chromium-browser"), args, r.env)
+	env := r.env
+	r.mobileScalePhase = 0
+	if r.mobile.live() {
+		args = append(args, "--force-renderer-accessibility", "--force-device-scale-factor=1")
+		if usesUnitDeviceScale(args) {
+			r.mobileScalePhase = generation
+		}
+		env = append(append([]string(nil), env...), "AT_SPI_BUS_ADDRESS="+r.mobile.address, "GTK_A11Y=1", "ACCESSIBILITY_ENABLED=1")
+	}
+	chrome, err := r.spawn("browser", app.Tool("REMOTE_GUI_CHROMIUM", "chromium-browser"), args, env)
 	if err != nil {
 		return empty, err
 	}

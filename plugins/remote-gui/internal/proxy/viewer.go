@@ -1,29 +1,40 @@
 package proxy
 
 import (
+	_ "embed"
 	"encoding/json"
 	"net/http"
 	"path"
 	"strings"
 )
 
+//go:embed mobile.js
+var mobileModule []byte
+
 const viewerPage = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shared browser</title><style>
 html,body{margin:0;height:100%;overflow:hidden;background:#15171c;color:#eee;font:14px system-ui}
 header{position:relative;height:32px;padding:3px 8px;box-sizing:border-box;display:flex;align-items:center;gap:12px}
-#status{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.viewer-status{flex:1;min-width:0}
+#status,#viewport-status,#mobile-hint{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#viewport-status,#mobile-hint{margin:0;color:#ffcf70}
+#viewport-status[hidden],#mobile-hint[hidden],#viewport-status:not([hidden])+#status,
+#mobile-hint:not([hidden])~#viewport-status,#mobile-hint:not([hidden])~#status{display:none}
 #screen{height:calc(100% - 32px);width:100%}
-#viewport-status{position:absolute;top:36px;right:8px;z-index:2;margin:0;box-sizing:border-box;width:min(30rem,calc(100vw - 16px));padding:8px;border-radius:4px;background:#2b303b;color:#eee}
 button{font:inherit;color:#eee;background:#2b303b;border:1px solid #4a5160;border-radius:4px;padding:2px 10px;min-height:26px;cursor:pointer}
 button:focus-visible,textarea:focus-visible,#clipboard-remote:focus-visible{outline:2px solid #7aa7ff;outline-offset:1px}
 #clipboard{position:absolute;top:36px;right:8px;z-index:1;width:min(30rem,calc(100% - 16px));max-height:calc(100% - 48px);overflow:auto;box-sizing:border-box;padding:12px;background:#1f232b;border:1px solid #4a5160;border-radius:6px;display:flex;flex-direction:column;gap:8px}
 #clipboard[hidden]{display:none}
+#mobile-type{position:fixed;z-index:3;min-width:112px;min-height:44px;font-size:16px}
+#mobile-type:disabled{opacity:.6;cursor:default}
+#mobile-editor{position:fixed;top:6px;left:8px;width:8px;height:20px;opacity:.01;pointer-events:none;font-size:16px;z-index:3}
+
 #clipboard p{margin:0}
 #clipboard-warning{color:#ffcf70}
 textarea{font:inherit;color:#eee;background:#15171c;border:1px solid #4a5160;border-radius:4px;min-height:5em;resize:vertical}
 #clipboard-remote{margin:0;min-height:3em;max-height:12em;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#15171c;border:1px solid #4a5160;border-radius:4px;padding:4px;font:13px ui-monospace,monospace}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 </style></head><body>
-<header><span id="status">Connecting to shared browser</span><p id="viewport-status" role="status" aria-live="polite" hidden></p><button id="clipboard-toggle" type="button" aria-expanded="false" aria-controls="clipboard">Clipboard</button></header>
+<header><div class="viewer-status"><p id="mobile-hint" role="status" hidden>Typing follows the shared browser’s focus.</p><p id="viewport-status" role="status" aria-live="polite" hidden></p><span id="status">Connecting to shared browser</span></div><button id="clipboard-toggle" type="button" aria-expanded="false" aria-controls="clipboard">Clipboard</button></header>
 <section id="clipboard" aria-label="Clipboard panel" hidden>
 <p id="clipboard-mode">Opening the panel shows who controls the shared browser.</p>
 <p id="clipboard-warning" hidden>Text you send now is readable by the agent.</p>
@@ -36,12 +47,14 @@ textarea{font:inherit;color:#eee;background:#15171c;border:1px solid #4a5160;bor
 <p id="clipboard-message" role="status" aria-live="polite"></p>
 </section>
 <div id="screen"></div>
+<button id="mobile-type" type="button" hidden>Tap to type</button>
+<input id="mobile-editor" aria-label="Shared browser keyboard" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="text" tabindex="-1" hidden>
 <script type="module">
 import RFB from '/core/rfb.js';
 const $=id=>document.getElementById(id);
 const status=$('status'),panel=$('clipboard'),toggle=$('clipboard-toggle'),field=$('clipboard-send'),area=$('clipboard-remote'),count=$('clipboard-count'),note=$('clipboard-message'),modeLine=$('clipboard-mode'),warning=$('clipboard-warning');
 // Clipboard text lives only in these page variables and elements, never in storage.
-let remote=null,mode='',remoteText='';
+let remote=null,mode='',remoteText='',phone=null;
 const inPanel=()=>panel.contains(document.activeElement);
 const focusRemote=()=>{if(remote&&!inPanel())remote.focus()};
 function showMode(next){
@@ -107,7 +120,7 @@ async function clearAll(){
 }
 function setOpen(open){
  panel.hidden=!open;toggle.setAttribute('aria-expanded',String(open));
- if(open){field.focus();void refresh()}else{note.textContent='';if(remote)remote.focus()}
+ if(open){phone?.cancel();field.focus();void refresh()}else{note.textContent='';if(remote)remote.focus()}
 }
 toggle.addEventListener('click',()=>setOpen(panel.hidden));
 panel.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();setOpen(false)}});
@@ -120,10 +133,13 @@ window.addEventListener('pagehide',forget);
 const sizingNotice=$('viewport-status'),screen=$('screen');
 const viewerID=Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,'0')).join('');
 let sizingConnected=false,controlsSize=false,sequence=0,generation=0;
-let pendingSize=null,sizeTimer=0,sizeInFlight=false,sizeAbort=null,lastSize='';
+let pendingSize=null,sizeTimer=0,sizeInFlight=false,sizeAbort=null,lastSize='',keyboardViewport=null;
 const sizingEligible=()=>sizingConnected&&document.visibilityState==='visible'&&document.hasFocus();
+const viewerHeight=()=>Math.floor(window.visualViewport?.height??window.innerHeight);
+const keyboardAffectsSize=()=>phone?.editing||
+ (keyboardViewport&&innerWidth===keyboardViewport.width&&viewerHeight()<keyboardViewport.height-90);
 function fitViewerHeight(){
- const height=Math.floor(window.visualViewport?window.visualViewport.height:window.innerHeight);
+ const height=viewerHeight();
  screen.style.height=Math.max(0,height-32)+'px';
  panel.style.maxHeight=Math.max(0,height-48)+'px';
 }
@@ -138,8 +154,16 @@ function pauseSizing(){
  generation++;clearTimeout(sizeTimer);sizeTimer=0;pendingSize=null;controlsSize=false;
  if(sizeAbort)sizeAbort.abort();
 }
+function beginMobileEditing(){
+ keyboardViewport={width:innerWidth,height:viewerHeight()};
+ pauseSizing();
+}
 function queueSize(claim=false){
- if(!sizingEligible()||(!claim&&!controlsSize))return;
+ if(keyboardAffectsSize()||!sizingEligible())return;
+ // The editor can blur before the native keyboard finishes closing.
+ // Reclaim sizing once the original viewport has returned.
+ if(keyboardViewport)claim=true;
+ if(!claim&&!controlsSize)return;
  const size=measuredSize();
  if(!size){clearTimeout(sizeTimer);sizeTimer=0;pendingSize=null;return}
  const key=size.width+'x'+size.height;
@@ -149,7 +173,8 @@ function queueSize(claim=false){
  clearTimeout(sizeTimer);sizeTimer=setTimeout(()=>{sizeTimer=0;void flushSize()},150);
 }
 async function flushSize(){
- if(sizeInFlight||!pendingSize||!sizingEligible())return;
+ if(sizeInFlight||!pendingSize||keyboardAffectsSize()||!sizingEligible())return;
+ keyboardViewport=null;
  const request=pendingSize;pendingSize=null;sizeInFlight=true;
  const controller=new AbortController();sizeAbort=controller;
  const deadline=setTimeout(()=>controller.abort(),5000);
@@ -187,7 +212,11 @@ async function flushSize(){
  }
 }
 fitViewerHeight();
-new ResizeObserver(()=>queueSize()).observe(screen);
+new ResizeObserver(()=>{
+ // noVNC can skip rescaling when the container returns to its expected size.
+ if(remote)remote.scaleViewport=true;
+ queueSize();
+}).observe(screen);
 window.addEventListener('resize',()=>{fitViewerHeight();queueSize()});
 if(window.visualViewport)window.visualViewport.addEventListener('resize',()=>{fitViewerHeight();queueSize()});
 window.addEventListener('focus',()=>queueSize(true));
@@ -200,11 +229,20 @@ try{
  const credentials=await reply.json();
  remote=new RFB($('screen'),(location.protocol==='https:'?'wss://':'ws://')+location.host+'/websockify',{credentials:{password:credentials.password}});
  remote.scaleViewport=true;remote.viewOnly=false;
+ const canvas=screen.querySelector('canvas');
+ canvas.setAttribute('role','img');
+ canvas.setAttribute('aria-label','Shared browser screen');
+ if(navigator.maxTouchPoints>0)void import('/__remote_gui/mobile.js').then(({mobileKeyboard})=>{
+  phone=mobileKeyboard(remote,screen,panel,beginMobileEditing,()=>{
+   remote.focusOnClick=true;
+   if(panel.hidden){focusRemote();queueSize(true)}
+  });
+ }).catch(()=>{});
  remote.addEventListener('connect',()=>{status.textContent='Shared browser connected';sizingConnected=true;focusRemote();queueSize(true)});
  remote.addEventListener('disconnect',()=>{status.textContent='Shared browser disconnected';sizingConnected=false;pauseSizing();sizingNotice.hidden=true;forget()});
  remote.addEventListener('securityfailure',()=>{status.textContent='Shared browser authentication failed';sizingConnected=false;pauseSizing();forget()});
  // A phone keyboard resizes the viewport; typing in the panel must stay there.
- window.addEventListener('resize',focusRemote);
+ window.addEventListener('resize',()=>{if(!phone?.editing)focusRemote()});
 }catch(error){status.textContent='Shared browser unavailable. Reopen the session link.'}
 </script></body></html>`
 
@@ -216,6 +254,14 @@ func (p *Proxy) viewer(w http.ResponseWriter, r *http.Request) bool {
 	case "/", "/vnc.html":
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(viewerPage))
+		return true
+	case "/__remote_gui/mobile.js":
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return true
+		}
+		w.Header().Set("Content-Type", "text/javascript")
+		_, _ = w.Write(mobileModule)
 		return true
 	case "/__remote_gui/viewer-access":
 		if r.Method != http.MethodGet {

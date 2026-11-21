@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><title>Owned keyboard fixture</title>
+<style>html,body{margin:0;background:#f0f1f4;font:32px sans-serif}input{position:absolute;box-sizing:border-box;width:700px;height:110px;left:130px;font-size:42px}#a{top:110px}#b{top:315px}p{position:absolute;top:510px;left:130px}</style>
+<input id="a" type="text" aria-label="Fixture text"><input id="b" type="password" aria-label="Fixture password"><p>Plain area</p>
+<script>
+const a=document.querySelector('#a'), b=document.querySelector('#b');
+const post=(path,body)=>fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+let deliveredA=0, deliveredB=0;
+a.addEventListener('input',()=>{deliveredA++;void result()});
+b.addEventListener('input',()=>{deliveredB++;void result()});
+function result(){
+  return post('/result',{exactA:a.value==='z',exactB:b.value==='z',emptyA:!a.value,emptyB:!b.value,deliveredA,deliveredB});
+}
+// Geometry is for test coordinates only. The viewer uses the live accessibility helper.
+const fields={a:{x:130,y:110,width:700,height:110},b:{x:130,y:315,width:700,height:110}};
+void post('/geometry',{width:screen.width,height:screen.height,viewport:{width:innerWidth,height:innerHeight},fields});
+</script>

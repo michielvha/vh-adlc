@@ -1,0 +1,5 @@
+body { font: 16px system-ui; margin: 16px; }
+h1 { font-size: 20px; }
+#stage { position: relative; max-width: 640px; }
+#surface { width: 100%; height: auto; display: block; touch-action: none; }
+#editor { position: absolute; inset: 10px auto auto 10px; width: 120px; opacity: .01; pointer-events: none; font-size: 16px; }

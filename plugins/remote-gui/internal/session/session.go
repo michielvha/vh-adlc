@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/mobile"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/profile"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/viewport"
@@ -46,19 +47,21 @@ type View struct {
 	EnrollmentExpires *time.Time `json:"enrollment_expires_at,omitempty"`
 }
 type BrowserHandle struct {
-	BrowserMode string
-	MarkerURL   string
-	Handoff     func(context.Context, string) (BrowserHandle, error)
-	Alive       func() bool
-	Assets      string
-	Target      string
-	CDPAddress  string
-	Marker      string
-	Password    string
-	Owned       []state.Process
-	Stop        func()
-	Clipboard   Clipboard
-	Resize      viewport.Resize
+	BrowserMode  string
+	MarkerURL    string
+	Handoff      func(context.Context, string) (BrowserHandle, error)
+	Alive        func() bool
+	Assets       string
+	Target       string
+	CDPAddress   string
+	Marker       string
+	Password     string
+	Owned        []state.Process
+	Stop         func()
+	Clipboard    Clipboard
+	Resize       viewport.Resize
+	MobileLookup mobile.Lookup
+	MobilePhase  func() uint64
 }
 
 // Clipboard sets, reads and clears a browser session's remote clipboard.

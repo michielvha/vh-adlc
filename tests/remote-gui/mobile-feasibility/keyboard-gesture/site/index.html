@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remote-gui gesture probe</title>
+<link rel="stylesheet" href="./probe.css">
+<h1>Remote-gui gesture probe</h1>
+<p id="result" role="status">Loading the noVNC gesture handler</p>
+<div id="stage">
+  <canvas id="surface" width="640" height="320" role="img" aria-label="Synthetic gesture surface"></canvas>
+  <input id="editor" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Synthetic keyboard input">
+</div>
+<script type="module" src="./probe.js"></script>
+</html>
