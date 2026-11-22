@@ -476,6 +476,7 @@ None.
 | 2026-11-22 | R-1 | spec | `a3bccaab` | claude-opus-5-5 | procedural | 2 blocking, 11 should-fix, 3 nit |
 | 2026-11-22 | R-2 | spec | `5c09d79f` | claude-opus-5-5 | procedural | 1 blocking, 16 should-fix, 2 nit |
 | 2026-11-22 | R-3 | spec | `98e792ad` | claude-opus-5-5 | procedural | 2 blocking, 9 should-fix, 2 nit |
+| 2026-11-22 | R-4 | spec | `e94e00e7` | claude-opus-5-5 | procedural | no blocking; 5 should-fix, 1 nit |
 
 ### R-1
 
@@ -818,3 +819,47 @@ SEVERITY: nit
 WHERE: Context Owner summary (stated limit bullet; replay paragraph; "Every change is gated on the resolved convention")
 EVIDENCE: The summary does not mention that a stated limit excluding a case the goal, a criterion or Scope names is an Open Question (Design, Stated limit), or that AC-13 also requires each new clean document to resolve the old brief's labels. "Every change is gated" sits beside Design's "The scope fields are passed on every pin", and the review-scope command and vh-adlc's own profile are not gated.
 PROPOSAL: Add the limit exception and AC-13's resolution condition to the summary, and say that only behavior changes are gated while the scope fields are always passed.
+
+### R-4
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-05 ("or the docs pin changed"); Scope (Out of scope, "Not handled: a repository without its own pin whose plugin upgrade moves the resolved docs revision ... (R-3 F-07)"); Design (Scoped re-review, "The pinless upgrade case is a stated limit in Scope"); Context Owner summary (re-review bullet, "the repository's docs pin"); Test Plan AC-05 row ("with a changed pin file")
+EVIDENCE: AC-05 still says "the pass is full when there is no previous spec review or covered code or the docs pin changed". For a repository without its own pin, the resolved docs pin is the plugin pin (internal/knowledge/knowledge.go:179 returns `Source: "plugin"` with `pluginPin`). The new Scope line says that repository gets a scoped pass after the pin moves, so the limit excludes a case AC-05 names. In response to R-3 F-07 the previous revision added the limit and changed the summary to "the repository's docs pin", but it left AC-05's wording, which R-3 F-07 asked to narrow. Design's own Stated limit rule says a limit that excludes a case a criterion names is an Open Question. The resolved convention at 0c983f67 (conventions/feature-documents.md:165-166) also makes every trade-off the document settles an Open Question. The document records no owner decision for this limit: Open Questions is "None." and the summary does not mention it. An implementation reviewer reading AC-05 literally would rule it not met for the pinless upgrade case.
+PROPOSAL: Narrow AC-05 to "a repository pin file (the `pin_files` that `vh-adlc knowledge` reports) changed". Then either record the owner's decision on the pinless limit in the summary or raise it as an Open Question.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, Retention and Aggregate paragraphs); Acceptance Criteria AC-11, AC-12; Test Plan AC-11, AC-12 rows; Context Owner summary (replay paragraph, "Per route, the new rules' average hits per run must also stay within 15 percent")
+EVIDENCE: I computed both rules for a reviewer whose hit rates do not change (python3, exact binomial sums). The per-label figure is right: the maximum is 0.87 percent, at p=0.137. The aggregate is right at 10 labels (7.85 percent) but not at 20: it gives 2.55 percent, not "about 2". At 5 labels it gives 17.2 percent per route, which matters because the small application case may have few labels. The document states each figure per check only. AC-11 and AC-12 together need four aggregate checks to pass, one per case and route. At 10 labels per case all four pass with probability 0.72, so a correct implementation fails about 28 percent of the time, before any per-label failures are added. The per-label rule has a confirmation step; the aggregate has none. It is also undefined whether the six confirmation runs count toward the aggregate: with them, 10 labels fail at 6.6 percent instead of 7.85. It is also unstated whether the confirmation runs must raise the label "at or above its minimum severity". Two implementers would compute AC-11 differently. The previous revision introduced both rules after R-3 F-01.
+PROPOSAL: Give the aggregate the same confirmation as labels: six more new-brief runs, judged on all twelve. State that confirmation hits count at or above minimum severity. Beside the rules, state the combined chance that an unchanged reviewer fails AC-11 and AC-12, and correct the 20-label figure.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Glossary, Always-blocking defect; Severity by consequence; Stated limit); Context Owner summary (second bullet, "Security, data-loss and tenant-isolation defects stay blocking on every product"); Acceptance Criteria AC-01, AC-03; Test Plan AC-03 row (S17.limit)
+EVIDENCE: The glossary defines an always-blocking defect as "A security, data-loss or tenant-isolation defect" and gives no boundary for any of the three classes. S17.limit seeds unlocked concurrent appends to names.log, "under a profile of a shared build host where parallel jobs run the command". It passes only when "no finding names `names.log` concurrency". Unlocked concurrent appends can lose or interleave lines, and a careful reviewer may call that data loss. Under Design's Stated limit, the reviewer then must raise it again as blocking with `EVIDENCE` quoting the limit, which fails S17.limit for a correct implementation. The same boundary decides how much the replay's new brief removes: a reviewer that treats every lost write as data loss keeps the old severity. The previous revision changed the S17.limit profile and limit text in response to R-3 F-03.
+PROPOSAL: Define the three classes in the glossary. For example, data loss is loss or corruption of data a user or tenant owns and cannot regenerate. Then either state in the S17.limit seed that names.log is a regenerable diagnostic record, or pick a seed whose consequence is clearly outside the three classes.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, case.yaml `terms` bullet, "The consumer repository's name is public, as the owner decided"; private material paragraph, "Cases are named ... with no repository or product names"); Context Owner summary ("the consumer repository's name is public, its document content is not"); Acceptance Criteria AC-10
+EVIDENCE: The owner's public-name decision answers R-3 F-09, which was about the owner's own repository, already named in the stored R-2 F-01 record. The case.yaml rule is written for every case, though. So for the small application case, the second user's repository name is left out of `terms`, and the whole-tree terms grep never stops it from appearing in the public repository. The document mentions the second user's consent only for copying their document and repository to the owner's host ("copied there with their consent"). It mentions no consent to publishing the repository name.
+PROPOSAL: Limit the public-name decision to the enterprise case's repository. List the second user's repository name in that case's `terms` unless they consent to publishing it.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-08; Test Plan AC-08 row; Design (Gate on the resolved convention)
+EVIDENCE: Design gates every rule on the resolved convention, including reading the product profile and honouring stated limits. AC-08 requires that "the reviewer ... behave as before this feature" on a 0c983f67 pin. Its proof runs old-pin controls of S17.scoped, S17.questions and S17.nits, plus S16.oldpin-reviewer. S16.oldpin-reviewer seeds no profile (tests/vh-adlc/scenarios/run.ts, the `S16.oldpin-reviewer` scenario writes only the names.log seed and the previous pin), so the production default raises the gap either way. A reviewer that reads the profile and weighs severity by it on every pin passes every AC-08 control.
+PROPOSAL: Add an old-pin control of S17.profile with the single-user profile. It passes only when the lock gap is still raised, as S16.oldpin-reviewer requires today.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Scoped re-review, "one of the repository's pin files (the `pin_files` that `vh-adlc knowledge` reports, such as `AGENTS.md`)" and the command line `review-scope --repo <dir> --document <doc> --commit <X>`)
+EVIDENCE: `vh-adlc knowledge` needs `--plugin-pin`, and `pin()` in internal/knowledge/knowledge.go reads the bridge files from the working tree. The bridge files are `.github/copilot-instructions.md`, `AGENTS.md` and `CLAUDE.md` (:35). The stated command takes no binary or plugin pin, and pin files read from the working tree cannot show a pin removed between the two reviewed commits. Running `knowledge` at e94e00e7 reports `"pin_files":["AGENTS.md"]`.
+PROPOSAL: Have `review-scope` compare the three bridge files between the two commits, or add the binary and plugin pin options to its command line.
