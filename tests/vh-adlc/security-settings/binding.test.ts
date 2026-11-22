@@ -130,7 +130,7 @@ test("check with a binding that does not resolve reports committed-settings-unre
   expect(output).toMatchObject({ mode: "check", mode_reason: "committed-settings-unresolved" });
   expect(output.mode_detail).toContain("default commit differs");
   expect(output.mode_detail).toContain("request-restricted");
-  expect(output.entries.length).toBe(4); expect(exit_code).toBe(1);
+  expect(output.entries.length).toBe(5); expect(exit_code).toBe(1);
 });
 
 test("check with invalid committed settings uses the working tree's keep-off rows", () => {
@@ -155,7 +155,8 @@ test("on a host other than github.com apply is refused as not-github-com", () =>
 
 test("on a host other than github.com private settings get no not-free-on-private reason and no code_scanning entry", () => {
   const f = setup({ hostname: "ghe.example.com", visibility: "private", analysis_null: true, files: dependabot }, ghe), { output } = f.helper("check");
-  expect(output.entries.map(item => item.setting)).toEqual(["dependabot_alerts", "dependabot_security_updates", "secret_scanning", "secret_scanning_push_protection"]);
+  expect(output.entries.map(item => item.setting)).toEqual(["dependabot_alerts", "dependabot_security_updates", "secret_scanning", "secret_scanning_push_protection", "private_vulnerability_reporting"]);
+  expect(entry(output, "private_vulnerability_reporting")).toMatchObject({ state: "unavailable", reason: "not-github-com" });
   expect(output.entries.some(item => item.reason === "not-free-on-private")).toBe(false);
   expect(entry(output, "secret_scanning")).toMatchObject({ state: "not-changed", reason: "check-only" });
 });
