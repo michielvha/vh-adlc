@@ -464,6 +464,7 @@ R-1 to R-8.
 | 2026-11-21 | R-6 | spec | `10298ec8` | claude-opus-5-5 | procedural | 1 blocking, 7 should-fix, 4 nits |
 | 2026-11-21 | R-7 | spec | `e7bac6a4` | claude-opus-5-5 | procedural | 0 blocking, 6 should-fix, 2 nits |
 | 2026-11-22 | R-8 | spec | `25865301` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 2 nits |
+| 2026-11-22 | R-9 | spec | `b0b67bbf` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 1 nit |
 
 ### R-1
 
@@ -1183,6 +1184,52 @@ SEVERITY: nit
 WHERE: Design > Ship steps 4, 7 and 8; Design > Command step 4 (the `### Missing` list "before the closing marker"); Design > Terms (the Before and after section row, "headed `## Before and after`")
 EVIDENCE: Steps 4 and 8 have ship write a marked section "holding one line", without saying whether the `## Before and after` heading comes first, although the Terms row defines the section as headed and the push step's `markdown` always includes the heading. Step 7 puts ship's own lines "under the table" but does not say whether they go before or after the `### Missing` list that the push step places just before the closing marker.
 PROPOSAL: Say that every marked section ship writes starts with the heading, and say where step 7's lines go relative to `### Missing`.
+
+### R-9
+
+TARGET: b0b67bbf800f60e309754ed686c5a44cd042f204
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-07, statement (18); Design > Ship step 2 ("After a withheld record it removes the directory and names its former path in the report, so no withheld image stays on disk"); Design > Command, State paragraph ("Images not pushed keep their local files"); AC-07
+EVIDENCE: Statement (18) only requires the tokens `temporary directory`, `remov`, `withheld`, `keeps` and `names it in the report` somewhere in one paragraph. It never checks which outcome removes the directory and which keeps it. A scratch script tested this wrong paragraph: "Ship uses a new directory under the system's temporary directory. It removes it after a verified push; when ship withheld the images, or a push failed, it keeps the directory and names it in the report." It holds all five tokens, so it passes (18). A skill that says this leaves on disk the images ship judged to show a credential, a session or real user data. That is the case step 2 calls out ("so no withheld image stays on disk"), and the pinned standard says "Redact credentials and session material before sharing artifacts" (`conventions/frontend-testing.md:177-178` at 0c983f6). This revision rewrote (18) when it applied R-8 F-03, so the row has not passed review and this is not a widening nit.
+PROPOSAL: Split (18) into two statements: one for the withheld case (for example `withheld` together with `remov` and `former path`), and one for the kept case (`captured but not pushed`, `keeps`, `names it in the report`). Give the paragraph above as a fail example for the first.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-07 (the matching rule: "A statement passes when at least one paragraph contains all of its tokens, matched case-insensitively"); Test Plan row AC-09 (required phrases in `loop-settings.md`, `docs/user-guides/workflows.md` and `docs/reference/compatibility.md`, and the synonym rejection)
+EVIDENCE: Both rows match multi-word tokens such as `names it in the report`, `temporary directory`, `before writing`, `stray marker`, `must not change the feature checkout`, `still serves the commit by SHA` and `upgrade the plugin before`. Neither row says whether whitespace runs fold to one space before matching. The target files are hard-wrapped Markdown: `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:15-18` and `plugins/vh-adlc/references/loop-settings.md:5-6` break sentences across lines. A scratch script split this document's own Design > Ship text with the row's paragraph rule. Statement (18) matched no paragraph when only newlines were replaced, because step 2 wraps "names it in" and "the report" onto separate indented lines. It matched step 2 only after whitespace runs were folded. So a test that doesn't fold fails a correct skill or guide whenever a line break falls inside a token. A test that folds passes the same text. Two implementers would write different tests, and a later rewrap of a correct document could break one of them.
+PROPOSAL: State in both rows that the checked text and each token have whitespace runs folded to one space before the case-insensitive match, as the standard does for criterion text. Add one must-pass example in each row where a required phrase spans a line break.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship step 7 ("when it inspected every pair and saw no visible difference, the line `No visible change` with the number of screens it inspected"); Context > Owner summary, the decisions paragraph ("says \"No visible change\" only when it sees none"); Test Plan row AC-07, statement (10)
+EVIDENCE: "Every pair" is vacuously inspected when `pairs` is empty. That happens after a non-zero, unrunnable or timed-out capture, because "no image is used" (Command step 2), and after a capture that wrote nothing. In those cases the push step returns a section with no table and a `### Missing` list (Command step 4). Step 7 doesn't rule out adding "No visible change" with zero screens. Statement (10)'s pass example, "Write `No visible change` only when you inspected every pair", is satisfied by a skill that allows it. A reader of such a PR sees "No visible change" next to a failed capture, which works against the goal ("or says which images are missing and why"). One skill author would require at least one inspected pair. Another would follow the text literally.
+PROPOSAL: Say that ship writes `No visible change` only when it inspected at least one screen with both sides and the record has no missing item. Make (10) require that condition, with a fail example such as "Write `No visible change` when you saw no difference in the pairs".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design > Command step 3 (`gh api --hostname <host> repos/<owner>/<repo>/git/matching-refs/pr-visuals/<number>`); Design > Command, State paragraph ("the PR's repository does not list `refs/pr-visuals/<number>` at `ref_commit` (or `gh` failed)"); AC-04; Test Plan row AC-04; Context > Owner summary, second paragraph ("check that the PR's repository holds that ref") and the validation paragraph ("Observed so far"); Context > Background, the probe bullet
+EVIDENCE: Every URL now depends on that endpoint listing a user-pushed ref in a custom namespace right after the push. The Background records only one probe: raw and contents fetches of a commit on `refs/pr-visuals/probe`. It doesn't record a `matching-refs` call on that ref. The only cited observation of the endpoint is R-8 F-01's call on `refs/pull/1177`, a ref GitHub manages. R-8 F-01 proposed "probe it once on a custom ref first", and this revision adopted the endpoint without recording such a probe. Read-only, I found no custom ref to test against: `git ls-remote origin` for `michielvha/vh-adlc` lists none outside heads, tags and pull. If the endpoint omits such refs, or lags behind the push, every record ends `partial` with null URLs. The `gh` stub in the AC-04 row can't detect either case, and only the manual AC-10 at the very end would.
+PROPOSAL: Before acceptance, run and record a probe in the Background: push a custom `refs/pr-visuals/*` ref to a private repository and call `matching-refs` on it straight away. Or state the fallback (for example a bounded retry of the check) if the listing can lag.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Concurrency, failure, retry, upgrade ("Killed runs": "Processes outside the group, such as a daemon, a `setsid` child or a container started with `docker compose up -d`, are never killed by the step"); Design > Command step 2 (the group kill at exit); Context > Owner summary, second paragraph ("leftover processes in its process group are stopped when it exits, and the guide tells adopters to stop containers or daemons they start"); AC-04; AC-09 and Test Plan row AC-09 (`outside its process group`)
+EVIDENCE: The plugin already has a runner that stops helpers that left the group. `plugins/vh-adlc/scripts/triage/owned-process.ts:1-7` says: "A helper can also leave the group with setsid or setpgid, so every child carries an owner marker in its environment, which descendants inherit, and processes that still carry it after the group is gone are stopped as well". It exports `markedProcesses` (`:33`) and `OWNER_MARKER_VARIABLE` (`:30`), and `tests/vh-adlc/loop/owned-process.test.ts` covers it. The design models the capture step on the rung runner (`rungs.ts:59-61`), which kills only the group. It then pushes every `setsid` or daemonized helper onto each adopter's guide, so a capture whose browser driver or dev server detaches keeps running after every ship. Only a container that a daemon owns is genuinely out of reach. This boundary was set when this revision applied R-8 F-04.
+PROPOSAL: Either reuse the owner-marker cleanup in the capture step, so marked processes that left the group are also stopped and only daemon-owned containers stay with the adopter, or raise the choice between the two as an Open Question. Update the summary, Killed runs, AC-04 (with a `setsid` child case) and the AC-09 phrase to match.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Background ("Loop commands exit 2 on a thrown error (`cli.ts:185`), including a failed Git call (`rungs.ts:17`)")
+EVIDENCE: `plugins/vh-adlc/scripts/loop/rungs.ts:17` is the line `function git(repo: string, args: string[]): string {`. The throw on a failed Git call is at `rungs.ts:19`.
+PROPOSAL: Cite `rungs.ts:19`, or `:17-21` for the whole helper.
 
 ## Sources
 
