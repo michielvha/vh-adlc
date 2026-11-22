@@ -450,6 +450,7 @@ R-1 to R-7.
 | 2026-11-21 | R-5 | spec | `fdfe84c7` | claude-opus-5-5 | procedural | 0 blocking, 9 should-fix, 1 nit |
 | 2026-11-21 | R-6 | spec | `10298ec8` | claude-opus-5-5 | procedural | 1 blocking, 7 should-fix, 4 nits |
 | 2026-11-21 | R-7 | spec | `e7bac6a4` | claude-opus-5-5 | procedural | 0 blocking, 6 should-fix, 2 nits |
+| 2026-11-22 | R-8 | spec | `25865301` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 2 nits |
 
 ### R-1
 
@@ -1116,6 +1117,59 @@ SEVERITY: nit
 WHERE: Design > Setting (`when.paths`); Design > Command step 1; AC-02
 EVIDENCE: `when.paths` is a "list of string globs" with no matcher named. The rung path condition matches with `Bun.Glob` (`plugins/vh-adlc/scripts/loop/rungs.ts:43`), while `covers` patterns use a separate matcher held to shared cases (`tests/vh-adlc/loop/covers-cases.json`). The two agree on simple patterns, so this rarely changes a result.
 PROPOSAL: Say that `when.paths` matches the same way as `verification_rungs[].when.paths`.
+
+### R-8
+
+TARGET: 25865301052ddbb235e6d62d492d7362d4aa341c
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 3 ("runs `gh api --hostname <host> repos/<owner>/<repo>/commits/<ref_commit>`; only when that succeeds do the URLs get set, so links never point at a repository that doesn't hold the commit"); Design > Command, State paragraph ("the PR's repository does not hold the pushed commit (or `gh` failed)"); Scope (the push step bullet, "checks the PR's repository holds them"); Context > Owner summary, second paragraph ("check that the PR's repository holds them"); Design > Concurrency, failure, retry, upgrade ("Retry and replay"); AC-04 ("URLs are set only after `gh api` confirms the PR's repository holds `ref_commit`"); Test Plan row AC-04
+EVIDENCE: The push step pushes to `origin` (`git push origin <commit>:refs/pr-visuals/<number>`) but verifies against the `--github` repository taken from the PR. GitHub's fork documentation (docs.github.com, About permissions and visibility of forks, fetched in this review) says "Commits pushed to any repository in a network can be accessible from other repositories in that network, including the upstream repository." So when `origin` is a fork and the PR targets the upstream, a case `plugins/vh-adlc/references/branches.md:91` already handles ("A PR from a fork has no branch in this repository"), the commits API check succeeds although the PR's repository holds no `refs/pr-visuals/<number>`. The record then lives in the fork, outside the retention, after-merge and deletion rules the Design states for the PR's repository, and the State reason for a repository that doesn't hold the commit never fires. A check on the ref itself is available: in this review `gh api repos/michielvha/stackweaver/git/matching-refs/pull/1177` returned `refs/pull/1177/head`, so that endpoint lists refs outside `refs/heads` and `refs/tags`. The AC-04 row's `gh` stub only succeeds or fails, so it cannot tell the two checks apart.
+PROPOSAL: Verify the ref in the PR's repository, for example by requiring `gh api --hostname <host> repos/<owner>/<repo>/git/matching-refs/pr-visuals/<number>` to list `refs/pr-visuals/<number>` at `ref_commit` (probe it once on a custom ref first), or state that a PR whose head repository differs from its base is a missing item. Update every location above and give the AC-04 stub a case where the commit resolves but the ref is absent.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-07, statement (8); Design > Ship, the lead paragraph ("Every section ship writes between vh-adlc's markers goes last in the PR body and replaces the earlier marked text") and steps 3 and 6
+EVIDENCE: A scratch script split Design > Ship into paragraphs, using the row's own rule (blank-line separated, each list item its own paragraph), and tested each statement's tokens case-insensitively. Every statement matched exactly one paragraph except (8) (`last`, `replac`, `marker`), which matched the lead paragraph, step 3 and step 6. Step 3 gained "ship removes or replaces only such a complete pair" and "appends its own section last" when this revision applied R-7 F-06. A skill that keeps step 3 but has step 6 put the push step's section first, or drops step 6's placement rule, still passes (8), so the statement no longer checks where the pushed record goes. The row changed in this revision ((11) rewritten, (18) and (19) added), so it has not passed review.
+PROPOSAL: Make (8) require `push step` together with `last`, with the pass example "Put the push step's section last, replacing the whole earlier text between vh-adlc's markers" and the fail example "Put the push step's section first, replacing the earlier marked text". Neither step 3 nor the lead paragraph contains `push step`, and step 4 does not contain `last`.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship step 2 ("Ship removes that directory after a verified push; after a withheld record it removes it as well and names its former path in the report"); Design > Command, State paragraph ("Images not pushed keep their local files"); Design > Command exit paragraph ("a nonexistent `--out` is created"); Test Plan row AC-07, statement (18)
+EVIDENCE: Step 2 covers only two outcomes. Ship creates a new directory under the temporary directory on every run, but the Design never says what happens to it after `not-applicable`, an exit 2, a step with no output, a capture with no images, a failed or twice-rejected push, or a push whose `gh` check failed. The State paragraph keeps unpushed images on disk, yet the report is required to name the directory only after a withheld record, so in those cases inspected images sit in an unnamed temporary directory that nobody is told about. One implementer removes the directory after every outcome. Another keeps it without saying where it is. R-7 F-05 proposed that the report name `--out`, and this revision applied that only to the withheld case.
+PROPOSAL: State, for every outcome, whether ship removes the directory, and require the report to name any directory it keeps, for example after a failed push so the owner can retry. Extend statement (18) to cover that rule.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context > Owner summary, second paragraph ("any background process it leaves behind is stopped when it exits"); Design > Command step 2 ("kills whatever is left of the capture's process group, so a server it started in the background never holds the run"); Design > Concurrency, failure, retry, upgrade ("Killed runs"); AC-04; AC-09 ("tolerance of leftovers"); Test Plan row AC-09 (`tolerate leftovers`)
+EVIDENCE: The Design kills only the capture's process group, as the rung runner does (`plugins/vh-adlc/scripts/loop/rungs.ts:59` spawns detached, `:61` kills `-child.pid`). A process that calls `setsid` or daemonizes, and a container started through a daemon such as `docker compose up -d`, is not in that group and keeps running after every ship. The summary promises that any leftover background process is stopped, which the Design does not deliver. The guide only has to tell adopters to tolerate leftovers after a SIGKILL ("Killed runs"), so a guide that never says the command must stop what it starts outside its process group passes AC-09, and an adopter following it leaves servers or containers running after each ship.
+PROPOSAL: Say in the summary that leftover processes in the capture's process group are stopped. Require the guide to say that the capture command must stop anything it starts outside its process group, such as containers or daemons, before it exits, with a required phrase and a must-fail example in the AC-09 row.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Terms (the third column and "Reports write \"record state `full`\" and so on, never the bare value"); AC-09 ("`TERMS` holds their rejected synonyms"); Test Plan row AC-09 ("`tests/vh-adlc/loop/glossary.test.ts` holds the three rows and their `TERMS` entries"); Context > Background (the glossary bullet)
+EVIDENCE: `tests/vh-adlc/loop/glossary.test.ts:18-21` scans only `loop-settings.md`, `review-protocol.md`, `loop.md`, `authority.md` and `scripts/loop/*`. The new terms are used mainly where that scan does not reach: the ship skill's `## Visual record` section, which tells ship how to write the section and the report, and `docs/user-guides/workflows.md`. A ship skill or guide that says "visual diff" or "screenshots section" passes AC-09. The standard says a feature's user-facing terms are "held to it by a criterion" (`conventions/feature-documents.md:169-170` at 0c983f6), and as written the criterion checks a test entry, not the surfaces readers see.
+PROPOSAL: Have `visuals-docs.test.ts`, or the AC-07 test, also reject the three terms' rejected synonyms in the ship skill's `## Visual record` section and in `docs/user-guides/workflows.md`, with a must-fail example, and name that in AC-09 and its row.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design > Setting ("Invalid shapes, including a missing `capture` or `capture.command`, fail with a message naming the field, like the rung validation"); AC-01; Test Plan row AC-01
+EVIDENCE: Rung validation rejects unknown fields through `keys()` (`plugins/vh-adlc/scripts/loop/settings.ts:62-63`, applied at `:112` and `:119`). The Design implies the same for `visual_record`, `when` and `capture` only through "like the rung validation", and neither AC-01 nor its row names an unknown field. With a lenient reader, a typo such as `capture.timeout` would silently fall back to the 60-minute default.
+PROPOSAL: Say that unknown fields in `visual_record`, `visual_record.when` and `visual_record.capture` are rejected, and add one such case to the AC-01 row.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design > Ship steps 4, 7 and 8; Design > Command step 4 (the `### Missing` list "before the closing marker"); Design > Terms (the Before and after section row, "headed `## Before and after`")
+EVIDENCE: Steps 4 and 8 have ship write a marked section "holding one line", without saying whether the `## Before and after` heading comes first, although the Terms row defines the section as headed and the push step's `markdown` always includes the heading. Step 7 puts ship's own lines "under the table" but does not say whether they go before or after the `### Missing` list that the push step places just before the closing marker.
+PROPOSAL: Say that every marked section ship writes starts with the heading, and say where step 7's lines go relative to `### Missing`.
 
 ## Sources
 
