@@ -222,6 +222,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-14 | spec | `06f91bd54a0adb348f68fd27ac36928326df1894` | n/a | n/a | accepted by owner |
 | 2026-11-21 | R-15 | spec | `cb08d97a3c436b8c4ea9f61f0120e3acb2544781` | unknown | procedural | Covered drift review found one factual nit in test evidence. Model identity was not attested. |
 | 2026-11-22 | R-16 | spec | `edc803664df47d93618462073a17537cbf01cd22` | unknown | procedural | Three should-fix findings and one factual nit. Model identity was not attested. |
+| 2026-11-22 | R-17 | spec | `62c95df927cbc33fa180f7f5c604b64b6039848c` | unknown | procedural | Three should-fix findings on recovery and geometry verification. Model identity was not attested. |
 
 ### R-1
 
@@ -649,3 +650,26 @@ SEVERITY: nit
 WHERE: Context / Packaged implementation checks (line 47)
 EVIDENCE: The paragraph ends by saying the repaired build still needs Android verification. The release scope and owner summary now defer that verification and report a newer physical Safari pass.
 PROPOSAL: Put the remaining verification statement in the past tense so it describes that earlier build.
+
+### R-17
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Detect and show the prompt (line 153), Acceptance Criteria AC-10, Test Plan AC-10
+EVIDENCE: The R-16 revision requires the same prompt to recover within its original lease. AC-10 checks that tapping cannot open the keyboard until verification recovers, but never explicitly requires a successful tap on that same prompt after recovery. An implementation that permanently disables the prompt after one phase failure can pass the refusal and expiry checks.
+PROPOSAL: Restore both checks before the original deadline and require a tap on the same prompt to open the keyboard without another remote field tap.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Detect and show the prompt (line 153), Acceptance Criteria AC-12, Test Plan AC-12
+EVIDENCE: The R-16 revision requires both scale and position changes to invalidate pending and visible prompts. AC-12 lets the test choose one geometry change. It also does not require an otherwise valid pending response to be delivered before expiry, so expiry alone can account for its rejection.
+PROPOSAL: Change scale and position independently with fixed framebuffer dimensions. For each pending case, release an otherwise valid response inside its original lease and verify it cannot display a prompt. For each visible case, verify the geometry change clears the prompt before expiry.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (lines 25 and 27), Design / Detect and show the prompt (line 153), Design / Type and dismiss (line 163), Acceptance Criteria AC-11 and AC-12, Test Plan AC-11 and AC-12
+EVIDENCE: The R-16 revision removes the previous qualification that a changed field extent invalidates an unopened prompt. The revised general invalidation rule can also apply to an open editor, although Design calls for typing to stay active during keyboard-induced viewport changes while focus and mode remain current. The implementation at `plugins/remote-gui/internal/proxy/mobile.js:190-198` applies the extent check only before opening.
+PROPOSAL: State whether an extent change alone invalidates an open editor when field, mode and phase remain the same. If the existing behavior is intended, retain the unopened-prompt qualification and check that keyboard animation can move or resize the field without dismissing the editor.
