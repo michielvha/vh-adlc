@@ -223,6 +223,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-21 | R-15 | spec | `cb08d97a3c436b8c4ea9f61f0120e3acb2544781` | unknown | procedural | Covered drift review found one factual nit in test evidence. Model identity was not attested. |
 | 2026-11-22 | R-16 | spec | `edc803664df47d93618462073a17537cbf01cd22` | unknown | procedural | Three should-fix findings and one factual nit. Model identity was not attested. |
 | 2026-11-22 | R-17 | spec | `62c95df927cbc33fa180f7f5c604b64b6039848c` | unknown | procedural | Three should-fix findings on recovery and geometry verification. Model identity was not attested. |
+| 2026-11-22 | R-18 | spec | `413ea2344b0a3b070d4ff6a1a3af47083676a73c` | unknown | procedural | No findings. Model identity was not attested. |
 
 ### R-1
 
@@ -673,3 +674,7 @@ SEVERITY: should-fix
 WHERE: Context / Owner summary (lines 25 and 27), Design / Detect and show the prompt (line 153), Design / Type and dismiss (line 163), Acceptance Criteria AC-11 and AC-12, Test Plan AC-11 and AC-12
 EVIDENCE: The R-16 revision removes the previous qualification that a changed field extent invalidates an unopened prompt. The revised general invalidation rule can also apply to an open editor, although Design calls for typing to stay active during keyboard-induced viewport changes while focus and mode remain current. The implementation at `plugins/remote-gui/internal/proxy/mobile.js:190-198` applies the extent check only before opening.
 PROPOSAL: State whether an extent change alone invalidates an open editor when field, mode and phase remain the same. If the existing behavior is intended, retain the unopened-prompt qualification and check that keyboard animation can move or resize the field without dismissing the editor.
+
+### R-18
+
+NO FINDINGS
