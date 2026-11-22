@@ -407,6 +407,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-22 | R-1 | spec | `a3bccaab` | claude-opus-5-5 | procedural | 2 blocking, 11 should-fix, 3 nit |
+| 2026-11-22 | R-2 | spec | `5c09d79f` | claude-opus-5-5 | procedural | 1 blocking, 16 should-fix, 2 nit |
 
 ### R-1
 
@@ -521,3 +522,138 @@ SEVERITY: nit
 WHERE: Test Plan AC-03 row (S17.limit), AC-06 row (S17.questions), AC-07 row (S17.nits)
 EVIDENCE: S17.limit's control applies "the same line on an unauthenticated delete path", but that line is about names.log concurrency and cannot describe a delete path. S17.questions and S17.nits need an exact review output ("a review returns one judgement finding...", "a pass with eight nits") but do not say they use canned records, as S16.nits does with `scriptedPlugin(f, "nits")` (tests/vh-adlc/scenarios/run.ts:1182).
 PROPOSAL: Give the control its own `Not handled:` line text, and state that S17.questions and S17.nits use scripted reviewer records.
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design (Replay harness, Retention paragraph); Acceptance Criteria AC-11, AC-12; Test Plan AC-11, AC-12 rows; Context Owner summary ("Every labelled real defect that any old-rules run raises must be raised by every new-rules run on that route"); frontmatter goal
+EVIDENCE: Retention says "a label gates when any old-brief first pass raises it. Every new-brief first pass on that route must raise each gating label as blocking or should-fix". The two briefs are held to different statistics. A label the old rules raise in one of three runs gates, and the new rules must then raise it in three of three. Take a reviewer whose new rules keep recall exactly unchanged, with a per-run hit rate of 0.5 for some label. That label gates with probability 0.875 and passes all three new runs with probability 0.125. The enterprise case is picked for having the most blocking findings (the candidates at Stackweaver HEAD hold 30 to 68 `SEVERITY: blocking` records), so several intermittent labels are near certain. A correct implementation would then fail AC-11 by chance. Severity is asymmetric too: an old run that raised a label only as nit still makes it gate, and the new run must then raise it at should-fix or higher. The design also gives no way for a label to legitimately become nit under severity by consequence, which is this feature's purpose, because labels.md records only "whether it is an always-blocking defect". This rule was added by the previous revision, which adopted R-1 F-02's proposal.
+PROPOSAL: Use the same statistic for both briefs, for example new-brief hits per label at least the old-brief hits at an equal or higher severity class, or gate only labels that all old runs raise. Have labels.md record the minimum severity the owner expects under the new scale, so a label the owner agrees is implausible may correctly come back as nit.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, step 2, the "clean pass" definition); Acceptance Criteria AC-13; Test Plan AC-13 row; Context Owner summary ("reach a clean pass")
+EVIDENCE: "A clean pass is a spec review with no blocking finding after which the author's handling leaves no Open Question, so `vh-adlc gate planned` would fail only on acceptance." The "so" does not follow. When the author applies should-fix findings, the baseline changes and `spec_review_fresh` fails as well as `accepted` (conventions/feature-documents.md Conditions; SKILL.md:129 needs "a clean review at X"). Under one reading, a pass with only should-fix findings is clean and the count stops there. Under the other, clean is a pass whose handling changes no baseline. The two readings give different round counts for AC-13. This definition was added by the previous revision in response to R-1 F-03.
+PROPOSAL: Define clean as a pass with no blocking finding whose handling leaves the normative baseline unchanged and no Open Question, so that `gate planned` at that commit fails only on `accepted`. Alternatively, say explicitly that a should-fix-only pass ends the count, and why.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, step 2, "A loop stops at 60 spec reviews and records the cap"); Acceptance Criteria AC-13; Test Plan AC-13 row; Context Owner summary
+EVIDENCE: Retention uses three first passes per brief per route because single runs are stochastic. AC-13 compares one old loop with one new loop per case and route, which is two samples of a long chain of stochastic reviews and authoring steps. That ratio can pass or fail on noise alone. The document does not say what AC-13 compares when the old loop hits the 60-review cap (60, or "not reached"), or when both loops hit it. It also does not say how to round "at most half" for an odd count. The full-loop comparison and the cap were added by the previous revision in response to R-1 F-03.
+PROPOSAL: State how many loops each brief runs and what statistic is compared, for example the median of three. State how a capped loop counts on each side.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "old (... at docs `0c983f67`) and new (the feature branch, at the companion docs revision)"); Test Plan AC-11, AC-12, AC-13 rows
+EVIDENCE: `gh api repos/vhco-pro/docs/compare/0c983f67...main` reports main ahead by 95 commits, changing conventions/delivery.md, conventions/documentation.md, AGENTS.md and other pages. The companion PR will be cut from that main, so the new brief changes far more than this feature's rules. The spec skill reads conventions/documentation.md and conventions/delivery.md before writing (SKILL.md:56-58), and the reviewer reads the routed pages. A difference in rounds or questions can therefore come from unrelated convention changes. "Both briefs use the same route settings and models" holds the models constant but not the docs.
+PROPOSAL: Run the old brief at the companion PR's parent revision, so the only docs difference between briefs is this feature's change, or state why 0c983f67 is an equivalent baseline for every page the spec skill and reviewer read.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Replay harness, the throwaway clone paragraph: "adds the profile to `AGENTS.md` in one scratch commit X', sets the brief's docs pin"; step 1; "Both briefs use the same route settings and models")
+EVIDENCE: The command route reads its policy from the reviewed commit, not the working tree: plugins/vh-adlc/scripts/loop/cli.ts:92-94 ("The review policy is the one committed at the reviewed commit") calls `loadLoopSettingsAt(repo, commit)`. The spec reviewer also reads a `git archive` export of that commit (review-route.ts:3). Only the profile is committed in X'. The docs pin is "set" with no commit, and no route settings are written. A case whose `.vh-adlc/loop.yaml` at X has no command route, such as a repository that predates loop settings, would silently run the "Codex" passes on the host route. An export would also show a pin that differs from the dispatched revision.
+PROPOSAL: State that X' commits the profile, the brief's docs pin and the `.vh-adlc/loop.yaml` route settings for the route under test. Have the harness check that the `review` command's JSON names the expected route and model before it counts a run.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, labels approval paragraph: "before the first commit on the feature branch that edits the reviewer, the spec skill or the companion convention"; terms paragraph: "greps the feature branch's diff from its merge base"); Acceptance Criteria AC-10; Test Plan AC-10, AC-11 rows; Context Owner summary ("before the first commit that edits the rules")
+EVIDENCE: The companion convention is a PR in vhco-pro/docs (Scope, first bullet), so no commit on the vh-adlc feature branch edits it. The harness compares the approval time with "that commit's committer time" and greps only the vh-adlc branch diff. A convention edit made in vhco-pro/docs before the labels are approved, or a case term written into the public convention text, passes both checks. Most of the rule text this feature changes lives in that convention. The approval timing rule was changed by the previous revision in response to R-1 F-07.
+PROPOSAL: Name the companion branch in vhco-pro/docs as a second source. Have the harness take the earliest rule-editing commit across both repositories and grep both diffs for the terms.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary ("Repositories on the current docs pin keep today's behavior until they move their pin"); Design (Gate on the resolved convention); Design (Failure, retry and rollback: "repositories on `0c983f67` keep today's behavior throughout", "Rollback is reverting the plugin release and the pin bump"); Scope (pin bump in `plugins/vh-adlc/knowledge.md`); Acceptance Criteria AC-08, AC-09
+EVIDENCE: internal/knowledge/knowledge.go:179 returns `Source: "plugin"` with the plugin pin when a repository has no pin of its own (knowledge_test.go:113 "no pin"). knowledge.md currently names 1ccf8f31 (line 5). Scope moves it to the companion revision, so every adopter without its own pin switches to the new rules on plugin upgrade without moving any pin. The summary says the opposite. The reverse path is also undefined. An adopter whose own pin moves to the companion revision or any later docs revision, while running an older plugin, gets the new convention's severity and Open Question text with the old reviewer and spec skill (SKILL.md:81 "Put every judgement call into Open Questions"). Reverting the plugin release does not revert the convention for such repositories.
+PROPOSAL: Correct the summary to say that repositories without their own pin take the new rules with the plugin upgrade. In Failure, retry and rollback, state what an older plugin does on a docs revision that has the new rules, and what rollback means for repositories that pin such a revision.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Open Questions and owner lists, first and third paragraphs); Scope (convention bullet; spec skill bullet); Acceptance Criteria AC-02, AC-06; Test Plan AC-06 row
+EVIDENCE: Design replaces only the "every trade-off" sentence. The next sentence at conventions/feature-documents.md:167-168 (0c983f67) still says "A section that weighs options and keeps one, such as a simplification check, raises that choice here instead of deciding it." That applies to any Design that records a settled choice, and to the rejected alternative in the PR #152 harm statement. SKILL.md:114-116 still says "where they behave differently, the choice is an Open Question recommending removal", and issue #141 also edits that sentence. Design says step 4 raises a question "only under the same rule" but does not say whether these sentences go, so one implementer keeps them and another drops them.
+PROPOSAL: Name every sentence the plausible-choice rule replaces or amends: convention :167-168, SKILL.md:114-116, and author mode :81-82. State how the result composes with #141's change to step 4.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Stated limit); Design (Glossary, Stated limit); Design (Open Questions and owner lists, first paragraph: "such as scope, a public contract, security posture"); Acceptance Criteria AC-02, AC-03; Context Owner summary (stated limit and Open Question bullets)
+EVIDENCE: A stated limit narrows Scope ("Not handled: <the case>"). The plausible-choice rule lists scope first among the things that make a choice the owner's. One implementer will raise every stated limit as an Open Question, which brings back the questions this feature removes. Another lets the author add limits alone and relies on acceptance. The document does not say which, and AC-13's question count depends on it.
+PROPOSAL: State whether adding a stated limit is an author choice recorded in Scope or an Open Question, and give the test the author applies, for example: an Open Question when the limit excludes a case the goal or a user-visible behavior names.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Open Questions and owner lists, fourth paragraph); Scope (`references/loop.md` bullet); Context Owner summary (last bullet); Acceptance Criteria AC-07, AC-08; Test Plan AC-07, AC-08 rows
+EVIDENCE: `git grep -l 'references/loop.md' -- plugins` lists the audit, triage, maintenance, docs-drift, ship, implement, review, tasks, clean, blog and diagram skills as well as spec. Owner-list triage stated once in loop.md, for "a list meant for the owner (findings, unapplied nits, review items)", therefore reaches audit findings, triage lists and maintenance reports, several of which have their own owner-report formats. The gate is defined by the content of conventions/feature-documents.md, which those operations may not resolve. The proofs cover only spec nits. Two implementers would scope triage differently.
+PROPOSAL: Name the operations and lists that owner-list triage applies to, or limit it to the spec and review operations' summaries, and say how the gate is evaluated in an operation that does not resolve feature-documents.md.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Scoped re-review, both paragraphs); Design (Glossary, Scoped re-review); Acceptance Criteria AC-05; Test Plan AC-05 row; Context Owner summary (re-review bullet)
+EVIDENCE: Scope is defined by `git diff <previous>..<X> -- <document>` alone. A drift re-review exists because covered code changed on the default branch while the document did not (SKILL.md:90-98). Its document diff is empty apart from stored records, so the pass checks the document's claims against the changed tree for blocking findings only, and a now-imprecise claim rated should-fix goes unreported. The same happens when a feature branch merges main between passes, or when the resolved docs revision changes between passes. "A drift re-review keeps its existing limit" refers to the revision-edit limit (SKILL.md:136-139), not to review scope. The diff also always includes the previous pass's stored records and Review Log row, which the scope rule then treats as changed text.
+PROPOSAL: Widen scope to include document claims about paths in `covers` that changed between the two commits, make the pass full when the resolved docs revision differs, and exclude the Review Log section from the diff.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-05 ("On both routes ... covers only that diff ..., reports only blocking findings outside that"); Test Plan AC-05 row (command route sentence); Design (Scoped re-review)
+EVIDENCE: For the command route the row proves only that `reviewPrompt` carries the fields (`review-scope.test.ts`) and says "AC-13's Codex loops exercise it end to end". AC-13 checks round and question counts, not whether a Codex reviewer withheld out-of-scope should-fix findings or still reported out-of-scope blocking ones. The behavioral half of AC-05 on the command route has no check, so an implementation reviewer can only return `untested` or `not verified` for the composite criterion.
+PROPOSAL: Run S17.scoped's seeded gap and its security control through the `review` command with a command route too, or narrow AC-05's behavioral clause to the host route and state the limit.
+
+FINDING: F-13
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Scoped re-review, first paragraph: "The spec skill adds them to the host dispatch; `reviewPrompt` adds them for the command route, computed by the `review` command"); Scope (dispatch bullet); Test Plan AC-05 row
+EVIDENCE: The selection rule (latest non-acceptance `spec` row at X whose commit is an ancestor of X, then a document diff) is implemented twice: in TypeScript for the command route, and as instructions the host session follows for the host route. S17.scoped checks one simple history. One implementer adds a shared CLI helper both routes call; another writes prose for the host session. The two can pick different previous reviews, for example after an acceptance row or a merge.
+PROPOSAL: Have both routes take the fields from one `bun scripts/loop/cli.ts` computation, and test that computation for acceptance rows, non-ancestor rows and the no-row case.
+
+FINDING: F-14
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-04 row (S17.profile); Acceptance Criteria AC-04
+EVIDENCE: The seeded document now has "a service appends each request to a shared file without a lock", and the first run's profile says "one user on one machine". One user can easily send overlapping requests to a service (parallel client calls, retries, two tabs). Under the Design's should-fix definition ("a concrete failure the profiled product's users would plausibly hit with limited harm"), a correct reviewer may rate the gap should-fix, and the pass condition "nit or absent with the first" would then fail it. The seed was changed by the previous revision in response to R-1 F-09.
+PROPOSAL: Seed a writer that one user cannot run concurrently under the first profile, for example a command one person runs by hand, or state in the first profile that requests are handled one at a time.
+
+FINDING: F-15
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-03 row (S17.limit); Acceptance Criteria AC-03
+EVIDENCE: The row does not say whether the seeded document has a previous spec review. If it has one and the `Not handled:` line is outside the diff, scoped re-review already suppresses a should-fix concurrency finding, so "no finding names `names.log` concurrency" passes whether or not the reviewer honours stated limits. If it has none, the line's "(R-1 F-01)" points at a review that does not exist, and a correct reviewer may raise a factual finding that names it, which fails the pass condition.
+PROPOSAL: Seed an R-1 record F-01 that the line answers, and run the case as a full pass (no previous review row, or the limit inside the diff) so only stated-limit honouring can suppress the finding.
+
+FINDING: F-16
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Tests that change); Test Plan AC-01, AC-02, AC-03 row ("`bun test tests/vh-adlc/review-convergence.test.ts`, updated to pin the new definitions"); frontmatter covers
+EVIDENCE: docs/specs/spec-review-convergence.md is `complete` and covers tests/vh-adlc/review-convergence.test.ts, the reviewer and the spec skill. Its criteria assert the should-fix sentence (review-convergence.test.ts:45), the failure-mode check and one-pass completeness, which this feature replaces once the repository pin moves. The test resolves the repository pin (`resolvedPage`), so rewriting it makes the complete feature's recorded evidence unreproducible and leaves its goal contradicted by current behavior. The document does not say whether that feature becomes superseded, keeps an old-pin proof, or gets a note.
+PROPOSAL: Leave review-convergence.test.ts proving the old text at 0c983f67, put the new assertions in tests/vh-adlc/proportional-review.test.ts, and add an Open Question on whether the owner marks spec-review-convergence superseded.
+
+FINDING: F-17
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Glossary); Design (Open Questions and owner lists); Scope ("plausible-choice rule", "owner-list triage"); Acceptance Criteria AC-06, AC-07, AC-09
+EVIDENCE: conventions/feature-documents.md:168-169 at 0c983f67: "User-facing terms the feature introduces or changes appear in a glossary row and are held to it by a criterion." The feature introduces "owner's recorded rules" (defined only in Design prose), "plausible-choice rule" (AC-06, Scope) and "owner-list triage" (Scope, loop.md). The convention and the user guides will describe all three to users, but the glossary has no row for any of them and AC-09 holds the guides only to the five listed terms.
+PROPOSAL: Add glossary rows for owner's recorded rules, plausible-choice rule and owner-list triage, and cover them in AC-09 and its test.
+
+FINDING: F-18
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter covers
+EVIDENCE: S17.questions and S17.nits use `scriptedPlugin`, which reads canned records from tests/vh-adlc/evidence/review-convergence/canned/<name> (tests/vh-adlc/scenarios/run.ts:1112-1120), a path covers does not list. tests/vh-adlc/loop/lenses.test.ts:78 and :93 call `reviewPrompt`, whose input this feature extends.
+PROPOSAL: Add the canned records directory, or name where the S17 canned records live, and tests/vh-adlc/loop/lenses.test.ts to covers.
+
+FINDING: F-19
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary (last bullet); Design (Open Questions and owner lists, second paragraph)
+EVIDENCE: The summary sorts owner lists "under the product profile and the repository's instruction files"; Design adds the project procedure. Design's "With none of those ... every judgement call is a question" contradicts its own first paragraph, where the goal alone can also decide a choice.
+PROPOSAL: Name the project procedure in the summary, and say "every judgement call the goal does not decide is a question".
