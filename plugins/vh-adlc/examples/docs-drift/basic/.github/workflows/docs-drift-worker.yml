@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.4
+          bun-version: 1.4.5
       # The operator verifies the immutable release first. Its installer/modules
       # run below to check pin consistency. A credentialed adaptation verifies
       # payload identity with already trusted tooling before loading it.
