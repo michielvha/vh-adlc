@@ -1,18 +1,26 @@
 ---
 status: draft
-status_description: "Drafted with the owner's answers folded in; waiting for the first independent spec review."
+status_description: "Revised after spec review R-1 with the owner's answers; waiting for the next independent spec review."
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds with fewer owner questions, while every real defect the current review raises is still raised."
 covers:
   - plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md
   - plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md
   - plugins/vh-adlc/references/loop.md
+  - plugins/vh-adlc/references/review-protocol.md
+  - plugins/vh-adlc/scripts/loop/cli.ts
   - plugins/vh-adlc/knowledge.md
+  - plugins/vh-adlc/plugin.json
+  - plugins/vh-adlc/.claude-plugin/plugin.json
   - AGENTS.md
   - docs/user-guides/workflows.md
   - docs/get-started/first-feature.md
   - tests/vh-adlc/replay/
   - tests/vh-adlc/evidence/proportional-review/
+  - tests/vh-adlc/scenarios/run.ts
+  - tests/vh-adlc/loop/review-scope.test.ts
+  - tests/vh-adlc/proportional-review.test.ts
+  - tests/vh-adlc/proportionality.test.ts
   - tests/vh-adlc/review-convergence.test.ts
   - tests/vh-adlc/direct-operation-compatibility.test.ts
 ---
@@ -21,7 +29,7 @@ covers:
 
 Spec review rates findings by what they would do to the product the project says it is, accepts a
 stated limit as an answer, and re-reviews only what changed. A replay of real documents proves that no
-real defect is lost.
+real defect the current review raises is lost.
 
 ## Context
 
@@ -37,54 +45,55 @@ instructions:
 
 - Each project states once, in a `## Product profile` section of its `AGENTS.md`, what it is and what is
   at stake. The reviewer weighs failure paths against it.
-- Blocking and should-fix need a concrete failure a user, tenant or operator of that product would
-  plausibly hit, or a criterion that cannot be met. Security, data-loss and tenant-isolation defects stay
-  blocking on every product. An undefined path below that bar is a nit.
-- The author may answer a finding with a stated limit in Scope, and later passes do not raise it again,
-  except for those three always-blocking classes.
-- After the first full pass, a re-review covers what changed since the previous pass and what it touches;
-  outside that it reports only blocking findings.
+- A false fact, an unmeetable criterion or a broken proof keeps its severity. A failure path is blocking
+  or should-fix only when a user, tenant or operator of that product would plausibly hit it; below that
+  bar it is a nit. Security, data-loss and tenant-isolation defects stay blocking on every product.
+- The author may answer a finding with a stated limit in Scope. Later passes do not raise it again unless
+  it leaves one of those three defects, an unmeetable criterion or an unsolved problem.
+- After the first full pass, the reviewer is handed the document's diff since the previous pass and covers
+  that and what it touches; outside it, only blocking findings. This works on both reviewer routes.
 - An Open Question is raised only where the owner could plausibly choose differently. The author settles
   the rest and records the choice in Design. Options offered are complete designs only.
-- A long list meant for the owner, such as unapplied nits, is triaged first; the owner sees only what the
-  author could not settle.
+- A list meant for the owner, such as unapplied nits, is sorted first under the product profile and the
+  repository's instruction files; the owner sees only what they do not settle.
 
-It builds on the harm statement and convergence trigger in
-[PR #152](https://github.com/michielvha/vh-adlc/pull/152) (issue
-[#148](https://github.com/michielvha/vh-adlc/issues/148)) and on cutting author-added extras
+Repositories on the current docs pin keep today's behavior until they move their pin. It builds on the
+harm statement and convergence trigger in [PR #152](https://github.com/michielvha/vh-adlc/pull/152)
+(issue [#148](https://github.com/michielvha/vh-adlc/issues/148)) and on cutting author-added extras
 ([#141](https://github.com/michielvha/vh-adlc/issues/141)); both land first and are not redone here. The
-load-only capacity exemption for read-only reviews stays with
-[#150](https://github.com/michielvha/vh-adlc/issues/150). This is the first step of the improvement loop
-tracked in [#52](https://github.com/michielvha/vh-adlc/issues/52).
+load-only capacity exemption stays with [#150](https://github.com/michielvha/vh-adlc/issues/150). This is
+the first step of the improvement loop tracked in [#52](https://github.com/michielvha/vh-adlc/issues/52).
 
-Product quality is a hard constraint. The proof is a replay: one enterprise document and one small
-application document, each at its first spec-review commit, reviewed with the old and new rules. The new
-rules pass only if every hand-labelled real defect is raised in every run, and only then are rounds and
-questions compared: the new rules must reach a clean pass in at most half the original reviews, with
-fewer owner questions. Each case runs three times per brief on both the Codex command route and the Claude
-host route. The owner approves each case's defect labels once, before any run. The second user's case is
-copied to the owner's host with their consent. Case material stays private; only counts are published.
-All of this is planned; no check has run.
+Product quality is a hard constraint, proved by replay. One enterprise and one small application
+document, each at its first spec-review commit, are reviewed three times with the old and the new rules,
+on both the Codex command route and the Claude host route. Every labelled real defect that any old-rules
+run raises must be raised by every new-rules run on that route. Only then are full loops compared: the
+new rules must reach a clean pass in at most half the spec reviews the old rules need under the same
+scripted owner, with fewer questions. The owner approves each case's labels before the first commit that
+edits the rules. The second user's case is copied to the owner's host with their consent. Case material
+stays private; only counts are published. All of this is planned; no check has run.
 
-The owner answered the four open questions on 2026-11-22, each at its recommendation. No review has run.
-Acceptance would authorize the
-plugin edits, the replay harness and a companion convention change in `vhco-pro/docs`, on a feature
-branch; shipping and the pin bump still need the usual approvals.
+Spec review R-1 found two blocking issues; the owner answered the four questions they raised, each at its
+recommendation, and this revision folds them in. Acceptance would authorize the plugin edits, the replay
+harness and a companion convention change in `vhco-pro/docs`, on a feature branch; shipping and the pin
+bump still need the usual approvals.
 
 ### Background
 
 Measured on `main` at `915441e8` with the conventions at `vhco-pro/docs` `0c983f67`, the pin in
-`AGENTS.md:3`.
+`AGENTS.md:4`.
 
 - Stored findings: `git grep -hE '^SEVERITY: ' -- docs/specs | sort | uniq -c` gives 204 blocking, 1,443
   should-fix and 1,023 nit, of 2,673 `FINDING:` records; `KIND:` gives 1,434 factual and 1,234 judgement.
 - Proposal direction: of 2,670 `PROPOSAL:` lines, 1,864 match an adding verb (add, require, prove, test,
   verify, record, specify, define) and 284 a cutting verb (remove, drop, cut, narrow, delete, withdraw,
   weaken, simplify). A line can match both.
-- Rounds: counting spec rows in the Review Log (`grep -cE '^\| [0-9-]+ \| R-[0-9]+ \| spec \|'`) gives
-  142 for `docs/specs/shared-docs-drift.md`, 48 for `blog-visual-reading.md`, 44 for `paseo-hosts.md`, and
-  24 reviews for `spec-review-convergence.md`, the change that added the nit rule and was merged in
-  [#93](https://github.com/michielvha/vh-adlc/pull/93) on 2026-11-14.
+- Rounds: spec rows in the Review Log that are not acceptances
+  (`grep -E '^\| [0-9-]+ \| R-[0-9]+ \| spec \|' | grep -vc 'accepted by owner'`) number 131 in
+  `docs/specs/shared-docs-drift.md`, 47 in `blog-visual-reading.md`, 40 in `paseo-hosts.md` and 20 in
+  `spec-review-convergence.md`, the change that added the nit rule, merged in
+  [#93](https://github.com/michielvha/vh-adlc/pull/93) on 2026-11-14. Counting only rows dated 2026-11-14
+  or later gives 69 in `shared-docs-drift.md` and 15 in `single-writer-ownership.md`.
 
 The text that produces this:
 
@@ -97,15 +106,22 @@ The text that produces this:
    (`conventions/feature-documents.md:209`). Any undefined edge case meets it.
 4. "A path the document leaves undefined is a finding" (`plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:49`),
    with nothing that weighs likelihood, harm or the project's stage.
-5. Every pass reviews the whole document (`vh-adlc-reviewer.agent.md:37-56`), so mechanisms a revision
-   adds become new surface. The stopping rule that would end this, `docs/specs/spec-review-stopping-rule.md`,
-   is `parked` (its frontmatter, line 2).
+5. Every pass reviews the whole document and returns every finding it can establish
+   (`vh-adlc-reviewer.agent.md:37-56`, `:52`), so mechanisms a revision adds become new surface. The
+   stopping rule that would end this, `docs/specs/spec-review-stopping-rule.md`, is `parked` (its
+   frontmatter, line 2).
 6. A finding can be met by adding text or asking the owner; nothing names a stated limit as an answer.
+
+A command-route spec reviewer sees no Git history: it reviews a `git archive` export of the commit
+(`plugins/vh-adlc/scripts/loop/review-route.ts:3`, `:208-209`), and `reviewPrompt` tells it so
+(`plugins/vh-adlc/scripts/loop/cli.ts:52`, `:172`). Anything it needs from earlier commits has to be in
+the dispatch.
 
 Wording tests do not show that a rule changes behavior: `tests/vh-adlc/review-convergence.test.ts:45`
 asserts the should-fix sentence is present. The scenario harness can run the real reviewer on a seeded
-document and check what it raises (`S16.oldpin-reviewer`, `tests/vh-adlc/scenarios/run.ts:1275-1300`); the
-replay below reuses that pattern on real documents.
+document and check what it raises (`S16.oldpin-reviewer`, `tests/vh-adlc/scenarios/run.ts:1275-1300`), or
+use scripted records (`scriptedPlugin`, `:1114-1121`); the replay below reuses that pattern on real
+documents.
 
 The owner set the constraints in this request: fix over-reach in the instructions rather than by filtering
 findings, keep product quality, prove it by replaying real documents (one enterprise, one small
@@ -113,29 +129,32 @@ application), and cite only public evidence because the investigation behind it 
 sessions.
 
 **Harm and simplest alternative.** The harm: every vh-adlc user pays for each spec in owner attention and
-elapsed time, on every feature, and it does not heal; rounds above 20 are common in the counts above. The
-simplest alternative without machinery is a process rule alone ("prefer removing", "revisit the previous
-change"), which `spec-review-convergence` already added (`SKILL.md:114-117`) without bringing rounds down
-in the counts above. This feature is mostly rule text too; the only machinery is the replay harness, which
-exists because a wording test cannot show the rules keep quality.
+elapsed time, on every feature, and it does not heal; dozens of rounds per document are common in the
+counts above. The simplest alternative without machinery is a process rule alone ("prefer removing",
+"revisit the previous change"), which `spec-review-convergence` added (`SKILL.md:114-117`); 69 and 15
+review rounds after its merge show it did not stop the churn. This feature is mostly rule text too; the
+machinery is two dispatch fields and the replay harness, which exists because a wording test cannot show
+the rules keep quality.
 
 ## Scope
 
 In scope:
 
-- The shared convention (`vhco-pro/docs`, one PR): consequence-based severity with the always-blocking
-  classes, the stated limit, the plausible-choice rule for Open Questions with complete-design options,
-  and owner-facing list triage in the nit paragraph.
+- The shared convention (`vhco-pro/docs`, one PR): severity by consequence with the always-blocking
+  classes, the product profile as its context, the stated limit, scoped re-review, the plausible-choice
+  rule for Open Questions with complete-design options, and owner-list triage in the nit paragraph.
 - The reviewer agent: reading the product profile, weighing failure paths, honouring stated limits, and
-  scoped re-review.
-- The spec skill: author mode and review mode step 4 under the new rules, gated on the resolved convention
-  stating them.
-- `references/loop.md`: the product profile and the owner-facing list triage, stated once.
-- vh-adlc's own `## Product profile` in `AGENTS.md`, and the docs pin bump in `AGENTS.md` and
-  `plugins/vh-adlc/knowledge.md` to the companion revision.
-- The user guides (`docs/user-guides/workflows.md`, `docs/get-started/first-feature.md`) and the tests
-  that pin the changed text.
-- A replay harness under `tests/vh-adlc/replay/`, and the two replay cases run through it, with published
+  scoped re-review, all gated on the resolved convention.
+- The dispatch: the previous spec review commit and the document diff, passed on both routes
+  (`references/review-protocol.md`, `reviewPrompt` in `scripts/loop/cli.ts`).
+- The spec skill: author mode, review dispatch and review mode step 4 under the new rules, gated the same
+  way.
+- `references/loop.md`: the product profile and owner-list triage, stated once.
+- vh-adlc's own `## Product profile` in `AGENTS.md`, the docs pin bump in `AGENTS.md` and
+  `plugins/vh-adlc/knowledge.md` to the companion revision, and the plugin version.
+- The user guides (`docs/user-guides/workflows.md`, `docs/get-started/first-feature.md`), the scenarios
+  and the tests that pin the changed text.
+- A replay harness under `tests/vh-adlc/replay/`, the two replay cases run through it, and published
   counts under `tests/vh-adlc/evidence/proportional-review/`.
 
 Out of scope, by name:
@@ -157,18 +176,36 @@ Out of scope, by name:
 
 ## Design
 
+### Glossary
+
+| Term | Definition |
+| --- | --- |
+| Product profile | The `## Product profile` section of a repository's root `AGENTS.md`: what the product is, who uses it, its stage, and what is at stake. |
+| Severity by consequence | Rating a failure path by whether a user, tenant or operator of the profiled product would plausibly hit it and how much harm it does; false facts, unmeetable criteria and broken proofs keep their current ratings. |
+| Always-blocking defect | A security, data-loss or tenant-isolation defect; blocking on every product, whatever its profile. |
+| Stated limit | A Scope line `Not handled: <the case>, <why> (R-<n> F-<nn>).` that answers a finding without adding a mechanism. |
+| Scoped re-review | A spec review after the first that covers the document diff since the previous spec review and the sections it touches, and reports only blocking findings outside that. |
+
+The convention, the reviewer, the spec skill and both user guides use these terms with these meanings.
+
+### Gate on the resolved convention
+
+Every rule below applies when the resolved `conventions/feature-documents.md` states severity by
+consequence: its Review log section names the product profile as the context for severity. On an older pin
+(such as `0c983f67`) the reviewer, the spec skill and `references/loop.md` keep today's behavior: full
+passes, today's severity, every unapplied nit in the owner summary, and judgement findings to Open
+Questions. This is the pattern the nit rule uses today (`SKILL.md:120-128`). The dispatcher passes the two
+new fields on every pin; on an older pin the reviewer ignores them.
+
 ### Product profile
 
 A repository states its product in a `## Product profile` section of its root `AGENTS.md`: what the
 product is, who uses it, its stage, and what is at stake (tenants, user data, money, credentials). A few
-lines are enough. `references/loop.md` describes it once, and the convention's Review log section names it
-as the context severity is judged in.
+lines are enough. `references/loop.md` describes it once.
 
 The reviewer reads the section from `AGENTS.md` at the reviewed commit, which both routes already have:
-the host reviewer reads the repository, and the command route reviews a read-only export of X
-(`references/review-protocol.md`, Routes). No dispatch field changes. Without a profile, the reviewer
-judges as for production software with users whose data matters, which is today's depth with severity by
-consequence.
+the host reviewer reads the repository, and the command-route export of X contains it. Without a
+profile, the reviewer judges as for production software with users whose data matters.
 
 vh-adlc's profile: an open-source agent workflow plugin and Go binary, used by a few developers on their
 own machines and repositories, alpha on 0.x; at stake are the user's repositories, branches and
@@ -180,155 +217,182 @@ The convention's definitions change as follows; record formats and names stay.
 
 - blocking: unchanged for false facts that change the build or a proof, an unmeetable criterion, and a
   proof that fails a correct implementation or cannot run. Added: a concrete failure that a user, tenant
-  or operator of the profiled product would plausibly hit with serious harm. A security, data-loss or
-  tenant-isolation defect is blocking on every product, whatever the profile says.
+  or operator of the profiled product would plausibly hit with serious harm, and every always-blocking
+  defect.
 - should-fix: a concrete failure the profiled product's users would plausibly hit with limited harm; two
   implementers building things whose difference a user or operator would notice; or a proof that could
   pass on a wrong implementation. The free-text widening exception stays.
 - nit: as today, plus an undefined path that nobody using the profiled product would plausibly hit.
 
 The reviewer's failure-mode paragraph (`vh-adlc-reviewer.agent.md:47-50`) keeps asking the same four
-questions and rates each gap by this scale rather than treating every gap as a finding. The harm-statement
-findings from PR #152 keep their severity.
+questions and rates each gap on this scale, replacing "A path the document leaves undefined is a
+finding". The harm-statement findings from PR #152 keep their severity.
 
 ### Stated limit
 
-The author may answer a finding by adding one line under Scope, `Not handled: <the case>, <why>.`, naming
-the finding (`R-<n> F-<nn>`). That is a baseline change, so it is reviewed like any other. A later pass does
-not raise the substance of a stated limit again, unless the limit leaves a security, data-loss or
-tenant-isolation defect, makes a criterion unmeetable, or leaves the stated problem unsolved; then it is
-blocking and its `EVIDENCE` quotes the limit.
+The author may answer a finding by adding a stated limit under Scope. That is a baseline change, so it is
+reviewed like any other. A later pass does not raise the substance of a stated limit again, unless the
+limit leaves an always-blocking defect, makes a criterion unmeetable, or leaves the stated problem
+unsolved; then it is blocking and its `EVIDENCE` quotes the limit.
 
 ### Scoped re-review
 
-The first spec review of a document is full. A later pass reviews the diff of the document between the
-previous spec review's commit and X (`git diff <previous>..<X> -- <document>`), plus every section that
-states a rule, ID or term the diff changes. Outside that scope the reviewer reports only blocking findings.
-The previous commit is the latest spec row in the Review Log at X that is not an acceptance row; the
-reviewer reads it itself. When it is missing or unreachable, the pass is full. A drift re-review keeps its
-existing limit (`SKILL.md`, Drift re-reviews).
+The dispatcher finds the previous spec review: the latest `spec` row in the Review Log at X whose outcome
+is not `accepted by owner` and whose commit is an ancestor of X. It passes two fields with the dispatch on
+both routes: the previous review commit and `git diff <previous>..<X> -- <document>`. The spec skill adds
+them to the host dispatch; `reviewPrompt` adds them for the command route, computed by the `review`
+command before the export. When there is no such row, the fields say `none` and the pass is full. A
+drift re-review keeps its existing limit (`SKILL.md`, Drift re-reviews).
+
+With the fields present, the reviewer covers the diff plus every section that states a rule, ID or term
+the diff changes. Outside that scope it reports only blocking findings. The sentence "Return every
+finding you can establish in this pass" (`vh-adlc-reviewer.agent.md:52`) becomes "within this pass's
+scope".
 
 ### Open Questions and owner lists
 
 The convention's Open questions section replaces the "every trade-off" sentence: a question is raised only
-where the owner could plausibly choose differently, because the options differ in something the goal, the
-product profile and the owner's recorded rules do not decide, such as scope, a public contract, security
-posture, permissions or cost to users. The author settles every other choice and records it in Design with
-a one-line reason. Each option offered meets the goal in full; a stopgap, a cheaper-now partial option or
-a lock to one dependency version is not offered.
+where the owner could plausibly choose differently, because the options differ in something the goal and
+the owner's recorded rules do not decide, such as scope, a public contract, security posture, permissions
+or cost to users. The author settles every other choice and records it in Design with a one-line reason.
+Each option offered meets the goal in full; a stopgap, a cheaper-now partial option or a lock to one
+dependency version is not offered.
+
+The owner's recorded rules are the product profile plus the instruction files and project procedure that
+`bun scripts/loop/cli.ts context` lists (`references/loop-settings.md`). With none of those, nothing is
+settled by them: every judgement call is a question and every list item reaches the owner.
 
 The spec skill follows: author mode raises a judgement call only under that rule, and review mode step 4
-resolves a judgement finding within the profile, raising a question only under the same rule. Both apply
-when the resolved convention states the rule, the way the nit rule is gated today (`SKILL.md:120-135`); on
-an older pin the current behavior stays.
+resolves a judgement finding within those rules, raising a question only under the same rule.
 
 `references/loop.md` states owner-list triage once: a list meant for the owner (findings, unapplied nits,
-review items) is first sorted by the agent under the owner's recorded rules, and the owner-facing summary
-shows only the items it could not settle, with a count of the rest and where the full list is. The full
-nit list stays in the report, as the nit rule requires.
+review items) is first sorted by the agent under the owner's recorded rules. The owner-facing summary
+shows the items those rules do not settle, with a count of the rest and where the full list is. The
+report keeps the full list; the convention's nit paragraph changes to allow this.
 
 ### Replay harness
 
 `tests/vh-adlc/replay/run.ts` takes a case directory outside the repository:
 
 - `case.yaml`: the local clone path, the commit X of the document's first spec review, the document path,
-  the profile text, the route list and the original count of spec reviews and owner questions;
+  the profile text, and `terms`, the case's repository and product names;
 - `labels.md`: the real defects present at X, each as `L-<nn>` with one line, the original finding it
-  came from, and how a reviewer's finding is matched to it (a must-match description, with one example
-  finding that matches and one that does not). The author proposes the list and the owner approves it
-  once per case; the file ends with the owner's approval line and its date, and the harness refuses a
-  case without it.
+  came from, whether it is an always-blocking defect, and how a reviewer's finding is matched to it (a
+  must-match description, with one example finding that matches and one that does not). The author
+  proposes the list and the owner approves it once; the file ends with an approval line naming the
+  owner, the time and the SHA-256 of everything above that line.
 
-For each brief, old (the plugin on `main` before this branch, at docs `0c983f67`) and new (this branch, at
-the companion docs revision), the harness makes a throwaway clone at X, adds the profile to `AGENTS.md` in
-one scratch commit X', sets the brief's docs pin, and runs a first-pass spec review there three times on each route, the Codex command route
-(`references/loop-settings.md`, `route: command`) and the Claude host route, through the scenario harness's session runner (`tests/vh-adlc/scenarios/run.ts`). It then runs the
-new brief's full loop from X' until a clean pass, with a scripted owner that adopts each question's
-recommendation, and counts passes and questions. A run that fails to execute is recorded as failed and
-rerun; it never counts as a pass. Matching a finding to a label is done by an independent agent reading
-`labels.md` and the stored records, and its verdicts are stored beside the run.
+The labels are approved before the first commit on the feature branch that edits the reviewer, the spec
+skill or the companion convention, so the rules cannot be fitted to them. The harness refuses a case
+whose approval line is missing, whose digest does not match, or whose approval time is later than that
+commit's committer time.
 
-Private material (case files, labels, records, transcripts) stays in the case directory, a private
-directory on the owner's host outside every public repository. The second user's document and repository
-at X are copied there with their consent, so both cases run and are verified on one host and stay in the
-replay set for later changes. The harness
-writes only counts to `tests/vh-adlc/evidence/proportional-review/results.md`: per case and brief, runs,
-labels raised per run by ID, rounds to clean, questions raised and execution failures. Cases are named
-"enterprise" and "small application", with no repository or product names.
+Before any new-brief run, the harness greps the feature branch's diff from its merge base for every entry
+in `terms` and records only pass or fail; a hit stops the run.
+
+For each brief, old (the plugin on `main` at the feature's merge base, at docs `0c983f67`) and new (the
+feature branch, at the companion docs revision), the harness makes a throwaway clone at X, adds the
+profile to `AGENTS.md` in one scratch commit X', sets the brief's docs pin, and runs:
+
+1. First passes: a spec review three times on each route, the Codex command route
+   (`references/loop-settings.md`, `route: command`) and the Claude host route, through the scenario
+   harness's session runner (`tests/vh-adlc/scenarios/run.ts`) and the `review` command.
+2. A full loop on each route, from X' until a clean pass, with a scripted owner that adopts each Open
+   Question's recommendation and answers the convergence trigger with "keep going". A clean pass is a
+   spec review with no blocking finding after which the author's handling leaves no Open Question, so
+   `vh-adlc gate planned` would fail only on acceptance. The loop counts spec reviews up to and including
+   that pass and the Open Questions the author raised. A loop stops at 60 spec reviews and records the cap.
+
+Both briefs use the same route settings and models. A run that fails to execute is recorded as failed and
+rerun; it never counts as a pass. An independent agent matches findings to labels from `labels.md` and the
+stored records, and its verdicts are stored beside each run.
+
+Retention: for each route, a label gates when any old-brief first pass raises it. Every new-brief first
+pass on that route must raise each gating label as blocking or should-fix, and as blocking when the label
+is an always-blocking defect. Labels no old-brief run raises are reported and do not gate.
+
+Private material (case files, labels, records, matcher verdicts, clean documents, transcripts) stays in
+the case directory, a private directory on the owner's host outside every public repository. The second
+user's document and repository at X are copied there with their consent, so both cases run and are
+verified on one host and stay in the replay set for later changes. The implementation review dispatch
+names the case directories so the reviewer can inspect them. The harness writes only counts to
+`tests/vh-adlc/evidence/proportional-review/results.md`: per case, route and brief, runs, gating labels,
+labels raised per run by ID, rounds to clean, questions raised, execution failures and the terms check.
+Cases are named "enterprise" and "small application", with no repository or product names.
 
 The cases:
 
 - Enterprise: from the owner's private multi-tenant platform repository, the feature document with the
-  most labelled real defects among those whose original review ran 19 or more spec rounds.
-- Small application: the second user's feature document with the most spec rounds.
-
-Labels are written and frozen before the new brief is edited, so the brief cannot be fitted to them, and
-the plugin diff names nothing from either case (a test greps for the cases' terms).
+  most blocking findings in its original reviews among those with 19 or more non-acceptance spec reviews.
+- Small application: the second user's feature document with the most non-acceptance spec reviews.
 
 ### Failure, retry and rollback
 
 The rules change no state at run time. A review interrupted mid-pass stores nothing, as today. Documents
 reviewed under the new rules keep valid records under the old ones, because names and formats do not
-change. Rollback is reverting the plugin release and the pin bump; repositories on `0c983f67` keep today's
-behavior throughout because the skill rules are gated on the resolved convention. The convention PR merges
-before the pin bump; until a repository moves its pin, nothing changes for it.
+change. Every behavior change is gated on the resolved convention, so repositories on `0c983f67` keep
+today's behavior throughout, apart from the two dispatch fields their reviewer ignores. The convention PR
+merges before the pin bump. Rollback is reverting the plugin release and the pin bump.
 
 ### Tests that change
 
-`tests/vh-adlc/review-convergence.test.ts` (it pins the old should-fix sentence) and the spec baseline in
-`tests/vh-adlc/direct-operation-compatibility.test.ts` move to the new text. `S16.oldpin-reviewer` stays: a
-concurrent write to a shared file by parallel CI runs is a plausible failure, so the reviewer must still
-raise it.
+`tests/vh-adlc/review-convergence.test.ts` (it pins the old should-fix sentence), the spec baseline in
+`tests/vh-adlc/direct-operation-compatibility.test.ts` and `tests/vh-adlc/proportionality.test.ts` from
+PR #152 (it pins reviewer severity text) move to the new text. `S16.oldpin-reviewer` stays: on the old pin
+the reviewer keeps today's failure-mode check.
 
 ## Acceptance Criteria
 
 - [ ] AC-01: The convention at the companion `vhco-pro/docs` revision defines blocking, should-fix and nit
-      by consequence for the profiled product as Design states, with security, data-loss and
-      tenant-isolation defects blocking on every product.
+      by consequence for the profiled product as Design states, with always-blocking defects blocking on
+      every product.
 - [ ] AC-02: That convention raises an Open Question only where the owner could plausibly choose
       differently, has the author record every other choice in Design, and offers only options that meet
       the goal in full.
-- [ ] AC-03: That convention and the reviewer accept a `Not handled:` line in Scope as an answer to a
-      finding, and the reviewer raises its substance again only for the always-blocking classes, an
-      unmeetable criterion or an unsolved problem.
-- [ ] AC-04: The reviewer reads `## Product profile` from `AGENTS.md` at the reviewed commit, rates failure
+- [ ] AC-03: That convention and the reviewer accept a stated limit as an answer to a finding, and the
+      reviewer raises its substance again only for an always-blocking defect, an unmeetable criterion or
+      an unsolved problem.
+- [ ] AC-04: The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure
       paths by it, and without one judges as for production software with users.
-- [ ] AC-05: After the first spec review, a pass reviews only the document diff since the previous spec
-      review and the sections it touches, reports only blocking findings outside that, and is full when no
-      previous review commit is reachable.
+- [ ] AC-05: On both routes, a spec review after the first receives the previous spec review commit and the
+      document diff, covers only that diff and the sections it touches, reports only blocking findings
+      outside that, and is full when there is no previous spec review.
 - [ ] AC-06: The spec skill raises judgement calls and judgement findings as Open Questions only under the
-      plausible-choice rule when the resolved convention states it, and keeps today's behavior on an older
-      pin.
-- [ ] AC-07: An owner-facing summary shows only the list items the agent could not settle under the owner's
-      recorded rules, with a count of the rest and where the full list is.
-- [ ] AC-08: vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, and the two user
-      guides describe the profile, severity by consequence, stated limits and scoped re-review.
-- [ ] AC-09: The replay harness runs a case end to end, refuses a case whose labels lack the owner's
-      approval line, writes counts only to the results file, records failed executions without counting
-      them as passes, and runs on a public fixture case in the test suite.
-- [ ] AC-10: On the enterprise case, with labels the owner approved before any new-brief run, every
-      labelled real defect is raised in every new-brief first-pass run on both routes.
-- [ ] AC-11: On the small application case, with labels the owner approved before any new-brief run,
-      every labelled real defect is raised in every new-brief first-pass run on both routes.
-- [ ] AC-12: On both cases, the new-brief loop reaches a clean pass in at most half the original number of
-      spec reviews, with fewer owner questions than the original, and its clean document resolves every
-      label without a stated limit on an always-blocking defect.
+      plausible-choice rule, judged against the product profile and the files loop context lists.
+- [ ] AC-07: An owner-facing summary shows only the list items the owner's recorded rules do not settle,
+      with a count of the rest and where the full list is.
+- [ ] AC-08: On the `0c983f67` pin, the reviewer, the spec skill and the owner-facing summary behave as
+      before this feature.
+- [ ] AC-09: vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, and the
+      convention and both user guides use the glossary terms with the glossary's meanings.
+- [ ] AC-10: The replay harness runs a case end to end, refuses a case whose label approval is missing,
+      altered or later than the first rule-editing commit, stops on a case term in the branch diff, writes
+      counts only to the results file, records failed executions without counting them as passes, and runs
+      on a public fixture case in the test suite.
+- [ ] AC-11: On the enterprise case, every gating label is raised by every new-brief first pass on its
+      route, at the severity the retention rule requires.
+- [ ] AC-12: On the small application case, every gating label is raised by every new-brief first pass on
+      its route, at the severity the retention rule requires.
+- [ ] AC-13: On both cases and both routes, the new-brief loop reaches a clean pass in at most half the
+      spec reviews of the old-brief loop, with fewer Open Questions, and its clean document resolves every
+      gating label without a stated limit on an always-blocking defect.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01, AC-02, AC-03 | Manual procedure: read the convention at the companion revision and confirm each Design rule, then run `bun test tests/vh-adlc/review-convergence.test.ts`, updated to pin the new definitions, the plausible-choice sentence and the stated-limit line. |
-| AC-04 | Scenario `S17.profile`: the same seeded document (a single-user CLI that writes a local file without a lock) reviewed twice, with a profile saying single user on one machine and with a multi-tenant service profile. Pass: the lock gap is nit or absent with the first and should-fix or blocking with the second. A third run without a profile rates it should-fix or blocking. |
-| AC-03 | Scenario `S17.limit`: a document whose Scope says `Not handled: concurrent writers to names.log, single-user tool.` Pass: no finding names `names.log` concurrency. Control: the same line on an unauthenticated delete path still yields a blocking finding quoting it. |
-| AC-05 | Scenario `S17.scoped`: a reviewed document gets one changed Design paragraph and keeps a seeded should-fix gap in an unchanged section. Pass: findings name only the changed paragraph or sections that state its terms, and none names the unchanged gap. Control: an unchanged seeded security defect is still raised as blocking. Second case: the previous review commit is unreachable and the gap is raised. |
-| AC-06 | Scenario `S17.questions`: a review returns one judgement finding the profile settles and one about a public contract. Pass at the companion pin: one Open Question, about the contract, and Design records the other choice. On the `0c983f67` pin: two Open Questions. |
-| AC-07 | Scenario `S17.nits`: a pass with eight nits, six of which the author settles under the nit rule. Pass: the final reply shows two nits, a count of six and where they are listed, and the report lists all eight. |
-| AC-08 | `bun test tests/vh-adlc/proportional-review.test.ts`: `AGENTS.md` has the section and the companion pin, `knowledge.md` names the same SHA, and both guides mention each of the four terms; plus a manual read of the guides against Design. |
-| AC-09 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and a scripted reviewer: the results file holds counts and label IDs and no line of the fixture document, a forced execution failure is recorded and not counted, a copy of the case without the approval line is refused before any run, and the grep for case terms fails on a planted term. |
-| AC-10 | Replay of the enterprise case with three runs per brief on each of the two routes. Pass: `labels.md` carries the owner's approval line dated before the first new-brief run, and the independent matcher marks every label raised in each of the six new-brief runs; the results file shows it. |
-| AC-11 | Replay of the small application case, same procedure and pass condition. |
-| AC-12 | The same replays' full new-brief loops. Pass: rounds to clean at most half of `case.yaml`'s original count, questions fewer than its original count, and a manual check that each label maps to a quoted Design or Scope resolution in the clean document, none an always-blocking defect under `Not handled:`. |
+| AC-01, AC-02, AC-03 | Manual procedure: read the convention at the companion revision and confirm each Design rule and glossary definition, then run `bun test tests/vh-adlc/review-convergence.test.ts`, updated to pin the new definitions, the plausible-choice sentence and the stated-limit line. |
+| AC-04 | Scenario `S17.profile`: a seeded document that says nothing about users or deployment, where a service appends each request to a shared file without a lock, reviewed three times by the real reviewer: with a profile saying one user on one machine, with a multi-tenant service profile, and with no profile. Pass: the lock gap is nit or absent with the first, should-fix or blocking with the second, and with the third no lower than with the first. |
+| AC-03 | Scenario `S17.limit`: a document whose Scope says `Not handled: concurrent writers to names.log, single-user tool (R-1 F-01).` Pass: no finding names `names.log` concurrency. Control: a document whose Scope says `Not handled: callers without a session on the delete endpoint, internal tool (R-1 F-02).` still yields a blocking finding quoting that line. |
+| AC-05 | Scenario `S17.scoped` (host route): a reviewed document gets one changed Design paragraph and keeps a seeded should-fix gap in an unchanged section. Pass: the dispatch carries both fields, findings name only the changed paragraph or sections that state its terms, and none names the unchanged gap. Control: an unchanged seeded security defect is still raised as blocking. Second case: with no previous spec review row the gap is raised. Command route: `bun test tests/vh-adlc/loop/review-scope.test.ts` shows `reviewPrompt` from the `review` command carries the previous commit and the diff, and `none` with no previous row; AC-13's Codex loops exercise it end to end. |
+| AC-06 | Scenario `S17.questions`, with scripted reviewer records (`scriptedPlugin`): one judgement finding the seeded product profile settles and one about a public contract. Pass at the companion pin: one Open Question, about the contract, and Design records the other choice. |
+| AC-07 | Scenario `S17.nits`, with scripted reviewer records: eight nits, six of them citation slips that the seeded project procedure says need no owner attention, two free-text widening nits. Pass: the final reply shows the two, a count of six and where they are listed, and the report lists all eight. |
+| AC-08 | Old-pin controls of `S17.scoped`, `S17.questions` and `S17.nits` on the `0c983f67` pin. Pass: the unchanged gap is raised, both judgement findings become Open Questions, and the reply lists all eight nits. `S16.oldpin-reviewer` still passes. |
+| AC-09 | `bun test tests/vh-adlc/proportional-review.test.ts`: `AGENTS.md` has the section and the companion pin, `knowledge.md` names the same SHA, and both guides use each glossary term; plus a manual read of the convention and guides against the glossary definitions. |
+| AC-10 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and scripted reviewers: the results file holds counts and label IDs and no line of the fixture document; a forced execution failure is recorded and not counted; copies of the case with no approval line, an edited label and an approval later than the first rule-editing commit are each refused before any run; a planted term in the branch diff stops the run. |
+| AC-11 | Replay of the enterprise case, three first passes per brief per route. Pass: the results file lists the gating labels per route and shows each raised in all three new-brief passes at the required severity. The implementation reviewer opens the case directory, checks the approval line against `labels.md` and the first rule-editing commit, and spot-checks the matcher's verdicts against the stored records. |
+| AC-12 | Replay of the small application case, same procedure and pass condition. |
+| AC-13 | The same replays' full loops per brief per route. Pass: new-brief spec reviews to clean at most half the old-brief count and fewer Open Questions, on each route; and in the case directory, each gating label maps to a quoted Design or Scope resolution in the clean document, none an always-blocking defect under a stated limit, which the implementation reviewer checks there. |
 
 ## Tasks
 
