@@ -607,6 +607,7 @@ None.
 | 2026-11-22 | R-5 | spec | `d73b31ea` | claude-opus-5-5 | procedural | no blocking; 6 should-fix, 3 nit |
 | 2026-11-22 | R-5 | spec | `d73b31ea` | n/a | n/a | accepted by owner |
 | 2026-11-22 | R-6 | spec | `c6c7afba` | claude-opus-5-5 | procedural | no blocking; 10 should-fix, 1 nit |
+| 2026-11-22 | R-7 | spec | `471f5761` | claude-opus-5-5 | procedural | 1 blocking, 5 should-fix, 2 nit |
 
 ### R-1
 
@@ -1137,3 +1138,61 @@ SEVERITY: nit
 WHERE: Context Background (Harm and simplest alternative)
 EVIDENCE: "the machinery is one loop command for the re-review scope and the replay harness". This revision adds a convention section, a ship procedure step that drafts and files issues and commits verdicts, and a per-pass growth measurement, and the statement does not mention or weigh them.
 PROPOSAL: Update the harm statement to list the added parts and say why they beat the simplest alternative, such as filing an issue at the time of deferral.
+
+### R-7
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan AC-14 row (S17.deferred); Acceptance Criteria AC-14; Design (Deferred items, source list; Stated limit, "That is a baseline change, so it is reviewed like any other")
+EVIDENCE: The S17.deferred script has the owner answer R-1 F-01 with a stated limit, then accept R-1 while deferring R-1 F-02, then defer extra work in a drift re-review. It expects `From: drift re-review R-2.` and `vh-adlc fresh` still fresh "after each Deferred edit". A correct spec skill cannot follow that script. The stated limit adds a Scope line, which changes the normative baseline, so R-1 is stale (Design, Stated limit). The acceptance row must name a clean review whose commit has the current baseline (conventions/feature-documents.md at 0c983f67, `accepted` condition and Acceptance steps 1 to 4). A drift re-review applies only to a `planned` or `in-progress` spec (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:96-98), and reaching `planned` needs that gate to pass. So a correct implementation runs a new review after the stated limit, accepts that review, and the drift re-review becomes R-3, not R-2. The stated-limit entry is also written in the same revision as its Scope line, so `vh-adlc fresh` reports the spec review stale after that edit. The row was rewritten by the previous revision in response to R-6 F-03.
+PROPOSAL: Put a scripted clean R-2 after the stated limit, have the owner accept R-2 while deferring R-1 F-02, and expect `From: drift re-review R-3.`, or derive the expected review IDs from the stored Review Log. Check freshness only after the acceptance and drift entries, which change nothing outside Deferred.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Follow-up review after merge, first paragraph: "the resume skill, finding a `complete` document with pending entries, reports them and names the step. Invoking ship on a complete document runs only this step."); Scope (follow-up review bullet, "a line in the ship report and the resume skill for a complete document with pending Deferred entries"); Acceptance Criteria AC-16 ("the ship report and resume flag a complete document with pending entries"); Test Plan AC-16 row; Context Owner summary (follow-up bullet)
+EVIDENCE: Ship sets `complete` itself, in its Gate step, before it pushes or opens the PR (plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:86-90, then Deliver :95-111). So a document is `complete` on its feature branch long before its PR merges. Ship is also invoked again on such a document: a rejected push ends in "partial delivery" and is retried (:56-58, :102-104), and a feature PR takes follow-up commits through another ship run. Under "Invoking ship on a complete document runs only this step", those runs would skip the push and PR update and start a follow-up review whose merged code does not exist yet. Resume would likewise flag every complete, unmerged feature with pending entries. Design says the review runs "once the feature's PR is merged", but both triggers key on status alone. S17.followup seeds only a feature that is "complete and merged", so an implementation keyed on status passes. This sentence was added by the previous revision.
+PROPOSAL: Key the ship and resume triggers on a merged PR (or the document being `complete` on the default branch), keep ship's normal delivery path for a complete document whose PR is not merged, and add a complete-but-unmerged control to S17.followup that expects no follow-up review.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-14 ("author cut"), AC-15 ("After every owner-directed deferral"); Test Plan AC-14 row; Test Plan AC-15 row; Design (Deferred items, `author cut` source; Cut check, first sentence)
+EVIDENCE: AC-14 requires an entry with the exact source text for author cuts, but no Test Plan proof makes the author cut an extra under #141 or checks for `From: author cut.`. S17.deferred covers a stated limit, an acceptance deferral and a drift deferral. S17.cut covers one owner cut in session. AC-15 requires the cut check line after every owner-directed deferral, and Design lists four kinds: a cut in session, a proportionality answer of "narrow", a finding deferred at acceptance and drift-deferred extra work. Only the in-session cut is checked for a `Cut check:` line. S17.deferred has an acceptance deferral and a drift deferral, but its pass condition does not look for that line. A spec skill that writes no author-cut entry, or no cut check outside an in-session cut, passes every listed proof. Both composite criteria would then be untested in part. The cut check's coverage and the author-cut source were widened by the previous revision.
+PROPOSAL: Add an author-cut step to S17.deferred that expects `From: author cut.`, and require a `Cut check:` line after its acceptance deferral and drift deferral, or narrow AC-14 and AC-15 to what the scenarios check.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Follow-up review after merge, "Before filing, the session searches the repository's issues for that line and records an existing issue instead of filing again, so a rerun after a partial failure files nothing twice"; Failure, retry and rollback, "the `Deferred:` line makes a rerun safe"); Acceptance Criteria AC-16 ("never twice for one entry"); Test Plan AC-16 row ("a second ship run creates no issue")
+EVIDENCE: Verdicts are written only after filing, in one commit, so after a partial failure every entry is still pending and only the issue search prevents a duplicate. GitHub issue search reads a search index that can lag behind a just-created issue, so a prompt rerun can miss the issue it just filed. In S17.followup the second ship run starts after every verdict has been recorded, so no entry is pending and nothing is filed whether or not the search exists. The `gh` stub answers searches, but no step makes it answer one for a pending entry. An implementation with no duplicate check passes the proof.
+PROPOSAL: Record each issue link in the entry's `Verdict:` as soon as that issue is created, or match the `Deferred:` line through the issue list rather than search. Add a case where the stub fails the second creation, then a rerun must file only the missing issue.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Follow-up review after merge, last paragraph: "one documentation-only commit of the verdicts to the default branch, pushed ... A rejected push makes the step partial: the report says so, keeps the local commit and asks whether to open a PR instead"); Design (Failure, retry and rollback); Test Plan AC-16 row; Context Owner summary (follow-up bullet, "approves filing in one batch")
+EVIDENCE: Design does not say which checkout gets the verdict commit. After an authorized merge, `after-merge` removes the feature branch's clean worktree (vh-adlc-ship/SKILL.md:126-135), so the commit lands in some default-branch checkout. Keeping a rejected local commit there leaves the local default branch diverged from origin. The delivery convention syncs a shared checkout only with `git fetch` and `git merge --ff-only` (conventions/delivery.md:31 at 0c983f67), and the spec skill's own default-branch merge is `--ff-only` (vh-adlc-spec/SKILL.md:93). A later sync there then fails until someone resolves a commit nobody owns. authority.md already names a `default-branch-checkout-ff-only` method for another default-branch publication (references/authority.md:20). S17.followup checks issue calls and entry text, not where the commit lands or that it is pushed. The Owner summary says the owner "approves filing in one batch". It does not say that the same approval covers a direct push to the default branch, which is a permission the owner accepts. This step was added by the previous revision.
+PROPOSAL: Name the checkout and method for the verdict commit, for example `default-branch-checkout-ff-only` in an owned clean checkout. On a rejected push, move the commit to a branch for the PR instead of leaving it on the local default branch. State the push permission in the Owner summary, and add the pushed commit to the S17.followup pass condition.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Replay harness, case.yaml `terms` bullet; "Before any new-brief run, the harness greps the whole vh-adlc tree at the feature head ... a hit stops the run"; "Cases are named "enterprise" and "small application", with no repository or product names"; The cases, Enterprise bullet); Acceptance Criteria AC-10, AC-11; Test Plan AC-10, AC-11 rows; Review Log R-5 F-01 EVIDENCE
+EVIDENCE: `terms` holds "the document's title and the product's internal feature names and identifiers". The terms check greps the whole public tree, including this document. R-5 F-01's EVIDENCE (line 1003 at 471f5761, on public origin/main; `gh repo view michielvha/vh-adlc` reports PUBLIC) names the enterprise candidate documents of the owner's private repository by feature, with their blocking counts. The Enterprise rule selects one of them deterministically. Stored records stay verbatim (conventions/feature-documents.md:94-95 at 0c983f67), so the text cannot be edited away. If `terms` contains those feature names, every new-brief run stops and AC-11 to AC-13 cannot be run. If it leaves them out, the terms check no longer guards what Design says it guards, and the public record, together with the selection rule, already identifies the enterprise case.
+PROPOSAL: Say whether the terms check skips stored review records, and choose the enterprise case without a rule that public text already resolves. Or record that the owner accepts this exposure and keep those names out of `terms`.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter covers; Test Plan AC-16 row ("`bun test tests/vh-adlc/labels` gains `follow-up` mode cases")
+EVIDENCE: The AC-16 proof adds cases under tests/vh-adlc/labels/ (file.test.ts, fake-gh.ts at 471f5761). covers names plugins/vh-adlc/scripts/labels/ and many other test paths, but not tests/vh-adlc/labels/.
+PROPOSAL: Add `tests/vh-adlc/labels/` to covers.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Glossary, Scoped re-review, "and the sections it touches"); Acceptance Criteria AC-05; Scope (Out of scope, "Not handled: a repository without its own pin ... (R-3 F-07; accepted by the owner after R-4).")
+EVIDENCE: R-5 F-07 and R-5 F-09 are still unapplied at 471f5761. The glossary and AC-05 say "the sections it touches", while Design (Scoped re-review) says every section that states a rule, ID or term the diff changes. The document's own stated limit does not follow the glossary form `Not handled: <the case>, <why> (R-<n> F-<nn>).`.
+PROPOSAL: Use Design's wording in the glossary row and AC-05, and write the Scope line in the glossary form, keeping the owner acceptance in the Owner summary.
