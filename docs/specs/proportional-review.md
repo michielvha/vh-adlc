@@ -623,6 +623,10 @@ None.
 - D-08: A per-route check on average labels raised per run. From: owner cut on 2026-11-22. Verdict: pending.
 - D-09: Owner-list triage in operations other than the spec skill. From: owner cut on 2026-11-22. Verdict: pending.
 - D-10: Safe concurrent follow-up reviews on one feature. From: R-8 F-02, stated limit. Verdict: pending.
+- D-11: While a follow-up docs PR is open, let its branch decide which entries are pending, so resume and ship do not repeat the review. From: R-9 F-01, deferred at acceptance. Verdict: pending.
+- D-12: Name the `references/authority.md` wording for the follow-up review's temporary worktree and its writer-handoff exception. From: R-9 F-02, deferred at acceptance. Verdict: pending.
+- D-13: Ask one approval for the docs branch, push and PR even when every entry is a drop or every filing is declined. From: R-9 F-03, deferred at acceptance. Verdict: pending.
+- D-14: Run the private-terms check on newly returned implementation review records before storing them. From: R-9 F-04, deferred at acceptance. Verdict: pending.
 
 ## Review Log
 
@@ -638,6 +642,7 @@ None.
 | 2026-11-22 | R-7 | spec | `471f5761` | claude-opus-5-5 | procedural | 1 blocking, 5 should-fix, 2 nit |
 | 2026-11-22 | R-8 | spec | `14d15c23` | claude-opus-5-5 | procedural | no blocking; 6 should-fix, 2 nit |
 | 2026-11-22 | R-9 | spec | `6abdbd3b` | claude-opus-5-5 | procedural | no blocking; 4 should-fix, 1 nit |
+| 2026-11-22 | R-9 | spec | `6abdbd3b` | n/a | n/a | accepted by owner |
 
 ### R-1
 
