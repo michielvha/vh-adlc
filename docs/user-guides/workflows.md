@@ -58,7 +58,7 @@ see [installation](../get-started/installation.md).
 | Documentation impact | `vh-adlc-docs-impact` | Find and review docs affected by selected code changes. |
 | Documentation drift | `vh-adlc-docs-drift` | Audit the configured corpus, resolve selected stale docs-audit PRs and freshly review selected post-merge closures. |
 | Documentation truth review | `vh-adlc-docs-truth` | Review factual claims in selected docs or agent instructions, or show recorded verification freshness. |
-| Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
+| Article and product copy | `vh-adlc-blog` | Draft, revise or review articles, announcements and community copy, with a rehearsal of reader actions. |
 | Clean | `vh-adlc-clean` | Plan and remove what killed runs left in `/tmp` and the project's temp root; Compose projects and kind clusters only on request. |
 
 Triage reports stay uncommitted unless requested. Every GitHub change, including comments and
@@ -255,10 +255,10 @@ binary and the allow rules.
 
 ## Articles and promotion
 
-Invoke `vh-adlc-blog <brief or article>` for a new draft, revision or editorial
-review. Use `vh-adlc-blog promote <project or article>` for an article and social
-drafts. Shipping public-facing work may suggest that command; it never runs the
-writer automatically. Article authoring does not create a software feature plan.
+Ask for a draft, revision or editorial review in ordinary language, or invoke
+`vh-adlc-blog <brief or article>`. Use `vh-adlc-blog promote <project or article>`
+for promotion drafts. A product announcement or a community reply can stand on
+its own. Shipping may suggest the command. Drafting starts with your request.
 
 The shared writer reads the adopter's agent entry point, voice guide and article
 schema. Keep personal samples and framework-specific frontmatter in the site
@@ -272,10 +272,11 @@ reported outside it. New material can develop rough notes into prose, while
 revisions retain sound existing passages. The handoff groups substantive
 exceptions instead of asking the owner to approve every copy repair.
 
-Promotion copy points to the verified canonical article URL. Unpublished or
-older article content keeps the bundle pending. Release-day launch copy may be
-prepared in advance when requested, with the release dependency recorded outside
-the public text. A private preview remains an owner-review link.
+Promotion copy links to the relevant published article, release or product
+documentation. The writer follows the actions a new draft asks readers to take
+and rechecks directions that change in an edit. The handoff reports obstacles
+and unverified steps. Release-day copy can remain pending until the destination
+is ready. Keep private preview links in the owner handoff.
 
 Tool availability is reported honestly. The writer uses the host's write-like-me
 and humanizer skills where available, otherwise supplied references and the

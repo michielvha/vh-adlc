@@ -48,6 +48,27 @@ describe("shared article and promotion contract", () => {
     expect(intake).toContain("promotion");
   });
 
+  test("discovers standalone product drafts from the skill description and generic intake", () => {
+    const entry = read("skills/vh-adlc-blog/SKILL.md");
+    expect(entry).toMatch(/description:.*public-facing product copy.*community replies/);
+    const intake = read("references/lifecycle.md");
+    expect(intake).toMatch(/public-facing product copy.*skills\/vh-adlc-blog\/SKILL\.md/);
+    expect(read("references/blog.md")).toContain("For standalone product copy, prepare only the requested drafts");
+  });
+
+  test("requires reader rehearsal for public drafting and changed directions before handoff", () => {
+    const workflow = read("references/blog.md");
+    const rehearsal = workflow.split("## Rehearse reader actions")[1]?.split("## ")[0];
+    expect(rehearsal).toBeDefined();
+    expect(rehearsal).toContain("new public-facing copy and whenever an edit changes a reader action");
+    expect(rehearsal).toContain("start with the draft as the reader receives it");
+    expect(rehearsal).toContain("Stop before submission");
+    expect(rehearsal).toContain("works");
+    expect(rehearsal).toContain("needs a fix");
+    expect(rehearsal).toContain("not verified");
+    expect(rehearsal).toContain("publication-ready");
+  });
+
   test("shipping only suggests explicit promotion for public-facing work", () => {
     const ship = read("skills/vh-adlc-ship/SKILL.md");
     expect(ship).toContain("vh-adlc-blog promote");

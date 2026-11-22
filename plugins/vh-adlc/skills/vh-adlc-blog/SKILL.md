@@ -1,6 +1,6 @@
 ---
 name: vh-adlc-blog
-description: Draft, revise or review an article using project evidence and the adopter's author voice. Use promote mode for an article plus social Markdown linking to the author's website. Does not publish or change software feature states.
+description: Draft, revise or review public-facing product copy and articles using project evidence and the adopter's voice. Use for launch announcements, forum posts, community replies, support instructions and social drafts. Rehearse the actions readers are asked to take. Drafting only.
 ---
 
 # vh-adlc-blog
@@ -14,8 +14,11 @@ request `conventions/documentation.md`, `conventions/feature-documents.md` and
 Read the resolved pages and report the revision. Use the feature loop's knowledge
 failure handling; article authoring itself needs no software feature document.
 
-Input is the owner's article brief, existing article, editorial request, or
-`promote <project or article>`. Read the adopter's instructions before writing.
+Input is a writing brief, existing copy, editorial request or
+`promote <project or article>`. A natural request for product copy selects this
+procedure without the command name. Before handing off public-facing copy,
+follow the reader rehearsal in `references/blog.md`. Read the adopter's
+instructions before writing.
 Publication remains subject to `references/authority.md`.
 Name hosted items in your report to the owner as `references/loop.md` step 5 says.
 
