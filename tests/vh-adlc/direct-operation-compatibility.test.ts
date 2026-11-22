@@ -4,11 +4,12 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "../..");
 const baseline = "b313327b134bc5ecfa7167856d4b567f8701ba06";
-// Keep the owner summary, finding rules, drift re-review limit and the proportionality gate
-// (michielvha/vh-adlc#148: harm statement and convergence trigger) in the spec baseline.
-const specBaseline = "e53fe39e7461b95c27b7481514688ee998970e18";
+// Keep the owner summary, finding rules, drift re-review limit, the proportionality gate
+// (michielvha/vh-adlc#148: harm statement and convergence trigger) and the author-added extras
+// exception (michielvha/vh-adlc#141) in the spec baseline.
+const specBaseline = "41355739d55e1d60f5c1839fa1c59a57089b96e0";
 // The proportionality gate (michielvha/vh-adlc#148) adds the harm statement step to investigate.
-const investigateBaseline = specBaseline;
+const investigateBaseline = "e53fe39e7461b95c27b7481514688ee998970e18";
 // The owner approved the rule that an agent-behavior proof needs a committed script that reruns it
 // (docs/specs/reproducible-agent-proofs.md, parked in favour of this short rule). Keep it as the implement baseline.
 const implementBaseline = "8d5a639bf3626a95901a125c0aeeff3e24b0f335";
