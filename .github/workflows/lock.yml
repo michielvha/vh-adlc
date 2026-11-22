@@ -18,11 +18,15 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       contents: read
+      checks: read
+      pull-requests: read
+      statuses: read
     steps:
       # The App token, unlike GITHUB_TOKEN, starts CI on the pushed branch and may merge the PR.
       - id: token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -36,7 +40,9 @@ jobs:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           TAG: ${{ github.event.workflow_run.head_branch }}
         run: scripts/release/lock-binary.sh "$TAG"
-      - if: steps.lock.outputs.changed == 'true'
+      - name: Open the lock pull request
+        id: pull
+        if: steps.lock.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ steps.token.outputs.token }}
           VERSION: ${{ steps.lock.outputs.version }}
@@ -46,9 +52,44 @@ jobs:
           git switch -c "$branch"
           git -c user.name="$BOT" -c user.email="$BOT@users.noreply.github.com" commit -qam "chore(vh-adlc): lock the $VERSION binary"
           git push -q origin "$branch"
-          gh pr create --base main --head "$branch" --title "chore(vh-adlc): lock the $VERSION binary" \
-            --body "Automated by .github/workflows/lock.yml: v$VERSION changed the binary. checksums.txt is signed by the release key and every archive matches it. Merges itself when CI passes."
-          # Wait for the PR's CI to start, then for it to finish; merge only when every check passed.
-          for _ in $(seq 30); do [ "$(gh pr view "$branch" --json statusCheckRollup -q '.statusCheckRollup | length')" -gt 0 ] && break; sleep 20; done
-          gh pr checks "$branch" --watch --fail-fast
-          gh pr merge "$branch" --merge --delete-branch --subject "chore(vh-adlc): lock the $VERSION binary"
+          pr=$(gh pr create --base main --head "$branch" --title "chore(vh-adlc): lock the $VERSION binary" \
+            --body "Automated by .github/workflows/lock.yml: v$VERSION changed the binary. checksums.txt is signed by the release key and every archive matches it. Merges itself when CI passes.")
+          head=$(git rev-parse HEAD)
+          printf 'url=%s\nhead=%s\nbranch=%s\n' "$pr" "$head" "$branch" >> "$GITHUB_OUTPUT"
+      # The installation token expires after one hour. Use the job token for polling.
+      - name: Wait for pull request checks
+        if: steps.lock.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.pull.outputs.url }}
+          PR_HEAD: ${{ steps.pull.outputs.head }}
+          PR_BRANCH: ${{ steps.pull.outputs.branch }}
+        run: |
+          for _ in $(seq 30); do
+            run=$(gh run list --workflow ci.yml --branch "$PR_BRANCH" --commit "$PR_HEAD" \
+              --event push --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            if [ -n "$run" ]; then
+              gh run watch "$run" --exit-status
+              gh pr checks "$PR" --watch --fail-fast
+              exit 0
+            fi
+            sleep 20
+          done
+          echo 'The lock branch CI run did not start within ten minutes.' >&2
+          exit 1
+      - id: merge-token
+        if: steps.lock.outputs.changed == 'true'
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+      - name: Merge the checked lock pull request
+        if: steps.lock.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.merge-token.outputs.token }}
+          PR: ${{ steps.pull.outputs.url }}
+          PR_HEAD: ${{ steps.pull.outputs.head }}
+          VERSION: ${{ steps.lock.outputs.version }}
+        run: |
+          gh pr merge "$PR" --merge --delete-branch --match-head-commit "$PR_HEAD" \
+            --subject "chore(vh-adlc): lock the $VERSION binary"
