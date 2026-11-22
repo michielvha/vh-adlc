@@ -479,6 +479,7 @@ None.
 | 2026-11-22 | R-2 | spec | `5c09d79f` | claude-opus-5-5 | procedural | 1 blocking, 16 should-fix, 2 nit |
 | 2026-11-22 | R-3 | spec | `98e792ad` | claude-opus-5-5 | procedural | 2 blocking, 9 should-fix, 2 nit |
 | 2026-11-22 | R-4 | spec | `e94e00e7` | claude-opus-5-5 | procedural | no blocking; 5 should-fix, 1 nit |
+| 2026-11-22 | R-5 | spec | `d73b31ea` | claude-opus-5-5 | procedural | no blocking; 6 should-fix, 3 nit |
 
 ### R-1
 
@@ -865,3 +866,68 @@ SEVERITY: nit
 WHERE: Design (Scoped re-review, "one of the repository's pin files (the `pin_files` that `vh-adlc knowledge` reports, such as `AGENTS.md`)" and the command line `review-scope --repo <dir> --document <doc> --commit <X>`)
 EVIDENCE: `vh-adlc knowledge` needs `--plugin-pin`, and `pin()` in internal/knowledge/knowledge.go reads the bridge files from the working tree. The bridge files are `.github/copilot-instructions.md`, `AGENTS.md` and `CLAUDE.md` (:35). The stated command takes no binary or plugin pin, and pin files read from the working tree cannot show a pin removed between the two reviewed commits. Running `knowledge` at e94e00e7 reports `"pin_files":["AGENTS.md"]`.
 PROPOSAL: Have `review-scope` compare the three bridge files between the two commits, or add the binary and plugin pin options to its command line.
+
+### R-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, Retention paragraph, "For a reviewer whose hit rate is unchanged, a label fails with probability at most 0.9 percent"); Context Owner summary ("an unchanged reviewer fails a label with at most 0.9 percent chance"); Acceptance Criteria AC-11, AC-12; Test Plan AC-11, AC-12 rows
+EVIDENCE: I computed the per-label figure exactly (python3, P(Binomial(3,p) >= 2) * (1-p)^12). The maximum is 0.873 percent at p=0.137, so the stated 0.9 percent is correct, but it is per label and route. AC-11 and AC-12 pass only if no label fails on either route in either case. For N independent label and route pairs the upper bound on an unchanged reviewer failing at least one is 1-(1-0.00873)^N: 8.4 percent at N=10, 16.1 percent at 20, 29.6 percent at 40, 40.9 percent at 60. At realistic rates the per-label figure stays at 0.39 to 0.87 percent for p from 0.05 to 0.25, which is the band where labels drawn from findings raised only in later original rounds will sit. The enterprise candidates in the owner's repository hold 30, 61 and 68 `SEVERITY: blocking` records (the multiple VCS connections, hosted job pod resources and VCS inventory documents, each with 28 or more non-acceptance spec reviews), so dozens of labels per case are likely, and a correct implementation then fails AC-11 or AC-12 by chance with a probability the document never states. After the confirmation runs there is no further path: the criterion is simply not met. R-4 F-02 asked for the combined chance beside the rule; the previous revision removed the aggregate check but did not add it.
+PROPOSAL: State beside the retention rule and in the summary the chance that an unchanged reviewer fails AC-11 or AC-12 for the expected label count, and either accept it explicitly or raise the confirmation so that the combined chance stays small (for example, more confirmation runs for a failing label, sized to the approved label count).
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Scoped re-review, second paragraph); Design (Glossary, Scoped re-review); Acceptance Criteria AC-05; Test Plan AC-05 row; Context Owner summary (re-review bullet); frontmatter goal
+EVIDENCE: A scoped pass covers "the diff plus every section that states a rule, ID or term the diff changes" and outside that "reports only blocking findings". A should-fix finding from the previous pass that the author's revision did not address leaves no trace in the diff, so the next pass never raises it again. Today a full pass re-raises it (vh-adlc-reviewer.agent.md:52, "Return every finding you can establish in this pass"). The new spec skill also lets the author "resolve a judgement finding within the recorded rules" (Design, Open Questions and owner lists), so a finding dropped without a recorded choice is lost silently. The goal says "every real defect the current review raises is still raised", but the replay measures retention only on first passes and rounds only by count, and S17.scoped seeds no previous unaddressed finding, so no check would notice.
+PROPOSAL: Add the previous pass's blocking and should-fix findings (already in the Review Log at X) to the scope: the reviewer confirms each is answered by the diff, a stated limit or a recorded choice in Design, and re-raises any that is not. Add a case to S17.scoped where a previous should-fix finding was left unaddressed and must be raised again.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Stated limit, "Adding one is the author's call, recorded in Scope, unless the limit excludes a case the goal, a criterion or a behavior Scope promises names; then it is an Open Question"); Scope (spec skill bullet); Acceptance Criteria AC-03, AC-06; Test Plan AC-03, AC-06 rows; Context Owner summary (stated limit bullet)
+EVIDENCE: The author-side half of the stated limit rule has no home in the spec skill and no proof. Scope lists the spec skill changes as "author mode, review dispatch, review mode step 4 and the owner-facing nit list" and does not name stated limits. AC-03 covers only "That convention and the reviewer". AC-06 and S17.questions cover judgement findings under the plausible-choice rule, with no stated limit seeded. A spec skill that adds a limit excluding a case the goal names, without an Open Question, passes every listed check; one implementer will edit SKILL.md to describe stated limits and the exception, another will rely on the convention alone.
+PROPOSAL: Name the stated limit and its Open Question exception among the spec skill changes in Scope and Design, extend AC-06 to cover it, and add a scripted case to S17.questions where one finding is answered by a limit the author adds and another would need a limit excluding a case the goal names, which must become an Open Question.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "An independent agent matches findings to labels from `labels.md` and the stored records, and its verdicts are stored beside each run"); Acceptance Criteria AC-11, AC-12; Test Plan AC-11, AC-12 rows
+EVIDENCE: Retention compares old-brief hits at any severity with new-brief hits at or above the minimum severity, and the verdicts come from one matching agent. The document does not say whether the matcher sees which brief, plugin commit or docs revision produced a record. A matcher that knows a run is the new brief can match loosely on borderline findings, and the implementation reviewer only "spot-checks the matcher's verdicts". One implementer passes run identities to the matcher, another strips them; the difference decides AC-11 and AC-12 on borderline labels.
+PROPOSAL: State that the matcher receives each run's records with the brief, plugin commit, docs revision and run order removed, in shuffled order, and that the harness rejoins verdicts to runs afterwards.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-10 ("runs a case end to end ... and runs on a public fixture case in the test suite"); Test Plan AC-10 row; Design (Replay harness, step 2); AGENTS.md (local commands, "The vh-adlc plugin checker: `bun test tests/vh-adlc`")
+EVIDENCE: An end-to-end case includes step 2's full loops, in which the spec skill revises the document between passes as a live `claude` session (the scenario session runner, tests/vh-adlc/scenarios/run.ts `session`, calls `claude` with maxTurns 80). The AC-10 row scripts only the reviewers. tests/vh-adlc/replay/run.test.ts sits under tests/vh-adlc, which AGENTS.md names as the routine plugin checker, so a live author session there makes the routine suite need a model. One implementer scripts the author too and the test proves only the harness plumbing; another runs a live author and the checker gains model calls.
+PROPOSAL: State that run.test.ts scripts both the reviewer and the author (or stubs the loop step) and makes no model call, and say which part of "end to end" the live replays alone exercise.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-09 ("the convention and both user guides use the glossary terms with the glossary's meanings"); Test Plan AC-09 row ("the convention and both guides use each glossary term"); Design (Glossary, closing sentence)
+EVIDENCE: The glossary has eleven rows, including Security defect, Data-loss defect, Tenant-isolation defect and Owner's recorded rules. The AC-09 test requires each guide to use each term. docs/get-started/first-feature.md is 96 lines and mentions review severity only in lines 42-46. Holding it to all eleven terms makes the implementer add definitional material a getting-started guide does not need, while a guide that uses only the terms it describes fails the test. The Design sentence says the guides "use these terms with these meanings", which reads as a meaning constraint, not a presence requirement, so two implementers would build different guides.
+PROPOSAL: Hold each guide to the meanings of the terms it uses and require presence only of a named subset per guide (for example, product profile, severity by consequence, stated limit and scoped re-review in both), and keep the full-term presence check for the convention.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Glossary, Scoped re-review, "and the sections it touches"); Acceptance Criteria AC-05 ("covers only the document diff and the sections it touches"); Design (Scoped re-review, "every section that states a rule, ID or term the diff changes"); Test Plan AC-05 row ("sections that state its terms")
+EVIDENCE: The glossary and AC-05 say "the sections it touches", which reads as the sections holding diff hunks. Design and the S17.scoped pass condition say every section that states a rule, ID or term the diff changes, which can include untouched sections.
+PROPOSAL: Use Design's wording in the glossary row and AC-05.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary (re-review bullet, "A pass is full again when covered code or the repository's docs pin changed"); Design (Scoped re-review, "a `covers` path outside the document or one of the docs pin bridge files ... changed")
+EVIDENCE: Design makes a pass full on any change to `AGENTS.md`, `CLAUDE.md` or `.github/copilot-instructions.md`, not only a pin change, and on any changed `covers` path, which in this document includes user guides, not only code.
+PROPOSAL: Say "when a covered path or a docs pin bridge file (`AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md`) changed".
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Scope (Out of scope, "Not handled: a repository without its own pin ... (R-3 F-07; accepted by the owner after R-4)."); Design (Glossary, Stated limit)
+EVIDENCE: The glossary defines a stated limit as a Scope line `Not handled: <the case>, <why> (R-<n> F-<nn>).`. The document's own stated limit ends "(R-3 F-07; accepted by the owner after R-4)", which does not match that form, and its reason follows a "because" clause rather than the `<the case>, <why>` order.
+PROPOSAL: Write the line in the glossary form, for example "Not handled: ..., because no file in the repository changes (R-3 F-07).", and keep the owner acceptance in the Owner summary where it already appears.
