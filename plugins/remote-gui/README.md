@@ -2,7 +2,9 @@
 
 Share a task-local app through private Tailscale HTTPS, or give a human control of a fresh headed Chromium browser. Human sign-in runs with automation and browser debugging disabled. After the owner confirms completion, the agent can resume in the same disposable profile. Tailscale access opens directly for the selected owner's identity, with no viewer password or enrollment step.
 
-## Phone keyboard
+## iPhone keyboard
+
+Use Safari on iPhone for the two-tap keyboard flow. Android Chrome verification is deferred.
 
 Tap the remote field and then tap **Tap to type**. The second tap opens the phone’s own keyboard. The viewer puts the prompt within the editable bounds Chromium reports. If a site covers a field while leaving it focused, the prompt can appear over that cover. Keys follow Chromium’s current focus, as they do with a hardware keyboard.
 

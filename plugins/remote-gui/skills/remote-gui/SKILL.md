@@ -75,6 +75,13 @@ Supported exported sizes range from 320 by 240 to 4096 by 4096. Larger viewers s
 
 An installed update affects new sessions. Keep an existing healthy supervisor running with its original behavior; do not stop or rotate it to demonstrate sizing.
 
+## iPhone keyboard
+
+In iPhone Safari, tap an editable field in the shared browser, then tap **Tap to type** over the field.
+The second tap opens the native keyboard. Typed keys follow the shared browser's current focus.
+During a brief focus verification failure, the viewer pauses typing and prompts the owner to re-enter any missed keys after it recovers.
+Android Chrome verification is deferred.
+
 ## Clipboard panel
 
 The browser viewer has a clipboard panel that the owner opens with its **Clipboard** button. Offer it when the owner needs to put text such as a long URL into the shared browser, or take text out of it. Text moves only when the owner presses a button; nothing copies between the clipboards on its own.
