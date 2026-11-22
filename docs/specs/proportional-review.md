@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Claimed for implementation on feat/proportional-review. Next: T1, then owner approval of the replay labels and cases before the first rule-editing commit (T2)."
+status_description: "Implementing on feat/proportional-review: T1, T9, T10 and T18 to T20 done. The enterprise replay labels and case were approved by the owner on 2026-11-22; T2, the first rule-editing commit, waits on the small application case."
 branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
