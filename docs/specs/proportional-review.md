@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted at R-9 and kept by drift re-review R-10 after PR #152 and PR #155 merged; tasks written. Next: implement."
+status: in-progress
+status_description: "Claimed for implementation on feat/proportional-review. Next: T1, then owner approval of the replay labels and cases before the first rule-editing commit (T2)."
+branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
 covers:
