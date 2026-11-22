@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after spec review R-3 with the owner's proportionality decision; waiting for the next independent spec review."
+status_description: "Revised after clean spec review R-4 with the owner's answers; waiting for the next independent spec review, then acceptance."
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds with fewer owner questions, while every real defect the current review raises is still raised."
 covers:
@@ -73,16 +73,18 @@ Product quality is a hard constraint, proved by replay on one enterprise and one
 document at their first spec-review commit, on the Codex command route and the Claude host route. The
 old rules run three first passes and the new rules six. A labelled real defect fails if the old rules
 raised it in two or more runs and the new rules raise it in none at the severity the owner set for it,
-confirmed by six more runs. Per route, the new rules' average hits per run must also stay within 15
-percent of the labels of the old rules' average. Then each brief runs one full loop per case and route
+confirmed by six more runs; an unchanged reviewer fails a label with at most 0.9 percent chance. Then
+each brief runs one full loop per case and route
 under the same scripted owner, and the new rules must need at most half the old total of spec reviews,
 with fewer questions. The owner approves the labels, profile and case before any rule is edited. Case
-material stays on the owner's host, the second user's with their consent; the consumer repository's
-name is public, its document content is not. Only counts are published. Nothing has run yet.
+material stays on the owner's host, the second user's with their consent. The owner's consumer
+repository name is public; the second user's repository name stays private unless they agree to publish
+it, and no document content is published. Only counts are published. Nothing has run yet.
 
-Reviews R-1 to R-3 raised eleven questions, ten answered at their recommendation; R-3 stopped the loop
-for a proportionality decision, and the owner chose to cut the replay statistics to the simple rule
-above. Acceptance authorizes
+The owner accepted one stated limit: a repository without its own pin gets one scoped pass after a plugin
+upgrade moves its docs revision. Reviews R-1 to R-4 raised thirteen questions, twelve answered at their
+recommendation; R-3 stopped the loop for a proportionality decision and the owner chose to cut the replay
+statistics, and after R-4 the owner removed the average-hits check as too noisy. Acceptance authorizes
 the plugin edits, the replay harness and the companion convention PR on a feature branch; shipping and
 the pin bump need the usual approvals.
 
@@ -184,7 +186,7 @@ Out of scope, by name:
 - Owner-list triage in operations other than the spec skill (audit, triage, maintenance and the rest).
 - Not handled: a repository without its own pin whose plugin upgrade moves the resolved docs revision
   between two passes gets a scoped pass under the new text, because no file in the repository changes;
-  the next covered or pin change makes the pass full again (R-3 F-07).
+  the next covered or pin change makes the pass full again (R-3 F-07; accepted by the owner after R-4).
 - Changing the complete `docs/specs/spec-review-convergence.md`: it stays complete, and its test keeps
   proving its text at `0c983f67`.
 - Calibrating the reviewer's precision over time.
@@ -198,6 +200,9 @@ Out of scope, by name:
 | Product profile | The `## Product profile` section of a repository's root `AGENTS.md`: what the product is, who uses it, its stage, and what is at stake. |
 | Severity by consequence | Rating a failure path by whether a user, tenant or operator of the profiled product would plausibly hit it and how much harm it does; false facts, unmeetable criteria and broken proofs keep their current ratings. |
 | Always-blocking defect | A security, data-loss or tenant-isolation defect; blocking on every product, whatever its profile. |
+| Security defect | A path that lets someone read or act beyond their authorization, or exposes a credential or secret. |
+| Data-loss defect | Loss or corruption of data a user or tenant owns and cannot regenerate. |
+| Tenant-isolation defect | A path that lets one tenant read or affect another tenant's data, runs or configuration. |
 | Stated limit | A Scope line `Not handled: <the case>, <why> (R-<n> F-<nn>).` that answers a finding without adding a mechanism. |
 | Scoped re-review | A spec review after the first that covers the document diff since the previous spec review and the sections it touches, and reports only blocking findings outside that. |
 | Owner's recorded rules | The product profile plus the instruction files and project procedure that `bun scripts/loop/cli.ts context` lists. |
@@ -268,8 +273,9 @@ for both routes and prints JSON with `previous`, `diff` and `full` with its reas
 the latest `spec` row in the Review Log at X whose outcome is not `accepted by owner` and whose commit is
 an ancestor of X. `diff` is `git diff <previous>..<X> -- <document>` without the Review Log section. The
 pass is full, with `previous` and `diff` empty, when there is no such row, or when a `covers` path outside
-the document or one of the repository's pin files (the `pin_files` that `vh-adlc knowledge` reports, such
-as `AGENTS.md`) changed between the two commits; drift re-reviews and merged default-branch work are
+the document or one of the docs pin bridge files (`AGENTS.md`, `CLAUDE.md`,
+`.github/copilot-instructions.md`, the files `vh-adlc knowledge` reads a pin from,
+`internal/knowledge/knowledge.go:35`) changed between the two commits; drift re-reviews and merged default-branch work are
 therefore full passes. The pinless upgrade case is a stated limit in Scope. The spec skill passes the result in
 the host dispatch; the `review` command calls the same function and `reviewPrompt` carries it for the
 command route, whose export has no Git history.
@@ -309,8 +315,9 @@ paragraph changes to allow this.
 
 - `case.yaml`: the local clone path, the commit X of the document's first spec review, the document path,
   the profile text, and `terms`, the case's private terms (the document's title and the product's
-  internal feature names and identifiers). The consumer repository's name is public, as the owner
-  decided; its document content is not;
+  internal feature names and identifiers). The enterprise case's repository name is public, as the owner
+  decided; the small application case's `terms` include the second user's repository name unless they
+  agree to publish it. No document content is public;
 - `labels.md`: the real defects present at X, each as `L-<nn>` with one line, the original finding it
   came from, the minimum severity the owner expects under the new scale (blocking for an always-blocking
   defect), and how a reviewer's finding is matched to it (a must-match description, with one example
@@ -354,15 +361,10 @@ stored records, and its verdicts are stored beside each run.
 
 Retention, per label and route: a label fails when at least two of the three old-brief first passes raise
 it, at any severity, and none of the six new-brief first passes raises it at or above its minimum
-severity. A failing label gets six more new-brief first passes and fails only if none of the twelve raises
-it. For a reviewer whose hit rate is unchanged, a label fails with probability at most 0.9 percent (at a
+severity. A failing label gets six more new-brief first passes and fails only if none of the twelve raises it at
+or above its minimum severity. For a reviewer whose hit rate is unchanged, a label fails with probability at most 0.9 percent (at a
 per-run hit rate near 0.14; computed exactly over the binomial outcomes). Labels no old-brief pass raises
 cannot fail and are reported.
-
-Aggregate, per route: the new brief's average number of labels raised per run, at or above minimum
-severity, is at least the old brief's average at any severity minus 15 percent of the case's labels. In a
-simulation with hit rate 0.5 for every label, an unchanged reviewer fails this with probability about 8
-percent at 10 labels and 2 percent at 20.
 
 Rounds: over the four case and route pairs, the new-brief loops' total spec reviews must be at most half
 the old-brief loops' total, and their total Open Questions fewer.
@@ -422,8 +424,8 @@ for the old-pin controls.
       paths by it, and without one judges as for production software with users.
 - [ ] AC-05: On both routes, a spec review after the first receives the scope from `review-scope`, covers
       only the document diff and the sections it touches, and reports only blocking findings outside
-      that; the pass is full when there is no previous spec review or covered code or the docs pin
-      changed.
+      that; the pass is full when there is no previous spec review or a covered path or a docs pin bridge
+      file changed.
 - [ ] AC-06: The spec skill raises judgement calls and judgement findings as Open Questions only under the
       plausible-choice rule, judged against the product profile and the files loop context lists.
 - [ ] AC-07: The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules
@@ -438,9 +440,9 @@ for the old-pin controls.
       model, writes nothing but counts and identities to the results file, records failed executions
       without counting them as passes, and runs on a public fixture case in the test suite.
 - [ ] AC-11: On the enterprise case, with labels and case approved before the first rule-editing commit, no
-      label fails the retention rule and the aggregate holds, on both routes.
+      label fails the retention rule on either route.
 - [ ] AC-12: On the small application case, with labels and case approved before the first rule-editing
-      commit, no label fails the retention rule and the aggregate holds, on both routes.
+      commit, no label fails the retention rule on either route.
 - [ ] AC-13: Over both cases and both routes, the new-brief loops need at most half the old-brief loops'
       total spec reviews, with fewer Open Questions in total.
 
@@ -448,16 +450,16 @@ for the old-pin controls.
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01, AC-02, AC-03 | Manual procedure: read the convention at the companion revision and confirm each Design rule and glossary definition, then run `bun test tests/vh-adlc/proportional-review.test.ts`, which pins the new definitions, the plausible-choice sentence and the stated-limit line at that revision. |
+| AC-01, AC-02, AC-03 | Manual procedure: read the convention at the companion revision and confirm each Design rule and glossary definition, including the three always-blocking classes, then run `bun test tests/vh-adlc/proportional-review.test.ts`, which pins the new definitions, the plausible-choice sentence and the stated-limit line at that revision. |
 | AC-04 | Scenario `S17.profile`: a seeded document, silent about users and deployment, where a command a person runs appends its result to a shared file without a lock, reviewed by the real reviewer three times: with a profile saying one person runs it by hand on their own machine, one run at a time; with a profile saying a hosted service runs it for many tenants at once; and with no profile. Pass: the lock gap is nit or absent with the first, and should-fix or blocking with the second and with the third. |
-| AC-03 | Scenario `S17.limit`, run as a full pass (the R-1 row's commit is not an ancestor of X) under a profile of a shared build host where parallel jobs run the command: the document has an R-1 record F-01 about concurrent writers to `names.log` and a Scope line `Not handled: concurrent writers to names.log, accepted for this version (R-1 F-01).` Pass: no finding names `names.log` concurrency. Control 1: the same document without that line raises the `names.log` gap. Control 2: an R-1 F-02 about the delete endpoint with `Not handled: callers without a session on the delete endpoint, internal tool (R-1 F-02).` still yields a blocking finding quoting that line. |
-| AC-05 | `bun test tests/vh-adlc/loop/review-scope.test.ts`: `review-scope` picks the right previous review with an acceptance row after it, skips a non-ancestor row, reports full with no row, with a changed `covers` path and with a changed pin file, leaves the Review Log out of the diff, and `reviewPrompt` from the `review` command carries the result. Scenario `S17.scoped` on the host route and `S17.scoped-command` through the `review` command with a Codex command route: a reviewed document gets one changed Design paragraph and keeps a seeded should-fix gap in an unchanged section. Pass on each: apart from blocking findings, findings name only the changed paragraph or sections that state its terms; none names the unchanged gap; and an unchanged seeded security defect is still raised as blocking. |
+| AC-03 | Scenario `S17.limit`, run as a full pass (the R-1 row's commit is not an ancestor of X) under a profile of a shared build host where parallel jobs run the command: the document says `names.log` is a diagnostic log rebuilt on every run, has an R-1 record F-01 about concurrent writers to it, and has a Scope line `Not handled: concurrent writers to names.log, accepted for this version (R-1 F-01).` Pass: no finding names `names.log` concurrency. Control 1: the same document without that line raises the `names.log` gap. Control 2: an R-1 F-02 about the delete endpoint with `Not handled: callers without a session on the delete endpoint, internal tool (R-1 F-02).` still yields a blocking finding quoting that line. |
+| AC-05 | `bun test tests/vh-adlc/loop/review-scope.test.ts`: `review-scope` picks the right previous review with an acceptance row after it, skips a non-ancestor row, reports full with no row, with a changed `covers` path and with each changed bridge file, leaves the Review Log out of the diff, and `reviewPrompt` from the `review` command carries the result. Scenario `S17.scoped` on the host route and `S17.scoped-command` through the `review` command with a Codex command route: a reviewed document gets one changed Design paragraph and keeps a seeded should-fix gap in an unchanged section. Pass on each: apart from blocking findings, findings name only the changed paragraph or sections that state its terms; none names the unchanged gap; and an unchanged seeded security defect is still raised as blocking. |
 | AC-06 | Scenario `S17.questions`, with scripted reviewer records (`scriptedPlugin`): one judgement finding the seeded product profile settles and one about a public contract. Pass at the companion pin: one Open Question, about the contract, and Design records the other choice. |
 | AC-07 | Scenario `S17.nits`, with scripted reviewer records: an earlier clean pass has reviewed a free-text pattern row; the new pass has no blocking or should-fix finding and eight nits, six citation slips in the normative baseline that the seeded project procedure says need no owner attention and two free-text widening nits on that row. Pass: the summary part of the final reply shows the two and a count of six, and its `All unapplied nits` section lists all eight. |
-| AC-08 | Old-pin controls of `S17.scoped`, `S17.questions` and `S17.nits` on a fixture pinned to `0c983f67`. Pass: the unchanged gap is raised, both judgement findings become Open Questions, and the summary lists all eight nits. `S16.oldpin-reviewer` and `bun test tests/vh-adlc/review-convergence.test.ts` at `0c983f67` still pass. |
-| AC-09 | `bun test tests/vh-adlc/proportional-review.test.ts`: `AGENTS.md` has the section and the companion pin, `knowledge.md` names the same SHA, and the convention and both guides use each of the eight glossary terms; plus a manual read of the convention and guides against the glossary definitions. |
+| AC-08 | Old-pin controls of `S17.scoped`, `S17.questions`, `S17.nits` and `S17.profile` (single-user profile) on a fixture pinned to `0c983f67`. Pass: the unchanged gap is raised, both judgement findings become Open Questions, the summary lists all eight nits, and the lock gap is raised at should-fix or blocking despite the profile. `S16.oldpin-reviewer` and `bun test tests/vh-adlc/review-convergence.test.ts` at `0c983f67` still pass. |
+| AC-09 | `bun test tests/vh-adlc/proportional-review.test.ts`: `AGENTS.md` has the section and the companion pin, `knowledge.md` names the same SHA, and the convention and both guides use each glossary term; plus a manual read of the convention and guides against the glossary definitions. |
 | AC-10 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and scripted reviewers: the results file holds counts, label IDs and run identities and no line of the fixture document; a forced execution failure is recorded and not counted; a run reporting another route or model is not counted; copies of the case with no approval line, an edited label and an edited `case.yaml` are refused before any run; a planted term in the tree or the companion diff stops the run. |
-| AC-11 | Replay of the enterprise case: three old-brief and six new-brief first passes per route, with confirmation runs where the rule calls for them. Pass: the results file shows no failing label and the aggregate holding on each route. The implementation reviewer opens the case directory, checks that the approval line matches `labels.md` and `case.yaml` and predates the first rule-editing commit in both repositories, and spot-checks the matcher's verdicts against the stored records. |
+| AC-11 | Replay of the enterprise case: three old-brief and six new-brief first passes per route, with confirmation runs where the rule calls for them. Pass: the results file shows no failing label on either route. The implementation reviewer opens the case directory, checks that the approval line matches `labels.md` and `case.yaml` and predates the first rule-editing commit in both repositories, and spot-checks the matcher's verdicts against the stored records. |
 | AC-12 | Replay of the small application case, same procedure and pass condition. |
 | AC-13 | The same replays' full loops, one per brief per case and route. Pass: the results file shows the new total of spec reviews at most half the old total and fewer Open Questions in total. |
 
