@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted by the owner at spec review R-5; R-5's six should-fix findings and three nits are listed follow-ups. Next: tasks, after PR #152 and #141 land."
+status: draft
+status_description: "Back to draft for an owner-requested revision: deferred items, the cut check, the follow-up review after delivery and scope growth."
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds with fewer owner questions, while every real defect the current review raises is still raised."
 covers:
