@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after spec review R-2 with the owner's answers; waiting for the next independent spec review."
+status_description: "Spec review R-3 found two blocking issues in the replay statistics, after R-2 found one; revision paused for the owner's proportionality decision."
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds with fewer owner questions, while every real defect the current review raises is still raised."
 covers:
@@ -443,6 +443,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-22 | R-1 | spec | `a3bccaab` | claude-opus-5-5 | procedural | 2 blocking, 11 should-fix, 3 nit |
 | 2026-11-22 | R-2 | spec | `5c09d79f` | claude-opus-5-5 | procedural | 1 blocking, 16 should-fix, 2 nit |
+| 2026-11-22 | R-3 | spec | `98e792ad` | claude-opus-5-5 | procedural | 2 blocking, 9 should-fix, 2 nit |
 
 ### R-1
 
@@ -692,3 +693,96 @@ SEVERITY: nit
 WHERE: Context Owner summary (last bullet); Design (Open Questions and owner lists, second paragraph)
 EVIDENCE: The summary sorts owner lists "under the product profile and the repository's instruction files"; Design adds the project procedure. Design's "With none of those ... every judgement call is a question" contradicts its own first paragraph, where the goal alone can also decide a choice.
 PROPOSAL: Name the project procedure in the summary, and say "every judgement call the goal does not decide is a question".
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design (Replay harness, Retention paragraph); Acceptance Criteria AC-11, AC-12; Test Plan AC-11, AC-12 rows; Context Owner summary ("the new rules must raise it in at least as many of three runs as the old rules, at or above the severity the owner set for it"); frontmatter goal
+EVIDENCE: Retention requires, per label and route, new-brief hits at or above the minimum severity to be at least old-brief hits at any severity over three runs, with three more runs of each brief and a judgement on all six when a label falls short. Two binomial samples compared with "at least" fail an unchanged reviewer often. I computed the exact probability for a label whose per-run hit rate is the same under both briefs, including the rerun: 0.755 at p=0.33, 0.747 at p=0.5, 0.755 at p=0.67, 0.834 at p=0.9 (python, sum over Binomial(3,p) outcomes for the first three runs and the six-run rerun). Ten such label and route pairs all pass with probability about 0.05 to 0.16. The enterprise candidates at the owner's repository HEAD hold 30, 61 and 68 `SEVERITY: blocking` records, so many intermittent labels are likely. The severity asymmetry (old hits at any severity, new hits only at or above the owner's minimum) makes the new side strictly harder still. A reviewer that keeps recall exactly unchanged would most likely fail AC-11 or AC-12 by chance. This rule was written by the previous revision in response to R-2 F-01, which fixed the different-statistics problem but not the noise.
+PROPOSAL: Replace the per-label count comparison with a rule an unchanged reviewer passes with high probability, for example: a label fails only when the new brief raises it at its minimum severity in none of six runs while the old brief raised it in at least two, plus an aggregate check per route that total new hits across labels are at least the old total minus a stated margin. State the rule's chance of failing an unchanged reviewer next to it.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: blocking
+WHERE: Acceptance Criteria AC-13 ("each new-brief clean document resolves every label the old brief raised"); Test Plan AC-13 row; Design (Replay harness, labels.md minimum severity; step 2; Scoped re-review); Context Owner summary (rounds paragraph)
+EVIDENCE: AC-13 needs every label "the old brief raised" to be resolved in each new-brief clean document. It does not say whether that means labels raised in the old first passes (three or six per route) or in the old loop. Either way, a correct implementation can fail it. First, the new brief runs one loop per case and route, so its single first pass misses an intermittent should-fix label with probability 1-p (0.33 at p=0.67). After that, every pass is scoped and reports only blocking findings outside the diff (Design, Scoped re-review), so that label is never raised again and never resolved. Second, Design lets the owner set a label's minimum severity to nit, so it "may correctly come back as nit". A nit raised in a pass whose blocking and should-fix findings leave the baseline unchanged is listed and not applied under the nit rule (conventions/feature-documents.md:219-227 at 0c983f67), and owner-list triage may only count it, so the clean document does not resolve it. With many labels, AC-13 fails a correct implementation almost surely. This clause was added by the previous revision.
+PROPOSAL: Define the set as labels the old loop on the same case and route raised at should-fix or above, exclude labels whose owner minimum is nit, and judge resolution as a total across the four loop pairs with a stated margin, rather than requiring every label in every new clean document.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-03 row (S17.limit); Acceptance Criteria AC-03; Design (Stated limit; Scoped re-review)
+EVIDENCE: S17.limit's pass condition is the absence of any finding naming `names.log` concurrency, on a scoped pass where only the `Not handled:` line is in the diff. Three other things also produce that absence. The section that describes the unlocked writes is unchanged, so it is outside scope, where the reviewer reports only blocking findings. The limit's reason, "single-user tool", may lead a profile-weighing reviewer to rate the gap nit or drop it. And no fixture profile is named for the case. The row has no control showing the same reviewer raises the gap when the limit line is absent, so a reviewer that ignores stated limits passes. The previous revision moved the limit "inside the scoped diff" in response to R-2 F-15, which asked for a set-up where only limit honouring could suppress the finding.
+PROPOSAL: Run S17.limit as a full pass (for example, with the R-1 row's commit not an ancestor of X), name a profile under which the gap is should-fix, and add a control run without the `Not handled:` line that must raise the `names.log` gap.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-04 row (S17.profile, third run); Acceptance Criteria AC-04 ("without one judges as for production software with users"); Design (Product profile, "Without a profile, the reviewer judges as for production software with users whose data matters")
+EVIDENCE: The no-profile run passes when the lock gap is "no lower than with the first", and the first run passes with "nit or absent". A reviewer that treats a missing profile as a single-user tool rates both runs nit or absent and passes, although AC-04 and Design require the production default. The second clause of AC-04 therefore has no check that a wrong implementation fails.
+PROPOSAL: Make the no-profile pass condition match the production default, for example should-fix or blocking, as for the hosted profile, or at least strictly above the first run's rating.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-05 row (S17.scoped and S17.scoped-command pass condition)
+EVIDENCE: The pass condition says "findings name only the changed paragraph or sections that state its terms" and also "an unchanged seeded security defect is still raised as blocking". The security finding names an unchanged section, so a check written to the first clause fails the correct behavior the second clause requires. Two people writing the scenario checks would code this differently.
+PROPOSAL: Say "apart from blocking findings, findings name only the changed paragraph or sections that state its terms".
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Open Questions and owner lists, third paragraph: "with a count of the rest and where the full list is. The report keeps the full list"); Design (Glossary, Owner-list triage); Acceptance Criteria AC-07; Test Plan AC-07, AC-08 rows; Context Owner summary (last bullet)
+EVIDENCE: The spec skill's report (SKILL.md:189-193) and its owner-facing summary (SKILL.md:152-172) are both the final conversation reply, and the convention keeps unapplied nits out of the document (conventions/feature-documents.md:222-225). Nothing says where "the full list" lives so the summary can point at it. S17.nits passes when "the final reply shows the two ... and the report lists all eight", which cannot both hold if the report is in the final reply. One implementer writes the list to a file, another puts it lower in the same reply. The row also does not say where the six citation slips sit or whether the pass has baseline-changing findings. A Context slip may be applied at any time, and the nit rule applies every nit when blocking or should-fix findings change the baseline, so the six may not end up unapplied. The two widening nits need a Test Plan pattern row that has already passed review, which needs a seeded earlier clean pass.
+PROPOSAL: Name the location of the full list, for example a labelled section at the end of the same reply or a named file outside the document, and make S17.nits check that location. Seed the six slips in the normative baseline of a pass with no blocking or should-fix finding, and seed the earlier clean pass the widening nits need.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Scoped re-review, first paragraph: "a docs pin file (`AGENTS.md`, `knowledge.md`) changed between the two commits"); Acceptance Criteria AC-05 ("or the docs pin changed"); Test Plan AC-05 row ("with a changed pin file"); Context Owner summary ("A pass is full again when covered code or the docs pin changed")
+EVIDENCE: `knowledge.md` exists only in this repository, as plugins/vh-adlc/knowledge.md, and the command gives no path for it. A repository without its own pin resolves the plugin pin (internal/knowledge/knowledge.go:178-179), so its resolved docs revision changes with a plugin upgrade, while no file in the repository changes between the two reviewed commits. The Review Log row records no docs revision, so `review-scope` cannot detect the change. A pinless adopter that upgrades the plugin between passes then gets a scoped pass under new convention text, which AC-05 says should be full.
+PROPOSAL: Either record or pass the previous pass's docs revision and plugin version so `review-scope` can compare them, or state the pinless upgrade case as a limit in Scope and narrow AC-05's "docs pin changed" to a repository pin file, naming its paths.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, case.yaml fields; labels.md approval line; "so the rules cannot be fitted to them"); Acceptance Criteria AC-10, AC-11, AC-12, AC-13; Test Plan AC-10, AC-11 rows
+EVIDENCE: The approval digest covers only labels.md. case.yaml holds the profile text, which X' commits into `AGENTS.md` and which decides new-brief severity under severity by consequence. It also holds X and the document path. None of these is approved or digested, so the profile can be rewritten after the first runs until retention and rounds pass. That is the same fitting the label approval exists to prevent.
+PROPOSAL: Put the profile text, X and the document path inside the approved, digested material, either in labels.md above the approval line or in a digest of case.yaml, and have the harness refuse a case whose digest does not match.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, terms paragraph; "Cases are named "enterprise" and "small application", with no repository or product names"); Acceptance Criteria AC-10; Test Plan AC-10 row; Review Log R-2 F-01 EVIDENCE
+EVIDENCE: `gh api repos/michielvha/vh-adlc` reports `"visibility": "public"`. `git grep -i` for the enterprise case's repository name in docs/specs/proportional-review.md at 98e792ad matches line 567, the stored R-2 F-01 EVIDENCE, which names that repository as the enterprise case's source. The terms check greps only the vh-adlc feature branch diff and the companion branch diff. This document is committed on the default branch before the feature branch exists, so the check passes while the public repository already names the case. Records are stored verbatim, so the author cannot edit that line away.
+PROPOSAL: Have the terms check grep the whole public tree at the feature head as well as both diffs, and decide in the document how to treat the existing exposure, either an owner decision that the repository name is not private or a different enterprise case.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Scoped re-review); Scope (re-review scope bullet naming `references/review-protocol.md`)
+EVIDENCE: plugins/vh-adlc/references/review-protocol.md (Independence) says "A dispatch never tells the reviewer to skip a check or to judge from stored results instead of running it." A scoped dispatch tells the reviewer to report only blocking findings outside the diff. The document lists review-protocol.md as changing but does not say this sentence is amended, so a host following the protocol as written may refuse to pass the scope, and two implementers would treat the sentence differently.
+PROPOSAL: State that the sentence gains an exception for the scope `review-scope` computes on a resolved convention that defines scoped re-review, and pin the new wording in tests/vh-adlc/proportional-review.test.ts.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, brief definitions "the plugin on main at the feature's merge base, at the companion PR's parent docs revision" and "the feature branch, at the companion docs revision"; results.md contents); Scope (pin bump to the companion revision); Acceptance Criteria AC-01, AC-09, AC-11, AC-12, AC-13; Test Plan AC-11, AC-12, AC-13 rows
+EVIDENCE: The feature's merge base moves whenever the feature branch merges the default branch, which SKILL.md:90-96 requires on drift, so the old brief can change between the first passes and the loops. vhco-pro/docs allows merge, squash and rebase merges (`gh api repos/vhco-pro/docs`), and merged PR #56 has head c3a6ac83 but merge commit 68fd1c9e. So "the companion revision" may be the PR head the replays ran on or a different main commit the pin names. results.md records only counts, with no plugin commits, docs revisions or models, so the implementation reviewer cannot tell which briefs produced them.
+PROPOSAL: Fix both briefs' plugin commits and docs revisions before the first run and record them, with the models, in results.md for every run. Define the companion revision as the commit the pin will name, and have the harness check that the new brief ran at that convention text.
+
+FINDING: F-12
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter covers; Design (Tests that change); Test Plan AC-08 row ("on a fixture pinned to `0c983f67`")
+EVIDENCE: tests/vh-adlc/fixtures/build.ts `buildDocs` builds revision A from the plugin pin in knowledge.md and the previous revision from PREVIOUS_DOCS_PIN d8f07c9d (lines 115-156). No fixture revision holds the 0c983f67 tree, so the AC-08 controls need a build.ts change, and covers does not list that file. `scriptedPlugin` reads canned records only from evidence/review-convergence/canned (tests/vh-adlc/scenarios/run.ts:1114-1120), so it also needs a change for the new canned directory. covers lists tests/vh-adlc/evidence/proportional-review/canned/ in addition to its parent tests/vh-adlc/evidence/proportional-review/.
+PROPOSAL: Add tests/vh-adlc/fixtures/build.ts to covers, name the build.ts and scriptedPlugin changes in Tests that change, and drop the duplicate canned entry.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary (stated limit bullet; replay paragraph; "Every change is gated on the resolved convention")
+EVIDENCE: The summary does not mention that a stated limit excluding a case the goal, a criterion or Scope names is an Open Question (Design, Stated limit), or that AC-13 also requires each new clean document to resolve the old brief's labels. "Every change is gated" sits beside Design's "The scope fields are passed on every pin", and the review-scope command and vh-adlc's own profile are not gated.
+PROPOSAL: Add the limit exception and AC-13's resolution condition to the summary, and say that only behavior changes are gated while the scope fields are always passed.
