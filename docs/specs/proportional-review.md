@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised after clean spec review R-8: the follow-up review lands its verdicts through a docs PR; waiting for one independent spec review and renewed acceptance."
+status: planned
+status_description: "Accepted by the owner at spec review R-9 after the deferred-items revision; R-9's four should-fix findings are Deferred entries D-11 to D-14. Next: tasks, after PR #152 and #141 land."
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
 covers:
