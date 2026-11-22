@@ -4,14 +4,17 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "../..");
 const baseline = "b313327b134bc5ecfa7167856d4b567f8701ba06";
-// Keep the owner summary, finding rules and drift re-review limit in the spec baseline.
-const specBaseline = "d0861dcc0f214e8fec984e05f6b7349ad21a2670";
+// Keep the owner summary, finding rules, drift re-review limit and the proportionality gate
+// (michielvha/vh-adlc#148: harm statement and convergence trigger) in the spec baseline.
+const specBaseline = "e53fe39e7461b95c27b7481514688ee998970e18";
+// The proportionality gate (michielvha/vh-adlc#148) adds the harm statement step to investigate.
+const investigateBaseline = specBaseline;
 // The owner approved the rule that an agent-behavior proof needs a committed script that reruns it
 // (docs/specs/reproducible-agent-proofs.md, parked in favour of this short rule). Keep it as the implement baseline.
 const implementBaseline = "8d5a639bf3626a95901a125c0aeeff3e24b0f335";
 test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resume"])("direct %s keeps its approved operation body", (name) => {
   const path = `plugins/vh-adlc/skills/vh-adlc-${name}/SKILL.md`;
-  const revision = name === "spec" ? specBaseline : name === "implement" ? implementBaseline : baseline;
+  const revision = name === "spec" ? specBaseline : name === "investigate" ? investigateBaseline : name === "implement" ? implementBaseline : baseline;
   const old = Bun.spawnSync(["git", "show", `${revision}:${path}`], { cwd: root, stdout: "pipe", stderr: "pipe" });
   expect(old.exitCode).toBe(0);
   const body = (text: string) => text.slice(text.indexOf("The plugin directory is two levels"));

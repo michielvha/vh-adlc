@@ -72,6 +72,9 @@ reports missing labels, create nothing and give its next step.
   allows creating it.
 - Ground every claim in a citation you gathered in this run: a `file:line`, a command and its output, or a
   source you read and list. Measure rather than remember.
+- Start Background with the harm statement from `references/loop.md` (Weigh the harm before building
+  machinery): the harm, the simplest alternative without machinery, and why the design beats it. Keep
+  the design in proportion to that harm.
 - Write criteria as end states, each with a Test Plan row naming a real check.
 - Where the design changes state, runs concurrently, or crosses a process or network boundary, state in
   Design what happens under concurrent requests, partial failure, retry or replay, and upgrade or rollback
@@ -105,7 +108,14 @@ reports missing labels, create nothing and give its next step.
    session. If the protocol leaves the review pending, store nothing. Otherwise store the records
    after the header under the next `### R-<n>`, with a Review Log row at X naming the reported model,
    before changing anything. Then run `vh-adlc review check` against the same text.
-4. Check the [drift re-review limit](#drift-re-reviews) before applying findings. Apply the eligible
+4. Check the [drift re-review limit](#drift-re-reviews) and the convergence trigger before applying
+   findings. The trigger fires when this pass and the spec review before it both have blocking
+   findings, and this pass has at least as many: count the `SEVERITY: blocking` records under each
+   `### R-<n>`. For example, R-5 with 12 blocking after R-4 with 11 fires it; R-5 with 9 does not. When
+   it fires, revise nothing. Ask the owner one proportionality question that restates the harm
+   statement and the simplest alternative, with four choices: keep going, narrow the scope, replace the
+   feature with the alternative, or park it. Recommend one. Act on the answer before any further
+   revision, and count passes for the trigger only from that answer onward. Otherwise apply the eligible
    findings as one revision. First list the behaviors the design touches and every test, scenario and
    fixture the criteria and Test Plan name. Walk each eligible finding and every change it implies
    through all of them, and re-read each named test or scenario before changing what it checks.
