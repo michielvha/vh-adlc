@@ -5,7 +5,7 @@ evidence engine for the vh-adlc SEO workflow: it analyzes observed links,
 duplicates and technical changes using local files. Skill integration remains
 with the separate SEO features. No third-party agent or skill is vendored here.
 
-Use Bun 1.4.3 or newer on Linux. CI selects Bun 1.4.4. Runtime dependencies are
+Use Bun 1.4.3 or newer on Linux. CI selects Bun 1.4.5. Runtime dependencies are
 locked locally in `bun.lock`; install them with `--frozen-lockfile`. Tests also
 need Bash, bubblewrap and strace. The offline proof requires a host that permits
 an unprivileged network namespace; run it outside a restrictive outer sandbox.

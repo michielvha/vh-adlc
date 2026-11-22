@@ -46,7 +46,7 @@ jobs:
           cache: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.4
+          bun-version: 1.4.5
       - name: Prepare the locked YAML reader
         run: bash plugins/vh-adlc/scripts/ensure-vh-adlc.sh
       - name: Typecheck documentation impact
@@ -83,7 +83,7 @@ jobs:
           cache: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.4
+          bun-version: 1.4.5
       # Managed verification and effect recovery require Linux/Bubblewrap/flock.
       # Ubuntu runs every test; macOS checks the portable feature and report inputs.
       - name: Prepare the locked YAML reader
@@ -122,7 +122,7 @@ jobs:
           cache: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.4
+          bun-version: 1.4.5
       - name: Check the remote-gui module
         working-directory: plugins/remote-gui
         run: |
@@ -178,7 +178,7 @@ jobs:
           cache: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
-          bun-version: 1.4.4
+          bun-version: 1.4.5
       - name: Check the paseo-hosts module
         working-directory: plugins/paseo-hosts
         run: |

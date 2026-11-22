@@ -67,7 +67,7 @@ test("missing or corrupt installed bundles hand off to verified setup", () => {
 test("the runtime bundle has pinned dependencies, notices and stable source labels", () => {
   const component = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift");
   const manifest: unknown = JSON.parse(readFileSync(join(component, "package.json"), "utf8"));
-  expect(manifest).toMatchObject({ packageManager: "bun@1.4.4", dependencies: { yauzl: "3.4.0" } });
+  expect(manifest).toMatchObject({ packageManager: "bun@1.4.5", dependencies: { yauzl: "3.4.0" } });
   const lock = readFileSync(join(component, "bun.lock"), "utf8");
   expect(lock).toContain('"pend@1.2.0"');
   expect(lock).toContain('"yauzl@3.4.0"');
