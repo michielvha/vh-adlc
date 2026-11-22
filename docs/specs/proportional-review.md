@@ -643,6 +643,7 @@ None.
 | 2026-11-22 | R-8 | spec | `14d15c23` | claude-opus-5-5 | procedural | no blocking; 6 should-fix, 2 nit |
 | 2026-11-22 | R-9 | spec | `6abdbd3b` | claude-opus-5-5 | procedural | no blocking; 4 should-fix, 1 nit |
 | 2026-11-22 | R-9 | spec | `6abdbd3b` | n/a | n/a | accepted by owner |
+| 2026-11-22 | R-10 | spec | `d3ad7ce2` | claude-opus-5-5 | procedural | drift re-review after PR #152 and PR #155: no blocking; 1 should-fix, 3 nit; acceptance kept |
 
 ### R-1
 
@@ -1326,3 +1327,33 @@ SEVERITY: nit
 WHERE: Acceptance Criteria AC-16 ("never twice for one entry"); Scope (Out of scope, "Not handled: two sessions running the follow-up review on one feature at the same time ... (R-8 F-02)"); Context Owner summary ("Accepted limit: two sessions running the review on one feature at the same time can file an issue twice"); Design (Follow-up review after merge, "Two sessions running it on one feature at once is a stated limit in Scope"); Design (Failure, retry and rollback, "a rerun files only what is missing"); Deferred D-10
 EVIDENCE: AC-16 still says "never twice for one entry" without qualification, while this revision's stated limit and Owner summary say two concurrent sessions can file an issue twice. The proof checks only a sequential rerun.
 PROPOSAL: Qualify AC-16 as "never twice for one entry across reruns in one session at a time", matching the stated limit.
+
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: frontmatter covers; Design (Tests that change); Design (Open Questions and owner lists, second paragraph: "#141 lands first and lets the author cut an extra it added without a question; that exception stays, and this rule covers the rest of step 4"); Design (Deferred items, "`author cut` for an extra the author removes under #141"); Scope (In scope, "the scenarios and the tests that pin the changed text"); Acceptance Criteria AC-06, AC-09, AC-14; Test Plan AC-09, AC-14 rows
+EVIDENCE: PR #155 (commits 41355739 and 6081943b, merged at d3ad7ce2) added tests/vh-adlc/author-extras.test.ts, which did not exist at R-9's commit 6abdbd3b. It pins spec skill step 4 sentences that this feature reworks under the plausible-choice rule: "where they behave differently, the choice is an Open Question recommending removal", "A removal that touches a criterion, an owner decision or a public contract keeps the Open Question." and "record the removal in the Outcome cell of that pass's Review Log row". It also pins text in both user guides that AC-09 has this feature edit: "is removed without asking you and noted in the Review Log" (docs/user-guides/workflows.md) and "It removes an extra it added on its own" (docs/get-started/first-feature.md). The test is not in covers, so `feature_tree_clean` and `vh-adlc fresh` ignore it, and Tests that change neither moves it nor says it stays. The Design adds a `From: author cut.` Deferred entry for the same removal that #141 records in the Outcome cell, without saying whether the Outcome record stays beside it. One implementer keeps both; another replaces the Outcome record and breaks this test. The other new prerequisite test, tests/vh-adlc/proportionality.test.ts, is already in covers and named in Tests that change.
+PROPOSAL: Add tests/vh-adlc/author-extras.test.ts to covers and to Tests that change. Say whether its assertions stay as they are, including that the Outcome-cell record of an author cut stays next to the new `author cut` Deferred entry.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context Background (text items 2, 4 and 5; Harm and simplest alternative); Design (Gate on the resolved convention); Design (Severity by consequence); Design (Scoped re-review); Design (Open Questions and owner lists, second paragraph); Design (Deferred items, drift re-review source)
+EVIDENCE: PR #152 (merge d0d7e10d) inserted six lines into plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md and the harm statement and convergence trigger into plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md. PR #155 (merge d3ad7ce2) added five more lines to step 4. As a result, every cited line into these two files has moved. At d3ad7ce2 the reviewer has "A path the document leaves undefined is a finding" at :55 (cited :49), the failure-mode paragraph at :53-56 (cited :47-50) and "Return every finding you can establish in this pass" at :58 (cited :52). The spec skill has "Put every judgement call into Open Questions" at :84 (cited :81 and :81-82), "Turn judgement findings into Open Questions" at :122 (cited :112), the remove-or-revisit rule at :124-132 (cited :114-117 and :112-116), the nit-rule gating at :135-143 (cited :120-128) and the drift re-review extra-work question at :156-159 (cited :141-144). The cited text still exists and still says what the document claims, so nothing that is built changes.
+PROPOSAL: Re-cite these locations at the commit of the next revision that touches them.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter status_description ("Next: tasks, after PR #152 and #141 land."); Context Owner summary ("It builds on PR #152 and #141, which land first")
+EVIDENCE: Both prerequisites have merged on the default branch. PR #152 merged at d0d7e10d, and #141 was closed by PR #155, which merged at d3ad7ce2 (git log 6abdbd3b..d3ad7ce2). The status line and the Owner summary still describe them as pending, so the reader is not told that tasks can start now. Neither location is in the normative baseline.
+PROPOSAL: Say that #152 and #141 have merged, and point status_description at tasks.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Context Background ("**Harm and simplest alternative.**" paragraph)
+EVIDENCE: PR #152 added the spec skill rule "Start Background with the harm statement from `references/loop.md`" (vh-adlc-spec/SKILL.md:75-77 at d3ad7ce2). It also added the loop.md alternative "waiting for a later milestone" and the reviewer check "Weigh the design against its harm statement ... the simplest alternative without machinery it rejected" (vh-adlc-reviewer.agent.md:47-51). In this document the harm statement comes at the end of Background, not the start. The alternative it rejects is "a process rule alone", backed by round counts taken before #152's convergence trigger and #141's author-cut exception merged. Both of those are process rules and are now in force. The statement does not weigh waiting to measure their effect before building review-scope, the follow-up review and the replay harness. The replay partly answers this: its old brief is the plugin at the merge base, so it already includes #152 and #141, and AC-13 compares against them. The reviewer rates this check nit because the document is past `draft`.
+PROPOSAL: At the next revision, move the harm statement to the start of Background and add one sentence explaining why the merged convergence trigger and author-cut exception are not enough alone, citing the replay's old brief as the measure.
