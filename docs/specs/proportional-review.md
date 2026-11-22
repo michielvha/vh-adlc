@@ -480,6 +480,7 @@ None.
 | 2026-11-22 | R-3 | spec | `98e792ad` | claude-opus-5-5 | procedural | 2 blocking, 9 should-fix, 2 nit |
 | 2026-11-22 | R-4 | spec | `e94e00e7` | claude-opus-5-5 | procedural | no blocking; 5 should-fix, 1 nit |
 | 2026-11-22 | R-5 | spec | `d73b31ea` | claude-opus-5-5 | procedural | no blocking; 6 should-fix, 3 nit |
+| 2026-11-22 | R-5 | spec | `d73b31ea` | n/a | n/a | accepted by owner |
 
 ### R-1
 
