@@ -114,6 +114,7 @@ None. The owner selected report mode first and approved explicit run outcomes an
 | 2026-11-20 | R-7 | spec | `ffe3077c7269d14ebe45781cd1a2e2eed9ae95f5` | unknown | procedural | NO FINDINGS |
 | 2026-11-20 | R-7 | spec | `ffe3077c7269d14ebe45781cd1a2e2eed9ae95f5` | n/a | n/a | accepted by owner |
 | 2026-11-21 | R-8 | spec | `46249c1b7f9232cd5afa999301da044b06960795` | unknown | procedural | NO FINDINGS |
+| 2026-11-22 | R-9 | spec | `287b10fbba86c66b86df971be37397b017e0a51a` | unknown | procedural | NO FINDINGS |
 
 ### R-1
 
@@ -342,6 +343,10 @@ PROPOSAL: Define exact matching on the entries and values the selected browser r
 NO FINDINGS
 
 ### R-8
+
+NO FINDINGS
+
+### R-9
 
 NO FINDINGS
 
