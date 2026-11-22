@@ -123,7 +123,12 @@ reports missing labels, create nothing and give its next step.
    the nit rule below applies, nits are the exception. Once the owner has answered, apply every factual finding to be applied and every answer in
    one commit. Where a finding can be met by removing a mechanism or by adding one with the same
    behavior, remove it; where they behave differently, the choice is an Open Question recommending
-   removal. Where a finding traces to a change the previous revision made, revisit that change instead of
+   removal. The exception is an extra the author added on its own initiative: a mechanism, assertion or
+   proof step that no criterion, owner decision or public contract requires. When removing it needs no
+   follow-up, remove it without an Open Question and record the removal in the Outcome cell of that
+   pass's Review Log row, for example `removed author extra: replacement-pod assertion (R-4 F-02)`. A
+   removal that touches a criterion, an owner decision or a public contract keeps the Open Question.
+   Where a finding traces to a change the previous revision made, revisit that change instead of
    patching on top of it. List the behaviors and checks you walked in the report. A blocking pass is
    cleared only by a new independent pass at the new commit.
 

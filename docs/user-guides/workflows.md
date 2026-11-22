@@ -326,7 +326,9 @@ severity. A nit never causes a revision on its own: when a pass's blocking or
 should-fix findings change the document, the same commit fixes that pass's nits, and
 the rest are listed in the conversation. The agent applies each pass's findings as one
 revision, after asking you about any judgement finding, so one pass's fixes do not
-seed the next pass's findings.
+seed the next pass's findings. An extra the agent added on its own, which no criterion,
+decision of yours or public contract needs, is removed without asking you and noted in
+the Review Log.
 
 Every investigation and spec states the harm a fix prevents and the simplest
 alternative without new machinery, such as a process rule or a manual step. The
