@@ -221,6 +221,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-14 | spec | `06f91bd54a0adb348f68fd27ac36928326df1894` | unknown | procedural | No findings. Model identity was not attested. |
 | 2026-11-19 | R-14 | spec | `06f91bd54a0adb348f68fd27ac36928326df1894` | n/a | n/a | accepted by owner |
 | 2026-11-21 | R-15 | spec | `cb08d97a3c436b8c4ea9f61f0120e3acb2544781` | unknown | procedural | Covered drift review found one factual nit in test evidence. Model identity was not attested. |
+| 2026-11-22 | R-16 | spec | `edc803664df47d93618462073a17537cbf01cd22` | unknown | procedural | Three should-fix findings and one factual nit. Model identity was not attested. |
 
 ### R-1
 
@@ -618,3 +619,33 @@ SEVERITY: nit
 WHERE: Context / Packaged implementation checks (line 57)
 EVIDENCE: The post-R-14 evidence describes a single HTTP 503 from the phase route. `git show d607a7b1 -- tests/remote-gui/mobile.e2e.test.js` adds a phase-route 503 immediately after an existing focus-route 503 before the same field tap. Both one-shot failures remain at `tests/remote-gui/mobile.e2e.test.js:161-163` in the reviewed commit.
 PROPOSAL: Say that the tracked browser test injects one 503 on each route before the same tap. If a separate phase-only reproduction was run, identify that procedure separately.
+
+### R-16
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 29), Scope (lines 137–138), Design / Packaging and recovery, Test Plan AC-14, Tasks T8
+EVIDENCE: The revised scope limits initial support to iPhone Safari. `plugins/remote-gui/README.md:5–7` still promises the phone keyboard without naming a supported browser. `plugins/remote-gui/internal/proxy/viewer.go:235` enables the feature for any touch-capable viewer, so the current AC-14 comparison with installed behavior could pass with the unqualified promise intact.
+PROPOSAL: Require the shipped instructions to name iPhone Safari as the supported platform and Android Chrome as deferred. Make that wording an explicit AC-14 check.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary (line 27), Context / Packaged implementation checks (lines 51 and 57), Scope (line 139), Design / Detect and show the prompt (line 153), Design / Type and dismiss (line 163), Acceptance Criteria AC-10 through AC-12, Test Plan AC-10 through AC-12
+EVIDENCE: Context describes a disabled prompt that can recover within its original lease and an open editor that pauses input for up to three seconds during verification loss. `plugins/remote-gui/internal/proxy/mobile.js:85–124,198–213` implements these states. Scope says unavailable metadata leaves the prompt hidden. The test plan checks expired replies and healthy renewals, so an implementation that immediately closes the editor on a temporary failure can pass.
+PROPOSAL: Define the temporary verification-loss behavior and its deadlines in Design. Require checks for activation refusal, recovery and expiry of an unopened prompt, plus editor recovery on the same field and phase with no key traffic or replay from the pause.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Detect and show the prompt (lines 151–153), Acceptance Criteria AC-10 and AC-12, Test Plan AC-10 and AC-12
+EVIDENCE: Design requires prompt invalidation when the canvas geometry changes. AC-12 checks alignment on a scaled and offset canvas but never requires that geometry to change after a tap while the framebuffer dimensions stay the same. `plugins/remote-gui/internal/proxy/mobile.js:77–81,348–350` compares only framebuffer dimensions and otherwise repositions an existing prompt.
+PROPOSAL: Exercise a change in the canvas scale or offset with fixed framebuffer dimensions after a tap. Require the pending response or visible prompt to be discarded, then verify that a fresh tap maps correctly.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Packaged implementation checks (line 47)
+EVIDENCE: The paragraph ends by saying the repaired build still needs Android verification. The release scope and owner summary now defer that verification and report a newer physical Safari pass.
+PROPOSAL: Put the remaining verification statement in the past tense so it describes that earlier build.
