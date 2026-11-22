@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Hosted CI passed for the prompt fix. Physical acceptance of that package and implementation review are open."
+status: draft
+status_description: "Revising release verification to cover iPhone Safari first."
 branch: feat/remote-gui-mobile
 issue: null
 goal: "Tap a remote Chromium field, then tap its inline prompt to type using the phone keyboard."
