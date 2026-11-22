@@ -622,6 +622,7 @@ None.
 | 2026-11-22 | R-5 | spec | `d73b31ea` | n/a | n/a | accepted by owner |
 | 2026-11-22 | R-6 | spec | `c6c7afba` | claude-opus-5-5 | procedural | no blocking; 10 should-fix, 1 nit |
 | 2026-11-22 | R-7 | spec | `471f5761` | claude-opus-5-5 | procedural | 1 blocking, 5 should-fix, 2 nit |
+| 2026-11-22 | R-8 | spec | `14d15c23` | claude-opus-5-5 | procedural | no blocking; 6 should-fix, 2 nit |
 
 ### R-1
 
@@ -1210,3 +1211,61 @@ SEVERITY: nit
 WHERE: Design (Glossary, Scoped re-review, "and the sections it touches"); Acceptance Criteria AC-05; Scope (Out of scope, "Not handled: a repository without its own pin ... (R-3 F-07; accepted by the owner after R-4).")
 EVIDENCE: R-5 F-07 and R-5 F-09 are still unapplied at 471f5761. The glossary and AC-05 say "the sections it touches", while Design (Scoped re-review) says every section that states a rule, ID or term the diff changes. The document's own stated limit does not follow the glossary form `Not handled: <the case>, <why> (R-<n> F-<nn>).`.
 PROPOSAL: Use Design's wording in the glossary row and AC-05, and write the Scope line in the glossary form, keeping the owner acceptance in the Owner summary.
+
+### R-8
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-14 row (S17.deferred, "the owner accepts R-2 while "deferring R-1 F-02""); Acceptance Criteria AC-14; Design (Deferred items, `R-<n> F-<nn>, deferred at acceptance` source); Design (Cut check, "A deferral at acceptance that the check turns into a question holds the acceptance")
+EVIDENCE: In the script, R-1 holds F-01 (answered by a stated limit), an extra the author cuts, and F-02. The owner defers F-02 only when accepting R-2, after the R-1 revision. A correct spec skill handles every R-1 finding in that revision: "Apply the eligible findings as one revision" (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:108-109). Judgement findings go to the owner before the revision commit (:112-113). Nits are fixed in the same commit once the pass changes the baseline (:122-124), and the stated limit does change it. So by the time R-2 runs, F-02 has been applied, answered as a question or fixed. The row gives F-02 no kind or severity and no step that keeps it unapplied, so there is nothing left to defer at R-2's acceptance. Depending on how F-02 is seeded, a correct implementation writes no `From: R-1 F-02, deferred at acceptance.` entry and fails the proof. This document's own acceptance deferrals (D-01 to D-06) defer findings of the review being accepted, R-5. The previous revision added this step when it adopted R-7 F-01's proposal.
+PROPOSAL: Have scripted R-2 return no blocking finding and one should-fix finding, have the owner accept R-2 while deferring R-2 F-01, and expect `From: R-2 F-01, deferred at acceptance.`. Or say what kind R-1 F-02 is and how it stays unapplied through the R-1 revision.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Follow-up review after merge, first paragraph "For a merge done elsewhere ... Invoking ship on a merged complete document runs only this step", and last paragraph on the verdict commit); Design (Failure, retry and rollback); Scope (In scope, follow-up review bullet and `references/authority.md`); Acceptance Criteria AC-16; Test Plan AC-16 row (S17.followup, "complete and merged outside the session"); Context Owner summary (follow-up bullet)
+EVIDENCE: A complete document keeps its `branch` field (conventions/feature-documents.md:45-46 at 0c983f67, "keeps it until the feature is closed"). The Handoff rule says that once a feature has a claim, a session writes to it "only when this session made that claim, or when the owner has said in this session that the earlier writer has stopped ... Invoking an operation is not a handoff" (plugins/vh-adlc/references/authority.md:213-217). Ship also runs the feature writer entry before any feature change (vh-adlc-ship/SKILL.md:44-46). There, `enter` returns `held` when another session's fingerprint holds the reservation (scripts/ownership/entry.ts:210-211). The fingerprint is derived from the session ID (scripts/ownership/identity.ts:38-47), and nothing releases a reservation at merge: branches.ts:340 and :411-415 keep the reservation history. The usual follow-up trigger is a merge done elsewhere followed by a later session. That session writes `Verdict:` lines and commits to a claimed feature, and the Design says nothing about the handoff or the reservation. One implementer stops and asks for a handoff. Another writes under the batch approval. S17.followup scripts no handoff, so the first implementer fails it. The Design also leaves open what happens when two sessions run the review at once, for example the shipping session after its merge and a resume elsewhere. Listing issues and then creating them is a check-then-create race.
+PROPOSAL: State whether the follow-up review needs the feature writer entry and a handoff on a merged feature. For example, it may ask for the handoff in the same answer as the batch approval, or be exempt because the feature is merged. Script that answer in S17.followup, and say what a second concurrent session does.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Follow-up review after merge, last paragraph "one documentation-only commit of the verdicts ... pushed to it, so no local default branch is touched"); Design (Failure, retry and rollback); Scope (In scope, convention bullet and follow-up review bullet); Acceptance Criteria AC-16 ("in a commit pushed to the default branch"); Test Plan AC-16 row ("the fixture remote's default branch holds the verdict commit"); Context Owner summary (follow-up bullet, "pushing the verdicts to the default branch")
+EVIDENCE: The pinned delivery convention says "Use short-lived branches and review changes through PRs". Only a private repository with one developer may record in its local instructions that small changes go straight to the default branch (conventions/delivery.md:43-48 at 0c983f67). Once a document has a `branch`, it "is edited only on that branch and returns to the default branch with the PR" (:99-101), and the documents-first exception covers only a document without a `branch` field (:96-97). vh-adlc is public (`gh api repos/michielvha/vh-adlc` gives `public`), and its AGENTS.md records no straight-to-default rule. The companion PR in Scope changes only conventions/feature-documents.md. So the plugin would push straight to the default branch in every public adopter repository, against a pinned convention the feature does not amend. The owner's approval in the summary covers the push but does not address the convention.
+PROPOSAL: Raise an Open Question. Either add the delivery convention exception for verdict commits to the companion PR's scope, or push to the default branch only where local instructions record the straight-to-default rule and otherwise use the existing `docs/` branch and PR path.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-16 ("records every verdict, including declined filings"); Test Plan AC-16 row (S17.followup, "the owner approves filing the follow-up and the gap"); Design (Follow-up review after merge, `follow-up, not filed (owner declined)` and `gap, not filed (owner declined)`)
+EVIDENCE: Before this revision, S17.followup had the owner decline one filing and expected `follow-up, not filed (owner declined)`. The previous revision changed the approval to cover both the follow-up and the gap, in response to R-7 F-04. Now no proof exercises a declined filing or checks either `not filed (owner declined)` verdict. An implementation that leaves a declined entry pending, or files it anyway, passes every listed check, so part of composite criterion AC-16 is untested.
+PROPOSAL: Add a declined filing back to S17.followup, for example a fourth pending entry the owner declines, or a rerun case in which the owner declines the gap, and expect its exact `not filed (owner declined)` verdict in the pushed commit.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Follow-up review after merge, "its link is written into the entry's `Verdict:` in the working tree" and "one documentation-only commit of the verdicts, made in a temporary detached worktree"); Design (Failure, retry and rollback); Acceptance Criteria AC-16; Test Plan AC-16 row ("the run reports partial with the first link recorded. A rerun files only the missing issue")
+EVIDENCE: Links are written "in the working tree" before the Design introduces the temporary worktree, so it is unclear which tree holds them. If a shared checkout holds them, it is left with an uncommitted edit to a file the pushed commit also changes, and a later `git merge --ff-only` there is refused. The Design defines a partial step only for a rejected push. It does not say whether a failed issue creation still commits and pushes the verdicts recorded so far. If it does, the run makes a second commit beyond the approved "one documentation-only commit". If it does not, the recorded first link exists only in an uncommitted temporary worktree that nothing preserves or cleans up. Whether the rerun needs fresh approval is also undefined: authority.md:48 says "an earlier approval ... never stands in for a missing approval". S17.followup does not say whether the scripted owner approves again, so an implementation that asks again can stall on the proof.
+PROPOSAL: Name the tree that holds the links and when the temporary worktree is removed. Say whether a failed creation commits the verdicts so far and whether the rerun's commit is covered by the same approval or needs a new one. Make S17.followup's rerun step match.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "The grep skips the stored review records under `### R-<n>` in feature documents"; "The implementation review dispatch names the case directories"; case.yaml `terms` bullet, "No document content is public"); Acceptance Criteria AC-10, AC-11, AC-12; Test Plan AC-10, AC-11 rows; Context Owner summary ("Case material stays private")
+EVIDENCE: The terms check runs only "Before any new-brief run". The previous revision made it skip every stored review record, not only the records the owner accepted (records that name enterprise candidate documents with counts). The AC-11 proof has the implementation reviewer open the case directory and "spot-check the matcher's verdicts against the stored records". Its EVIDENCE will naturally quote label lines, finding text or the case.yaml clone path, which can carry the second user's repository name. Review records are stored verbatim (conventions/feature-documents.md:94-95 at 0c983f67) in a public repository, and nothing checks them for case terms: they are written after the runs, and the check now skips them. The AC-10 proof plants a term only "in the tree or the companion diff". It does not check where the skip ends, so an implementation that skips whole feature documents also passes.
+PROPOSAL: Tell the implementation reviewer in the AC-11 and AC-12 rows to cite case material only by label ID, count and digest. Run the terms check again on the document and the results file before the implementation review is stored or shipped. Add a fixture case where a planted term inside a `### R-<n>` record passes and the same term in Design stops the run.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Scope (In scope, follow-up review bullet, "a line in the ship report and the resume skill for a complete document with pending Deferred entries")
+EVIDENCE: The previous revision keyed the trigger on the merge in Design, AC-16 and the Owner summary ("a merged complete document", "runs only for a merged feature"). It left this Scope bullet keyed on `complete` alone, though R-7 F-02 named it in its WHERE.
+PROPOSAL: Say "for a merged complete document with pending Deferred entries".
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context Background ("`scriptedPlugin`, `:1114-1121`"); Design (Tests that change, "`tests/vh-adlc/scenarios/run.ts:1114-1120`")
+EVIDENCE: The two places cite different ranges for the same function. In tests/vh-adlc/scenarios/run.ts at 14d15c23, the comment starts at 1114, `function scriptedPlugin` is at 1116 and its closing brace is at 1122.
+PROPOSAL: Cite `:1114-1122` in both places.
