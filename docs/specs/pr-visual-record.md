@@ -481,6 +481,7 @@ R-1 to R-9.
 | 2026-11-21 | R-7 | spec | `e7bac6a4` | claude-opus-5-5 | procedural | 0 blocking, 6 should-fix, 2 nits |
 | 2026-11-22 | R-8 | spec | `25865301` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 2 nits |
 | 2026-11-22 | R-9 | spec | `b0b67bbf` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 1 nit |
+| 2026-11-22 | R-10 | spec | `a94fb265` | claude-opus-5-5 | procedural | 0 blocking, 6 should-fix, 1 nit |
 
 ### R-1
 
@@ -1246,6 +1247,59 @@ SEVERITY: nit
 WHERE: Context > Background ("Loop commands exit 2 on a thrown error (`cli.ts:185`), including a failed Git call (`rungs.ts:17`)")
 EVIDENCE: `plugins/vh-adlc/scripts/loop/rungs.ts:17` is the line `function git(repo: string, args: string[]): string {`. The throw on a failed Git call is at `rungs.ts:19`.
 PROPOSAL: Cite `rungs.ts:19`, or `:17-21` for the whole helper.
+
+### R-10
+
+TARGET: a94fb2658410631982bdca43c038657263e12be7
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command, the exit paragraph ("On SIGINT or SIGTERM during a capture it kills the capture's process group before exiting"); Design > Concurrency, failure, retry, upgrade ("Killed runs": "On SIGINT or SIGTERM, and after the capture command exits normally, the capture step stops the capture's process group and every process carrying its owner marker"); Design > Command step 2 (the marker cleanup at exit); AC-04; Test Plan row AC-04 (the SIGTERM and SIGINT cases); Context > Owner summary, second paragraph
+EVIDENCE: The exit paragraph stops only the process group on a signal, while Killed runs and AC-04 also require every marked process to stop. `runOwnedClient` stops marked processes on cancellation only when it is cancelled through `options.signal` (`plugins/vh-adlc/scripts/triage/owned-process.ts:87`, `:170-175`, then `stopMarked` at `:185`). An implementation that installs its own SIGTERM handler, kills `-pid` and exits skips the marker sweep, as the exit paragraph allows. The AC-04 signal cases start "a child sleeping for minutes", which stays in the group, so they pass that implementation. Only the exit-0 cases use `setsid`. The rule changed when this revision applied R-9 F-05 (owner-marker cleanup).
+PROPOSAL: Make the exit paragraph say that the signal path also stops every process carrying the owner marker, for example by aborting `runOwnedClient` through its AbortSignal. Add a `setsid sleep 600 &` child to the SIGTERM and SIGINT cases of the AC-04 row.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 2 ("The capture runs through the owned-process runner (`runOwnedClient`)", "Images count only when the command exited 0"); Design > Command, State paragraph ("Missing reasons, the full list"); Design > Command output table (`output_tail`); AC-04; AC-05; Test Plan rows AC-04 and AC-05
+EVIDENCE: Reusing `runOwnedClient` brings outcomes that the "full list" of missing reasons does not name. With `capture: "memory"`, the natural way to keep the capture's output off the command's stdout, the runner applies `OUTPUT_LIMIT` of 16 MiB (`owned-process.ts:61`, `:93`). On overflow it sets `output_limit` and stops the whole group (`:148`, `:165`), so a verbose build is killed partway through. File output without `maxOutputBytes` has no limit at all. After the child exits, the runner can also return `confirmed: false` with `survivors`, or a group probe it cannot settle (`:185-194`, `groupProbe` at `:53-56`). `review-route.ts:339` treats that case as pending. Here, a capture that exited 0 would have its images used under step 2, although AC-04 says nothing is left behind. The runner's `pidNamespace` option (`:99-100`), which `review-route.ts:331` turns on, decides whether processes that clear the marker are stopped, and the Design does not say whether the capture uses it. Two implementers would classify output overflow as a timeout, a non-zero exit or an exit 2, and would use or drop images after unconfirmed cleanup. This came in when this revision applied R-9 F-05.
+PROPOSAL: State the runner options the capture uses: the output mode and limit, and either a PID namespace or the marker only. Add output overflow and unconfirmed cleanup to the full list of missing reasons, each saying whether images are used, and add a case for each to the AC-05 row.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `covers`; Design > Command step 2 (`runOwnedClient`); Context > Background (the `owned-process.ts` bullet)
+EVIDENCE: The capture step now runs through `runOwnedClient`, `OWNER_MARKER_VARIABLE` and `markedProcesses`, all in `plugins/vh-adlc/scripts/triage/owned-process.ts` (`:30`, `:33`, `:91`). That path is not in `covers`, which lists only `scripts/loop/` files, `scripts/settings-file.ts` and `scripts/branches/` among the scripts. The runner's test, `tests/vh-adlc/loop/owned-process.test.ts`, is covered through `tests/vh-adlc/loop/`, but its source is not. A change to the runner's cleanup, limits or exit handling would change AC-04 and AC-05 behaviour, yet it would not make a review stale or show in `feature_tree_clean`. The dependency came in with this revision.
+PROPOSAL: Add `plugins/vh-adlc/scripts/triage/owned-process.ts` to `covers`.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 2 ("If the listing of the PR's ref lags behind the push, the step repeats the ref check up to three times, a few seconds apart, before reporting the missing item"); Design > Command step 3 (the `gh api ... matching-refs` check); Design > Command, State paragraph ("does not list `refs/pr-visuals/<number>` at `ref_commit` (or `gh` failed)"); AC-04; Test Plan row AC-04 ("a `gh` stub that lists the ref only on its third call"); Context > Owner summary, second paragraph; Context > Background, the 2026-11-22 probe
+EVIDENCE: The retry rule sits in the capture step, which "pushes nothing" and runs no ref check; the check lives in step 3. "Repeats the ref check up to three times" can mean three calls in all or four. "A few seconds apart" fixes no interval. The text also does not say whether a `gh` that exits non-zero, or a listing at another commit, is retried or ends at once. AC-04's text has no retry, so an implementation without one meets the criterion but fails the row's third-call case. An implementation that makes three calls and one that makes four both pass that case. The sentence came in this revision, applying R-9 F-04.
+PROPOSAL: Move the rule into step 3 and state the total number of calls, the interval and which results are retried. Add the retry to AC-04's text, and add a stub case that lists the ref only after the last allowed call and expects null URLs.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship step 7 ("only when the record has no missing item, at least one screen has both sides, and it inspected every pair and saw no visible difference"); Context > Owner summary, decisions paragraph ("says \"No visible change\" only when it saw complete pairs and no difference"); Test Plan row AC-07, statement (10); Design > Command step 2 ("A stem on one side only is a one-sided screen, added or removed")
+EVIDENCE: A one-sided screen is a screen the feature added or removed, which is a visible change. Step 7 requires only that at least one screen has both sides. Take a record with an unchanged `home` pair and a new after-only `settings` screen. A skill that reads "pair" as a two-sided screen meets step 7's words and writes `No visible change` on a PR that adds a page. The summary's "complete pairs" reads as every screen having both sides, which contradicts step 7. The tokens of statement (10) (`No visible change`, `inspected`, `both sides`, `no missing item`) accept both readings. This wording came in this revision, applying R-9 F-03.
+PROPOSAL: Require in step 7 and the summary that every screen in the record has both sides, with at least one screen, no missing item and no difference seen. Give (10) the token `every screen`, with the fail example "Write `No visible change` when there is no missing item, at least one screen has both sides and you inspected every pair".
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship step 2 (the `--capture true` run); Design > Ship step 8 ("when a step produced no output"); Design > Setting (`capture.timeout_minutes`, default 60); Design > Concurrency, failure, retry, upgrade ("Killed runs"); AC-07; Test Plan row AC-07
+EVIDENCE: Ship runs the capture as an ordinary host command. The Bash tool of the Claude Code host running this review caps a foreground command at 600000 ms ("max 600000 for a foreground command" in its tool schema). That is a sixth of the 60-minute default the Design sets for building and capturing two commits. A search of `plugins/vh-adlc/references` and `plugins/vh-adlc/skills` for "foreground", "in the background", "run_in_background" and "tool limit" found nothing, so no shared rule covers this. When the host stops the command, ship gets no output, and step 8 writes "Visual record missing" on every ship of a project whose capture takes longer. A stop by SIGKILL also leaves the capture's processes behind ("Killed runs"). Rungs have the same 60-minute default (`rungs.ts:58`), but a failed rung blocks delivery. Here the failure is disclosed and the delivery goes on, so a slow capture never produces a record and the original problem remains for that project. One skill author would tell ship to keep the host from cutting the run short; another would not.
+PROPOSAL: Say in Ship step 2 how ship runs the capture so the host cannot stop it before `capture.timeout_minutes` runs out, for example as a background command ship waits on, or with a host timeout at least that long. Add that statement to the AC-07 row with must-pass and must-fail examples.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Owner summary, validation paragraph ("Observed so far: one probe showed GitHub serving a file from a commit that only a custom ref holds") and second paragraph
+EVIDENCE: This revision added a second probe to Background for R-9 F-04: on 2026-11-22, `matching-refs` listed `refs/pr-visuals/probe-empty` right after the push. Every URL now depends on that listing, and step 2 adds a bounded retry of the ref check. The summary still names one probe and does not mention the retry. I confirmed the probe's remains: `gh api repos/michielvha/stackweaver/commits/77e40d2b324234a6d166d18214d6b1e559cd8546` returns a parentless commit with the empty tree `4b825dc642cb6eb9a060e54bf8d69288fbee4904`, and `gh api repos/michielvha/stackweaver/git/matching-refs/pr-visuals/` now returns `[]`.
+PROPOSAL: Name both probes in the summary's observed proof and mention the bounded retry of the ref check.
 
 ## Sources
 
