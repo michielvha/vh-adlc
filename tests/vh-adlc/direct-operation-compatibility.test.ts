@@ -65,6 +65,16 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     else for (const phrase of ["owner-authorized", "preflight succeeds", "no completion", "review-refresh"]) expect(section).toContain(phrase);
     current = current.slice(0, start) + current.slice(end);
   }
+  // Proportional review (docs/specs/proportional-review.md) adds the follow-up review after merge to ship and resume.
+  if (name === "ship" || name === "resume") {
+    const start = current.indexOf("## Follow-up review after merge\n");
+    expect(start).toBeGreaterThan(0);
+    const next = current.indexOf("\n## ", start + 1), end = next < 0 ? current.length : next + 1;
+    const section = current.slice(start, end).replace(/\s+/g, " ");
+    for (const phrase of ["names the product profile as the context for severity", "pending Deferred entries", "On an older revision"]) expect(section).toContain(phrase);
+    if (name === "ship") for (const phrase of ["drop, follow-up or gap", "--operation follow-up", "gh issue list --state all", "`docs/follow-up-<slug>`", "Never merge it", "needs no feature writer entry or handoff"]) expect(section).toContain(phrase);
+    current = (current.slice(0, start) + current.slice(end)).replace(/\n+$/, "\n");
+  } else expect(current).not.toContain("## Follow-up review after merge\n");
   if (name === "ship") {
     const promotionStart = current.indexOf("## Article and promotion handoff\n");
     const promotionEnd = current.indexOf("## After an authorized merge\n", promotionStart);
