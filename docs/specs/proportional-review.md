@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Drafted; four owner questions open, then the first independent spec review."
+status_description: "Drafted with the owner's answers folded in; waiting for the first independent spec review."
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds with fewer owner questions, while every real defect the current review raises is still raised."
 covers:
@@ -60,11 +60,14 @@ tracked in [#52](https://github.com/michielvha/vh-adlc/issues/52).
 Product quality is a hard constraint. The proof is a replay: one enterprise document and one small
 application document, each at its first spec-review commit, reviewed with the old and new rules. The new
 rules pass only if every hand-labelled real defect is raised in every run, and only then are rounds and
-questions compared. Case material stays private; only counts are published. All of this is planned; no
-check has run.
+questions compared: the new rules must reach a clean pass in at most half the original reviews, with
+fewer owner questions. Each case runs three times per brief on both the Codex command route and the Claude
+host route. The owner approves each case's defect labels once, before any run. The second user's case is
+copied to the owner's host with their consent. Case material stays private; only counts are published.
+All of this is planned; no check has run.
 
-Four owner questions are open: where the small application's case material lives, the round threshold,
-the reviewer routes, and who approves the defect labels. No review has run. Acceptance would authorize the
+The owner answered the four open questions on 2026-11-22, each at its recommendation. No review has run.
+Acceptance would authorize the
 plugin edits, the replay harness and a companion convention change in `vhco-pro/docs`, on a feature
 branch; shipping and the pin bump still need the usual approvals.
 
@@ -232,18 +235,23 @@ nit list stays in the report, as the nit rule requires.
   the profile text, the route list and the original count of spec reviews and owner questions;
 - `labels.md`: the real defects present at X, each as `L-<nn>` with one line, the original finding it
   came from, and how a reviewer's finding is matched to it (a must-match description, with one example
-  finding that matches and one that does not).
+  finding that matches and one that does not). The author proposes the list and the owner approves it
+  once per case; the file ends with the owner's approval line and its date, and the harness refuses a
+  case without it.
 
 For each brief, old (the plugin on `main` before this branch, at docs `0c983f67`) and new (this branch, at
 the companion docs revision), the harness makes a throwaway clone at X, adds the profile to `AGENTS.md` in
-one scratch commit X', sets the brief's docs pin, and runs a first-pass spec review there three times per
-route through the scenario harness's session runner (`tests/vh-adlc/scenarios/run.ts`). It then runs the
+one scratch commit X', sets the brief's docs pin, and runs a first-pass spec review there three times on each route, the Codex command route
+(`references/loop-settings.md`, `route: command`) and the Claude host route, through the scenario harness's session runner (`tests/vh-adlc/scenarios/run.ts`). It then runs the
 new brief's full loop from X' until a clean pass, with a scripted owner that adopts each question's
 recommendation, and counts passes and questions. A run that fails to execute is recorded as failed and
 rerun; it never counts as a pass. Matching a finding to a label is done by an independent agent reading
 `labels.md` and the stored records, and its verdicts are stored beside the run.
 
-Private material (case files, labels, records, transcripts) stays in the case directory. The harness
+Private material (case files, labels, records, transcripts) stays in the case directory, a private
+directory on the owner's host outside every public repository. The second user's document and repository
+at X are copied there with their consent, so both cases run and are verified on one host and stay in the
+replay set for later changes. The harness
 writes only counts to `tests/vh-adlc/evidence/proportional-review/results.md`: per case and brief, runs,
 labels raised per run by ID, rounds to clean, questions raised and execution failures. Cases are named
 "enterprise" and "small application", with no repository or product names.
@@ -295,13 +303,13 @@ raise it.
       recorded rules, with a count of the rest and where the full list is.
 - [ ] AC-08: vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, and the two user
       guides describe the profile, severity by consequence, stated limits and scoped re-review.
-- [ ] AC-09: The replay harness runs a case end to end, writes counts only to the results file, records
-      failed executions without counting them as passes, and runs on a public fixture case in the test
-      suite.
-- [ ] AC-10: On the enterprise case, every labelled real defect is raised in every new-brief first-pass run
-      on every route.
-- [ ] AC-11: On the small application case, every labelled real defect is raised in every new-brief
-      first-pass run on every route.
+- [ ] AC-09: The replay harness runs a case end to end, refuses a case whose labels lack the owner's
+      approval line, writes counts only to the results file, records failed executions without counting
+      them as passes, and runs on a public fixture case in the test suite.
+- [ ] AC-10: On the enterprise case, with labels the owner approved before any new-brief run, every
+      labelled real defect is raised in every new-brief first-pass run on both routes.
+- [ ] AC-11: On the small application case, with labels the owner approved before any new-brief run,
+      every labelled real defect is raised in every new-brief first-pass run on both routes.
 - [ ] AC-12: On both cases, the new-brief loop reaches a clean pass in at most half the original number of
       spec reviews, with fewer owner questions than the original, and its clean document resolves every
       label without a stated limit on an always-blocking defect.
@@ -317,8 +325,8 @@ raise it.
 | AC-06 | Scenario `S17.questions`: a review returns one judgement finding the profile settles and one about a public contract. Pass at the companion pin: one Open Question, about the contract, and Design records the other choice. On the `0c983f67` pin: two Open Questions. |
 | AC-07 | Scenario `S17.nits`: a pass with eight nits, six of which the author settles under the nit rule. Pass: the final reply shows two nits, a count of six and where they are listed, and the report lists all eight. |
 | AC-08 | `bun test tests/vh-adlc/proportional-review.test.ts`: `AGENTS.md` has the section and the companion pin, `knowledge.md` names the same SHA, and both guides mention each of the four terms; plus a manual read of the guides against Design. |
-| AC-09 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and a scripted reviewer: the results file holds counts and label IDs and no line of the fixture document, a forced execution failure is recorded and not counted, and the grep for case terms fails on a planted term. |
-| AC-10 | Replay of the enterprise case with three runs per brief per route. Pass: the independent matcher marks every label raised in each new-brief run; the results file shows it. |
+| AC-09 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and a scripted reviewer: the results file holds counts and label IDs and no line of the fixture document, a forced execution failure is recorded and not counted, a copy of the case without the approval line is refused before any run, and the grep for case terms fails on a planted term. |
+| AC-10 | Replay of the enterprise case with three runs per brief on each of the two routes. Pass: `labels.md` carries the owner's approval line dated before the first new-brief run, and the independent matcher marks every label raised in each of the six new-brief runs; the results file shows it. |
 | AC-11 | Replay of the small application case, same procedure and pass condition. |
 | AC-12 | The same replays' full new-brief loops. Pass: rounds to clean at most half of `case.yaml`'s original count, questions fewer than its original count, and a manual check that each label maps to a quoted Design or Scope resolution in the clean document, none an always-blocking defect under `Not handled:`. |
 
@@ -328,50 +336,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q1: Where should the small application's replay material live?
-
-**Recommendation:** A. Copy it to the owner's host, so one person can run, rerun and verify both cases.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. On the owner's host, with consent** | The second user's document and repository at X sit in a private case directory here; both cases replay and are verified in one place, and the case joins the replay set for later changes | The second user must agree to a private copy |
-| **B. On the second user's host** | Nothing leaves that machine except the counts and label IDs | Each rerun needs that host; the implementation review cannot inspect the records |
-
-**Why this is yours:** it is the second user's material and needs their consent.
-
-### Q2: How large must the reduction in rounds be?
-
-**Recommendation:** A. At most half the original spec reviews, with fewer owner questions, matching "far fewer" in the request.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. At most half, fewer questions** | A clear bar that a cosmetic change cannot pass | A real but smaller gain fails the proof |
-| **B. Any reduction** | Accepts every improvement | One fewer round passes |
-| **C. A fixed cap, at most 6 spec reviews** | The same bar for every document | Ignores how hard each document was |
-
-**Why this is yours:** it sets what counts as success for the change you asked for.
-
-### Q3: Which reviewer routes must the replay cover?
-
-**Recommendation:** A. Both, three runs each, because adopters use both and the routes rate severity very differently.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Codex command route and Claude host route** | Defect retention proved on both routes vh-adlc supports | Twice the replay runs |
-| **B. Only the route that originally reviewed each case** | Half the runs, compared like with like | The other route is unproved and may lose defects |
-
-**Why this is yours:** it decides how much of the supported product the proof covers.
-
-### Q4: Who approves the defect labels before the runs?
-
-**Recommendation:** A. The author proposes each label with its original finding, and you approve the list once per case.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Author proposes, owner approves once** | The quality bar is yours, set before any result exists | One sitting per case |
-| **B. Author proposes, an independent agent checks** | No owner time | The bar that gates product quality is set without you |
-
-**Why this is yours:** the labels are the quality bar this whole change is measured against.
+None.
 
 ## Review Log
 
