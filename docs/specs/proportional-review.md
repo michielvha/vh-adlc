@@ -1,6 +1,6 @@
 ---
 status: planned
-status_description: "Accepted by the owner at spec review R-9 after the deferred-items revision; R-9's four should-fix findings are Deferred entries D-11 to D-14. Next: tasks, after PR #152 and #141 land."
+status_description: "Accepted at R-9 and kept by drift re-review R-10 after PR #152 and PR #155 merged; tasks written. Next: implement."
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
 covers:
@@ -76,7 +76,7 @@ ship and resume skills:
 Behavior changes are gated on the resolved convention: repositories with their own older pin keep
 today's behavior, pinless ones take the new rules with the plugin upgrade. It builds on
 [PR #152](https://github.com/michielvha/vh-adlc/pull/152) and
-[#141](https://github.com/michielvha/vh-adlc/issues/141), which land first; it is the first step of
+[#141](https://github.com/michielvha/vh-adlc/issues/141) (PR #155), both merged; it is the first step of
 [#52](https://github.com/michielvha/vh-adlc/issues/52).
 
 Product quality is a hard constraint, proved by replay on one enterprise and one small application
@@ -605,7 +605,30 @@ for the old-pin controls.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/proportional-review.test.ts` - failing tests that pin the companion convention's severity definitions, always-blocking classes, stated limit, scoped re-review, plausible-choice rule, owner-list triage, Deferred section and source list, the glossary terms the convention uses, vh-adlc's product profile and the companion pin; fails because none exist yet (AC-01, AC-02, AC-03, AC-09, AC-14)
+- [ ] T2 `vhco-pro/docs: conventions/feature-documents.md` - the companion PR on its own branch with every convention rule Design names; T1's convention assertions pass against the companion head (AC-01, AC-02, AC-03, AC-14)
+- [ ] T3 `tests/vh-adlc/loop/review-scope.test.ts` - failing tests for `review-scope`: previous review after an acceptance row, a non-ancestor row, no row, a changed `covers` path, each changed bridge file, the Review Log left out of the diff, and `reviewPrompt` carrying the result; fails because the command does not exist (AC-05)
+- [ ] T4 `plugins/vh-adlc/scripts/loop/cli.ts`, `tests/vh-adlc/loop/lenses.test.ts` - the `review-scope` command and its result in `reviewPrompt` for the command route; T3 and `lenses.test.ts` pass (AC-05)
+- [ ] T5 `plugins/vh-adlc/references/review-protocol.md` - both routes pass the scope, and the Independence sentence gains the scope exception; T1's protocol assertions pass (AC-05)
+- [ ] T6 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `tests/vh-adlc/proportionality.test.ts` - the reviewer reads the product profile, rates failure paths by consequence, honours stated limits and Deferred entries, and scopes re-reviews, all gated on the resolved convention; T1's reviewer assertions and `proportionality.test.ts` pass (AC-03, AC-04, AC-05, AC-08, AC-14)
+- [ ] T7 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `tests/vh-adlc/direct-operation-compatibility.test.ts` - the plausible-choice rule, the author-side stated limit, Deferred entries with their five sources, the cut check, owner-list triage and the scope in the host dispatch, gated on the resolved convention, keeping #141's author-cut exception and its Review Log record; T1's spec assertions and `tests/vh-adlc/author-extras.test.ts` pass, and the spec baseline moves to this commit (AC-06, AC-07, AC-08, AC-14, AC-15)
+- [ ] T8 `plugins/vh-adlc/references/loop.md` - the product profile, stated once; T1's loop assertion passes (AC-04, AC-09)
+- [ ] T9 `tests/vh-adlc/labels/` - failing `follow-up` mode cases: one type label, no state label, no alias change, the `Deferred:` line at the end of the body; fails because the mode does not exist (AC-16)
+- [ ] T10 `plugins/vh-adlc/scripts/labels/`, `plugins/vh-adlc/references/issues.md` - the `follow-up` filing mode and ship's filing role; T9 passes (AC-16)
+- [ ] T11 `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md`, `plugins/vh-adlc/references/authority.md` - the follow-up review after merge, triggers keyed on the merge, the ship report and resume flags, and its authority, gated on the resolved convention; T1's ship, resume and authority assertions pass (AC-08, AC-16)
+- [ ] T12 `tests/vh-adlc/fixtures/build.ts`, `tests/vh-adlc/scenarios/run.ts` - a fixture docs revision holding the `0c983f67` tree and `scriptedPlugin` taking the canned directory as a parameter; the existing S16 scenarios still pass (AC-08)
+- [ ] T13 `tests/vh-adlc/scenarios/run.ts` - scenarios `S17.profile`, `S17.limit`, `S17.scoped` and `S17.scoped-command`; each passes its Test Plan condition (AC-03, AC-04, AC-05)
+- [ ] T14 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/proportional-review/canned/` - scenarios `S17.questions` and `S17.nits` with scripted records; each passes (AC-06, AC-07)
+- [ ] T15 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/proportional-review/canned/` - scenarios `S17.deferred`, `S17.deferred-review` and `S17.cut`; each passes (AC-14, AC-15)
+- [ ] T16 `tests/vh-adlc/scenarios/run.ts` - scenario `S17.followup` with the `gh` stub, its partial run, rerun and unmerged control; passes (AC-16)
+- [ ] T17 `tests/vh-adlc/scenarios/run.ts` - the old-pin controls of `S17.scoped`, `S17.questions`, `S17.nits`, `S17.profile`, `S17.deferred`, `S17.cut` and `S17.followup`; each passes and `S16.oldpin-reviewer` still passes (AC-08)
+- [ ] T18 `tests/vh-adlc/review-convergence.test.ts` - resolve its pages at `0c983f67` explicitly; passes before and after the pin bump (AC-08)
+- [ ] T19 `tests/vh-adlc/replay/run.test.ts` - failing harness tests on a fixture case: counts and identities only, a failed execution not counted, another route or model not counted, refusal without an approval line or with an edited label or `case.yaml`, the terms check in the tree, the companion diff and a Design section but not a stored record, and body size per pass without the Deferred section; fails because the harness does not exist (AC-10, AC-17)
+- [ ] T20 `tests/vh-adlc/replay/run.ts` - the replay harness; T19 passes (AC-10, AC-17)
+- [ ] T21 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - vh-adlc's product profile, the pin bump to the merged companion revision and the plugin version; T1 passes in full and `bun test tests/vh-adlc` stays green (AC-09)
+- [ ] T22 `docs/user-guides/workflows.md`, `docs/get-started/first-feature.md` - the guides describe the terms they use with the glossary's meanings; manual read against the glossary (AC-09)
+- [ ] T23 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the enterprise case on both routes; the results show no failing label (AC-11, AC-13, AC-17)
+- [ ] T24 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the small application case and the round and growth totals over all four pairs; the results show no failing label, at most half the old total of spec reviews and body growth, and fewer Open Questions (AC-12, AC-13, AC-17)
 
 ## Open Questions
 
