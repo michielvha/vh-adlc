@@ -1112,12 +1112,14 @@ SCENARIOS.push(...PHASE5);
 const CONVERGENCE = join(ROOT, "tests", "vh-adlc", "evidence", "review-convergence");
 
 // scriptedPlugin copies plugin A and replaces its reviewer with the scripted stand-in, which returns the
-// canned record for the next pass from evidence/review-convergence/canned/<name>/pass-N.txt.
-function scriptedPlugin(f: Fixtures, name: string): string {
+// canned record for the next pass from <canned>/<name>/pass-N.txt. The canned directory defaults to the
+// review convergence records; the proportional review scenarios keep theirs in
+// evidence/proportional-review/canned.
+function scriptedPlugin(f: Fixtures, name: string, canned = join(CONVERGENCE, "canned")): string {
   const copy = join(f.dir, `plugin-scripted-${name}`);
   cpSync(f.pluginA, copy, { recursive: true });
   const template = readFileSync(join(CONVERGENCE, "scripted-reviewer.agent.md"), "utf8");
-  writeFileSync(join(copy, "agents", "vh-adlc-reviewer.agent.md"), template.replaceAll("{{CANNED}}", join(CONVERGENCE, "canned", name)));
+  writeFileSync(join(copy, "agents", "vh-adlc-reviewer.agent.md"), template.replaceAll("{{CANNED}}", join(canned, name)));
   return copy;
 }
 

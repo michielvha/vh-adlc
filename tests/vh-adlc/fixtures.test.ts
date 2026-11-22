@@ -63,6 +63,14 @@ describe("docs fixture", () => {
     expect(b).toContain("default: plans");
     expect(b).toContain("accepted, all_met, on_feature_branch_if_set]");
   });
+
+  test("the convergence revision holds the vhco-pro/docs tree at 0c983f67 for old-pin controls", () => {
+    expect(f.revisionConvergence).toMatch(/^[0-9a-f]{40}$/);
+    const standard = sh(f.docs, "git", "show", `${f.revisionConvergence}:conventions/feature-documents.md`);
+    expect(standard.code).toBe(0);
+    expect(standard.out).toContain("- should-fix: two careful implementers would build different things");
+    expect(standard.out).toContain("Every trade-off the document settles is an open question");
+  });
 });
 
 describe("project fixture", () => {
