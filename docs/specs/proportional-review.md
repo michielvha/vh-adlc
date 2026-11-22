@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised after clean spec review R-4 with the owner's answers; waiting for the next independent spec review, then acceptance."
+status: planned
+status_description: "Accepted by the owner at spec review R-5; R-5's six should-fix findings and three nits are listed follow-ups. Next: tasks, after PR #152 and #141 land."
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds with fewer owner questions, while every real defect the current review raises is still raised."
 covers:
