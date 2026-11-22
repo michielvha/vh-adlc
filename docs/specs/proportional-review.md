@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after clean spec review R-6 with the owner's answers; waiting for one more independent spec review and renewed acceptance."
+status_description: "Revised after spec review R-7 with the owner's answers; waiting for an independent spec review and renewed acceptance."
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
 covers:
@@ -9,6 +9,7 @@ covers:
   - plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md
   - plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md
   - plugins/vh-adlc/scripts/labels/
+  - tests/vh-adlc/labels/
   - plugins/vh-adlc/references/issues.md
   - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/references/loop.md
@@ -68,7 +69,8 @@ ship and resume skills:
   important lost, or the important item becomes a question.
 - Once the feature's PR is merged, ship's follow-up review judges each deferred item against the built
   feature as drop, follow-up or gap. The owner sees gaps and follow-ups with drafted issues and the drops
-  one line each, and approves filing in one batch. The ship report and resume flag pending items.
+  one line each. One approval covers filing the chosen issues and pushing the verdicts to the default
+  branch. The ship report and resume flag a merged feature with pending items.
 
 Behavior changes are gated on the resolved convention: repositories with their own older pin keep
 today's behavior, pinless ones take the new rules with the plugin upgrade. It builds on
@@ -81,7 +83,9 @@ document, on the Codex and Claude routes. The owner approves the labels, profile
 first rule-editing commit. A labelled defect fails if the old rules raised it in two of three runs and the
 new rules miss it in all twelve at the owner's minimum severity. Full loops under a scripted owner must
 then need at most half the old total of reviews and body growth, with fewer questions. Case material
-stays private; the owner's repository name is public, the second user's stays private unless they agree.
+stays private. The owner's repository name is public, and the owner accepts that stored review records
+name its candidate documents with counts; the second user's repository name stays private unless they
+agree.
 Nothing has run yet.
 
 Since the acceptance at R-5, the owner added the Deferred section, the cut check, the follow-up review
@@ -197,9 +201,9 @@ Out of scope, by name:
   change.
 - Product profiles for consumer repositories; each adopter adds its own.
 - Owner-list triage in operations other than the spec skill (audit, triage, maintenance and the rest).
-- Not handled: a repository without its own pin whose plugin upgrade moves the resolved docs revision
-  between two passes gets a scoped pass under the new text, because no file in the repository changes;
-  the next covered or pin change makes the pass full again (R-3 F-07; accepted by the owner after R-4).
+- Not handled: a full pass for a repository without its own pin when a plugin upgrade moves its docs
+  revision between two passes, because no file in the repository changes and the next covered or pin
+  change makes the pass full again (R-3 F-07).
 - Changing the complete `docs/specs/spec-review-convergence.md`: it stays complete, and its test keeps
   proving its text at `0c983f67`.
 - Calibrating the reviewer's precision over time.
@@ -221,7 +225,7 @@ Out of scope, by name:
 | Data-loss defect | Loss or corruption of data a user or tenant owns and cannot regenerate. |
 | Tenant-isolation defect | A path that lets one tenant read or affect another tenant's data, runs or configuration. |
 | Stated limit | A Scope line `Not handled: <the case>, <why> (R-<n> F-<nn>).` that answers a finding without adding a mechanism. |
-| Scoped re-review | A spec review after the first that covers the document diff since the previous spec review and the sections it touches, and reports only blocking findings outside that. |
+| Scoped re-review | A spec review after the first that covers the document diff since the previous spec review and every section that states a rule, ID or term the diff changes, and reports only blocking findings outside that. |
 | Owner's recorded rules | The product profile plus the instruction files and project procedure that `bun scripts/loop/cli.ts context` lists. |
 | Plausible-choice rule | An Open Question is raised only where the owner could plausibly choose differently; the author settles every other choice and records it in Design. |
 | Deferred list | The optional `## Deferred` section of a feature document, outside the normative baseline: one `D-<nn>` line per deferred item, its source and its verdict. |
@@ -364,10 +368,13 @@ until the owner answers it. The check judges importance only; usefulness waits f
 
 The follow-up review needs only the merged code, so it runs once the feature's PR is merged, whatever
 `cli.ts delivery` reports (delivered, no publication path, manual, blocked or failed;
-`scripts/loop/delivery.ts:66-80`). Ship runs it right after an authorized merge it performed. For a merge
-done elsewhere, two prompts exist: the ship report on that feature ends with the count of pending
-Deferred entries, and the resume skill, finding a `complete` document with pending entries, reports them
-and names the step. Invoking ship on a complete document runs only this step. The binary is unchanged.
+`scripts/loop/delivery.ts:66-80`). A document is `complete` before its PR merges (ship sets it in its
+Gate step), so every trigger keys on the merge: the feature's PR is merged, or the `complete` document is
+on the default branch. Ship runs the review right after an authorized merge it performed. For a merge done
+elsewhere, the ship report on a merged feature ends with the count of pending Deferred entries, and the
+resume skill, finding a merged `complete` document with pending entries, reports them and names the step.
+Invoking ship on a merged complete document runs only this step; on a complete document whose PR is not
+merged, ship keeps its normal delivery path. The binary is unchanged.
 
 For each pending entry the session inspects the tree at the merge commit and gives one verdict with one
 line of reason:
@@ -382,15 +389,17 @@ Drops are recorded without approval. The owner approves, in one answer, which fo
 Filing uses a new labels helper mode, `bun scripts/labels/cli.ts file --operation follow-up --type <type
 label>`, with the repository's mapped feature type for a follow-up and its bug type for a gap, no state
 label, and no change to any feature's ownership or issue aliases. `references/issues.md` gives ship this
-filing role. Each issue body ends with `Deferred: <document path> D-<nn>`. Before filing, the session
-searches the repository's issues for that line and records an existing issue instead of filing again, so
-a rerun after a partial failure files nothing twice.
+filing role. Each issue body ends with `Deferred: <document path> D-<nn>`. Before filing an entry, the
+session lists the repository's issues (`gh issue list --state all`, not the search index) and records an
+existing issue whose body ends with that line instead of filing again. Right after each issue is created,
+its link is written into the entry's `Verdict:` in the working tree, before the next one is filed.
 
-Each entry's `Verdict:` then records `drop, <reason>`, `follow-up <issue link>`, `gap <issue link>`, or
+Each entry's `Verdict:` records `drop, <reason>`, `follow-up <issue link>`, `gap <issue link>`, or
 `follow-up, not filed (owner declined)` and `gap, not filed (owner declined)`. The owner's batch approval
-covers creating those issues and one documentation-only commit of the verdicts to the default branch,
-pushed; `references/authority.md` adds this to ship's authority. A rejected push makes the step partial:
-the report says so, keeps the local commit and asks whether to open a PR instead.
+covers creating those issues and one documentation-only commit of the verdicts, made in a temporary
+detached worktree at the remote default branch and pushed to it, so no local default branch is touched;
+`references/authority.md` adds this to ship's authority. A rejected push makes the step partial: the same
+commit is pushed to a new `docs/` branch instead, and the report asks whether to open a PR from it.
 
 ### Replay harness
 
@@ -415,7 +424,9 @@ not match.
 
 Before any new-brief run, the harness greps the whole vh-adlc tree at the feature head and the companion
 branch's diff (from a local `vhco-pro/docs` checkout passed as an option) for every entry in `terms` and
-records only pass or fail; a hit stops the run.
+records only pass or fail; a hit stops the run. The grep skips the stored review records under `### R-<n>`
+in feature documents, which stay verbatim: the owner accepts that they name the enterprise candidate
+documents with counts, and no document content.
 
 Both briefs are fixed before the first run: old is the plugin at the feature branch's merge base at that
 moment, with the companion PR's parent docs revision; new is the feature head at that moment, with the
@@ -477,8 +488,9 @@ The cases:
 ### Failure, retry and rollback
 
 The review rules change no state at run time; a review interrupted mid-pass stores nothing, as today.
-The follow-up review creates issues and a commit: the `Deferred:` line makes a rerun safe, and a rejected
-push is reported as partial with the commit kept. Documents
+The follow-up review creates issues and a commit: each issue link is recorded as soon as it exists and
+the `Deferred:` line is matched through the issue list, so a rerun files only what is missing, and a
+rejected push leaves the commit on its own branch for a PR. Documents
 reviewed under the new rules keep valid records under the old ones, because names and formats do not
 change. Every behavior change is gated on the resolved convention, so repositories with their own
 `0c983f67` pin keep today's behavior throughout, apart from the scope fields their reviewer ignores. The
@@ -514,7 +526,8 @@ for the old-pin controls.
 - [ ] AC-04: The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure
       paths by it, and without one judges as for production software with users.
 - [ ] AC-05: On both routes, a spec review after the first receives the scope from `review-scope`, covers
-      only the document diff and the sections it touches, and reports only blocking findings outside
+      only the document diff and every section that states a rule, ID or term the diff changes, and
+      reports only blocking findings outside
       that; the pass is full when there is no previous spec review or a covered path or a docs pin bridge
       file changed.
 - [ ] AC-06: The spec skill raises judgement calls and judgement findings as Open Questions only under the
@@ -549,8 +562,9 @@ for the old-pin controls.
 - [ ] AC-16: Once a feature's PR is merged, the follow-up review gives every pending Deferred entry a verdict
       of drop, follow-up or gap with one line of reason; shows gaps and follow-ups with issue previews and
       drops one line each; files only what the owner approves, through the labels helper's `follow-up`
-      mode, never twice for one entry; records every verdict, including declined filings; and the ship
-      report and resume flag a complete document with pending entries.
+      mode, never twice for one entry; records every verdict, including declined filings, in a commit
+      pushed to the default branch; runs only for a merged feature; and the ship report and resume flag a
+      merged complete document with pending entries.
 - [ ] AC-17: Over both cases and both routes, the new-brief loops' total body growth is at most half the
       old-brief loops' total, or no larger than it when the old total is zero or negative, with body size
       recorded per pass and the Deferred section left out of it.
@@ -571,9 +585,9 @@ for the old-pin controls.
 | AC-11 | Replay of the enterprise case: three old-brief and six new-brief first passes per route, with confirmation runs where the rule calls for them. Pass: the results file shows no failing label on either route. The implementation reviewer opens the case directory, checks that the approval line matches `labels.md` and `case.yaml` and predates the first rule-editing commit in both repositories, and spot-checks the matcher's verdicts against the stored records. |
 | AC-12 | Replay of the small application case, same procedure and pass condition. |
 | AC-13 | The same replays' full loops, one per brief per case and route. Pass: the results file shows the new total of spec reviews at most half the old total and fewer Open Questions in total. |
-| AC-14 | Scenario `S17.deferred`, with scripted reviewer records and a scripted owner: the owner says "answer R-1 F-01 with a stated limit", then accepts R-1 while "deferring R-1 F-02"; later, default-branch drift brings a re-review whose finding asks for extra work and the owner answers "defer it". Pass: three entries reading `From: R-1 F-01, stated limit.`, `From: R-1 F-02, deferred at acceptance.` and `From: drift re-review R-2.`, the Scope line beside the first, and `vh-adlc fresh` still fresh after each Deferred edit. Scenario `S17.deferred-review`, with the real reviewer, on a document whose Deferred section holds a deferred retry sampler and a deferred session check on a delete endpoint. Pass: no finding names the sampler, and a blocking finding against Scope quotes the delete entry. `bun test tests/vh-adlc/proportional-review.test.ts` pins the convention's section definition and source list. |
-| AC-15 | Scenario `S17.cut`, with scripted reviewer records: the owner says in session "cut the retry sampler and the session check on delete". Pass: a Deferred entry `From: owner cut on <today>.` for the sampler, an Open Question about the session check, Scope still holding the check, and a reply line starting `Cut check:` that names the session check as a security defect. Control: "cut the retry sampler" alone gives the `nothing important lost` line. |
-| AC-16 | `bun test tests/vh-adlc/labels` gains `follow-up` mode cases: one type label, no state label, no alias change, and the `Deferred:` line at the end of the body. Scenario `S17.followup`, with a `gh` stub on `PATH` that records calls and answers issue searches: a fixture feature, complete and merged outside the session, with three pending entries, one the merged code already covers, one useful extension, and one whose absence a seeded usage example hits. Pass: `/vh-adlc-resume` reports the three pending entries and names the follow-up review; `/vh-adlc-ship` on the document gives drop, follow-up and gap in entry order, shows the gap, then the follow-up with previews, then the drop line; the owner approves filing the gap only; the stub records exactly one issue creation; the entries read `drop, ...`, `follow-up, not filed (owner declined)` and `gap <stub link>`; a second ship run creates no issue. |
+| AC-14 | Scenario `S17.deferred`, with scripted reviewer records and a scripted owner: the owner says "answer R-1 F-01 with a stated limit"; the author also cuts an extra the scripted R-1 flags as added beyond any criterion; scripted R-2 is clean; the owner accepts R-2 while "deferring R-1 F-02"; later, default-branch drift brings re-review R-3 whose finding asks for extra work, and the owner answers "defer it". Pass: four entries reading `From: R-1 F-01, stated limit.`, `From: author cut.`, `From: R-1 F-02, deferred at acceptance.` and `From: drift re-review R-3.`; the Scope line beside the first; a `Cut check:` line in the replies after the acceptance deferral and the drift deferral; and `vh-adlc fresh` still fresh after the acceptance and drift entries. Scenario `S17.deferred-review`, with the real reviewer, on a document whose Deferred section holds a deferred retry sampler and a deferred session check on a delete endpoint. Pass: no finding names the sampler, and a blocking finding against Scope quotes the delete entry. `bun test tests/vh-adlc/proportional-review.test.ts` pins the convention's section definition and source list. |
+| AC-15 | Scenario `S17.cut`, with scripted reviewer records: the owner says in session "cut the retry sampler and the session check on delete". Pass: a Deferred entry `From: owner cut on <today>.` for the sampler, an Open Question about the session check, Scope still holding the check, and a reply line starting `Cut check:` that names the session check as a security defect. Control: "cut the retry sampler" alone gives the `nothing important lost` line. The acceptance and drift deferrals of `S17.deferred` check the line for those kinds. |
+| AC-16 | `bun test tests/vh-adlc/labels` gains `follow-up` mode cases: one type label, no state label, no alias change, and the `Deferred:` line at the end of the body. Scenario `S17.followup`, with a `gh` stub on `PATH` that records calls and serves `gh issue list`: a fixture feature, complete and merged outside the session, with three pending entries, one the merged code already covers, one useful extension, and one whose absence a seeded usage example hits. Pass: `/vh-adlc-resume` reports the three pending entries and names the follow-up review; `/vh-adlc-ship` on the document gives drop, follow-up and gap in entry order, shows the gap, then the follow-up with previews, then the drop line; the owner approves filing the follow-up and the gap; the stub fails the second creation; the run reports partial with the first link recorded. A rerun files only the missing issue, the entries end as `drop, ...`, `follow-up <stub link>` and `gap <stub link>`, and the fixture remote's default branch holds the verdict commit. Control: the same fixture with its PR not merged runs ship's normal delivery path and no follow-up review, and resume names no follow-up review. |
 | AC-17 | `bun test tests/vh-adlc/replay/run.test.ts`: on the fixture case the results file records body size per pass and leaves a seeded Deferred section out of it; plus the replays' full loops. Pass: the results file shows the new total growth at most half the old total, or no larger than it when the old total is zero or negative. |
 
 ## Tasks
