@@ -562,6 +562,7 @@ None.
 | 2026-11-22 | R-4 | spec | `e94e00e7` | claude-opus-5-5 | procedural | no blocking; 5 should-fix, 1 nit |
 | 2026-11-22 | R-5 | spec | `d73b31ea` | claude-opus-5-5 | procedural | no blocking; 6 should-fix, 3 nit |
 | 2026-11-22 | R-5 | spec | `d73b31ea` | n/a | n/a | accepted by owner |
+| 2026-11-22 | R-6 | spec | `c6c7afba` | claude-opus-5-5 | procedural | no blocking; 10 should-fix, 1 nit |
 
 ### R-1
 
@@ -1013,3 +1014,82 @@ SEVERITY: nit
 WHERE: Scope (Out of scope, "Not handled: a repository without its own pin ... (R-3 F-07; accepted by the owner after R-4)."); Design (Glossary, Stated limit)
 EVIDENCE: The glossary defines a stated limit as a Scope line `Not handled: <the case>, <why> (R-<n> F-<nn>).`. The document's own stated limit ends "(R-3 F-07; accepted by the owner after R-4)", which does not match that form, and its reason follows a "because" clause rather than the `<the case>, <why>` order.
 PROPOSAL: Write the line in the glossary form, for example "Not handled: ..., because no file in the repository changes (R-3 F-07).", and keep the owner acceptance in the Owner summary where it already appears.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary (stated limit bullet, re-review bullet, Deferred bullet, nit bullet, replay paragraph, "Since the acceptance at R-5" paragraph); Design (Stated limit; Deferred items; Scoped re-review; Replay harness, labels approval paragraph and case.yaml `terms` bullet); Scope (Out of scope, the pinless `Not handled:` line)
+EVIDENCE: The summary now says a stated limit is not raised again "except for those three defect classes". Design (Stated limit) also re-raises it for an unmeetable criterion or an unsolved problem, and so does AC-03. The summary accepted at R-5 (d73b31ea, line 51) said so, after R-1 F-12. This revision narrowed it again. The summary also calls the Deferred section "outside the reviewed text", but Design says "The reviewer reads the section" and raises a blocking finding on some entries. The revision also dropped owner decisions and limits the summary had at d73b31ea: the labels, profile and case are approved before any rule is edited (Design, Replay harness: approved "before the first commit that edits the reviewer, the spec skill or the companion convention"). That condition limits what "Acceptance authorizes the plugin edits" allows. Also dropped: the enterprise repository name is public while the second user's stays private unless they consent; the accepted pinless stated limit; when a pass becomes full again; where the full nit list goes; and that scope fields are always passed. The owner accepts against this summary.
+PROPOSAL: Restore the stated limit's full re-raise conditions and say that the reviewer reads the Deferred section, with its blocking exception. Put the dropped owner decisions and limits back, especially that labels and case are approved before the first rule-editing commit.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Deferred items, last two sentences); Design (Stated limit); Design (Cut check); Design (Glossary, Deferred list); Acceptance Criteria AC-14; Test Plan AC-14 row (S17.deferred-review); Deferred (D-01 to D-06); Context Owner summary (Deferred bullet)
+EVIDENCE: Design says the reviewer "raises nothing on" the Deferred section except an entry that drops an always-blocking defect or a case the goal or a criterion names. Only stated limits have a rule saying a later pass does not raise their substance again (Design, Stated limit). Nothing says whether an owner-deferred finding or a cut item may be raised again against the normative section where the gap still exists. One reviewer reads the entry as an answer. Another treats it as a note and raises the gap against Design on every pass. S17.deferred-review passes only on the first reading ("no finding names the sampler"). Findings deferred at acceptance also skip the cut check, which only runs after an owner-directed cut. The reviewer's exception then raises them as blocking on the next pass. D-02 is an example: it defers R-5 F-02, whose EVIDENCE cites the goal clause "every real defect the current review raises is still raised", so under the new rules this document's own entry would come back blocking. This mechanism was added by this revision.
+PROPOSAL: State whether a Deferred entry answers its finding the way a stated limit does, with the same re-raise exceptions. Either run the cut check on findings deferred at acceptance, or say the owner's deferral at acceptance is a knowing drop that the reviewer does not raise again.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-14 row (S17.deferred); Design (Deferred items, entry format line and "each stated limit it adds"); Design (Stated limit, "Adding one is the author's call"); Deferred (D-01 to D-07, D-09)
+EVIDENCE: S17.deferred uses scripted reviewer records and requires that "the author answers one finding with a stated limit". The author is a live session, and Design leaves the stated limit to the author's choice ("The author may answer a finding by adding a stated limit"). A correct author may add text instead, and then the two-entry pass condition fails. The row does not say how the scenario forces that choice or how the scripted owner defers a finding at acceptance. "The right `From:` values" is also undefined. The template is `From: <R-<n> F-<nn> | stated limit | owner cut on <date> | author cut>`, and a stated limit that answers a finding fits both the first and the second alternative. This document's own entries use neither form: D-01 reads "From: R-5 F-01, deferred by the owner at acceptance", D-07 reads "stated limit (R-3 F-07)" and D-09 reads "owner cut on 2026-11-22 (R-2 F-10)".
+PROPOSAL: Have the scripted owner direct the stated limit and the acceptance deferral explicitly. Give the exact expected `From:` text for each entry, and make the template match the entries this document writes, or the other way round.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Follow-up review after delivery, first paragraph); Scope (In scope, follow-up review bullet; Out of scope, "A binary step for the follow-up review"); Acceptance Criteria AC-16; Test Plan AC-16 row; frontmatter goal ("every deferred item is judged once the feature is delivered"); Context Owner summary (follow-up bullet)
+EVIDENCE: The review runs after a merge the session performs, when `cli.ts delivery` reports delivered or no publication path, or when there are no loop settings. Several cases are left out. `deliveryVerdict` returns `state: "manual"` with `delivered: false` when loop settings declare no `post_merge_watch` (plugins/vh-adlc/scripts/loop/delivery.ts:70), and `blocked` or `failed` in other cases (:78-80). The owner may also merge outside any session. The ship skill says it "never merges" (SKILL.md description, :113). `vh-adlc next` returns `do: none` for `complete` (rules block), and Scope excludes a binary step. So nothing tells a later session to run ship on a delivered feature, and the review that is "Invoking ship on a delivered feature" depends on someone remembering. The goal's last clause can fail silently, and the AC-16 proof starts by invoking ship on a merged fixture, so it never tests the trigger.
+PROPOSAL: Name what prompts the follow-up review in the manual, blocked and failed states and after a merge outside the session, for example a line in the ship report and in lifecycle or resume intake for a complete document with pending entries. Add that to Scope and to the AC-16 proof.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Follow-up review after delivery, verdict list and "The owner sees gaps first, then follow-ups, with the drafts, and a count of the drops ... Each entry's `Verdict:` then records"); Design (Glossary, Follow-up review); Acceptance Criteria AC-16; Test Plan AC-16 row; Context Owner summary (follow-up bullet)
+EVIDENCE: "drop: the delivered feature does not need it" also describes every follow-up, which by definition the delivered feature does not need now. S17.followup still expects "follow-up" for "one useful extension", so a correct session that calls it drop fails the proof. Approval is also unclear. Design shows the owner only "a count of the drops" and records verdicts "then", after approval for creating issues. The proof has the owner "approve only the drop verdict", which they cannot see, and then expects the drop recorded and the follow-up and gap left pending. Design does not say whether drops need approval, or what is recorded when the owner declines to file a follow-up or gap.
+PROPOSAL: Define the verdicts so they do not overlap, for example: drop when no user of the delivered feature needs it now or later, or it is already covered. Say whether drop verdicts need the owner's approval, and if they do, list the drop items rather than a count. Say what a declined filing records, and make the S17.followup approval step match.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Follow-up review after delivery, "`bun scripts/labels/cli.ts file ... --output`" and "the existing `--preview --approved-digest` flow"); Scope; frontmatter covers; Acceptance Criteria AC-16; Test Plan AC-16 row ("Filing after approval reuses the labels flow already tested in `tests/vh-adlc/labels`")
+EVIDENCE: The labels helper's `file` mode requires `--operation investigate|spec` (plugins/vh-adlc/scripts/labels/cli.ts USAGE; issue.ts:7 `operation: "investigate" | "spec"`). Investigate needs a verdict and a state label, and spec allows a type label only (issue.ts `stateFor`). With adopted ownership, `spec` refuses without `--ownership-spec` and updates that spec's issue aliases before creating the issue (cli.ts, the `beforeCreate` callback). references/issues.md "Who applies which label" gives ship no filing role. Design names no operation, type label or state label for a follow-up or gap issue, and neither `scripts/labels/` nor `references/issues.md` is in Scope or covers. The cited command cannot run as written, and two implementers would file under different operations, one of them possibly rebinding the delivered document's issue aliases.
+PROPOSAL: Name the operation and labels a follow-up and a gap issue get, for example investigate with `track` and `needs-decision` for a gap. If the helper needs a ship operation, add `scripts/labels/` and `references/issues.md` to Scope and covers.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Failure, retry and rollback, "The rules change no state at run time"); Design (Follow-up review after delivery, issue creation and "committed as a documentation-only change on the default branch"); Context Owner summary ("approves filing in one batch"; "shipping and the pin bump need the usual approvals"); Acceptance Criteria AC-16; Test Plan AC-16 row; frontmatter covers
+EVIDENCE: The follow-up review creates GitHub issues and commits verdicts to the default branch, so "The rules change no state at run time" is no longer true. references/authority.md:14 allows committing and pushing a feature document to the default branch only when it has no `branch` field, and only through spec, tasks or an implement claim. A delivered document keeps its `branch` (conventions/feature-documents.md, Frontmatter). Ship's authority covers the feature branch, the PR and the issue (authority.md:27). Nothing grants the verdict commit or its push, and nothing says what happens when a protected default branch rejects it. Partial failure is undefined too. If issues are created and the verdict commit or push then fails, the entries stay pending, and the next ship invocation drafts and may file the same issues again. This revision added the step and did not update the Failure section.
+PROPOSAL: State which approval covers the verdict commit and push, and the fallback when the push is rejected. Make re-running safe, for example by recording each created issue link before the next one is filed, or by checking for an existing issue that names the D-entry. Update Failure, retry and rollback, and add references/authority.md to Scope and covers if it changes.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Gate on the resolved convention, first paragraph's list of old-pin behavior); Design (Failure, retry and rollback, "Every behavior change is gated"); Acceptance Criteria AC-08, AC-14, AC-15, AC-16; Test Plan AC-08 row
+EVIDENCE: The gate says "Every rule below applies" on a convention with severity by consequence. Its list of old-pin behavior covers full passes, severity, nits and questions, but says nothing about Deferred entries, the cut check or ship's follow-up review. AC-08 covers "the reviewer, the spec skill and the owner-facing summary" and leaves out ship. Its old-pin controls are S17.scoped, S17.questions, S17.nits and S17.profile only. A spec skill that writes `## Deferred` sections and cut check lines, or a ship skill that runs the follow-up review and files issues on a repository pinned to 0c983f67, whose convention defines no Deferred section, passes every AC-08 control. This is the gap R-4 F-05 found for the profile, now opened again by the parts this revision adds.
+PROPOSAL: Add the Deferred section, the cut check and the follow-up review to the gate's old-pin list, extend AC-08 to ship, and add old-pin controls of S17.deferred, S17.cut and S17.followup that expect today's behavior.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-09; Test Plan AC-09 row ("the convention and both guides use each glossary term"); Design (Glossary, Cut check and Follow-up review rows, and "The convention, the reviewer, the spec skill and both user guides use these terms"); Scope (convention bullet; Deferred items bullet; follow-up review bullet)
+EVIDENCE: This revision added glossary rows for Cut check and Follow-up review. Scope puts the cut check in the spec skill and the follow-up review in the ship skill. The convention changes are listed in the first Scope bullet and the Deferred bullet, and neither includes them. The AC-09 test still requires the convention to use every glossary term. An implementer who keeps these plugin procedures out of the shared convention fails AC-09. One who passes it writes ship-specific procedure into `vhco-pro/docs` that Scope does not authorize. D-06 deferred the per-guide subset only, not the convention.
+PROPOSAL: Name the glossary terms the convention must use, leaving out Cut check and Follow-up review unless Scope adds them to the convention, and make the AC-09 test check that list.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Deferred items, "The spec skill writes an entry for every deferral: ..."); Acceptance Criteria AC-14; frontmatter goal; Context Owner summary (Deferred bullet)
+EVIDENCE: The list names four sources: stated limits, owner-directed cuts, author cuts under #141 and findings deferred at acceptance. The spec skill has a fifth. Its drift re-review step tells the author to "Ask the owner one question about the extra work and recommend dropping or deferring it" (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:141-144). An item deferred that way gets no Deferred entry, so it never reaches the follow-up review, although the goal promises that "every deferred item is judged once the feature is delivered".
+PROPOSAL: Add drift re-review deferrals to the list of sources and to the `From:` template, and cover them in AC-14.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: nit
+WHERE: Context Background (Harm and simplest alternative)
+EVIDENCE: "the machinery is one loop command for the re-review scope and the replay harness". This revision adds a convention section, a ship procedure step that drafts and files issues and commits verdicts, and a per-pass growth measurement, and the statement does not mention or weigh them.
+PROPOSAL: Update the harm statement to list the added parts and say why they beat the simplest alternative, such as filing an issue at the time of deferral.
