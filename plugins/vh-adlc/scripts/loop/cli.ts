@@ -12,10 +12,13 @@
 //                                    --message <text> [--owned <branch>[,<branch>...]] [--client codex|claude] [--no-push true]
 //   bun scripts/loop/cli.ts review --repo <dir> --document <doc> --commit <sha> --kind spec|implementation
 //                                  --docs-revision <sha> --binary <path> --plugin-pin <pin> [--timeout-ms <n>]
+//   bun scripts/loop/cli.ts review-scope --repo <dir> --document <doc> --commit <sha>
 //
 // `route` prints the role and route an operation runs on. `review` runs a reviewer role's command
 // route and prints its outcome; for a host route it prints the route and runs nothing, because the
-// host dispatches its own reviewer. Output is one JSON object on stdout.
+// host dispatches its own reviewer. `review-scope` prints the scope of a spec review at the commit: the
+// previous spec review, the document diff since it, and whether the pass is full and why. Output is one
+// JSON object on stdout.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadLoopSettings, loadLoopSettingsAt, routeFor, type LoopOperation } from "./settings";
@@ -27,6 +30,7 @@ import { applicableRungs, deferredRungs, featureDelta, mayAdvance, RUNG_STAGES, 
 import { ciReport, conventionSupportsSkipPaths, deliveryVerdict, repositoryVisibility, skipMarker } from "./delivery";
 import { claim, isolation } from "./claim";
 import { diffPaths, rangePaths } from "./git-paths";
+import { reviewScope, type ReviewScope } from "./review-scope";
 import { writeFileSync } from "node:fs";
 import { execFileSync, execSync } from "node:child_process";
 
@@ -49,7 +53,7 @@ function need(options: Record<string, string>, name: string): string {
 }
 
 /** The prompt a command-route reviewer receives: the canonical reviewer instructions and the dispatch identity. */
-export function reviewPrompt(input: { repository: string; document: string; commit: string; kind: string; docsRevision: string; binary: string; pluginPin: string }, context?: LoopContext): string {
+export function reviewPrompt(input: { repository: string; document: string; commit: string; kind: string; docsRevision: string; binary: string; pluginPin: string; scope?: ReviewScope }, context?: LoopContext): string {
   const agent = readFileSync(join(PLUGIN, "agents", "vh-adlc-reviewer.agent.md"), "utf8").replace(/^---\n[\s\S]*?\n---\n/, "");
   return `${agent.trim()}
 
@@ -62,7 +66,7 @@ export function reviewPrompt(input: { repository: string; document: string; comm
 - vhco-pro/docs revision: ${input.docsRevision}
 - vh-adlc binary: ${input.binary}
 - Plugin pin: ${input.pluginPin}
-
+${scopeLines(input.scope)}
 ${context && context.read.length ? `Repository instructions to check the document against: ${context.read.join(", ")}
 ` : ""}${context && context.lenses.length ? `Declared lenses, each a check whose failure is a finding at the given severity:
 ${context.lensText}
@@ -72,11 +76,27 @@ reviewed, then the records.
 `;
 }
 
+/** The dispatch lines for a spec review's scope; an implementation review has none. */
+function scopeLines(scope?: ReviewScope): string {
+  if (!scope) return "";
+  if (scope.full) return `- Scope: full pass (${scope.reason})\n`;
+  return `- Scope: scoped re-review since the previous spec review at ${scope.previous}; the document diff since then, without its Review Log:
+
+\`\`\`diff
+${scope.diff.trimEnd()}
+\`\`\`
+`;
+}
+
 export async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv;
   const options = args(rest);
   const repo = need(options, "repo");
   // A review reads its policy from the reviewed commit; only the other commands read the working tree.
+  if (command === "review-scope") {
+    console.log(JSON.stringify(reviewScope(repo, need(options, "document"), need(options, "commit"))));
+    return 0;
+  }
   const settings = command === "review" ? (undefined as unknown as ReturnType<typeof loadLoopSettings>) : loadLoopSettings(repo);
   if (command === "route") {
     const operation = need(options, "operation") as LoopOperation;
@@ -170,13 +190,14 @@ export async function main(argv: string[]): Promise<number> {
       return 3;
     }
     const prompt = reviewPrompt({ repository: kind === "spec" ? "the current directory, a read-only export of the commit" : "the current directory, a private clone of the reviewed commit",
-      document, commit, kind, docsRevision: need(options, "docs-revision"), binary: need(options, "binary"), pluginPin: need(options, "plugin-pin") }, loopContext(policy));
+      document, commit, kind, docsRevision: need(options, "docs-revision"), binary: need(options, "binary"), pluginPin: need(options, "plugin-pin"),
+      ...(kind === "spec" ? { scope: reviewScope(repo, document, commit) } : {}) }, loopContext(policy));
     const outcome = await runReviewRoute({ repo, commit, kind, document, route: { model: route.model!, argv: route.argv, ...(route.model_attestation ? { model_attestation: route.model_attestation } : {}) }, prompt,
       scratch: policy.review_scratch, timeoutMs: options["timeout-ms"] ? Number(options["timeout-ms"]) : undefined });
     console.log(JSON.stringify({ role: route.role, ...outcome }));
     return outcome.status === "ready" ? 0 : 3;
   }
-  throw Error(`unknown command ${command ?? ""}; use route, context, rungs, ci, skip, delivery, isolation, claim or review`);
+  throw Error(`unknown command ${command ?? ""}; use route, context, rungs, ci, skip, delivery, isolation, claim, review or review-scope`);
 }
 
 if (import.meta.main) {
