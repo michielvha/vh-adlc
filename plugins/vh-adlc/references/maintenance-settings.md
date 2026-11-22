@@ -26,7 +26,8 @@ only repository, renovate/dependabot are the configured bots, and reports/histor
 | `project_procedure` | Existing contained Markdown with project ownership, managers/checks, report metadata/index generation and delivery rules. |
 | `surface_expectations` | Documented code-scanning unavailability, described below. |
 | `security_settings` | `apply` or `check`, default `check`. `apply` lets a sweep or onboarding turn on the free security settings in [security-settings.md](security-settings.md), and counts only from the committed default branch as described there. |
-| `security_settings_keep_off` | Rows of `{repository, settings, reason}`: a repository in declared scope, a non-empty list from `dependabot_alerts`, `dependabot_security_updates`, `secret_scanning` and `secret_scanning_push_protection`, and required reason text. Listed settings are never written. One row per repository. |
+| `security_settings_apply_only` | Optional nonempty list of supported settings. Only this list may be written in apply mode. Check mode still reports the settings. The limit is read from the committed default branch. |
+| `security_settings_keep_off` | Rows of `{repository, settings, reason}`: a repository in declared scope, a non-empty list from `dependabot_alerts`, `dependabot_security_updates`, `secret_scanning`, `secret_scanning_push_protection` and `private_vulnerability_reporting`, and required reason text. Listed settings are never written. One row per repository. |
 
 Unknown keys, invalid types, duplicate/conflicting roles and mismatched identity fail visibly.
 Paths resolve inside the checkout, including existing symlink ancestors; required missing references

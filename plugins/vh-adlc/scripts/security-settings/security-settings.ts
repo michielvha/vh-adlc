@@ -1,7 +1,7 @@
 import { committedSecuritySettings, securitySettingsMode, type CommittedSecuritySettings } from "../maintenance/authority";
 import { readRun } from "../maintenance/journal";
 import { loadSettings, normalizeLogin, repository as repositoryName } from "../maintenance/settings";
-import type { SecurityKeepOff, WritableSecuritySetting } from "../maintenance/types";
+import { WRITABLE_SECURITY_SETTINGS, type SecurityKeepOff, type WritableSecuritySetting } from "../maintenance/types";
 
 export type Run = (argv: string[], input?: string) => { code: number; stdout: string; stderr: string };
 export type State = "already-on" | "enabled" | "left-off" | "unavailable" | "not-changed" | "unknown";
@@ -18,10 +18,11 @@ export type Options = {
   run_id?: string; mode_reason?: string; run?: Run;
 };
 
-export const WRITABLE: WritableSecuritySetting[] = ["dependabot_alerts", "dependabot_security_updates", "secret_scanning", "secret_scanning_push_protection"];
+export const WRITABLE = WRITABLE_SECURITY_SETTINGS;
 export const OWNER_DECISIONS = ["renovate-overlap", "owner-choice-conflict", "paused"];
 export const RENOVATE_PATHS = ["renovate.json", "renovate.jsonc", "renovate.json5", ".github/renovate.json", ".github/renovate.jsonc", ".github/renovate.json5",
   ".gitlab/renovate.json", ".gitlab/renovate.jsonc", ".gitlab/renovate.json5", ".renovaterc", ".renovaterc.json", ".renovaterc.jsonc", ".renovaterc.json5"];
+const REPORTING = "private_vulnerability_reporting";
 const DEPENDABOT_PATHS = [".github/dependabot.yml", ".github/dependabot.yaml"];
 
 const ghRun: Run = (argv, input) => {
@@ -90,7 +91,7 @@ function detect(api: Api, base: string, branch: string): { renovate: Lookup; dep
   return { renovate: found, dependabot: { status: "not-configured" } };
 }
 
-type Binding = { mode: "check" | "apply"; mode_reason: string | null; mode_detail?: string; keep_off: SecurityKeepOff[] };
+type Binding = { mode: "check" | "apply"; mode_reason: string | null; mode_detail?: string; keep_off: SecurityKeepOff[]; apply_only?: WritableSecuritySetting[] };
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 /**
  * Binds keep-off rows and the mode to the committed, linked default-branch settings. `apply` never falls
@@ -109,7 +110,8 @@ function bind(config: ReturnType<typeof loadSettings>, target: string, options: 
     }
     const decided = securitySettingsMode(config, target, observed, run ? { request: run.state.request, scope: run.header.scope } : undefined);
     const keep_off = decided.committed.linked ? decided.committed.keep_off : tree;
-    return { mode: decided.mode, mode_reason: decided.reason, ...(decided.detail ? { mode_detail: decided.detail } : {}), keep_off };
+    return { mode: decided.mode, mode_reason: decided.reason, ...(decided.detail ? { mode_detail: decided.detail } : {}), keep_off,
+      ...(decided.committed.apply_only ? { apply_only: decided.committed.apply_only } : {}) };
   }
   const passed = options.mode_reason ?? null;
   if (!observed) return { mode: "check", mode_reason: passed, keep_off: tree };
@@ -162,6 +164,7 @@ export function securitySettings(options: Options): { output: Output; exit_code:
     for (const setting of secrets) if (!(admin && enabled(setting))) decide(setting, "unavailable", "not-free-on-private");
     if (admin && codeScanningListed) decide("code_scanning", "unavailable", "not-free-on-private");
   }
+  if (!github || privateRepo) decide(REPORTING, "unavailable", github ? "not-available-on-private" : "not-github-com");
   // Rule 3: not admin.
   if (!admin) { for (const setting of settings) decide(setting, "unknown", "needs-admin"); return done(); }
 
@@ -177,6 +180,16 @@ export function securitySettings(options: Options): { output: Output; exit_code:
   else if (updatesRead.status === 404) on.set("dependabot_security_updates", false);
   else decide("dependabot_security_updates", "unknown", "api-error", describe(updatesRead));
   for (const setting of secrets) on.set(setting, enabled(setting));
+  const reportingEndpoint = `${base}/private-vulnerability-reporting`;
+  if (!decided.has(REPORTING)) {
+    const read = api("GET", reportingEndpoint);
+    if (!read.ok) decide(REPORTING, "unknown", "api-error", describe(read));
+    else {
+      const value = record(json(read)).enabled;
+      if (typeof value === "boolean") on.set(REPORTING, value);
+      else decide(REPORTING, "unknown", "api-error", "GitHub did not return an enabled boolean");
+    }
+  }
 
   // Rule 5: keep-off rows, with the settings that depend on a listed one.
   const listed = new Set(keepOff?.settings ?? []);
@@ -189,6 +202,14 @@ export function securitySettings(options: Options): { output: Output; exit_code:
   }
   if (listed.has("dependabot_alerts") && on.get("dependabot_security_updates") === false) decide("dependabot_security_updates", "left-off", "owner-choice", keepOff!.reason);
   if (listed.has("secret_scanning") && on.get("secret_scanning_push_protection") === false) decide("secret_scanning_push_protection", "left-off", "owner-choice", keepOff!.reason);
+
+  // A committed apply filter narrows writes. It cannot expand the existing authority.
+  const applyOnly = bound.apply_only;
+  if (mode === "apply" && applyOnly) {
+    for (const setting of WRITABLE) {
+      if (on.get(setting) === false && !applyOnly.includes(setting)) decide(setting, "left-off", "outside-apply-scope");
+    }
+  }
 
   // Rule 6: Renovate and Dependabot for security updates.
   if (!decided.has("dependabot_security_updates")) {
@@ -237,6 +258,15 @@ export function securitySettings(options: Options): { output: Output; exit_code:
         if (record(after[setting]).status === "enabled") decide(setting, "enabled");
         else decide(setting, "not-changed", "api-error", notOn(write, read));
       }
+    }
+  }
+  if (!decided.has(REPORTING)) {
+    const write = api("PUT", reportingEndpoint);
+    if (!write.ok) decide(REPORTING, "not-changed", "api-error", describe(write));
+    else {
+      const read = api("GET", reportingEndpoint);
+      if (read.ok && record(json(read)).enabled === true) decide(REPORTING, "enabled");
+      else decide(REPORTING, "not-changed", "api-error", notOn(write, read));
     }
   }
   return done();
