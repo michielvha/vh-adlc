@@ -332,6 +332,7 @@ statements.
 | 2026-11-22 | R-8 | spec | `25865301` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 2 nits |
 | 2026-11-22 | R-9 | spec | `b0b67bbf` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 1 nit |
 | 2026-11-22 | R-10 | spec | `a94fb265` | claude-opus-5-5 | procedural | 0 blocking, 6 should-fix, 1 nit |
+| 2026-11-22 | R-11 | spec | `7f8e3452` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 4 nits |
 
 ### R-1
 
@@ -1150,6 +1151,73 @@ SEVERITY: nit
 WHERE: Context > Owner summary, validation paragraph ("Observed so far: one probe showed GitHub serving a file from a commit that only a custom ref holds") and second paragraph
 EVIDENCE: This revision added a second probe to Background for R-9 F-04: on 2026-11-22, `matching-refs` listed `refs/pr-visuals/probe-empty` right after the push. Every URL now depends on that listing, and step 2 adds a bounded retry of the ref check. The summary still names one probe and does not mention the retry. I confirmed the probe's remains: `gh api repos/michielvha/stackweaver/commits/77e40d2b324234a6d166d18214d6b1e559cd8546` returns a parentless commit with the empty tree `4b825dc642cb6eb9a060e54bf8d69288fbee4904`, and `gh api repos/michielvha/stackweaver/git/matching-refs/pr-visuals/` now returns `[]`.
 PROPOSAL: Name both probes in the summary's observed proof and mention the bounded retry of the ref check.
+
+### R-11
+
+TARGET: 7f8e3452accadc83c227ac96ce060cf4eb15027b
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship step 8 ("except when it holds images that were captured but not stored, which it keeps and names in the report"); Design > Ship step 4 (withheld images); Context > Owner summary, first paragraph ("only if nothing should stay private does the push step store them") and third paragraph ("inspecting before the push is the protection"); Test Plan row AC-07 (no statement covers what happens to the output directory)
+EVIDENCE: Images that ship withholds in step 4, because one shows a credential, a session or real user data, are by definition "captured but not stored". Step 8 as written therefore keeps them on disk and names their path in the report. The previous revision ruled this out. At a94fb265, Ship step 2 said "After a withheld record it removes the directory and names its former path in the report, so no withheld image stays on disk", which was the fix for R-9 F-01. This revision dropped that sentence. The owner's decisions about the cut, as Open Questions records them, cover three items only: the capture runs like a rung, the ref check is a single call, and the text checks keep only the essential statements. Retention is not among them. The pinned standard says "Redact credentials and session material before sharing artifacts" and "Do not put runtime secrets, private user data or captured sessions into Git" (`conventions/frontend-testing.md:77`, `:177-178` at 0c983f6). This traces to a change the previous revision made (7f8e3452 reverted the R-9 F-01 fix).
+PROPOSAL: Restore the rule that a withheld record's directory is removed and its former path reported, and keep only images that passed inspection but failed to push or verify. Either that, or raise keeping withheld images as an Open Question.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship step 5 ("replacing a complete marker pair, or appending when there is none or a marker has no partner"); Design > Ship step 3 ("removes its section if a complete marker pair is present"); Design > Terms, the "Before and after section" row ("from vh-adlc's start marker through its end marker"); Design > Command step 4 (the markers); Context > Owner summary, second paragraph ("replacing only the section it wrote before")
+EVIDENCE: The document doesn't say how markers pair once a body holds a stray one. Take a body with a start marker whose end marker someone deleted, then a reviewer's paragraph, then the start and end markers of the section the last ship appended (step 5 appends when "a marker has no partner"). On the next ship, pairing each start marker with the next end marker gives a pair that spans the reviewer's paragraph, and replacing it deletes text vh-adlc did not write. Pairing innermost replaces only the appended section. The design also doesn't say whether a body that holds both a stray marker and a complete pair gets a replacement or an append. The previous revision had "the text from its start marker through the next end marker ... When a start or end marker has no partner, ship leaves the existing body text alone, appends its own section last and reports the stray marker" (a94fb265, Ship step 3, from R-7 F-?? at line 985 of this document). This revision removed it, so two implementers would replace different spans. This traces to a change the previous revision made.
+PROPOSAL: Define the pair as a start marker followed by an end marker with no other marker between them. Ship replaces or removes only that span, leaves every other marker and the text around it in place, and reports a stray marker. Use the same definition in the Terms row and in steps 3 and 5.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Ship steps 2, 5, 6 and 7 (the PR body write); Design > Ship step 8 ("the report repeats every missing item"); Design > Concurrency, failure, retry, upgrade, first bullet ("Each run writes only to its own `--out` and its PR's ref"); Context > Owner summary, second paragraph
+EVIDENCE: Deliver writes the PR body, and then the capture runs for up to `capture.timeout_minutes`, 60 by default, before ship writes the section. The design doesn't say when ship reads the body it rewrites. An implementation that reuses the body from Deliver overwrites any edit the owner, a reviewer or a bot made during the capture. The design also defines no outcome when the ref push succeeded but the body write fails. The command has already reported `full` with no missing item, so step 8 has nothing to repeat and the record is stored but never linked or disclosed. The previous revision covered both: "It reads the PR body again just before writing it ... If writing the PR body fails, ship reports a missing record naming the pushed `ref_commit`" (a94fb265, Ship step 6, which applied R-6's finding at line 911 of this document). The Concurrency bullet names only `--out` and the ref as shared state, not the PR body. This traces to a change the previous revision made.
+PROPOSAL: State that ship reads the PR body again just before writing it, and that a failed body write is reported as a missing record naming the pushed `ref_commit`. Name the PR body in the Concurrency bullet.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design > Command step 3 ("It reads `capture.json`" and builds the commit with `hash-object -w`); Design > Ship steps 4 and 5; Context > Owner summary, third paragraph ("inspecting before the push is the protection"); Scope, out of scope ("Process cleanup beyond the rung runner's"); Design > Concurrency, failure, retry, upgrade, second bullet; Test Plan row AC-04
+EVIDENCE: The rung runner returns once the child exits and its output pipes close (`plugins/vh-adlc/scripts/loop/rungs.ts:59-62`). A helper started with `setsid ... >/dev/null 2>&1 &` holds neither pipe, so the run ends with exit 0 while the helper keeps running and can still write to `$VH_ADLC_VISUAL_OUT/before/` or `after/`. The design deliberately leaves such processes running. The push step then reads whatever bytes are on disk when it runs, after ship's inspection, and nothing in `capture.json` ties those bytes to the ones ship looked at. The Owner summary calls inspection "the protection" because GitHub keeps serving a commit by SHA after its ref is deleted (Background, 2026-11-21 probe). An image that changes between inspection and push is therefore published for good without ever being inspected.
+PROPOSAL: Record each capture's blob ID (`git hash-object`, without `-w`) in `capture.json`. Have the push step store only files whose ID still matches, and report any mismatch as a missing item. Add a changed-after-capture case to the AC-04 row.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-06 ("`a\|b (c).png` appears as `a\\\|b (c)` in the text"); Design > Command step 4 (the escaping rule); AC-06
+EVIDENCE: The row sits inside a table, where `\|` stands for a pipe. Parsing the row's code spans with remark-gfm (from `/home/m/code/stackweaver/frontend/node_modules`) gave `a|b (c).png`, `a\\|b (c)` with two backslashes, and `| Screen | Before | After |` for the header. The file name holds no backslash (the URL example `a%7Cb%20%28c%29.png` has no `%5C`), so the design's rule ("`\`, `|`, `[` and `]` backslash-escaped") gives `a\|b (c)` with one backslash. As rendered, the row expects text that a correct implementation does not produce. A reader of the raw source could take it either way, so two implementers would write different assertions. The text came in with this revision. At a94fb265 the row read `a\|b (c)`, which rendered as an unescaped `a|b (c)`. This traces to a change the previous revision made.
+PROPOSAL: State the expected Screen cell and alt text in prose outside the table's code spans, for example "the stem with one backslash before the pipe", or move the escaping examples to a list below the table.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design > Command step 3 ("parented on the remote tip from `git ls-remote origin refs/pr-visuals/<number>` when one exists"); Design > Command, State paragraph ("`ls-remote` or `fetch` failed")
+EVIDENCE: `commit-tree -p <tip>` needs the parent object in the local repository, so the step has to fetch the tip. The State paragraph still lists a `fetch` failure, but step 3 no longer mentions a fetch. At a94fb265, step 3 said "fetches that commit when it exists". 7f8e3452 dropped it. This traces to a change the previous revision made.
+PROPOSAL: Restore "fetches that commit when it exists" in step 3.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan row AC-05 ("the timeout case with a sub-minute limit passed to the function"); Design > Setting (`capture.timeout_minutes`, "default 60"); Design > Command step 2 ("time limit ... behave as for a rung")
+EVIDENCE: The rung runner uses `rung.timeout_minutes` when it is set and falls back to `options.timeoutMs` only otherwise (`plugins/vh-adlc/scripts/loop/rungs.ts:58`). An implementation that turns the 60-minute default into `timeout_minutes: 60` ignores a millisecond override. The design names no function and no override for the row to call.
+PROPOSAL: Name the exported function and its timeout override in Command step 2, and say the override wins over `capture.timeout_minutes`.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context > Background, the frontend testing bullet ("`conventions/frontend-testing.md:77`, `:177-178`")
+EVIDENCE: At 0c983f6, line 77 reads "Do not put runtime secrets, private user data or captured sessions into Git." Taking and inspecting captures is at `:164-165`, and reporting missing evidence is at `:188`.
+PROPOSAL: Cite `:164-165`, `:188` and `:177-178` for the stated claims, and quote `:77` as the rule against putting captured sessions into Git.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Sources, first bullet ("the proposed shared rule this feature implements"); Context > Owner summary, first paragraph ("merged on 2026-11-22")
+EVIDENCE: `gh pr view 53 -R vhco-pro/docs --json state,mergedAt,mergeCommit` returned `MERGED`, `2026-11-22T07:31:36Z`, merge commit `edd4c091cd7913e5c4eeb716e6f0f13df2fe7ab7`. The summary says the rule is merged, but Sources still calls it proposed.
+PROPOSAL: Call it the merged rule in Sources and name the merge commit.
 
 ## Sources
 
