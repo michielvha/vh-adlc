@@ -2047,6 +2047,203 @@ function cutScenario(id: string, title: string, variant: "both" | "sampler", pin
   };
 }
 
+// ---- S17.followup ----
+
+const FOLLOWUP_REPO = "example/greet";
+const FOLLOWUP_PROFILE = "greet is a small shell script a few developers run by hand on their own machines. It is at alpha. At stake: their terminal output.";
+const FOLLOWUP_DEFERRED = [
+  "- D-01: Print `Hello, world.` when no name is given. From: R-1 F-02, stated limit. Verdict: pending.",
+  "- D-02: A `--shout` flag that prints the greeting in capitals. From: owner cut on 2026-11-20. Verdict: pending.",
+  "- D-03: Greet several names in one run, one line each. From: owner cut on 2026-11-20. Verdict: pending.",
+  "- D-04: A `--help` flag that prints the usage line `usage: greet.sh <name>`. From: author cut. Verdict: pending.",
+].join("\n");
+const USAGE_DOC = "# Usage\n\nRun `./greet.sh <name>` to greet someone, or `./greet.sh` for `Hello, world.`\n\nNot sure how to call it? Run `./greet.sh --help` to print the usage line.\n";
+
+type FollowupFixture = { stub: string; stubDir: string; owning: string; mainBefore: string };
+
+// githubRemote points the project's origin at a GitHub URL that the labels helper accepts, while a local SSH
+// command serves it from the fixture's bare repository, so nothing reaches GitHub.
+function githubRemote(f: Fixtures) {
+  const ssh = join(f.dir, "fixture-ssh");
+  writeFileSync(ssh, `#!/bin/sh\n# Serves git@github.com:${FOLLOWUP_REPO}.git from the fixture's bare repository.\nfor last; do :; done\nset -- $last\nexec git "\${1#git-}" '${f.origin}'\n`, { mode: 0o755 });
+  git(f.home, f.project, "config", "core.sshCommand", ssh);
+  git(f.home, f.project, "remote", "set-url", "origin", `git@github.com:${FOLLOWUP_REPO}.git`);
+}
+
+// ghStub writes the gh stand-in and its state; it returns the state path and the directory to put on PATH.
+function ghStub(f: Fixtures, prs: StubPR[]): { stub: string; stubDir: string } {
+  const stubDir = join(f.dir, "gh-stub");
+  mkdirSync(stubDir, { recursive: true });
+  const stub = join(f.dir, "gh-stub-state.json");
+  const labels = (JSON.parse(readFileSync(join(ROOT, "plugins", "vh-adlc", "scripts", "labels", "vocabulary.json"), "utf8")).labels as { name: string; color: string; description: string }[]).map(({ name, color, description }) => ({ name, color, description }));
+  writeFileSync(stub, JSON.stringify({ host: "github.com", repository: FOLLOWUP_REPO, actor: "owner", labels, issues: [], prs, fail_issue_attempts: [2], issue_attempts: 0 }, null, 2));
+  writeFileSync(join(stubDir, "gh"), `#!/bin/sh\nexec '${process.execPath}' '${join(import.meta.dir, "gh-stub.ts")}' '${stub}' "$@"\n`, { mode: 0o755 });
+  return { stub, stubDir };
+}
+
+type StubPR = { number: number; title: string; body: string; headRefName: string; baseRefName: string; state: "OPEN" | "MERGED" | "CLOSED"; mergedAt: string | null; mergeCommit: string | null; headRefOid: string };
+type StubIssue = { number: number; title: string; body: string; labels: string[]; state: string };
+
+function stubState(path: string): { issues: StubIssue[]; prs: StubPR[]; issue_attempts: number } {
+  return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function stubCalls(path: string): string[][] {
+  return existsSync(`${path}.calls`) ? readFileSync(`${path}.calls`, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l).args) : [];
+}
+
+// completeFeature builds the fixture feature implemented, reviewed and complete on its branch, with four
+// pending Deferred entries and a usage doc, pushed to origin. Merged, another clone merges it into the
+// default branch as PR #1 and the feature branch is gone; otherwise PR #1 is open.
+function completeFeature(f: Fixtures, pin: string, merged: boolean): FollowupFixture {
+  editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+  writeAgents(f, pin, FOLLOWUP_PROFILE);
+  githubRemote(f);
+  const owning = reviewedFeature(f);
+  mkdirSync(join(owning, "docs"), { recursive: true });
+  writeFileSync(join(owning, "docs", "usage.md"), USAGE_DOC);
+  git(f.home, owning, "add", "--", "docs/usage.md");
+  git(f.home, owning, "commit", "-q", "-m", "docs: describe usage", "--", "docs/usage.md");
+  const path = join(owning, FEATURE_PATH);
+  writeFileSync(path, readFileSync(path, "utf8").replace("status: in-progress\n", "status: complete\n").replace("## Open Questions\n\nNone.\n", `## Open Questions\n\nNone.\n\n## Deferred\n\n${FOLLOWUP_DEFERRED}\n`));
+  git(f.home, owning, "commit", "-q", "-m", "docs: complete greeting-name", "--", FEATURE_PATH);
+  git(f.home, owning, "push", "-q", "origin", FEATURE_BRANCH);
+  const head = git(f.home, owning, "rev-parse", "HEAD");
+  let prs: StubPR[];
+  if (merged) {
+    const other = join(f.dir, "merging-clone");
+    git(f.home, f.dir, "clone", "-q", f.origin, other);
+    git(f.home, other, "merge", "-q", "--no-ff", `origin/${FEATURE_BRANCH}`, "-m", `Merge pull request #1 from ${FOLLOWUP_REPO.split("/")[0]}/${FEATURE_BRANCH}`);
+    git(f.home, other, "push", "-q", "origin", "main");
+    const mergeCommit = git(f.home, other, "rev-parse", "HEAD");
+    git(f.home, other, "push", "-q", "origin", "--delete", FEATURE_BRANCH);
+    git(f.home, f.project, "worktree", "remove", owning);
+    git(f.home, f.project, "branch", "-D", FEATURE_BRANCH);
+    git(f.home, f.project, "fetch", "-q", "--prune", "origin");
+    git(f.home, f.project, "merge", "-q", "--ff-only", "origin/main");
+    prs = [{ number: 1, title: "Greeting with a name", body: "Closes nothing; local fixture.", headRefName: FEATURE_BRANCH, baseRefName: "main", state: "MERGED", mergedAt: "2026-11-22T12:00:00Z", mergeCommit, headRefOid: head }];
+  } else {
+    prs = [{ number: 1, title: "Greeting with a name", body: "Local fixture.", headRefName: FEATURE_BRANCH, baseRefName: "main", state: "OPEN", mergedAt: null, mergeCommit: null, headRefOid: head }];
+  }
+  const { stub, stubDir } = ghStub(f, prs);
+  return { stub, stubDir, owning: merged ? f.project : owning, mainBefore: git(f.home, f.project, "rev-parse", "origin/main") };
+}
+
+// followupBranch finds the docs/follow-up-<slug> branch on the fixture remote: its name, tip and document.
+function followupBranch(f: Fixtures): { name: string; tip: string; doc: string } | null {
+  const line = (gitIn(f, f.origin, "for-each-ref", "--format=%(refname:short) %(objectname)", "refs/heads/docs/") ?? "").split("\n").find((l) => l.startsWith("docs/follow-up-"));
+  if (!line) return null;
+  const [name, tip] = line.split(" ");
+  return { name, tip, doc: gitIn(f, f.origin, "show", `${tip}:${FEATURE_PATH}`) ?? "" };
+}
+
+function verdicts(doc: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  // An entry ends with its sentence's full stop, which stays when the verdict replaces `pending`.
+  for (const m of section(doc, "Deferred").matchAll(/^- (D-\d+): .*Verdict: (.*)$/gm)) out[m[1]] = m[2].trim().replace(/\.$/, "");
+  return out;
+}
+
+const ISSUE_LINK = `https://github.com/${FOLLOWUP_REPO}/issues/`;
+const SHIP_FOLLOWUP = "/vh-adlc-ship greeting-name. The owner asks you to ship it.";
+const APPROVE = "The owner here: file the gap D-04 and the follow-up D-02. Do not file D-03.";
+
+const FOLLOWUP: Scenario = {
+  id: "S17.followup.merged",
+  title: "The follow-up review after merge judges, files, records partially and resumes on a rerun",
+  phase: 7,
+  run: async (f) => {
+    const fx = completeFeature(f, f.revisionCompanion, true);
+    const env = { PATH: `${fx.stubDir}:${SCENARIO_PATH}` };
+    let partial: { branch: ReturnType<typeof followupBranch>; issues: number; attempts: number } = { branch: null, issues: 0, attempts: 0 };
+    const turns = session(f, [f.pluginA], ["/vh-adlc-resume greeting-name"], { env });
+    turns.push(
+      ...session(f, [f.pluginA], [SHIP_FOLLOWUP, APPROVE], {
+        env,
+        after: (i) => {
+          if (i === 1) {
+            const s = stubState(fx.stub);
+            partial = { branch: followupBranch(f), issues: s.issues.length, attempts: s.issue_attempts };
+          }
+        },
+      }),
+    );
+    turns.push(...session(f, [f.pluginA], [SHIP_FOLLOWUP, "The owner here: I approve again. File the gap D-04 and the follow-up D-02 where they are still missing. Do not file D-03."], { env }));
+    const final = followupBranch(f);
+    const s = stubState(fx.stub);
+    return {
+      turns,
+      notes: [
+        `after the partial run: branch ${partial.branch?.name ?? "none"} at ${partial.branch?.tip.slice(0, 7) ?? "-"}, ${partial.issues} issue(s), ${partial.attempts} creation attempt(s); verdicts ${JSON.stringify(partial.branch ? verdicts(partial.branch.doc) : {})}`,
+        `after the rerun: branch ${final?.name ?? "none"} at ${final?.tip.slice(0, 7) ?? "-"}, ${s.issues.length} issue(s), ${s.issue_attempts} creation attempt(s), ${s.prs.length} PR(s); verdicts ${JSON.stringify(final ? verdicts(final.doc) : {})}`,
+        `gh calls: ${stubCalls(fx.stub).map((a) => a.slice(0, 3).join(" ")).join("; ").slice(0, 1500)}`,
+      ],
+      checks: (c) => {
+        const [resume, shipAsk, shipPartial] = turns.map((t) => t.result);
+        const at = (text: string, id: string) => text.indexOf(id);
+        const order = ["D-04", "D-02", "D-03", "D-01"].map((id) => at(shipAsk ?? "", id));
+        const v = final ? verdicts(final.doc) : {};
+        const firstLinks = partial.branch ? Object.values(verdicts(partial.branch.doc)).filter((x) => x.includes(ISSUE_LINK)) : [];
+        const byDeferred = (id: string) => s.issues.find((x) => x.body.trimEnd().endsWith(`Deferred: ${FEATURE_PATH} ${id}`));
+        const gap = byDeferred("D-04"), followUp = byDeferred("D-02");
+        const branchPRs = s.prs.filter((x) => x.headRefName.startsWith("docs/follow-up-"));
+        return [
+          { name: "resume reports the four pending entries and names the follow-up review", ok: ["D-01", "D-02", "D-03", "D-04"].every((id) => (resume ?? "").includes(id)) && /follow-up review/i.test(resume ?? "") },
+          // The groups are ordered (gaps, follow-ups, drops); the follow-ups among themselves are not.
+          { name: "ship shows the gap, then the follow-ups, then the drop, without asking for a writer handoff", ok: order.every((x) => x >= 0) && order[0] < Math.min(order[1], order[2]) && Math.max(order[1], order[2]) < order[3], detail: `first positions D-04 ${order[0]}, D-02 ${order[1]}, D-03 ${order[2]}, D-01 ${order[3]}` },
+          { name: "the failed second creation made the run partial, and the remote branch holds a commit with the first link", ok: /partial/i.test(shipPartial ?? "") && partial.attempts === 2 && partial.issues === 1 && firstLinks.length === 1, detail: `${partial.attempts} attempts, ${partial.issues} issues, links ${firstLinks.join(", ")}` },
+          { name: "the rerun filed only the missing issue and added a commit to the same branch", ok: s.issues.length === 2 && s.issue_attempts === 3 && !!final && !!partial.branch && final.name === partial.branch.name && final.tip !== partial.branch.tip && gitIn(f, f.origin, "merge-base", "--is-ancestor", partial.branch.tip, final.tip) !== null, detail: `${s.issues.length} issues, ${s.issue_attempts} attempts` },
+          { name: "the gap was filed with the bug type and the follow-up with the feature type, each ending with its Deferred line", ok: !!gap && !!followUp && JSON.stringify(gap.labels) === '["bug"]' && JSON.stringify(followUp.labels) === '["enhancement"]', detail: s.issues.map((x) => `#${x.number} ${x.labels.join(",")} ${x.body.trim().split("\n").at(-1)}`).join(" | ") },
+          {
+            name: "the entries end as drop, follow-up with its link, follow-up not filed, and gap with its link",
+            ok: /^drop, \S/.test(v["D-01"] ?? "") && v["D-02"] === `follow-up ${ISSUE_LINK}${followUp?.number}` && v["D-03"] === "follow-up, not filed (owner declined)" && v["D-04"] === `gap ${ISSUE_LINK}${gap?.number}`,
+            detail: JSON.stringify(v),
+          },
+          { name: "one PR exists for the follow-up branch", ok: branchPRs.length === 1 && branchPRs[0].headRefName === final?.name, detail: s.prs.map((x) => `#${x.number} ${x.headRefName} ${x.state}`).join(", ") },
+          { name: "the fixture remote's default branch is unchanged", ok: gitIn(f, f.origin, "rev-parse", "main") === fx.mainBefore },
+          { name: "nothing was merged", ok: !stubCalls(fx.stub).some((a) => a[0] === "pr" && a[1] === "merge") },
+          unrelatedIntact(c),
+        ];
+      },
+    };
+  },
+};
+
+// followupControl: a complete feature whose PR is not merged (or, on the old pin, merged) gets no follow-up review.
+function followupControl(id: string, title: string, pin: "companion" | "convergence", merged: boolean): Scenario {
+  return {
+    id,
+    title,
+    phase: 7,
+    run: async (f) => {
+      const fx = completeFeature(f, pin === "companion" ? f.revisionCompanion : f.revisionConvergence, merged);
+      const env = { PATH: `${fx.stubDir}:${SCENARIO_PATH}` };
+      const turns = session(f, [f.pluginA], ["/vh-adlc-resume greeting-name"], { env, cwd: fx.owning });
+      turns.push(...session(f, [f.pluginA], [`${SHIP_FOLLOWUP} ${merged ? "" : HANDOFF}`.trim()], { env, cwd: fx.owning }));
+      const s = stubState(fx.stub);
+      const calls = stubCalls(fx.stub);
+      return {
+        turns,
+        notes: [`gh calls: ${calls.map((a) => a.slice(0, 3).join(" ")).join("; ").slice(0, 1500)}`],
+        checks: (c) => {
+          const [resume, ship] = turns.map((t) => t.result);
+          const checks: Check[] = [
+            { name: "resume names no follow-up review", ok: !!resume && !/follow-up review/i.test(resume) },
+            { name: "no follow-up review ran: no docs/follow-up branch and no issue filed", ok: followupBranch(f) === null && s.issue_attempts === 0 && !calls.some((a) => a[0] === "issue" && a[1] === "create") },
+            { name: "the fixture remote's default branch is unchanged", ok: gitIn(f, f.origin, "rev-parse", "main") === fx.mainBefore },
+          ];
+          if (merged) checks.push({ name: "ship names no follow-up review on the old pin", ok: !!ship && !/follow-up review/i.test(ship) });
+          // Ship may mention the follow-up review as the step after the merge; running it is what is ruled out,
+          // which the check above covers.
+          else checks.push({ name: "ship ran its normal delivery path for the open PR", ok: calls.some((a) => a[0] === "pr" && ["edit", "create", "view"].includes(a[1])), detail: calls.map((a) => a.slice(0, 2).join(" ")).join("; ") });
+          checks.push(unrelatedIntact(c));
+          return checks;
+        },
+      };
+    },
+  };
+}
+
 const PROPORTIONAL_SCENARIOS: Scenario[] = [
   profileScenario("S17.profile.single", "A single-person profile lowers the lock gap to a nit or less", "single", "companion"),
   profileScenario("S17.profile.hosted", "A hosted multi-tenant profile keeps the lock gap at should-fix or blocking", "hosted", "companion"),
@@ -2062,6 +2259,8 @@ const PROPORTIONAL_SCENARIOS: Scenario[] = [
   DEFERRED_REVIEW,
   cutScenario("S17.cut.both", "An owner cut defers the sampler and turns the security item into a question", "both", "companion"),
   cutScenario("S17.cut.control", "Control: cutting only the sampler loses nothing important", "sampler", "companion"),
+  FOLLOWUP,
+  followupControl("S17.followup.unmerged", "Control: a complete feature whose PR is not merged keeps ship's delivery path", "companion", false),
 ];
 SCENARIOS.push(...PROPORTIONAL_SCENARIOS);
 
