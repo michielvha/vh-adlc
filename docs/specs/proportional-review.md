@@ -729,6 +729,7 @@ None.
 | 2026-11-22 | R-10 | spec | `d3ad7ce2` | claude-opus-5-5 | procedural | drift re-review after PR #152 and PR #155: no blocking; 1 should-fix, 3 nit; acceptance kept |
 | 2026-11-23 | R-11 | spec | `9e9236a0` | claude-opus-5-5 | procedural | no blocking; 7 should-fix, 2 nit |
 | 2026-11-23 | R-12 | spec | `28be40ab` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
+| 2026-11-23 | R-13 | spec | `529d2648` | claude-opus-5-5 | procedural | scoped: no blocking; 2 should-fix, 1 nit |
 
 ### R-1
 
@@ -1530,3 +1531,26 @@ SEVERITY: nit
 WHERE: Context Owner summary (first bullet, "a failure path is blocking or should-fix only when someone using that product would plausibly hit it"; "Validation so far: ... The replays on the fixed reviewer are still running."); frontmatter status_description ("T1 to T22 stay done; T23 and T24 continue after acceptance")
 EVIDENCE: Severity by consequence and AC-04 now say that a failure path the reviewer is unsure about is rated should-fix rather than nit or dropped (vh-adlc-reviewer.agent.md:66-67). The summary still says should-fix applies "only when someone ... would plausibly hit it". The summary's validation line mentions only the replay reruns. It leaves out that the real-reviewer S17 scenarios ran before ef685da1 and rerun under T26, and that T25 changes the harness before T23 and T24. status_description names only T23 and T24. Neither location is in the normative baseline.
 PROPOSAL: Add the uncertain-path rule to the first bullet. Name T25 and T26 as the remaining work in both the validation line and status_description.
+
+### R-13
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "Each brief records its plugin commit, docs revision and model per route beside its stored runs"; "`assemble` checks every stored set the same way"; "the results are assembled from those stored runs"); Tasks T25; Test Plan AC-10 row; Test Plan AC-11 row (brief check)
+EVIDENCE: This traces to the previous revision's answer to R-12 F-01. The new rule keeps one identity per brief and route, not per stored run. The harness at the commit names its private files `${name}-${route}-pass-${n}.txt` (tests/vh-adlc/replay/run.ts, the `pass` store callback in `runCase`), and n restarts at 1 on every invocation because `firstPasses` starts from a fresh set (`n = set.runs.length + 1`). The first new brief `5e94e593` on the Claude route had failing labels (ef685da1's message: always-blocking defects "only at should-fix"), so it took the six confirmation passes, plus any failed runs, which also take an n. Suppose a rerun on the fixed brief needs no confirmation. It overwrites passes 1 to 6 and leaves the higher-numbered `5e94e593` passes in place. With one identity per brief and route, the directory then reads as the fixed brief, and `assemble` counts those leftovers, so AC-11's retention verdict can mix two new briefs. The AC-11 brief check compares only the brief named in the results file. No AC-10 case covers a set that still holds runs of an earlier brief with the same name.
+PROPOSAL: Store the plugin commit, docs revision and model with each run, as `RunEntry` already does in the results, and have `assemble` and the reuse check count only runs whose own identity matches. Alternatively, clear a brief's stored set when its identity changes. Add that case to the AC-10 row and T25.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "A run of the new brief alone reuses the old-brief passes and loops already stored only when that recorded identity matches the current old brief and route, and refuses otherwise"; "Moving the new brief therefore reruns only the new brief"; approval-order paragraph, "the old-brief runs stay valid because the old brief does not change"); Context Owner summary ("every new-rules run repeats on the fixed plugin"); Tasks T25
+EVIDENCE: The old-brief runs of the first complete enterprise result were stored by the harness as it was before T25. That harness writes only pass text, verdict JSON and loop documents to `<case>/runs/`. Plugin commit, docs revision and model go only into the `replay-data` block of the results file (`writeResults`). The results file is not in the tree at the commit: `git ls-tree -r --name-only 529d2648 tests/vh-adlc/evidence/proportional-review/` lists only `canned/`. So the stored set the Design means to reuse has no identity "beside its stored runs". Under the new rule a new-brief-only run must either refuse it, which reruns the old brief and contradicts "reruns only the new brief" and "the old-brief runs stay valid", or accept an identity someone writes by hand, which the check cannot verify. The Design does not say which. Two implementers would differ in whether the owner waits for a full old-brief rerun.
+PROPOSAL: Say where a set stored before T25 gets its identity, for example the per-run identities in the `replay-data` block that run wrote, checked run by run. Otherwise state that the old brief reruns for every case and route, and change the reuse sentences and the Owner summary to match.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-10; Test Plan AC-10 row; Design (Replay harness, stored-runs paragraph)
+EVIDENCE: The previous revision added reuse of a matching stored old-brief set, refusal of a mismatched one, and assembly after an interrupted first-pass set to the AC-10 row and to T25. AC-10's text still lists only "runs a case end to end, refuses a case whose approval line is missing ... records failed executions without counting them as passes, and runs on a public fixture case". No criterion states the reuse, refusal or assembly end state that the row now proves.
+PROPOSAL: Add to AC-10 that a new-brief-only run reuses only stored old-brief runs whose identity matches and refuses otherwise, and that results assembled from stored runs keep every finished pass.
