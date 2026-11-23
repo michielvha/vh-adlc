@@ -242,8 +242,17 @@ load 17: 238.4 seconds on main and 234.0 on the branch, all passing on both.
   took 21 minutes (12:57:18 to 13:18:32 UTC) against 44. All 4,290 tests passed in 1,275 seconds.
   Per-test times summed to 4,808 seconds against 9,444, and docs-drift to 4,499 against 8,792.
   Files that read no settings barely moved (`ensure.test.ts` 29.0 to 27.7 seconds,
-  `loop/review-route.test.ts` 16.2 to 14.1), so most of the gain comes from the change. This is one
-  run on each side, so some runner variance remains in the numbers.
+  `loop/review-route.test.ts` 16.2 to 14.1), which points to the change, but see the next entry for
+  how far runs vary.
+- CI run [45182976519](https://github.com/michielvha/vh-adlc/actions/runs/45182976519) at
+  `8b39b15a`, merged as PR #161 (the worktree scope read once per command), ran twice on the same
+  commit. Per-test times summed to 7,220 seconds in the first attempt and 5,526 in the second, and
+  `delivery-ack.test.ts`, which neither change reaches through a command, took 210.7 and 160.2
+  seconds. Attempts on one commit differ by about 30%, so a single run per side cannot measure a
+  change smaller than that. #161 showed no measurable CI gain over #160: most heavy tests call the
+  journal APIs directly, outside a command. The 9,444 to 4,808 seconds of #160 is larger than that
+  spread, but its exact size is uncertain. The second attempt's test step took 25.5 minutes; the
+  first attempt's remote-gui job failed in an unrelated browser test, tracked in #163.
 
 ## Follow-ups
 
