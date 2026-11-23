@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after spec review R-5 with the owner's answer to Q27; waits for independent re-review R-6."
+status_description: "Spec review R-6 is stored; its judgement findings wait for the owner before the next revision."
 issue: null
 goal: "A session that drives many sub-sessions across a workstream follows one generic vh-adlc procedure that starts only work the host and the loop can carry, keeps every session's state and blockers current, routes owner decisions correctly and closes sessions without losing work."
 covers:
@@ -551,6 +551,7 @@ None.
 | 2026-11-23 | R-3 | spec | `de1a5171` | claude-opus-5-5 | procedural | 0 blocking, 9 should-fix, 2 nits; judgement findings go to the owner first |
 | 2026-11-23 | R-4 | spec | `36eed728` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 1 nit; judgement findings go to the owner first |
 | 2026-11-23 | R-5 | spec | `20c6df0d` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement finding goes to the owner first |
+| 2026-11-23 | R-6 | spec | `d4207bf5` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement findings go to the owner first |
 
 ### R-1
 
@@ -891,6 +892,36 @@ SEVERITY: nit
 WHERE: Design, Required sentences S-32, S-45 and S-11; Design, Concurrency, failure and upgrade; Design, Explanation the reference adds (Admission order)
 EVIDENCE: S-32 has the stale orchestrator hand off and stop steering, and the owner starts the replacement. No sentence says who ends the stale orchestrator's session. S-02 and S-45 cover sub-sessions only, and plugins/vh-adlc/references/authority.md:30 requires "Separate approval for that exact action" to "end a live session". The explanation says paused sessions "count toward the live-session limit until they are archived", so a stopped orchestrator that stays live keeps using a live-session slot and a bridge worker.
 PROPOSAL: Add to S-32 or S-45 that the replacement includes the stale orchestrator in the batched archive approval, or that the owner ends it when starting the replacement.
+
+### R-6
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-30, S-31, S-45, S-36, S-07, S-09, S-10, S-11 and S-52; Design, Explanation the reference adds (Admission order); Design, Concurrency, failure and upgrade; Context, Owner summary (Upgrades and close-out bullet); Context, Owner decisions Q19 and Q24; Acceptance Criteria AC-04 and AC-10
+EVIDENCE: S-30 says to "replace the paused sessions once, when the release they wait for has landed". S-45 allows archiving only "replaced, paused sessions", and S-36 allows other archiving only after a reported done. The Admission order explanation says "Pending and paused sessions count toward the live-session limit until they are archived", and S-11 says to "start no session that would bring the count above the limit". Take a limit of 20 with 15 sub-sessions paused after an install, plus the stale and replacement orchestrators. Only a few replacements fit under the limit. The other paused sessions cannot be archived because they are not yet replaced and have not reported done. No sentence says whether replacements are new sub-sessions under S-07, S-09, S-10 and S-52, which would mean batches of at most three, a ten-minute wait and a ramp reset, or whether they start together "once" as S-30 says. Incident 7 was churn from replacing sessions one by one. One implementer archives each paused session before starting its replacement. Another replaces in rounds of three, with several approval batches against S-45's "asked for in one batch". A third goes over the limit to honour "once". This combines S-45 and the live-count sentence, both added at 36eed728, with S-30.
+PROPOSAL: State whether replacements go through admission (capacity, batch size, wait, ramp). Also state the order when the live-session limit leaves no room, for example that the batched S-45 approval may archive a paused session as soon as its handoff is recorded and before its replacement starts.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-09, S-52, S-19 and S-32; Design, Glossary (Workstream ledger, Batch); Design, Concurrency, failure and upgrade; Context, Owner decisions Q24, Q26 and Q27
+EVIDENCE: S-09 lets a batch grow only "when the batch before it counted toward the ramp". S-52 decides that from three facts: every member reported its first step, none was pending or failed, and "the capacity check after the wait passed the first time". The glossary's ledger, which the reference carries verbatim, holds "its work item, worktree, state, blockers, next step, the merge order, each exclusive resource's queue and every handoff". It holds no batch membership, size or ramp outcome. Under S-32 and Q24, a replacement orchestrator takes over the whole workstream from the ledger and fresh reports, so it cannot tell how large the last batch was or whether it counted. Nor can the same orchestrator after it loses context in a long session. One implementer starts the replacement at three. Another resumes the predecessor's size from its handoff, which S-32 sends to the owner, not to the ledger. This traces to the ramp added at 20c6df0d and S-52 added at d4207bf5.
+PROPOSAL: Add each batch's members, size and S-52 result to the ledger's glossary row. Or state that a replacement orchestrator's first batch has at most three sessions.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (Admission bullet); Design, Required sentences S-09 and S-52
+EVIDENCE: The Owner summary says "each batch may exceed the one before it by at most three, and only when that batch counted". That puts the counting condition on any growth. S-09 puts it only on "a batch larger than three", and S-52 lets the next batch after a non-counting batch have up to three. So after a non-counting batch of one, for example one started under S-12, the summary forbids a batch of three, while S-09 and S-52 allow it. This traces to the revision at d4207bf5.
+PROPOSAL: Reword the summary to say that a batch larger than three needs the batch before it to have counted and may exceed it by at most three.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner decisions Q26 and Q27; Design, Required sentence S-09; Design, Explanation the reference adds (Admission order)
+EVIDENCE: Q26 still reads "A batch larger than three starts only after a batch of three has met every condition for the next batch, and each batch may exceed the last one that met them by at most three". The revision at d4207bf5 changed S-09 to "starts only when the batch before it counted toward the ramp, and may exceed that batch by at most three". That drops "after a batch of three", so a counted batch of one or two may now be followed by four or five. It also replaces "the last one that met them" with the batch just before. Q27 changes Q26 this way, but Q26 is not marked "Amended by Q27". Q7, Q13 and Q14 are marked amended where later answers changed them.
+PROPOSAL: Mark Q26 as amended by Q27. If the owner meant to require a batch of three before any larger batch, restore "after a batch of three" in S-09.
 
 ## Sources
 
