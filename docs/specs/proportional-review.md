@@ -749,6 +749,7 @@ None.
 | 2026-11-23 | R-14 | spec | `436d91c5` | claude-opus-5-5 | procedural | scoped: no blocking; 2 should-fix, 1 nit |
 | 2026-11-23 | R-15 | spec | `9299b15b` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
 | 2026-11-23 | R-16 | spec | `06bdcac5` | claude-opus-5-5 | procedural | scoped: no blocking, no should-fix; 4 nit |
+| 2026-11-23 | R-17 | spec | `dfdd422d` | claude-opus-5-5 | procedural | drift re-review after merging main 74e7b1d2: no findings |
 
 ### R-1
 
@@ -1649,3 +1650,7 @@ SEVERITY: nit
 WHERE: Design (Replay harness, "earlier files of that part, with its identity, move to `runs-superseded/`"; "Sets stored before T25 have no identity file: `runs/launch-record.json` ... the harness counts only the listed files and refuses any other file of that set"); Scope (the R-15 F-01 limit, "a loop rerun on one is made as a fresh set instead")
 EVIDENCE: When a post-T25 run starts a fresh set for a part stored before T25, its files move aside, but its identity is an entry in the shared `runs/launch-record.json`, which the document does not say is removed or marked. Afterwards the part has both a new identity file and a launch-record entry listing moved files. A careful implementer most likely treats the identity file as governing ("Sets stored before T25 have no identity file"), but one who applies the entry would refuse the new loop files as "any other file of that set", and `assemble` would fail until the record is edited by hand. The failure is a visible refusal, not a wrong count, and it arises only if an old-brief part stored before T25 is rerun.
 PROPOSAL: Add one clause: a part with an identity file is governed by it alone, and starting a fresh set for a pre-T25 part moves its launch-record entry aside with its files.
+
+### R-17
+
+NO FINDINGS
