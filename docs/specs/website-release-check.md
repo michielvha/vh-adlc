@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after spec review R-11 with the owner's 2026-11-23 answers on profile keys, the test CA and local prerequisites. Next: follow-up spec review and renewed acceptance."
+status_description: "Spec review R-12 returned five should-fix findings and two nits. Waiting on the owner's answer to Q1 (whether the shipped command may trust an extra CA) before one revision."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
@@ -124,13 +124,24 @@ Check explicitly configured routes on two targets: the adopter's locally served 
 
 ## Open Questions
 
-None. The owner selected report mode first and approved explicit run outcomes and bounded observation, scoped and sanitized evidence, and a separate Stackweaver adoption. Lighthouse remains outside the shared tool.
+The owner selected report mode first and approved explicit run outcomes and bounded observation, scoped and sanitized evidence, and a separate Stackweaver adoption. Lighthouse remains outside the shared tool.
 
 On 2026-11-23 the owner settled two questions raised during T4. An unfinished transfer never satisfies a required request, and adopters declare a response the page never reads as an expected response. This delivery is Chromium-only, a profile that selects Firefox is rejected before start, and Firefox support is the follow-up feature #158.
 
 The owner also answered two questions from spec review R-10 on 2026-11-23. A profile names its browser in an optional `browser` field that defaults to `chromium` and accepts only `chromium`, and undefined profile keys are invalid configuration. Hosted CI installs the smoke prerequisites in the `checker` job, pins playwright-core with a lockfile, and fails rather than skips when a prerequisite is missing; the first hosted run shows whether Ubuntu's Squid works or the job pins 7.5.
 
 On 2026-11-23 the owner also answered two questions from spec review R-11. Unknown profile keys are rejected at every nesting level, against the defined key set in the Design, and the fixture CA is a runner argument the test harness passes, never part of a checked-in profile. The website-check tests fail without their prerequisites on every host, and `AGENTS.md` states the Linux requirement and names the portable selection for other hosts.
+
+### Q1: Can the shipped command trust an extra certificate authority, or only the test harness?
+
+**Recommendation:** A. Keep the CA argument in the internal runner API that the tests call, and leave it out of the shipped command, so no adopter pipeline can weaken certificate validation on a deployed check.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Internal runner API only** | The installed command always uses normal certificate validation. AC-03's certificate cases run through the runner API with the fixture CA. AC-04's installed-entry proofs use the build target over loopback HTTP, which the Design already allows. | The installed command is never exercised against an HTTPS fixture; its HTTPS path is proven only through the same runner the command calls. |
+| **B. A flag on the shipped command** | The installed command can be proven end to end against the HTTPS fixtures. | Any adopter can pass the flag. The report would have to show it on every run, and enforcement would need to refuse it on the deployed target. |
+
+**Why this is yours:** it sets the trust boundary of the shipped command.
 
 ## Review Log
 
