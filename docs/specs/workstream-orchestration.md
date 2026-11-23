@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after spec review R-6 with the owner's answers to Q28 and Q29; waits for independent re-review R-7."
+status_description: "Spec review R-7 found nothing blocking; waits for the owner's acceptance."
 issue: null
 goal: "A session that drives many sub-sessions across a workstream follows one generic vh-adlc procedure that starts only work the host and the loop can carry, keeps every session's state and blockers current, routes owner decisions correctly and closes sessions without losing work."
 covers:
@@ -570,6 +570,7 @@ None.
 | 2026-11-23 | R-4 | spec | `36eed728` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 1 nit; judgement findings go to the owner first |
 | 2026-11-23 | R-5 | spec | `20c6df0d` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement finding goes to the owner first |
 | 2026-11-23 | R-6 | spec | `d4207bf5` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement findings go to the owner first |
+| 2026-11-23 | R-7 | spec | `96664f59` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; the owner chose to end the revision cycle, so the findings go to follow-up rather than another revision |
 
 ### R-1
 
@@ -940,6 +941,38 @@ SEVERITY: nit
 WHERE: Context, Owner decisions Q26 and Q27; Design, Required sentence S-09; Design, Explanation the reference adds (Admission order)
 EVIDENCE: Q26 still reads "A batch larger than three starts only after a batch of three has met every condition for the next batch, and each batch may exceed the last one that met them by at most three". The revision at d4207bf5 changed S-09 to "starts only when the batch before it counted toward the ramp, and may exceed that batch by at most three". That drops "after a batch of three", so a counted batch of one or two may now be followed by four or five. It also replaces "the last one that met them" with the batch just before. Q27 changes Q26 this way, but Q26 is not marked "Amended by Q27". Q7, Q13 and Q14 are marked amended where later answers changed them.
 PROPOSAL: Mark Q26 as amended by Q27. If the owner meant to require a batch of three before any larger batch, restore "after a batch of three" in S-09.
+
+### R-7
+
+TARGET: 96664f59c4deb16ac6a7f531bb094738014a57e0
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-45, S-15, S-36 and S-30; Design, Concurrency, failure and upgrade; Context, Owner summary (Upgrades and close-out bullet); Context, Owner decisions Q19 and Q28; Acceptance Criteria AC-10
+EVIDENCE: S-45 now says "archive each paused session as soon as its report is in the workstream ledger, before its replacement starts" (document line 428), and the Concurrency section repeats it ("archives each paused session once its report is recorded"). S-15 says "a claimed feature continues in its owning worktree" (line 393), so the replacement needs the paused session's worktree, together with any uncommitted changes in it. A paused session is stale and "writes nothing" (S-44), so it cannot commit, push or record its work in progress before it is archived. S-36 exempts paused sessions from the "confirmed its cleanup finished" check. The loop's clean-up treats archiving as the point where a session removes "temporary worktrees and their branches, worktree slots" (plugins/vh-adlc/references/loop.md:196-198, :213-214), and the Explanation says "Archiving is final". No sentence says the archive must leave the paused session's worktree and uncommitted state in place, or that the orchestrator checks this before archiving. Before this revision, the replacement started first and was using the worktree when the old session was archived. Now the worktree has no session attached at the moment of archiving, so on a host whose archive action removes or abandons the session's worktree, the work is lost. The goal promises to close "sessions without losing work", and incident 13 was this kind of loss. One implementer archives at once. Another first checks that the worktree survives. This traces to the revision at 96664f59 (Q28).
+PROPOSAL: Add to S-45 that a paused session is archived only in a way that keeps its worktree, branch and uncommitted changes for its replacement, and that its ledger report names that worktree. Where the host's archive would remove the worktree, the orchestrator asks the owner before archiving.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-10, S-52, S-09, S-45 and S-53; Design, Glossary (Workstream ledger); Design, Concurrency, failure and upgrade; Context, Owner decisions Q20, Q27, Q28 and Q29
+EVIDENCE: S-10 lets the next batch start only "after every session in the current batch has reported its first step or been recorded in the workstream ledger as pending or failed" (line 383). S-53 makes replacements "new sub-sessions" that "go through admission like any other", so the first replacement batch is the next batch under S-10. A member of the batch still in flight when the plugin install lands can go stale and pause before its first step (S-30, S-44). Under S-45 it is then archived. It is neither "pending or failed", and "first step" is not defined, so it is unclear whether its state report by message counts as one. Read strictly, S-10 holds the replacement batch back for good. S-52 also gives no result for that batch, so the ledger record Q29 adds ("whether it counted toward the ramp") has nothing to record, and S-09 cannot size the replacement batch. One implementer counts the stale report as a first step and the batch as counted. Another treats the paused member as failed and resets the ramp to three. A third waits. This combines S-53 and the batch record added at 96664f59 with S-10 and S-52.
+PROPOSAL: State that a batch member that goes stale and pauses before its first step no longer holds back the next batch, and that its batch does not count toward the ramp, so the first replacement batch has at most three sessions.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Required sentence S-30; Context, Owner summary (Upgrades and close-out bullet); Design, Required sentence S-53
+EVIDENCE: S-30 still says "replace the paused sessions once, when the release they wait for has landed" (line 424), and the Owner summary says "Paused sessions are replaced once when the awaited release lands" (line 69). S-53 and Q28 now send replacements through admission, so they start in batches of at most three with a ten-minute wait between them. "Once" can be read as all at the same time, which S-53 rules out. The intended meaning is that each paused session is replaced a single time. This traces to the revision at 96664f59, which added S-53 without rewording S-30.
+PROPOSAL: Reword S-30 and the summary to "replace each paused session once, after the release it waits for has landed".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (Upgrades and close-out bullet)
+EVIDENCE: The summary says "One batched owner approval covers archiving the replaced orchestrator and each paused session, as soon as its report is in the ledger" (lines 73-75). Read naturally, the "as soon as" clause also covers the replaced orchestrator, which has no report in the ledger: it sends its handoff to the owner by message (S-32). S-45 puts the condition on paused sessions only. This traces to the revision at 96664f59.
+PROPOSAL: Reword as "One batched owner approval covers archiving the replaced orchestrator and the paused sessions; each paused session is archived as soon as its report is in the ledger."
 
 ## Sources
 
