@@ -320,15 +320,45 @@ model does not satisfy that request.
 Review isolation is procedural: the reviewer has a shell that can still write.
 See the [compatibility details](../reference/compatibility.md).
 
-A spec review rates each finding blocking, should-fix or nit, using the definitions in
-the pinned feature-document convention; a lens your repository declares keeps its own
-severity. A nit never causes a revision on its own: when a pass's blocking or
-should-fix findings change the document, the same commit fixes that pass's nits, and
-the rest are listed in the conversation. The agent applies each pass's findings as one
-revision, after asking you about any judgement finding, so one pass's fixes do not
-seed the next pass's findings. An extra the agent added on its own, which no criterion,
-decision of yours or public contract needs, is removed without asking you and noted in
-the Review Log.
+A spec review rates each finding blocking, should-fix or nit by its consequence for your product. This
+is severity by consequence. Describe the product in a `## Product profile` section of your root
+`AGENTS.md`: what it is, who uses it, its stage and what is at stake, in a few lines. A failure path is
+should-fix or blocking only when a user, tenant or operator of that product would plausibly hit it, and
+how high depends on the harm. Without a profile, the reviewer judges as for production software with
+users whose data matters. A false fact, an unmeetable criterion or a broken proof keeps its rating, and
+an always-blocking defect (a security, data-loss or tenant-isolation defect) is blocking on every
+product. A lens your repository declares keeps its own severity.
+
+The agent may answer a finding with a stated limit instead of a new mechanism: a `Not handled:` line in
+Scope that names the case, why, and the finding it answers. Later passes leave a stated limit alone unless
+it leaves an always-blocking defect, makes a criterion unmeetable or leaves the problem unsolved. After the
+first pass, each spec review is a scoped re-review: it covers what changed in the document since the
+previous spec review, and every section that states a rule, ID or term the change touches, and elsewhere
+it reports only blocking findings. A pass is full again when a covered file, or a file that pins your
+conventions such as `AGENTS.md`, changed in between.
+
+The agent asks you only where you could plausibly choose differently, which is a choice that the goal and
+your recorded rules (the product profile, your instruction files and project procedure) do not decide. It
+settles every other choice and records why in Design. A nit never causes a revision on its own: when a
+pass's blocking or should-fix findings change the document, the same commit fixes that pass's nits. The
+summary shows you only the unapplied nits your recorded rules do not settle, with a count of the rest,
+and the full list follows at the end of the same reply. The agent applies each pass's findings as one
+revision, after asking you about any question that remains, so one pass's fixes do not seed the next
+pass's findings. An extra the agent added on its own, which no criterion, decision of yours or public
+contract needs, is removed without asking you and noted in the Review Log.
+
+Everything a spec defers is one line in its `## Deferred` section: a stated limit, something you cut, a
+finding you defer when accepting, an extra the agent removed, or extra work you defer after a change on
+the default branch. Editing that list never makes a review stale. After every deferral you direct, the
+agent checks that nothing important was lost; an always-blocking defect, or something the goal or a
+criterion names, becomes a question instead. Once the feature's PR is merged, ship's follow-up review
+judges each pending item against what was built, as drop, follow-up or gap. In one answer you choose which
+follow-ups and gaps become issues, and the verdicts land in a short docs PR. Resume and the ship report
+point out a merged feature whose items are still pending.
+
+These rules apply when your repository resolves a vhco-pro/docs revision whose feature-document convention
+rates severity by consequence. A repository pinned to an earlier revision keeps the previous rules until it
+moves its pin.
 
 Every investigation and spec states the harm a fix prevents and the simplest
 alternative without new machinery, such as a process rule or a manual step. The
