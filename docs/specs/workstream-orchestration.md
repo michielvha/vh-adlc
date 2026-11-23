@@ -1,12 +1,13 @@
 ---
 status: draft
-status_description: "Revised after spec review R-1 with the owner's answers to Q1 to Q13; waits for an independent re-review."
+status_description: "Revised after spec review R-2 with the owner's answers to Q1 to Q17; waits for independent re-review R-3."
 issue: null
 goal: "A session that drives many sub-sessions across a workstream follows one generic vh-adlc procedure that starts only work the host and the loop can carry, keeps every session's state and blockers current, routes owner decisions correctly and closes sessions without losing work."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-orchestrate/
   - plugins/vh-adlc/references/orchestrate.md
   - plugins/vh-adlc/references/lifecycle.md
+  - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
   - tests/vh-adlc/check.test.ts
@@ -35,8 +36,8 @@ It has nothing for the session above them.
 The feature adds one skill and one reference, a procedure rather than a framework:
 
 - **Admission.** Before starting work, check that its harm justifies it, that none of the gates it
-  will reach is blocked, and that the host can carry it (`capacity.sh` and the host's live-session
-  count). Start at most three new sessions per batch. The next batch waits until every session in the
+  will reach is blocked, and that the host can carry it (`capacity.sh`, and where the project sets a
+  live-session limit, no start that would exceed it). Start at most three new sessions per batch. The next batch waits until every session in the
   current one has reported its first step, ten minutes have passed and the check passes again. Nothing,
   not even an owner instruction, overrides a blocked capacity check. Each exclusive resource, such as
   a single test cluster, gets a queue and one heavy job at a time.
@@ -44,25 +45,27 @@ The feature adds one skill and one reference, a procedure rather than a framewor
   hours, list every session's state and check every recorded blocker against its PR or issue. A read
   that fails counts as unknown, never as clear.
 - **Communication.** Steer by message; interrupt only for an emergency stop and tell the owner at once.
-  Owner answers are recorded, dated, in the work item's issue or document, where the sub-session reads
+  Owner answers are recorded, dated, as comments on the work item's issue, where the sub-session reads
   them. Facts are verified before they are relayed, owner questions are batched with recommendations,
   interface contracts go from producer to consumers, and each shared code area has one owner.
-- **Decision boundary.** The orchestrator sequences work, applies recorded owner decisions, writes the
-  workstream ledger and archives its finished sub-sessions. Scope, rule changes, merges and releases go
-  to the owner.
+- **Decision boundary.** The orchestrator sequences work and applies recorded owner decisions. The
+  owner's request to orchestrate grants a short, exact list of writes (the ledger, dated answer records
+  on work-item issues, its own harm statements and handoffs, archiving its finished sub-sessions), and
+  the plugin's authority table gets a row for it. It never writes a claimed feature document. Scope,
+  rule changes, merges and releases go to the owner.
 - **Upgrades and close-out.** Stale sessions write a handoff and pause, and are replaced once when the
-  awaited release lands, each with the owner's handoff. A stale orchestrator stops writing and asks to
-  be replaced. Sessions are archived only after a confirmed done and cleanup; handoffs never live in
+  awaited release lands, each with the owner's handoff; the handoff is the one write a stale session
+  makes. A stale orchestrator stops every other write and asks to be replaced. Sessions are archived only after a confirmed done and cleanup; handoffs never live in
   `/tmp`.
 
 Project specifics go in an `## Orchestration` section of the project procedure the loop settings
 already name. The plugin names no adopter.
 
-The owner answered all thirteen questions on 2026-11-23, relayed by the orchestrating session (Owner
+The owner answered all seventeen questions on 2026-11-23, relayed by the orchestrating session (Owner
 decisions below). Proof is planned, not observed: package tests that assert each rule's exact sentence
 in the reference, a list of adopter terms the package must not contain, and a written walkthrough in
 which the implementation reviewer confirms each rule reads as a requirement and replays each incident
-to the step that stops it. R-1 found nothing blocking; this revision applies its findings. Acceptance
+to the step that stops it. R-2 found one blocking issue, about which writes the orchestrator may make; this revision answers it with the owner's grant in Q14. Acceptance
 authorizes the plugin edits, tests and docs rows on a feature branch and one PR; merging and releasing
 need the owner's separate approval.
 
@@ -95,10 +98,33 @@ All answered on 2026-11-23 and relayed by the orchestrating session; each was th
   example for each.
 - Q13: the request to orchestrate a workstream covers archiving the sub-sessions it started once each
   is done; an interrupt is only for an emergency stop, reported to the owner at once.
+- Q14: the request to orchestrate authorizes exactly: the workstream ledger, dated owner-answer
+  comments on work-item issues (never inside a claimed feature document), its own harm statements and
+  handoffs in the ledger, and archiving finished sub-sessions it started; the grant gets its own row in
+  `references/authority.md`; its own commits keep needing the repository's normal authority and gates.
+- Q15: start no session that would bring the live count above the project's limit; the count gates
+  admission only where the project procedure sets a limit.
+- Q16: the stall rule says explicitly that the orchestrator applies no convergence threshold of its
+  own, and the implementation reviewer confirms none appears.
+- Q17: keep a separate skill rather than a section in `references/loop.md`, for the reason the harm
+  statement gives.
 
 ### Background
 
 Measured at `0c9fee77` on `main`, conventions at `vhco-pro/docs` `0c983f67` (`AGENTS.md:4`).
+
+**Harm and simplest alternative.** The harm: the owner of a multi-session workstream loses hours per
+incident (two hours on ENOSPC, a day of idle sessions on a missed merge, hours of queued jobs), every
+session can be blocked by one bad commit to the shared default branch, and owner attention is spent on
+review loops whose harm never justified them. It recurs on every workstream and does not heal; the same
+orchestrator repeated several mistakes in one week. The simplest alternative without machinery is a
+written procedure, and this feature is one: no binary command, settings schema, helper script or state
+store. The smallest home for it would be an "Orchestrating sub-sessions" section in
+`references/loop.md`, beside the capacity and harm rules (`references/loop.md:22-51`). That loses: the
+loop reference is read by sessions running an operation, and an orchestrating session usually runs
+none itself, while lifecycle intake routes requests only to skills (`references/lifecycle.md:51-66`). A
+separate skill costs one checker kind, two count changes and an intake row, and it is what lets a
+session asked to orchestrate find the procedure.
 
 **What exists.** The loop requires a capacity check before any fan-out and says to start nothing new
 on `capacity: blocked` (`plugins/vh-adlc/references/loop.md:36-51`, `:46`). The check covers disk,
@@ -190,14 +216,6 @@ review and an owner-only acceptance. The design adopts the admission, ledger, st
 leaves out what conflicts with the loop, such as a manager agent that reviews and accepts worker output
 in place of the independent reviewer and the owner (CrewAI's hierarchical manager).
 
-**Harm and simplest alternative.** The harm: the owner of a multi-session workstream loses hours per
-incident (two hours on ENOSPC, a day of idle sessions on a missed merge, hours of queued jobs), every
-session can be blocked by one bad commit to the shared default branch, and owner attention is spent on
-review loops whose harm never justified them. It recurs on every workstream and does not heal; the same
-orchestrator repeated several mistakes in one week. The simplest alternative without machinery is a
-written procedure. This feature is that alternative: one skill and one reference, with no new binary
-command, settings schema, helper script or state store.
-
 ## Scope
 
 In scope:
@@ -210,6 +228,8 @@ In scope:
   `vh-adlc-orchestrate` to its non-engineering list, so the engineering count stays eleven, and checks
   nineteen skills. Both guides keep "eleven engineering operations", add one coordination operation
   and say nineteen skills; the workflows guide gets an Orchestrate row.
+- A row in `references/authority.md` for the request to orchestrate a workstream, with exactly the
+  writes S-02 lists.
 - A plugin version bump.
 
 Out of scope:
@@ -241,6 +261,7 @@ The reference carries this table verbatim.
 | Heavy job | A run that loads the host for minutes or more: a full test suite, an image build, a cluster run. |
 | Status pass | One sweep over every sub-session and every recorded blocker. |
 | Coordination operation | A vh-adlc operation that steers other sessions and changes no feature status itself. |
+| Emergency stop | Interrupting a sub-session that is about to destroy data, push to a protected branch or exhaust the host; nothing else qualifies. |
 
 ### The skill
 
@@ -262,26 +283,29 @@ reference may add explanation around them but never softens one. The Test Plan a
 **Decision boundary** (`## Decision boundary`):
 
 - S-01: The orchestrator decides alone: sequencing, batch membership, applying a recorded owner decision to the case it names, following repository rules, pausing its own admissions and messaging sub-sessions.
-- S-02: The owner's request to orchestrate a workstream authorizes writing its workstream ledger and archiving the sub-sessions it started once each is done; it authorizes no other issue or repository write.
+- S-02: The owner's request to orchestrate a workstream authorizes exactly these writes: its workstream ledger, dated owner-answer comments on work-item issues, its own harm statements and handoffs in the ledger, and archiving the sub-sessions it started once each is done.
 - S-03: Scope, accepting or parking a feature, any change to or bending of a rule in the repository's instruction files, merging and releasing go to the owner.
 - S-04: When unsure which side a question falls on, ask the owner.
+- S-41: Never write a claimed feature document; only its owning session edits it.
+- S-42: The orchestrator's own commits need the repository's normal authority for that change.
 
 **Admission** (`## Admission`):
 
-- S-05: Before starting any work, write or find its harm statement, and raise disproportionate machinery with the owner as a proportionality question before the work starts.
+- S-05: Before starting any work, find its harm statement or write one in the workstream ledger, and raise disproportionate machinery with the owner as a proportionality question before the work starts.
 - S-06: If any gate the work reaches next is blocked for everyone, do not start the work; finish in-flight work first.
 - S-07: Run `capacity.sh` on the checkout and the temp directory before every batch; on `capacity: blocked`, start nothing.
 - S-08: Nothing overrides a blocked capacity check, an owner instruction included; report the blocked lines and offer to start the batch once the check passes.
 - S-09: Start at most three new sub-sessions per batch unless the project procedure sets another limit.
 - S-10: Start the next batch only after every session in the current batch has reported its first step, at least 10 minutes after the last start, and a new capacity check passes.
-- S-11: Count the host's live sessions before every batch, and start nothing at or above the project procedure's live-session limit.
+- S-11: Where the project procedure sets a live-session limit, count the host's live sessions before every start and start no session that would bring the count above the limit.
 - S-12: A session that stays pending without a worker is a capacity signal: do not retry it, and start nothing new until archived sessions free a slot.
 - S-13: Never archive running sessions to recover from overload; stop admitting and let them finish.
 - S-14: Keep one queue per exclusive resource in the workstream ledger, and run one heavy job at a time on each exclusive resource.
 
 **The brief** (`## The brief`):
 
-- S-15: Each sub-session works in its own worktree from an up-to-date default branch and reads every rule from that worktree.
+- S-15: A new work item starts in a fresh worktree from an up-to-date default branch, a claimed feature continues in its owning worktree, and the sub-session reads every rule from that worktree.
+- S-43: The worktree comes from the host's worktree tool or the project's worktree provisioning, never from one the orchestrator creates itself.
 - S-16: The brief names the work item, its scope, the recorded decisions, the code areas the session owns and those another session owns, the interface contracts it produces or consumes, and its durable handoff location.
 - S-17: The sub-session verifies the brief's claims before acting on them and reports any that are wrong.
 
@@ -289,14 +313,17 @@ reference may add explanation around them but never softens one. The Test Plan a
 
 - S-18: Run a status pass before every admission, after every sub-session report, and at least every 2 hours while any sub-session is active, unless the project procedure sets another interval.
 - S-19: Each status pass lists every sub-session's state and last report and updates the workstream ledger.
+- S-38: Each status pass ends with one table of every sub-session and every open owner question.
+- S-39: Only the orchestrator writes the workstream ledger; sub-sessions report to the orchestrator.
+- S-40: Without a ledger location in the project procedure, ask the owner where the ledger lives before the first batch.
 - S-20: For every recorded blocker, read its PR or issue state with the forge CLI, and tell each dependent session as soon as it clears.
 - S-21: A read that fails, times out or returns an error is unknown, never merged, clear, idle or done.
-- S-22: When the spec operation's convergence trigger has fired for a sub-session, add that session's pending proportionality question to the batched owner questions and do not ask a second one.
+- S-22: When the spec operation's convergence trigger has fired for a sub-session, add that session's pending proportionality question to the batched owner questions, do not ask a second one, and apply no convergence threshold of its own.
 
 **Communication and stops** (`## Communication and stops`):
 
 - S-23: Steer a sub-session by message; interrupt only for an emergency stop, tell the owner at once, and leave resuming it to the owner.
-- S-24: Record each owner answer, dated, in the work item's issue or feature document, and point the sub-session there.
+- S-24: Record each owner answer, dated, as a comment on the work item's issue, and point the sub-session there.
 - S-25: A feature handoff needs the owner to say it in the receiving session.
 - S-26: Verify every fact and link before relaying it.
 - S-27: Batch owner questions into one message, each with the decision, the options and a recommendation.
@@ -306,8 +333,9 @@ reference may add explanation around them but never softens one. The Test Plan a
 **Plugin upgrades** (`## Plugin upgrades`):
 
 - S-30: When a plugin release makes sessions stale, have each write its durable handoff and pause, and replace the paused sessions once, when the release they wait for has landed.
+- S-44: Writing its durable handoff is the one write a stale session makes.
 - S-31: Ask the owner for every replacement's handoff in one batch; a replacement writes only after the owner hands it the feature in its own session.
-- S-32: A stale orchestrator keeps reading and messaging, makes no repository or ledger write, writes its own handoff and asks the owner to replace it.
+- S-32: A stale orchestrator keeps reading and messaging, makes no other repository or ledger write, writes its own handoff and asks the owner to replace it.
 
 **Own commits** (`## The orchestrator's own commits`):
 
@@ -321,7 +349,7 @@ reference may add explanation around them but never softens one. The Test Plan a
 **Close-out** (`## Close-out`):
 
 - S-36: Archive a sub-session only after it has reported done and confirmed its cleanup finished, and archive finished sub-sessions promptly.
-- S-37: Handoffs go to the location the workstream ledger names or into the feature document, never to `/tmp`.
+- S-37: Handoffs go to the location the workstream ledger names or, failing that, to a comment on the work item's issue, never to `/tmp`.
 
 ### Explanation the reference adds
 
@@ -332,15 +360,12 @@ Around the sentences, the reference explains:
   lags sessions that have not started building. Owner urgency is answered with the largest start the
   check allows later, never with an override.
 - **The workstream ledger.** It lives where the project procedure names, such as a tracking issue or a
-  document; without one, the orchestrator asks the owner before the first batch. Only the orchestrator
-  writes it; sub-sessions report to the orchestrator.
+  document (S-39, S-40).
 - **Status pass states.** Working, idle, pending, failed and archived, as the host shows them, plus
-  which sessions report `plugin.stale` and the release each waits for. The pass ends with one table of
-  every session and every open owner question.
+  which sessions report `plugin.stale` and the release each waits for (S-38).
 - **Stops.** A message is recoverable by the orchestrator. An interrupt makes the session treat itself
   as stopped by the owner, and it may refuse a peer's resume message. Archiving is final.
-- **Emergency stop.** A sub-session about to destroy data, push to a protected branch or exhaust the
-  host is an emergency; anything else is steered by message.
+- **Emergency stop.** The glossary defines it; anything else is steered by message.
 - **Close-out.** After the workstream's last merge, the orchestrator removes what it created, as the
   loop's clean-up section describes.
 
@@ -363,8 +388,9 @@ returns.
 
 The procedure adds no shared state beyond the workstream ledger, which only the orchestrator writes;
 sub-sessions report to it. A failed forge read leaves the blocker unknown and is retried on the next
-status pass, which S-18 bounds at two hours. Installing a new plugin version changes nothing for running
-sessions until they restart; a running orchestrator then follows S-32. Rolling back the plugin removes
+status pass, which S-18 bounds at two hours. Sessions become stale as soon as a new plugin version
+installs (`references/loop-settings.md:124-128`); stale sub-sessions then follow S-30 and S-44, and a
+stale orchestrator follows S-32. Rolling back the plugin removes
 the skill and nothing else.
 
 ## Acceptance Criteria
@@ -374,19 +400,21 @@ the skill and nothing else.
       reads the loop context, and lifecycle intake routes to it. The discovery check counts eleven
       engineering operations and nineteen skills, and both guides say eleven engineering operations, one
       coordination operation and nineteen skills, with an Orchestrate row in the workflows guide.
-- [ ] AC-02: The reference states the decision boundary, sentences S-01 to S-04.
+- [ ] AC-02: The reference states the decision boundary, sentences S-01 to S-04, S-41 and S-42, and
+      `references/authority.md` has a row for the request to orchestrate a workstream granting the writes
+      S-02 lists.
 - [ ] AC-03: The reference requires proportion and gate checks before new work, sentences S-05 and S-06.
 - [ ] AC-04: The reference requires the capacity, batch, live-session and overload rules, sentences
       S-07 to S-13.
 - [ ] AC-05: The reference requires a queue and one heavy job at a time per exclusive resource,
       sentence S-14.
-- [ ] AC-06: The reference states the brief's rules, sentences S-15 to S-17.
-- [ ] AC-07: The reference requires the status pass timing, contents, dependency watch and fail-closed
-      reads, sentences S-18 to S-21.
+- [ ] AC-06: The reference states the brief's rules, sentences S-15 to S-17 and S-43.
+- [ ] AC-07: The reference requires the status pass timing, contents, dependency watch, ledger rules and
+      fail-closed reads, sentences S-18 to S-21 and S-38 to S-40.
 - [ ] AC-08: The reference routes a fired convergence trigger into the batched owner questions without
       a second question or a threshold of its own, sentence S-22.
 - [ ] AC-09: The reference states the communication and stop rules, sentences S-23 to S-29.
-- [ ] AC-10: The reference states the plugin-upgrade rules, sentences S-30 to S-32.
+- [ ] AC-10: The reference states the plugin-upgrade rules, sentences S-30 to S-32 and S-44.
 - [ ] AC-11: The reference requires the orchestrator's own commits to pass the repository's delivery
       gates, sentence S-33.
 - [ ] AC-12: The reference states the watcher rules, sentences S-34 and S-35.
@@ -403,9 +431,9 @@ the skill and nothing else.
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | `bun test tests/vh-adlc/check.test.ts`: a coordination-operation test asserts the skill file, name, description, no `model`, `vh-adlc knowledge`, `guides/humanize-prose.md`, `scripts/loop/cli.ts context` and `references/orchestrate.md`, and that the lifecycle table names `skills/vh-adlc-orchestrate/SKILL.md`. `bun test tests/vh-adlc/triage/discovery.test.ts` asserts nineteen skill directories, eleven engineering operations with `vh-adlc-orchestrate` in the non-engineering list, "nineteen skills", "eleven engineering operations" and "one coordination operation" in both guides, and a `vh-adlc-orchestrate` row in the workflows guide. |
-| AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-11, AC-12, AC-13 | `bun test tests/vh-adlc/check.test.ts`: the test reads S-01 to S-37 from this document's Required sentences section and asserts each appears verbatim, with whitespace folded, in `references/orchestrate.md` under the section its heading names. It must fail when one sentence is deleted or reworded (checked once locally by changing S-09's "three" to "five"). |
+| AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-11, AC-12, AC-13 | `bun test tests/vh-adlc/check.test.ts`: the test reads every S-NN sentence from this document's Required sentences section and asserts each appears verbatim, with whitespace folded, in `references/orchestrate.md` under the section its heading names. It must fail when one sentence is deleted or reworded (checked once locally by changing S-09's "three" to "five"). For AC-02 it also asserts a `references/authority.md` table row naming `skills/vh-adlc-orchestrate/SKILL.md` and the words "workstream ledger" and "archiving". For AC-08, the implementation reviewer reads the whole reference and confirms it states no convergence threshold, round count or pass count of its own. |
 | AC-14 | `bun test tests/vh-adlc/check.test.ts`: asserts `## Orchestration` and the eight field names in the reference; then scans every file under `plugins/vh-adlc/` for the case-insensitive adopter terms `stackweaver`, `sw-e2e`, `agent-slot`, `worktree-dev.sh` and `iac_platform`. Must pass: the package as built. Must fail: a fixture file holding each term in turn. |
-| AC-15 | `bun test tests/vh-adlc/check.test.ts` asserts fifteen numbered incident rows, each naming at least one sentence ID from S-01 to S-37. Written procedure for the implementation reviewer: for each incident in Background, find the step in `references/orchestrate.md` that would have stopped it and record incident, step and verdict; met only when all fifteen have a step. |
+| AC-15 | `bun test tests/vh-adlc/check.test.ts` asserts fifteen numbered incident rows, each naming at least one sentence ID that exists in the Required sentences section. Written procedure for the implementation reviewer: for each incident in Background, find the step in `references/orchestrate.md` that would have stopped it and record incident, step and verdict; met only when all fifteen have a step. |
 | AC-16 | `bun test tests/vh-adlc/check.test.ts` asserts every row of this document's Glossary table appears verbatim in the reference. Written procedure for the implementation reviewer: read the whole reference and confirm no stated rule is softened into advice (for example "usually", "consider", "optional"), recording each rule and verdict. |
 
 ## Tasks
