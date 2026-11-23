@@ -22,5 +22,6 @@ Feature documents: docs/specs/
 
 - The vh-adlc binary: `go test ./...`, `go vet ./...`, `golangci-lint config verify` and
   `golangci-lint run` (v2.15.0), and `go mod tidy -diff`.
-- The vh-adlc plugin checker: `bun test tests/vh-adlc`.
+- The vh-adlc plugin checker: `bun test tests/vh-adlc --parallel --timeout 60000`, with `go` on
+  PATH and network access to GitHub. CI runs the same command.
 - The github-app-registration plugin: `bun test --cwd plugins/github-app-registration/skills/github-app-registration/scripts`.
