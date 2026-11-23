@@ -177,6 +177,7 @@ Spec reviews R-17 and R-18 both returned a blocking finding, so the convergence 
 | 2026-11-23 | R-16 | spec | `dd48a4a0beb0989353b634591ce8be7d13acc0f6` | n/a | n/a | accepted by owner |
 | 2026-11-23 | R-17 | spec | `9a148c337cdfe5db2948955122d9e5e8bed4ce91` | claude-opus-5-5 | procedural | One blocking finding, one should-fix finding and three nits |
 | 2026-11-23 | R-18 | spec | `aa30003f0174709b3772d22ae0741230a45bcdf9` | claude-opus-5-5 | procedural | One blocking finding, three should-fix findings and two nits |
+| 2026-11-23 | R-19 | spec | `4a554015b17aa482aa98020a0391f0454041429e` | claude-opus-5-5 | procedural | Five should-fix findings and two nits |
 
 ### R-1
 
@@ -893,6 +894,57 @@ SEVERITY: nit
 WHERE: Context / Owner summary line 32 ("Since the acceptance at `dd48a4a0`, the command's own network requests move into a cleared-environment child process that connects only through the confinement proxy"), Owner summary line 28 ("The command's own network requests run in a child process with a cleared environment")
 EVIDENCE: At X the upgrade probe still runs in the parent process (`runner.ts:22`), and T5 and T6 are unticked. The summary lists which checks have run and passed, but it states the child-process change in the present tense without saying that it and its seven T5 cases are planned and not yet observed. The standard asks the summary to tell planned checks apart from observed proof. This is outside the normative baseline.
 PROPOSAL: Say that the child-process change is planned for T5 and T6 and has not run yet.
+
+### R-19
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-03 line 101 (the trust and proxy cases: "verify that inside the boundary the certificate check still fails on the untrusted certificate, the logging proxy receives nothing"), Tasks T5 line 120, Design line 63 ("no environment variable, dotenv file, `bunfig.toml` or command-line setting from the invoking process or directory can reach these requests"), Context / Owner summary line 28, Open Questions line 153 ("every proof must be able to fail")
+EVIDENCE: The fixture writes its certificates under the host temp directory (`tests/vh-adlc/website-check/fixtures/site.ts:39` and `:103`, `mkdtempSync(join(tmpdir(), ...))`). The Bubblewrap boundary this revision reuses mounts `--tmpfs /tmp` (`plugins/vh-adlc/scripts/website-check/chromium.ts:108`) and gives the worker its own network namespace with `--unshare-net` (`chromium.ts:107`). Suppose a worker leaks the invoking environment, for example because it was started without `--clearenv`. Then `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE` and `SSL_CERT_DIR` point at files that do not exist inside the boundary, so the certificate check still fails. `HTTP_PROXY` and `https_proxy` point at a logging proxy on host loopback that the namespace cannot reach, so the logging proxy still receives nothing and the probe just fails to connect. The row does not require the probe to succeed. Of the listed cases, only `NODE_TLS_REJECT_UNAUTHORIZED=0` (directly or through `.env`) can fail on such a worker. `BUN_OPTIONS --preload` can fail only if the test asserts a certificate failure rather than any failure, because the preload file is also missing inside. The leak still matters, because the boundary mounts the host's `/etc/ssl` and `/etc/pki` (`chromium.ts:112-113`). A leaked `SSL_CERT_FILE` or `SSL_CERT_DIR` pointing into the system store, or a leaked `NODE_USE_SYSTEM_CA`, would take effect there. This traces to this revision's move of the command's requests into the browser's boundary.
+PROPOSAL: Make each case able to fail on a leaking worker: put the fixture certificate and preload file at a path the boundary mounts, or have the network worker report its own environment and assert that none of the listed names is in it. For the proxy settings, also require that the upgrade probe still reaches the destination through the confinement proxy.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-03 line 101 ("Serve the deployed fixture under a hostname that only the confinement proxy resolves, and verify that the command's own requests still reach it"), Tasks T5 line 120 ("Add the proxy-only hostname case"), Design line 63 ("accepts it only for a loopback origin (`127.0.0.1` or `localhost`)", "The only proxy override is `WEBSITE_CHECK_SQUID`")
+EVIDENCE: The runner writes the Squid configuration itself (`plugins/vh-adlc/scripts/website-check/chromium.ts:72-83`), with no `hosts_file` or resolver setting. The only outside input is the executable path from `WEBSITE_CHECK_SQUID` (`chromium.ts:31`). Squid resolves names through the host's resolver, so a test cannot give Squid a name the host does not resolve without one of these: a new test hook in the shipped runner, which the Design does not define and which would be a second override, a wrapper script passed as `WEBSITE_CHECK_SQUID`, or editing the host's `/etc/hosts`. Every fixture origin today is `127.0.0.1` (`fixtures/site.ts`). A proxy-only hostname is not loopback, so the Design's rule rejects the fixture CA for that origin (`runner.ts:15-16`). The deployed fixture's HTTPS certificate then cannot validate, and the row does not say whether "still reach it" means a destination-log entry for a TLS handshake that then fails, or only the plain HTTP upgrade probe. Two implementers would build different hooks and different pass conditions.
+PROPOSAL: State how the test gives Squid alone a resolution for the hostname, and whether that hook ships in the runner and is recorded in the report. Say that the case runs without a fixture CA, and what observation counts as reaching the fixture: the upgrade probe's destination log, a TLS handshake log, or both.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design line 63 ("The report names every variable present in the invoking environment from this set"), Test Plan AC-03 line 101 ("a `.env` file carrying `NODE_TLS_REJECT_UNAUTHORIZED=0` and `HTTP_PROXY`", "the report names each variable that was set"), Tasks T5 line 120 ("with the variable named in the report"), Context / Owner summary line 28 ("the report names ambient trust or proxy variables that were present")
+EVIDENCE: The Design defines the report entries over the invoking environment. The AC-03 row also requires the report to name the variables a `.env` file in the invoking directory sets. Whether those variables are in the invoking environment depends on how the shipped command itself starts, and the document does not say. If the CLI entry runs under plain `bun`, Bun loads the `.env` into the parent's `process.env`, and the variables are reported. If the entry runs with `--no-env-file`, the same hardening the Design gives the worker, they are absent, and a Design-conforming report names nothing, so the row fails. A third implementer scans `.env` files in the directory. The `bunfig.toml` case sets no variable unless its preload does, so "each variable that was set" is undefined there.
+PROPOSAL: Say whether the shipped command's own process loads dotenv files, and whether the report covers variables set only in `.env` or by a `bunfig.toml` preload. Make the AC-03 row's report check for the `.env` and `bunfig.toml` cases match that choice.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design line 63 ("The HTTP upgrade probe uses its own instance of the boundary"), Design line 67 ("Check the boundary before navigation. A browser without it is incomplete required coverage. An optional network adapter that cannot obey it is skipped with a reason"), Test Plan AC-01 line 99 ("A missing confinement boundary fails browser coverage before navigation"), Tasks T5 and T6 lines 120-121
+EVIDENCE: This revision adds new Bubblewrap instances for the upgrade probe and for the certificate and redirect checks. The browser worker refuses to run without its network namespace (`plugins/vh-adlc/scripts/website-check/smoke-worker.ts:10-14`), and AC-01 proves that path for the browser. The document defines no outcome when the probe's or the HTTPS checks' boundary cannot be set up, for example when Bubblewrap cannot create the namespace or Squid fails to start. The certificate and redirect checks may read as optional adapters and be skipped. The upgrade probe is a profile key (`httpUpgradeUrl`), not an adapter, and today a failed probe throws before the browser starts (`runner.ts:27-29`). No proof row checks that the new worker refuses to run outside its namespace. A worker with a cleared environment, an empty working directory, `--no-env-file` and an explicit proxy, but no network namespace, passes every listed case.
+PROPOSAL: State the outcome for the upgrade probe and for the certificate and redirect checks when their boundary is missing: skipped with a reason, incomplete required coverage, or a startup failure. Add a proof that the network worker detects a missing namespace and fails, as the browser worker does.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design line 63 ("run inside the same Bubblewrap boundary as the browser. The boundary clears the environment, mounts only the runner's own files read-only"), Context / Owner summary line 28 ("run inside the browser's Bubblewrap boundary")
+EVIDENCE: The browser's boundary mounts more than the runner's own files: `/usr`, `/etc/fonts`, `/etc/ssl`, `/etc/pki`, `/etc/ld.so.cache`, the Bun executable, the adopter's playwright-core directory and the browser cache (`plugins/vh-adlc/scripts/website-check/chromium.ts:109-118`). Bun needs `/usr` to run at all. One implementer reuses the browser's argument list and mounts the host trust stores and the adopter's module directory into the network worker. Another follows "only the runner's own files" and leaves them out. The two builds differ in which host trust material the worker can read, which matters under F-01.
+PROPOSAL: Say which host paths the network worker's boundary mounts, in particular whether `/etc/ssl` and `/etc/pki` are included, and drop either "the same boundary as the browser" or "only the runner's own files", whichever is not meant.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary line 28 ("so nothing from the invoking environment or directory can weaken them"), Design line 63 ("no environment variable ... from the invoking process or directory can reach these requests")
+EVIDENCE: `WEBSITE_CHECK_SQUID` comes from the invoking environment (`chromium.ts:31`) and picks the proxy executable that enforces the allowlist for these requests. The same Design bullet keeps it and records it in the report, so the absolute wording leaves out the one override it allows.
+PROPOSAL: Except the recorded `WEBSITE_CHECK_SQUID` override in both sentences.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T6 line 121 ("`report.ts`, `cli.ts`, `adapters.ts`, `runner.ts` and a new boundary entry `network-worker.ts`")
+EVIDENCE: The Bubblewrap command and the Squid setup that the network worker is to share with the browser live in `confinedChromium` (`plugins/vh-adlc/scripts/website-check/chromium.ts:29-31` and `:72-126`). Reusing that boundary for a second worker means changing `chromium.ts`, which T6 does not list. The standard asks each task to name the files it touches.
+PROPOSAL: Add `chromium.ts`, or whichever file the shared boundary moves to, to T6's file list.
 
 ## Sources
 
