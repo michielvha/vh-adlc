@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementation claimed. Starting with the confined Chromium report-mode smoke test."
+status: parked
+status_description: "Parked by the owner on 2026-11-23 after acceptance at spec review R-19: T1 to T4 and T11 to T13 are done and CI is green. Next on resume: T5, then T6, then T14 and T15 after a scoped R-19 revision; see the pause note in Open Questions."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
