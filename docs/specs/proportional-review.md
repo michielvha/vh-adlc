@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by the owner at spec review R-9 after the deferred-items revision; R-9's four should-fix findings are Deferred entries D-11 to D-14. Next: tasks, after PR #152 and #141 land."
+status: in-progress
+status_description: "Claimed for implementation on feat/proportional-review. Next: T1, then owner approval of the replay labels and cases before the first rule-editing commit (T2)."
+branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
 covers:
@@ -76,7 +77,7 @@ ship and resume skills:
 Behavior changes are gated on the resolved convention: repositories with their own older pin keep
 today's behavior, pinless ones take the new rules with the plugin upgrade. It builds on
 [PR #152](https://github.com/michielvha/vh-adlc/pull/152) and
-[#141](https://github.com/michielvha/vh-adlc/issues/141), which land first; it is the first step of
+[#141](https://github.com/michielvha/vh-adlc/issues/141) (PR #155), both merged; it is the first step of
 [#52](https://github.com/michielvha/vh-adlc/issues/52).
 
 Product quality is a hard constraint, proved by replay on one enterprise and one small application
@@ -605,7 +606,30 @@ for the old-pin controls.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/proportional-review.test.ts` - failing tests that pin the companion convention's severity definitions, always-blocking classes, stated limit, scoped re-review, plausible-choice rule, owner-list triage, Deferred section and source list, the glossary terms the convention uses, vh-adlc's product profile and the companion pin; fails because none exist yet (AC-01, AC-02, AC-03, AC-09, AC-14)
+- [ ] T2 `vhco-pro/docs: conventions/feature-documents.md` - the companion PR on its own branch with every convention rule Design names; T1's convention assertions pass against the companion head (AC-01, AC-02, AC-03, AC-14)
+- [ ] T3 `tests/vh-adlc/loop/review-scope.test.ts` - failing tests for `review-scope`: previous review after an acceptance row, a non-ancestor row, no row, a changed `covers` path, each changed bridge file, the Review Log left out of the diff, and `reviewPrompt` carrying the result; fails because the command does not exist (AC-05)
+- [ ] T4 `plugins/vh-adlc/scripts/loop/cli.ts`, `tests/vh-adlc/loop/lenses.test.ts` - the `review-scope` command and its result in `reviewPrompt` for the command route; T3 and `lenses.test.ts` pass (AC-05)
+- [ ] T5 `plugins/vh-adlc/references/review-protocol.md` - both routes pass the scope, and the Independence sentence gains the scope exception; T1's protocol assertions pass (AC-05)
+- [ ] T6 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `tests/vh-adlc/proportionality.test.ts` - the reviewer reads the product profile, rates failure paths by consequence, honours stated limits and Deferred entries, and scopes re-reviews, all gated on the resolved convention; T1's reviewer assertions and `proportionality.test.ts` pass (AC-03, AC-04, AC-05, AC-08, AC-14)
+- [ ] T7 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `tests/vh-adlc/direct-operation-compatibility.test.ts` - the plausible-choice rule, the author-side stated limit, Deferred entries with their five sources, the cut check, owner-list triage and the scope in the host dispatch, gated on the resolved convention, keeping #141's author-cut exception and its Review Log record; T1's spec assertions and `tests/vh-adlc/author-extras.test.ts` pass, and the spec baseline moves to this commit (AC-06, AC-07, AC-08, AC-14, AC-15)
+- [ ] T8 `plugins/vh-adlc/references/loop.md` - the product profile, stated once; T1's loop assertion passes (AC-04, AC-09)
+- [ ] T9 `tests/vh-adlc/labels/` - failing `follow-up` mode cases: one type label, no state label, no alias change, the `Deferred:` line at the end of the body; fails because the mode does not exist (AC-16)
+- [ ] T10 `plugins/vh-adlc/scripts/labels/`, `plugins/vh-adlc/references/issues.md` - the `follow-up` filing mode and ship's filing role; T9 passes (AC-16)
+- [ ] T11 `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md`, `plugins/vh-adlc/references/authority.md` - the follow-up review after merge, triggers keyed on the merge, the ship report and resume flags, and its authority, gated on the resolved convention; T1's ship, resume and authority assertions pass (AC-08, AC-16)
+- [ ] T12 `tests/vh-adlc/fixtures/build.ts`, `tests/vh-adlc/scenarios/run.ts` - a fixture docs revision holding the `0c983f67` tree and `scriptedPlugin` taking the canned directory as a parameter; the existing S16 scenarios still pass (AC-08)
+- [ ] T13 `tests/vh-adlc/scenarios/run.ts` - scenarios `S17.profile`, `S17.limit`, `S17.scoped` and `S17.scoped-command`; each passes its Test Plan condition (AC-03, AC-04, AC-05)
+- [ ] T14 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/proportional-review/canned/` - scenarios `S17.questions` and `S17.nits` with scripted records; each passes (AC-06, AC-07)
+- [ ] T15 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/proportional-review/canned/` - scenarios `S17.deferred`, `S17.deferred-review` and `S17.cut`; each passes (AC-14, AC-15)
+- [ ] T16 `tests/vh-adlc/scenarios/run.ts` - scenario `S17.followup` with the `gh` stub, its partial run, rerun and unmerged control; passes (AC-16)
+- [ ] T17 `tests/vh-adlc/scenarios/run.ts` - the old-pin controls of `S17.scoped`, `S17.questions`, `S17.nits`, `S17.profile`, `S17.deferred`, `S17.cut` and `S17.followup`; each passes and `S16.oldpin-reviewer` still passes (AC-08)
+- [ ] T18 `tests/vh-adlc/review-convergence.test.ts` - resolve its pages at `0c983f67` explicitly; passes before and after the pin bump (AC-08)
+- [ ] T19 `tests/vh-adlc/replay/run.test.ts` - failing harness tests on a fixture case: counts and identities only, a failed execution not counted, another route or model not counted, refusal without an approval line or with an edited label or `case.yaml`, the terms check in the tree, the companion diff and a Design section but not a stored record, and body size per pass without the Deferred section; fails because the harness does not exist (AC-10, AC-17)
+- [ ] T20 `tests/vh-adlc/replay/run.ts` - the replay harness; T19 passes (AC-10, AC-17)
+- [ ] T21 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - vh-adlc's product profile, the pin bump to the merged companion revision and the plugin version; T1 passes in full and `bun test tests/vh-adlc` stays green (AC-09)
+- [ ] T22 `docs/user-guides/workflows.md`, `docs/get-started/first-feature.md` - the guides describe the terms they use with the glossary's meanings; manual read against the glossary (AC-09)
+- [ ] T23 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the enterprise case on both routes; the results show no failing label (AC-11, AC-13, AC-17)
+- [ ] T24 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the small application case and the round and growth totals over all four pairs; the results show no failing label, at most half the old total of spec reviews and body growth, and fewer Open Questions (AC-12, AC-13, AC-17)
 
 ## Open Questions
 
@@ -643,6 +667,7 @@ None.
 | 2026-11-22 | R-8 | spec | `14d15c23` | claude-opus-5-5 | procedural | no blocking; 6 should-fix, 2 nit |
 | 2026-11-22 | R-9 | spec | `6abdbd3b` | claude-opus-5-5 | procedural | no blocking; 4 should-fix, 1 nit |
 | 2026-11-22 | R-9 | spec | `6abdbd3b` | n/a | n/a | accepted by owner |
+| 2026-11-22 | R-10 | spec | `d3ad7ce2` | claude-opus-5-5 | procedural | drift re-review after PR #152 and PR #155: no blocking; 1 should-fix, 3 nit; acceptance kept |
 
 ### R-1
 
@@ -1326,3 +1351,33 @@ SEVERITY: nit
 WHERE: Acceptance Criteria AC-16 ("never twice for one entry"); Scope (Out of scope, "Not handled: two sessions running the follow-up review on one feature at the same time ... (R-8 F-02)"); Context Owner summary ("Accepted limit: two sessions running the review on one feature at the same time can file an issue twice"); Design (Follow-up review after merge, "Two sessions running it on one feature at once is a stated limit in Scope"); Design (Failure, retry and rollback, "a rerun files only what is missing"); Deferred D-10
 EVIDENCE: AC-16 still says "never twice for one entry" without qualification, while this revision's stated limit and Owner summary say two concurrent sessions can file an issue twice. The proof checks only a sequential rerun.
 PROPOSAL: Qualify AC-16 as "never twice for one entry across reruns in one session at a time", matching the stated limit.
+
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: frontmatter covers; Design (Tests that change); Design (Open Questions and owner lists, second paragraph: "#141 lands first and lets the author cut an extra it added without a question; that exception stays, and this rule covers the rest of step 4"); Design (Deferred items, "`author cut` for an extra the author removes under #141"); Scope (In scope, "the scenarios and the tests that pin the changed text"); Acceptance Criteria AC-06, AC-09, AC-14; Test Plan AC-09, AC-14 rows
+EVIDENCE: PR #155 (commits 41355739 and 6081943b, merged at d3ad7ce2) added tests/vh-adlc/author-extras.test.ts, which did not exist at R-9's commit 6abdbd3b. It pins spec skill step 4 sentences that this feature reworks under the plausible-choice rule: "where they behave differently, the choice is an Open Question recommending removal", "A removal that touches a criterion, an owner decision or a public contract keeps the Open Question." and "record the removal in the Outcome cell of that pass's Review Log row". It also pins text in both user guides that AC-09 has this feature edit: "is removed without asking you and noted in the Review Log" (docs/user-guides/workflows.md) and "It removes an extra it added on its own" (docs/get-started/first-feature.md). The test is not in covers, so `feature_tree_clean` and `vh-adlc fresh` ignore it, and Tests that change neither moves it nor says it stays. The Design adds a `From: author cut.` Deferred entry for the same removal that #141 records in the Outcome cell, without saying whether the Outcome record stays beside it. One implementer keeps both; another replaces the Outcome record and breaks this test. The other new prerequisite test, tests/vh-adlc/proportionality.test.ts, is already in covers and named in Tests that change.
+PROPOSAL: Add tests/vh-adlc/author-extras.test.ts to covers and to Tests that change. Say whether its assertions stay as they are, including that the Outcome-cell record of an author cut stays next to the new `author cut` Deferred entry.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context Background (text items 2, 4 and 5; Harm and simplest alternative); Design (Gate on the resolved convention); Design (Severity by consequence); Design (Scoped re-review); Design (Open Questions and owner lists, second paragraph); Design (Deferred items, drift re-review source)
+EVIDENCE: PR #152 (merge d0d7e10d) inserted six lines into plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md and the harm statement and convergence trigger into plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md. PR #155 (merge d3ad7ce2) added five more lines to step 4. As a result, every cited line into these two files has moved. At d3ad7ce2 the reviewer has "A path the document leaves undefined is a finding" at :55 (cited :49), the failure-mode paragraph at :53-56 (cited :47-50) and "Return every finding you can establish in this pass" at :58 (cited :52). The spec skill has "Put every judgement call into Open Questions" at :84 (cited :81 and :81-82), "Turn judgement findings into Open Questions" at :122 (cited :112), the remove-or-revisit rule at :124-132 (cited :114-117 and :112-116), the nit-rule gating at :135-143 (cited :120-128) and the drift re-review extra-work question at :156-159 (cited :141-144). The cited text still exists and still says what the document claims, so nothing that is built changes.
+PROPOSAL: Re-cite these locations at the commit of the next revision that touches them.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter status_description ("Next: tasks, after PR #152 and #141 land."); Context Owner summary ("It builds on PR #152 and #141, which land first")
+EVIDENCE: Both prerequisites have merged on the default branch. PR #152 merged at d0d7e10d, and #141 was closed by PR #155, which merged at d3ad7ce2 (git log 6abdbd3b..d3ad7ce2). The status line and the Owner summary still describe them as pending, so the reader is not told that tasks can start now. Neither location is in the normative baseline.
+PROPOSAL: Say that #152 and #141 have merged, and point status_description at tasks.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Context Background ("**Harm and simplest alternative.**" paragraph)
+EVIDENCE: PR #152 added the spec skill rule "Start Background with the harm statement from `references/loop.md`" (vh-adlc-spec/SKILL.md:75-77 at d3ad7ce2). It also added the loop.md alternative "waiting for a later milestone" and the reviewer check "Weigh the design against its harm statement ... the simplest alternative without machinery it rejected" (vh-adlc-reviewer.agent.md:47-51). In this document the harm statement comes at the end of Background, not the start. The alternative it rejects is "a process rule alone", backed by round counts taken before #152's convergence trigger and #141's author-cut exception merged. Both of those are process rules and are now in force. The statement does not weigh waiting to measure their effect before building review-scope, the follow-up review and the replay harness. The replay partly answers this: its old brief is the plugin at the merge base, so it already includes #152 and #141, and AC-13 compares against them. The reviewer rates this check nit because the document is past `draft`.
+PROPOSAL: At the next revision, move the harm statement to the start of Background and add one sentence explaining why the merged convergence trigger and author-cut exception are not enough alone, citing the replay's old brief as the measure.
