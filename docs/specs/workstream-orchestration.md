@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-23 at R-7; R-7 F-02 and the nits go to follow-up issues, and R-7 F-01's safeguard goes into the implementation. Waits for tasks."
+status: in-progress
+status_description: "Claimed on 2026-11-23; implementation on feat/workstream-orchestration."
 issue: null
+branch: feat/workstream-orchestration
 goal: "A session that drives many sub-sessions across a workstream follows one generic vh-adlc procedure that starts only work the host and the loop can carry, keeps every session's state and blockers current, routes owner decisions correctly and closes sessions without losing work."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-orchestrate/
