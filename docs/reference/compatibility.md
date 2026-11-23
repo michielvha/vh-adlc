@@ -130,7 +130,7 @@ sessions, other Linux hosts and macOS, where `clean` does not run, are not cover
 
 ## Workstream orchestration
 
-Plugin 0.31.0 adds `vh-adlc-orchestrate`, a written procedure for a session that drives many
+Plugin 0.32.0 adds `vh-adlc-orchestrate`, a written procedure for a session that drives many
 sub-sessions. It is unverified on every host: the package tests check the procedure's text, and no
 scenario run has exercised it in a live workstream.
 [Feature document](../specs/workstream-orchestration.md)
@@ -155,7 +155,7 @@ claiming that the whole scenario matrix passed.
 | Claude Code remote sessions | Unsupported | Not inferred from another Claude Code surface |
 | VS Code Copilot Chat 1.142, Local harness, macOS arm64 | Core GUI loop and explicit-model rejection passed; permission-mode caveat recorded separately | [Local GUI run](../../tests/vh-adlc/evidence/vscode-local/gui-smoke.md) |
 | VS Code Copilot Chat, Copilot and Claude harnesses | Unsupported | Not tested |
-| `vh-adlc-orchestrate` workstream orchestration, plugin 0.31.0 | Unverified on every host; only package tests of the procedure's text have run | [Workstream orchestration](#workstream-orchestration) |
+| `vh-adlc-orchestrate` workstream orchestration, plugin 0.32.0 | Unverified on every host; only package tests of the procedure's text have run | [Workstream orchestration](#workstream-orchestration) |
 | Copilot CLI lifecycle intake and agent loop | Unsupported | [Copilot CLI evidence](../../tests/vh-adlc/evidence/copilot-cli/README.md) |
 | `vh-adlc-clean` host cleanup, plugin 0.13.0, Claude Code and Codex on Linux | Headless Claude Code 2.1.316 auto-mode and Codex CLI 0.163.0 `workspace-write` sessions and the real-host sequence passed on one Linux host with the operation as it stood at plugin 0.11.0, unchanged in 0.13.0; interactive sessions are not covered | [Host cleanup acceptance](../specs/host-cleanup.md); [AC-11 procedure](../../tests/vh-adlc/evidence/clean/procedure.md); [host cleanup](#host-cleanup) |
 | macOS arm64 | Core desktop GUI loop passed; other surfaces and full-matrix limits are listed separately | [Desktop GUI run](../../tests/vh-adlc/evidence/claude-desktop/gui-smoke.md), [binary and fixture checks](../../tests/vh-adlc/evidence/claude-code/S1.host.macos.md) |

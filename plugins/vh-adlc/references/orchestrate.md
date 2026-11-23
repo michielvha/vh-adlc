@@ -191,8 +191,9 @@ A watcher treats a nonzero exit, an API error or unreadable output as unknown an
 On a workstation, run the host's remote-control bridge as a user service, as the owner's conventions or the project procedure describe, never in a terminal multiplexer.
 
 The bridge serves every session on the host. A stalled bridge looks like a pending session (see
-Admission). Running it as a user service, such as a macOS LaunchAgent or a Linux `systemd --user`
-unit, keeps it alive across logouts and closed terminals.
+Admission). Running it as a user service, a macOS LaunchAgent or a Linux `systemd --user` unit, keeps
+it alive across logouts and closed terminals. `scripts/host/remote-control.sh` installs, reports and
+removes that service, and the plugin's Remote Control host guide describes it.
 
 ## Close-out
 
