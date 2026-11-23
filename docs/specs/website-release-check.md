@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised before T5 after spec reviews R-17 and R-18: the command's own requests run inside the browser's Bubblewrap boundary, as the owner chose on 2026-11-23. Next: spec review R-19 and renewed acceptance."
+status: planned
+status_description: "Accepted by the owner on 2026-11-23 at spec review R-19."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
@@ -178,6 +178,7 @@ Spec reviews R-17 and R-18 both returned a blocking finding, so the convergence 
 | 2026-11-23 | R-17 | spec | `9a148c337cdfe5db2948955122d9e5e8bed4ce91` | claude-opus-5-5 | procedural | One blocking finding, one should-fix finding and three nits |
 | 2026-11-23 | R-18 | spec | `aa30003f0174709b3772d22ae0741230a45bcdf9` | claude-opus-5-5 | procedural | One blocking finding, three should-fix findings and two nits |
 | 2026-11-23 | R-19 | spec | `4a554015b17aa482aa98020a0391f0454041429e` | claude-opus-5-5 | procedural | Five should-fix findings and two nits |
+| 2026-11-23 | R-19 | spec | `4a554015b17aa482aa98020a0391f0454041429e` | n/a | n/a | accepted by owner |
 
 ### R-1
 
