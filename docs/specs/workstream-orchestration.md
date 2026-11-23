@@ -439,6 +439,121 @@ error as unknown.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-23 | R-1 | spec | `ea534657` | claude-opus-5-5 | procedural | 0 blocking, 14 should-fix, 2 nits; judgement findings go to the owner first |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Status pass step 3; Acceptance Criteria AC-08; Test Plan row AC-02 to AC-13 (AC-08 part)
+EVIDENCE: Step 3 says the orchestrator raises the question "When the spec operation's convergence trigger has fired, or the passes keep finding new blocking issues", then says "It uses the spec operation's trigger and does not define its own threshold". AC-08 says the same: "without its own threshold". The second condition is a separate, undefined threshold. The trigger at ea534657 is exact: "fires when this pass and the spec review before it both have blocking findings, and this pass has at least as many" (plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:111-118). docs/specs/proportional-review.md keeps that trigger out of its scope ("Out of scope, by name: The harm statement, proportionality findings and convergence trigger"), so the trigger stays as written. When it fires, the sub-session's own spec operation already "revise[s] nothing" and asks the owner the proportionality question (SKILL.md:115-118). The Design does not say how the orchestrator's question relates to that one, so the owner can get two questions for the same pass, one from each session.
+PROPOSAL: Delete "or the passes keep finding new blocking issues". State that when the trigger has fired, the orchestrator puts the sub-session's pending proportionality question into the batched owner questions and does not ask a second one.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Communication and stops; Design, Decision boundary; Design, Status pass step 3
+EVIDENCE: The design depends on the orchestrator passing owner answers to sub-sessions: batched owner questions, the proportionality answer the sub-session's spec operation must "Act on" (vh-adlc-spec/SKILL.md:117-118), and "applying an owner decision already recorded in a document, issue or the ledger". Incident 4 shows that a sub-session's permission check refuses a peer's message. authority.md:98-99 and :213-217 accept certain owner statements only when the owner makes them in that session. The Design never says how an answer the owner gave to the orchestrator becomes something a sub-session may act on. One implementer relays it by message, which the sub-session may refuse. Another records it in the issue or document first and points the sub-session at it. A third has the owner answer in the sub-session.
+PROPOSAL: State the channel. For example, the orchestrator records each owner answer verbatim in the work item's issue or feature document, with the date, and the sub-session reads it there. List which answers still need the owner to speak in the sub-session itself, such as a handoff.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Plugin upgrades; Owner summary (Close-out bullet); Acceptance Criteria AC-10; Design, Concurrency, failure and upgrade
+EVIDENCE: "Replace the paused sessions once ... A replacement starts from the handoff and the ledger." Under plugins/vh-adlc/references/authority.md:213-217, once a feature has a claim, a session writes to it only when it made the claim or "when the owner has said in this session that the earlier writer has stopped and the feature is yours ... Invoking an operation is not a handoff". authority.md:98-99 says the same. So a replacement the orchestrator starts stops before its first write unless the owner hands the feature over in that new session. The document cites authority.md:211-217 in Background but never applies it to replacements, and AC-10 can be met by a procedure that leaves every replacement blocked.
+PROPOSAL: Add to Plugin upgrades and AC-10 that each replacement needs the owner's handoff in that session. Have the orchestrator put the handoffs into one batched owner request when the release lands.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The skill; Design, Plugin upgrades; Design, Concurrency, failure and upgrade; Design, Workstream ledger
+EVIDENCE: The skill runs `bun scripts/loop/cli.ts context`, which reports `plugin.stale`, and "operations stop before writing" while it is true (references/loop-settings.md:124-128). After a plugin release on the same host the orchestrator is stale too. Concurrency says only that it "keeps its old instructions until replaced". The Design does not say whether a stale orchestrator may still update the ledger, message sessions and replace them, which Plugin upgrades requires. It also does not say who replaces the orchestrator or how its successor takes over the ledger, which "only the orchestrator writes". The ledger may be a tracking issue, and authority.md:25-27 grants issue creation and updates only in specific cases. The Design does not say what authority covers the orchestrator's edits to it.
+PROPOSAL: Say what a stale orchestrator may still do, and how its own replacement and ledger takeover work, through a durable handoff and the owner. Name the authority under which the orchestrator writes a ledger that lives in an issue.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Admission step 3; Design, Decision boundary; Owner summary (Admission bullet); Acceptance Criteria AC-04
+EVIDENCE: Admission step 3 says "Owner urgency does not override either signal", and the Owner summary says "Owner urgency never overrides a blocked check". The Decision boundary lists "overriding a gate or check" among the things the orchestrator asks the owner about, which implies the owner can grant an override. One implementer refuses an explicit owner override and the other accepts it. Step 3 also says to "start nothing" on `blocked` and then to "offer the largest batch the host allows". On `blocked` that batch is zero, so the instruction is empty or contradicts "start nothing". loop.md:46-48 says to report and wait for the owner to free space or load.
+PROPOSAL: Say whether an explicit owner instruction can override a blocked capacity check. If not, take capacity out of the Decision boundary's "overriding a gate or check". Replace "offer the largest batch" with "report the blocked lines and offer to start the batch once the check passes".
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Admission step 4; Owner summary (Admission bullet); Acceptance Criteria AC-04; Open Questions Q3 (option C)
+EVIDENCE: The next batch may start after "a later capacity check, run once the batch is working, still passes". The check reads the one-minute load average (capacity.sh:81-94), and Q3 option C itself says it "lags sessions that have not started building yet". "Once the batch is working" gives no signal or minimum wait. With every box ticked, an orchestrator can start three sessions, check while they are still reading files, see `ok`, and repeat until it has fourteen running. That is incident 2, and the problem survives.
+PROPOSAL: Define when the later check runs. For example, only after every session in the batch has reached its first heavy job or reported its first step, and at least N minutes after the last start. Pin that in AC-04.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Admission step 3; Owner summary (Admission bullet); Acceptance Criteria AC-04; Test Plan row AC-02 to AC-13
+EVIDENCE: Admission step 3 says "Also count the host's live sessions or workers where the host shows them" but gives no limit and no action tied to the count. AC-04 requires only "the host's live session count". A procedure that counts and ignores the result meets the criterion. Incident 15 (a bridge already serving about twenty workers) is caught only after the fact, by the pending-session signal.
+PROPOSAL: Say what the count decides: a project-procedure limit on live sessions, with a default, beyond which nothing new starts. Or drop the count from the design and AC-04 and rely on the pending-session signal.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Status pass; Owner summary (Status passes bullet); Acceptance Criteria AC-07; Design, Concurrency, failure and upgrade
+EVIDENCE: The Owner summary says a merged dependency "is seen on the next pass", and Concurrency says a failed read "is retried on the next pass". Nothing says when a pass runs: on a schedule, after each sub-session report, or before each admission. Incident 5 was a day without a check. An orchestrator that runs a pass once a day meets AC-07 and repeats incident 5. Scope excludes a scheduler, but not a rule for when passes happen.
+PROPOSAL: State when a pass runs, for example before every admission, after every sub-session report and at least every N hours while sessions are active, overridable in the project procedure. Add that rule to AC-07.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Admission step 5; Owner summary (Admission bullet); Acceptance Criteria AC-05; Design, Glossary; Design, Project procedure slot
+EVIDENCE: Step 5 keeps "one queue per exclusive resource" but runs "one heavy job at a time on each shared resource". AC-05 repeats "per shared resource". The glossary defines "Exclusive resource" but not "shared resource". If the host counts as a shared resource, then only one test suite or image build may run on the host at once across all sub-sessions, which conflicts with batches of three sessions that each build. If it does not, incident 12 (a cluster run alongside several integration suites) is covered only when the project declares the cluster exclusive.
+PROPOSAL: Either use "exclusive resource" throughout, or define "shared resource" in the glossary and say whether the host is one and how heavy jobs on it are limited.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope (package checker bullet); Acceptance Criteria AC-01; Test Plan row AC-01
+EVIDENCE: tests/vh-adlc/triage/discovery.test.ts:22-24 counts every `vh-adlc-*` skill except the five content operations and clean, and expects 11. It would count `vh-adlc-orchestrate` and fail at 12. Line 51 asserts "eleven engineering operations" in docs/user-guides/workflows.md (:16), and docs/get-started/installation.md:115-118 also says "eleven engineering operations" and lists every non-engineering skill. The document moves only the skill count from eighteen to nineteen. It does not say whether orchestrate becomes a twelfth engineering operation or joins the non-engineering list as a coordination operation, or how both guides describe it.
+PROPOSAL: Decide the classification. Then name the discovery.test.ts:22-24 change and the "eleven engineering operations" wording in both guides in Scope, AC-01 and the AC-01 proof.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan row AC-02 to AC-13
+EVIDENCE: The proof asserts that a section exists and "carries the criterion's key terms", and gives only two examples (AC-04, AC-07). For the other ten criteria, implementers pick their own terms. Term presence also does not show that a rule is required. A reference saying "three sessions is a suggestion; capacity.sh is optional when pending sessions are rare" passes the AC-04 assertion. No manual read is listed, so an implementation reviewer has only the term test for twelve criteria that each say "requires" or "states".
+PROPOSAL: List the exact phrases each test asserts per criterion, written as the required sentences. Add a manual read in which the implementation reviewer confirms that each rule is stated as a requirement.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-14; Test Plan row AC-14; Design, Project procedure slot
+EVIDENCE: AC-14 requires that "no file under `plugins/vh-adlc/` names an adopter repository", and the Design says "The plugin never names an adopter, its resources or its clients". The proof matches only `/stackweaver/i`, so a reference naming any other adopter or client passes. Its must-fail example also covers only that one name.
+PROPOSAL: Narrow AC-14 to the adopter the proof checks, or make the proof check a named list of adopter and client terms with a must-fail example for each.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Glossary; Acceptance Criteria
+EVIDENCE: conventions/feature-documents.md at 0c983f67, Open questions: "User-facing terms the feature introduces or changes appear in a glossary row and are held to it by a criterion." The glossary introduces Orchestrator, Sub-session, Workstream ledger, Batch, Exclusive resource, Heavy job and Status pass, and the Design also uses "coordination operation" and "shared resource". No criterion requires the reference or the guides to define or use these terms as the glossary does.
+PROPOSAL: Add a criterion, with a Test Plan row, that the reference defines each glossary term with the glossary's meaning, and add the missing terms to the glossary.
+
+FINDING: F-14
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Close-out; Design, Communication and stops; Design, Decision boundary; Acceptance Criteria AC-13
+EVIDENCE: Close-out says to "Archive finished sessions promptly", and the Decision boundary does not list archiving among the owner's decisions. It does defer to "anything the authority reference already reserves for the owner". plugins/vh-adlc/references/authority.md:30 reserves "end a live session" for "Separate approval for that exact action". One implementer reads archiving or interrupting a sub-session as ending a live session and asks each time. The other archives without asking.
+PROPOSAL: State whether archiving and interrupting a sub-session fall under authority.md:30, and if they do, how the approval is batched.
+
+FINDING: F-15
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (first paragraph); Context, Background (The incidents); Design, Incident table; Acceptance Criteria AC-15
+EVIDENCE: The Owner summary says the session "made fourteen kinds of mistake". Background lists fifteen incidents, and the Incident table and AC-15 both say "fifteen".
+PROPOSAL: Say fifteen in the Owner summary, or say why incident 15 is not counted as a mistake.
+
+FINDING: F-16
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (What exists); Open Questions Q3
+EVIDENCE: `plugins/vh-adlc/references/loop.md:36-56` runs past the capacity section, which ends at :51 ("## 1. Get the binary" is :53). In Q3, "Matches the observed safe size" (option A) and "five sessions building at once already exceeded the load limit" (option B) are supported by nothing in Background, whose only recorded count is fourteen sessions at load 22.6.
+PROPOSAL: Cite loop.md:36-51, and either cite the observation behind the three and five figures or drop those claims from Q3.
 
 ## Sources
 
