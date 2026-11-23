@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Confined Chromium smoke runner and observation tests are in place. Next is the T4 observation collector."
+status: draft
+status_description: "Back to draft to record two owner decisions from 2026-11-23: unread response bodies and a Chromium-only delivery. T1 to T3 are done; the T4 collector waits for its full-suite run."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
