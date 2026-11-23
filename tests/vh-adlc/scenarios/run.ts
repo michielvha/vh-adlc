@@ -1848,6 +1848,205 @@ function nitsScenario(id: string, title: string, pin: "companion" | "convergence
   };
 }
 
+// ---- S17.deferred ----
+
+// specFresh asks the binary, outside the session's log, whether the latest spec review is fresh.
+function specFresh(f: Fixtures): { fresh: boolean; detail: string } {
+  const r = Bun.spawnSync([fixtureBinary(f), "fresh", FEATURE_PATH, "--repo", f.project, "--plugin-pin", f.revisionA], { cwd: f.project, env: gitEnv(f.home), stdout: "pipe", stderr: "pipe" });
+  // The wrapper logs every call; this one is the harness's, so it leaves the session's log as it found it.
+  let json: Record<string, any> = {};
+  try {
+    json = JSON.parse(r.stdout.toString());
+  } catch {}
+  const s = json.data?.spec_review;
+  return { fresh: !!s && s.stale === false, detail: s ? `${s.review} at ${s.commit}: ${s.stale ? `stale (${(s.reasons ?? []).join(", ")})` : "fresh"}` : `no answer (exit ${r.exitCode})` };
+}
+
+// harnessCall runs fn and drops the wrapper log lines it adds, so the session's binary calls stay its own.
+function harnessCall<T>(f: Fixtures, fn: () => T): T {
+  const before = existsSync(f.log) ? readFileSync(f.log, "utf8") : "";
+  try {
+    return fn();
+  } finally {
+    if (existsSync(f.log)) writeFileSync(f.log, before);
+  }
+}
+
+const DEFERRED_PROFILE =
+  "greet is an internal command-line tool on a shared build host, where parallel build jobs run it at the same time. It is at alpha. At stake: the build host's diagnostic logs, which every build starts afresh.";
+
+const DEFERRED_DOC = featureDoc({
+  goal: "greet prints a greeting for the name it is given and keeps a diagnostic list of the names it greeted.",
+  scope: "In scope: one name argument for `greet.sh`, the diagnostic `names.log`, and a retry sampler for failed appends. Out of scope: more than one argument.",
+  design: [
+    "`greet.sh <name>` prints `Hello, <name>.`; `greet.sh` with no argument keeps printing `Hello, world.`",
+    "Every run appends the name it greeted as one line to `names.log`, a diagnostic log that every build starts afresh. Parallel build jobs append to it at the same time.",
+    "A retry sampler retries a failed append three times and logs one retry in ten to `retries.log`.",
+  ].join("\n\n"),
+  criteria: `${BASE_CRITERIA}- [ ] AC-04: after \`./greet.sh Ada\`, the last line of \`names.log\` is \`Ada\`.\n`,
+  plan: `${BASE_PLAN}| AC-04 | \`./test.sh\`, extended to check the last line of \`names.log\` |\n`,
+});
+
+const DEFERRED_SOURCES = ["From: R-1 F-01, stated limit.", "From: author cut.", "From: R-2 F-01, deferred at acceptance.", "From: drift re-review R-3."];
+
+function deferredScenario(id: string, title: string, pin: "companion" | "convergence"): Scenario {
+  return {
+    id,
+    title,
+    phase: 4,
+    run: async (f) => {
+      writeAgents(f, pin === "companion" ? f.revisionCompanion : f.revisionConvergence, DEFERRED_PROFILE);
+      writeDoc(f, DEFERRED_DOC);
+      const plugin = scriptedPlugin(f, "deferred", PROPORTIONAL_CANNED);
+      const fresh: { fresh: boolean; detail: string }[] = [];
+      const turns = session(
+        f,
+        [plugin],
+        [
+          `/vh-adlc-spec review ${FEATURE_PATH}. Store the review records and stop before revising: I will answer first.`,
+          "The owner here: answer R-1 F-01 with a stated limit, and handle the rest of R-1 as the procedure says. Do not run a new review in this turn.",
+          `/vh-adlc-spec review ${FEATURE_PATH}. Store the review records and stop before revising: I will decide.`,
+          "The owner here: I accept the document as reviewed in R-2, deferring R-2 F-01.",
+          `/vh-adlc-spec review ${FEATURE_PATH}. The default branch moved under this planned document: bring it in as the procedure says and run the drift re-review.`,
+          "The owner here: defer it.",
+        ],
+        {
+          env: { PATH: SCENARIO_PATH },
+          after: (i) => {
+            if (i === 3) {
+              fresh.push(harnessCall(f, () => specFresh(f)));
+              pushFromElsewhere(f, "greet.sh", '#!/bin/sh\necho "Hello, world."\n# drift from another session\n', "chore: touch greet.sh from elsewhere");
+            }
+            if (i === 5) fresh.push(harnessCall(f, () => specFresh(f)));
+          },
+        },
+      );
+      return {
+        turns,
+        notes: fresh.map((x, i) => `vh-adlc fresh after the ${i === 0 ? "acceptance" : "drift"} deferral: ${x.detail}`),
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const deferred = section(doc, "Deferred");
+          const entries = deferred.split("\n").filter((l) => /^- D-\d+: /.test(l));
+          const replies = turns.map((t) => t.result);
+          const checks: Check[] = [{ name: "all six owner turns ran", ok: turns.length === 6 && turns.every((t) => !t.isError), detail: `${turns.length} turns` }];
+          if (pin === "companion") {
+            for (const source of DEFERRED_SOURCES) checks.push({ name: `a Deferred entry reads \`${source}\``, ok: entries.some((l) => l.includes(source) && /Verdict: pending\.$/.test(l.trim())), detail: entries.join(" | ") || "no entries" });
+            checks.push({ name: "Scope holds the stated limit beside the first entry", ok: /^Not handled: [^\n]*\(R-1 F-01\)\.$/m.test(section(doc, "Scope")), detail: section(doc, "Scope").trim().slice(0, 400) });
+            checks.push({ name: "the reply after the acceptance deferral carries a Cut check line", ok: /Cut check:/.test(replies[3] ?? "") });
+            checks.push({ name: "the reply after the drift deferral carries a Cut check line", ok: /Cut check:/.test(replies[5] ?? "") });
+            checks.push({ name: "vh-adlc fresh is still fresh after the acceptance and drift entries", ok: fresh.length === 2 && fresh.every((x) => x.fresh), detail: fresh.map((x) => x.detail).join("; ") });
+          } else {
+            checks.push({ name: "no Deferred section is written on the old pin", ok: !/^## Deferred$/m.test(doc) });
+            checks.push({ name: "no Cut check line is written on the old pin", ok: !/Cut check:/.test([doc, ...replies].join("\n")) });
+          }
+          checks.push(unrelatedIntact(c));
+          return checks;
+        },
+      };
+    },
+  };
+}
+
+// ---- S17.deferred-review ----
+
+const DELETE_PROFILE =
+  "greet is an internal tool on a shared build host that many developers use; each developer saves their own greeting on the host. It is at alpha. At stake: each developer's saved greeting and the build host's diagnostic logs.";
+
+const DEFERRED_REVIEW: Scenario = {
+  id: "S17.deferred-review",
+  title: "The reviewer honours Deferred entries except one that leaves a security defect",
+  phase: 4,
+  run: async (f) => {
+    writeAgents(f, f.revisionCompanion, DELETE_PROFILE);
+    writeDoc(
+      f,
+      featureDoc({
+        goal: "greet prints a greeting for the name it is given, and a developer can delete their saved greeting.",
+        scope: "In scope: one name argument for `greet.sh`, the diagnostic `names.log`, and deleting a saved greeting. Out of scope: more than one argument.",
+        design: [
+          "`greet.sh <name>` prints `Hello, <name>.`; `greet.sh` with no argument keeps printing `Hello, world.`",
+          "Every run appends the name it greeted as one line to `names.log`, a diagnostic log that every build starts afresh. A failed append is reported on stderr and not retried.",
+          "`greet.sh serve` answers `DELETE /greetings/<name>` on the build host's port 8080 and removes the saved greeting in `greetings/<name>`.",
+        ].join("\n\n"),
+        deferred: "- D-01: A retry sampler that retries a failed append to `names.log` and samples one retry in ten. From: author cut. Verdict: pending.\n- D-02: The session check on the delete endpoint, so only the developer who saved a greeting can delete it. From: owner cut on 2026-11-20. Verdict: pending.",
+      }),
+    );
+    const turns = session(f, [f.pluginA], [`/vh-adlc-spec review ${FEATURE_PATH}. ${RECORD_ONLY}`], { env: { PATH: SCENARIO_PATH } });
+    return {
+      turns,
+      notes: [passNote(f, 0)],
+      checks: (c) => {
+        const doc = c.file(FEATURE_PATH) ?? "";
+        const pass = newPass(doc, 0);
+        const all = findings(pass.records);
+        const quoting = all.filter((x) => x.severity === "blocking" && /Scope/i.test(x.where) && (/D-02/.test(x.evidence) || /session check on the delete endpoint/i.test(x.evidence)));
+        return [
+          { name: "a review pass was stored with records", ok: pass.records.trim() !== "" },
+          { name: "no finding names the retry sampler", ok: !all.some((x) => /sampl/i.test(x.text)), detail: describeFindings(all.filter((x) => /sampl/i.test(x.text))) },
+          { name: "a blocking finding against Scope quotes the delete entry", ok: quoting.length > 0, detail: describeFindings(all) },
+          unrelatedIntact(c),
+        ];
+      },
+    };
+  },
+};
+
+// ---- S17.cut ----
+
+const CUT_DOC = featureDoc({
+  goal: "greet prints a greeting for the name it is given, and a developer can delete their saved greeting.",
+  scope: "In scope: one name argument for `greet.sh`, deleting a saved greeting with a session check on the delete endpoint, and a retry sampler for failed appends to `names.log`. Out of scope: more than one argument.",
+  design: [
+    "`greet.sh <name>` prints `Hello, <name>.`; `greet.sh` with no argument keeps printing `Hello, world.` Every run appends the name to `names.log`, a diagnostic log every build starts afresh.",
+    "A retry sampler retries a failed append to `names.log` three times and logs one retry in ten to `retries.log`.",
+    "`greet.sh serve` answers `DELETE /greetings/<name>` on the build host's port 8080 and removes the saved greeting in `greetings/<name>`. The session check on the delete endpoint refuses a caller whose session does not belong to the developer who saved that greeting.",
+  ].join("\n\n"),
+});
+
+function cutScenario(id: string, title: string, variant: "both" | "sampler", pin: "companion" | "convergence"): Scenario {
+  return {
+    id,
+    title,
+    phase: 4,
+    run: async (f) => {
+      writeAgents(f, pin === "companion" ? f.revisionCompanion : f.revisionConvergence, DELETE_PROFILE);
+      writeDoc(f, CUT_DOC);
+      const plugin = scriptedPlugin(f, "cut", PROPORTIONAL_CANNED);
+      const ask = variant === "both" ? "cut the retry sampler and the session check on delete" : "cut the retry sampler";
+      const today = new Date().toISOString().slice(0, 10);
+      const turns = session(f, [plugin], [`/vh-adlc-spec ${FEATURE_PATH}. The owner here: ${ask}.`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const entries = section(doc, "Deferred").split("\n").filter((l) => /^- D-\d+: /.test(l));
+          const questions = section(doc, "Open Questions");
+          const reply = turns.map((t) => t.result).join("\n");
+          const cutLine = reply.split("\n").find((l) => /^\W*Cut check:/.test(l.trim())) ?? "";
+          const checks: Check[] = [];
+          if (pin === "convergence") {
+            checks.push({ name: "no Deferred section is written on the old pin", ok: !/^## Deferred$/m.test(doc) });
+            checks.push({ name: "no Cut check line is written on the old pin", ok: !/Cut check:/.test(`${doc}\n${reply}`) });
+          } else {
+            checks.push({ name: `a Deferred entry for the sampler reads \`From: owner cut on ${today}.\``, ok: entries.some((l) => /sampler/i.test(l) && l.includes(`From: owner cut on ${today}.`)), detail: entries.join(" | ") || "no entries" });
+            if (variant === "both") {
+              checks.push({ name: "an Open Question about the session check", ok: /^### Q\d+/m.test(questions) && /session/i.test(questions), detail: questions.trim().slice(0, 300) });
+              checks.push({ name: "Scope still holds the session check", ok: /session check/i.test(section(doc, "Scope")) });
+              checks.push({ name: "no Deferred entry for the session check", ok: !entries.some((l) => /session/i.test(l)), detail: entries.join(" | ") });
+              checks.push({ name: "a reply line starting Cut check: names the session check as a security defect", ok: /session/i.test(cutLine) && /secur/i.test(cutLine), detail: cutLine || "no Cut check line" });
+            } else {
+              checks.push({ name: "the reply gives the nothing important lost line", ok: /Cut check: nothing important lost/i.test(cutLine.replace(/\*/g, "")), detail: cutLine || "no Cut check line" });
+            }
+          }
+          checks.push(unrelatedIntact(c));
+          return checks;
+        },
+      };
+    },
+  };
+}
+
 const PROPORTIONAL_SCENARIOS: Scenario[] = [
   profileScenario("S17.profile.single", "A single-person profile lowers the lock gap to a nit or less", "single", "companion"),
   profileScenario("S17.profile.hosted", "A hosted multi-tenant profile keeps the lock gap at should-fix or blocking", "hosted", "companion"),
@@ -1859,6 +2058,10 @@ const PROPORTIONAL_SCENARIOS: Scenario[] = [
   SCOPED_COMMAND,
   questionsScenario("S17.questions", "Only a judgement finding the owner could answer differently becomes an Open Question", "companion"),
   nitsScenario("S17.nits", "The owner summary shows only the nits the recorded rules do not settle", "companion"),
+  deferredScenario("S17.deferred", "Every deferral becomes one Deferred entry with its exact source, and freshness holds", "companion"),
+  DEFERRED_REVIEW,
+  cutScenario("S17.cut.both", "An owner cut defers the sampler and turns the security item into a question", "both", "companion"),
+  cutScenario("S17.cut.control", "Control: cutting only the sampler loses nothing important", "sampler", "companion"),
 ];
 SCENARIOS.push(...PROPORTIONAL_SCENARIOS);
 
