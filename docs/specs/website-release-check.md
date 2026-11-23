@@ -148,6 +148,7 @@ On 2026-11-23 the owner also answered two questions from spec review R-11. Unkno
 | 2026-11-22 | R-9 | spec | `287b10fbba86c66b86df971be37397b017e0a51a` | unknown | procedural | NO FINDINGS |
 | 2026-11-23 | R-10 | spec | `37f956c5db149b84d5aa21c48d4708bc70566be0` | claude-opus-5-5 | procedural | Four should-fix findings and two nits |
 | 2026-11-23 | R-11 | spec | `ed45264af49645b4c191390ccf3ca0afa4397c18` | claude-opus-5-5 | procedural | Four should-fix findings and one nit |
+| 2026-11-23 | R-12 | spec | `87e238777ec294f196f8e1a341248082b82b4b27` | claude-opus-5-5 | procedural | Five should-fix findings and two nits |
 
 ### R-1
 
@@ -467,6 +468,59 @@ SEVERITY: nit
 WHERE: Tasks T3 evidence line
 EVIDENCE: T3's evidence says "The Test Plan's Chromium and Firefox comparison stays untested because no task builds a confined Firefox runner." At X, the Test Plan has no Chromium and Firefox comparison. The previous revision moved it to #158, and the only Firefox mention left in the AC-03 row is the rejected `browser: firefox` profile.
 PROPOSAL: Add a note that the comparison has since moved to #158, or drop the sentence the next time Tasks are edited.
+
+### R-12
+
+TARGET: 87e238777ec294f196f8e1a341248082b82b4b27
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design line 67 (profile contents and the defined key set), Design line 70 (header rules with a "configured string"), Design line 73 (enforcement and required rules), Context / Owner summary line 32 ("can each be enabled separately"), Test Plan AC-03, Tasks T6, T11 and T12, Open Questions line 133
+EVIDENCE: Line 67 says the profile "selects the browser, origins, routes, capabilities, required rules, and precise expected responses", and that a profile "may make selected applicable adapters required". The same bullet then gives a closed key set: `target`, `origin`, `mode`, `browser`, `httpUpgradeUrl`, `expectedResponses` and `route`, with `route` holding one `path`, `visibleHeading`, `deadlineMs` and `requiredRequests`. It says "any undefined key at any of these levels, is invalid configuration". No key selects accessibility, Gitleaks, SEO, certificate or redirect checks, header presence or exact-value rules, the built artifact root, required rules or an enforcement policy. There is also only one `origin` and one `route`, not origins and routes. The values `mode` takes, and whether it may be left out when "Report mode is the default", are not stated. `plugins/vh-adlc/scripts/website-check/profile.ts:48` requires `mode === "report"` today. Under the closed set, T6 must either reject every profile that enables an adapter or break the key rule. One implementer will add keys and another will move capability and policy selection to CLI flags. This traces to the key list this revision added for R-11 F-01.
+PROPOSAL: Complete the defined key set so it covers adapter selection, header rules, required rules and policy, routes and the values of `mode` and its default, or state which of these come from CLI arguments instead of the profile. Make the Owner summary and the first Design sentence agree with that choice.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design line 67 ("two explicit modes, build and deployed", key `mode`), Design line 71 ("For the local mode"), Design line 73 ("exits nonzero in either mode"), Terms table, Acceptance Criteria AC-03, Test Plan AC-01 ("Run both modes") and AC-03 ("Verify both modes", "Give both modes a profile")
+EVIDENCE: The Design calls build and deployed "two explicit modes", and the AC-01 row's "Run both modes" means build and deployed. This revision also names the profile key `target` for build or deployed and the key `mode` for report or enforce (`profile.ts:4-6`). Line 73 uses "either mode" for report and enforce. The AC-03 row's "Verify both modes for passed checks, findings, optional failure" and "Give both modes a profile whose `browser` is `firefox`" can be read either way, so the T11 proof could cover build and deployed with no enforce run, or report and enforce with only one target. AC-03 requires "the glossary meanings for modes", but the Terms table has no row for mode or target.
+PROPOSAL: Use one word for build and deployed, matching the `target` key, and keep "mode" for report and enforcement. Add the terms to the Terms table and say in the AC-03 row which pair each "both modes" means.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-03, Tasks T11, Design line 67 ("at any of these levels"), Context / Owner summary line 32 ("at any level"), Open Questions line 133 ("at every nesting level")
+EVIDENCE: The Design defines four levels: top level, `route`, each required request and each expected response. It rejects an undefined key at any of them. The AC-03 row and T11 test only "an undefined top-level key" and "an undefined key inside `route`". An implementation that checks only those two levels passes the proof while silently ignoring an extra field such as `redirect` or `anonymous` in an expected response, or `query` in a required request. The existing checks at `profile.ts:53-55` validate only the required fields there and ignore extra ones.
+PROPOSAL: Add a profile with an undefined key inside a required request and one inside an expected response to the AC-03 row and T11.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design line 67 ("separate runner argument, outside the profile"), Context / Owner summary line 32 ("A profile cannot add a trusted certificate authority"), Open Questions line 133, Test Plan AC-03 and AC-04, Tasks T6, T7 and T12
+EVIDENCE: The fixture CA moves to "a separate runner argument" that "the test harness passes". The document does not say whether that argument exists only in the internal `runWebsiteCheck` API or is also accepted by `cli.ts` and the installed entry point. The AC-04 row invokes "the installed smoke entry on both marketplace routes" and the AC-03 row distinguishes certificate validation failure, and both run against fixtures that use their own CA (`tests/vh-adlc/website-check/fixtures/README.md:6-7`, `confinement.test.ts:36`). So one implementer ships a CA flag on the installed CLI, which any adopter pipeline can use to trust an extra CA and weaken "normal certificate validation" (Design line 70). Another keeps it internal and has to find another way to run the installed checks over HTTPS. The Owner summary only promises that the profile cannot add a CA.
+PROPOSAL: State whether the shipped CLI accepts a CA argument, and if it does, how its use is shown in the report. Otherwise say how the installed and certificate proofs reach their HTTPS fixtures. Raise this as an Open Question if it changes the trust boundary the owner approved.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design line 74 ("A Renovate custom manager in the repository's `renovate.json`"), frontmatter covers (`renovate.json`), Tasks T13, Context / Owner summary line 36
+EVIDENCE: At X there is no `renovate.json`; `git ls-files | grep -i renovate` is empty, and `gh api repos/michielvha/vh-adlc/contents/renovate.json` returns 404 on the default branch. Renovate already opens PRs here with no repository config file, for example #125 "update dependency bun to v1.4.5" and #106 "update dependency ubuntu to v26". So T13 creates the repository's first Renovate config file. That changes how Renovate resolves its config for the whole repository, and the document does not say whether the new file must keep the current inherited settings. The Design names no datasource for the Ubuntu Squid version or the Fedora package and its SHA-256. Pinned `conventions/delivery.md` ("Adding a dependency includes confirming the updater will propose its next version") and `knowledge/managed-renovate.md` ("A config file is not proof") require an observed confirmation. T13's done condition only checks the hosted job, and no proof row confirms that Renovate picks up the pin. The Owner summary does not mention the new updater config at all. This traces to the change this revision made for R-11 F-03.
+PROPOSAL: Say that `renovate.json` is new and must keep the current inherited behavior, name the datasources that track the Squid pin and its checksum, and add a T13 done condition that observes Renovate detecting that dependency. Mention the new updater config in the Owner summary.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design line 74 ("a portable selection without `tests/vh-adlc/website-check/`"), Context / Owner summary line 36, Tasks T13, Open Questions line 133
+EVIDENCE: Other tests already need Linux. `tests/vh-adlc/triage/execution.test.ts:504` spawns `flock`, and `.github/workflows/ci.yml:87-88` says "Managed verification and effect recovery require Linux/Bubblewrap/flock". The macOS job leaves out `tests/vh-adlc/triage/execution.test.ts`, `lifecycle/` and `loop/`, among others. If the portable selection is read as "all of `tests/vh-adlc` except website-check", `AGENTS.md` would document a command that still fails on macOS. The "like the hosted `checker-macos` job's file list" clause points at the right selection but does not require it.
+PROPOSAL: Say that the portable selection in `AGENTS.md` is the `checker-macos` file list, not the full suite minus website-check.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: frontmatter covers (`AGENTS.md`)
+EVIDENCE: `internal/fresh/fresh.go:164-180` marks a review stale with `covered-drift` when any covered path changes on the default branch. `git log -- AGENTS.md` shows routine docs pin bumps such as `8a21a1e0`, `ff8d7fe0`, `eae566bd` and `111af6c4`, and those have nothing to do with this feature. Covering `AGENTS.md` makes every future pin bump or unrelated instruction edit mark this document's spec and implementation reviews stale. This is the same pattern R-10 F-06 raised for `tests/vh-adlc/`, and it traces to the entry this revision added.
+PROPOSAL: Drop `AGENTS.md` from `covers` and rely on T13's done condition for the instruction change, or keep it knowing that pin bumps will force re-review.
 
 ## Sources
 
