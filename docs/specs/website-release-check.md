@@ -122,6 +122,8 @@ Check explicitly configured routes on two targets: the adopter's locally served 
 - [ ] T9 `tests/vh-adlc/website-check/seo.test.ts` - for the SEO-enabled delivery only, after the analyzer is available in the supported marketplace package, exercise the installed two-target bundle, incomplete analysis and analyzer failure proofs. Observe failure without the adapter (AC-03, AC-04)
 - [ ] T10 `plugins/vh-adlc/scripts/website-check/adapters.ts` and `plugins/vh-adlc/references/website-check.md` - for the SEO-enabled delivery only, consume the installed canonical analyzer and make T9 pass without a source checkout (AC-03, AC-04)
 
+Order note, 2026-11-23: the owner moved T13 ahead of the pre-T11 revision, T11 and T12, so the hosted `checker` job runs the full suite with the smoke prerequisites. That run on the T13 commit is T4's full-suite evidence.
+
 ## Open Questions
 
 None. The owner selected report mode first and approved explicit run outcomes and bounded observation, scoped and sanitized evidence, and a separate Stackweaver adoption. Lighthouse remains outside the shared tool.

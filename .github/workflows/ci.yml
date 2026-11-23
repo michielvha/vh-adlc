@@ -31,7 +31,7 @@ jobs:
       - name: Install and probe the Linux verification boundary
         run: |
           sudo apt-get update
-          sudo apt-get install -y bubblewrap util-linux apparmor libxml2-utils
+          sudo apt-get install -y bubblewrap util-linux apparmor libxml2-utils socat iproute2 openssl libnss3-tools squid
           sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
           bwrap --unshare-all --ro-bind / / -- /usr/bin/true
           # Command-route reviews run their reviewer in an unprivileged PID namespace through unshare,
@@ -65,7 +65,20 @@ jobs:
           make -j "$(nproc)"
           install -D src/mv "$RUNNER_TEMP/diagram-bin/mv"
           printf '%s\n' "$RUNNER_TEMP/diagram-bin" >> "$GITHUB_PATH"
+      - name: Prepare the website smoke prerequisites
+        run: |
+          # Install outside the plugin payload, which the package checks scan.
+          install -d "$RUNNER_TEMP/website-check"
+          cp plugins/vh-adlc/scripts/website-check/package.json plugins/vh-adlc/scripts/website-check/bun.lock "$RUNNER_TEMP/website-check/"
+          bun install --cwd "$RUNNER_TEMP/website-check" --frozen-lockfile --ignore-scripts
+          bun "$RUNNER_TEMP/website-check/node_modules/playwright-core/cli.js" install --with-deps chromium-headless-shell
+          # The plugin's Git reads pass --no-lazy-fetch, which needs git 2.44 or later.
+          git --version
+          /usr/sbin/squid -v | head -n 1
       - name: Check the vh-adlc package
+        env:
+          WEBSITE_CHECK_PLAYWRIGHT_MODULE: ${{ runner.temp }}/website-check/node_modules/playwright-core/index.mjs
+          WEBSITE_CHECK_SQUID: /usr/sbin/squid
         run: bun test tests/vh-adlc --parallel --timeout 60000
 
   checker-macos:

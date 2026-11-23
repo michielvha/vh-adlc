@@ -1,5 +1,6 @@
 import { dirname, join } from "node:path";
 import { readFile } from "node:fs/promises";
+import { pinnedPlaywrightVersion } from "../../../../plugins/vh-adlc/scripts/website-check/chromium";
 
 type Browser = {
   newPage(): Promise<{
@@ -16,8 +17,9 @@ export async function existingSuiteMasksServiceFailure(origin: string) {
   const modulePath = process.env.WEBSITE_CHECK_PLAYWRIGHT_MODULE;
   if (!modulePath) throw new Error("Set WEBSITE_CHECK_PLAYWRIGHT_MODULE to the pinned playwright-core entry point");
   const metadata: unknown = JSON.parse(await readFile(join(dirname(modulePath), "package.json"), "utf8"));
-  if (typeof metadata !== "object" || metadata === null || !("version" in metadata) || metadata.version !== "1.64.1") {
-    throw new Error("The existing-suite fixture needs playwright-core 1.64.1");
+  const pinned = await pinnedPlaywrightVersion();
+  if (typeof metadata !== "object" || metadata === null || !("version" in metadata) || metadata.version !== pinned) {
+    throw new Error(`The existing-suite fixture needs playwright-core ${pinned}`);
   }
   const { chromium }: { chromium: { launch(): Promise<Browser> } } = await import(modulePath);
   const browser = await chromium.launch();

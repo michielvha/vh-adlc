@@ -6,9 +6,18 @@ namespace with only loopback. The fixture servers bind ephemeral loopback ports
 and issue their own HTTPS certificate. The smoke runner installs that CA into
 a new temporary Chromium profile for the test.
 
-Use the repository's pinned playwright-core 1.64.1 and its matching Chromium
-headless shell. Point `WEBSITE_CHECK_PLAYWRIGHT_MODULE` at the package's
-absolute `index.mjs` path.
+The runner accepts only the playwright-core version pinned in
+`plugins/vh-adlc/scripts/website-check/package.json` and its `bun.lock`. Install
+it outside the plugin directory, which the package checks scan, and add its
+Chromium headless shell, as the CI `checker` job does:
+
+```sh
+work=$(mktemp -d)
+cp plugins/vh-adlc/scripts/website-check/package.json plugins/vh-adlc/scripts/website-check/bun.lock "$work/"
+bun install --cwd "$work" --frozen-lockfile --ignore-scripts
+bun "$work/node_modules/playwright-core/cli.js" install chromium-headless-shell
+export WEBSITE_CHECK_PLAYWRIGHT_MODULE="$work/node_modules/playwright-core/index.mjs"
+```
 
 ```sh
 bun test tests/vh-adlc/website-check/confinement.test.ts tests/vh-adlc/website-check/observations.test.ts
@@ -20,7 +29,8 @@ Its session page leaves the 401 bodies unread, as an anonymous session client
 usually does. Chromium never finishes such a fetch, so the expected response is
 matched on its observed status.
 
-The runner finds an installed Squid in `/usr/bin` or `/bin`. To test an
+The runner finds an installed Squid in `/usr/bin` or `/bin`. Ubuntu installs it in
+`/usr/sbin`, so set `WEBSITE_CHECK_SQUID=/usr/sbin/squid` there. To test an
 unpacked Fedora Squid package without installing it, set
 `WEBSITE_CHECK_SQUID` to the absolute executable,
 `WEBSITE_CHECK_SQUID_ROOT` to the extraction root, and

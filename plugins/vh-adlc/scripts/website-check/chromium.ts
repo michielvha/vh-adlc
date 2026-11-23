@@ -11,6 +11,16 @@ function executable(name: string, override?: string) {
   return path;
 }
 
+/** The one playwright-core version the runner supports, pinned in this directory's package manifest. */
+export async function pinnedPlaywrightVersion(): Promise<string> {
+  const manifest: unknown = await Bun.file(join(import.meta.dir, "package.json")).json();
+  const version = typeof manifest === "object" && manifest !== null && "dependencies" in manifest &&
+    typeof manifest.dependencies === "object" && manifest.dependencies !== null && "playwright-core" in manifest.dependencies
+    ? manifest.dependencies["playwright-core"] : undefined;
+  if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Invalid pinned playwright-core version");
+  return version;
+}
+
 export async function confinedChromium(options: {
   scratch: string; origin: URL; caFile?: string; url: URL; heading: string; deadlineMs: number;
   rules: { required: RequiredRequest[]; expected: ExpectedResponse[] };
@@ -21,9 +31,10 @@ export async function confinedChromium(options: {
   const squid = executable("squid", process.env.WEBSITE_CHECK_SQUID);
   const module = process.env.WEBSITE_CHECK_PLAYWRIGHT_MODULE;
   if (!module || !isAbsolute(module) || !existsSync(module)) throw new Error("Missing pinned Playwright module");
+  const pinned = await pinnedPlaywrightVersion();
   const metadata: unknown = await Bun.file(join(dirname(module), "package.json")).json();
-  if (typeof metadata !== "object" || metadata === null || !("version" in metadata) || metadata.version !== "1.64.1") {
-    throw new Error("Website smoke requires playwright-core 1.64.1");
+  if (typeof metadata !== "object" || metadata === null || !("version" in metadata) || metadata.version !== pinned) {
+    throw new Error(`Website smoke requires playwright-core ${pinned}`);
   }
   const playwright = await import(module);
   const browser = playwright.chromium.executablePath().replace(/\/chromium-(\d+)\/chrome-linux64\/chrome$/, "/chromium_headless_shell-$1/chrome-headless-shell-linux64/chrome-headless-shell");
