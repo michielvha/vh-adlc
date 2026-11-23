@@ -60,6 +60,15 @@ const pages: Record<string, { body: string; headers?: Record<string, string> }> 
       addEventListener("load", () => setTimeout(() => fetch("/late", { cache: "no-store" }).then(r => r.text()).catch(() => {}), 1500));
     </script>`),
   },
+  // A required fetch whose whole 200 body the server sends but the page never reads, beside the
+  // declared anonymous session 401, also left unread.
+  "/unread": {
+    body: page("Loading", `<script>
+      Promise.all([fetch("/unread-data", { cache: "no-store" }), fetch("/auth/session")]).then(() => {
+        document.querySelector("h1").textContent = "Release ready";
+      });
+    </script>`),
+  },
   // Two matching attempts start before the assertion. One completes and the other holds its body.
   "/overlap": {
     body: page("Loading", `<script>
@@ -129,6 +138,10 @@ export async function startObservationSite() {
         case "/late":
           res.writeHead(500, { "content-type": "text/plain", ...noStore });
           res.end("late failure");
+          return;
+        case "/unread-data":
+          res.writeHead(200, { "content-type": "text/plain", ...noStore });
+          res.end("complete body the page never reads");
           return;
         case "/overlap-data":
           if (count === 1) {

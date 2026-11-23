@@ -178,6 +178,26 @@ test("a matching attempt still in flight at the deadline leaves coverage incompl
   expect(result.exitCode).not.toBe(0);
 }, 30_000);
 
+test("an unread required body never satisfies its rule, while an unread expected response stays expected", async () => {
+  const site = await fixture();
+  const result = await observe(site, {
+    path: "/unread", deadlineMs: 6_000, requiredRequests: [{ method: "GET", url: `${site.origin}/unread-data` }],
+  }, [{ method: "GET", url: `${site.origin}/auth/session`, resourceType: "fetch", status: 401 }]);
+  // The server sent the whole body; only the page left it unread.
+  expect(site.visits).toContainEqual({ method: "GET", path: "/unread-data", search: "" });
+  expect(responses(result, "/unread-data")).toEqual([expect.objectContaining({
+    kind: "response", status: 200, transfer: "unfinished", outcome: "pass",
+  })]);
+  expect(rule(result, "/unread-data")).toEqual(expect.objectContaining({ outcome: "skipped", reason: "no-terminal-attempt" }));
+  expect(responses(result, "/auth/session")).toEqual([expect.objectContaining({
+    status: 401, transfer: "unfinished", outcome: "expected",
+  })]);
+  expect(result.visibleAssertion).toBe("pass");
+  expect(result.boundary).toBe("deadline");
+  expect(result.coverage).toBe("incomplete");
+  expect(result.exitCode).not.toBe(0);
+}, 30_000);
+
 test("a failed attempt beside one still in flight fails the rule and leaves coverage incomplete", () => {
   const url = "https://example.test/data";
   const collector = new ObservationCollector([{ method: "GET", url }], []);
