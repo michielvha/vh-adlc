@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-23 at spec review R-15. Next: finish T4 on the Linux host, then a revision for R-15's findings before T11."
+status: in-progress
+status_description: "Re-entered after the owner accepted the revised spec on 2026-11-23. Next: finish T4 on the Linux host, then a revision for R-15's findings before T11."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
