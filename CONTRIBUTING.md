@@ -47,8 +47,15 @@ go mod tidy -diff
 For the vh-adlc package, run:
 
 ```sh
-bun test tests/vh-adlc
+bun test tests/vh-adlc --parallel --timeout 60000
 ```
+
+`--parallel` runs the test files in separate processes, one per CPU core. The test
+files share no state, so they can run in any order. `--timeout 60000` matches CI:
+many tests build Git repositories and run the plugin's commands, and they take
+longer than Bun's 5-second default on a busy machine. The suite needs `go` on
+`PATH` and network access to GitHub, because the fixture builder fetches the pinned
+shared docs. Name a directory or file instead of `tests/vh-adlc` to run part of it.
 
 For the GitHub App registration scripts, run:
 

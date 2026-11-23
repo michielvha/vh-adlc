@@ -95,8 +95,7 @@ See the [marketplace guide](docs/reference/marketplace.md) for availability and 
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and local checks.
-Run `bun test tests/vh-adlc` for the full plugin suite. Tests that create Git
-repositories or invoke compilers use bounded setup timeouts.
+Run `bun test tests/vh-adlc --parallel --timeout 60000` for the full plugin suite.
 Report bugs and suggest improvements in [GitHub Issues](https://github.com/michielvha/vh-adlc/issues).
 
 Maintained by [VH & Co](https://vhco.pro).
