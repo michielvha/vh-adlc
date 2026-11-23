@@ -151,6 +151,7 @@ Spec review R-12 asked whether the shipped command may trust an extra certificat
 | 2026-11-23 | R-10 | spec | `37f956c5db149b84d5aa21c48d4708bc70566be0` | claude-opus-5-5 | procedural | Four should-fix findings and two nits |
 | 2026-11-23 | R-11 | spec | `ed45264af49645b4c191390ccf3ca0afa4397c18` | claude-opus-5-5 | procedural | Four should-fix findings and one nit |
 | 2026-11-23 | R-12 | spec | `87e238777ec294f196f8e1a341248082b82b4b27` | claude-opus-5-5 | procedural | Five should-fix findings and two nits |
+| 2026-11-23 | R-13 | spec | `d5b0409bb8d50bae1f9f2e4c348483ddb9d70f5e` | claude-opus-5-5 | procedural | Four should-fix findings and four nits |
 
 ### R-1
 
@@ -523,6 +524,66 @@ SEVERITY: nit
 WHERE: frontmatter covers (`AGENTS.md`)
 EVIDENCE: `internal/fresh/fresh.go:164-180` marks a review stale with `covered-drift` when any covered path changes on the default branch. `git log -- AGENTS.md` shows routine docs pin bumps such as `8a21a1e0`, `ff8d7fe0`, `eae566bd` and `111af6c4`, and those have nothing to do with this feature. Covering `AGENTS.md` makes every future pin bump or unrelated instruction edit mark this document's spec and implementation reviews stale. This is the same pattern R-10 F-06 raised for `tests/vh-adlc/`, and it traces to the entry this revision added.
 PROPOSAL: Drop `AGENTS.md` from `covers` and rely on T13's done condition for the instruction change, or keep it knowing that pin bumps will force re-review.
+
+### R-13
+
+TARGET: d5b0409bb8d50bae1f9f2e4c348483ddb9d70f5e
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design line 65 ("T6 adds the keys for adapter selection, header rules, required rules and the enforcement policy to the same profile schema, under the same rule"), Context / Owner summary line 30 ("a key the profile format does not define at any level"), Test Plan AC-03 ("an undefined key at each level the schema defines (top level, `route`, a required request and an expected response)"), Tasks T5, T6, T11 and T12, Open Questions line 133 ("at every nesting level")
+EVIDENCE: This revision answers R-12 F-01 by letting T6 add the adapter, header rule, required rule and policy keys "under the same rule", but it names none of them. The AC-03 row's parenthetical fixes the levels it tests to the four browser-check levels, and T11 runs before T5 and T6. Header rules (presence and exact-value entries), adapter selection with the built artifact root and Gitleaks settings, and the enforcement policy all add new nested objects. No proof row or task tests an undefined key inside any of them. A T6 that rejects unknown keys only at the four listed levels passes every listed proof while silently ignoring a typo such as `exactvalue` in a header rule, which is the silent misconfiguration the closed key set exists to stop. The key names themselves are left to the T6 implementer, so two implementers would ship different adopter-facing profile shapes. This traces to the change this revision made for R-12 F-01.
+PROPOSAL: Name the keys and nesting levels T6 adds, or name the schema file that will define them, and extend the AC-03 row and T5 so an undefined key is tested at every level the final schema defines, not only the four browser-check levels.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-03 ("For each target in both report and enforce mode, give a profile whose `browser` is `firefox` ..."), Tasks T11 ("Observe them fail before T12") and T12, Design line 65 ("Enforce mode requires an explicit policy")
+EVIDENCE: The Design says enforce mode requires an explicit policy, and the policy keys only arrive with T6, after T11 and T12. Until then no enforce-mode profile can be valid, so each enforce-mode rejection case is rejected whatever its `browser`, unknown key or CA setting. At X, `plugins/vh-adlc/scripts/website-check/profile.ts:48` throws for any `mode` other than `report`, and `runner.ts:8` calls `resolveProfile` before the proxy, boundary or browser starts. So the enforce-mode half of T11 already passes before T12, and its "Observe them fail before T12" step cannot be met. Even after T6, the row does not require each rejected profile to be otherwise valid with a valid policy. An implementation that ignores `browser` or unknown keys in enforce mode passes as long as the test profile also lacks a policy.
+PROPOSAL: State in the AC-03 row that each rejected profile is otherwise valid, with a valid enforcement policy in enforce mode, and that the test asserts the rejection reason. Move the enforce-mode cases to T5 or after T6, or say that only the report-mode cases are red before T12.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design line 65 ("An existing Playwright suite can call the shared runner from a dedicated project" and "Only the internal runner API that the tests call takes a fixture CA argument"), Context / Owner summary line 30 ("Neither a profile nor the shipped command can add a trusted certificate authority"), Open Questions line 135, Tasks T12
+EVIDENCE: The same Design bullet makes the shared runner something an adopter's existing Playwright suite calls directly, and makes the runner API the one place that accepts a fixture CA. The runner ships inside the installed plugin (`plugins/vh-adlc/scripts/website-check/runner.ts`, exported `runWebsiteCheck`), so whether adopter suites get the CA-accepting function is not settled. One implementer exposes `runWebsiteCheck` with its CA argument to adopter projects, so any adopter can trust an extra CA and weaken the "normal certificate validation" in Design line 68. Another keeps a CA-free adopter entry point and a test-only function. The shipped runner also takes test-only overrides the Design does not mention: `chromium.ts:21` and `:60` read `WEBSITE_CHECK_SQUID` and `WEBSITE_CHECK_SQUID_ROOT` to replace the deny-by-default proxy executable, and `:84` passes `WEBSITE_CHECK_SQUID_LIB` as `LD_LIBRARY_PATH`. This traces to the change this revision made for R-12 F-04.
+PROPOSAL: State which entry point adopter suites call and that it takes no CA argument, and keep the CA-accepting function reachable only from the tests. Say whether the Squid override variables stay in the shipped runner, and if they do, how the report shows their use.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design line 65 ("Reuse its configured Playwright runtime" and "An existing Playwright suite can call the shared runner"), Design line 72 ("playwright-core 1.64.1 pinned by a lockfile under `tests/vh-adlc/website-check/`"), Test Plan AC-01 (existing-suite fixture), Tasks T13
+EVIDENCE: The shipped runner refuses every Playwright version except one: `plugins/vh-adlc/scripts/website-check/chromium.ts:25-26` throws "Website smoke requires playwright-core 1.64.1" for any other version, and `tests/vh-adlc/website-check/fixtures/existing-suite.ts:19-20` hardcodes the same version. The Design promises to reuse an existing adopter's configured Playwright runtime. The AC-01 existing-suite fixture runs on the same 1.64.1 runtime, so the proof passes while any adopter on another version is refused. This repository already shows the mismatch: `tests/remote-gui/package.json` with its `bun.lock` pins playwright-core 1.65.1. T13 then adds a second, older playwright-core pin. Renovate will propose a bump on that new lockfile that the hardcoded checks reject, which conflicts with pinned `conventions/delivery.md` ("A version and checksum hardcoded in a script are invisible to Dependabot and Renovate").
+PROPOSAL: State which Playwright versions the shared runner supports for existing suites and how it checks them, and give the existing-suite fixture a runtime version different from the generic runner's pin, or limit the reuse claim to the pinned version. Say whether T13 reuses the repository's existing playwright-core pin or keeps a separate one that the updater can bump without editing code.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design line 72 ("Ubuntu 24.04's Squid 6.14 passed all 14 website-check tests on 2026-11-23"), Context / Owner summary line 34
+EVIDENCE: The claim gives no log path or command output, though Context and Design claims must be cited. The `checker` job runs on `ubuntu-latest` (`.github/workflows/ci.yml:25`), not on 24.04, so the Squid version the hosted job installs may not be the one tested. The Design already says the job logs its version and that the confinement tests run on every push.
+PROPOSAL: Cite the log of the 6.14 run, and say that the hosted job's Squid version follows `ubuntu-latest`.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Background line 56 (`observations.ts:186-192`)
+EVIDENCE: At X, `plugins/vh-adlc/scripts/website-check/observations.ts:186-192` holds `#isExpected` and `#outcome`, which classify a response from its status. The unfinished transfer is recorded at line 222 (`transfer: open ? "unfinished" : "finished"`).
+PROPOSAL: Cite lines 186-192 for the classification and line 222 for the unfinished transfer record.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design line 71 ("machine mode", "plain mode is selected"), Test Plan AC-03 ("in terminal mode"), Terms table row Mode, Acceptance Criteria AC-03 ("the glossary meanings for modes")
+EVIDENCE: This revision defines Mode in the Terms table as report or enforce only, and AC-03 holds the command, report and skill to the glossary meanings for modes. The Design and the AC-03 row still use "mode" for output kinds: machine mode, plain mode and terminal mode. The command's user-facing text could then use "mode" in two senses. This traces to the R-12 F-02 change. Gitleaks "directory mode" is the tool's own term and is fine.
+PROPOSAL: Call the output kinds "machine output", "plain output" and "terminal output", or add them to the Terms table as distinct from Mode.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Design line 72 ("`AGENTS.md` states that `bun test tests/vh-adlc` needs Linux and these prerequisites"), Tasks T13
+EVIDENCE: The full `bun test tests/vh-adlc` run in the `checker` job also depends on setup outside the smoke prerequisites: the AppArmor sysctl (`.github/workflows/ci.yml:41`), libxml2-utils for `xmllint` (`ci.yml:36`, used at `tests/vh-adlc/diagram/grade.ts:27`), the Go-built YAML reader (`ci.yml:50-51`), and GNU mv built from coreutils 9.7 (`ci.yml:59-68`). An `AGENTS.md` line that names only Linux and the smoke prerequisites would describe a command that still fails on a Linux host that has just those.
+PROPOSAL: Have `AGENTS.md` say the full selection needs the `checker` job's setup, including the smoke prerequisites, rather than only the smoke prerequisites.
 
 ## Sources
 
