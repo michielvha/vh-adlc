@@ -5,6 +5,7 @@ import type { PullRequestInput } from "../../../plugins/vh-adlc/scripts/github-r
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { closureFixture } from "./closure-fixture";
 import { commitAll, git, put } from "./repository-fixture";
+import { gitStub } from "./git-stub";
 
 function nativePull(proposal: PullRequestInput) {
   return { id: 1000 + proposal.number, number: proposal.number, state: proposal.state, merged_at: proposal.merged_at, body: proposal.body, draft: proposal.draft,
@@ -43,12 +44,7 @@ export async function nativeClosureFixture(roots: string[], method: "merge" | "s
   const calls = join(artifacts, "native-closure-calls.jsonl"), responses_file = join(artifacts, "native-closure-responses.json");
   writeFileSync(responses_file, JSON.stringify(responses), { mode: 0o600 });
   const realGit = Bun.which("git"); if (!realGit) throw Error("fixture requires Git");
-  writeFileSync(join(bin, "git"), `#!${process.execPath}
-const args = process.argv.slice(2), target = args.indexOf("https://github.com/fixture/docs.git");
-require("node:fs").appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ program: "git", args }) + "\\n", { mode: 0o600 });
-if (target >= 0) { args[target] = ${JSON.stringify(f.repo)}; args.splice(args.indexOf("fetch"), 0, "-c", "protocol.file.allow=always"); }
-const child = Bun.spawnSync([${JSON.stringify(realGit)}, ...args], { stdin: "inherit", stdout: "inherit", stderr: "inherit" }); process.exit(child.exitCode);
-`, { mode: 0o700 });
+  writeFileSync(join(bin, "git"), gitStub({ git: realGit, origin: f.repo, log: calls }), { mode: 0o700 });
   writeFileSync(join(bin, "gh"), `#!${process.execPath}
 const args = process.argv.slice(2);
 require("node:fs").appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ program: "gh", args }) + "\\n", { mode: 0o600 });

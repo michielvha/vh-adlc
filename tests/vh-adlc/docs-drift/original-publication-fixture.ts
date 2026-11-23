@@ -11,6 +11,7 @@ import { effectDigest, verifyRoleIdentity, type NativeRoleEvidence, type RolePol
 import { roleRuntimeDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/role-capture";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
+import { ownedWrapper } from "./git-stub";
 
 type Reference = { path: string; sha256: string };
 function retain(root: string, name: string, bytes: Uint8Array): Reference {
@@ -63,15 +64,7 @@ export function installOwnedNativeService(f: Pick<Awaited<ReturnType<typeof orig
   const program = nativeServiceProgram(statePath, calls);
   for (const name of ["gh", "git"]) {
     const service = join(directory, name); writeFileSync(service, program, { mode: 0o700 });
-    const wrapper = `#!${process.execPath}
-const args = process.argv.slice(2);
-const readOnlyGit = ${JSON.stringify(name === "git")} && !args.includes("fetch") && !args.includes("push");
-if (readOnlyGit && args.some(arg => arg.startsWith("https://"))) process.exit(91);
-const command = readOnlyGit ? [${JSON.stringify(executable)}] : ${JSON.stringify([flock, "-x", join(directory, "state.lock"), process.execPath, service])};
-const environment = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_COUNT: "0" };
-const result = Bun.spawnSync([...command, ...args], { env: environment, stdin: "inherit", stdout: "inherit", stderr: "inherit" }); process.exit(result.exitCode);
-`;
-
+    const wrapper = ownedWrapper({ name: name as "git" | "gh", git: executable, flock, lock: join(directory, "state.lock"), bun: process.execPath, service });
     writeFileSync(join(bin, name), wrapper, { mode: 0o700 });
   }
   return { statePath, calls };

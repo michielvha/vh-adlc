@@ -1,7 +1,8 @@
 ---
-status: draft
-status_description: "Spec review R-7 found nothing blocking; waits for the owner's acceptance."
+status: in-progress
+status_description: "Claimed on 2026-11-23; implementation on feat/workstream-orchestration."
 issue: null
+branch: feat/workstream-orchestration
 goal: "A session that drives many sub-sessions across a workstream follows one generic vh-adlc procedure that starts only work the host and the loop can carry, keeps every session's state and blockers current, routes owner decisions correctly and closes sessions without losing work."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-orchestrate/
@@ -554,7 +555,23 @@ plugin removes the skill and nothing else.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 Write `plugins/vh-adlc/references/orchestrate.md` with the glossary, every required sentence
+      under its section, the explanation, the `## Orchestration` fields and the sixteen-row incident
+      table, plus the safeguard the owner moved into implementation from R-7 F-01. Add the sentence,
+      glossary, field, incident-row and adopter-term tests with their must-fail fixtures to
+      `tests/vh-adlc/check.test.ts`, and bump the version in `plugins/vh-adlc/plugin.json` and
+      `plugins/vh-adlc/.claude-plugin/plugin.json`. Done when `bun test tests/vh-adlc/check.test.ts`
+      passes, after the new tests were seen failing without the reference. AC-03 to AC-16.
+- [ ] T2 Add the request-to-orchestrate row to `plugins/vh-adlc/references/authority.md` with exactly
+      S-02's four writes, and its test in `tests/vh-adlc/check.test.ts`, which must fail when any one
+      write is missing. Done when `bun test tests/vh-adlc/check.test.ts` passes, after the row test was
+      seen failing. AC-02.
+- [ ] T3 Add `plugins/vh-adlc/skills/vh-adlc-orchestrate/SKILL.md`, the coordination kind in
+      `tests/vh-adlc/check.test.ts`, the intake row in `plugins/vh-adlc/references/lifecycle.md`, the
+      nineteen-skill count in `tests/vh-adlc/triage/discovery.test.ts`, the counts and Orchestrate row in
+      `docs/user-guides/workflows.md` and `docs/get-started/installation.md`, and the unverified entry in
+      `docs/reference/compatibility.md`. Done when `bun test tests/vh-adlc` passes, after the
+      coordination and discovery tests were seen failing. AC-01.
 
 ## Open Questions
 
@@ -571,6 +588,7 @@ None.
 | 2026-11-23 | R-5 | spec | `20c6df0d` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement finding goes to the owner first |
 | 2026-11-23 | R-6 | spec | `d4207bf5` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement findings go to the owner first |
 | 2026-11-23 | R-7 | spec | `96664f59` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; the owner chose to end the revision cycle, so the findings go to follow-up rather than another revision |
+| 2026-11-23 | R-7 | spec | `96664f59` | n/a | n/a | accepted by owner |
 
 ### R-1
 
