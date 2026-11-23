@@ -233,6 +233,10 @@ load 17: 238.4 seconds on main and 234.0 on the branch, all passing on both.
   The fix is plugin 0.30.2.
 - The Go job failed because `TestCIWorkflow` in `cmd/vh-adlc/workflow_test.go` checks the exact
   checker command in `ci.yml`; it now expects the new one.
+- CI run [45170835960](https://github.com/michielvha/vh-adlc/actions/runs/45170835960) at
+  `e66f8040`, the head merged as PR #156, with the race fix: the test step took 44 minutes
+  (12:06:44 to 12:50:44 UTC) against 117 before. All 4,289 tests in 276 files passed in
+  2,640 seconds. Every other job passed.
 
 ## Follow-ups
 
