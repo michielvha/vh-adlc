@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Spec review R-7 found nothing blocking; waits for the owner's acceptance."
+status: planned
+status_description: "Accepted by the owner on 2026-11-23 at R-7; R-7 F-02 and the nits go to follow-up issues, and R-7 F-01's safeguard goes into the implementation. Waits for tasks."
 issue: null
 goal: "A session that drives many sub-sessions across a workstream follows one generic vh-adlc procedure that starts only work the host and the loop can carry, keeps every session's state and blockers current, routes owner decisions correctly and closes sessions without losing work."
 covers:
@@ -571,6 +571,7 @@ None.
 | 2026-11-23 | R-5 | spec | `20c6df0d` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement finding goes to the owner first |
 | 2026-11-23 | R-6 | spec | `d4207bf5` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement findings go to the owner first |
 | 2026-11-23 | R-7 | spec | `96664f59` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; the owner chose to end the revision cycle, so the findings go to follow-up rather than another revision |
+| 2026-11-23 | R-7 | spec | `96664f59` | n/a | n/a | accepted by owner |
 
 ### R-1
 
