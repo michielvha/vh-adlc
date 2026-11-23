@@ -736,6 +736,7 @@ None.
 | 2026-11-23 | R-11 | spec | `9e9236a0` | claude-opus-5-5 | procedural | no blocking; 7 should-fix, 2 nit |
 | 2026-11-23 | R-12 | spec | `28be40ab` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
 | 2026-11-23 | R-13 | spec | `529d2648` | claude-opus-5-5 | procedural | scoped: no blocking; 2 should-fix, 1 nit |
+| 2026-11-23 | R-14 | spec | `436d91c5` | claude-opus-5-5 | procedural | scoped: no blocking; 2 should-fix, 1 nit |
 
 ### R-1
 
@@ -1560,3 +1561,26 @@ SEVERITY: nit
 WHERE: Acceptance Criteria AC-10; Test Plan AC-10 row; Design (Replay harness, stored-runs paragraph)
 EVIDENCE: The previous revision added reuse of a matching stored old-brief set, refusal of a mismatched one, and assembly after an interrupted first-pass set to the AC-10 row and to T25. AC-10's text still lists only "runs a case end to end, refuses a case whose approval line is missing ... records failed executions without counting them as passes, and runs on a public fixture case". No criterion states the reuse, refusal or assembly end state that the row now proves.
 PROPOSAL: Add to AC-10 that a new-brief-only run reuses only stored old-brief runs whose identity matches and refuses otherwise, and that results assembled from stored runs keep every finished pass.
+
+### R-14
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "Sets stored before T25 take that identity from a launch record written for them, naming each launch's plugin commit, docs revision, route and model; the owner accepted this on 2026-11-23, and the implementation review checks the record against the run logs and file times"; "so a set never mixes two invocations"; "`assemble` checks every stored set the same way"); Tasks T25, T23, T24; Acceptance Criteria AC-10; Test Plan AC-10, AC-11, AC-12, AC-13 and AC-17 rows
+EVIDENCE: This traces to the previous revision's answer to R-13 F-02. The document does not say where the launch record lives, what format it has, who writes it, or whether the harness reads it. No task writes it. T25 and the AC-10 row only cover sets the new harness stores. The implementation review check "against the run logs and file times" is stated only in Design. No criterion or Test Plan row names it, and the AC-11 row's brief check covers only the new brief. Also, the record names an identity per launch, not the files each launch wrote. The pre-T25 harness reuses file names across invocations: `${name}-${route}-pass-${n}.txt` and `${name}-${route}-loop-${i}.md` (tests/vh-adlc/replay/run.ts, `runCase`), and its stop message tells the operator to "rerun its loops with --only loops". If an old-brief loop is rerun and the second loop is shorter than the first, higher-numbered `old-<route>-loop-<i>.md` files from the first launch are left behind. If `assemble` counts the stored documents, which `reviews: documents.length - 1` does today, those leftovers inflate the old total behind AC-13 and AC-17 and make the halving easier. So "a set never mixes two invocations" holds only for sets stored after T25. The pre-T25 harness's only log line (`console.log` at the end of `runCase`) prints case, results, retention and loops, with no plugin commit or docs revision. So whether the "run logs" can confirm an identity depends on what the operator captured, which the document does not name.
+PROPOSAL: Name the launch record's path in the case directory and its fields, including the stored files each launch wrote. Make T25 read the record as the set's identity and refuse a stored file the record does not list. Add AC-10 row cases for a pre-T25 set with a matching record, a mismatched record and an unlisted leftover file, and add the record check to the AC-11 and AC-12 rows.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "A run of a brief on a route starts a fresh stored set: any earlier set for that brief and route is moved aside first, so a set never mixes two invocations"; "the results are assembled from those stored runs, so a run that stops loses no finished pass"); Acceptance Criteria AC-10 ("keeps every finished pass when it assembles results from stored runs, starts a fresh stored set for each run of a brief"); Test Plan AC-10 row; Tasks T25
+EVIDENCE: This revision adds the fresh-set rule. The harness runs first passes and loops separately: `only` takes `loops` or `first-passes` in `runCase`, `writeResults` merges partial runs, and a stopped loop reports "its first passes are recorded, rerun its loops with --only loops". The document does not say whether a `--only loops` run is "a run of a brief". If it is, it moves aside the finished first passes, and those hours of passes have to run again, so the promise that a run that stops loses no finished pass fails in practice. If it is not, the loop joins the first passes of an earlier invocation, against "a set never mixes two invocations". The document also does not say whether `assemble` reads moved-aside sets. AC-10's "keeps every finished pass" can be read as including them, which would bring back the `5e94e593` passes that the rule moves aside. Two careful implementers would build harnesses that differ in rerun cost or in what gets counted, and the owner running the replays would notice the difference.
+PROPOSAL: Define the stored set per brief, route and part (first passes, loop), with a partial run starting fresh only for the part it runs. Say that `assemble` reads only the current sets, and add a `--only loops` rerun case to the AC-10 row and T25.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary ("builds the replay results from the stored private runs"; "every new-rules run repeats on the fixed plugin")
+EVIDENCE: This revision records a new owner decision in Design: sets stored before T25 take their identity from a hand-written launch record, which "the owner accepted ... on 2026-11-23". The Owner summary's list of changes since the R-9 acceptance does not mention this decision or the fresh-set rule. The convention asks the summary to reflect decisions and material changes. The Owner summary is outside the normative baseline.
+PROPOSAL: Add one line to the change paragraph naming the launch record for pre-T25 sets and the fresh stored set per run.
