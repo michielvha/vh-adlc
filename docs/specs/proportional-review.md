@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Back to draft on feat/proportional-review for an owner-requested revision (2026-11-23): AC-13 drops its Open Question count, and the revision records the reviewer fix the owner allowed after the enterprise replay. T1 to T22 stay done; T23 and T24 continue after acceptance."
+status_description: "In draft on feat/proportional-review for an owner-requested revision (2026-11-23): AC-13 drops its Open Question count and the revision records the reviewer fix the owner allowed after the enterprise replay. T1 to T22 stay done; T25, T26, T23 and T24 continue after acceptance."
 branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
@@ -60,8 +60,8 @@ The feature changes the rules at their source, in the shared convention, the rev
 ship and resume skills:
 
 - Each project states a `## Product profile` in `AGENTS.md`. A false fact, an unmeetable criterion or a
-  broken proof keeps its severity; a failure path is blocking or should-fix only when someone using that
-  product would plausibly hit it. Security, data-loss and tenant-isolation defects stay blocking always.
+  broken proof keeps its severity; a failure path is blocking or should-fix only when someone using that product would plausibly hit it,
+and one the reviewer is unsure about is rated should-fix rather than dropped. Security, data-loss and tenant-isolation defects stay blocking always.
 - The author may answer a finding with a stated limit in Scope, unless it excludes a case the goal, a
   criterion or Scope names. Later passes do not raise it again unless it leaves one of those three
   defects, an unmeetable criterion or an unsolved problem.
@@ -97,7 +97,7 @@ one generic reviewer fix, and every new-rules run repeats on the fixed plugin. C
 stays private. The owner's repository name is public, and the owner accepts that stored review records
 name its candidate documents with counts; the second user's repository name stays private unless they
 agree.
-Validation so far: T1 to T22 are done with observed evidence (unit tests, the S17 scenarios and the pin bump), and the first complete replay result is in. The replays on the fixed reviewer are still running.
+Validation so far: T1 to T22 are done with observed evidence (unit tests, the S17 scenarios and the pin bump), and the first complete replay result is in. The remaining work is T25 (the harness changes this revision describes), T26 (the real-reviewer S17 scenarios again on the fixed reviewer) and the replays on the fixed reviewer (T23, T24).
 
 The R-9 acceptance covered what the owner added after R-5: the Deferred section, the cut check, the
 follow-up review (judged after merge, because the spec rests on assumptions the built feature tests) and
@@ -111,7 +111,7 @@ pin bump is done (T21); shipping still needs the usual approvals.
 
 **Harm and simplest alternative.** The harm: every vh-adlc user pays for each spec in owner attention and
 elapsed time, on every feature, and it does not heal; dozens of rounds per document are common in the counts below. The simplest alternative without machinery is a process rule alone ("prefer removing",
-"revisit the previous change"), which `spec-review-convergence` added (`SKILL.md:114-117`); 69 and 15
+"revisit the previous change"), which `spec-review-convergence` added (`SKILL.md:114-117` at `915441e8`; `SKILL.md:129-137` now); 69 and 15
 review rounds after its merge show it did not stop the churn. This feature is mostly rule text too. Its
 machinery is the `review-scope` command, a `follow-up` mode of the labels helper, the follow-up review's
 issue filing and verdict commit, and the replay harness with its growth measure. The replay exists
@@ -492,8 +492,10 @@ Both briefs use the same route settings and models. A run that fails to execute 
 rerun; it never counts as a pass. An independent agent matches findings to labels from `labels.md` and the
 stored records, and its verdicts are stored beside each run. Every counted pass, its verdicts and every
 loop's documents are stored in the case directory as they finish, and the results are assembled from those
-stored runs, so a run that stops loses no finished pass. A run of the new brief alone reuses the old-brief
-passes and loops already stored, so moving the new brief reruns only the new brief.
+stored runs, so a run that stops loses no finished pass. Each brief records its plugin commit, docs revision and model per route beside its stored runs. A run of
+the new brief alone reuses the old-brief passes and loops already stored only when that recorded identity
+matches the current old brief and route, and refuses otherwise; `assemble` checks every stored set the same
+way. Moving the new brief therefore reruns only the new brief.
 
 Retention, per label and route: a label fails when at least two of the three old-brief first passes raise
 it, at any severity, and none of the six new-brief first passes raises it at or above its minimum
@@ -626,7 +628,7 @@ for the old-pin controls.
 | AC-07 | Scenario `S17.nits`, with scripted reviewer records: an earlier clean pass has reviewed a free-text pattern row; the new pass has no blocking or should-fix finding and eight nits, six citation slips in the normative baseline that the seeded project procedure says need no owner attention and two free-text widening nits on that row. Pass: the summary part of the final reply shows the two and a count of six, and its `All unapplied nits` section lists all eight. |
 | AC-08 | Old-pin controls of `S17.scoped`, `S17.questions`, `S17.nits`, `S17.profile` (single-user profile), `S17.deferred`, `S17.cut` and `S17.followup` on a fixture pinned to `0c983f67`. Pass: the unchanged gap is raised, both judgement findings become Open Questions, the summary lists all eight nits, the lock gap is raised at should-fix or blocking despite the profile, no `## Deferred` section or `Cut check:` line is written, and neither ship nor resume runs or names a follow-up review. `S16.oldpin-reviewer` and `bun test tests/vh-adlc/review-convergence.test.ts` at `0c983f67` still pass. |
 | AC-09 | `bun test tests/vh-adlc/proportional-review.test.ts`: `AGENTS.md` has the section and the companion pin, `knowledge.md` names the same SHA, and the convention uses each glossary term except Cut check and Follow-up review; plus a manual read of the convention and both guides against the glossary definitions. |
-| AC-10 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and scripted reviewers: the results file holds counts, label IDs and run identities and no line of the fixture document; a forced execution failure is recorded and not counted; a run reporting another route or model is not counted; copies of the case with no approval line, an edited label and an edited `case.yaml` are refused before any run; a planted term in the tree or the companion diff stops the run; a term inside a `### R-<n>` record passes while the same term in Design stops it. |
+| AC-10 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and scripted reviewers: the results file holds counts, label IDs and run identities and no line of the fixture document; a forced execution failure is recorded and not counted; a run reporting another route or model is not counted; a new-brief-only run reuses a stored old-brief set whose recorded identity matches and refuses a mismatched one; results assembled after an interrupted first-pass set keep its finished passes; copies of the case with no approval line, an edited label and an edited `case.yaml` are refused before any run; a planted term in the tree or the companion diff stops the run; a term inside a `### R-<n>` record passes while the same term in Design stops it. |
 | AC-11 | Replay of the enterprise case: three old-brief and six new-brief first passes per route, with confirmation runs where the rule calls for them. Pass: the results file shows no failing label on either route. The implementation reviewer opens the case directory, checks that the approval line matches `labels.md` and `case.yaml` and predates the first rule-editing commit in both repositories, and spot-checks the matcher's verdicts against the stored records, citing case material only by label ID, count and digest. It also checks that the reviewer, the spec skill, `references/review-protocol.md`, `references/loop.md` and `scripts/loop/` differ between the first new brief `5e94e593` and the new brief in the results file only by `ef685da1`'s reviewer change (`git diff 5e94e593 <new brief> -- <those paths>`); the harness's terms check on this document and the results file passes before the review is stored. |
 | AC-12 | Replay of the small application case, same procedure, brief check and pass condition. |
 | AC-13 | The same replays' full loops, one per brief per case and route. Pass: the results file shows the new total of spec reviews at most half the old total. |
@@ -684,7 +686,7 @@ for the old-pin controls.
 - [ ] T23 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the enterprise case on both routes; the results show no failing label (AC-11, AC-13, AC-17)
 - [ ] T24 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the small application case and the round and growth totals over all four pairs; the results show no failing label, at most half the old total of spec reviews and body growth (AC-12, AC-13, AC-17)
 
-- [ ] T25 `tests/vh-adlc/replay/run.ts`, `tests/vh-adlc/replay/run.test.ts` - results without an Open Question condition, a run of the new brief alone that reuses the stored old-brief runs, and `assemble`, which builds a case's results from its stored runs; run.test.ts passes, including a check of the totals table (AC-10, AC-13, AC-17)
+- [ ] T25 `tests/vh-adlc/replay/run.ts`, `tests/vh-adlc/replay/run.test.ts` - results without an Open Question condition, a recorded brief identity per route, a run of the new brief alone that reuses only a matching stored old-brief set, and `assemble`, which builds a case's results from its stored runs; run.test.ts passes, including the totals table, a matching and a mismatched stored set, and assembly after an interrupted first-pass set (AC-10, AC-13, AC-17)
 - [ ] T26 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/claude-code/` - rerun S17.profile, S17.limit, S17.scoped, S17.scoped-command and S17.deferred-review on the fixed reviewer, and add `S17.profile.unsure`; each passes its Test Plan condition (AC-03, AC-04, AC-05, AC-14)
 
 ## Open Questions
