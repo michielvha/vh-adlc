@@ -148,6 +148,10 @@ changed here.
   passed on, environment, log contents or log file mode, under bash with gawk and under dash with
   mawk.
 
+- The owned-process runner waits within its reap window for a killed process group to disappear
+  before it reports cleanup, instead of probing once (plugin 0.30.2). Parallel CI exposed the race;
+  see After on CI below.
+
 No assertion was removed or weakened, and no test moved out of the default suite.
 
 ### Opt-in suite: not created
@@ -215,7 +219,20 @@ load 17: 238.4 seconds on main and 234.0 on the branch, all passing on both.
 
 ### After on CI
 
-Pending: the CI run of the pushed branch.
+- CI run [45163275342](https://github.com/michielvha/vh-adlc/actions/runs/45163275342) at
+  `70f42cbd`, four workers on `ubuntu-latest`: the test step took 43 minutes against 117 before.
+  4,288 of 4,289 tests passed in 2,584 seconds.
+- The one failure, `loop/owned-process.test.ts` `the same helper after a timeout is stopped too`,
+  was a race in the plugin, not in the test. After the client was killed and reaped, the
+  owned-process runner (`runOwnedClient()` in `scripts/triage/owned-process.ts`) probed the
+  process group once. A killed group's last member can stay probeable for a moment while it waits
+  to be reaped: on this host, 1 of 30 runs still answered 0.4 milliseconds after the client exited.
+  On a busy runner that moment is longer, so a complete cleanup was reported unconfirmed (reaped,
+  no survivors, group still present). The runner now polls the group within its existing reap
+  window. A group with a live member still ends unconfirmed, after the window instead of at once.
+  The fix is plugin 0.30.2.
+- The Go job failed because `TestCIWorkflow` in `cmd/vh-adlc/workflow_test.go` checks the exact
+  checker command in `ci.yml`; it now expects the new one.
 
 ## Follow-ups
 
