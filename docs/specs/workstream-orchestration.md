@@ -450,6 +450,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-23 | R-1 | spec | `ea534657` | claude-opus-5-5 | procedural | 0 blocking, 14 should-fix, 2 nits; judgement findings go to the owner first |
 | 2026-11-23 | R-2 | spec | `46ccf25a` | claude-opus-5-5 | procedural | 1 blocking, 7 should-fix, 1 nit; judgement findings go to the owner first |
+| 2026-11-23 | R-3 | spec | `de1a5171` | claude-opus-5-5 | procedural | 0 blocking, 9 should-fix, 2 nits; judgement findings go to the owner first |
 
 ### R-1
 
@@ -631,6 +632,87 @@ SEVERITY: nit
 WHERE: Context, Background (Harm and simplest alternative)
 EVIDENCE: plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:75-77 at 46ccf25a: "Start Background with the harm statement from `references/loop.md`". In this document the harm statement is the last paragraph of Background, after What exists, What is missing, The incidents and Prior art.
 PROPOSAL: Move the Harm and simplest alternative paragraph to the start of Background.
+
+### R-3
+
+TARGET: de1a5171
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Background (Harm and simplest alternative); Context, Owner decisions Q17
+EVIDENCE: The harm statement rejects the smallest home, a section in references/loop.md, partly because "lifecycle intake routes requests only to skills (`references/lifecycle.md:51-66`)". At de1a5171 that range routes several requests to procedures that are not skills: :53 "Inspect the relevant source and answer", :62 "Edit the authoritative requested artifact", :65 "Merge only under the exact approval in `references/authority.md`, then run `after-merge` from `references/branches.md`", and :66 "Follow the maintenance procedure below". So an intake row could route orchestration requests to a reference or a loop.md section with no skill, no checker kind and no count changes. The stated cost of the skill, "one checker kind, two count changes and an intake row", also leaves out the new authority.md row, the guide rows and the version bump that Scope lists. Q17 adopts the skill "for the reason the harm statement gives", so the owner decided on a false premise. This traces to the revision at de1a5171, which added this reason in answer to R-2 F-08.
+PROPOSAL: Correct the reason. If the real argument is native skill discovery by a session that never enters vh-adlc, say that and cite it. Otherwise put the corrected comparison to the owner again, since Q17 rests on the claim.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-30, S-31, S-32, S-36, S-37 and S-44; Design, The skill (loop frame); Design, Concurrency, failure and upgrade; Context, Owner summary (Upgrades and close-out bullet); Context, Owner decisions Q5; Acceptance Criteria AC-10
+EVIDENCE: S-44 ("Writing its durable handoff is the one write a stale session makes") lives only in references/orchestrate.md, which only the orchestrator reads. Every operation a sub-session runs says "If its `plugin.stale` is true, stop before any write" (vh-adlc-spec/SKILL.md:40, vh-adlc-implement/SKILL.md:49, vh-adlc-review/SKILL.md:27, vh-adlc-tasks/SKILL.md:26, vh-adlc-ship/SKILL.md:51, vh-adlc-resume/SKILL.md:41, vh-adlc-investigate/SKILL.md:45), and references/loop-settings.md:126-127 says the same. Scope puts "Changing how sub-sessions run operations" out of scope, and loop-settings.md is not in covers. So a stale sub-session told by a peer message to write its handoff still meets a rule that forbids it. The skill "follows the loop frame", which carries the same stop line, so the orchestrator's own skill also contradicts S-32's handoff write. Second, loop-settings.md:126-127 makes every session started before an install stale, the orchestrator included. S-30 (record handoffs, replace sessions once the release lands) is then run by an orchestrator that S-32 bars from ledger writes and tells to ask for its own replacement; the document does not say which happens first or who replaces the sub-sessions. Third, a replaced, paused session is not "done", so neither S-02 nor S-36 lets the orchestrator archive it, authority.md:30 needs separate approval to end a live session, and the old sessions keep counting against S-11's live-session limit. This traces to the revision at de1a5171, which added S-44 in answer to R-2 F-03.
+PROPOSAL: Either bring loop-settings.md (and the skill frame) into Scope and covers with the handoff exception, or have stale sessions report their state by message only and let a non-stale orchestrator or its replacement record it. State the order when the orchestrator is stale too, and say how replaced sessions are archived (a batched owner approval under authority.md:30).
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-02, S-24 and S-37; Context, Owner decisions Q4 and Q14; Context, Owner summary (Communication bullet); Acceptance Criteria AC-02, AC-09, AC-13
+EVIDENCE: S-24 records every owner answer "as a comment on the work item's issue", S-37 falls back to "a comment on the work item's issue" for handoffs, and S-02 grants only "dated owner-answer comments on work-item issues". The standard allows `issue: null` for local-only work (conventions/feature-documents.md, Frontmatter), and this document itself has `issue: null`. For such a work item there is no channel for owner answers and no fallback handoff location. Q4 in Owner decisions still says "a dated record in the work item's issue or feature document", which S-02 and S-24 no longer allow. S-37 also has sub-sessions write handoffs as issue comments, but S-02 grants issue comments to the orchestrator only, and authority.md:27 gives a session issue updates only under a ship request. This traces to the revision at de1a5171, which narrowed S-24 and S-37 to issue comments.
+PROPOSAL: Name the channel for a work item without an issue (for example the ledger, which S-02 already grants), and say what authority a sub-session uses for its own handoff write. Reword Q4 to match Q14.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-10, S-12, S-36 and S-02; Context, Owner decisions Q7 and Q8; Context, Owner summary (Admission bullet); Acceptance Criteria AC-04
+EVIDENCE: S-10 starts the next batch only "after every session in the current batch has reported its first step". A session that stays pending (S-12) or fails before its first report never reports, so admissions stop for good. S-12 says "do not retry it, and start nothing new until archived sessions free a slot", but says nothing about the pending session itself. Incident 15 says the pending session "spawned only after other sessions were archived and it was recreated", so freeing a slot alone did not recover it. Recreating it means ending it first, and S-02 and S-36 only allow archiving sessions that are done; authority.md:30 needs separate approval to end a live session. One implementer waits forever, another asks the owner, a third archives and restarts the pending session without a grant.
+PROPOSAL: Define the path for a batch member that stays pending or fails: it is excluded from S-10's wait once recorded in the ledger, and recreating it needs the owner's approval, batched with other questions.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-09 and S-18; Design, Explanation the reference adds (Admission order); Design, Project procedure slot (Batch limit, Status pass interval); Context, Owner decisions Q3; Context, Owner summary (Admission and Status passes bullets); Acceptance Criteria AC-04
+EVIDENCE: Q3 decided "at most three new sub-sessions per batch by default, overridable in the project procedure, with more only once load shows the batch fit". S-09 says only "Start at most three new sub-sessions per batch unless the project procedure sets another limit"; the condition "more only once load shows the batch fit" appears nowhere in Design, so a project limit of ten admits ten at once on the first batch. The Owner summary says "Start at most three new sessions per batch" and "at least every two hours" without the project overrides that S-09, S-18, Q3 and Q9 give.
+PROPOSAL: Fold Q3's condition into S-09 or the explanation (for example, a batch larger than three only after a previous batch of that size passed S-10), and mention both overrides in the Owner summary.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-02, S-19, S-32, S-33, S-39 and S-42; Design, Explanation the reference adds (The workstream ledger); Design, Project procedure slot (Ledger location); Scope (authority.md row); Acceptance Criteria AC-02
+EVIDENCE: The ledger may be "a tracking issue or a document". S-02 grants writing "its workstream ledger", while S-42 says "The orchestrator's own commits need the repository's normal authority for that change" and S-33 has them pass the repository's hooks. If the ledger is a repository document, each S-19 update (every status pass, so after every sub-session report) is a commit, and probably a push to the shared default branch. authority.md has no row for committing a non-feature document to the default branch (row 14 covers feature documents under vh-adlc-spec only). One implementer reads S-02 as covering the commit and push, another needs approval for each. Creating a tracking issue for the ledger is likewise not in S-02 (authority.md:25 needs acceptance or a request).
+PROPOSAL: Say whether S-02 covers committing and pushing a ledger document and creating a ledger issue, or limit the ledger to locations that need no commit, and state it in the authority row.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-14 and S-16; Design, Project procedure slot (Exclusive resources, Heavy jobs); Scope (Out of scope, sub-session operations); Acceptance Criteria AC-05, AC-06
+EVIDENCE: S-14 keeps "one queue per exclusive resource in the workstream ledger" and runs "one heavy job at a time on each exclusive resource". Heavy jobs such as a cluster run are started by sub-sessions inside their own implement or ship operations, which Scope leaves unchanged and which do not read the ledger. The brief (S-16) names code areas, contracts and the handoff location, but not the exclusive resources or a rule to wait for the orchestrator's turn before using one. So once every box is ticked, two sub-sessions can still start cluster runs together, as in incident 12. One implementer enforces the queue by messaging, another only queues the orchestrator's own jobs.
+PROPOSAL: Add to S-16 that the brief names the exclusive resources and requires the sub-session to ask the orchestrator for its turn before a heavy job on one.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Concurrency, failure and upgrade; Design, Required sentences S-11, S-14, S-32 and S-39; Design, Glossary (Workstream ledger)
+EVIDENCE: The concurrency section covers only a single orchestrator ("no shared state beyond the workstream ledger, which only the orchestrator writes"). Two orchestrators can be live on one host: two workstreams, or a stale orchestrator and its replacement, since S-32 has the stale one keep "reading and messaging". Each keeps its own ledger and exclusive-resource queues, so S-14's one heavy job per resource holds per ledger, not per host, and two orchestrators can both pass S-11's live-session count and start batches at once. Two orchestrators messaging the same sub-sessions can also steer them in conflicting ways. The document leaves these paths undefined.
+PROPOSAL: State that one orchestrator per host (or per exclusive resource) is the rule, or that queues live in a shared location, and that a stale orchestrator stops steering once its replacement starts.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-11, AC-12, AC-13; Acceptance Criteria AC-02; Scope (authority.md row)
+EVIDENCE: AC-02 requires an authority.md row "granting the writes S-02 lists", and Scope says "with exactly the writes S-02 lists". The proof asserts only a row naming `skills/vh-adlc-orchestrate/SKILL.md` and the words "workstream ledger" and "archiving". A row that leaves out the owner-answer comments and harm statements, or adds a grant such as writing feature documents or merging, passes. The grant is the fix for R-2's blocking finding, so a weak proof here lets that defect return.
+PROPOSAL: Assert each of the four writes in the row, and add a manual step in which the implementation reviewer confirms the row grants nothing beyond S-02.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (Admission bullet); Design, Required sentences S-06
+EVIDENCE: The Owner summary says to check "that none of the gates it will reach is blocked". S-06 says "If any gate the work reaches next is blocked for everyone". The summary covers every later gate and drops "for everyone"; S-06 covers only the next gate.
+PROPOSAL: Make the summary say "the next gate the work reaches is not blocked for everyone".
+
+FINDING: F-11
+KIND: factual
+SEVERITY: nit
+WHERE: Scope (In scope); frontmatter covers
+EVIDENCE: docs/user-guides/workflows.md:17-19 sends readers to docs/reference/compatibility.md "for the lifecycle trials and limits on your host", and that page lists each operation's verified hosts (for example :152 for `vh-adlc-clean`, :246 for `vh-adlc-docs-truth`). Scope adds a new operation but no compatibility entry saying it is unverified, and covers omits docs/reference/compatibility.md.
+PROPOSAL: Add an unverified entry for `vh-adlc-orchestrate` to compatibility.md, and list that file in Scope and covers.
 
 ## Sources
 
