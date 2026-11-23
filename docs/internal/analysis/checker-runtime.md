@@ -237,13 +237,33 @@ load 17: 238.4 seconds on main and 234.0 on the branch, all passing on both.
   `e66f8040`, the head merged as PR #156, with the race fix: the test step took 44 minutes
   (12:06:44 to 12:50:44 UTC) against 117 before. All 4,289 tests in 276 files passed in
   2,640 seconds. Every other job passed.
+- CI run [45178726616](https://github.com/michielvha/vh-adlc/actions/runs/45178726616) at
+  `d66b97c9`, merged as PR #160 (the settings reader resolved once per process): the test step
+  took 21 minutes (12:57:18 to 13:18:32 UTC) against 44. All 4,290 tests passed in 1,275 seconds.
+  Per-test times summed to 4,808 seconds against 9,444, and docs-drift to 4,499 against 8,792.
+  Files that read no settings barely moved (`ensure.test.ts` 29.0 to 27.7 seconds,
+  `loop/review-route.test.ts` 16.2 to 14.1), which points to the change, but see the next entry for
+  how far runs vary.
+- CI run [45182976519](https://github.com/michielvha/vh-adlc/actions/runs/45182976519) at
+  `8b39b15a`, merged as PR #161 (the worktree scope read once per command), ran twice on the same
+  commit. Per-test times summed to 7,220 seconds in the first attempt and 5,526 in the second, and
+  `delivery-ack.test.ts`, which neither change reaches through a command, took 210.7 and 160.2
+  seconds. Attempts on one commit differ by about 30%, so a single run per side cannot measure a
+  change smaller than that. #161 showed no measurable CI gain over #160: most heavy tests call the
+  journal APIs directly, outside a command. The 9,444 to 4,808 seconds of #160 is larger than that
+  spread, but its exact size is uncertain. The second attempt's test step took 25.5 minutes; the
+  first attempt's remote-gui job failed in an unrelated browser test, tracked in #163.
 
 ## Follow-ups
 
-- Track: `externalArtifactDirectory()` re-reads the worktree list and two Git paths on each of its
-  calls. Caching the scope for one operation would remove most Git calls from the docs-drift tests
-  and from real runs. It changes when a newly added worktree is noticed, so it needs a decision on
-  the docs-drift security model.
+- Done in plugin 0.30.4, by owner decision on 2026-11-23: `externalArtifactDirectory()` re-read the
+  worktree list and two Git paths on each of its calls. Inside one command (`withRuntimeValidation()`)
+  the scope is now read once per source repository and remembers every path it checked.
+  `assertCallerUnchanged()`, which guards a command's completion, reads the list again and refuses
+  when a checked path now lies inside a worktree or Git directory. A worktree added mid-command is
+  therefore noticed before completion, not at the next journal write. Standalone calls outside a
+  command still read the list every time, so tests that call the journal APIs directly, such as
+  `delivery-ack.test.ts`, do not get faster.
 - Done in plugin 0.30.3: settings readers ran `ensure-vh-adlc.sh` once per read. `createYAMLReader()`
   now keeps the installer's answer for the process, keyed by offline mode, the lock's digest and the
   environment, and hashes the binary in process before each reuse (about 4 milliseconds for the

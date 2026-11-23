@@ -242,7 +242,13 @@ export function matchesCallerState(directory: string, expected: string, scope: "
 
 /** Complete retained stages and report artifacts only after the invocation's final comparison. */
 export function assertCallerUnchanged(): void {
-  const caller = currentRuntimeValidation()?.caller;
+  const context = currentRuntimeValidation();
+  // The command reused one worktree list; a worktree added since must not hold a checked path.
+  for (const scope of context?.resources.values() ?? []) {
+    const current = protectedResourcePaths(scope.repo);
+    for (const path of scope.checked) outside(path, current);
+  }
+  const caller = context?.caller;
   if (caller && !caller.unchanged()) throw Error("Caller source, index or repository configuration changed during this operation.");
 }
 
@@ -276,12 +282,28 @@ export function artifactDirectoryScope(directory: string, sourceRepo: string) {
 }
 
 /** Check future resource paths before creating them, using the same caller and Git exclusions. */
+/** One command reads the caller's worktree list once; assertCallerUnchanged() rechecks it before completion. */
 export function externalResourceScope(sourceRepo: string) {
+  const resources = currentRuntimeValidation()?.resources;
+  if (!resources) {
+    const protectedPaths = protectedResourcePaths(sourceRepo);
+    return { assertExternal(path: string) { outside(path, protectedPaths); } };
+  }
+  const key = realpathSync(sourceRepo);
+  let scope = resources.get(key);
+  if (!scope) {
+    scope = { repo: sourceRepo, protected: protectedResourcePaths(sourceRepo), checked: new Set<string>() };
+    resources.set(key, scope);
+  }
+  const selected = scope;
+  return { assertExternal(path: string) { outside(path, selected.protected); selected.checked.add(path); } };
+}
+
+function protectedResourcePaths(sourceRepo: string): string[] {
   const worktrees = nulFields(readGit(sourceRepo, "worktree", "list", "--porcelain", "-z"))
     .filter(field => field.subarray(0, 9).equals(Buffer.from("worktree ")))
     .map(field => realpathSync(decodeUTF8(field.subarray(9))));
-  const protectedPaths = [...worktrees, realpathSync(gitPath(sourceRepo, "--git-common-dir")), realpathSync(gitPath(sourceRepo, "--git-path", "objects"))];
-  return { assertExternal(path: string) { outside(path, protectedPaths); } };
+  return [...worktrees, realpathSync(gitPath(sourceRepo, "--git-common-dir")), realpathSync(gitPath(sourceRepo, "--git-path", "objects"))];
 }
 
 /** Record the exact assessment resource before creating or fetching into its new bare store. */
