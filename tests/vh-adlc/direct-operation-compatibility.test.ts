@@ -6,8 +6,9 @@ const root = join(import.meta.dir, "../..");
 const baseline = "b313327b134bc5ecfa7167856d4b567f8701ba06";
 // Keep the owner summary, finding rules, drift re-review limit, the proportionality gate
 // (michielvha/vh-adlc#148: harm statement and convergence trigger) and the author-added extras
-// exception (michielvha/vh-adlc#141) in the spec baseline.
-const specBaseline = "41355739d55e1d60f5c1839fa1c59a57089b96e0";
+// exception (michielvha/vh-adlc#141) in the spec baseline, and the rules under severity by consequence
+// (docs/specs/proportional-review.md).
+const specBaseline = "c2eff1d0300af93f8aed228dcff68e6c55714ecf";
 // The proportionality gate (michielvha/vh-adlc#148) adds the harm statement step to investigate.
 const investigateBaseline = "e53fe39e7461b95c27b7481514688ee998970e18";
 // The owner approved the rule that an agent-behavior proof needs a committed script that reruns it
