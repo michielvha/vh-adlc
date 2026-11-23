@@ -1,5 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
-import { access, readFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pinnedPlaywrightVersion } from "../../../plugins/vh-adlc/scripts/website-check/chromium";
 import { existingSuiteMasksServiceFailure } from "./fixtures/existing-suite";
 import { startSite } from "./fixtures/site";
 
@@ -130,5 +133,94 @@ test("missing proxy prerequisites fail before the browser contacts the site", as
   } finally {
     if (previous === undefined) delete process.env.WEBSITE_CHECK_SQUID;
     else process.env.WEBSITE_CHECK_SQUID = previous;
+  }
+});
+
+// A run that passes profile validation fails on this missing proxy instead, so a rejection that names the
+// offending key or CA proves the profile was refused before the proxy, the boundary or the browser started.
+async function withoutProxy<T>(run: () => Promise<T>) {
+  const previous = process.env.WEBSITE_CHECK_SQUID;
+  process.env.WEBSITE_CHECK_SQUID = "/nonexistent/website-check/squid";
+  try {
+    return await run();
+  } finally {
+    if (previous === undefined) delete process.env.WEBSITE_CHECK_SQUID;
+    else process.env.WEBSITE_CHECK_SQUID = previous;
+  }
+}
+
+function validProfile(target: "build" | "deployed", origin: string): Record<string, any> {
+  return {
+    target, origin, mode: "report", browser: "chromium",
+    expectedResponses: [{ method: "GET", url: `${origin}/auth/session`, resourceType: "fetch", status: 401 }],
+    route: {
+      path: "/", visibleHeading: "Release ready", deadlineMs: 8_000,
+      requiredRequests: [{ method: "GET", url: `${origin}/asset` }],
+    },
+  };
+}
+
+const rejectedProfiles: [string, (profile: Record<string, any>, site: Site) => void, string][] = [
+  ["browser firefox", (p) => { p.browser = "firefox"; }, "firefox"],
+  ["browser webkit", (p) => { p.browser = "webkit"; }, "webkit"],
+  ["an undefined top-level key", (p) => { p.routes = []; }, "routes"],
+  ["an undefined key in route", (p) => { p.route.requiredRequest = p.route.requiredRequests; }, "requiredRequest"],
+  ["an undefined key in a required request", (p) => { p.route.requiredRequests[0].query = "a=1"; }, "query"],
+  ["an undefined key in an expected response", (p) => { p.expectedResponses[0].anonymous = true; }, "anonymous"],
+  ["a profile certificate authority", (p, site) => { p.chromium = { caFile: site.caFile }; }, "chromium"],
+];
+
+for (const target of ["build", "deployed"] as const) {
+  test(`an otherwise valid ${target} profile reaches the proxy prerequisites`, async () => {
+    const site = fixture();
+    const origin = target === "build" ? site.localURL : site.deploymentURL;
+    const { runWebsiteCheck } = await import(runnerPath.href);
+    await withoutProxy(() => expect(runWebsiteCheck(validProfile(target, origin), { fixtureCaFile: site.caFile }))
+      .rejects.toThrow("Missing prerequisite"));
+    expect(site.visits).toEqual([]);
+  });
+
+  for (const [name, change, named] of rejectedProfiles) {
+    test(`a ${target} profile with ${name} is invalid configuration before anything starts`, async () => {
+      const site = fixture();
+      const profile = validProfile(target, target === "build" ? site.localURL : site.deploymentURL);
+      change(profile, site);
+      const { runWebsiteCheck } = await import(runnerPath.href);
+      const error = await withoutProxy(() => runWebsiteCheck(profile, { fixtureCaFile: site.caFile }).then(() => undefined, (e: Error) => e));
+      expect(error).toBeInstanceOf(Error);
+      expect(error?.message).toContain("Invalid website smoke profile");
+      expect(error?.message).toContain(named);
+      expect(error?.message).not.toContain("Missing prerequisite");
+      expect(site.visits).toEqual([]);
+    });
+  }
+}
+
+test("a fixture CA with a non-loopback origin is invalid configuration before anything starts", async () => {
+  const site = fixture();
+  const { runWebsiteCheck } = await import(runnerPath.href);
+  const error = await withoutProxy(() => runWebsiteCheck(validProfile("deployed", "https://release.example.invalid"),
+    { fixtureCaFile: site.caFile }).then(() => undefined, (e: Error) => e));
+  expect(error?.message).toContain("fixture CA");
+  expect(error?.message).not.toContain("Missing prerequisite");
+  expect(site.visits).toEqual([]);
+});
+
+test("a playwright-core module that differs from the pin is refused before launch", async () => {
+  const site = fixture();
+  const module = await mkdtemp(join(tmpdir(), "website-check-module-"));
+  await writeFile(join(module, "package.json"), JSON.stringify({ name: "playwright-core", version: "0.0.1" }));
+  await writeFile(join(module, "index.mjs"), "export const chromium = {};\n");
+  const previous = process.env.WEBSITE_CHECK_PLAYWRIGHT_MODULE;
+  process.env.WEBSITE_CHECK_PLAYWRIGHT_MODULE = join(module, "index.mjs");
+  try {
+    const { runWebsiteCheck } = await import(runnerPath.href);
+    await expect(runWebsiteCheck(validProfile("build", site.localURL)))
+      .rejects.toThrow(`Website smoke requires playwright-core ${await pinnedPlaywrightVersion()}`);
+    expect(site.visits).toEqual([]);
+  } finally {
+    if (previous === undefined) delete process.env.WEBSITE_CHECK_PLAYWRIGHT_MODULE;
+    else process.env.WEBSITE_CHECK_PLAYWRIGHT_MODULE = previous;
+    await rm(module, { recursive: true, force: true });
   }
 });
