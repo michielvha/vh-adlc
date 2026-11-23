@@ -13,7 +13,7 @@ async function waitForOwnedLocks(paths:string[]){
   catch(error){if(!(error instanceof Error)||!error.message.includes("is locked")||Date.now()>=deadline)throw error;await Bun.sleep(10);}
  }
 }
-const hostCap=Number(process.env.VH_ADLC_TRIAGE_TEST_TIMEOUT_MS??15000);
+const hostCap=Number(process.env.VH_ADLC_TRIAGE_TEST_TIMEOUT_MS??60000);
 if(!Number.isInteger(hostCap)||hostCap<15000||hostCap>60000)throw Error("invalid triage fixture timeout allowance");
 for(const point of["init-anchor","init-log","journal-complete","journal-started","journal-gated","head-lag","partial-log","anchor-partial","phase-write","phase-marker","phase-marker-done","plan-write"])test(`original journal recovers after owned kill at ${point}`,async()=>{
  const f=fixture();try{

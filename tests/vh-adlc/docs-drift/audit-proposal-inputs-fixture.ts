@@ -1,8 +1,9 @@
 /** Owned synthetic native proposals, including immutable Git objects and mutable API inventory. */
-import { readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { bindingFixture } from "./binding-fixture";
 import { commitAll, git, put } from "./repository-fixture";
+import { gitStub } from "./git-stub";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
 export const auditInputFaults = ["empty", "matching", "multiple", "partial-missing", "early-missing", "oversized-first", "missing-objects", "changed-after-fetch", "oversized-inputs"] as const;
@@ -32,13 +33,12 @@ export async function auditProposalInputsFixture(roots: string[], fault: typeof 
         if (multiple && fault !== "partial-missing") git(f.origin, "update-ref", "refs/pull/12/head", legacyHead);
       }
       if (fault === "changed-after-fetch") {
-        const path = join(f.root, "native-bin/git"), original = readFileSync(path, "utf8");
-        const edit = `if (args.some(value => value.includes("refs/pull/11/head"))) {
-          const fs = require("node:fs"), path = ${JSON.stringify(f.inventoryFile)}, values = JSON.parse(fs.readFileSync(path, "utf8"));
-          values[0].body = "Changed while reading the full original proposal"; fs.writeFileSync(path, JSON.stringify(values)); }
-`;
-        if (!original.includes("process.exit(result.exitCode);")) throw Error("Missing owned Git fixture completion boundary");
-        writeFileSync(path, original.replace("process.exit(result.exitCode);", edit + "process.exit(result.exitCode);"));
+        // Rewrite the inventory after Git has fetched the original proposal head, before the reader returns.
+        const executable = Bun.which("git"); if (!executable) throw Error("fixture requires Git");
+        const edit = `const fs = require("node:fs"), path = ${JSON.stringify(f.inventoryFile)}, values = JSON.parse(fs.readFileSync(path, "utf8"));
+values[0].body = "Changed while reading the full original proposal"; fs.writeFileSync(path, JSON.stringify(values));`;
+        writeFileSync(join(f.root, "native-bin/git"), gitStub({ git: executable, origin: f.origin, refuseRemote: true,
+          after: { contains: "refs/pull/11/head", command: [process.execPath, "-e", edit] } }), { mode: 0o700 });
       }
     }
   return { ...f, proposalHead: head, legacyHead };
