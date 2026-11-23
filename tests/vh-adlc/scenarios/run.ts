@@ -2261,6 +2261,14 @@ const PROPORTIONAL_SCENARIOS: Scenario[] = [
   cutScenario("S17.cut.control", "Control: cutting only the sampler loses nothing important", "sampler", "companion"),
   FOLLOWUP,
   followupControl("S17.followup.unmerged", "Control: a complete feature whose PR is not merged keeps ship's delivery path", "companion", false),
+  // AC-08: the same fixtures pinned to the docs revision before this feature behave as before it.
+  scopedScenario("S17.oldpin.scoped", "Old pin: the re-review stays a full pass and raises the unchanged gap", "convergence"),
+  questionsScenario("S17.oldpin.questions", "Old pin: both judgement findings become Open Questions", "convergence"),
+  nitsScenario("S17.oldpin.nits", "Old pin: the summary lists every unapplied nit", "convergence"),
+  profileScenario("S17.oldpin.profile", "Old pin: the lock gap is raised at should-fix or blocking despite the single-person profile", "single", "convergence"),
+  deferredScenario("S17.oldpin.deferred", "Old pin: no Deferred section and no cut check", "convergence"),
+  cutScenario("S17.oldpin.cut", "Old pin: an owner cut writes no Deferred entry and no cut check", "both", "convergence"),
+  followupControl("S17.oldpin.followup", "Old pin: neither ship nor resume runs or names a follow-up review on a merged feature", "convergence", true),
 ];
 SCENARIOS.push(...PROPORTIONAL_SCENARIOS);
 
