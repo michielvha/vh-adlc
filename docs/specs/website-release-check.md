@@ -174,6 +174,7 @@ Later on 2026-11-23, after spec review R-17 showed that a list of refused variab
 | 2026-11-23 | R-16 | spec | `dd48a4a0beb0989353b634591ce8be7d13acc0f6` | claude-opus-5-5 | procedural | One should-fix finding and five nits |
 | 2026-11-23 | R-16 | spec | `dd48a4a0beb0989353b634591ce8be7d13acc0f6` | n/a | n/a | accepted by owner |
 | 2026-11-23 | R-17 | spec | `9a148c337cdfe5db2948955122d9e5e8bed4ce91` | claude-opus-5-5 | procedural | One blocking finding, one should-fix finding and three nits |
+| 2026-11-23 | R-18 | spec | `aa30003f0174709b3772d22ae0741230a45bcdf9` | claude-opus-5-5 | procedural | One blocking finding, three should-fix findings and two nits |
 
 ### R-1
 
@@ -846,6 +847,50 @@ SEVERITY: nit
 WHERE: Tasks T12 evidence
 EVIDENCE: The T12 evidence line ("with `profile.schema.json` and the runner option, `bun test tests/vh-adlc/website-check` ... passed 33 of 33") names no commit. T11's evidence names `8d8df408`. `git log -- plugins/vh-adlc/scripts/website-check/profile.schema.json` shows `bfa03f79` as the T12 commit.
 PROPOSAL: Name the commit tested (`bfa03f79`, if that is the one) in T12's evidence.
+
+### R-18
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context / Owner summary line 28 ("Neither a profile nor the shipped command can add a trusted certificate authority", "so ambient trust and proxy variables have no effect on them"), Owner summary line 32, Design line 63 ("in a child Bun process started with a cleared environment in which the runner sets only `PATH`, `HOME` and `LANG`, with no inherited command-line flags and no `BUN_OPTIONS`", "Ambient trust and proxy variables therefore have no effect on them"), Design line 66 ("normal certificate validation"), Test Plan AC-03 (the seven variables "one at a time"), Tasks T5 and T6, Open Questions line 151
+EVIDENCE: This revision replaced the refusal list with the cleared-environment child, but a cleared environment does not stop Bun from loading the same settings from files in its working directory. In a scratch directory on macOS with Bun 1.4.2, a child started as `env -i PATH=/usr/bin:/bin HOME=<dir> LANG=C bun check.ts` printed "rejected self signed certificate" for a Bun.serve TLS server on localhost with a self-signed certificate, and the plain HTTP probe got ENOTFOUND. The same command with a `.env` in the cwd holding `NODE_TLS_REJECT_UNAUTHORIZED=0` and `HTTP_PROXY=http://127.0.0.1:<port>` printed "trusted 200" and "probe 301 https://evil.invalid/", and the fake proxy logged "PROXY GOT http://upgrade.example.invalid/upgrade". `.env.local` with `NODE_TLS_REJECT_UNAUTHORIZED=0` printed "trusted 200". A `bunfig.toml` in the cwd with a `preload` that sets that variable printed "trusted 200". With `--no-env-file` the `.env.local` case printed "rejected self signed certificate". The browser avoids this only because it runs under Bubblewrap with no adopter directory mounted (`plugins/vh-adlc/scripts/website-check/chromium.ts:106-121`). The Design pins down only the environment, flags and `BUN_OPTIONS`, not the child's working directory or dotenv and bunfig loading. A child built exactly to the Design and started from an adopter repository with a `.env` therefore trusts any certificate and sends the upgrade probe to an ambient proxy, which can forge the upgrade response that `runner.ts:27` accepts. Every AC-03 case still passes, because they set only process environment variables. Limitation: observed on macOS with Bun 1.4.2, not on CI's Linux Bun 1.4.5.
+PROPOSAL: State that the child runs with `--no-env-file` (or the equivalent), in a runner-owned empty working directory with no `bunfig.toml`, so neither dotenv files nor bunfig preloads apply. Add AC-03 and T5 cases that put `.env` and `bunfig.toml` files carrying these settings in the invoking directory and expect the certificate check to fail and the probe to stay away from the named proxy.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design line 63 ("run the way the browser does", "connecting only through the run's confinement proxy"), Design line 67 ("An explicitly enabled HTTP upgrade probe runs in a separate client boundary scoped to the configured initial HTTP origin", "Allow the browser and network adapter processes to connect only to that proxy, with no direct egress or loopback bypass"), Owner summary line 32 ("connects only through the confinement proxy"), Test Plan AC-01 (HTTP probe destination log), Test Plan AC-03 (environment cases), Tasks T5 and T6
+EVIDENCE: The browser's "only through the proxy" is enforced by a network namespace: Bubblewrap `--unshare-net` at `chromium.ts:107`, and the worker refuses to run if it still shares the parent namespace (`smoke-worker.ts`, the `/proc/self/ns/net` check). The Design does not say whether the new child gets the same network boundary or is just a cleared-environment process that passes the Squid address to `fetch`. "The way the browser does" can be read either way. Every fixture destination is on loopback, which a host process can reach directly. So a child that fetches directly, not through Squid, still produces the destination-log entries the AC-01 HTTP probe proof checks, and still passes the AC-03 cases, because those check only that the named proxy saw nothing. No row checks that the child's requests went through the confinement proxy or that it has no direct egress.
+PROPOSAL: Say whether the child runs inside the same network-namespace boundary as the browser, or how it is otherwise kept from direct egress, and which proxy the HTTP upgrade probe uses, given the HTTPS-only deployed boundary. Add a proof that fails when the child connects directly, for example a destination reachable only through the proxy, or a check of the Squid access record against the destination log.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-03 ("Set `NODE_EXTRA_CA_CERTS`, `NODE_USE_SYSTEM_CA`, `NODE_TLS_REJECT_UNAUTHORIZED=0`, `SSL_CERT_FILE`, `SSL_CERT_DIR`, `BUN_OPTIONS=--use-openssl-ca` and `HTTP_PROXY` one at a time, each pointing at the fixture's certificate or a logging proxy"), Tasks T5 ("each of the seven trust and proxy settings")
+EVIDENCE: On Bun 1.4.2 (macOS), with a cleared environment, a fetch to a localhost TLS server with a self-signed certificate printed "rejected self signed certificate" with `NODE_USE_SYSTEM_CA=1`, with `BUN_OPTIONS=--use-openssl-ca` and with `BUN_OPTIONS=--use-system-ca`, each set alone. In the same run, `NODE_EXTRA_CA_CERTS=<cert>` printed "trusted 200". Those settings switch to a system store that does not hold the fixture certificate, so the certificate check fails whether or not the child inherits them. The `NODE_USE_SYSTEM_CA` and `BUN_OPTIONS=--use-openssl-ca` cases therefore pass on an implementation that passes those variables through, even though the Design says "no `BUN_OPTIONS`". Also, `NODE_TLS_REJECT_UNAUTHORIZED=0` and `NODE_USE_SYSTEM_CA` point at nothing, which "each pointing at the fixture's certificate or a logging proxy" does not cover. This row changed in this revision.
+PROPOSAL: For `BUN_OPTIONS`, use a value whose effect the fixture can see when inherited, such as `--preload` of a file that disables certificate validation, or pair `--use-openssl-ca` with `SSL_CERT_FILE` given only through `BUN_OPTIONS`. For `NODE_USE_SYSTEM_CA`, either add the fixture certificate to a store that setting would read, or say the case checks only the report listing.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 28 ("the report names any that were present"), Design line 63 ("the report lists by name any that were present and ignored"), Test Plan AC-03 ("the report lists the variable by name"), Tasks T5 ("with the variable listed in the report"), Open Questions line 151 ("any ambient trust or proxy variables")
+EVIDENCE: The Design names trust and proxy settings only as examples ("such as `NODE_EXTRA_CA_CERTS`, `SSL_CERT_FILE`, `BUN_OPTIONS` and `HTTP_PROXY`"), and the Test Plan checks seven. Nothing defines which variables count as ambient trust or proxy variables for the report. `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`, their lowercase forms and `NODE_OPTIONS` are left open. R-17 F-02 named the first four as Bun inputs. One implementer lists only the seven tested names, another lists a wider set, and both pass the AC-03 row.
+PROPOSAL: Give the exact set the report checks in the Design (for example the seven plus `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY`, the lowercase proxy forms and `NODE_OPTIONS`), or a stated name pattern, and test at least one name outside the seven.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T6 ("`plugins/vh-adlc/scripts/website-check/report.ts`, `cli.ts` and `adapters.ts` in the same directory", "with the upgrade probe and the certificate and redirect checks in a cleared-environment child process")
+EVIDENCE: The upgrade probe is the in-process `fetch` at `plugins/vh-adlc/scripts/website-check/runner.ts:21-31`. Moving it into a child process changes `runner.ts`, and probably adds a child entry file like `smoke-worker.ts`, but T6 names neither. The standard asks each task to name the files it touches. This revision added the child-process clause to T6.
+PROPOSAL: Add `runner.ts` and the child process's entry file to T6's file list.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary line 32 ("Since the acceptance at `dd48a4a0`, the command's own network requests move into a cleared-environment child process that connects only through the confinement proxy"), Owner summary line 28 ("The command's own network requests run in a child process with a cleared environment")
+EVIDENCE: At X the upgrade probe still runs in the parent process (`runner.ts:22`), and T5 and T6 are unticked. The summary lists which checks have run and passed, but it states the child-process change in the present tense without saying that it and its seven T5 cases are planned and not yet observed. The standard asks the summary to tell planned checks apart from observed proof. This is outside the normative baseline.
+PROPOSAL: Say that the child-process change is planned for T5 and T6 and has not run yet.
 
 ## Sources
 
