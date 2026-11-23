@@ -24,6 +24,8 @@ const CONTENT_OPERATIONS = ["blog", "diagram", "docs-impact", "docs-drift", "doc
 // Host operations call the vh-adlc binary on PATH, unverified and without
 // knowledge, as references/loop.md's exception allows.
 const HOST_OPERATIONS = ["clean"];
+// Coordination operations steer other sessions and change no feature status.
+const COORDINATION_OPERATIONS = ["orchestrate"];
 
 function selectedPhase(): number {
   const raw = process.env.VH_ADLC_PHASE;
@@ -237,7 +239,7 @@ describe("skills", () => {
 
     const dirs = existsSync(join(PKG, "skills")) ? readdirSync(join(PKG, "skills")).sort() : [];
     expect(dirs).toContain("vh-adlc");
-    for (const d of dirs) expect(["vh-adlc",...[...ALL_OPERATIONS, ...CONTENT_OPERATIONS, ...HOST_OPERATIONS].map((op) => `vh-adlc-${op}`)]).toContain(d);
+    for (const d of dirs) expect(["vh-adlc",...[...ALL_OPERATIONS, ...CONTENT_OPERATIONS, ...HOST_OPERATIONS, ...COORDINATION_OPERATIONS].map((op) => `vh-adlc-${op}`)]).toContain(d);
     for (const op of CONTENT_OPERATIONS) {
       expect(dirs).toContain(`vh-adlc-${op}`);
       const fm = frontmatter(read(skillPath(op)));
@@ -636,5 +638,63 @@ describe("workstream orchestration reference", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+// The four writes S-02 grants, each of which the authority row must name (AC-02).
+const ORCHESTRATION_GRANT = [
+  "workstream ledger",
+  "owner-answer comments on work-item issues",
+  "harm statements and handoffs",
+  "archiving",
+];
+
+function orchestrationRows(authority: string): string[] {
+  return authority.split("\n").filter((l) => l.startsWith("|") && l.includes("skills/vh-adlc-orchestrate/SKILL.md"));
+}
+
+function missingGrants(row: string): string[] {
+  const text = normalise(row);
+  return ORCHESTRATION_GRANT.filter((w) => !text.includes(normalise(w)));
+}
+
+describe("workstream orchestration authority", () => {
+  const authority = read(join(PKG, "references", "authority.md"));
+
+  test("one authority row names the orchestrate skill and each write S-02 grants (AC-02)", () => {
+    const rows = orchestrationRows(authority);
+    expect(rows.length).toBe(1);
+    expect(missingGrants(rows[0])).toEqual([]);
+  });
+
+  test("the row check fails when any one write is removed", () => {
+    const row = orchestrationRows(authority)[0] ?? "";
+    for (const write of ORCHESTRATION_GRANT) {
+      const without = row.split(new RegExp(write.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")).join("");
+      expect(missingGrants(without)).toContain(write);
+    }
+  });
+});
+
+describe("coordination operations", () => {
+  for (const op of COORDINATION_OPERATIONS) {
+    test(`vh-adlc-${op} exists, names its directory, has a description and no model (AC-01)`, () => {
+      expect(existsSync(skillPath(op))).toBe(true);
+      const fm = frontmatter(read(skillPath(op)));
+      expect(fm?.name).toBe(`vh-adlc-${op}`);
+      expect(typeof fm?.description).toBe("string");
+      expect(fm).not.toHaveProperty("model");
+    });
+
+    test(`vh-adlc-${op} resolves knowledge, names the humanize guide and reads the loop context (AC-01)`, () => {
+      const text = existsSync(skillPath(op)) ? read(skillPath(op)) : "";
+      for (const phrase of ["vh-adlc knowledge", "guides/humanize-prose.md", "scripts/loop/cli.ts context", `references/${op}.md`]) {
+        expect(text).toContain(phrase);
+      }
+    });
+  }
+
+  test("lifecycle intake routes to the orchestrate skill (AC-01)", () => {
+    expect(read(join(PKG, "references", "lifecycle.md"))).toContain("skills/vh-adlc-orchestrate/SKILL.md");
   });
 });

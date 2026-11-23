@@ -509,12 +509,13 @@ plugin removes the skill and nothing else.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: `vh-adlc-orchestrate` is in the package as a coordination operation: its name equals its
+- [x] AC-01: `vh-adlc-orchestrate` is in the package as a coordination operation: its name equals its
       directory, it has a description and no model, it resolves knowledge, names the humanize guide and
       reads the loop context, and lifecycle intake routes to it. The discovery check counts eleven
       engineering operations and nineteen skills, and both guides say eleven engineering operations, one
       coordination operation and nineteen skills, with an Orchestrate row in the workflows guide, and
       `docs/reference/compatibility.md` lists `vh-adlc-orchestrate` as unverified.
+      Evidence: T4, `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/triage/discovery.test.ts`, 83 pass: the coordination tests, nineteen skills with eleven engineering operations, both guides' counts, the Orchestrate row and the unverified compatibility row.
 - [ ] AC-02: The reference states the decision boundary, sentences S-01 to S-04, S-41 and S-42, and
       `references/authority.md` has a row for the request to orchestrate a workstream granting the writes
       S-02 lists.
@@ -579,16 +580,23 @@ plugin removes the skill and nothing else.
       files that fail with the same counts on `origin/main` (Linux-only Bubblewrap, `/proc`, GNU sed and
       path-length cases), apart from one closure-worker timeout under shard load that passed alone (27
       pass, 0 fail).
-- [ ] T2 Add the request-to-orchestrate row to `plugins/vh-adlc/references/authority.md` with exactly
-      S-02's four writes, and its test in `tests/vh-adlc/check.test.ts`, which must fail when any one
-      write is missing. Done when `bun test tests/vh-adlc/check.test.ts` passes, after the row test was
-      seen failing. AC-02.
-- [ ] T3 Add `plugins/vh-adlc/skills/vh-adlc-orchestrate/SKILL.md`, the coordination kind in
-      `tests/vh-adlc/check.test.ts`, the intake row in `plugins/vh-adlc/references/lifecycle.md`, the
-      nineteen-skill count in `tests/vh-adlc/triage/discovery.test.ts`, the counts and Orchestrate row in
-      `docs/user-guides/workflows.md` and `docs/get-started/installation.md`, and the unverified entry in
-      `docs/reference/compatibility.md`. Done when `bun test tests/vh-adlc` passes, after the
-      coordination and discovery tests were seen failing. AC-01.
+- [x] T4 Add `plugins/vh-adlc/skills/vh-adlc-orchestrate/SKILL.md` and, since the authority row
+      names that file, the request-to-orchestrate row in `plugins/vh-adlc/references/authority.md` with
+      exactly S-02's four writes. Add the coordination kind and the row test, which must fail when any
+      one write is missing, to `tests/vh-adlc/check.test.ts`; the intake row in
+      `plugins/vh-adlc/references/lifecycle.md`; the nineteen-skill count in
+      `tests/vh-adlc/triage/discovery.test.ts`; the counts and Orchestrate row in
+      `docs/user-guides/workflows.md` and `docs/get-started/installation.md`; and the unverified entry
+      in `docs/reference/compatibility.md`. This replaces T2 and T3, dropped because the row cannot land
+      before the skill file it names. Done when `bun test tests/vh-adlc/check.test.ts
+      tests/vh-adlc/triage/discovery.test.ts` passes, after the row, coordination and discovery tests
+      were seen failing. AC-01, AC-02.
+      Evidence: before the change, the row test, the three coordination tests and both discovery tests
+      failed; after it, `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/triage/discovery.test.ts`
+      gave 83 pass and 0 fail, and the package-text files gave 516 pass and 0 fail. A full six-shard
+      `bun test tests/vh-adlc --timeout 60000` run on macOS failed only in the same 22 files, with the
+      same counts as `origin/main`, apart from the closure-worker timeout under shard load that passes
+      alone.
 
 ## Open Questions
 
