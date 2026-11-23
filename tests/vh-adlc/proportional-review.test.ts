@@ -149,6 +149,12 @@ describe("reviewer (AC-03, AC-04, AC-05, AC-08, AC-14)", () => {
     expect(reviewer).toContain("rate each gap by whether a user, tenant or operator of that product would plausibly hit it and how much harm it does");
   });
 
+  test("checks every finding against the always-blocking classes and never drops an uncertain failure path", () => {
+    expect(reviewer).toContain("Before you settle any finding's severity, check it against the always-blocking classes");
+    expect(reviewer).toContain("is blocking whichever section or path it came from and however unlikely the path looks");
+    expect(reviewer).toContain("When you are unsure whether people using the product would hit a failure path, rate it should-fix rather than nit or dropping it");
+  });
+
   test("honours stated limits and Deferred entries", () => {
     expect(reviewer).toContain("Do not raise the substance of a stated limit or a `## Deferred` entry again");
     expect(reviewer).toContain("leaves an always-blocking defect, makes a criterion unmeetable or leaves the stated problem unsolved");

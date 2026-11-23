@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Implementing on feat/proportional-review: T1, T3 to T12 and T18 to T20 done. Both replay cases were approved by the owner (2026-11-22 and 2026-11-23) before any rule edit. The companion convention commit exists locally on vhco-pro/docs docs/proportional-review and passes T1; pushing it and opening its PR waits on the owner, and T2, T13 to T17 and T21 to T24 wait on that."
+status_description: "Implementing on feat/proportional-review: T1 to T22 done. The enterprise replay on the Claude route failed retention for 4 of 50 labels (three always-blocking defects raised only at should-fix, one should-fix defect never raised); on 2026-11-23 the owner allowed a generic reviewer fix after seeing that result, and the new-rules replays rerun on the fixed plugin. T23 and T24 in progress."
 branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."

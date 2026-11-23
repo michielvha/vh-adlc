@@ -57,8 +57,14 @@ happens under concurrent requests, partial failure, retry or replay, and upgrade
 previous version. When the resolved `conventions/feature-documents.md` names the product profile as the
 context for severity, rate each gap by whether a user, tenant or operator of that product would plausibly
 hit it and how much harm it does, on that page's scale: a security, data-loss or tenant-isolation gap is
-blocking whatever the product, and a path nobody using the product would plausibly hit is a nit. On a
-revision that does not, a path the document leaves undefined is a finding. A design that changes no state
+blocking whatever the product, and a path nobody using the product would plausibly hit is a nit. Before
+you settle any finding's severity, check it against the always-blocking classes: a finding that lets
+someone read or act beyond their authorization, forge or bypass an authorization, or reach a credential or
+secret, that loses, corrupts or silently drops data users own and cannot regenerate, or that lets one
+tenant read or affect another's data, runs or configuration, is blocking whichever section or path it came
+from and however unlikely the path looks. When you are unsure whether people using the product would hit
+a failure path, rate it should-fix rather than nit or dropping it. On a revision that does not, a path
+the document leaves undefined is a finding. A design that changes no state
 and crosses no boundary gets no such finding.
 
 This paragraph applies only under a convention that names the product profile as the context for
