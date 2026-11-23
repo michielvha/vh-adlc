@@ -742,6 +742,7 @@ None.
 | 2026-11-23 | R-12 | spec | `28be40ab` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
 | 2026-11-23 | R-13 | spec | `529d2648` | claude-opus-5-5 | procedural | scoped: no blocking; 2 should-fix, 1 nit |
 | 2026-11-23 | R-14 | spec | `436d91c5` | claude-opus-5-5 | procedural | scoped: no blocking; 2 should-fix, 1 nit |
+| 2026-11-23 | R-15 | spec | `9299b15b` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
 
 ### R-1
 
@@ -1589,3 +1590,26 @@ SEVERITY: nit
 WHERE: Context Owner summary ("builds the replay results from the stored private runs"; "every new-rules run repeats on the fixed plugin")
 EVIDENCE: This revision records a new owner decision in Design: sets stored before T25 take their identity from a hand-written launch record, which "the owner accepted ... on 2026-11-23". The Owner summary's list of changes since the R-9 acceptance does not mention this decision or the fresh-set rule. The convention asks the summary to reflect decisions and material changes. The Owner summary is outside the normative baseline.
 PROPOSAL: Add one line to the change paragraph naming the launch record for pre-T25 sets and the fresh stored set per run.
+
+### R-15
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "A stored set is one part (first passes or loop) of one brief on one route"; "Each brief and route records its plugin commit, docs revision and model in `runs/<brief>-<route>.identity.json`"; "one entry per launch with its brief, route, plugin commit, docs revision, model, process ID, log file and the stored files it wrote. For such a set the harness counts only the files its launch entry lists and refuses any other file of that brief and route"); Acceptance Criteria AC-10; Test Plan AC-10 row; Tasks T25
+EVIDENCE: This traces to the previous revision's answers to R-14 F-01 and F-02. The set is now per part, but the identity file and the launch-record refusal are still keyed per brief and route, and the launch entry per launch. Three cases follow. (1) Every pre-T25 launch ran both briefs: `runCase` calls `pass("old", ...)` then `pass("new", ...)` (tests/vh-adlc/replay/run.ts:345-346) and loops `for (const name of ["old", "new"])` (run.ts:358), across both routes by default (run.ts:331). So one launch used two plugin commits and two docs revisions, and an entry "per launch with its brief, route, plugin commit, docs revision" cannot describe it as written. (2) A pre-T25 loop stop on the new brief, after the old loop has written `old-<route>-loop-<i>.md` (run.ts:369), tells the operator to "rerun its loops with --only loops" (run.ts:373). That rerun repeats the old loop too. If it is shorter, the leftover higher-numbered files are still listed by the first launch's entry. With two entries for one part, "its launch entry" is undefined, and the leftovers count toward the old total behind AC-13 and AC-17. (3) A brief and route whose first passes were stored before T25 and whose loop is rerun after T25 with `--only loops` gets an identity file for its brief and route, while the rule "refuses any other file of that brief and route" refuses the new loop files. Neither rule says which identity governs which part. The same per brief and route key also lets a post-T25 `--only loops` run under another identity overwrite the identity file and relabel the first passes it keeps. The AC-10 row's cases (a matching, a mismatched and an unlisted-file launch record, and a `--only loops` rerun) cover none of these. Two careful implementers would differ in what gets counted or refused, and the owner running the replays would notice: a refusal forces an old-brief rerun, which contradicts "Moving the new brief therefore reruns only the new brief".
+PROPOSAL: Key the identity file and the launch-record entries per set (brief, route and part), let the latest launch that wrote a part govern it and refuse files of that part listed only by an earlier entry, and have a partial run refuse to keep a part whose recorded identity differs from its own. Add AC-10 row and T25 cases for two pre-T25 launches that wrote one loop part, and for pre-T25 first passes followed by a post-T25 `--only loops` run.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-10 ("starts a fresh stored set for each run of a brief"); Context Owner summary ("with a fresh stored set per run"); Design (Replay harness, stored-set paragraph)
+EVIDENCE: This revision defines the set per part and says "a `--only loops` run keeps the stored first passes". AC-10 and the Owner summary still say a fresh set per run of a brief, which reads as moving aside first passes on a `--only loops` run. AC-10 also does not state the launch-record behavior that the AC-10 row now proves: a pre-T25 set counted through a matching record, refused through a mismatched one or one with an unlisted file. The Test Plan row and Design agree with each other, so a wrong implementation still fails the row.
+PROPOSAL: Change AC-10 to "starts a fresh stored set for each part a run executes, keeping the other part", add the launch-record counting and refusal to AC-10, and say "per part" in the Owner summary.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-11 row ("checks each pre-T25 set in `runs/launch-record.json` against the launch's log and the stored files' times"); Design (Replay harness, launch-record fields)
+EVIDENCE: The pre-T25 harness prints one JSON line on success with case, results, retention and loops (tests/vh-adlc/replay/run.ts:387), and on a stop only the stop message to stderr (run.ts:419). Neither names a plugin commit or docs revision. So the launch's log confirms the hand-written identity only if the operator captured the launch's command line (`--old-plugin`, `--new-plugin`, `--companion-base`, `--companion-head`), and neither the record's fields nor the row say so. R-14 F-01 raised this point and the revision added a log file field but not what the log must show. The harm is small because the old brief has only ever been one commit and the pre-T25 new-brief sets are superseded.
+PROPOSAL: Add the launch's command line to the launch-record fields, or name what in the log the implementation reviewer compares with the recorded plugin commit and docs revision.
