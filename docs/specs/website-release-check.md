@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised before T11 for spec review R-15's findings and the owner's 2026-11-23 answers on the fixture CA and the Playwright module. Next: spec review R-16 and renewed acceptance."
+status: planned
+status_description: "Accepted by the owner on 2026-11-23 at spec review R-16. Next: T11 and T12, then a revision before T5."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
@@ -142,6 +142,8 @@ On 2026-11-23 the owner accepted the spec at `66c17b40`, on condition that spec 
 
 On 2026-11-23 the owner settled two questions for the revision before T11. A fixture CA given with a non-loopback origin rejects the run as invalid configuration before the proxy or browser starts, with a nonzero exit and a reason that names the CA. The runner keeps `WEBSITE_CHECK_PLAYWRIGHT_MODULE` to locate playwright-core, refuses a module whose version differs from the pin before launch, derives the Chromium headless shell from that module, and records the module path, its version and the browser executable in the report.
 
+On 2026-11-23 the owner accepted the revised spec at `dd48a4a0` (spec review R-16, no blocking finding). R-16 F-01, F-04 and F-05 touch the Design, so they go into a revision with its own review before T5, with F-01 put to the owner as a question.
+
 ## Review Log
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
@@ -164,6 +166,7 @@ On 2026-11-23 the owner settled two questions for the revision before T11. A fix
 | 2026-11-23 | R-15 | spec | `66c17b40e95ddce378a86032040e0aacba63774b` | claude-opus-5-5 | procedural | Two should-fix findings and ten nits |
 | 2026-11-23 | R-15 | spec | `66c17b40e95ddce378a86032040e0aacba63774b` | n/a | n/a | accepted by owner |
 | 2026-11-23 | R-16 | spec | `dd48a4a0beb0989353b634591ce8be7d13acc0f6` | claude-opus-5-5 | procedural | One should-fix finding and five nits |
+| 2026-11-23 | R-16 | spec | `dd48a4a0beb0989353b634591ce8be7d13acc0f6` | n/a | n/a | accepted by owner |
 
 ### R-1
 
