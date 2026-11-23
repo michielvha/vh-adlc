@@ -1,7 +1,8 @@
 ---
-status: draft
-status_description: "Revised after spec review R-5 with the owner's answer to Q27; waits for independent re-review R-6."
+status: in-progress
+status_description: "Claimed on 2026-11-23; implementation on feat/workstream-orchestration."
 issue: null
+branch: feat/workstream-orchestration
 goal: "A session that drives many sub-sessions across a workstream follows one generic vh-adlc procedure that starts only work the host and the loop can carry, keeps every session's state and blockers current, routes owner decisions correctly and closes sessions without losing work."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-orchestrate/
@@ -40,8 +41,8 @@ The feature adds one skill and one reference, a procedure rather than a framewor
 - **Admission.** Before starting work, check that its harm justifies it, that the next gate the work
   reaches is not blocked for everyone, and that the host can carry it (`capacity.sh`, and where the
   project sets a live-session limit, no start that would exceed it). Start at most three new sessions
-  per batch. A project limit above three is reached step by step: each batch may exceed the one
-  before it by at most three, and only when that batch counted. A batch counts when every member
+  per batch. A project limit above three is reached step by step: a batch larger than three needs
+  the batch before it to have counted, and may exceed it by at most three. A batch counts when every member
   reported its first step, none stayed pending or failed, and the capacity check after the wait passed
   the first time; after any other batch, the next one has at most three. The next batch waits until every session in the current one has
   reported its first step or been recorded as pending or failed, ten minutes have passed and the check
@@ -70,18 +71,20 @@ The feature adds one skill and one reference, a procedure rather than a framewor
   status pass re-checks whether the orchestrator itself is stale. A stale orchestrator sends its
   handoff to the owner by message and stops steering; the owner starts its replacement first, and the
   replacement asks each paused session to report again, records the reports and replaces the
-  sub-sessions. Archiving replaced, paused sessions and the replaced orchestrator needs one batched
-  owner approval. Other sessions are archived only after a confirmed done
+  sub-sessions. Replacements go through admission like new sessions. One batched owner approval
+  covers archiving the replaced orchestrator and each paused session, as soon as its report is in the
+  ledger. Other sessions are archived only after a confirmed done
   and cleanup; handoffs live in the ledger, never in `/tmp`.
 
 Project specifics go in an `## Orchestration` section of the project procedure the loop settings
 already name. The plugin names no adopter.
 
-The owner answered all twenty-seven questions on 2026-11-23, relayed by the orchestrating session
+The owner answered all twenty-nine questions on 2026-11-23, relayed by the orchestrating session
 (Owner decisions below). Proof is planned, not observed: package tests that assert each rule's exact sentence
 in the reference, a list of adopter terms the package must not contain, and a written walkthrough in
 which the implementation reviewer confirms each rule reads as a requirement and replays each incident
-to the step that stops it. R-5 found no blocking issue; this revision applies its findings with the owner's answer to Q27. Acceptance
+to the step that stops it. R-6 found no blocking issue; this revision applies its findings with the owner's answers to Q28
+and Q29. Acceptance
 authorizes the plugin edits, tests and docs rows on a feature branch and one PR; merging and releasing
 need the owner's separate approval.
 
@@ -138,7 +141,8 @@ recommended option.
   records the report in the ledger. A stale orchestrator sends its handoff to the owner by message and
   stops steering. The owner starts the replacement orchestrator first, and it replaces the
   sub-sessions. Archiving replaced, paused sessions needs one batched owner approval. This replaces
-  the stale-session part of Q5.
+  the stale-session part of Q5. Amended by Q28: a paused session may be archived under that approval
+  as soon as its report is in the ledger, before its replacement starts.
 - Q20: a batch member that stays pending or fails before its first report is recorded in the ledger
   and no longer holds back the next batch; recreating it needs the owner's approval, batched with
   other questions.
@@ -159,7 +163,8 @@ recommended option.
   follows the stale-orchestrator rule before anything else.
 - Q26: batches ramp up. A batch larger than three starts only after a batch of three has met every
   condition for the next batch, and each batch may exceed the last one that met them by at most three,
-  up to the project's limit.
+  up to the project's limit. Amended by Q27: a batch larger than three needs the batch before it to
+  have counted, and may exceed it by at most three.
 
 Answered on 2026-11-23 after review R-5, relayed by the orchestrating session; it was the recommended
 option.
@@ -167,6 +172,16 @@ option.
 - Q27: a batch counts toward the ramp only if every member reported its first step, none was pending
   or failed, and the capacity check after the wait passed the first time; any other batch resets the
   next one to three.
+
+Answered on 2026-11-23 after review R-6, relayed by the orchestrating session; each was the
+recommended option.
+
+- Q28: replacements of stale sessions are new sub-sessions and go through admission (capacity check,
+  batch size, the ten-minute wait and the ramp). The one batched archive approval under Q19 lets the
+  orchestrator archive each paused session as soon as its report is in the ledger, before its
+  replacement starts.
+- Q29: the ledger records each batch's members, its size and whether it counted toward the ramp, so
+  a replacement orchestrator, or one that lost context, resumes from the record.
 
 ### Background
 
@@ -324,7 +339,7 @@ The reference carries this table verbatim.
 | --- | --- |
 | Orchestrator | The session that starts, steers and closes sub-sessions for a workstream. |
 | Sub-session | A session started for one issue or feature of the workstream, by the current orchestrator or a previous one. |
-| Workstream ledger | The one durable record of every sub-session, kept in a tracking issue: its work item, worktree, state, blockers, next step, the merge order, each exclusive resource's queue and every handoff. |
+| Workstream ledger | The one durable record of every sub-session, kept in a tracking issue: its work item, worktree, state, blockers, next step, the merge order, each exclusive resource's queue, every handoff, and each batch's members, size and whether it counted toward the ramp. |
 | Batch | The sub-sessions started together between two capacity checks. |
 | Exclusive resource | A resource only one heavy job may use at a time, such as a single test cluster. |
 | Heavy job | A run that loads the host for minutes or more: a full test suite, an image build, a cluster run. |
@@ -411,7 +426,8 @@ reference may add explanation around them but never softens one. The Test Plan a
 - S-44: A stale session writes nothing; it reports its state to the orchestrator by message only.
 - S-31: Ask the owner for every replacement's handoff in one batch; a replacement writes only after the owner hands it the feature in its own session.
 - S-32: A stale orchestrator sends its handoff to the owner by message, stops steering and writes nothing; the owner starts the replacement orchestrator first, and the replacement asks each paused sub-session to report its state again by message, records those reports and replaces the sub-sessions.
-- S-45: Archiving replaced, paused sessions, and a replaced stale orchestrator, needs the owner's approval, asked for in one batch.
+- S-45: Archiving paused sessions, and a replaced stale orchestrator, needs the owner's approval, asked for in one batch; under that approval, archive each paused session as soon as its report is in the workstream ledger, before its replacement starts.
+- S-53: Replacements are new sub-sessions and go through admission like any other.
 
 **Own commits** (`## The orchestrator's own commits`):
 
@@ -425,7 +441,7 @@ reference may add explanation around them but never softens one. The Test Plan a
 
 **Close-out** (`## Close-out`):
 
-- S-36: Apart from replaced, paused sessions and pending or failed sessions the owner approves ending, archive a sub-session only after it has reported done and confirmed its cleanup finished, and archive finished sub-sessions promptly.
+- S-36: Apart from paused sessions and pending or failed sessions the owner approves ending, archive a sub-session only after it has reported done and confirmed its cleanup finished, and archive finished sub-sessions promptly.
 - S-37: Sub-sessions send their handoffs to the orchestrator by message, and the orchestrator records each in the workstream ledger, never in `/tmp`.
 
 ### Explanation the reference adds
@@ -484,9 +500,11 @@ version installs (`references/loop-settings.md:124-128`), the orchestrator inclu
 write nothing, which matches every operation's stop-before-write rule: sub-sessions report by message
 (S-30, S-44). When the orchestrator is stale too, S-32 runs first. The orchestrator learns it is stale at its next
 status pass (S-51); it hands off to the owner and stops steering, the owner starts its replacement,
-and the replacement asks the paused sessions to report again, records the reports, replaces the
-sub-sessions and asks for one batched approval to archive the paused ones and the stale orchestrator
-(S-45). Rolling back the
+and the replacement asks the paused sessions to report again and records the reports. It asks for
+one batched approval to archive the paused sessions and the stale orchestrator (S-45), archives each
+paused session once its report is recorded, and starts the replacements through admission (S-53), so
+paused sessions never hold the live-session slots their replacements need. The batch record in the
+ledger tells it where the ramp stands. Rolling back the
 plugin removes the skill and nothing else.
 
 ## Acceptance Criteria
@@ -512,7 +530,8 @@ plugin removes the skill and nothing else.
 - [ ] AC-08: The reference routes a fired convergence trigger into the batched owner questions without
       a second question or a threshold of its own, sentence S-22.
 - [ ] AC-09: The reference states the communication and stop rules, sentences S-23 to S-29.
-- [ ] AC-10: The reference states the plugin-upgrade rules, sentences S-30 to S-32, S-44 and S-45.
+- [ ] AC-10: The reference states the plugin-upgrade rules, sentences S-30 to S-32, S-44, S-45 and
+      S-53.
 - [ ] AC-11: The reference requires the orchestrator's own commits to pass the repository's delivery
       gates, sentence S-33.
 - [ ] AC-12: The reference states the watcher and bridge rules, sentences S-34, S-35 and S-50.
@@ -536,7 +555,23 @@ plugin removes the skill and nothing else.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 Write `plugins/vh-adlc/references/orchestrate.md` with the glossary, every required sentence
+      under its section, the explanation, the `## Orchestration` fields and the sixteen-row incident
+      table, plus the safeguard the owner moved into implementation from R-7 F-01. Add the sentence,
+      glossary, field, incident-row and adopter-term tests with their must-fail fixtures to
+      `tests/vh-adlc/check.test.ts`, and bump the version in `plugins/vh-adlc/plugin.json` and
+      `plugins/vh-adlc/.claude-plugin/plugin.json`. Done when `bun test tests/vh-adlc/check.test.ts`
+      passes, after the new tests were seen failing without the reference. AC-03 to AC-16.
+- [ ] T2 Add the request-to-orchestrate row to `plugins/vh-adlc/references/authority.md` with exactly
+      S-02's four writes, and its test in `tests/vh-adlc/check.test.ts`, which must fail when any one
+      write is missing. Done when `bun test tests/vh-adlc/check.test.ts` passes, after the row test was
+      seen failing. AC-02.
+- [ ] T3 Add `plugins/vh-adlc/skills/vh-adlc-orchestrate/SKILL.md`, the coordination kind in
+      `tests/vh-adlc/check.test.ts`, the intake row in `plugins/vh-adlc/references/lifecycle.md`, the
+      nineteen-skill count in `tests/vh-adlc/triage/discovery.test.ts`, the counts and Orchestrate row in
+      `docs/user-guides/workflows.md` and `docs/get-started/installation.md`, and the unverified entry in
+      `docs/reference/compatibility.md`. Done when `bun test tests/vh-adlc` passes, after the
+      coordination and discovery tests were seen failing. AC-01.
 
 ## Open Questions
 
@@ -551,6 +586,9 @@ None.
 | 2026-11-23 | R-3 | spec | `de1a5171` | claude-opus-5-5 | procedural | 0 blocking, 9 should-fix, 2 nits; judgement findings go to the owner first |
 | 2026-11-23 | R-4 | spec | `36eed728` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 1 nit; judgement findings go to the owner first |
 | 2026-11-23 | R-5 | spec | `20c6df0d` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement finding goes to the owner first |
+| 2026-11-23 | R-6 | spec | `d4207bf5` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement findings go to the owner first |
+| 2026-11-23 | R-7 | spec | `96664f59` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; the owner chose to end the revision cycle, so the findings go to follow-up rather than another revision |
+| 2026-11-23 | R-7 | spec | `96664f59` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -891,6 +929,68 @@ SEVERITY: nit
 WHERE: Design, Required sentences S-32, S-45 and S-11; Design, Concurrency, failure and upgrade; Design, Explanation the reference adds (Admission order)
 EVIDENCE: S-32 has the stale orchestrator hand off and stop steering, and the owner starts the replacement. No sentence says who ends the stale orchestrator's session. S-02 and S-45 cover sub-sessions only, and plugins/vh-adlc/references/authority.md:30 requires "Separate approval for that exact action" to "end a live session". The explanation says paused sessions "count toward the live-session limit until they are archived", so a stopped orchestrator that stays live keeps using a live-session slot and a bridge worker.
 PROPOSAL: Add to S-32 or S-45 that the replacement includes the stale orchestrator in the batched archive approval, or that the owner ends it when starting the replacement.
+
+### R-6
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-30, S-31, S-45, S-36, S-07, S-09, S-10, S-11 and S-52; Design, Explanation the reference adds (Admission order); Design, Concurrency, failure and upgrade; Context, Owner summary (Upgrades and close-out bullet); Context, Owner decisions Q19 and Q24; Acceptance Criteria AC-04 and AC-10
+EVIDENCE: S-30 says to "replace the paused sessions once, when the release they wait for has landed". S-45 allows archiving only "replaced, paused sessions", and S-36 allows other archiving only after a reported done. The Admission order explanation says "Pending and paused sessions count toward the live-session limit until they are archived", and S-11 says to "start no session that would bring the count above the limit". Take a limit of 20 with 15 sub-sessions paused after an install, plus the stale and replacement orchestrators. Only a few replacements fit under the limit. The other paused sessions cannot be archived because they are not yet replaced and have not reported done. No sentence says whether replacements are new sub-sessions under S-07, S-09, S-10 and S-52, which would mean batches of at most three, a ten-minute wait and a ramp reset, or whether they start together "once" as S-30 says. Incident 7 was churn from replacing sessions one by one. One implementer archives each paused session before starting its replacement. Another replaces in rounds of three, with several approval batches against S-45's "asked for in one batch". A third goes over the limit to honour "once". This combines S-45 and the live-count sentence, both added at 36eed728, with S-30.
+PROPOSAL: State whether replacements go through admission (capacity, batch size, wait, ramp). Also state the order when the live-session limit leaves no room, for example that the batched S-45 approval may archive a paused session as soon as its handoff is recorded and before its replacement starts.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-09, S-52, S-19 and S-32; Design, Glossary (Workstream ledger, Batch); Design, Concurrency, failure and upgrade; Context, Owner decisions Q24, Q26 and Q27
+EVIDENCE: S-09 lets a batch grow only "when the batch before it counted toward the ramp". S-52 decides that from three facts: every member reported its first step, none was pending or failed, and "the capacity check after the wait passed the first time". The glossary's ledger, which the reference carries verbatim, holds "its work item, worktree, state, blockers, next step, the merge order, each exclusive resource's queue and every handoff". It holds no batch membership, size or ramp outcome. Under S-32 and Q24, a replacement orchestrator takes over the whole workstream from the ledger and fresh reports, so it cannot tell how large the last batch was or whether it counted. Nor can the same orchestrator after it loses context in a long session. One implementer starts the replacement at three. Another resumes the predecessor's size from its handoff, which S-32 sends to the owner, not to the ledger. This traces to the ramp added at 20c6df0d and S-52 added at d4207bf5.
+PROPOSAL: Add each batch's members, size and S-52 result to the ledger's glossary row. Or state that a replacement orchestrator's first batch has at most three sessions.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (Admission bullet); Design, Required sentences S-09 and S-52
+EVIDENCE: The Owner summary says "each batch may exceed the one before it by at most three, and only when that batch counted". That puts the counting condition on any growth. S-09 puts it only on "a batch larger than three", and S-52 lets the next batch after a non-counting batch have up to three. So after a non-counting batch of one, for example one started under S-12, the summary forbids a batch of three, while S-09 and S-52 allow it. This traces to the revision at d4207bf5.
+PROPOSAL: Reword the summary to say that a batch larger than three needs the batch before it to have counted and may exceed it by at most three.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner decisions Q26 and Q27; Design, Required sentence S-09; Design, Explanation the reference adds (Admission order)
+EVIDENCE: Q26 still reads "A batch larger than three starts only after a batch of three has met every condition for the next batch, and each batch may exceed the last one that met them by at most three". The revision at d4207bf5 changed S-09 to "starts only when the batch before it counted toward the ramp, and may exceed that batch by at most three". That drops "after a batch of three", so a counted batch of one or two may now be followed by four or five. It also replaces "the last one that met them" with the batch just before. Q27 changes Q26 this way, but Q26 is not marked "Amended by Q27". Q7, Q13 and Q14 are marked amended where later answers changed them.
+PROPOSAL: Mark Q26 as amended by Q27. If the owner meant to require a batch of three before any larger batch, restore "after a batch of three" in S-09.
+
+### R-7
+
+TARGET: 96664f59c4deb16ac6a7f531bb094738014a57e0
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-45, S-15, S-36 and S-30; Design, Concurrency, failure and upgrade; Context, Owner summary (Upgrades and close-out bullet); Context, Owner decisions Q19 and Q28; Acceptance Criteria AC-10
+EVIDENCE: S-45 now says "archive each paused session as soon as its report is in the workstream ledger, before its replacement starts" (document line 428), and the Concurrency section repeats it ("archives each paused session once its report is recorded"). S-15 says "a claimed feature continues in its owning worktree" (line 393), so the replacement needs the paused session's worktree, together with any uncommitted changes in it. A paused session is stale and "writes nothing" (S-44), so it cannot commit, push or record its work in progress before it is archived. S-36 exempts paused sessions from the "confirmed its cleanup finished" check. The loop's clean-up treats archiving as the point where a session removes "temporary worktrees and their branches, worktree slots" (plugins/vh-adlc/references/loop.md:196-198, :213-214), and the Explanation says "Archiving is final". No sentence says the archive must leave the paused session's worktree and uncommitted state in place, or that the orchestrator checks this before archiving. Before this revision, the replacement started first and was using the worktree when the old session was archived. Now the worktree has no session attached at the moment of archiving, so on a host whose archive action removes or abandons the session's worktree, the work is lost. The goal promises to close "sessions without losing work", and incident 13 was this kind of loss. One implementer archives at once. Another first checks that the worktree survives. This traces to the revision at 96664f59 (Q28).
+PROPOSAL: Add to S-45 that a paused session is archived only in a way that keeps its worktree, branch and uncommitted changes for its replacement, and that its ledger report names that worktree. Where the host's archive would remove the worktree, the orchestrator asks the owner before archiving.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-10, S-52, S-09, S-45 and S-53; Design, Glossary (Workstream ledger); Design, Concurrency, failure and upgrade; Context, Owner decisions Q20, Q27, Q28 and Q29
+EVIDENCE: S-10 lets the next batch start only "after every session in the current batch has reported its first step or been recorded in the workstream ledger as pending or failed" (line 383). S-53 makes replacements "new sub-sessions" that "go through admission like any other", so the first replacement batch is the next batch under S-10. A member of the batch still in flight when the plugin install lands can go stale and pause before its first step (S-30, S-44). Under S-45 it is then archived. It is neither "pending or failed", and "first step" is not defined, so it is unclear whether its state report by message counts as one. Read strictly, S-10 holds the replacement batch back for good. S-52 also gives no result for that batch, so the ledger record Q29 adds ("whether it counted toward the ramp") has nothing to record, and S-09 cannot size the replacement batch. One implementer counts the stale report as a first step and the batch as counted. Another treats the paused member as failed and resets the ramp to three. A third waits. This combines S-53 and the batch record added at 96664f59 with S-10 and S-52.
+PROPOSAL: State that a batch member that goes stale and pauses before its first step no longer holds back the next batch, and that its batch does not count toward the ramp, so the first replacement batch has at most three sessions.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Required sentence S-30; Context, Owner summary (Upgrades and close-out bullet); Design, Required sentence S-53
+EVIDENCE: S-30 still says "replace the paused sessions once, when the release they wait for has landed" (line 424), and the Owner summary says "Paused sessions are replaced once when the awaited release lands" (line 69). S-53 and Q28 now send replacements through admission, so they start in batches of at most three with a ten-minute wait between them. "Once" can be read as all at the same time, which S-53 rules out. The intended meaning is that each paused session is replaced a single time. This traces to the revision at 96664f59, which added S-53 without rewording S-30.
+PROPOSAL: Reword S-30 and the summary to "replace each paused session once, after the release it waits for has landed".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (Upgrades and close-out bullet)
+EVIDENCE: The summary says "One batched owner approval covers archiving the replaced orchestrator and each paused session, as soon as its report is in the ledger" (lines 73-75). Read naturally, the "as soon as" clause also covers the replaced orchestrator, which has no report in the ledger: it sends its handoff to the owner by message (S-32). S-45 puts the condition on paused sessions only. This traces to the revision at 96664f59.
+PROPOSAL: Reword as "One batched owner approval covers archiving the replaced orchestrator and the paused sessions; each paused session is archived as soon as its report is in the ledger."
 
 ## Sources
 

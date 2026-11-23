@@ -183,7 +183,15 @@ export async function runOwnedClient(argv: string[], options: OwnedOptions,
     if (signal("SIGTERM")) { await Bun.sleep(limits.grace_ms); signal("SIGKILL"); }
     const final = first ?? await wait(limits.reap_ms);
     const survivors = await stopMarked();
-    const groupGone = groupAbsent || probeGroup(child.pid) === "gone";
+    // A killed group's last members can still await reaping just after the client exits, longer on
+    // a busy host, so wait within the reap window for the group to disappear before judging it.
+    let probe = groupAbsent ? "gone" : probeGroup(child.pid);
+    const settle = Date.now() + limits.reap_ms;
+    while (probe === "alive" && final !== null && Date.now() < settle) {
+      await Bun.sleep(10);
+      probe = probeGroup(child.pid);
+    }
+    const groupGone = probe === "gone";
     if (groupGone) groupAbsent = true;
     checkOutputs();
     const captured = capturedResult ? await capturedResult : null;
