@@ -3,6 +3,7 @@
 // resolves its old scripts and binary lock. The host's install record is read when one exists
 // (Claude Code: plugins/installed_plugins.json in its config directory); hosts without one report only
 // the running version.
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -10,16 +11,23 @@ import { join, resolve } from "node:path";
 export type PluginStatus = { running: string; installed?: string; stale: boolean; warning?: string;
   path_binary?: string; locked_binary?: string; binary_warning?: string };
 
-/** A `vh-adlc` on PATH at another version than the plugin's lock: operations must use the locked binary. */
+/**
+ * A `vh-adlc` on PATH that is not the plugin's locked binary: operations must use the locked binary.
+ * It is identified by its digest and never run, because an unverified program named vh-adlc can be a
+ * wrapper that calls scripts/ensure-vh-adlc.sh, and running it to ask its version recursed without end.
+ */
 function pathBinary(): Pick<PluginStatus, "path_binary" | "locked_binary" | "binary_warning"> {
   const found = Bun.which("vh-adlc");
   if (!found) return {};
-  const locked = JSON.parse(readFileSync(resolve(import.meta.dir, "../../vh-adlc.lock.json"), "utf8")).version as string;
-  const run = Bun.spawnSync([found, "--version"], { stdout: "pipe", stderr: "ignore" });
-  const version = /(\d+\.\d+\.\d+\S*)/.exec(run.stdout.toString())?.[1] ?? "unknown";
-  if (version === locked) return { path_binary: version, locked_binary: locked };
-  return { path_binary: version, locked_binary: locked,
-    binary_warning: `vh-adlc on PATH (${found}) is ${version}, not the locked ${locked}; run the binary scripts/ensure-vh-adlc.sh prints, never the one on PATH` };
+  const lock = JSON.parse(readFileSync(resolve(import.meta.dir, "../../vh-adlc.lock.json"), "utf8")) as
+    { version: string; assets?: Record<string, { binary_sha256?: string }> };
+  const platform = `${process.platform === "darwin" ? "darwin" : "linux"}_${process.arch === "arm64" ? "arm64" : "amd64"}`;
+  const expected = lock.assets?.[platform]?.binary_sha256;
+  let actual: string | undefined;
+  try { actual = createHash("sha256").update(readFileSync(found)).digest("hex"); } catch { /* unreadable: unverified */ }
+  if (expected && actual === expected) return { path_binary: lock.version, locked_binary: lock.version };
+  return { path_binary: "unverified", locked_binary: lock.version,
+    binary_warning: `vh-adlc on PATH (${found}) is not the locked ${lock.version} binary: its digest does not match the lock; run the binary scripts/ensure-vh-adlc.sh prints, never the one on PATH` };
 }
 
 /** The install that applies to `repo`: a project-scope install for it (or a directory holding it), else the user install. */
