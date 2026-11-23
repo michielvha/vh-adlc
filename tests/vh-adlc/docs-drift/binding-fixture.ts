@@ -8,6 +8,7 @@ import { verifyCandidate } from "../../../plugins/vh-adlc/scripts/docs-drift/can
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { nativeReader, runtimeFixture, nativeInvocationFixture, type RuntimePublisher, type RuntimeRole, type RuntimeSource } from "./runtime-fixture";
 import { commitAll, git, put } from "./repository-fixture";
+import { gitStub } from "./git-stub";
 
 export async function bindingFixture(roots: string[], incompleteInventory: boolean, options: {
   publisher?: RuntimePublisher;
@@ -72,13 +73,7 @@ export async function bindingFixture(roots: string[], incompleteInventory: boole
   if (options.mutableInventory) writeFileSync(inventoryFile, "[]", { mode: 0o600 });
   const native = nativeReader({ ...f, candidate: source, inventory_path: options.mutableInventory ? inventoryFile : undefined }, f.selection.identity.actor, false, incompleteInventory, f.selection.identity.actor_id), executable = Bun.which("git");
   if (!executable) throw Error("fixture requires Git");
-  writeFileSync(join(f.root, "native-bin", "git"), `#!${process.execPath}
-const args = process.argv.slice(2), target = args.indexOf("https://github.com/fixture/docs.git");
-if (args.includes("push")) process.exit(91);
-if (args.includes("fetch") && args.some(value => value.startsWith("https://")) && target < 0) process.exit(91);
-if (target >= 0) { args[target] = ${JSON.stringify(origin)}; args.splice(args.indexOf("fetch"), 0, "-c", "protocol.file.allow=always"); }
-const result = Bun.spawnSync([${JSON.stringify(executable)}, ...args], { stdin: "inherit", stdout: "inherit", stderr: "inherit" }); process.exit(result.exitCode);
-`, { mode: 0o700 });
+  writeFileSync(join(f.root, "native-bin", "git"), gitStub({ git: executable, origin, refuseRemote: true }), { mode: 0o700 });
   const worker_options: WorkerCollectionOptions = { ...common, repo, source, source_verification: baseline.evidence!,
     decisions: { path: "decisions.json", sha256: sha256(decisionBytes) }, credential: "synthetic-read-token", path: native.environment.PATH,
     cache_directory: f.selection.cache_directory, entry: f.selection.entry, launcher_path: f.selection.launcher_path, settings_path: join(repo, ".vh-adlc/docs-drift.yaml") };
