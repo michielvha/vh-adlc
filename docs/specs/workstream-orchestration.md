@@ -516,9 +516,10 @@ plugin removes the skill and nothing else.
       coordination operation and nineteen skills, with an Orchestrate row in the workflows guide, and
       `docs/reference/compatibility.md` lists `vh-adlc-orchestrate` as unverified.
       Evidence: T4, `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/triage/discovery.test.ts`, 83 pass: the coordination tests, nineteen skills with eleven engineering operations, both guides' counts, the Orchestrate row and the unverified compatibility row.
-- [ ] AC-02: The reference states the decision boundary, sentences S-01 to S-04, S-41 and S-42, and
+- [x] AC-02: The reference states the decision boundary, sentences S-01 to S-04, S-41 and S-42, and
       `references/authority.md` has a row for the request to orchestrate a workstream granting the writes
       S-02 lists.
+      Evidence: R-9 returned AC-02 as met at `4221d175`, with the package tests and the reviewer's written procedure.
 - [x] AC-03: The reference requires proportion and gate checks before new work, sentences S-05 and S-06.
       Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
 - [x] AC-04: The reference requires the capacity, batch, live-session, pending-session, overload and
@@ -533,8 +534,9 @@ plugin removes the skill and nothing else.
       fail-closed reads and its own staleness check, sentences S-18 to S-21, S-38 to S-40, S-47 and
       S-51.
       Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
-- [ ] AC-08: The reference routes a fired convergence trigger into the batched owner questions without
+- [x] AC-08: The reference routes a fired convergence trigger into the batched owner questions without
       a second question or a threshold of its own, sentence S-22.
+      Evidence: R-9 returned AC-08 as met at `4221d175`, with the package tests and the reviewer's written procedure.
 - [x] AC-09: The reference states the communication and stop rules, sentences S-23 to S-29.
       Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
 - [x] AC-10: The reference states the plugin-upgrade rules, sentences S-30 to S-32, S-44, S-45 and
@@ -550,10 +552,12 @@ plugin removes the skill and nothing else.
 - [x] AC-14: The reference defines the project procedure's `## Orchestration` section with its eight
       fields, and no file under `plugins/vh-adlc/` contains a term from the test's adopter list.
       Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the field test finds `## Orchestration` and all eight fields, the plugin scan finds no adopter term, and the fixture scan flags each term.
-- [ ] AC-15: The reference's incident table maps each of the sixteen incidents to sentence IDs that
+- [x] AC-15: The reference's incident table maps each of the sixteen incidents to sentence IDs that
       exist, and replaying each incident against the procedure finds a step that would have stopped it.
-- [ ] AC-16: The reference carries the Design's glossary table verbatim, and every rule the reference
+      Evidence: R-9 returned AC-15 as met at `4221d175`, with the package tests and the reviewer's written procedure.
+- [x] AC-16: The reference carries the Design's glossary table verbatim, and every rule the reference
       states is written as a requirement.
+      Evidence: R-9 returned AC-16 as met at `4221d175`, with the package tests and the reviewer's written procedure.
 
 ## Test Plan
 
@@ -614,6 +618,8 @@ None.
 | 2026-11-23 | R-6 | spec | `d4207bf5` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement findings go to the owner first |
 | 2026-11-23 | R-7 | spec | `96664f59` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; the owner chose to end the revision cycle, so the findings go to follow-up rather than another revision |
 | 2026-11-23 | R-7 | spec | `96664f59` | n/a | n/a | accepted by owner |
+| 2026-11-23 | R-8 | spec | `4221d175` | claude-opus-5-5 | procedural | drift re-review after merging main: 0 blocking, 0 should-fix, 2 nits; the baseline is unchanged, so the acceptance stands |
+| 2026-11-23 | R-9 | implementation | `4221d175` | claude-opus-5-5 | procedural | all 16 criteria met; 1 nit |
 
 ### R-1
 
@@ -1016,6 +1022,99 @@ SEVERITY: nit
 WHERE: Context, Owner summary (Upgrades and close-out bullet)
 EVIDENCE: The summary says "One batched owner approval covers archiving the replaced orchestrator and each paused session, as soon as its report is in the ledger" (lines 73-75). Read naturally, the "as soon as" clause also covers the replaced orchestrator, which has no report in the ledger: it sends its handoff to the owner by message (S-32). S-45 puts the condition on paused sessions only. This traces to the revision at 96664f59.
 PROPOSAL: Reword as "One batched owner approval covers archiving the replaced orchestrator and the paused sessions; each paused session is archived as soon as its report is in the ledger."
+
+### R-8
+
+TARGET: 4221d175ece92c17a0e0ce1585a7fae6cca65dc6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Required sentence S-50; Design, Explanation the reference adds (The bridge); Scope, Out of scope (bridge user-service bullet); Context, Background, incident 16
+EVIDENCE: S-50 says to run the bridge as a user service "as the owner's conventions or the project procedure describe" (line 440). The Scope bullet says "S-50 points to wherever the owner's conventions or the project procedure describe it" (lines 327-328). Incident 16 says the setup is "documented and scripted separately, outside this feature; the reference only points to it" (lines 260-263). Since R-7, the default branch added the setup to this same package: plugins/vh-adlc/scripts/host/remote-control.sh (from c71c75af, merged in fdbe0da9) installs a macOS LaunchAgent or a Linux `systemd --user` unit, and docs/user-guides/remote-control-host.md describes it. The pinned conventions at 0c983f67 do not describe it: a grep for "remote-control" or "remote control" in the cached docs finds no page. So S-50 now points to two places that may say nothing, while the plugin's own script and guide go unnamed in the Design. The explanation bullet for the bridge (lines 468-470) also does not name the script. The implementation already covers this: commit 4221d175 adds to plugins/vh-adlc/references/orchestrate.md:194-196 that `scripts/host/remote-control.sh` installs, reports and removes the service. That falls within "the reference may add explanation", so nothing an implementer builds or a proof checks changes. `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/triage/discovery.test.ts` gave 83 pass and 0 fail at this commit. This traces to covered drift from the default branch, not to a change the previous revision made.
+PROPOSAL: At the next revision that touches Design, make S-50 say "as `scripts/host/remote-control.sh`, the owner's conventions or the project procedure describe", and update the Scope bullet and the bridge explanation bullet to name the script. Until then, leave the baseline as it is.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (final paragraph)
+EVIDENCE: The summary still says "Proof is planned, not observed" and "R-6 found no blocking issue; this revision applies its findings with the owner's answers to Q28 and Q29" (lines 83-87). The document is now `in-progress`. R-7 is recorded and accepted, and the owner sent its findings to follow-up rather than another revision (Review Log, line 615). AC-01, AC-03 to AC-07 and AC-09 to AC-14 are ticked with observed test evidence (lines 512-552). T1 records that the owner moved the R-7 F-01 safeguard into implementation (line 572), and plugins/vh-adlc/references/orchestrate.md:170-172 carries it. The summary mentions none of this, so a reader of the summary gets the wrong proof state and does not learn that R-7's findings were deferred and that one became an implementation safeguard. This is confined to Context and does not change the normative baseline. It came from the claim and implementation commits after R-7, not from the default-branch drift.
+PROPOSAL: Refresh the summary's last paragraph: say that R-7 was accepted with its findings sent to follow-up, that the F-01 safeguard was added to the reference in implementation, and which criteria now have observed package-test evidence and which still wait on the implementation reviewer's written procedures.
+
+### R-9
+
+TARGET: 4221d175ece92c17a0e0ce1585a7fae6cca65dc6
+
+CRITERION: AC-01 `vh-adlc-orchestrate` is in the package as a coordination operation: its name equals its directory, it has a description and no model, it resolves knowledge, names the humanize guide and reads the loop context, and lifecycle intake routes to it. The discovery check counts eleven engineering operations and nineteen skills, and both guides say eleven engineering operations, one coordination operation and nineteen skills, with an Orchestrate row in the workflows guide, and `docs/reference/compatibility.md` lists `vh-adlc-orchestrate` as unverified.
+VERDICT: met
+EVIDENCE: `bun test --timeout 60000 tests/vh-adlc/check.test.ts tests/vh-adlc/triage/discovery.test.ts` with GNU coreutils first on PATH, at 4221d175 in the worktree, 83 pass 0 fail. I also ran the same files in a `git archive` copy of 4221d175 outside the repository: adding `model:` to the skill failed the coordination test, deleting the lifecycle row failed the intake test, changing "nineteen skills" in the workflows guide failed the guides test, and changing the compatibility row to "Verified" failed the guides test. I read the skill frontmatter, SKILL.md steps 1 to 3, lifecycle.md:55, workflows.md:16-17 and :63, installation.md:115-116 and compatibility.md:131-136 and :158, and they match the criterion. Limitations: these are text checks only, and no host session ran the skill.
+
+CRITERION: AC-02 The reference states the decision boundary, sentences S-01 to S-04, S-41 and S-42, and `references/authority.md` has a row for the request to orchestrate a workstream granting the writes S-02 lists.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. In the temp copy, deleting the S-02 line from orchestrate.md failed the sentence test, and dropping "its own harm statements and handoffs in the ledger" from the authority row failed the row test. Written procedure: I read authority.md:36. It grants exactly S-02's four writes: editing the workstream ledger, dated owner-answer comments on work-item issues, its own harm statements and handoffs in the ledger, and archiving the workstream's finished sub-sessions, including a predecessor's. It says "It grants nothing else" and keeps creating the ledger issue, writing a feature document, merging, releasing and ending any other live session under their own rows. Verdict for the procedure: the row grants nothing beyond S-02. I found no wider grant in SKILL.md, lifecycle.md:55 or orchestrate.md:31-32. Limitations: none.
+
+CRITERION: AC-03 The reference requires proportion and gate checks before new work, sentences S-05 and S-06.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. The sentence test reads every S-NN from the feature document and finds it verbatim under its named section. I read orchestrate.md:47 and :49 under `## Admission`. In the temp copy the mutation test fails when S-09 is reworded, and deleting S-02 or S-22 also failed the test, so the check is live. Limitations: none.
+
+CRITERION: AC-04 The reference requires the capacity, batch, live-session, pending-session, overload and one-orchestrator rules, sentences S-07 to S-13, S-46, S-49 and S-52.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. I read orchestrate.md:51, :55, :60, :62, :64, :72, :76, :78, :80 and :84 under `## Admission`. In the temp copy, changing S-09's "three" to "five" made the sentence test fail. Limitations: none.
+
+CRITERION: AC-05 The reference requires a queue and one heavy job at a time per exclusive resource, and a sub-session's request for its turn, sentences S-14 and S-48.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. I read S-14 at orchestrate.md:82 under `## Admission` and S-48 at :97 under `## The brief`. Limitations: none.
+
+CRITERION: AC-06 The reference states the brief's rules, sentences S-15 to S-17 and S-43.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. I read orchestrate.md:91, :93, :95 and :102 under `## The brief`. Limitations: none.
+
+CRITERION: AC-07 The reference requires the status pass timing, contents, dependency watch, ledger rules and fail-closed reads and its own staleness check, sentences S-18 to S-21, S-38 to S-40, S-47 and S-51.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. I read orchestrate.md:106, :108, :110, :115, :117, :119, :121, :126 and :128 under `## Status pass`. Limitations: none.
+
+CRITERION: AC-08 The reference routes a fired convergence trigger into the batched owner questions without a second question or a threshold of its own, sentence S-22.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. S-22 is at orchestrate.md:132 under `## Status pass`, and deleting it in the temp copy failed the sentence test. Written procedure: I read the whole reference and grepped it for threshold, round, pass-count and numeric terms. The only numbers are the batch size of three, the 10-minute wait, the 2-hour status pass interval and incident 6's description of "9 and 38 rounds" (orchestrate.md:235). The last is history, not a threshold. The reference states no convergence threshold, round count or pass count of its own. Limitations: none.
+
+CRITERION: AC-09 The reference states the communication and stop rules, sentences S-23 to S-29.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. I read orchestrate.md:136, :142, :144, :146, :148, :150 and :152 under `## Communication and stops`. Limitations: none.
+
+CRITERION: AC-10 The reference states the plugin-upgrade rules, sentences S-30 to S-32, S-44, S-45 and S-53.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. I read orchestrate.md:160, :162, :164, :166, :168 and :174 under `## Plugin upgrades`, plus the R-7 F-01 worktree-keeping safeguard at :170-172. Limitations: none.
+
+CRITERION: AC-11 The reference requires the orchestrator's own commits to pass the repository's delivery gates, sentence S-33.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. I read orchestrate.md:183 under `## The orchestrator's own commits`. Limitations: none.
+
+CRITERION: AC-12 The reference states the watcher and bridge rules, sentences S-34, S-35 and S-50.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. I read orchestrate.md:187, :189 and :191 under `## Watchers and tools`. The `scripts/host/remote-control.sh` that :195 names exists at 4221d175. Limitations: none.
+
+CRITERION: AC-13 The reference states the close-out rules, sentences S-36 and S-37.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. I read orchestrate.md:200 and :202 under `## Close-out`. Limitations: none.
+
+CRITERION: AC-14 The reference defines the project procedure's `## Orchestration` section with its eight fields, and no file under `plugins/vh-adlc/` contains a term from the test's adopter list.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. The field test, the plugin scan and the fixture scan, which flags each of the five terms in turn, all passed. In the temp copy, appending "stackweaver" to orchestrate.md failed the plugin scan, and removing the backticks from `Heavy jobs` failed the field test. I read orchestrate.md:207-221 and it lists the eight fields. Limitations: the scan covers only the five listed terms, as the accepted Test Plan row defines.
+
+CRITERION: AC-15 The reference's incident table maps each of the sixteen incidents to sentence IDs that exist, and replaying each incident against the procedure finds a step that would have stopped it.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. In the temp copy, deleting row 16 or changing its ID to S-99 failed the incident test. Written procedure, as incident, step, verdict: 1 disk, S-07 capacity.sh before every batch, stopped. 2 fourteen starts while blocked, S-08 no override plus S-09/S-52 batch of three with ramp plus S-13 no mass archive, stopped. 3 drafts behind paused reviews, S-06, stopped. 4 interrupt, S-23 message only outside emergency stops, stopped. 5 missed merge, S-18 pass at most every 2 hours plus S-20/S-21, stopped. 6 9 and 38 rounds, S-05 harm statement and proportionality question before work plus S-22, stopped. 7 one-by-one replacement churn, S-30/S-31 replace once with batched handoffs, stopped. 8 watchers, S-34/S-35, stopped. 9 commit missing its record, S-33, stopped. 10 bent rule, S-03/S-04, stopped. 11 wrong link or fact, S-26/S-17, stopped. 12 parallel cluster jobs, S-14/S-48, stopped where the cluster is a declared exclusive resource. 13 archive during cleanup and /tmp handoffs, S-36/S-37, stopped. 14 moved shared checkout, S-15/S-43, stopped. 15 bridge stall, S-11/S-12/S-46, stopped. 16 bridge in tmux, S-50, stopped. All sixteen have a step. Limitations: incident 12 depends on the project declaring the resource exclusive, as Q10 decided.
+
+CRITERION: AC-16 The reference carries the Design's glossary table verbatim, and every rule the reference states is written as a requirement.
+VERDICT: met
+EVIDENCE: Same test run at 4221d175, 83 pass. The glossary test checks all nine rows, and changing "nothing else qualifies" in the reference failed it in the temp copy. Written procedure: I read the whole reference and grepped it for usually, consider, optional, may, might, should, could, try, prefer, ideally, recommend, typically and can. Every "may" or "can" hit is a description or a capacity limit: glossary :19, brief :95, :100, the stops explanation :138-139, project section :209, :214, :218 and the incidents intro :226. None softens a rule. Each S-NN sentence and the added rules at :44-45, :57-58, :74, :99-100, :112-113, :123-124, :130, :170-172 and :204-205 are written as imperatives or obligations. Verdict for every rule: requirement. Limitations: none.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T1 Evidence
+EVIDENCE: T1's evidence line says "with it and the 0.31.0 bump, 73 pass". At 4221d175 both plugins/vh-adlc/plugin.json:4 and plugins/vh-adlc/.claude-plugin/plugin.json:3 say 0.32.0, origin/main has 0.31.1, and docs/reference/compatibility.md:133 and :158 say plugin 0.32.0. The bump moved to 0.32.0 after main was merged in, so the recorded version is out of date.
+PROPOSAL: Note in T1's evidence that the version became 0.32.0 after the merge of main, or record the final bump under T4.
 
 ## Sources
 
