@@ -9,7 +9,7 @@ function runOpenSSL(directory: string, args: string[]) {
   if (result.exitCode !== 0) throw new Error(result.stderr.toString());
 }
 
-function certificate(directory: string) {
+export function certificate(directory: string) {
   runOpenSSL(directory, [
     "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
     "-subj", "/CN=Website Check Fixture CA", "-keyout", "ca.key", "-out", "ca.pem",
