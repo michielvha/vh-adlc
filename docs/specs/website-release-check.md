@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after spec review R-10 with the owner's 2026-11-23 answers on the profile browser field and CI prerequisites. Next: follow-up spec review and renewed acceptance."
+status_description: "Spec review R-11 returned four should-fix findings and one nit. Waiting on owner answers to Q1 (profile keys and the test CA) and Q2 (local runs without the smoke prerequisites) before one revision."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
@@ -122,11 +122,36 @@ Check explicitly configured routes on two targets: the adopter's locally served 
 
 ## Open Questions
 
-None. The owner selected report mode first and approved explicit run outcomes and bounded observation, scoped and sanitized evidence, and a separate Stackweaver adoption. Lighthouse remains outside the shared tool.
+The owner selected report mode first and approved explicit run outcomes and bounded observation, scoped and sanitized evidence, and a separate Stackweaver adoption. Lighthouse remains outside the shared tool.
 
 On 2026-11-23 the owner settled two questions raised during T4. An unfinished transfer never satisfies a required request, and adopters declare a response the page never reads as an expected response. This delivery is Chromium-only, a profile that selects Firefox is rejected before start, and Firefox support is the follow-up feature #158.
 
 The owner also answered two questions from spec review R-10 on 2026-11-23. A profile names its browser in an optional `browser` field that defaults to `chromium` and accepts only `chromium`, and undefined profile keys are invalid configuration. Hosted CI installs the smoke prerequisites in the `checker` job, pins playwright-core with a lockfile, and fails rather than skips when a prerequisite is missing; the first hosted run shows whether Ubuntu's Squid works or the job pins 7.5.
+
+### Q1: Which profile keys are defined, at which levels are unknown keys rejected, and where does a test CA belong?
+
+**Recommendation:** A. Reject unknown keys at every level, and take the CA out of the profile. A typo nested in `route` such as `requiredRequest` would otherwise drop a required request without a word, and a checked-in profile that can trust an extra CA weakens the deployed HTTPS check.
+
+The defined keys would be: top level `target`, `origin`, `mode`, `browser`, `httpUpgradeUrl`, `expectedResponses` and `route`; in `route`, `path`, `visibleHeading`, `deadlineMs` and `requiredRequests`; in each required request, `method` and `url`; in each expected response, `method`, `url`, `resourceType` and `status`.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Every level, CA as a runner option** | Any misspelled key anywhere is invalid configuration. The fixture CA is passed by the test harness as a runner argument and can never come from a profile. | T12 moves the existing `chromium.caFile` profile key into a runner option and updates the T1 and T3 tests that pass it. |
+| **B. Every level, CA kept in the profile** | The same nested checking, and no change to how the tests pass the CA. | A checked-in profile can make Chromium trust an extra CA on the deployed target. |
+| **C. Top level only** | The smallest change. | A nested typo still drops a rule silently. |
+
+**Why this is yours:** it fixes the adopter-facing profile format and decides whether trust settings can live in a checked-in file.
+
+### Q2: Do the website-check tests fail without their prerequisites on every host, and how do macOS contributors run the plugin checker?
+
+**Recommendation:** A. Fail on every host, and have `AGENTS.md` say that `bun test tests/vh-adlc` needs the Linux smoke prerequisites and name a portable selection without website-check for other hosts. That matches the testing convention, and a contributor on macOS still has a documented check that passes.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Fail everywhere, documented portable selection** | A green full run always means the smoke tests ran. macOS contributors run the named selection, like the hosted `checker-macos` job's file list. | `AGENTS.md` changes and joins `covers`. `bun test tests/vh-adlc` fails on macOS with prerequisite errors. |
+| **B. Fail only in hosted CI, skip elsewhere** | `bun test tests/vh-adlc` stays green on macOS. | A local green run no longer says whether the smoke tests ran, against the testing convention, and the tests need a CI-only switch. |
+
+**Why this is yours:** it changes the repository's documented local check, which every contributor uses.
 
 ## Review Log
 
