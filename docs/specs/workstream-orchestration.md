@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Claimed on 2026-11-23; implementation on feat/workstream-orchestration."
+status: complete
+status_description: "Implemented on feat/workstream-orchestration; implementation review R-9 met all criteria at 4221d175. Follow-up issues carry R-7 F-02 and the deferred nits."
 issue: null
 branch: feat/workstream-orchestration
 goal: "A session that drives many sub-sessions across a workstream follows one generic vh-adlc procedure that starts only work the host and the loop can carry, keeps every session's state and blockers current, routes owner decisions correctly and closes sessions without losing work."
