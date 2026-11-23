@@ -6,7 +6,7 @@
 // the checker runs the full v1 selection.
 
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -493,6 +493,148 @@ describe("README", () => {
       for (const heading of headings) {
         expect(guide).toMatch(new RegExp(`^#+ .*${heading}`, "mi"));
       }
+    }
+  });
+});
+
+// Workstream orchestration (docs/specs/workstream-orchestration.md). The tests read the
+// required sentences and the glossary from the accepted feature document, so the reference
+// cannot drift from it without a test failing.
+const ORCHESTRATION_SPEC = join(ROOT, "docs", "specs", "workstream-orchestration.md");
+const ORCHESTRATE = join(PKG, "references", "orchestrate.md");
+const ORCHESTRATION_FIELDS = [
+  "Ledger location",
+  "Tracking issues",
+  "Exclusive resources",
+  "Heavy jobs",
+  "Worktree provisioning",
+  "Batch limit",
+  "Live-session limit",
+  "Status pass interval",
+];
+// Terms from known adopters that must never appear in the plugin (AC-14).
+const ADOPTER_TERMS = ["stackweaver", "sw-e2e", "agent-slot", "worktree-dev.sh", "iac_platform"];
+
+type RequiredSentence = { id: string; section: string; text: string };
+
+function specSection(text: string, heading: string): string {
+  const start = text.indexOf(`\n${heading}\n`);
+  if (start < 0) throw new Error(`feature document has no ${heading}`);
+  const rest = text.slice(start + heading.length + 2);
+  const end = rest.search(/\n#{2,3} /);
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+function requiredSentences(): RequiredSentence[] {
+  const block = specSection(read(ORCHESTRATION_SPEC), "### Required sentences");
+  const out: RequiredSentence[] = [];
+  let section = "";
+  for (const line of block.split("\n")) {
+    const heading = line.match(/^\*\*[^*]+\*\* \(`(## [^`]+)`\):$/);
+    if (heading) section = heading[1];
+    const sentence = line.match(/^- (S-\d{2}): (.+)$/);
+    if (sentence) {
+      if (section === "") throw new Error(`${sentence[1]} has no section`);
+      out.push({ id: sentence[1], section, text: sentence[2] });
+    }
+  }
+  return out;
+}
+
+function referenceSection(reference: string, heading: string): string {
+  const lines = reference.split("\n");
+  const start = lines.indexOf(heading);
+  if (start < 0) return "";
+  const end = lines.findIndex((l, i) => i > start && /^## /.test(l));
+  return lines.slice(start + 1, end < 0 ? undefined : end).join("\n");
+}
+
+// missingSentences lists every required sentence the reference lacks under its section.
+function missingSentences(reference: string, sentences: RequiredSentence[]): string[] {
+  return sentences
+    .filter((s) => !normalise(referenceSection(reference, s.section)).includes(normalise(s.text)))
+    .map((s) => s.id);
+}
+
+function glossaryRows(): string[] {
+  return specSection(read(ORCHESTRATION_SPEC), "### Glossary")
+    .split("\n")
+    .filter((l) => /^\| [^-]/.test(l) && !l.startsWith("| Term |"));
+}
+
+function incidentRows(reference: string): { n: number; ids: string[] }[] {
+  return referenceSection(reference, "## Incidents")
+    .split("\n")
+    .map((l) => l.match(/^\| (\d+) \|(.*)\|$/))
+    .filter((m): m is RegExpMatchArray => m !== null)
+    .map((m) => ({ n: Number(m[1]), ids: m[2].match(/S-\d{2}/g) ?? [] }));
+}
+
+function adopterHits(files: string[]): string[] {
+  const hits: string[] = [];
+  for (const f of files) {
+    const text = read(f).toLowerCase();
+    for (const term of ADOPTER_TERMS) if (text.includes(term)) hits.push(`${relative(ROOT, f)}: ${term}`);
+  }
+  return hits;
+}
+
+describe("workstream orchestration reference", () => {
+  const reference = existsSync(ORCHESTRATE) ? read(ORCHESTRATE) : "";
+  const sentences = requiredSentences();
+
+  test("the feature document lists the required sentences with unique IDs", () => {
+    expect(sentences.length).toBeGreaterThanOrEqual(53);
+    expect(new Set(sentences.map((s) => s.id)).size).toBe(sentences.length);
+  });
+
+  test("states every required sentence under the section its heading names (AC-02 to AC-13)", () => {
+    expect(existsSync(ORCHESTRATE)).toBe(true);
+    expect(missingSentences(reference, sentences)).toEqual([]);
+  });
+
+  test("the sentence check fails when one sentence is reworded", () => {
+    const changed = reference.replace("Start at most three new sub-sessions", "Start at most five new sub-sessions");
+    expect(changed).not.toBe(reference);
+    expect(missingSentences(changed, sentences)).toEqual(["S-09"]);
+  });
+
+  test("carries the feature document's glossary table verbatim (AC-16)", () => {
+    const rows = glossaryRows();
+    expect(rows.length).toBe(9);
+    for (const row of rows) expect(reference).toContain(row);
+  });
+
+  test("defines the project procedure's Orchestration section and its eight fields (AC-14)", () => {
+    expect(reference).toContain("## Orchestration");
+    for (const field of ORCHESTRATION_FIELDS) expect(reference).toContain(`\`${field}\``);
+  });
+
+  test("maps each of the sixteen incidents to sentence IDs that exist (AC-15)", () => {
+    const ids = new Set(sentences.map((s) => s.id));
+    const rows = incidentRows(reference);
+    expect(rows.map((r) => r.n)).toEqual(Array.from({ length: 16 }, (_, i) => i + 1));
+    for (const row of rows) {
+      expect(row.ids.length).toBeGreaterThan(0);
+      for (const id of row.ids) expect(ids.has(id)).toBe(true);
+    }
+  });
+
+  test("no file in the plugin names a known adopter (AC-14)", () => {
+    expect(adopterHits(walk(PKG))).toEqual([]);
+  });
+
+  test("the adopter scan fails on a file holding each term", () => {
+    const dir = join(ROOT, "tests", "vh-adlc", ".tmp-adopter-scan");
+    mkdirSync(dir, { recursive: true });
+    try {
+      for (const term of ADOPTER_TERMS) {
+        const file = join(dir, "fixture.md");
+        writeFileSync(file, `A procedure that mentions ${term.toUpperCase()} by name.\n`);
+        expect(adopterHits([file])).toEqual([`${relative(ROOT, file)}: ${term}`]);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
     }
   });
 });

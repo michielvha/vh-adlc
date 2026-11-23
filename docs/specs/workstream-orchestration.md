@@ -518,26 +518,37 @@ plugin removes the skill and nothing else.
 - [ ] AC-02: The reference states the decision boundary, sentences S-01 to S-04, S-41 and S-42, and
       `references/authority.md` has a row for the request to orchestrate a workstream granting the writes
       S-02 lists.
-- [ ] AC-03: The reference requires proportion and gate checks before new work, sentences S-05 and S-06.
-- [ ] AC-04: The reference requires the capacity, batch, live-session, pending-session, overload and
+- [x] AC-03: The reference requires proportion and gate checks before new work, sentences S-05 and S-06.
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
+- [x] AC-04: The reference requires the capacity, batch, live-session, pending-session, overload and
       one-orchestrator rules, sentences S-07 to S-13, S-46, S-49 and S-52.
-- [ ] AC-05: The reference requires a queue and one heavy job at a time per exclusive resource, and a
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
+- [x] AC-05: The reference requires a queue and one heavy job at a time per exclusive resource, and a
       sub-session's request for its turn, sentences S-14 and S-48.
-- [ ] AC-06: The reference states the brief's rules, sentences S-15 to S-17 and S-43.
-- [ ] AC-07: The reference requires the status pass timing, contents, dependency watch, ledger rules and
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
+- [x] AC-06: The reference states the brief's rules, sentences S-15 to S-17 and S-43.
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
+- [x] AC-07: The reference requires the status pass timing, contents, dependency watch, ledger rules and
       fail-closed reads and its own staleness check, sentences S-18 to S-21, S-38 to S-40, S-47 and
       S-51.
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
 - [ ] AC-08: The reference routes a fired convergence trigger into the batched owner questions without
       a second question or a threshold of its own, sentence S-22.
-- [ ] AC-09: The reference states the communication and stop rules, sentences S-23 to S-29.
-- [ ] AC-10: The reference states the plugin-upgrade rules, sentences S-30 to S-32, S-44, S-45 and
+- [x] AC-09: The reference states the communication and stop rules, sentences S-23 to S-29.
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
+- [x] AC-10: The reference states the plugin-upgrade rules, sentences S-30 to S-32, S-44, S-45 and
       S-53.
-- [ ] AC-11: The reference requires the orchestrator's own commits to pass the repository's delivery
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
+- [x] AC-11: The reference requires the orchestrator's own commits to pass the repository's delivery
       gates, sentence S-33.
-- [ ] AC-12: The reference states the watcher and bridge rules, sentences S-34, S-35 and S-50.
-- [ ] AC-13: The reference states the close-out rules, sentences S-36 and S-37.
-- [ ] AC-14: The reference defines the project procedure's `## Orchestration` section with its eight
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
+- [x] AC-12: The reference states the watcher and bridge rules, sentences S-34, S-35 and S-50.
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
+- [x] AC-13: The reference states the close-out rules, sentences S-36 and S-37.
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the sentence test finds each of this criterion's sentences verbatim under its section, and fails when S-09 is reworded.
+- [x] AC-14: The reference defines the project procedure's `## Orchestration` section with its eight
       fields, and no file under `plugins/vh-adlc/` contains a term from the test's adopter list.
+      Evidence: T1, `bun test tests/vh-adlc/check.test.ts`, 73 pass: the field test finds `## Orchestration` and all eight fields, the plugin scan finds no adopter term, and the fixture scan flags each term.
 - [ ] AC-15: The reference's incident table maps each of the sixteen incidents to sentence IDs that
       exist, and replaying each incident against the procedure finds a step that would have stopped it.
 - [ ] AC-16: The reference carries the Design's glossary table verbatim, and every rule the reference
@@ -555,13 +566,19 @@ plugin removes the skill and nothing else.
 
 ## Tasks
 
-- [ ] T1 Write `plugins/vh-adlc/references/orchestrate.md` with the glossary, every required sentence
+- [x] T1 Write `plugins/vh-adlc/references/orchestrate.md` with the glossary, every required sentence
       under its section, the explanation, the `## Orchestration` fields and the sixteen-row incident
       table, plus the safeguard the owner moved into implementation from R-7 F-01. Add the sentence,
       glossary, field, incident-row and adopter-term tests with their must-fail fixtures to
       `tests/vh-adlc/check.test.ts`, and bump the version in `plugins/vh-adlc/plugin.json` and
       `plugins/vh-adlc/.claude-plugin/plugin.json`. Done when `bun test tests/vh-adlc/check.test.ts`
       passes, after the new tests were seen failing without the reference. AC-03 to AC-16.
+      Evidence: before the reference existed, `bun test tests/vh-adlc/check.test.ts` failed 5 tests (the
+      sentence, mutation, glossary, field and incident-row tests); with it and the 0.31.0 bump, 73 pass and
+      0 fail. A full `bun test tests/vh-adlc --timeout 60000` run in six shards on macOS failed only in 22
+      files that fail with the same counts on `origin/main` (Linux-only Bubblewrap, `/proc`, GNU sed and
+      path-length cases), apart from one closure-worker timeout under shard load that passed alone (27
+      pass, 0 fail).
 - [ ] T2 Add the request-to-orchestrate row to `plugins/vh-adlc/references/authority.md` with exactly
       S-02's four writes, and its test in `tests/vh-adlc/check.test.ts`, which must fail when any one
       write is missing. Done when `bun test tests/vh-adlc/check.test.ts` passes, after the row test was
