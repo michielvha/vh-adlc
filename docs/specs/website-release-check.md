@@ -125,6 +125,7 @@ On 2026-11-23 the owner settled two questions raised during T4. An unfinished tr
 | 2026-11-20 | R-7 | spec | `ffe3077c7269d14ebe45781cd1a2e2eed9ae95f5` | n/a | n/a | accepted by owner |
 | 2026-11-21 | R-8 | spec | `46249c1b7f9232cd5afa999301da044b06960795` | unknown | procedural | NO FINDINGS |
 | 2026-11-22 | R-9 | spec | `287b10fbba86c66b86df971be37397b017e0a51a` | unknown | procedural | NO FINDINGS |
+| 2026-11-23 | R-10 | spec | `37f956c5db149b84d5aa21c48d4708bc70566be0` | claude-opus-5-5 | procedural | Four should-fix findings and two nits |
 
 ### R-1
 
@@ -359,6 +360,52 @@ NO FINDINGS
 ### R-9
 
 NO FINDINGS
+
+### R-10
+
+TARGET: 37f956c5db149b84d5aa21c48d4708bc70566be0
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design line 51 (profile contents and the Chromium-only rule), Context / Owner summary line 28, Test Plan AC-03, Tasks T11 and T12, Open Questions line 112
+EVIDENCE: This revision adds "A profile that selects any other browser, including Firefox, is invalid configuration". The same Design bullet lists what a profile selects ("origins, routes, capabilities, required rules, and precise expected responses"), and no browser selection is among them. `plugins/vh-adlc/scripts/website-check/profile.ts:3-11` has no browser key, and `resolveProfile` (lines 38-62) ignores unknown keys, so a profile with `browser: firefox` would run Chromium today. The document never says which field selects a browser, whether leaving it out means Chromium, whether an explicit `chromium` is allowed, or whether unknown keys are rejected. The AC-03 row and T11 only exercise Firefox, so an implementation that rejects only the string `firefox` and accepts `webkit` would pass. The issue comes from the change this revision made.
+PROPOSAL: Name the profile field that selects the browser, its default, and `chromium` as the only accepted value. State that any other value, and say whether an unrecognised key too, is invalid configuration. Add a value other than Firefox, such as `webkit`, to the AC-03 proof.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-03, Design line 51, Context / Owner summary line 28, Tasks T11
+EVIDENCE: The Design says a profile that selects another browser "is rejected before the boundary check or any request", and the Owner summary says it "is refused before the run starts". The AC-03 row only lists "a profile that selects Firefox" among the cases where it will "Assert coverage and exits". An implementation that starts the proxy and Chromium, visits the route, and only then reports invalid configuration with a nonzero exit passes that row. Only the unticked task T11 asks for "before the fixture receives any request", and a task is not the normative proof. This row was changed in this revision.
+PROPOSAL: Extend the AC-03 row so that, for the rejected browser profile, the destination log has no request and no boundary check or browser launch is recorded, in both modes.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks T11, T12 and T4, Context / Background line 42
+EVIDENCE: Commit X already contains `6b00d5a9 feat: collect typed website check observations`, the T4 work. In it, `plugins/vh-adlc/scripts/website-check/observations.ts:172-177` (`requiredSettled`) keeps waiting while any matching attempt is pending. `#ruleOutcome` (lines 201-209) returns `skipped` with `no-terminal-attempt` when no attempt is terminal, and `result()` (lines 228-232) then sets `requiredComplete` to false. A required 200 fetch whose body the page never reads gets no `requestfinished`, so it stays pending and coverage is already incomplete, the same path that `tests/vh-adlc/website-check/observations.test.ts:167` exercises for a held body. T11's done condition "Observe both fail before T12" therefore cannot be met for the unread required body case, and T12's change to `observations.ts` has nothing left to implement. Background line 42 also says the collector "now" handles unread bodies while T4 is still unticked. These tasks were added in this revision.
+PROPOSAL: Move the unread required body test under T4 as a check on the existing collector, or say how its red state is observed. Limit T11's red step and T12's change to the browser rejection in `profile.ts`.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary lines 26-32, Context / Background lines 36-43
+EVIDENCE: Context shows what happened at Stackweaver: a localhost API default and CSP blocks on the local build, and a 401 plus a console error on the deployed site. It does not say who is harmed by a release that ships with these failures, how often that happens, how badly, or whether it heals on its own. It also names no simplest alternative that was rejected, with its reason. One example would be running the adopter's existing Playwright suite against the deployed URL, without the proxy and Bubblewrap confinement, the completion markers or the adapter framework. The goal says "without a hosted scanning service" but gives no reason for rejecting that service, and none for rejecting a plain unconfined smoke run. The document is at `draft`.
+PROPOSAL: Add a short harm statement to Context covering who is affected, frequency, severity and self-healing. Name the simplest alternative considered, such as an unconfined Playwright smoke run or the hosted scanner, and say why it was rejected, so the confinement and evidence machinery can be weighed against the harm.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary line 32, Design line 52
+EVIDENCE: The Owner summary says an unread response "still gets its expected or failed verdict from the observed status". The Design classifies it "against the expected-response rules like any other response", which also allows a pass: `observations.ts:194-198` gives an unread non-required 200 the outcome `pass` with `transfer: "unfinished"`.
+PROPOSAL: Say "its pass, expected or failed verdict" in the Owner summary, or say that an unread response is classified like any other.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: frontmatter covers (`tests/vh-adlc/`)
+EVIDENCE: `/tmp/vhadlc-bin/vh-adlc fresh docs/specs/website-release-check.md --repo . --plugin-pin 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff` reports `covered-drift` for R-9 from unrelated files, including `tests/vh-adlc/proportionality.test.ts`, `tests/vh-adlc/security-settings/helper.test.ts` and `tests/vh-adlc/author-extras.test.ts`. Covering the whole test directory makes any other feature's test change mark this document's reviews stale.
+PROPOSAL: Narrow the entry to `tests/vh-adlc/website-check/` plus any specific package check file this feature changes, such as `tests/vh-adlc/check.test.ts`, the next time the baseline is revised.
 
 ## Sources
 
