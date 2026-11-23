@@ -143,6 +143,7 @@ The owner also answered two questions from spec review R-10 on 2026-11-23. A pro
 | 2026-11-21 | R-8 | spec | `46249c1b7f9232cd5afa999301da044b06960795` | unknown | procedural | NO FINDINGS |
 | 2026-11-22 | R-9 | spec | `287b10fbba86c66b86df971be37397b017e0a51a` | unknown | procedural | NO FINDINGS |
 | 2026-11-23 | R-10 | spec | `37f956c5db149b84d5aa21c48d4708bc70566be0` | claude-opus-5-5 | procedural | Four should-fix findings and two nits |
+| 2026-11-23 | R-11 | spec | `ed45264af49645b4c191390ccf3ca0afa4397c18` | claude-opus-5-5 | procedural | Four should-fix findings and one nit |
 
 ### R-1
 
@@ -423,6 +424,45 @@ SEVERITY: nit
 WHERE: frontmatter covers (`tests/vh-adlc/`)
 EVIDENCE: `/tmp/vhadlc-bin/vh-adlc fresh docs/specs/website-release-check.md --repo . --plugin-pin 1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff` reports `covered-drift` for R-9 from unrelated files, including `tests/vh-adlc/proportionality.test.ts`, `tests/vh-adlc/security-settings/helper.test.ts` and `tests/vh-adlc/author-extras.test.ts`. Covering the whole test directory makes any other feature's test change mark this document's reviews stale.
 PROPOSAL: Narrow the entry to `tests/vh-adlc/website-check/` plus any specific package check file this feature changes, such as `tests/vh-adlc/check.test.ts`, the next time the baseline is revised.
+
+### R-11
+
+TARGET: ed45264af49645b4c191390ccf3ca0afa4397c18
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design line 65 (profile contents, `browser` field and undefined keys), Context / Owner summary lines 30 and 34, Test Plan AC-03, Tasks T11 and T12, Open Questions line 129
+EVIDENCE: This revision makes "any key the profile format does not define" invalid configuration. The document never lists the keys the profile format defines, and it does not say whether the rule also applies to keys nested inside a route, a required request or an expected response. The two readings lead to different builds. A top-level-only check would accept a typo such as `requiredRequest` inside `route`, and the run would silently drop a required request, which is the silent misconfiguration the rule exists to stop. The AC-03 row and T11 ask only for "one with a key the profile format does not define", so a top-level-only implementation passes. The current profile type at `plugins/vh-adlc/scripts/website-check/profile.ts:3-11` also carries `mode` and a `chromium: { caFile }` key that the confinement tests pass (`tests/vh-adlc/website-check/confinement.test.ts:37`). The Design does not mention `chromium.caFile`, so it is unclear whether T12 must reject it, which breaks the existing tests, or accept it as a defined key. Accepting it lets a checked-in profile trust an extra CA. This traces to the change this revision made for R-10 F-01.
+PROPOSAL: List the profile's defined keys at each level, or name the schema file that defines them, and state that unknown keys are rejected at every nesting level. Say whether a CA override belongs to the profile or only to the test harness, and add a nested unknown key to the AC-03 proof.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design line 72 (CI prerequisites, "they never skip"), Context / Owner summary line 34, Test Plan AC-01, Tasks T13, Open Questions line 129, repository `AGENTS.md` (Local commands and constraints)
+EVIDENCE: `AGENTS.md` names `bun test tests/vh-adlc` as the vh-adlc plugin checker for local use. The Design says "A missing prerequisite fails the website-check tests; they never skip" with no host condition, and the tests need Linux, Bubblewrap and Squid. On this macOS checkout at X, `bun test tests/vh-adlc/website-check/` gave 3 pass and 11 fail, with errors such as "Missing prerequisite: bwrap" and "Set WEBSITE_CHECK_PLAYWRIGHT_MODULE to the pinned playwright-core entry point". After this feature, the repository's documented local check cannot pass on macOS or on any host without these prerequisites. The hosted `checker-macos` job avoids this only because it runs an explicit file list (`.github/workflows/ci.yml:98-110`). The owner's answer in Open Questions is about hosted CI, while the Design states the rule without that limit. The document neither proposes a change to `AGENTS.md` nor says that the rule applies only to hosted CI.
+PROPOSAL: Raise an Open Question on whether fail-not-skip applies only in the hosted `checker` job or on every host, and whether `AGENTS.md` should state the Linux prerequisites or give a portable local selection that leaves out website-check. Fold the answer into the Design and T13.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design line 72 ("or the job pins Squid 7.5"), Open Questions line 129, Tasks T13, `tests/vh-adlc/website-check/fixtures/README.md`
+EVIDENCE: The Design lets the first hosted run decide between Ubuntu's packaged Squid and "the job pins Squid 7.5", but gives no source, checksum or updater-visible manifest for the 7.5 path. Pinned `conventions/delivery.md:188-199` requires downloading executable tools at an exact version, verifying an independently pinned checksum, rejecting a different preinstalled version, and keeping every pin discoverable by the update tool. A version hardcoded in a workflow script is called out there as invisible to updaters. T2's evidence and the fixtures README record that the tests passed with Squid 7.5, and Ubuntu's packaged Squid is a different version, accepted with no pin. One implementer could add an unverified source build in a workflow step, and another could accept whatever version apt installs. Either would meet T13 as written. This traces to the CI change this revision made.
+PROPOSAL: State how the 7.5 fallback is obtained and verified, with its checksum and the manifest or Renovate custom manager that carries the pin. Also state whether the packaged path records and checks the installed Squid version.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context / Owner summary lines 32 and 36, Context / Background line 40
+EVIDENCE: The new harm statement says the harm is a page that breaks in the built or deployed artifact "as the Stackweaver local build did, and stays broken for visitors until someone happens to notice". The same Context says the local run "used default configuration", with "no injected deploy settings" (line 52), and that its failure came from the localhost API default at `frontend/src/config.ts:45`. The deployed homepage returned 200 with only the expected anonymous 401 (line 54). The one cited example therefore never reached a visitor, and it may come from the missing deploy configuration rather than from a release defect. No observed visitor-facing break is cited, so the frequency ("recurs at every release") and the severity of the harm are not supported by the evidence given. That makes it harder to weigh the Squid, Bubblewrap and report machinery against the harm. This traces to the harm statement this revision added for R-10 F-04.
+PROPOSAL: Cite an observed visitor-facing break, or state plainly that none has been observed. Describe the Stackweaver local result as a build run without release configuration, not as a failure visitors saw.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T3 evidence line
+EVIDENCE: T3's evidence says "The Test Plan's Chromium and Firefox comparison stays untested because no task builds a confined Firefox runner." At X, the Test Plan has no Chromium and Firefox comparison. The previous revision moved it to #158, and the only Firefox mention left in the AC-03 row is the rejected `browser: firefox` profile.
+PROPOSAL: Add a note that the comparison has since moved to #158, or drop the sentence the next time Tasks are edited.
 
 ## Sources
 
