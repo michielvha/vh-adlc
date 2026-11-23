@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after spec review R-3 with the owner's answers to Q18 to Q23; waits for independent re-review R-4."
+status_description: "Spec review R-4 is stored; its judgement findings wait for the owner before the next revision."
 issue: null
 goal: "A session that drives many sub-sessions across a workstream follows one generic vh-adlc procedure that starts only work the host and the loop can carry, keeps every session's state and blockers current, routes owner decisions correctly and closes sessions without losing work."
 covers:
@@ -517,6 +517,7 @@ None.
 | 2026-11-23 | R-1 | spec | `ea534657` | claude-opus-5-5 | procedural | 0 blocking, 14 should-fix, 2 nits; judgement findings go to the owner first |
 | 2026-11-23 | R-2 | spec | `46ccf25a` | claude-opus-5-5 | procedural | 1 blocking, 7 should-fix, 1 nit; judgement findings go to the owner first |
 | 2026-11-23 | R-3 | spec | `de1a5171` | claude-opus-5-5 | procedural | 0 blocking, 9 should-fix, 2 nits; judgement findings go to the owner first |
+| 2026-11-23 | R-4 | spec | `36eed728` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 1 nit; judgement findings go to the owner first |
 
 ### R-1
 
@@ -779,6 +780,52 @@ SEVERITY: nit
 WHERE: Scope (In scope); frontmatter covers
 EVIDENCE: docs/user-guides/workflows.md:17-19 sends readers to docs/reference/compatibility.md "for the lifecycle trials and limits on your host", and that page lists each operation's verified hosts (for example :152 for `vh-adlc-clean`, :246 for `vh-adlc-docs-truth`). Scope adds a new operation but no compatibility entry saying it is unverified, and covers omits docs/reference/compatibility.md.
 PROPOSAL: Add an unverified entry for `vh-adlc-orchestrate` to compatibility.md, and list that file in Scope and covers.
+
+### R-4
+
+TARGET: 36eed72819ef25cc7383d836474f4e85d0c8a630
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-10, S-12 and S-46; Design, Concurrency, failure and upgrade; Design, Explanation the reference adds (Admission order); Context, Owner decisions Q7, Q8 and Q20; Context, Owner summary (Admission bullet); Acceptance Criteria AC-04
+EVIDENCE: The Concurrency section says "A batch member that stays pending or fails is recorded and no longer holds back the next batch (S-10, S-12)", and Q20 says the same. S-12 says the opposite for a pending session: "record it in the workstream ledger, do not retry it, and start nothing new until archived sessions free a slot", and Q8 says "a pending session stops admissions until finished sessions are archived". So S-10 releases the batch wait while S-12 still stops every start. "Slot" is also undefined when the project sets no live-session limit, because S-11 counts sessions only "Where the project procedure sets a live-session limit". After one archive, one implementer starts a whole batch, another starts one session, and a third waits while the pending session is still listed. Q7 is not marked as amended by Q20, and the Owner summary leaves out that a pending session stops admissions. This traces to the revision at 36eed728, which added the "no longer holds back" wording in answer to R-3 F-04.
+PROPOSAL: Say in S-12 and the Concurrency section that a recorded pending session releases S-10's wait but blocks new starts until one archive happens. Define "frees a slot" with and without a live-session limit, and how many sessions one archive allows. Mark Q7 as amended by Q20, and add the pending-session stop to the Owner summary.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-36, S-45, S-46 and S-02; Context, Owner summary (Upgrades and close-out bullet); Context, Owner decisions Q13, Q19 and Q20; Acceptance Criteria AC-04, AC-10, AC-13 and AC-16; Test Plan row AC-16
+EVIDENCE: S-36 is absolute: "Archive a sub-session only after it has reported done and confirmed its cleanup finished". S-45 lets the orchestrator archive "replaced, paused sessions" with a batched owner approval, and S-46 lets it recreate a pending or failed session with approval, which ends that session first. A paused or pending session has not "reported done", so the reference would carry two required sentences that contradict each other. The Owner summary has the exception ("Other sessions are archived only after a confirmed done and cleanup"), but S-36 does not, and the AC-16 reviewer is told to confirm that each rule reads as a requirement. This traces to the revision at 36eed728, which added S-45 and S-46 in answer to R-3 F-02 and F-04.
+PROPOSAL: Reword S-36 so it covers sub-sessions other than those S-45 and S-46 name, for example "Apart from S-45 and S-46, archive a sub-session only after ...", matching the Owner summary.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-02, S-30, S-32, S-44 and S-45; Design, Concurrency, failure and upgrade; Context, Owner summary (Decision boundary and Upgrades and close-out bullets); Context, Owner decisions Q13, Q14 and Q19; Acceptance Criteria AC-02 and AC-10
+EVIDENCE: Under S-30 and S-44, stale sub-sessions send their state by message "to the orchestrator", which is the stale orchestrator when it was started before the same install. S-32 then has "the replacement records the stale reports", but the replacement is a new session that never received those messages, and S-32 sends only the orchestrator's own handoff to the owner. The document does not say whether the replacement asks each paused session again, gets the reports from the owner, or reads them some other way. Second, S-02 grants archiving only "the sub-sessions it started once each is done". The replacement did not start its predecessor's sub-sessions, so every finished one of them falls back to authority.md:30 ("end a live session" needs separate approval for that exact action). S-45 covers only replaced, paused sessions. This traces to the revision at 36eed728, which added the replacement order in answer to R-3 F-02.
+PROPOSAL: State how the replacement gets the stale reports, for example by asking each paused session to report again by message. Extend S-02 and the authority row to the sub-sessions of the workstream it took over, or say that archiving those needs the owner's batched approval.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The skill; Design, Required sentences S-30 and S-32; Design, Explanation the reference adds (Status pass states); Design, Concurrency, failure and upgrade
+EVIDENCE: A session learns it is stale only from `plugin.stale` in `bun scripts/loop/cli.ts context` (plugins/vh-adlc/references/loop-settings.md:124-128), and each operation reads that once at entry (for example plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:40). The skill runs `context` once in its frame. An orchestrator stays in one long session across many status passes, so nothing in the Design makes it notice an install that lands mid-workstream. S-32 ("A stale orchestrator sends its handoff ...") and the Concurrency section ("the orchestrator included") assume it knows. The Status pass states list only "which sessions report `plugin.stale`", which covers sub-sessions. One implementer re-runs `context` on every status pass, another only when a sub-session reports stale, and a third never does, and keeps writing the ledger while stale.
+PROPOSAL: Add to S-19, or a new sentence, that each status pass re-runs `bun scripts/loop/cli.ts context` and, when its own `plugin.stale` is true, follows S-32 before anything else.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-09 and S-10; Design, Explanation the reference adds (Admission order); Design, Project procedure slot (Batch limit); Context, Owner decisions Q3; Context, Owner summary (Admission bullet); Acceptance Criteria AC-04
+EVIDENCE: Q3 decided at most three per batch, "overridable in the project procedure, with more only once load shows the batch fit". The explanation now says "S-10 is how Q3's 'more only once load shows the batch fit' holds: a project limit above three sets the batch size, but no batch starts until the one before it has reported ... and the first batch still needs S-07's check." So a project limit of fourteen starts fourteen sessions in the first batch on one passing capacity check, which is incident 2. The same paragraph says the one-minute load average "lags sessions that have not started building", so that check cannot show the batch fit. This reading leaves Q3's condition no stronger than the rule for every batch. It settles a trade-off the owner's answer did not settle, without an open question. R-3 F-05 proposed a ramp ("a batch larger than three only after a previous batch of that size passed S-10"). This traces to the revision at 36eed728.
+PROPOSAL: Either add the ramp to S-09 (a batch larger than three only after an earlier batch of three passed S-10, growing step by step), or raise the reading as an Open Question for the owner.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Glossary (Coordination operation); Scope (guides say one coordination operation); Acceptance Criteria AC-01; Test Plan row AC-01
+EVIDENCE: plugins/vh-adlc/references/lifecycle.md:54 already routes "Cross-repository GitHub Projects coordination" to `vh-adlc-projects`, which the checker counts as an engineering operation (tests/vh-adlc/check.test.ts:20). The guides would then say "one coordination operation" while the intake table calls a different, engineering operation coordination.
+PROPOSAL: Note in the glossary row or the guide text that the projects operation is not a coordination operation in this sense, or pick a term that does not collide.
 
 ## Sources
 
