@@ -90,20 +90,22 @@ function fixture(opts: { assetSha?: string; binarySha?: string | null; binaryVer
   return { dir, plugin, home, marker, binary, asset, lock };
 }
 
-function run(f: Fixture, args: string[] = [], pathDirs: string[] = []) {
+function run(f: Fixture, args: string[] = [], pathDirs: string[] = [], extraEnv: Record<string, string> = {}, timeout?: number) {
   const env: Record<string, string> = {
     HOME: f.home,
     XDG_CACHE_HOME: join(f.home, "cache"),
     PATH: [...pathDirs, "/usr/local/bin", "/usr/bin", "/bin"].join(":"),
     LC_ALL: "C",
+    ...extraEnv,
   };
   const r = Bun.spawnSync(["bash", join(f.plugin, "scripts", "ensure-vh-adlc.sh"), ...args], {
     env,
     cwd: f.dir,
     stdout: "pipe",
     stderr: "pipe",
+    timeout,
   });
-  return { code: r.exitCode, out: r.stdout.toString().trim(), err: r.stderr.toString() };
+  return { code: r.exitCode, out: r.stdout.toString().trim(), err: r.stderr.toString(), timedOut: r.exitedDueToTimeout === true };
 }
 
 function cached(f: Fixture): string {
@@ -195,22 +197,65 @@ describe("rejected sources", () => {
     expect(after).toEqual(before);
   });
 
-  test("ignores another version on PATH with a diagnostic", () => {
+  // An unverified PATH entry is never run, whatever version it would report and in either mode: running
+  // it to ask its version once let a wrapper that calls this script recurse until the host ran out of memory.
+  for (const offline of [false, true]) {
+    test.each([VERSION, "1.0.0"])(`never runs an unverified PATH entry reporting %s and uses the verified cache (offline: ${offline})`, reported => {
+      const f = fixture();
+      expect(run(f).code).toBe(0);
+      const marker = join(f.dir, "path-ran");
+      const bin = onPath(f, fakeBinary(reported, marker, "# unverified\n"));
+      const r = run(f, offline ? ["--offline"] : [], [bin]);
+      expect(existsSync(marker)).toBe(false);
+      expect(r.code).toBe(0);
+      expect(r.out).toBe(cached(f));
+      expect(r.err).toContain(`ignoring unverified PATH entry ${join(bin, "vh-adlc")}`);
+    });
+  }
+
+  test("downloads the verified binary when the only PATH entry is unverified, without running it", () => {
     const f = fixture();
-    const bin = onPath(f, fakeBinary("1.0.0", join(f.dir, "path-ran")));
+    const marker = join(f.dir, "path-ran");
+    const bin = onPath(f, fakeBinary(VERSION, marker, "# tampered\n"));
     const r = run(f, [], [bin]);
+    expect(existsSync(marker)).toBe(false);
     expect(r.code).toBe(0);
     expect(r.out).toBe(cached(f));
-    expect(r.err).toContain("ignoring");
+    expect(sha256(readFileSync(cached(f)))).toBe(sha256(f.binary));
   });
 
-  test("fails closed on a same-version PATH binary with the wrong digest", () => {
+  test("a wrapper on PATH that calls this script cannot make it recurse", () => {
     const f = fixture();
-    const bin = onPath(f, fakeBinary(VERSION, join(f.dir, "path-ran"), "# tampered\n"));
-    const r = run(f, [], [bin]);
-    expect(r.code).not.toBe(0);
-    expect(r.err).toContain("digest");
+    expect(run(f).code).toBe(0);
+    // The wrapper the incident installed: it resolves the binary through this script and runs it. It
+    // counts its own runs and gives up after a few, so a regression fails this test instead of the host.
+    const calls = join(f.dir, "wrapper-calls");
+    const wrapper = [
+      "#!/bin/bash",
+      `printf x >> "${calls}"`,
+      `[ "$(wc -c < "${calls}")" -le 8 ] || exit 1`,
+      `binary=$(bash "${join(f.plugin, "scripts", "ensure-vh-adlc.sh")}") || exit 1`,
+      'exec "$binary" "$@"',
+      "",
+    ].join("\n");
+    const bin = onPath(f, wrapper);
+    const r = run(f, [], [bin], {}, 10_000);
+    expect(r.timedOut).toBe(false);
+    expect(existsSync(calls) ? readFileSync(calls, "utf8").length : 0).toBe(0);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe(cached(f));
+  }, 15_000);
+
+  test("a nested run fails at once and names a wrapper on PATH as the likely cause", () => {
+    const f = fixture();
+    const r = run(f, [], [], { VH_ADLC_ENSURE_ACTIVE: "1" }, 10_000);
+    expect(r.timedOut).toBe(false);
+    expect(r.code).toBe(1);
     expect(r.out).toBe("");
+    expect(r.err).toContain("already running");
+    expect(r.err).toContain("wrapper on PATH");
+    expect(existsSync(cached(f))).toBe(false);
+    expect(existsSync(f.marker)).toBe(false);
   });
 
   test("fails closed on a cache entry with the wrong digest", () => {
