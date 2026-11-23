@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-23 at spec review R-19."
+status: parked
+status_description: "Parked by the owner on 2026-11-23 after acceptance at spec review R-19: T1 to T4 and T11 to T13 are done and CI is green. Next on resume: T5, then T6, then T14 and T15 after a scoped R-19 revision; see the pause note in Open Questions."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
@@ -151,6 +151,8 @@ On 2026-11-23 the owner answered spec review R-16 F-01 for the revision before T
 Later on 2026-11-23, after spec review R-17 showed that a list of refused variables could not be complete, the owner replaced that answer. The command's own network requests run in a child Bun process with a cleared environment, in which the runner sets only `PATH`, `HOME` and `LANG`, with no inherited command-line flags and no `BUN_OPTIONS`, and connect only through the run's confinement proxy. The report lists by name any ambient trust or proxy variables that were present and ignored. There is no refusal list.
 
 Spec reviews R-17 and R-18 both returned a blocking finding, so the convergence rule put a proportionality question to the owner on 2026-11-23. The harm: an adopter's own environment or repository settings could weaken the command's own certificate and redirect checks, or redirect its HTTP upgrade probe, so a report-only run shows a pass it should not. It is rare, it needs trust-weakening settings in the adopter's environment or repository, it does not heal on its own, and the browser checks stay confined either way. The simplest alternative without new machinery was to reuse the browser's existing Bubblewrap boundary. The owner chose to keep going with that alternative, replacing the cleared-environment child above: the command's own requests run inside the same boundary as the browser, the boundary is stated as the requirement instead of a list of Bun inputs, the report still names ambient trust or proxy variables, and every proof must be able to fail.
+
+Pause, 2026-11-23: the owner accepted the spec at `4a554015` (spec review R-19, no blocking finding) and parked the feature because it is not a priority now. Where it stands: T1 to T4 and T11 to T13 are done, and hosted CI is green on the T12 commit `bfa03f79` (run 45243710791, 4353 pass, 0 fail). T5 has not started. Proposed next steps when work resumes: move the network-worker work out of T5 and T6 into a new pair after T6, T14 writing its tests first and T15 building `network-worker.ts`, the probe move in `runner.ts` and the shared boundary in `chromium.ts`. Before T14, make one scoped revision for R-19's findings with its own review, putting F-01 (proofs that can fail on a leaking worker), F-03 (whether the shipped command loads `.env`) and F-04 (the outcome when a network boundary cannot start) to the owner as questions. T5 and T6 can go ahead first on output, policy, interruption, sanitization and the adapters without their own network requests. Before resuming, merge the default branch and check that the plugin version is still above the latest release.
 
 ## Review Log
 
