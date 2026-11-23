@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "vh-adlc website check profile",
+  "description": "Every profile key. An undefined key at any object level is invalid configuration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["target", "origin", "route"],
+  "properties": {
+    "target": { "enum": ["build", "deployed"] },
+    "origin": { "type": "string" },
+    "mode": { "enum": ["report", "enforce"], "default": "report" },
+    "browser": { "enum": ["chromium"], "default": "chromium" },
+    "httpUpgradeUrl": { "type": "string" },
+    "expectedResponses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["method", "url", "resourceType", "status"],
+        "properties": {
+          "method": { "type": "string" },
+          "url": { "type": "string" },
+          "resourceType": { "type": "string" },
+          "status": { "type": "integer" }
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "visibleHeading", "deadlineMs"],
+      "properties": {
+        "path": { "type": "string" },
+        "visibleHeading": { "type": "string" },
+        "deadlineMs": { "type": "integer" },
+        "requiredRequests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["method", "url"],
+            "properties": {
+              "method": { "type": "string" },
+              "url": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

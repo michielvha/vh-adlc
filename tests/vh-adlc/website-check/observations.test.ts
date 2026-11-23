@@ -37,7 +37,6 @@ async function observe(site: Site, route: {
     target: "deployed",
     origin: site.origin,
     mode: "report",
-    chromium: { caFile: site.caFile },
     expectedResponses,
     route: {
       path: route.path,
@@ -45,7 +44,7 @@ async function observe(site: Site, route: {
       deadlineMs: route.deadlineMs ?? 8_000,
       requiredRequests: route.requiredRequests ?? [],
     },
-  });
+  }, { fixtureCaFile: site.caFile });
 }
 
 function responses(result: Result, path: string) {

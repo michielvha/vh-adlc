@@ -36,9 +36,8 @@ async function smoke(site: Site, profile: Profile) {
     origin: profile.origin,
     httpUpgradeUrl: profile.httpUpgradeUrl,
     mode: "report",
-    chromium: { caFile: site.caFile },
     route: { path: profile.path, visibleHeading: profile.visibleHeading ?? "Release ready", deadlineMs: 8_000 },
-  });
+  }, { fixtureCaFile: site.caFile });
 }
 
 test("the build fixture serves a real document and logs the visit", async () => {

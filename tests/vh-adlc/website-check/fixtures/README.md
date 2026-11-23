@@ -3,8 +3,9 @@
 Run on Linux from the repository root with Bun, Bubblewrap, iproute, socat,
 OpenSSL, certutil, and Squid. The browser must be able to start a network
 namespace with only loopback. The fixture servers bind ephemeral loopback ports
-and issue their own HTTPS certificate. The smoke runner installs that CA into
-a new temporary Chromium profile for the test.
+and issue their own HTTPS certificate. The tests pass that CA to the runner API
+as `fixtureCaFile`, which installs it into a new temporary Chromium profile and
+accepts it only for a loopback origin. A profile cannot carry a CA.
 
 The runner accepts only the playwright-core version pinned in
 `plugins/vh-adlc/scripts/website-check/package.json` and its `bun.lock`. Install
@@ -30,11 +31,8 @@ usually does. Chromium never finishes such a fetch, so the expected response is
 matched on its observed status.
 
 The runner finds an installed Squid in `/usr/bin` or `/bin`. Ubuntu installs it in
-`/usr/sbin`, so set `WEBSITE_CHECK_SQUID=/usr/sbin/squid` there. To test an
-unpacked Fedora Squid package without installing it, set
-`WEBSITE_CHECK_SQUID` to the absolute executable,
-`WEBSITE_CHECK_SQUID_ROOT` to the extraction root, and
-`WEBSITE_CHECK_SQUID_LIB` to its library directory. The test uses Squid 7.5.
+`/usr/sbin`, so set `WEBSITE_CHECK_SQUID=/usr/sbin/squid` there. That path is the
+only proxy override. The hosted checker job uses Ubuntu's packaged Squid.
 
 The direct request to the excluded server is a positive control for its
 destination log. The test removes that one record before it launches confined

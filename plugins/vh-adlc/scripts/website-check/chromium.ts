@@ -68,10 +68,6 @@ export async function confinedChromium(options: {
   }
   const socket = join(scratch, "proxy.sock");
   const config = join(scratch, "squid.conf");
-  const packageRoot = process.env.WEBSITE_CHECK_SQUID_ROOT;
-  if (packageRoot && !/^\/[a-zA-Z0-9/_.-]+$/.test(packageRoot)) {
-    throw new Error("Invalid Squid package root");
-  }
   const tls = origin.protocol === "https:";
   await writeFile(config, [
     `http_port 127.0.0.1:${address.port}`,
@@ -79,12 +75,6 @@ export async function confinedChromium(options: {
     `cache_log ${join(scratch, "squid.log")}`,
     "access_log none", "cache deny all", "forwarded_for delete", "via off",
     "debug_options ALL,1", "shutdown_lifetime 0 seconds",
-    ...(packageRoot ? [
-      `error_directory ${packageRoot}/usr/share/squid/errors/en`,
-      `icon_directory ${packageRoot}/usr/share/squid/icons`,
-      `mime_table ${packageRoot}/etc/squid/mime.conf`,
-      `unlinkd_program ${packageRoot}/usr/lib64/squid/unlinkd`,
-    ] : []),
     `acl selected_host dstdomain -n ${origin.hostname}`,
     `acl selected_port port ${origin.port || (tls ? "443" : "80")}`,
     "acl connect method CONNECT", "acl plain proto HTTP",
@@ -92,7 +82,7 @@ export async function confinedChromium(options: {
     "http_access deny all", "",
   ].join("\n"));
 
-  const processEnv = { PATH: "/usr/bin:/bin", LANG: "C", LD_LIBRARY_PATH: process.env.WEBSITE_CHECK_SQUID_LIB || "" };
+  const processEnv = { PATH: "/usr/bin:/bin", LANG: "C" };
   const proxy = Bun.spawn([squid, "-N", "-f", config], { env: processEnv, stderr: "ignore", stdout: "ignore" });
   let relay: ReturnType<typeof Bun.spawn<["ignore", "ignore", "ignore"]>> | undefined;
   try {
