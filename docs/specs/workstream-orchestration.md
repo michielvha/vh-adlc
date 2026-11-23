@@ -421,6 +421,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-23 | R-1 | spec | `ea534657` | claude-opus-5-5 | procedural | 0 blocking, 14 should-fix, 2 nits; judgement findings go to the owner first |
+| 2026-11-23 | R-2 | spec | `46ccf25a` | claude-opus-5-5 | procedural | 1 blocking, 7 should-fix, 1 nit; judgement findings go to the owner first |
 
 ### R-1
 
@@ -535,6 +536,73 @@ SEVERITY: nit
 WHERE: Context, Background (What exists); Open Questions Q3
 EVIDENCE: `plugins/vh-adlc/references/loop.md:36-56` runs past the capacity section, which ends at :51 ("## 1. Get the binary" is :53). In Q3, "Matches the observed safe size" (option A) and "five sessions building at once already exceeded the load limit" (option B) are supported by nothing in Background, whose only recorded count is fourteen sessions at load 22.6.
 PROPOSAL: Cite loop.md:36-51, and either cite the observation behind the three and five figures or drop those claims from Q3.
+
+### R-2
+
+TARGET: 46ccf25a
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Required sentences S-02, S-05, S-24, S-32, S-33 and S-37; Design, Explanation the reference adds (The workstream ledger); Context, Owner summary (Communication and Decision boundary bullets); Context, Owner decisions Q4 and Q13; Acceptance Criteria AC-02, AC-03, AC-09
+EVIDENCE: S-02 says the orchestrate request "authorizes writing its workstream ledger and archiving the sub-sessions it started once each is done; it authorizes no other issue or repository write." Several other required sentences need exactly such writes. S-24: "Record each owner answer, dated, in the work item's issue or feature document". S-05: "write or find its harm statement". S-33 assumes the orchestrator commits to the shared default branch. S-32 and S-37 have it write its own handoff "into the feature document" or a location the ledger names. Writing into a sub-session's feature document also breaks plugins/vh-adlc/references/authority.md:213-217 at 46ccf25a: once a feature has a `branch` claim, only the claiming session, or one the owner has handed it to in that session, may write to it. The orchestrator is neither. The sub-session edits the same file at the same time, and authority.md:79 says "A conflicting concurrent edit to the same file stops the run". So the reference this document specifies tells the orchestrator to route every owner answer through a write that S-02 and the authority reference both forbid. That route is the fix R-1 F-02 asked for and Q4 chose, so the problem it addressed (a sub-session that cannot act on an owner answer given to the orchestrator) is still there once every box is ticked. This traces to the revision at 46ccf25a, which added S-02 (from Q13) and S-24 (from Q4) together.
+PROPOSAL: Make S-02 list every write the procedure requires (the ledger, owner-answer records in the work item's issue, harm statements, its own handoff and its own commits under S-33), or say each needs the owner's separate approval. Send owner answers for a claimed feature to its issue or to the ledger, never into the claimed feature document, unless the owning sub-session writes them itself.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-02; Design, Decision boundary; Scope (In scope); frontmatter covers; Context, Owner decisions Q13; Context, Owner summary (Decision boundary bullet)
+EVIDENCE: plugins/vh-adlc/references/authority.md is the package's action-to-authority table. Line 30 requires "Separate approval for that exact action" to "end a live session". Lines 5-6 say "selecting a procedure creates no additional execution or publication permission", and lines 42-46 say "Host approval cannot supply missing task authority". Line 25 covers creating a tracking issue but not updating one as a ledger outside a ship request (line 27). S-02 grants archiving finished sub-sessions and ledger writes from the orchestrate request alone, but Scope and covers leave authority.md unchanged. An orchestrator that loads both references gets a grant in orchestrate.md that authority.md does not recognize. One implementer adds an authority.md row and the other does not, and covers forbids the first. This traces to the fold of Q13 in this revision, which answered R-1 F-14 in the new reference only.
+PROPOSAL: Add an authority.md row for the orchestrate request (ledger writes, archiving finished sub-sessions it started, and any writes F-01 adds) to Scope and covers, with a Test Plan assertion. Alternatively, have S-02 defer to authority.md:30 and batch the archive approvals.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-30, S-32 and S-37; Design, Concurrency, failure and upgrade; Context, Owner summary (Upgrades and close-out bullet); Context, Owner decisions Q5; Acceptance Criteria AC-10, AC-13
+EVIDENCE: plugins/vh-adlc/references/loop-settings.md:126-127 at 46ccf25a says that after an update "`plugin.stale` is true until the session restarts, and operations stop before writing". S-30 still requires each stale sub-session to "write its durable handoff and pause". S-32 requires a stale orchestrator to make "no repository or ledger write" but also to write "its own handoff". S-37 puts handoffs "into the feature document", which is a repository write. The document never says that a handoff write is an exception to the stale stop, or where a handoff that is not a repository write goes. Concurrency also says installing a new version "changes nothing for running sessions until they restart; a running orchestrator then follows S-32". That conflicts with S-30's premise and with loop-settings.md:127, under which the session goes stale at install time, not at restart. One implementer has stale sessions commit handoffs into feature documents. Another forbids it and leaves no durable handoff, which repeats incident 7.
+PROPOSAL: State that writing a durable handoff is the one write a stale session makes, and name where it goes when the ledger or feature document is unavailable to it. Correct the Concurrency sentence to say that sessions become stale when the release installs and then follow S-30 or S-32.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-15, S-30 and S-31; Design, Project procedure slot (Worktree provisioning); Acceptance Criteria AC-06
+EVIDENCE: S-15: "Each sub-session works in its own worktree from an up-to-date default branch". plugins/vh-adlc/references/authority.md:92 says "Work on a feature only in its owning worktree", and :93 says that outside named roles a session must "never create, remove, prune, reset or force-move a worktree". A replacement started under S-30 and S-31, or a sub-session given an already claimed feature, has to work in that feature's existing worktree on its feature branch, not a new one from the default branch. The document also does not say who creates the worktree: the orchestrator, the host tool, or the project's `Worktree provisioning` field.
+PROPOSAL: Reword S-15 so a new work item starts in a fresh worktree from an up-to-date default branch, and a claimed feature continues in its owning worktree. Say the worktree comes from the host's tool or the project's provisioning, never one the orchestrator creates itself.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-09 and S-11; Design, Project procedure slot (Live-session limit); Context, Owner decisions Q8; Context, Owner summary (Admission bullet); Acceptance Criteria AC-04
+EVIDENCE: S-11 says to "start nothing at or above the project procedure's live-session limit". With a limit of 20 and 19 live sessions, the count is below the limit, so S-09 allows a batch of three and the host ends at 22. That is the overshoot incident 15 describes, with "about twenty workers". One implementer checks the count before the batch. Another checks that count plus batch size stays at or below the limit. The Owner summary lists "the host's live-session count" as an admission check without saying that it decides anything only when the project procedure sets a limit, since Q8 gives no default.
+PROPOSAL: Say "start no session that would bring the live count above the limit", and have the Owner summary say the count gates admission only where the project procedure sets a limit.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-08; Test Plan row AC-02 to AC-13; Test Plan row AC-16
+EVIDENCE: AC-08 requires routing a fired trigger "without a second question or a threshold of its own". S-22 covers the second question but not the threshold. The AC-02 to AC-13 proof only asserts that S-22 is present. The AC-16 manual read only checks that rules are not softened. A reference that keeps S-22 and adds "also raise a proportionality question after five rounds" in its explanation, which is R-1 F-01's defect again, passes every listed proof.
+PROPOSAL: Add the threshold clause to S-22, for example "and apply no convergence threshold of its own", or add a manual step to the AC-08 proof in which the reviewer confirms the reference defines no threshold.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Explanation the reference adds (Emergency stop, The workstream ledger, Status pass states, Admission order); Design, Project procedure slot; Design, Glossary; Design, Required sentences S-23; Acceptance Criteria AC-09, AC-14, AC-16; Test Plan
+EVIDENCE: Several rules the Design requires appear only in the explanation bullets, which no criterion or proof covers. Examples: "A sub-session about to destroy data, push to a protected branch or exhaust the host is an emergency; anything else is steered by message", "without one, the orchestrator asks the owner before the first batch", "Only the orchestrator writes it", and "The pass ends with one table of every session and every open owner question". AC-14 asserts only the eight field names, and AC-16 checks only that the rules present are worded as requirements. So a reference that leaves out the emergency-stop definition passes. Without that definition, S-23 ("interrupt only for an emergency stop") can be read in different ways, and incident 4 can recur. conventions/feature-documents.md at 0c983f67, Open questions, says user-facing terms the feature introduces "appear in a glossary row and are held to it by a criterion". "Emergency stop" is such a term and has no glossary row.
+PROPOSAL: Add an "Emergency stop" glossary row with the explanation's meaning. Either turn the ledger-location fallback, the single-writer rule and the end-of-pass table into numbered sentences, or name them in a criterion with a proof.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context, Background (Harm and simplest alternative); Scope (In scope)
+EVIDENCE: The harm statement says "The simplest alternative without machinery is a written procedure. This feature is that alternative". It names no rejected alternative. The feature adds more than a procedure: a new skill, a fourth checker operation kind (COORDINATION_OPERATIONS), changed skill counts in two guides and two tests, a lifecycle row, a version bump and a test that parses this document. A smaller written-procedure option is an "Orchestrating sub-sessions" section in plugins/vh-adlc/references/loop.md, which already holds the capacity and harm rules (loop.md:22-51) that every operation reads. That needs no new skill, operation kind or count changes. The document does not weigh it or say why a separate operation beats it. One possible reason is that an orchestrating session may run no vh-adlc operation and needs a skill to be discovered, but the document does not say so.
+PROPOSAL: Name the loop.md-section alternative in the harm statement and give the reason the separate skill beats it, or adopt that alternative.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background (Harm and simplest alternative)
+EVIDENCE: plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:75-77 at 46ccf25a: "Start Background with the harm statement from `references/loop.md`". In this document the harm statement is the last paragraph of Background, after What exists, What is missing, The incidents and Prior art.
+PROPOSAL: Move the Harm and simplest alternative paragraph to the start of Background.
 
 ## Sources
 
