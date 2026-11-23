@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "T4 and T13 are done, with the hosted checker job running the full suite and the smoke tests. Next: a revision for spec review R-15's findings before T11."
+status: draft
+status_description: "Back to draft for the revision the owner approved before T11: spec review R-15's two should-fix findings and its nits. T1 to T4 and T13 are done."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
