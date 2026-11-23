@@ -554,7 +554,23 @@ plugin removes the skill and nothing else.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 Write `plugins/vh-adlc/references/orchestrate.md` with the glossary, every required sentence
+      under its section, the explanation, the `## Orchestration` fields and the sixteen-row incident
+      table, plus the safeguard the owner moved into implementation from R-7 F-01. Add the sentence,
+      glossary, field, incident-row and adopter-term tests with their must-fail fixtures to
+      `tests/vh-adlc/check.test.ts`, and bump the version in `plugins/vh-adlc/plugin.json` and
+      `plugins/vh-adlc/.claude-plugin/plugin.json`. Done when `bun test tests/vh-adlc/check.test.ts`
+      passes, after the new tests were seen failing without the reference. AC-03 to AC-16.
+- [ ] T2 Add the request-to-orchestrate row to `plugins/vh-adlc/references/authority.md` with exactly
+      S-02's four writes, and its test in `tests/vh-adlc/check.test.ts`, which must fail when any one
+      write is missing. Done when `bun test tests/vh-adlc/check.test.ts` passes, after the row test was
+      seen failing. AC-02.
+- [ ] T3 Add `plugins/vh-adlc/skills/vh-adlc-orchestrate/SKILL.md`, the coordination kind in
+      `tests/vh-adlc/check.test.ts`, the intake row in `plugins/vh-adlc/references/lifecycle.md`, the
+      nineteen-skill count in `tests/vh-adlc/triage/discovery.test.ts`, the counts and Orchestrate row in
+      `docs/user-guides/workflows.md` and `docs/get-started/installation.md`, and the unverified entry in
+      `docs/reference/compatibility.md`. Done when `bun test tests/vh-adlc` passes, after the
+      coordination and discovery tests were seen failing. AC-01.
 
 ## Open Questions
 
