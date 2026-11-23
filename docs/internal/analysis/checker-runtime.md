@@ -244,9 +244,11 @@ load 17: 238.4 seconds on main and 234.0 on the branch, all passing on both.
   calls. Caching the scope for one operation would remove most Git calls from the docs-drift tests
   and from real runs. It changes when a newly added worktree is noticed, so it needs a decision on
   the docs-drift security model.
-- Track: settings readers run `ensure-vh-adlc.sh` once per read. Resolving the verified binary once
-  per process would remove a bash run, a hash of the binary and several helper processes from every
-  read. It changes how soon a replaced binary is noticed.
+- Done in plugin 0.30.3: settings readers ran `ensure-vh-adlc.sh` once per read. `createYAMLReader()`
+  now keeps the installer's answer for the process, keyed by offline mode, the lock's digest and the
+  environment, and hashes the binary in process before each reuse (about 4 milliseconds for the
+  7.6 MB binary). A binary whose bytes changed goes back to the installer, so a replaced binary is
+  still never run unverified.
 - Track: `closure-controller.test.ts` (709 seconds on CI) sets the lower bound of a parallel run,
   because Bun parallelizes files, not tests. Splitting its nine tests across files would lower it.
 - Track: `review-convergence.test.ts` and `owner-summary.test.ts` run the installer with
