@@ -123,7 +123,7 @@ function fixture(o: Options = {}) {
   { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: script } });
   const calls = () => readFileSync(log, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
   const resultsText = () => readFileSync(results, "utf8");
-  return { dir, run, calls, resultsText, oldPlugin, newPlugin, base, head, caseRepo: caseRepo.root };
+  return { dir, run, calls, resultsText, oldPlugin, newPlugin, base, head, caseRepo: caseRepo.root, tree: plugin.root, docs: docs.root, routes, results, script };
 }
 
 const loopDoc = (extra: string, deferred = "") => CASE_DOC.replace("## Review Log", `${extra}${deferred ? `## Deferred\n\n${deferred}\n\n` : ""}## Review Log`);
@@ -187,6 +187,21 @@ describe("X'", () => {
     expect(calls.find((c) => c.key === "old/host").loop).toContain("route: host");
     expect(git(f.caseRepo, "branch", "--list")).not.toContain("replay");
     expect(git(f.caseRepo, "log", "--oneline", "-1")).toContain("fixture");
+  });
+});
+
+describe("routes run separately", () => {
+  test("a run of one route keeps the other route's results for the same briefs", () => {
+    const f = fixture(healthy());
+    const run = (route: string) => Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin,
+      "--docs", f.docs, "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--routes-under-test", route],
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
+    expect(run("command").exitCode).toBe(0);
+    expect(run("host").exitCode).toBe(0);
+    const data = JSON.parse(/```replay-data\n([\s\S]*?)\n```/.exec(f.resultsText())![1]);
+    expect(Object.keys(data.retention).sort()).toEqual(["command", "host"]);
+    expect(Object.keys(data.firstPasses).sort()).toEqual(["new/command", "new/host", "old/command", "old/host"]);
+    expect(Object.keys(data.loops).sort()).toEqual(["new/command", "new/host", "old/command", "old/host"]);
   });
 });
 

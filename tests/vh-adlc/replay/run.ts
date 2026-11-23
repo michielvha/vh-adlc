@@ -282,9 +282,23 @@ function totals(cases: CaseData[]): string {
     `| Failing labels | | ${failing.length} | none | ${failing.length ? "no" : "yes"} |`, ""].join("\n");
 }
 
+/**
+ * Writes one case's counts, keeping the other cases. A run of some routes keeps the same case's results for
+ * the routes it did not run, when both runs used the same briefs, so the two routes can run separately.
+ */
 export function writeResults(file: string, data: CaseData) {
   const previous = existsSync(file) ? readFileSync(file, "utf8") : "";
-  const cases = [...previous.matchAll(/```replay-data\n([\s\S]*?)\n```/g)].map((m) => JSON.parse(m[1]) as CaseData).filter((c) => c.case !== data.case);
+  const all = [...previous.matchAll(/```replay-data\n([\s\S]*?)\n```/g)].map((m) => JSON.parse(m[1]) as CaseData);
+  const before = all.find((c) => c.case === data.case);
+  const cases = all.filter((c) => c.case !== data.case);
+  if (before && JSON.stringify(before.briefs) === JSON.stringify(data.briefs)) {
+    const ran = new Set([...Object.keys(data.retention), ...Object.keys(data.firstPasses).map((k) => k.split("/")[1]), ...Object.keys(data.loops).map((k) => k.split("/")[1])]);
+    const kept = <T>(entries: Record<string, T>, route: (key: string) => string) => Object.fromEntries(Object.entries(entries).filter(([key]) => !ran.has(route(key))));
+    data = { ...data,
+      firstPasses: { ...kept(before.firstPasses, (k) => k.split("/")[1]), ...data.firstPasses },
+      retention: { ...kept(before.retention, (k) => k), ...data.retention },
+      loops: { ...kept(before.loops, (k) => k.split("/")[1]), ...data.loops } };
+  }
   cases.push(data);
   cases.sort((a, b) => a.case.localeCompare(b.case));
   const header = "# Proportional review replay results\n\nCounts and run identities only, written by `tests/vh-adlc/replay/run.ts`. Case material stays in the private case directories.\n";
