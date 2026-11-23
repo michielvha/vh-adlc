@@ -726,6 +726,7 @@ None.
 | 2026-11-22 | R-9 | spec | `6abdbd3b` | n/a | n/a | accepted by owner |
 | 2026-11-22 | R-10 | spec | `d3ad7ce2` | claude-opus-5-5 | procedural | drift re-review after PR #152 and PR #155: no blocking; 1 should-fix, 3 nit; acceptance kept |
 | 2026-11-23 | R-11 | spec | `9e9236a0` | claude-opus-5-5 | procedural | no blocking; 7 should-fix, 2 nit |
+| 2026-11-23 | R-12 | spec | `28be40ab` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
 
 ### R-1
 
@@ -1504,3 +1505,26 @@ SEVERITY: nit
 WHERE: Context Background ("**Harm and simplest alternative.**" paragraph)
 EVIDENCE: vh-adlc-spec/SKILL.md:75 at the commit says "Start Background with the harm statement from `references/loop.md`". The harm statement is still the last paragraph of Background, as R-10 F-04 noted, and that finding is unapplied.
 PROPOSAL: Move the harm statement to the start of Background.
+
+### R-12
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "A run of the new brief alone reuses the old-brief passes and loops already stored, so moving the new brief reruns only the new brief"; "the results are assembled from those stored runs, so a run that stops loses no finished pass"; approval-order paragraph, "the old-brief runs stay valid because the old brief does not change"); Tasks T25; Test Plan AC-10, AC-13 and AC-17 rows; Acceptance Criteria AC-10; Context Owner summary ("builds the replay results from the stored private runs")
+EVIDENCE: This revision answers R-11 F-02 by building the reuse and the assembly (T25). But neither the Design nor T25 says how the harness decides that stored old-brief runs belong to the current old brief, and no Test Plan row names a check for either behavior. T25's done condition is only "run.test.ts passes, including a check of the totals table", and the AC-10 row does not list a reuse or assembly case. At the commit, tests/vh-adlc/replay/run.ts keeps one `briefs` object per case (line 245) and keeps earlier results only when `JSON.stringify(before.briefs) === JSON.stringify(data.briefs)` (line 295), so T25 has to replace that identity check. Suppose one implementer reuses every stored old-brief run, with no check of its plugin commit and docs revision. The old totals behind AC-11 to AC-13 and AC-17 could then mix briefs, and every proof the document names would still pass. The AC-11 brief check covers only the new brief.
+PROPOSAL: Say that a new-brief-only run reuses only stored runs whose recorded old plugin commit, docs revision, route and model match the current old brief, and refuses otherwise. Add cases to the AC-10 row and T25: a matching stored set is reused, a mismatched one is refused, and results assembled after an interrupted first-pass set keep its finished passes.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context Background ("**Harm and simplest alternative.**" paragraph, `SKILL.md:114-117`)
+EVIDENCE: This revision moved the harm paragraph to the start of Background, ahead of "Measured on `main` at `915441e8`". Its citation `SKILL.md:114-117` was taken at 915441e8, where those lines hold the remove-or-revisit rule. A reader now takes the citation at the reviewed commit. There, vh-adlc-spec/SKILL.md:112-118 is the convergence trigger in step 4, and the remove-or-add rule is at :129-131 and the revisit sentence at :136. This traces to the previous revision's move.
+PROPOSAL: Re-cite the rule at the reviewed commit (`SKILL.md:129-137`), or say the citation is at 915441e8.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary (first bullet, "a failure path is blocking or should-fix only when someone using that product would plausibly hit it"; "Validation so far: ... The replays on the fixed reviewer are still running."); frontmatter status_description ("T1 to T22 stay done; T23 and T24 continue after acceptance")
+EVIDENCE: Severity by consequence and AC-04 now say that a failure path the reviewer is unsure about is rated should-fix rather than nit or dropped (vh-adlc-reviewer.agent.md:66-67). The summary still says should-fix applies "only when someone ... would plausibly hit it". The summary's validation line mentions only the replay reruns. It leaves out that the real-reviewer S17 scenarios ran before ef685da1 and rerun under T26, and that T25 changes the harness before T23 and T24. status_description names only T23 and T24. Neither location is in the normative baseline.
+PROPOSAL: Add the uncertain-path rule to the first bullet. Name T25 and T26 as the remaining work in both the validation line and status_description.
