@@ -701,7 +701,7 @@ for the old-pin controls.
 - [ ] T23 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the enterprise case on both routes; the results show no failing label (AC-11, AC-13, AC-17)
 - [ ] T24 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the small application case and the round and growth totals over all four pairs; the results show no failing label, at most half the old total of spec reviews and body growth (AC-12, AC-13, AC-17)
 
-- [ ] T25 `tests/vh-adlc/replay/run.ts`, `tests/vh-adlc/replay/run.test.ts` - results without an Open Question condition, a recorded brief identity per route, a run of the new brief alone that reuses only a matching stored old-brief set, a fresh stored set per part and run, the launch record for pre-T25 sets, and `assemble`, which builds a case's results from its stored runs; run.test.ts passes, including the totals table, a matching and a mismatched stored set, a second run of a brief, a `--only loops` rerun, a launch record that matches, mismatches or misses a file, and assembly after an interrupted first-pass set (AC-10, AC-13, AC-17)
+- [ ] T25 `tests/vh-adlc/replay/run.ts`, `tests/vh-adlc/replay/run.test.ts` - results without an Open Question condition, a recorded identity per brief, route and part, a run of the new brief alone that reuses only a matching stored old-brief set, a fresh stored set per part and run, the launch record for pre-T25 sets, and `assemble`, which builds a case's results from its stored runs; run.test.ts passes, including the totals table, a matching and a mismatched stored set, a second run of a brief, a `--only loops` rerun, a launch record that matches, mismatches or misses a file, pre-T25 first passes followed by a post-T25 `--only loops` run, and assembly after an interrupted first-pass set (AC-10, AC-13, AC-17)
 - [ ] T26 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/claude-code/` - rerun S17.profile, S17.limit, S17.scoped, S17.scoped-command and S17.deferred-review on the fixed reviewer, and add `S17.profile.unsure`; each passes its Test Plan condition (AC-03, AC-04, AC-05, AC-14)
 
 ## Open Questions
@@ -748,6 +748,7 @@ None.
 | 2026-11-23 | R-13 | spec | `529d2648` | claude-opus-5-5 | procedural | scoped: no blocking; 2 should-fix, 1 nit |
 | 2026-11-23 | R-14 | spec | `436d91c5` | claude-opus-5-5 | procedural | scoped: no blocking; 2 should-fix, 1 nit |
 | 2026-11-23 | R-15 | spec | `9299b15b` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
+| 2026-11-23 | R-16 | spec | `06bdcac5` | claude-opus-5-5 | procedural | scoped: no blocking, no should-fix; 4 nit |
 
 ### R-1
 
@@ -1618,3 +1619,33 @@ SEVERITY: nit
 WHERE: Test Plan AC-11 row ("checks each pre-T25 set in `runs/launch-record.json` against the launch's log and the stored files' times"); Design (Replay harness, launch-record fields)
 EVIDENCE: The pre-T25 harness prints one JSON line on success with case, results, retention and loops (tests/vh-adlc/replay/run.ts:387), and on a stop only the stop message to stderr (run.ts:419). Neither names a plugin commit or docs revision. So the launch's log confirms the hand-written identity only if the operator captured the launch's command line (`--old-plugin`, `--new-plugin`, `--companion-base`, `--companion-head`), and neither the record's fields nor the row say so. R-14 F-01 raised this point and the revision added a log file field but not what the log must show. The harm is small because the old brief has only ever been one commit and the pre-T25 new-brief sets are superseded.
 PROPOSAL: Add the launch's command line to the launch-record fields, or name what in the log the implementation reviewer compares with the recorded plugin commit and docs revision.
+
+### R-16
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T25 ("a recorded brief identity per route"; its done-condition case list); Design (Replay harness, "it records its plugin commit, docs revision and model in `runs/<brief>-<route>-<part>.identity.json`"); Test Plan AC-10 row ("pre-T25 first passes followed by a post-T25 `--only loops` run keep each part's own identity")
+EVIDENCE: This traces to this revision's answer to R-15 F-01, which moved the identity file from per brief and route to per part. T25 still says "a recorded brief identity per route", which is the old key. Its done condition lists "a launch record that matches, mismatches or misses a file" and "a `--only loops` rerun" but not the new AC-10 row case where pre-T25 first passes are followed by a post-T25 `--only loops` run, which R-15 F-01 asked to add to both the row and T25. The AC-10 row and Design agree with each other, so the proof still checks the right behavior. Tasks are outside the normative baseline.
+PROPOSAL: Change T25 to "a recorded identity per brief, route and part" and add the mixed pre-T25 and post-T25 case to its done-condition list.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Replay harness, stored-set paragraph: "A new-brief-only run and `assemble` use a stored set only when its identity matches the current brief, route and model, and refuse otherwise"; and the closing sentence "A run of the new brief alone reuses the old-brief passes and loops already stored only when that recorded identity matches the current old brief and route, and refuses otherwise; `assemble` checks every stored set the same way")
+EVIDENCE: This revision added the first sentence and kept the second, so the paragraph states the reuse and assemble rule twice. The two copies differ: the first checks brief, route and model, the second only brief and route. The second's "that recorded identity" used to point at the identity-file sentence; it now follows the launch-record sentence ("the owner accepted this record on 2026-11-23"), so its antecedent reads as the launch record only. AC-10 and its row check the matching and mismatched cases either way.
+PROPOSAL: Delete the closing reuse sentence except "Moving the new brief therefore reruns only the new brief", leaving the new sentence (brief, route and model) as the single statement.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Scope ("Not handled: resuming a set stored before T25 with `--only loops`, because no such set was resumed and a loop rerun on one is made as a fresh set instead (R-15 F-01)."); Deferred D-16 ("Resume a set stored before T25 with `--only loops`."); Test Plan AC-10 row ("pre-T25 first passes followed by a post-T25 `--only loops` run keep each part's own identity")
+EVIDENCE: The limit, added by this revision, answers R-15 F-01 case (2): a pre-T25 loop part written by two pre-T25 launches, which Design now rules out as fact ("Each listed set was written by one launch"). As worded, "resuming a set stored before T25 with `--only loops`" also reads as running `--only loops` on a brief and route whose first passes were stored before T25, which is exactly the case the AC-10 row now proves is handled. Since every post-T25 run starts a fresh set, no post-T25 run resumes anything, so the limit concerns only past launches.
+PROPOSAL: Reword the Scope line and D-16 to name the past case, for example "Not handled: a loop part that two pre-T25 launches wrote, because none did and a post-T25 loop rerun starts a fresh set (R-15 F-01)."
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Replay harness, "earlier files of that part, with its identity, move to `runs-superseded/`"; "Sets stored before T25 have no identity file: `runs/launch-record.json` ... the harness counts only the listed files and refuses any other file of that set"); Scope (the R-15 F-01 limit, "a loop rerun on one is made as a fresh set instead")
+EVIDENCE: When a post-T25 run starts a fresh set for a part stored before T25, its files move aside, but its identity is an entry in the shared `runs/launch-record.json`, which the document does not say is removed or marked. Afterwards the part has both a new identity file and a launch-record entry listing moved files. A careful implementer most likely treats the identity file as governing ("Sets stored before T25 have no identity file"), but one who applies the entry would refuse the new loop files as "any other file of that set", and `assemble` would fail until the record is edited by hand. The failure is a visible refusal, not a wrong count, and it arises only if an old-brief part stored before T25 is rerun.
+PROPOSAL: Add one clause: a part with an identity file is governed by it alone, and starting a fresh set for a pre-T25 part moves its launch-record entry aside with its files.
