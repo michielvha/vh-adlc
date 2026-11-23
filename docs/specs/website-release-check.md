@@ -154,6 +154,7 @@ On 2026-11-23 the owner answered spec review R-13 in three parts. One schema fil
 | 2026-11-23 | R-11 | spec | `ed45264af49645b4c191390ccf3ca0afa4397c18` | claude-opus-5-5 | procedural | Four should-fix findings and one nit |
 | 2026-11-23 | R-12 | spec | `87e238777ec294f196f8e1a341248082b82b4b27` | claude-opus-5-5 | procedural | Five should-fix findings and two nits |
 | 2026-11-23 | R-13 | spec | `d5b0409bb8d50bae1f9f2e4c348483ddb9d70f5e` | claude-opus-5-5 | procedural | Four should-fix findings and four nits |
+| 2026-11-23 | R-14 | spec | `2f557d3ffb21001492c0f2ff28859d7705e88df2` | claude-opus-5-5 | procedural | Two should-fix findings and seven nits |
 
 ### R-1
 
@@ -586,6 +587,73 @@ SEVERITY: nit
 WHERE: Design line 72 ("`AGENTS.md` states that `bun test tests/vh-adlc` needs Linux and these prerequisites"), Tasks T13
 EVIDENCE: The full `bun test tests/vh-adlc` run in the `checker` job also depends on setup outside the smoke prerequisites: the AppArmor sysctl (`.github/workflows/ci.yml:41`), libxml2-utils for `xmllint` (`ci.yml:36`, used at `tests/vh-adlc/diagram/grade.ts:27`), the Go-built YAML reader (`ci.yml:50-51`), and GNU mv built from coreutils 9.7 (`ci.yml:59-68`). An `AGENTS.md` line that names only Linux and the smoke prerequisites would describe a command that still fails on a Linux host that has just those.
 PROPOSAL: Have `AGENTS.md` say the full selection needs the `checker` job's setup, including the smoke prerequisites, rather than only the smoke prerequisites.
+
+### R-14
+
+TARGET: 2f557d3ffb21001492c0f2ff28859d7705e88df2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-03 (line 103), Design line 65 ("honours it only when the profile's origin is a loopback address", "the report records the proxy path and version", "refuses any other version"), Context / Owner summary line 30 ("the tests' fixture CA works only for loopback origins"), Tasks T11 ("Add a non-loopback origin given a fixture CA, which must not trust it"), T12 and T13, Open Questions line 137
+EVIDENCE: This revision adds three Design behaviours that no Test Plan row proves. First, the loopback-only fixture CA appears only in T11. The AC-03 row still says only "distinguish certificate validation failure from reachability failure through the runner API with the fixture CA", and every fixture origin is `127.0.0.1` (`tests/vh-adlc/website-check/fixtures/site.ts:64,77,101`), so a runner that trusts the CA for any origin passes the row. The document also does not say what a non-loopback origin given a CA produces. "Honours it only" reads as ignore the CA and continue, while "must not trust it" also allows rejecting the run as invalid configuration, and the two have different exits and report entries. Second, nothing in the Test Plan or Tasks checks that the report records the proxy path and version, which is how the owner's R-13 answer makes a `WEBSITE_CHECK_SQUID` override visible. Third, the runner reading the playwright-core version from the plugin's `package.json` and refusing any other version has no proof. T13's done condition only observes the hosted job failing and then passing, and today the check is the hardcoded `"1.64.1"` at `plugins/vh-adlc/scripts/website-check/chromium.ts:25-26`. All three trace to the changes this revision made for R-13 F-03 and F-04.
+PROPOSAL: Add to the AC-03 row (or AC-01 for the version check) a non-loopback origin given the fixture CA with its stated outcome, a report that names the proxy path and version, including under `WEBSITE_CHECK_SQUID`, and a mismatched playwright-core version that is refused before launch. Say whether a CA with a non-loopback origin is ignored or rejected.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design line 65 ("Reuse its Playwright runtime when it is the playwright-core version the plugin pins", "The runner reads that version from `plugins/vh-adlc/scripts/website-check/package.json` and its lockfile", "The only proxy override is `WEBSITE_CHECK_SQUID`", "run with a pinned Playwright runtime and Chromium installed through documented repository setup"), Design line 72 (installed entry point), Test Plan AC-04, Tasks T12 and T13
+EVIDENCE: The Design says which version the runner accepts but not how it finds the runtime to load. At X the shipped runner loads whatever module the `WEBSITE_CHECK_PLAYWRIGHT_MODULE` environment variable names (`chromium.ts:22-27`). It accepts that module if the `package.json` next to it says 1.64.1, and it derives the Chromium executable from that module (`chromium.ts:29`). `tests/vh-adlc/website-check/fixtures/README.md` documents that variable as required setup. The Design does not mention it, though it says `WEBSITE_CHECK_SQUID` is the only proxy override and that the report records the proxy. That leaves room for different builds. One implementer keeps the environment variable in the shipped runner, unrecorded. Another resolves playwright-core from the plugin's own `package.json` install. A third resolves it from the adopter's project for an existing suite. AC-04's installed-entry proof runs "without a source checkout", and it passes with any of these, so it does not fix which one ships.
+PROPOSAL: State how the shipped runner and an existing suite locate the playwright-core module and Chromium executable, and whether `WEBSITE_CHECK_PLAYWRIGHT_MODULE` stays. If it stays, say that the report records the module path, version and browser executable, as it does for the proxy.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary lines 28 and 30, Design line 65 ("Reuse its Playwright runtime when it is the playwright-core version the plugin pins ... and refuses any other version")
+EVIDENCE: This revision limits reuse of an adopter's existing Playwright runtime to the exact version the plugin pins, with every other version refused. Renovate can bump that pin (T13). As a result, an existing suite such as Stackweaver's works only while its playwright-core matches the plugin release exactly. The Owner summary describes Stackweaver's adoption and says the shared code adds "browser event collection where an existing runner lacks it", but it does not mention the exact-version requirement. It also does not mention the retained `WEBSITE_CHECK_SQUID` override. Both are defaults and permission limits the owner is asked to accept. This traces to the change this revision made for R-13 F-04.
+PROPOSAL: Add one sentence to the Owner summary saying that an existing suite's runtime is reused only at the plugin's pinned playwright-core version, and that the one Squid path override stays and is recorded in the report.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design line 72 ("Ubuntu 24.04's Squid 6.14 passed all 14 website-check tests on 2026-11-23, on a Linux host with Bun 1.4.5, playwright-core 1.64.1 and Chromium headless shell 156 (`website-check-squid614.log` ...)"), Context / Owner summary line 34
+EVIDENCE: The cited `~/.cache/sw-handoffs/vh-adlc-website-release-check/evidence/website-check-squid614.log` exists and shows `bun test v1.4.5` with 14 pass and 0 fail across `observations.test.ts` and `confinement.test.ts`. It does not record the Ubuntu release, the Squid version, the playwright-core or Chromium versions, or the tested commit. Only the Bun version and the pass count are supported by the citation. This traces to the citation this revision added for R-13 F-05.
+PROPOSAL: Cite a log that also shows `squid -v`, the OS release, the browser version and the commit, or limit the claim to what the log shows.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design line 72 ("because the plugin's Git reads pass `--no-lazy-fetch` (`plugins/vh-adlc/scripts/git-read.ts`)"), Tasks T13
+EVIDENCE: `plugins/vh-adlc/scripts/git-read.ts` contains no `--no-lazy-fetch`. The flag is passed by its callers: `plugins/vh-adlc/scripts/docs-drift/git.ts:27` and `:131`, `docs-drift/proposals.ts:154` and `docs-drift/git-success.ts:42`. This citation was added in this revision.
+PROPOSAL: Cite `plugins/vh-adlc/scripts/docs-drift/git.ts:27` or one of the other callers instead of `git-read.ts`.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Background line 50 ("The local evidence directory is `/tmp/stackweaver-release-check.HSTmoi/`"), Background line 56 ("in the same evidence directory"), Tasks T1, T2 and T3 evidence lines
+EVIDENCE: On this host `ls /tmp/stackweaver-release-check.HSTmoi/` reports "No such file or directory". The cited files (`build.log`, `nginx-built.jsonl`, `deployed.jsonl`, `chromium-t1-red.log`, `website-ci-bun-focused.log`, `website-t3-red.log`, `website-t4-first-attempt.log`) are present in `~/.cache/sw-handoffs/vh-adlc-website-release-check/evidence/`, which Design line 72 already cites. A reader following Background line 56 to "the same evidence directory" for the T4 log will not find it.
+PROPOSAL: Point the Background and evidence citations at the handoff evidence directory, or note that the `/tmp` directory was copied there.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T11 ("must be rejected for its own reason"), Test Plan AC-03 ("one that sets a certificate authority such as `chromium.caFile`", "rejected for its own reason"), Design line 65
+EVIDENCE: Once the single schema with closed objects is in place, `chromium` is a key the schema does not define. A profile that sets `chromium.caFile` is then rejected for the same reason as the undefined-key profiles, an unknown key, and has no separate reason of its own. The row does not say whether "its own reason" means a diagnostic that names the offending key or value, or a CA-specific rejection. Tests written either way meet the text.
+PROPOSAL: Say that "its own reason" means the error names the offending key or value, such as `chromium` or `browser: webkit`.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T12 and T13, `tests/vh-adlc/website-check/fixtures/README.md`
+EVIDENCE: T12 removes `WEBSITE_CHECK_SQUID_ROOT` and `WEBSITE_CHECK_SQUID_LIB` and moves the fixture CA out of the profile. The fixtures README still tells readers to set both variables to test an unpacked Fedora Squid and says "The test uses Squid 7.5". It also says "The smoke runner installs that CA into a new temporary Chromium profile". T13 corrects the README only for the playwright-core pin claim, so these paragraphs would describe removed behaviour.
+PROPOSAL: Have T12 or T13 also update the README's Squid override paragraph, its Squid version and its CA sentence.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Open Questions line 137 ("the owner is asked to accept whatever should-fix findings it returns; those become items for the T5 and T6 replan, and only a blocking finding triggers another revision")
+EVIDENCE: Pinned `conventions/feature-documents.md` (Sections) makes any change to Scope, Design, Acceptance Criteria, Test Plan or `covers` a revision that makes earlier reviews stale and requires renewed acceptance. Should-fix findings that need Design or Test Plan text, such as F-01 and F-02 here, cannot be folded into a T5 and T6 replan without that revision. The alternative is to leave the baseline ambiguous through implementation. Tasks-only fixes, such as F-08, can go into a replan.
+PROPOSAL: Say that accepted should-fix findings that touch the normative baseline are either deferred knowingly or applied through a revision with a new review, and that only Tasks-only items go into the T5 and T6 replan.
 
 ## Sources
 
