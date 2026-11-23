@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for two owner decisions from 2026-11-23: unread response bodies and a Chromium-only delivery. Next: spec review R-10 and renewed acceptance."
+status_description: "Spec review R-10 returned four should-fix findings and two nits. Waiting on owner answers to Q1 (profile browser field) and Q2 (smoke prerequisites in CI) before one revision."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
@@ -107,9 +107,32 @@ Check explicitly configured routes on two targets: the adopter's locally served 
 
 ## Open Questions
 
-None. The owner selected report mode first and approved explicit run outcomes and bounded observation, scoped and sanitized evidence, and a separate Stackweaver adoption. Lighthouse remains outside the shared tool.
+The owner selected report mode first and approved explicit run outcomes and bounded observation, scoped and sanitized evidence, and a separate Stackweaver adoption. Lighthouse remains outside the shared tool.
 
 On 2026-11-23 the owner settled two questions raised during T4. An unfinished transfer never satisfies a required request, and adopters declare a response the page never reads as an expected response. This delivery is Chromium-only, a profile that selects Firefox is rejected before start, and Firefox support is the follow-up feature #158.
+
+### Q1: How does a profile name its browser, and what happens to keys the profile does not define?
+
+**Recommendation:** A. An optional `browser` field that defaults to `chromium` and accepts only `chromium`, with unknown keys rejected, so a misspelled or unsupported browser setting can never quietly run Chromium.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. `browser` field, unknown keys rejected** | Any other browser value, and any key the profile does not define, is invalid configuration before start. A typo such as `browsers: [firefox]` fails instead of running Chromium. | Every profile key must be in the schema, so a future field needs a schema change before adopters can use it. |
+| **B. `browser` field only** | Any value other than `chromium` is rejected. Other keys stay ignored, as `profile.ts` does today. | A misspelled key still runs Chromium without a warning. |
+| **C. No field** | Nothing to add. Firefox cannot be selected, so nothing is refused. | The Design's "a profile that selects Firefox is rejected" has no meaning, and #158 must add the field later. |
+
+**Why this is yours:** it sets how strict the adopter-facing profile format is, which every adopter's profile has to follow.
+
+### Q2: Should hosted CI install the smoke prerequisites, or should the website-check tests skip there?
+
+**Recommendation:** A. Install them in the existing `checker` job, because the confinement tests are the only proof that the browser cannot reach excluded destinations. A skip would hide a broken boundary on every pull request, and the testing convention says a missing dependency fails rather than skips green.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Prerequisites in CI** | Every push runs the confinement and observation tests. The `checker` job already lifts Ubuntu's user namespace restriction for Bubblewrap. | apt packages (socat, certutil, Squid), a pinned playwright-core with a lockfile and a Chromium headless shell download on each run. Ubuntu ships an older Squid than the tested 7.5, so the first CI run has to prove that version works or the job pins 7.5. |
+| **B. Skip without prerequisites** | No CI change. The tests run only on a Linux host set up by hand. | A boundary regression ships unless someone runs the Linux suite before each release, and green CI no longer means the smoke tests ran. |
+
+**Why this is yours:** it adds CI time and dependencies, and decides whether a release can rely on CI alone for the confinement proof.
 
 ## Review Log
 
