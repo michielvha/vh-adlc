@@ -163,6 +163,7 @@ On 2026-11-23 the owner settled two questions for the revision before T11. A fix
 | 2026-11-23 | R-14 | spec | `2f557d3ffb21001492c0f2ff28859d7705e88df2` | claude-opus-5-5 | procedural | Two should-fix findings and seven nits |
 | 2026-11-23 | R-15 | spec | `66c17b40e95ddce378a86032040e0aacba63774b` | claude-opus-5-5 | procedural | Two should-fix findings and ten nits |
 | 2026-11-23 | R-15 | spec | `66c17b40e95ddce378a86032040e0aacba63774b` | n/a | n/a | accepted by owner |
+| 2026-11-23 | R-16 | spec | `dd48a4a0beb0989353b634591ce8be7d13acc0f6` | claude-opus-5-5 | procedural | One should-fix finding and five nits |
 
 ### R-1
 
@@ -750,6 +751,52 @@ SEVERITY: nit
 WHERE: frontmatter `status_description`
 EVIDENCE: Line 3 says "Next: spec review R-14, then the owner's acceptance." The Review Log already records R-14 at `2f557d3f`, and `vh-adlc next` at X answers "spec review" because of covered drift.
 PROPOSAL: Update `status_description` to name the current pass and the owner's acceptance of its findings.
+
+### R-16
+
+TARGET: dd48a4a0beb0989353b634591ce8be7d13acc0f6
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context / Owner summary line 28 ("Neither a profile nor the shipped command can add a trusted certificate authority"), Design line 63 ("A profile cannot add trusted certificate authorities, and neither can the shipped command", "so it cannot weaken certificate validation for a real site"), Design line 66 ("Use ordinary confined HTTPS requests with normal certificate validation for explicitly selected redirect and certificate checks"), Test Plan AC-03, Open Questions line 137 ("the shipped command never takes one")
+EVIDENCE: The Design and the AC-03 row close the CA path only through the profile and the runner API's fixture CA argument. The certificate and redirect checks T6 adds run as HTTPS requests from the Bun process, like the existing upgrade probe at `plugins/vh-adlc/scripts/website-check/runner.ts:13`. That process keeps the caller's environment. Only the browser is isolated, through `--clearenv` at `chromium.ts:118`. `strings $(which bun)` on Bun 1.4.2 shows Bun reading `NODE_EXTRA_CA_CERTS` and `NODE_USE_SYSTEM_CA`, and treating `NODE_TLS_REJECT_UNAUTHORIZED === "0"` as allowUnauthorized. So the shipped command, run with one of those variables set, can trust an extra CA or skip certificate validation for the deployed certificate check, and no AC-03 case would notice. One implementer clears these variables for adapter requests, another inherits them. Both pass the AC-03 row as written.
+PROPOSAL: State that the shipped command ignores or rejects environment trust overrides (`NODE_EXTRA_CA_CERTS`, `NODE_USE_SYSTEM_CA`, `NODE_TLS_REJECT_UNAUTHORIZED`) for its own HTTPS requests. Add an AC-03 case that runs a certificate check against the fixture's untrusted certificate with those variables set and expects a certificate validation failure.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary line 32 ("The new checks for these decisions are planned and have not run yet"), Owner summary line 28, frontmatter covers
+EVIDENCE: T13 is ticked with hosted run 45230936234 attempt 2 at `08e20d61`. The CI log `ci-45230936234-attempt2-checker.log` shows playwright-core@1.64.1, Chrome Headless Shell 156.0.8078.4, "Squid Cache: Version 7.7" and git 2.56.1, and Design line 70 cites that run. The unread required body check from the same decisions ran too (`t4-unread.log`, 15 pass, and `t4-unread-mutant.log`, 1 fail). Only the `browser` field and closed schema checks (T11, T12) are unrun, so the summary misstates validation state. The summary also lists four scope changes from earlier revisions but does not point out what changed since the acceptance at `66c17b40`: a fixture CA with a non-loopback origin now rejects the run as invalid configuration, `WEBSITE_CHECK_PLAYWRIGHT_MODULE` is kept and recorded in the report, and the two plugin manifests were dropped from `covers`. This finding is outside the normative baseline apart from naming the `covers` change.
+PROPOSAL: Say which of these checks have run (the hosted prerequisites run and the unread body test) and which are still planned (T11 and T12). Add one sentence on the changes since the `66c17b40` acceptance.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T11 ("a playwright-core module whose version differs from the pin, which must be refused before launch. Observe them fail before T12"), Test Plan AC-03 ("Point `WEBSITE_CHECK_PLAYWRIGHT_MODULE` at a playwright-core whose version differs from the pin")
+EVIDENCE: At X, `plugins/vh-adlc/scripts/website-check/chromium.ts:32-38` already reads the module that `WEBSITE_CHECK_PLAYWRIGHT_MODULE` names, compares its `package.json` version with `pinnedPlaywrightVersion()` and throws "Website smoke requires playwright-core <pin>". It does this before Squid is spawned (line 96) and before Bubblewrap starts. So the mismatched module case passes as soon as T11 adds it, and T11's red step cannot be observed for it. T4 handled the same situation by saying it has no separate red step.
+PROPOSAL: Say in T11 that the mismatched module case already passes and has no separate red step, as T4 does for the unread body case.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design line 70 ("It also installs the smoke prerequisites: ... and a git of 2.44 or later", "`.github/workflows/ci.yml:96-108`", "If the first hosted run fails with the packaged Squid, pinning Squid 7.5 is a revision of this document"), Tasks T13, Open Questions line 133
+EVIDENCE: `cat -n .github/workflows/ci.yml` at X: the `checker-macos` file list is at lines 109-121. Lines 96-108 are the Bun version, the YAML reader and the typecheck steps. The `checker` job installs no git. Its "Prepare the website smoke prerequisites" step only runs `git --version` on the runner image's git and checks no minimum. The Squid 7.5 conditional is already settled: T13's evidence says run 45230936234 passed with Squid 7.7, "so no Squid 7.5 pin is needed".
+PROPOSAL: Cite `.github/workflows/ci.yml:109-121`, say the job logs the runner image's git version instead of installing git 2.44 or later, and drop or close the Squid 7.5 conditional.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design line 63 ("The runner reads that version from `plugins/vh-adlc/scripts/website-check/package.json` and its lockfile")
+EVIDENCE: `pinnedPlaywrightVersion()` at `plugins/vh-adlc/scripts/website-check/chromium.ts:15-22`, built and ticked under T13, reads only `package.json` `dependencies["playwright-core"]`. The lockfile is enforced only by `bun install --frozen-lockfile` in the CI step and the README procedure. A T12 implementer could read "reads ... and its lockfile" as a call to also parse `bun.lock`.
+PROPOSAL: Say the runner reads the pin from `package.json`, and that the frozen lockfile install keeps `bun.lock` consistent with it.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Background line 54 ("The T4 collector, implemented at `6b00d5a9` and not yet ticked"), Tasks T4 evidence ("on Ubuntu 24.04 with Squid 6.14 and Chromium headless shell 156")
+EVIDENCE: T4 is ticked at X. Also, `t4-unread.log` in the handoff evidence directory shows only "bun test v1.4.5", the 15 test names and "15 pass, 0 fail". It does not show the OS release, the Squid version, the Chromium version or the commit tested. This is the same gap R-15 F-04 raised for `website-check-squid614.log`.
+PROPOSAL: Drop "and not yet ticked", and limit the T4 unread-test evidence to what the log shows or cite a log that records the commit, the OS release, `squid -v` and the browser version.
 
 ## Sources
 
