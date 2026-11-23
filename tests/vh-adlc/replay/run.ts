@@ -283,8 +283,8 @@ function totals(cases: CaseData[]): string {
 }
 
 /**
- * Writes one case's counts, keeping the other cases. A run of some routes keeps the same case's results for
- * the routes it did not run, when both runs used the same briefs, so the two routes can run separately.
+ * Writes one case's counts, keeping the other cases. With the same briefs, a run keeps every earlier result it
+ * did not produce again, so the routes, and the first passes and loops, can run separately.
  */
 export function writeResults(file: string, data: CaseData) {
   const previous = existsSync(file) ? readFileSync(file, "utf8") : "";
@@ -292,12 +292,8 @@ export function writeResults(file: string, data: CaseData) {
   const before = all.find((c) => c.case === data.case);
   const cases = all.filter((c) => c.case !== data.case);
   if (before && JSON.stringify(before.briefs) === JSON.stringify(data.briefs)) {
-    const ran = new Set([...Object.keys(data.retention), ...Object.keys(data.firstPasses).map((k) => k.split("/")[1]), ...Object.keys(data.loops).map((k) => k.split("/")[1])]);
-    const kept = <T>(entries: Record<string, T>, route: (key: string) => string) => Object.fromEntries(Object.entries(entries).filter(([key]) => !ran.has(route(key))));
-    data = { ...data,
-      firstPasses: { ...kept(before.firstPasses, (k) => k.split("/")[1]), ...data.firstPasses },
-      retention: { ...kept(before.retention, (k) => k), ...data.retention },
-      loops: { ...kept(before.loops, (k) => k.split("/")[1]), ...data.loops } };
+    // Each entry this run produced replaces the earlier one; every other earlier entry stays.
+    data = { ...data, firstPasses: { ...before.firstPasses, ...data.firstPasses }, retention: { ...before.retention, ...data.retention }, loops: { ...before.loops, ...data.loops } };
   }
   cases.push(data);
   cases.sort((a, b) => a.case.localeCompare(b.case));

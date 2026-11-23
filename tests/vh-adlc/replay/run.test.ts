@@ -198,6 +198,10 @@ describe("routes run separately", () => {
     { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
     expect(run("command").exitCode).toBe(0);
     expect(run("host").exitCode).toBe(0);
+    // A loops-only rerun of one route keeps that route's first passes.
+    expect(Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--docs", f.docs,
+      "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--routes-under-test", "host", "--only", "loops"],
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } }).exitCode).toBe(0);
     const data = JSON.parse(/```replay-data\n([\s\S]*?)\n```/.exec(f.resultsText())![1]);
     expect(Object.keys(data.retention).sort()).toEqual(["command", "host"]);
     expect(Object.keys(data.firstPasses).sort()).toEqual(["new/command", "new/host", "old/command", "old/host"]);
