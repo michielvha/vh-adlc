@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing on feat/proportional-review: T1 to T22 done. The enterprise replay on the Claude route failed retention for 4 of 50 labels (three always-blocking defects raised only at should-fix, one should-fix defect never raised); on 2026-11-23 the owner allowed a generic reviewer fix after seeing that result, and the new-rules replays rerun on the fixed plugin. T23 and T24 in progress."
+status: draft
+status_description: "Back to draft on feat/proportional-review for an owner-requested revision (2026-11-23): AC-13 drops its Open Question count, and the revision records the reviewer fix the owner allowed after the enterprise replay. T1 to T22 stay done; T23 and T24 continue after acceptance."
 branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
