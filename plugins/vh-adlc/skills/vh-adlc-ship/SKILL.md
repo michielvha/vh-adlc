@@ -144,14 +144,15 @@ merge or repository-setting changes.
 
 This step applies when the resolved `conventions/feature-documents.md` names the product profile as the
 context for severity, which its Review log section does when it rates findings by consequence. On an
-older revision, ship runs no follow-up review and its report names none.
+older revision, skip this whole section: run nothing from it, and do not mention a follow-up review,
+Deferred verdicts or a pin change in any reply or report.
 
 It judges what the feature deferred against what was built, so it runs once the feature's PR is merged,
 whatever `bun scripts/loop/cli.ts delivery` reports. A document is `complete` before its PR merges, so
 the trigger is the merge itself: the feature's PR is merged, or the `complete` document is on the
 default branch. Ship runs it right after an authorized merge it performed. Invoked on a merged
-`complete` document, ship runs only this step; on a `complete` document whose PR is not merged, it keeps
-the normal delivery path above. The feature's writing is over: this step edits only the document's `## Deferred`
+`complete` document, ship runs only this step. On a `complete` document whose PR is not merged, it keeps
+the normal delivery path above and says nothing about this step. The feature's writing is over: this step edits only the document's `## Deferred`
 section, on its own branch, and needs no feature writer entry or handoff.
 
 1. **Verdicts.** For each entry whose `Verdict:` is `pending`, inspect the tree at the merge commit and
