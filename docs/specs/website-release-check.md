@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "T11 and T12 are done: one closed profile schema, Chromium only, and a fixture CA accepted only for loopback origins. Next: the revision before T5."
+status: draft
+status_description: "Back to draft for the revision before T5: spec review R-16 F-01, F-04 and F-05. T1 to T4 and T11 to T13 are done."
 branch: feat/website-release-check
 issue: null
 goal: "Run repeatable website release checks against a locally served production build and an owned deployed URL without a hosted scanning service."
