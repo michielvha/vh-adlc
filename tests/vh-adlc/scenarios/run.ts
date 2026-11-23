@@ -1302,6 +1302,461 @@ const CONVERGENCE_SCENARIOS: Scenario[] = [
 ];
 SCENARIOS.push(...CONVERGENCE_SCENARIOS);
 
+// ---- Proportional review (docs/specs/proportional-review.md) ----
+
+const PROPORTIONAL_CANNED = join(ROOT, "tests", "vh-adlc", "evidence", "proportional-review", "canned");
+
+// writeAgents writes the fixture project's root AGENTS.md: the docs pin and, when given, a product profile
+// and further instructions; it commits and pushes it.
+function writeAgents(f: Fixtures, sha: string, profileText?: string, extra = "") {
+  let text = `# Repository instructions\n\nRead the personal conventions at\nhttps://github.com/vhco-pro/docs/blob/${sha}/AGENTS.md\nand follow the task routes there before implementation.\n`;
+  if (profileText) text += `\n## Product profile\n\n${profileText}\n`;
+  if (extra) text += `\n${extra}`;
+  writeFileSync(join(f.project, "AGENTS.md"), text);
+  git(f.home, f.project, "add", "AGENTS.md");
+  git(f.home, f.project, "commit", "-q", "-m", "fixture: instructions", "--", "AGENTS.md");
+  git(f.home, f.project, "push", "-q", "origin", "main");
+}
+
+// commitFiles writes files into the project, commits exactly them and pushes; it returns the new commit.
+function commitFiles(f: Fixtures, files: Record<string, string>, message: string): string {
+  for (const [path, text] of Object.entries(files)) {
+    mkdirSync(join(f.project, path, ".."), { recursive: true });
+    writeFileSync(join(f.project, path), text);
+  }
+  git(f.home, f.project, "add", "--", ...Object.keys(files));
+  git(f.home, f.project, "commit", "-q", "-m", message, "--", ...Object.keys(files));
+  git(f.home, f.project, "push", "-q", "origin", "main");
+  return git(f.home, f.project, "rev-parse", "HEAD");
+}
+
+type DocParts = { goal?: string; context?: string; scope?: string; design: string; criteria?: string; plan?: string; deferred?: string; log?: string; status?: string };
+
+const BASE_CRITERIA = "- [ ] AC-01: `./greet.sh Ada` prints `Hello, Ada.`\n- [ ] AC-02: `./greet.sh Grace` prints `Hello, Grace.`\n- [ ] AC-03: `./greet.sh` with no argument prints `Hello, world.`\n";
+const BASE_PLAN = "| AC-01 | `./test.sh` |\n| AC-02 | `./test.sh` |\n| AC-03 | `./test.sh` |\n";
+const HARM =
+  "Harm: without this, people who use the greeting cannot greet anyone by name, on every run, and it does not heal. The simplest alternative without machinery, an alias per name, needs one alias for every person and is rejected for that reason.";
+
+// featureDoc builds a fixture feature document from its parts; the Review Log starts empty unless given.
+function featureDoc(p: DocParts): string {
+  return `---
+status: ${p.status ?? "draft"}
+status_description: "Fixture feature for the proportional review scenarios."
+issue: null
+goal: "${p.goal ?? "greet prints a greeting for the name it is given."}"
+covers:
+  - greet.sh
+  - test.sh
+---
+
+# Plan: Greeting with a name
+
+## Context
+
+\`greet.sh\` prints a fixed greeting (greet.sh:2).
+
+${p.context ?? HARM}
+
+## Scope
+
+${p.scope ?? "In scope: one name argument for `greet.sh`. Out of scope: more than one argument."}
+
+## Design
+
+${p.design.trim()}
+
+## Acceptance Criteria
+
+${(p.criteria ?? BASE_CRITERIA).trimEnd()}
+
+## Test Plan
+
+| Criterion | Proof |
+| --- | --- |
+${(p.plan ?? BASE_PLAN).trimEnd()}
+
+## Tasks
+
+None yet.
+
+## Open Questions
+
+None.
+${p.deferred ? `\n## Deferred\n\n${p.deferred.trimEnd()}\n` : ""}
+## Review Log
+
+| Date | Review | Kind | Commit | Model | Isolation | Outcome |
+| --- | --- | --- | --- | --- | --- | --- |
+${p.log ?? ""}`;
+}
+
+// writeDoc replaces the fixture feature document with text, commits and pushes; it returns the commit.
+function writeDoc(f: Fixtures, text: string, message = "fixture: feature document"): string {
+  return commitFiles(f, { [FEATURE_PATH]: text }, message);
+}
+
+// recordReview adds a spec review row at commit, after the existing rows, and its records at the end of the
+// document; it commits and pushes.
+function recordReview(f: Fixtures, id: string, commit: string, records: string, outcome = "Fixture review."): string {
+  const path = join(f.project, FEATURE_PATH);
+  const header = "| --- | --- | --- | --- | --- | --- | --- |\n";
+  const [head, tail] = readFileSync(path, "utf8").split(header);
+  const rows = tail.match(/^(\|[^\n]*\n)*/)?.[0] ?? "";
+  const row = `| 2026-11-20 | ${id} | spec | \`${commit.slice(0, 7)}\` | fixture-reviewer | procedural | ${outcome} |\n`;
+  writeFileSync(path, `${head}${header}${rows}${row}${tail.slice(rows.length)}`.replace(/\n*$/, "\n") + `\n### ${id}\n\n${records.trim()}\n`);
+  git(f.home, f.project, "commit", "-q", "-m", `fixture: record ${id}`, "--", FEATURE_PATH);
+  git(f.home, f.project, "push", "-q", "origin", "main");
+  return git(f.home, f.project, "rev-parse", "HEAD");
+}
+
+type Finding = { id: string; kind: string; severity: string; where: string; evidence: string; proposal: string; text: string };
+
+// passRecords returns the stored records under `### <id>`.
+function passRecords(doc: string, id: string): string {
+  return doc.split(new RegExp(`^### ${id}$`, "m"))[1]?.split(/^### R-\d+$|^## /m)[0] ?? "";
+}
+
+function findings(records: string): Finding[] {
+  return records
+    .split(/^(?=FINDING: )/m)
+    .filter((b) => b.startsWith("FINDING: "))
+    .map((b) => {
+      const field = (n: string) => b.match(new RegExp(`^${n}: (.*)$`, "m"))?.[1]?.trim() ?? "";
+      return { id: field("FINDING"), kind: field("KIND"), severity: field("SEVERITY"), where: field("WHERE"), evidence: field("EVIDENCE"), proposal: field("PROPOSAL"), text: b };
+    });
+}
+
+const SEVERITY_RANK: Record<string, number> = { nit: 1, "should-fix": 2, blocking: 3 };
+
+// The lock gap: a finding about concurrent writers to names.log.
+const LOCK_GAP = (x: Finding) => /names\.log/.test(x.text) && /(lock|concurren|parallel|simultaneous|interleav|race|atomic|at the same time|same time|two runs|torn)/i.test(x.text);
+
+// RAISES_LOCK_GAP is stricter: the finding's proposal asks for something about concurrent writers to
+// names.log. A clause of the proposal that names a limit (quoting the stated limit, or offering to state one)
+// does not count, so a finding that only refers to the stated limit is not one that raises the gap.
+const RAISES_LOCK_GAP = (x: Finding) =>
+  /names\.log/.test(x.text) && /(lock|serializ|atomic|concurren|parallel|interleav|flock|O_APPEND|one writer|single writer|per-job|separate (log|file))/i.test(x.proposal.replace(/[^.;,]*\blimit\b[^.;,]*/gi, ""));
+
+function strongest(list: Finding[]): string {
+  return list.reduce((best, x) => ((SEVERITY_RANK[x.severity] ?? 0) > (SEVERITY_RANK[best] ?? 0) ? x.severity : best), "absent");
+}
+
+function describeFindings(list: Finding[]): string {
+  return list.map((x) => `${x.id} ${x.severity} [${x.where}] ${x.evidence.slice(0, 160)}`).join(" | ") || "no findings";
+}
+
+// The first spec review this session stored: the lowest `### R-<n>` the fixture did not seed.
+function newPass(doc: string, seeded: number): { id: string; records: string } {
+  const id = `R-${seeded + 1}`;
+  return { id, records: passRecords(doc, id) };
+}
+
+// passNote describes the findings of the first pass the session stored, for the scenario summary.
+function passNote(f: Fixtures, seeded: number): string {
+  const doc = existsSync(join(f.project, FEATURE_PATH)) ? readFileSync(join(f.project, FEATURE_PATH), "utf8") : "";
+  const pass = newPass(doc, seeded);
+  return `${pass.id} findings: ${describeFindings(findings(pass.records))}`;
+}
+
+const RECORD_ONLY = "This run only records the review: store the reviewer's records as the procedure says, then stop without revising the document or raising questions.";
+
+// ---- S17.profile ----
+
+const PROFILE_DOC = featureDoc({
+  goal: "greet prints a greeting for the name it is given and keeps a list of the names it greeted.",
+  scope: "In scope: one name argument for `greet.sh`, and the list of greeted names. Out of scope: more than one argument.",
+  design:
+    "`greet.sh <name>` prints `Hello, <name>.`; `greet.sh` with no argument keeps printing `Hello, world.`\n\nEvery run also appends the name it greeted, or `world`, as one line to the shared file `names.log` in the working directory. It opens the file in append mode and takes no lock.",
+  criteria: `${BASE_CRITERIA}- [ ] AC-04: after \`./greet.sh Ada\`, the last line of \`names.log\` is \`Ada\`.\n`,
+  plan: `${BASE_PLAN}| AC-04 | \`./test.sh\`, extended to run \`./greet.sh Ada\` and check the last line of \`names.log\` |\n`,
+});
+
+const PROFILES: Record<string, string> = {
+  single: "greet is a small shell script that one person runs by hand on their own laptop, one run at a time; no other program calls it. It is a personal tool at alpha. At stake: only that person's own list of greeted names, which they can rebuild from memory.",
+  hosted: "greet runs inside a hosted greeting service: the service runs `greet.sh` for many tenants at once on shared hosts, with many runs in parallel. It is in production with paying tenants. At stake: each tenant's greeting history and the service's availability.",
+};
+
+function profileScenario(id: string, title: string, variant: "single" | "hosted" | "none", pin: "companion" | "convergence"): Scenario {
+  return {
+    id,
+    title,
+    phase: 4,
+    run: async (f) => {
+      writeAgents(f, pin === "companion" ? f.revisionCompanion : f.revisionConvergence, variant === "none" ? undefined : PROFILES[variant]);
+      writeDoc(f, PROFILE_DOC, "fixture: a feature that appends to a shared file");
+      const turns = session(f, [f.pluginA], [`/vh-adlc-spec review ${FEATURE_PATH}. ${RECORD_ONLY}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        notes: [passNote(f, 0)],
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const pass = newPass(doc, 0);
+          const all = findings(pass.records);
+          const gap = strongest(all.filter(LOCK_GAP));
+          const knowledge = c.log().filter((x) => words(x.args)[0] === "knowledge" && x.json?.result === "answered").map((x) => x.json?.knowledge?.revision);
+          const expected = pin === "companion" ? f.revisionCompanion : f.revisionConvergence;
+          const lowered = variant === "single" && pin === "companion";
+          return [
+            { name: "every answered knowledge call resolved the fixture's pin", ok: knowledge.length > 0 && knowledge.every((r) => r === expected), detail: knowledge.join(", ") },
+            { name: "a review pass was stored with records", ok: pass.records.trim() !== "", detail: pass.id },
+            lowered
+              ? { name: "the lock gap on names.log is nit or absent under the single-person profile", ok: gap === "nit" || gap === "absent", detail: `${gap}: ${describeFindings(all)}` }
+              : { name: `the lock gap on names.log is should-fix or blocking (${variant === "none" ? "no profile" : variant === "hosted" ? "hosted multi-tenant profile" : "old pin, despite the profile"})`, ok: gap === "should-fix" || gap === "blocking", detail: `${gap}: ${describeFindings(all)}` },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  };
+}
+
+// ---- S17.limit ----
+
+const LIMIT_PROFILE =
+  "greet is an internal command-line tool on a shared build host, where parallel build jobs run it at the same time. It is at alpha. At stake: the greetings users save on the host, and the build host's diagnostic logs.";
+
+const LIMIT_F01 = "FINDING: F-01\nKIND: judgement\nSEVERITY: should-fix\nWHERE: Design\nEVIDENCE: Parallel build jobs append to names.log at the same time and Design takes no lock, so lines from concurrent writers can interleave.\nPROPOSAL: Take a lock around each append, or state the limit.";
+const LIMIT_F02 = "FINDING: F-02\nKIND: factual\nSEVERITY: blocking\nWHERE: Design\nEVIDENCE: `DELETE /greetings/<name>` removes a user's saved greeting and Design checks no session, so any caller on the host network can delete any user's greeting.\nPROPOSAL: Require a valid session that owns the greeting before deleting it.";
+
+const LIMIT_LINE = "Not handled: concurrent writers to names.log, accepted for this version (R-1 F-01).";
+const DELETE_LINE = "Not handled: callers without a session on the delete endpoint, internal tool (R-1 F-02).";
+
+function limitScenario(id: string, title: string, variant: "limit" | "nolimit" | "security"): Scenario {
+  return {
+    id,
+    title,
+    phase: 4,
+    run: async (f) => {
+      writeAgents(f, f.revisionCompanion, LIMIT_PROFILE);
+      commitFiles(f, { "build.sh": "#!/bin/sh\nrm -f names.log\n./test.sh\n" }, "fixture: the build step that starts names.log afresh");
+      // R-1 reviewed a draft on an abandoned branch, so its commit is not an ancestor of the reviewed commit
+      // and the session's pass is full.
+      git(f.home, f.project, "branch", "abandoned-draft");
+      git(f.home, f.worktree, "checkout", "-q", "abandoned-draft");
+      writeFileSync(join(f.worktree, "DRAFT.md"), "An abandoned draft.\n");
+      git(f.home, f.worktree, "add", "DRAFT.md");
+      git(f.home, f.worktree, "commit", "-q", "-m", "fixture: abandoned draft", "--", "DRAFT.md");
+      const abandoned = git(f.home, f.worktree, "rev-parse", "HEAD");
+      git(f.home, f.worktree, "checkout", "-q", OTHER_FEATURE_BRANCH);
+      const security = variant === "security";
+      const design = [
+        "`greet.sh <name>` prints `Hello, <name>.`; `greet.sh` with no argument keeps printing `Hello, world.`",
+        "Every run appends the name it greeted as one line to `names.log` in the build's working directory. `names.log` is a diagnostic log: `build.sh` deletes it at the start of every build (build.sh:2), and nothing reads it after the build.",
+        ...(security ? ["`greet.sh serve` answers `DELETE /greetings/<name>` on the build host's port 8080 and removes that user's saved greeting from `greetings/<name>`."] : []),
+      ].join("\n\n");
+      const scope = [
+        "In scope: one name argument for `greet.sh`, the diagnostic `names.log`" + (security ? ", and deleting a saved greeting." : ".") + " Out of scope: more than one argument.",
+        ...(variant === "nolimit" ? [] : [LIMIT_LINE]),
+        ...(security ? [DELETE_LINE] : []),
+      ].join("\n\n");
+      writeDoc(
+        f,
+        featureDoc({
+          goal: security ? "greet prints a greeting for the name it is given, and a user can delete their saved greeting." : "greet prints a greeting for the name it is given.",
+          context: `${HARM} Without \`names.log\`, someone debugging a failed build cannot tell which names that build greeted; reading the job output, the alternative, loses the names once the job log rotates.`,
+          scope,
+          design,
+          log: `| 2026-11-20 | R-1 | spec | \`${abandoned.slice(0, 7)}\` | fixture-reviewer | procedural | ${security ? "Two findings." : "One finding."} |\n\n### R-1\n\n${LIMIT_F01}\n${security ? `\n${LIMIT_F02}\n` : ""}`,
+        }),
+        "fixture: a document with stated limits",
+      );
+      const turns = session(f, [f.pluginA], [`/vh-adlc-spec review ${FEATURE_PATH}. ${RECORD_ONLY}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        notes: [passNote(f, 1)],
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const pass = newPass(doc, 1);
+          const all = findings(pass.records);
+          const gap = all.filter(RAISES_LOCK_GAP);
+          const checks: Check[] = [{ name: "a full review pass was stored with records", ok: pass.records.trim() !== "", detail: pass.id }];
+          if (variant === "limit") checks.push({ name: "no finding names names.log concurrency", ok: gap.length === 0, detail: describeFindings(all) });
+          if (variant === "nolimit") checks.push({ name: "without the stated limit, a finding raises the names.log gap", ok: gap.length > 0, detail: describeFindings(all) });
+          if (variant === "security") {
+            const quoted = all.filter((x) => x.severity === "blocking" && x.evidence.includes("callers without a session on the delete endpoint"));
+            checks.push({ name: "a blocking finding quotes the delete endpoint's stated limit", ok: quoted.length > 0, detail: describeFindings(all) });
+          }
+          checks.push(unrelatedIntact(c));
+          return checks;
+        },
+      };
+    },
+  };
+}
+
+// ---- S17.scoped ----
+
+const SCOPED_PROFILE =
+  "greet is an internal command-line tool a few developers run on a shared build host, where parallel build jobs run it at the same time. It is at alpha. At stake: the host's diagnostic logs, which are rebuilt each day, and the deploy token in the host's `.env`, which must never leave the host.";
+
+function scopedDoc(changed: boolean): string {
+  const greeting = changed
+    ? "`greet.sh <name>` prints `Hello, <name>.`; `greet.sh` with no argument keeps printing `Hello, world.` A name longer than 64 characters is cut to its first 64 characters before it is printed."
+    : "`greet.sh <name>` prints `Hello, <name>.`; `greet.sh` with no argument keeps printing `Hello, world.`";
+  return featureDoc({
+    goal: "greet prints a greeting for the name it is given, keeps a diagnostic list of names, and helps developers debug a job.",
+    scope: "In scope: one name argument for `greet.sh`, the diagnostic `names.log` and a `--debug` flag. Out of scope: more than one argument.",
+    design: [
+      `### Greeting\n\n${greeting}`,
+      "### Log\n\nParallel jobs on the build host run `greet.sh` at the same time, and every run appends the name it greeted as one line to `names.log`, a diagnostic log rebuilt each day. The appends take no lock.",
+      "### Debug output\n\n`greet.sh --debug <name>` prints the greeting, then every line of the build host's `.env`, including `DEPLOY_TOKEN`, so a developer can see the environment the job ran with. Build jobs keep their output in the shared job log.",
+    ].join("\n\n"),
+    criteria: `${BASE_CRITERIA}- [ ] AC-04: after \`./greet.sh Ada\`, the last line of \`names.log\` is \`Ada\`.\n- [ ] AC-05: \`./greet.sh --debug Ada\` prints \`Hello, Ada.\` followed by every line of \`.env\`.\n`,
+    plan: `${BASE_PLAN}| AC-04 | \`./test.sh\`, extended to check the last line of \`names.log\` |\n| AC-05 | \`./test.sh\`, extended to compare the \`--debug\` output with \`.env\` |\n`,
+  });
+}
+
+// seedScoped builds the scoped re-review fixture: a document reviewed clean at X0, then one changed Design
+// paragraph at X1. It returns X1.
+function seedScoped(f: Fixtures, pin: string, loop?: string): string {
+  writeAgents(f, pin, SCOPED_PROFILE);
+  if (loop) commitFiles(f, { ".vh-adlc/loop.yaml": loop }, "fixture: loop settings");
+  const x0 = writeDoc(f, scopedDoc(false), "fixture: the reviewed document");
+  recordReview(f, "R-1", x0, "NO FINDINGS", "Clean.");
+  const path = join(f.project, FEATURE_PATH);
+  const before = scopedDoc(false).split("## Review Log")[0];
+  const after = scopedDoc(true).split("## Review Log")[0];
+  writeFileSync(path, readFileSync(path, "utf8").replace(before, after));
+  git(f.home, f.project, "commit", "-q", "-m", "fixture: cut long names in the greeting", "--", FEATURE_PATH);
+  git(f.home, f.project, "push", "-q", "origin", "main");
+  return git(f.home, f.project, "rev-parse", "HEAD");
+}
+
+// The changed paragraph: cutting long names.
+const CHANGED = (x: Finding) => /64|long(er)? name|cut to|truncat|Greeting/i.test(`${x.where} ${x.evidence} ${x.proposal}`);
+const SECRET = (x: Finding) => /\.env|DEPLOY_TOKEN|token|secret|credential|--debug/i.test(x.text);
+
+function scopedChecks(all: Finding[]): Check[] {
+  const others = all.filter((x) => x.severity !== "blocking");
+  return [
+    { name: "apart from blocking findings, every finding names the changed paragraph or a section stating its terms", ok: others.every(CHANGED), detail: describeFindings(others.filter((x) => !CHANGED(x))) },
+    { name: "no finding names the unchanged names.log gap", ok: !all.some(LOCK_GAP), detail: describeFindings(all.filter(LOCK_GAP)) },
+    { name: "the unchanged secret exposure is still raised as blocking", ok: all.some((x) => x.severity === "blocking" && SECRET(x)), detail: describeFindings(all) },
+  ];
+}
+
+function scopedScenario(id: string, title: string, pin: "companion" | "convergence"): Scenario {
+  return {
+    id,
+    title,
+    phase: 4,
+    run: async (f) => {
+      const x1 = seedScoped(f, pin === "companion" ? f.revisionCompanion : f.revisionConvergence);
+      const turns = session(f, [f.pluginA], [`/vh-adlc-spec review ${FEATURE_PATH}. ${RECORD_ONLY}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        notes: [`Reviewed commit X1: ${x1.slice(0, 7)}`, passNote(f, 1)],
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const pass = newPass(doc, 1);
+          const all = findings(pass.records);
+          const checks: Check[] = [{ name: "a review pass was stored with records", ok: pass.records.trim() !== "", detail: pass.id }];
+          if (pin === "companion") checks.push(...scopedChecks(all));
+          else checks.push({ name: "on the old pin the unchanged names.log gap is raised", ok: all.some(LOCK_GAP), detail: describeFindings(all) });
+          checks.push(unrelatedIntact(c));
+          return checks;
+        },
+      };
+    },
+  };
+}
+
+
+// ---- S17.scoped-command ----
+
+// The Codex command route for spec review, with the argv of Stackweaver's loop settings.
+const CODEX_LOOP = `schema_version: 1
+roles:
+  spec_reviewer:
+    route: command
+    model: gpt-6.2-sol
+    model_attestation: codex-session
+    argv:
+      - unshare
+      - --user
+      - --map-current-user
+      - --pid
+      - --fork
+      - --kill-child
+      - --mount-proc
+      - '--'
+      - npm
+      - exec
+      - --yes
+      - --ignore-scripts
+      - --package=@openai/codex@0.170.0
+      - '--'
+      - codex
+      - exec
+      - --json
+      - -c
+      - 'model_reasoning_effort="medium"'
+      - -c
+      - 'service_tier="default"'
+      - --skip-git-repo-check
+      - -s
+      - read-only
+      - -m
+      - "{model}"
+      - "{prompt}"
+`;
+
+// fixtureBinary is the logging wrapper the fixture plugin's installer verified into the fixture cache.
+function fixtureBinary(f: Fixtures, plugin = f.pluginA): string {
+  const r = Bun.spawnSync(["bash", join(plugin, "scripts", "ensure-vh-adlc.sh")], { env: { HOME: f.home, XDG_CACHE_HOME: join(f.home, ".cache"), PATH: "/usr/bin:/bin", LC_ALL: "C" }, stdout: "pipe", stderr: "pipe" });
+  if (r.exitCode !== 0) throw new Error(`the fixture installer failed: ${r.stderr.toString()}`);
+  return r.stdout.toString().trim();
+}
+
+const SCOPED_COMMAND: Scenario = {
+  id: "S17.scoped-command",
+  title: "A scoped re-review through the review command on a Codex command route",
+  phase: 4,
+  run: async (f) => {
+    const x1 = seedScoped(f, f.revisionCompanion, CODEX_LOOP);
+    const cliPath = join(f.pluginA, "scripts", "loop", "cli.ts");
+    const scope = JSON.parse(Bun.spawnSync([process.execPath, cliPath, "review-scope", "--repo", f.project, "--document", FEATURE_PATH, "--commit", x1], { stdout: "pipe" }).stdout.toString() || "{}");
+    // No Claude session: the review command runs the Codex CLI with the real HOME, where it is logged in. The
+    // docs cache stays in the fixture home, which the reviewer inherits through XDG_CACHE_HOME.
+    const r = Bun.spawnSync(
+      [process.execPath, cliPath, "review", "--repo", f.project, "--document", FEATURE_PATH, "--commit", x1, "--kind", "spec", "--docs-revision", f.revisionCompanion, "--binary", fixtureBinary(f), "--plugin-pin", f.revisionA],
+      { cwd: f.project, env: { ...process.env, XDG_CACHE_HOME: join(f.home, ".cache") }, stdout: "pipe", stderr: "pipe", timeout: 2_400_000 },
+    );
+    let out: Record<string, any> = {};
+    try {
+      out = JSON.parse(r.stdout.toString().trim().split("\n").at(-1) ?? "{}");
+    } catch {}
+    const all = findings(String(out.records ?? ""));
+    return {
+      turns: [],
+      notes: [
+        `review command: exit ${r.exitCode}, status ${out.status ?? "none"}, model ${out.model ?? "none"}, target ${String(out.target ?? "").slice(0, 7)}${out.reason ? `, reason: ${out.reason}` : ""}`,
+        `scope: ${scope.full ? `full (${scope.reason})` : `scoped since ${String(scope.previous).slice(0, 7)}`}`,
+        `findings: ${describeFindings(all)}`,
+        ...(r.exitCode !== 0 && !out.status ? [`stderr: ${redactPaths(r.stderr.toString(), f).slice(0, 1500)}`] : []),
+      ],
+      checks: (c) => [
+        { name: "review-scope gives a scoped re-review since the clean pass", ok: scope.full === false && typeof scope.previous === "string" && scope.previous.length === 40 },
+        { name: "the review command returned ready records on the Codex route, attested as the configured model", ok: out.status === "ready" && out.model === "gpt-6.2-sol" && String(x1).startsWith(String(out.target ?? "-")) },
+        ...scopedChecks(all),
+        unrelatedIntact(c),
+      ],
+    };
+  },
+};
+
+const PROPORTIONAL_SCENARIOS: Scenario[] = [
+  profileScenario("S17.profile.single", "A single-person profile lowers the lock gap to a nit or less", "single", "companion"),
+  profileScenario("S17.profile.hosted", "A hosted multi-tenant profile keeps the lock gap at should-fix or blocking", "hosted", "companion"),
+  profileScenario("S17.profile.none", "Without a profile the lock gap is rated as for production software", "none", "companion"),
+  limitScenario("S17.limit.stated", "A stated limit answers its finding on a full pass", "limit"),
+  limitScenario("S17.limit.nolimit", "Control: without the stated limit the names.log gap is raised", "nolimit"),
+  limitScenario("S17.limit.security", "Control: a stated limit that leaves a security defect is blocking", "security"),
+  scopedScenario("S17.scoped", "A scoped re-review on the host route covers only the change and blocking findings", "companion"),
+  SCOPED_COMMAND,
+];
+SCENARIOS.push(...PROPORTIONAL_SCENARIOS);
+
 // ---- Phase 6: review ----
 
 const EXPECTED_VERDICTS: Record<string, string> = { "AC-01": "met", "AC-02": "not met", "AC-03": "untested", "AC-04": "not verified" };

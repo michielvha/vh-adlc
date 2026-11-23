@@ -71,6 +71,17 @@ describe("docs fixture", () => {
     expect(standard.out).toContain("- should-fix: two careful implementers would build different things");
     expect(standard.out).toContain("Every trade-off the document settles is an open question");
   });
+
+  test("the companion revision holds the vhco-pro/docs tree with severity by consequence for the proportional review scenarios", () => {
+    expect(f.revisionCompanion).toMatch(/^[0-9a-f]{40}$/);
+    expect(f.revisionCompanion).not.toBe(f.revisionConvergence);
+    const standard = sh(f.docs, "git", "show", `${f.revisionCompanion}:conventions/feature-documents.md`);
+    expect(standard.code).toBe(0);
+    expect(standard.out).toContain("This is severity by consequence");
+    expect(standard.out).toContain("## Product profile");
+    expect(standard.out).toContain("## Deferred");
+    expect(standard.out).not.toContain("Every trade-off the document settles is an open question");
+  });
 });
 
 describe("project fixture", () => {

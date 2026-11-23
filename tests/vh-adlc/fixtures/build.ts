@@ -47,6 +47,7 @@ export type Fixtures = {
   revisionD: string;
   revisionPrevious: string;
   revisionConvergence: string;
+  revisionCompanion: string;
   project: string;
   origin: string;
   worktree: string;
@@ -120,8 +121,14 @@ const PREVIOUS_DOCS_PIN = "d8f07c9dd69038375a535af8ad586086688f85ab";
 // scenarios (docs/specs/proportional-review.md) pin a fixture project to its tree.
 export const CONVERGENCE_DOCS_PIN = "0c983f6793bfe35eb96ae95ad0c361c6200af44f";
 
+// COMPANION_DOCS_PIN is the vhco-pro/docs revision that holds proportional review's convention: severity by
+// consequence for the product profile, stated limits, scoped re-review and the Deferred section. The
+// proportional review scenarios pin a fixture project to its tree; the pin bump moves this constant to the
+// merged revision.
+export const COMPANION_DOCS_PIN = "0fa68d68db3e65585f505e86f4850d883d6ef1d7";
+
 // The docs fixture: revision A is the real vhco-pro/docs tree at the plugin pin.
-function buildDocs(home: string, dir: string): { a: string; b: string; c: string; d: string; previous: string; convergence: string } {
+function buildDocs(home: string, dir: string): { a: string; b: string; c: string; d: string; previous: string; convergence: string; companion: string } {
   initRepo(home, dir);
   git(home, dir, "fetch", "-q", "--depth", "1", "https://github.com/vhco-pro/docs", pin());
   git(home, dir, "read-tree", "-u", "--reset", "FETCH_HEAD");
@@ -164,8 +171,14 @@ function buildDocs(home: string, dir: string): { a: string; b: string; c: string
   git(home, dir, "read-tree", "-u", "--reset", "FETCH_HEAD");
   git(home, dir, "commit", "-q", "-m", "docs convergence pin (vhco-pro/docs before proportional review)");
   const convergence = git(home, dir, "rev-parse", "HEAD");
+  // The companion revision is the real docs tree at COMPANION_DOCS_PIN, on its own root.
+  git(home, dir, "checkout", "-q", "--orphan", "companion-pin");
+  git(home, dir, "fetch", "-q", "--depth", "1", "https://github.com/vhco-pro/docs", COMPANION_DOCS_PIN);
+  git(home, dir, "read-tree", "-u", "--reset", "FETCH_HEAD");
+  git(home, dir, "commit", "-q", "-m", "docs companion pin (vhco-pro/docs with proportional review)");
+  const companion = git(home, dir, "rev-parse", "HEAD");
   git(home, dir, "checkout", "-q", "-f", "main");
-  return { a, b, c, d, previous, convergence };
+  return { a, b, c, d, previous, convergence, companion };
 }
 
 const FEATURE = `---
@@ -333,7 +346,7 @@ export function build(dir: string): Fixtures {
   const work = join(dir, "work");
   mkdirSync(work);
   const docs = join(dir, "docs");
-  const { a, b, c, d, previous, convergence } = buildDocs(home, docs);
+  const { a, b, c, d, previous, convergence, companion } = buildDocs(home, docs);
   const project = join(dir, "project");
   const origin = join(dir, "origin.git");
   const worktree = join(dir, "project-other-work");
@@ -349,7 +362,7 @@ export function build(dir: string): Fixtures {
   const pluginB = join(dir, "plugin-b");
   fixturePlugin(pluginA, a, wrapper, home, version, work);
   fixturePlugin(pluginB, b, wrapper, home, version, work);
-  return { dir, docs, revisionA: a, revisionB: b, revisionC: c, revisionD: d, revisionPrevious: previous, revisionConvergence: convergence, project, origin, worktree, otherPlugin, pluginA, pluginB, home, log, wrapper };
+  return { dir, docs, revisionA: a, revisionB: b, revisionC: c, revisionD: d, revisionPrevious: previous, revisionConvergence: convergence, revisionCompanion: companion, project, origin, worktree, otherPlugin, pluginA, pluginB, home, log, wrapper };
 }
 
 if (import.meta.main) {
