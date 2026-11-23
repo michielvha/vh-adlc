@@ -703,6 +703,7 @@ None.
 | 2026-11-22 | R-9 | spec | `6abdbd3b` | claude-opus-5-5 | procedural | no blocking; 4 should-fix, 1 nit |
 | 2026-11-22 | R-9 | spec | `6abdbd3b` | n/a | n/a | accepted by owner |
 | 2026-11-22 | R-10 | spec | `d3ad7ce2` | claude-opus-5-5 | procedural | drift re-review after PR #152 and PR #155: no blocking; 1 should-fix, 3 nit; acceptance kept |
+| 2026-11-23 | R-11 | spec | `9e9236a0` | claude-opus-5-5 | procedural | no blocking; 7 should-fix, 2 nit |
 
 ### R-1
 
@@ -1416,3 +1417,68 @@ SEVERITY: nit
 WHERE: Context Background ("**Harm and simplest alternative.**" paragraph)
 EVIDENCE: PR #152 added the spec skill rule "Start Background with the harm statement from `references/loop.md`" (vh-adlc-spec/SKILL.md:75-77 at d3ad7ce2). It also added the loop.md alternative "waiting for a later milestone" and the reviewer check "Weigh the design against its harm statement ... the simplest alternative without machinery it rejected" (vh-adlc-reviewer.agent.md:47-51). In this document the harm statement comes at the end of Background, not the start. The alternative it rejects is "a process rule alone", backed by round counts taken before #152's convergence trigger and #141's author-cut exception merged. Both of those are process rules and are now in force. The statement does not weigh waiting to measure their effect before building review-scope, the follow-up review and the replay harness. The replay partly answers this: its old brief is the plugin at the merge base, so it already includes #152 and #141, and AC-13 compares against them. The reviewer rates this check nit because the document is past `draft`.
 PROPOSAL: At the next revision, move the harm statement to the start of Background and add one sentence explaining why the merged convergence trigger and author-cut exception are not enough alone, citing the replay's old brief as the measure.
+
+### R-11
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Replay harness, results paragraph: "labels raised per run by ID and severity, rounds to clean, questions raised, body size per pass"); Scope (Out of scope, "Counting the Open Questions the author raises in the replay loops"); Context Owner summary ("the question rule is proved by scenario, not counted in the loops"); Acceptance Criteria AC-13; Test Plan AC-13 row; Tasks T23, T24; Deferred D-15
+EVIDENCE: This revision drops the Open Question count from AC-13, its Test Plan row, Rounds and T24. The built harness, a covered path, still makes it a pass condition. tests/vh-adlc/replay/run.ts at the commit has `totals()` emit "| Open Questions | ${oldQ} | ${newQ} | new fewer than old | ${newQ < oldQ ? "yes" : "no"} |" next to the spec review and growth conditions. `renderCase` writes an "Open Questions" column per loop, and live.ts:117-122 counts increases between commits. The new Scope line says that count "reads zero", so the published results.md would show "Met: no" for a condition the document no longer has. The Design's results paragraph still lists "questions raised". No unchecked task changes the harness. T23 and T24 write results.md with the harness as it is.
+PROPOSAL: Remove the Open Questions condition and column from the harness totals and results (or keep the count as information only, with no Condition or Met cell), drop "questions raised" from the Design's results paragraph, and add a new task with a run.test.ts case that checks the totals table.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "Every counted pass, its verdicts and every loop's documents are stored in the case directory as they finish, and the results are assembled from those stored runs, so a run that stops loses no finished pass"); Design (Replay harness, approval-order paragraph, "The new brief then moves to the fixed plugin and every new-brief run repeats; the old-brief runs stay valid because the old brief does not change"); Design (Replay harness, "Both briefs are fixed before the first run, apart from that one owner-allowed move of the new brief"); Context Owner summary ("every new-rules run repeats on the fixed plugin"); Acceptance Criteria AC-10; Test Plan AC-10 row
+EVIDENCE: Both sentences were added by this revision, and the built harness does neither. In tests/vh-adlc/replay/run.ts `runCase` always runs `await pass("old", FIRST_PASSES.old)` before the new passes, and old loops too. It writes passes and loop documents to `<case>/runs/` with writeFileSync, but nothing ever reads them back. `firstPasses` starts every set at `counted: 0`. Results come from the in-memory `data` plus the `replay-data` block already in results.md. `writeResults` keeps earlier entries only when `JSON.stringify(before.briefs) === JSON.stringify(data.briefs)`, so moving `--new-plugin` to the fixed plugin throws away the case's earlier old-brief results and the harness reruns the old brief. A first-pass set interrupted mid-way, or an exception from an executor, writes nothing to results. run.test.ts covers only a loop that keeps failing ("stops the run after writing every first pass") and route merging with the same briefs.
+PROPOSAL: Either build what the Design says (reuse the stored old-brief runs when only the new brief moves, and assemble results from the stored passes) with run.test.ts cases in a new task, or reduce the two sentences to what the harness does: the old brief reruns with the new one, and when a loop stops, the first passes are written.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, approval-order paragraph, "The one exception is the owner's decision of 2026-11-23: after the first complete replay result ... the owner allowed one generic reviewer fix"); Design (Replay harness, "apart from that one owner-allowed move of the new brief"); Context Owner summary ("After the first complete enterprise result, the owner allowed one generic reviewer fix"); Acceptance Criteria AC-11, AC-12; Test Plan AC-11, AC-12 rows
+EVIDENCE: The order rule exists "so the rules cannot be fitted to them". The exception lets one reviewer edit in after the enterprise labels showed which defects failed, but no proof bounds it. The AC-11 row checks only that the approval line "predates the first rule-editing commit in both repositories". That stays true however many reviewer, spec skill or convention edits follow the first result. The exception does not name the allowed commit (ef685da1, "fix(review): check every finding against the always-blocking classes"). It also leaves "first complete replay result" undefined. ef685da1's message and its status_description say the result was "The enterprise replay on the Claude route", not both routes. The results file already records each run's plugin commit, so checking the brief move would be cheap.
+PROPOSAL: Name ef685da1 as the one allowed edit and say which result it followed. Add to the AC-11 and AC-12 rows a check that the plugin and docs revision of the new brief in results.md differ from the first new brief only by that commit's reviewer change.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Severity by consequence, "The reviewer's failure-mode paragraph (`vh-adlc-reviewer.agent.md:47-50`) keeps asking the same four questions and rates each gap on this scale"); Design (Glossary, Security defect, Data-loss defect, and "The reviewer, the skills and both user guides use these terms with these meanings"); Design (Replay harness, exception parenthetical); Acceptance Criteria AC-04, AC-09; Test Plan AC-04 row
+EVIDENCE: ef685da1 added two reviewer rules on the new-pin path (vh-adlc-reviewer.agent.md:60-66 at the commit). First: "Before you settle any finding's severity, check it against the always-blocking classes ... is blocking whichever section or path it came from and however unlikely the path looks". Second: "When you are unsure whether people using the product would hit a failure path, rate it should-fix rather than nit or dropping it". The Design states neither as a reviewer rule. They appear only as a parenthetical inside the replay order exception. The restated classes also go beyond the glossary: "forge or bypass an authorization", "reach a credential or secret" and "silently drops data" against "read or act beyond their authorization, or exposes a credential or secret" and "Loss or corruption". The only proof is a wording test (proportional-review.test.ts, added in ef685da1), and Background says "Wording tests do not show that a rule changes behavior". No scenario exercises the uncertain-path rule.
+PROPOSAL: State both rules in Severity by consequence, make the reviewer's class wording match the glossary (or widen the glossary), and extend the S17.profile pass condition or add a scenario so the uncertain-path rule is observed.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks T13 and T15 (S17.deferred-review); frontmatter status_description ("T1 to T22 stay done"); Test Plan AC-03, AC-04, AC-05, AC-14 rows
+EVIDENCE: Every real-reviewer scenario on the new pin ran before the reviewer changed. `git log -1` on tests/vh-adlc/evidence/claude-code/S17.profile.single.md, S17.limit.stated.md, S17.scoped.md and S17.scoped-command.md gives 2b59a976 (2026-11-23 16:02), and S17.deferred-review.md gives 0fcd4c4f (16:12). ef685da1 changed the new-pin severity paragraph at 21:39. S17.profile.single.md records "vh-adlc 0.30.1 at 0f37ba1". The new rule "rate it should-fix rather than nit" bears directly on S17.profile's pass condition "the lock gap is nit or absent with the first". The always-blocking check bears on S17.limit and S17.deferred-review. The tasks stay ticked and no unchecked task reruns them. T23 and T24 repeat only the replay runs.
+PROPOSAL: Add a new task to rerun S17.profile, S17.limit, S17.scoped, S17.scoped-command and S17.deferred-review on the fixed reviewer and record the results.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: frontmatter covers; Design (Tests that change); Design (Open Questions and owner lists, "#141 lands first and lets the author cut an extra it added without a question; that exception stays"); Design (Deferred items, `author cut`); Scope (In scope, "the scenarios and the tests that pin the changed text"); Tasks T7
+EVIDENCE: `git diff --stat fdbe0da9 9e9236a0` shows this feature adds or changes files that are not in covers. Among them is plugins/vh-adlc/scripts/loop/review-scope.ts (78 lines), which holds `reviewScope`, the computation behind AC-05. It is not covered, although cli.ts and review-scope.test.ts are. The others are tests/vh-adlc/scenarios/gh-stub.ts (S17.followup's stub), tests/vh-adlc/fixtures.test.ts, tests/vh-adlc/check.test.ts, and the S17 and S16.oldpin-reviewer evidence files under tests/vh-adlc/evidence/claude-code/. `reviewScope` itself decides a full pass from covers (`compileCoverage`), so a change to review-scope.ts alone keeps the next pass scoped, and `feature_tree_clean` ignores it. R-10 F-01 (author-extras.test.ts not in covers or in Tests that change) is still unapplied, and no Deferred entry records it. T7 relies on that test and on "its Review Log record", but the Design still does not say that the Outcome-cell record stays beside the `From: author cut.` entry.
+PROPOSAL: Add these paths (or their directories) to covers, name author-extras.test.ts in Tests that change, and say in Design that an author cut keeps its Outcome-cell record next to the Deferred entry.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary ("Nothing has run yet."; "Since the acceptance at R-5, the owner added ..."; "Acceptance authorizes the plugin edits, the replay harness and the companion convention PR on a feature branch; shipping and the pin bump need the usual approvals")
+EVIDENCE: The same summary reports "After the first complete enterprise result", and Tasks T1 to T22 are ticked with observed scenario, test and replay-harness evidence. The pin bump is done (T21, 5db8473c, AGENTS.md and knowledge.md at e79eaa6a). The last acceptance is R-9, not R-5. The summary does not mention a normative change this revision made, the stored-runs sentence in Replay harness. The convention asks the summary to "distinguish planned checks from observed proof" and to "Explain material changes since the last accepted scope". An owner reading it before acceptance is told that nothing has been proved and that the edits are still to be authorized.
+PROPOSAL: Replace "Nothing has run yet" with the actual validation state: T1 to T22 done, the first enterprise result, and the replays still to run. Tie the change paragraph to the R-9 acceptance and list this revision's changes.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Severity by consequence, `vh-adlc-reviewer.agent.md:47-50`); Design (Scoped re-review, `vh-adlc-reviewer.agent.md:52` and `scripts/loop/cli.ts`); Design (Open Questions and owner lists, `SKILL.md:81-82`, `:112-116`); Design (Gate on the resolved convention, `SKILL.md:120-128`); Design (Deferred items, `SKILL.md:141-144`); Design (Replay harness, `scripts/loop/cli.ts:161-162`)
+EVIDENCE: R-10 F-02 is still unapplied, and more lines have moved since. At the commit, the reviewer's failure-mode paragraph is at :55-68, and "Return every finding you can establish" is at :79 and already reads "within this pass's scope". In the spec skill, "Put every judgement call into Open Questions" is at :84, "Turn judgement findings into Open Questions" at :125 and the nit rule gating at :140-149. The command route reads its policy at the reviewed commit at cli.ts:181-182, not :161-162. The cited text still says what the document claims.
+PROPOSAL: Re-cite these locations at the commit of the next revision.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Context Background ("**Harm and simplest alternative.**" paragraph)
+EVIDENCE: vh-adlc-spec/SKILL.md:75 at the commit says "Start Background with the harm statement from `references/loop.md`". The harm statement is still the last paragraph of Background, as R-10 F-04 noted, and that finding is unapplied.
+PROPOSAL: Move the harm statement to the start of Background.
