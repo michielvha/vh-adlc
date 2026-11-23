@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { ObservationCollector } from "../../../plugins/vh-adlc/scripts/website-check/observations";
 import { runWebsiteCheck } from "../../../plugins/vh-adlc/scripts/website-check/runner";
 import { startObservationSite, SYNTHETIC_SECRET } from "./fixtures/observation-site";
 
@@ -51,6 +52,11 @@ function responses(result: Result, path: string) {
   return result.observations.filter((o) => o.kind === "response" && o.path === path);
 }
 
+// Responses and failed transfers both carry the observed HTTP status.
+function httpRecords(result: Result, path: string) {
+  return result.observations.filter((o) => (o.kind === "response" || o.kind === "request-failed") && o.path === path);
+}
+
 function rule(result: Result, path: string) {
   return result.rules.find((r) => r.type === "required-request" && r.path === path);
 }
@@ -81,7 +87,8 @@ test("only the exact anonymous session response is expected", async () => {
   expect(responses(result, "/auth/session")).toContainEqual(expect.objectContaining({
     method: "POST", status: 401, outcome: "fail",
   }));
-  expect(responses(result, "/required.js")).toContainEqual(expect.objectContaining({
+  // Chromium fails a script with an error status after its headers, so either record kind may carry it.
+  expect(httpRecords(result, "/required.js")).toContainEqual(expect.objectContaining({
     resourceType: "script", status: 401, outcome: "fail",
   }));
   expect(rule(result, "/required.js")).toEqual(expect.objectContaining({ method: "GET", outcome: "fail" }));
@@ -136,7 +143,7 @@ test("retries, failed bodies and late failures of required requests each fail th
 test("a required request that never starts leaves coverage incomplete at the deadline", async () => {
   const site = await fixture();
   const result = await observe(site, {
-    path: "/", deadlineMs: 3_000, requiredRequests: [{ method: "GET", url: `${site.origin}/never` }],
+    path: "/", deadlineMs: 6_000, requiredRequests: [{ method: "GET", url: `${site.origin}/never` }],
   });
   expect(site.visits.filter(({ path }) => path === "/never")).toEqual([]);
   expect(rule(result, "/never")?.outcome).toBe("skipped");
@@ -148,7 +155,7 @@ test("a required request that never starts leaves coverage incomplete at the dea
 
 test("a false visible assertion at the deadline is a failed rule, not missing coverage", async () => {
   const site = await fixture();
-  const result = await observe(site, { path: "/", visibleHeading: "Not on this page", deadlineMs: 3_000 });
+  const result = await observe(site, { path: "/", visibleHeading: "Not on this page", deadlineMs: 6_000 });
   expect(result.visibleAssertion).toBe("fail");
   expect(result.rules).toContainEqual(expect.objectContaining({ type: "visible-assertion", outcome: "fail" }));
   expect(result.observations).toContainEqual(expect.objectContaining({ kind: "assertion", path: "/" }));
@@ -160,7 +167,7 @@ test("a false visible assertion at the deadline is a failed rule, not missing co
 test("a matching attempt still in flight at the deadline leaves coverage incomplete", async () => {
   const site = await fixture();
   const result = await observe(site, {
-    path: "/overlap", deadlineMs: 4_000, requiredRequests: [{ method: "GET", url: `${site.origin}/overlap-data` }],
+    path: "/overlap", deadlineMs: 6_000, requiredRequests: [{ method: "GET", url: `${site.origin}/overlap-data` }],
   });
   expect(site.visits.filter(({ path }) => path === "/overlap-data")).toHaveLength(2);
   expect(responses(result, "/overlap-data")).toContainEqual(expect.objectContaining({ status: 200, outcome: "pass" }));
@@ -170,3 +177,15 @@ test("a matching attempt still in flight at the deadline leaves coverage incompl
   expect(result.coverage).toBe("incomplete");
   expect(result.exitCode).not.toBe(0);
 }, 30_000);
+
+test("a failed attempt beside one still in flight fails the rule and leaves coverage incomplete", () => {
+  const url = "https://example.test/data";
+  const collector = new ObservationCollector([{ method: "GET", url }], []);
+  const failed = collector.started({ method: "GET", url, resourceType: "fetch", redirected: false });
+  collector.responded(failed, 503);
+  collector.finished(failed);
+  collector.responded(collector.started({ method: "GET", url, resourceType: "fetch", redirected: false }), 200);
+  const { rules, requiredComplete } = collector.result("pass");
+  expect(rules).toContainEqual(expect.objectContaining({ type: "required-request", outcome: "fail", inFlight: 1 }));
+  expect(requiredComplete).toBe(false);
+});

@@ -3,6 +3,7 @@ import { createServer } from "node:net";
 import { existsSync } from "node:fs";
 import { mkdir, readlink, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join } from "node:path";
+import type { ExpectedResponse, RequiredRequest } from "./observations";
 
 function executable(name: string, override?: string) {
   const path = override || Bun.which(name, { PATH: "/usr/bin:/bin" });
@@ -12,6 +13,7 @@ function executable(name: string, override?: string) {
 
 export async function confinedChromium(options: {
   scratch: string; origin: URL; caFile?: string; url: URL; heading: string; deadlineMs: number;
+  rules: { required: RequiredRequest[]; expected: ExpectedResponse[] };
 }) {
   const { scratch, origin } = options;
   const bwrap = executable("bwrap");
@@ -111,6 +113,7 @@ export async function confinedChromium(options: {
       "--ro-bind-try", "/etc/ld.so.cache", "/etc/ld.so.cache",
       "--ro-bind", process.execPath, "/run/website-bun",
       "--ro-bind", worker, "/run/smoke-worker.ts",
+      "--ro-bind", join(import.meta.dir, "observations.ts"), "/run/observations.ts",
       "--ro-bind", cache, cache, "--ro-bind", moduleDirectory, moduleDirectory,
       "--ro-bind", socket, "/run/proxy.sock", "--bind", guest, "/run/website-check",
       "--setenv", "HOME", "/run/website-check/home", "--setenv", "PATH", "/usr/bin:/bin",
@@ -118,6 +121,7 @@ export async function confinedChromium(options: {
       "/bin/sh", "-c",
       'socat TCP4-LISTEN:3128,bind=127.0.0.1,reuseaddr,fork UNIX-CONNECT:/run/proxy.sock & PID=$!; trap \'kill "$PID" 2>/dev/null || true\' EXIT; /run/website-bun /run/smoke-worker.ts "$@"',
       "website-check", parentNetwork, module, browser, options.url.href, options.heading, String(options.deadlineMs),
+      JSON.stringify(options.rules),
     ];
     const child = Bun.spawn(command, { stdin: "ignore", stdout: "pipe", stderr: "ignore" });
     const deadline = setTimeout(() => child.kill(), options.deadlineMs + 12_000);

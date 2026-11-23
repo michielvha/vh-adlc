@@ -5,7 +5,7 @@ import { confinedChromium } from "./chromium";
 import { resolveProfile, type SmokeProfile } from "./profile";
 
 export async function runWebsiteCheck(profile: SmokeProfile) {
-  const { origin, route, upgrade } = resolveProfile(profile);
+  const { origin, route, upgrade, required, expected } = resolveProfile(profile);
   const scratch = await mkdtemp(join(tmpdir(), "website-check-"));
   try {
     const upgradeObservations = [];
@@ -22,12 +22,15 @@ export async function runWebsiteCheck(profile: SmokeProfile) {
     }
     const browser = await confinedChromium({
       scratch, origin, caFile: profile.chromium?.caFile, url: route,
-      heading: profile.route.visibleHeading, deadlineMs: profile.route.deadlineMs,
+      heading: profile.route.visibleHeading, deadlineMs: profile.route.deadlineMs, rules: { required, expected },
     });
+    // Report mode: a completed run exits zero even with findings; incomplete required coverage never does.
     return {
-      mode: profile.mode, browser: "chromium", browserVersion: browser.browserVersion, exitCode: browser.incomplete ? 1 : 0,
+      mode: profile.mode, browser: "chromium", browserVersion: browser.browserVersion,
+      exitCode: browser.coverage === "complete" ? 0 : 1,
       routeStatus: browser.routeStatus, visibleAssertion: browser.visibleAssertion,
-      observations: [...upgradeObservations, ...browser.observations],
+      coverage: browser.coverage, boundary: browser.boundary,
+      observations: [...upgradeObservations, ...browser.observations], rules: browser.rules,
     };
   } finally {
     await rm(scratch, { recursive: true, force: true });

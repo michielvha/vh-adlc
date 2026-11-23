@@ -11,8 +11,14 @@ headless shell. Point `WEBSITE_CHECK_PLAYWRIGHT_MODULE` at the package's
 absolute `index.mjs` path.
 
 ```sh
-bun test tests/vh-adlc/website-check/confinement.test.ts
+bun test tests/vh-adlc/website-check/confinement.test.ts tests/vh-adlc/website-check/observations.test.ts
 ```
+
+The observation fixture serves one HTTPS origin with direct socket control, so it
+can drop a connection, break off a body after its headers and hold a body open.
+Its session page leaves the 401 bodies unread, as an anonymous session client
+usually does. Chromium never finishes such a fetch, so the expected response is
+matched on its observed status.
 
 The runner finds an installed Squid in `/usr/bin` or `/bin`. To test an
 unpacked Fedora Squid package without installing it, set

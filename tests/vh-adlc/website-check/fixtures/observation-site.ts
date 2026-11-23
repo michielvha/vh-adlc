@@ -17,7 +17,8 @@ function page(heading: string, script: string) {
 const pages: Record<string, { body: string; headers?: Record<string, string> }> = {
   "/": { body: page("Release ready", "") },
   // The exact anonymous session request, a wrong query, a wrong method and a redirect that ends on the
-  // same URL. An unrelated console error echoes the synthetic value.
+  // same URL. Like a typical anonymous session client, the page never reads the 401 bodies. An
+  // unrelated console error echoes the synthetic value.
   "/session": {
     body: page("Loading", `<script src="/required.js"></script><script>
       Promise.allSettled([
@@ -45,16 +46,18 @@ const pages: Record<string, { body: string; headers?: Record<string, string> }> 
     </script>`),
   },
   // A 503 then 200 for one required request before the assertion, a required body that fails after
-  // 200 headers, and a required request that fails after the load event.
+  // 200 headers, and a required request that fails after the load event. The page reads each body,
+  // because Chromium only finishes a fetch whose body is read.
   "/timing": {
     body: page("Loading", `<script>
       (async () => {
         const first = await fetch("/flaky", { cache: "no-store" });
-        if (!first.ok) await fetch("/flaky", { cache: "no-store" });
+        await first.text();
+        if (!first.ok) await (await fetch("/flaky", { cache: "no-store" })).text();
         fetch("/partial", { cache: "no-store" }).then(r => r.text()).catch(() => {});
         document.querySelector("h1").textContent = "Release ready";
       })();
-      addEventListener("load", () => setTimeout(() => fetch("/late", { cache: "no-store" }).catch(() => {}), 1500));
+      addEventListener("load", () => setTimeout(() => fetch("/late", { cache: "no-store" }).then(r => r.text()).catch(() => {}), 1500));
     </script>`),
   },
   // Two matching attempts start before the assertion. One completes and the other holds its body.
