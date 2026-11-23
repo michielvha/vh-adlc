@@ -171,6 +171,7 @@ On 2026-11-23 the owner answered spec review R-16 F-01 for the revision before T
 | 2026-11-23 | R-15 | spec | `66c17b40e95ddce378a86032040e0aacba63774b` | n/a | n/a | accepted by owner |
 | 2026-11-23 | R-16 | spec | `dd48a4a0beb0989353b634591ce8be7d13acc0f6` | claude-opus-5-5 | procedural | One should-fix finding and five nits |
 | 2026-11-23 | R-16 | spec | `dd48a4a0beb0989353b634591ce8be7d13acc0f6` | n/a | n/a | accepted by owner |
+| 2026-11-23 | R-17 | spec | `9a148c337cdfe5db2948955122d9e5e8bed4ce91` | claude-opus-5-5 | procedural | One blocking finding, one should-fix finding and three nits |
 
 ### R-1
 
@@ -804,6 +805,45 @@ SEVERITY: nit
 WHERE: Context / Background line 54 ("The T4 collector, implemented at `6b00d5a9` and not yet ticked"), Tasks T4 evidence ("on Ubuntu 24.04 with Squid 6.14 and Chromium headless shell 156")
 EVIDENCE: T4 is ticked at X. Also, `t4-unread.log` in the handoff evidence directory shows only "bun test v1.4.5", the 15 test names and "15 pass, 0 fail". It does not show the OS release, the Squid version, the Chromium version or the commit tested. This is the same gap R-15 F-04 raised for `website-check-squid614.log`.
 PROPOSAL: Drop "and not yet ticked", and limit the T4 unread-test evidence to what the log shows or cite a log that records the commit, the OS release, `squid -v` and the browser version.
+
+### R-17
+
+TARGET: 9a148c337cdfe5db2948955122d9e5e8bed4ce91
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context / Owner summary line 28 ("Neither a profile nor the shipped command can add a trusted certificate authority", "The command refuses to run when an environment variable would make Bun trust extra certificate authorities or skip certificate validation"), Design line 63 ("Bun would otherwise use `NODE_EXTRA_CA_CERTS`, `NODE_USE_SYSTEM_CA` and `NODE_TLS_REJECT_UNAUTHORIZED`", "refuses the run ... when `NODE_EXTRA_CA_CERTS` or `NODE_USE_SYSTEM_CA` is set, or `NODE_TLS_REJECT_UNAUTHORIZED` is `0`"), Design line 66 ("normal certificate validation"), Test Plan AC-03 (the three variables "one at a time"), Tasks T5, Open Questions lines 139 and 149
+EVIDENCE: The previous revision added this rule, and its three-variable list is incomplete. `strings $(which bun)` on Bun 1.4.2 also shows `SSL_CERT_FILE`, `SSL_CERT_DIR` and `BUN_OPTIONS`. In /tmp/rv-bun, a Bun 1.4.2 script fetching a Bun.serve TLS server on localhost with a self-signed certificate printed "rejected self signed certificate" with a clean environment. It printed "trusted 200" with `SSL_CERT_FILE=<that cert>`, "trusted 200" with `SSL_CERT_DIR=<hashed dir holding it>`, and "trusted 200" with `BUN_OPTIONS=--use-openssl-ca SSL_CERT_FILE=<cert>`. `BUN_OPTIONS=--use-openssl-ca` puts the flag into `process.execArgv`. A shipped command built exactly to the Design's list therefore still trusts an extra CA for its certificate and redirect checks. The AC-03 row would pass on that build, and the summary's guarantee would be false. The summary also states the general rule ("an environment variable would make Bun trust extra certificate authorities"), while the Design gives a closed list of three variables, so two implementers would refuse different sets. Limitation: this was observed on macOS with Bun 1.4.2, not on the CI's Linux Bun 1.4.5.
+PROPOSAL: Make the refusal cover every environment input that changes trust for the command's own TLS: at least `SSL_CERT_FILE`, `SSL_CERT_DIR` and CA flags passed through `BUN_OPTIONS` or the command line (`--use-system-ca`, `--use-openssl-ca`). Add each one to the AC-03 row and T5. If the owner would rather run the command's own HTTPS requests in a child process with a cleared environment, as the browser already runs under `--clearenv`, raise that as an Open Question.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design line 63 ("for the command's own HTTPS requests, such as the HTTP upgrade probe"), Design line 66 ("Use ordinary confined HTTPS requests"), Design line 67 ("An explicitly enabled HTTP upgrade probe runs in a separate client boundary scoped to the configured initial HTTP origin", "Allow the browser and network adapter processes to connect only to that proxy, with no direct egress"), Test Plan AC-01 (HTTP probe destination log), Test Plan AC-03 (environment cases), Tasks T5
+EVIDENCE: The environment-override rule covers only trust variables, but Bun also routes its own requests through `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY` (all three appear in `strings $(which bun)`). The probe at `plugins/vh-adlc/scripts/website-check/runner.ts:22` is a plain `fetch` from the Bun process with the caller's environment. In /tmp/rv-bun, the same kind of `fetch("http://upgrade.example.invalid/upgrade", { redirect: "manual" })`, run with `HTTP_PROXY` pointing at a local Bun.serve, printed "301 https://upgrade.example.invalid/", and the fake proxy logged "http://upgrade.example.invalid/upgrade". So an ambient proxy variable sends the command's requests outside the confinement proxy, and over plain HTTP it can forge the upgrade response that runner.ts:27 accepts. One implementer honours these variables, another ignores or refuses them, and the AC-01 destination-log proof passes for both because the fixture sets no proxy variable.
+PROPOSAL: State that the command's own requests ignore or refuse ambient proxy variables (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` in both cases) and go only through the run's confinement proxy. Add a case that sets `HTTP_PROXY` and checks that the run is refused, or that the probe never reaches the named proxy.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design line 63 ("for the command's own HTTPS requests, such as the HTTP upgrade probe")
+EVIDENCE: The upgrade probe is plain HTTP. `profile.ts:103` requires `upgrade.protocol === "http:"`, and `runner.ts:22` fetches that URL directly. CA trust and certificate validation variables do not affect it. The previous revision added the sentence.
+PROPOSAL: Name the certificate and redirect checks as the HTTPS requests these variables affect, and drop the upgrade probe from the example. F-02 covers how the environment affects the probe.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary line 32 ("the `browser` field and closed schema checks (T11 and T12) are still planned", "Since the acceptance at `66c17b40`")
+EVIDENCE: At X, T11 and T12 are ticked with evidence (`t11-red.log` at `8d8df408`, `t12-green.log`), and `bfa03f79` added `profile.schema.json`. Here `bun test tests/vh-adlc/website-check/confinement.test.ts -t "invalid configuration|differs from the pin"` on Bun 1.4.2 (macOS) passed 15 rejection cases. The mismatched module case failed only on "Missing prerequisite: bwrap". The latest acceptance is R-16 at `dd48a4a0`, not `66c17b40`. The summary does not say this revision added the environment-override refusal since that acceptance. The finding is outside the normative baseline.
+PROPOSAL: Say that T11 and T12 have run and passed. Describe changes since the `dd48a4a0` acceptance, chiefly the environment-override refusal.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T12 evidence
+EVIDENCE: The T12 evidence line ("with `profile.schema.json` and the runner option, `bun test tests/vh-adlc/website-check` ... passed 33 of 33") names no commit. T11's evidence names `8d8df408`. `git log -- plugins/vh-adlc/scripts/website-check/profile.schema.json` shows `bfa03f79` as the T12 commit.
+PROPOSAL: Name the commit tested (`bfa03f79`, if that is the one) in T12's evidence.
 
 ## Sources
 
