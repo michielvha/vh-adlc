@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised after spec review R-4 with the owner's answers to Q24 to Q26; waits for independent re-review R-5."
+status_description: "Spec review R-5 is stored; its judgement finding waits for the owner before the next revision."
 issue: null
 goal: "A session that drives many sub-sessions across a workstream follows one generic vh-adlc procedure that starts only work the host and the loop can carry, keeps every session's state and blockers current, routes owner decisions correctly and closes sessions without losing work."
 covers:
@@ -538,6 +538,7 @@ None.
 | 2026-11-23 | R-2 | spec | `46ccf25a` | claude-opus-5-5 | procedural | 1 blocking, 7 should-fix, 1 nit; judgement findings go to the owner first |
 | 2026-11-23 | R-3 | spec | `de1a5171` | claude-opus-5-5 | procedural | 0 blocking, 9 should-fix, 2 nits; judgement findings go to the owner first |
 | 2026-11-23 | R-4 | spec | `36eed728` | claude-opus-5-5 | procedural | 0 blocking, 5 should-fix, 1 nit; judgement findings go to the owner first |
+| 2026-11-23 | R-5 | spec | `20c6df0d` | claude-opus-5-5 | procedural | 0 blocking, 2 should-fix, 2 nits; judgement finding goes to the owner first |
 
 ### R-1
 
@@ -846,6 +847,38 @@ SEVERITY: nit
 WHERE: Design, Glossary (Coordination operation); Scope (guides say one coordination operation); Acceptance Criteria AC-01; Test Plan row AC-01
 EVIDENCE: plugins/vh-adlc/references/lifecycle.md:54 already routes "Cross-repository GitHub Projects coordination" to `vh-adlc-projects`, which the checker counts as an engineering operation (tests/vh-adlc/check.test.ts:20). The guides would then say "one coordination operation" while the intake table calls a different, engineering operation coordination.
 PROPOSAL: Note in the glossary row or the guide text that the projects operation is not a coordination operation in this sense, or pick a term that does not collide.
+
+### R-5
+
+TARGET: 20c6df0d56e159d5eee997b9f4a187ff60bebf86
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-09 and S-10; Design, Explanation the reference adds (Admission order); Context, Owner summary (Admission bullet); Context, Owner decisions Q26; Acceptance Criteria AC-04
+EVIDENCE: S-09 says "each batch may exceed the last batch that met them by at most three". The Admission order explanation says "a batch that fails a condition sets the size back to the last one that passed". With a limit of nine and batches of three and six passed, a batch of nine that fails leaves six as the last batch that met the conditions, so S-09 allows another nine (six plus three), while the explanation sets the size back to six. The reference would carry both. No sentence also says what failing a condition means. S-10's conditions all hold after waiting: every member "has reported its first step or been recorded in the workstream ledger as pending or failed", "at least 10 minutes after the last start", and "a new capacity check passes", which can be re-run until it passes. So under S-09 alone no batch ever fails, and the set-back never applies. This traces to the revision at 20c6df0d, which added the ramp in answer to R-4 F-05 and Q26.
+PROPOSAL: Say in S-09 when a batch counts as failed, for example when the capacity check after the wait is blocked, and what size the next batch may then have. Make the Admission order explanation and the Owner summary match that sentence exactly.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Required sentences S-09, S-10 and S-12; Design, Explanation the reference adds (Admission order); Design, Concurrency, failure and upgrade; Context, Owner decisions Q20 and Q26; Context, Owner summary (Admission bullet); Acceptance Criteria AC-04
+EVIDENCE: Q26 and S-09 let a batch grow after the previous batch "has met every condition for starting the next batch". Under S-10 those conditions are met when a member has been "recorded in the workstream ledger as pending or failed". S-12 calls a pending session "a capacity signal", and incident 15 is exactly that signal. So a batch of three whose members all go pending counts as a batch that met the conditions, and once S-12's hold ends (the pending sessions are archived or recreated), S-09 allows a batch of six. The ramp treats the host's clearest overload signal as proof that the batch fitted, which is the reverse of Q3's "more only once load shows the batch fit". One implementer counts such a batch toward the ramp, another does not. This traces to the revision at 20c6df0d (Q26), combined with S-10 as amended by Q20 at 36eed728.
+PROPOSAL: State in S-09 that only a batch whose members all reported their first step, with none recorded as pending or failed, counts toward the ramp. Or raise as an Open Question whether a pending or failed member resets the ramp to three.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Glossary (Sub-session); Design, Required sentences S-02 and S-32; Context, Owner decisions Q13, Q14 and Q24
+EVIDENCE: The glossary, which the reference carries verbatim, defines a sub-session as "A session the orchestrator started for one issue or feature." S-02 now grants archiving "the workstream's sub-sessions, including those a previous orchestrator started", and Q24 says the replacement "takes over the whole workstream". Read strictly, the predecessor's sessions are not sub-sessions of the replacement by the glossary, so S-19, S-36 and S-38 ("every sub-session") might not cover them. Q13 ("archiving the sub-sessions it started") and Q14 ("archiving finished sub-sessions it started") are not marked as amended by Q24, unlike Q7, which the same revision marked as amended by Q20. This traces to the revision at 20c6df0d.
+PROPOSAL: Define a sub-session as a session started for one issue or feature of the workstream, by the current or a previous orchestrator. Mark Q13 and Q14 as amended by Q24.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Required sentences S-32, S-45 and S-11; Design, Concurrency, failure and upgrade; Design, Explanation the reference adds (Admission order)
+EVIDENCE: S-32 has the stale orchestrator hand off and stop steering, and the owner starts the replacement. No sentence says who ends the stale orchestrator's session. S-02 and S-45 cover sub-sessions only, and plugins/vh-adlc/references/authority.md:30 requires "Separate approval for that exact action" to "end a live session". The explanation says paused sessions "count toward the live-session limit until they are archived", so a stopped orchestrator that stays live keeps using a live-session slot and a bridge worker.
+PROPOSAL: Add to S-32 or S-45 that the replacement includes the stale orchestrator in the batched archive approval, or that the owner ends it when starting the replacement.
 
 ## Sources
 
