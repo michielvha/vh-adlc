@@ -103,8 +103,7 @@ The R-9 acceptance covered what the owner added after R-5: the Deferred section,
 follow-up review (judged after merge, because the spec rests on assumptions the built feature tests) and
 scope growth as a pass condition. R-5's deferred findings are this document's first Deferred entries. This
 revision, after that acceptance, drops the Open Question count from the replay loops, records the one
-owner-allowed reviewer fix and the new-brief reruns it needs, builds the replay results from the stored private runs with a fresh stored set per run and a launch
-record for the sets stored before that (owner decision, 2026-11-23), and adds a scenario for an uncertain
+owner-allowed reviewer fix and the new-brief reruns it needs, builds the replay results from the stored private runs with a fresh stored set per part and run and a launch record for the sets stored before that (owner decision, 2026-11-23), and adds a scenario for an uncertain
 failure path. The companion convention is merged and the
 pin bump is done (T21); shipping still needs the usual approvals.
 
@@ -223,6 +222,8 @@ Out of scope, by name:
 - Changing the complete `docs/specs/spec-review-convergence.md`: it stays complete, and its test keeps
   proving its text at `0c983f67`.
 - Calibrating the reviewer's precision over time.
+- Not handled: resuming a set stored before T25 with `--only loops`, because no such set was resumed and a
+  loop rerun on one is made as a fresh set instead (R-15 F-01).
 - Counting the Open Questions the author raises in the replay loops: a headless session settles a question
   before it commits, so a commit-based count reads zero, and rerunning every old-brief loop to count them
   another way costs about a day. The plausible-choice rule is proved by `S17.questions` (owner cut on
@@ -493,15 +494,17 @@ Both briefs use the same route settings and models. A run that fails to execute 
 rerun; it never counts as a pass. An independent agent matches findings to labels from `labels.md` and the
 stored records, and its verdicts are stored beside each run. Every counted pass, its verdicts and every
 loop's documents are stored in the case directory as they finish, and the results are assembled from those
-stored runs, so a run that stops loses no finished pass. A stored set is one part (first passes or loop) of one brief on one route. A run starts a fresh set for
-each part it runs: earlier files of that part move to `runs-superseded/`, so a set never mixes two
-invocations, while a `--only loops` run keeps the stored first passes. Each brief and route records its
-plugin commit, docs revision and model in `runs/<brief>-<route>.identity.json`. Sets stored before T25 take
-that identity from `runs/launch-record.json` in the case directory, which the owner accepted on
-2026-11-23: one entry per launch with its brief, route, plugin commit, docs revision, model, process ID,
-log file and the stored files it wrote. For such a set the harness counts only the files its launch entry
-lists and refuses any other file of that brief and route. `assemble` reads only the current sets, never
-`runs-superseded/`. A run of
+stored runs, so a run that stops loses no finished pass. A stored set is one part (first passes or loop) of one brief on one route, and it records its plugin
+commit, docs revision and model in `runs/<brief>-<route>-<part>.identity.json`. A run starts a fresh set
+for each part it runs: earlier files of that part, with its identity, move to `runs-superseded/`, so a set
+never mixes two invocations, and a `--only loops` run keeps the stored first passes under their own
+identity. A new-brief-only run and `assemble` use a stored set only when its identity matches the current
+brief, route and model, and refuse otherwise; `assemble` reads only current sets, never
+`runs-superseded/`. Sets stored before T25 have no identity file: `runs/launch-record.json` in the case
+directory gives each such set one entry with its brief, route, part, plugin commit, docs revision, model,
+the launching process ID and command line, and the files it wrote, and the harness counts only the listed
+files and refuses any other file of that set. Each listed set was written by one launch; the owner accepted
+this record on 2026-11-23. A run of
 the new brief alone reuses the old-brief passes and loops already stored only when that recorded identity
 matches the current old brief and route, and refuses otherwise; `assemble` checks every stored set the same
 way. Moving the new brief therefore reruns only the new brief.
@@ -597,8 +600,9 @@ for the old-pin controls.
       uses every glossary term except Cut check and Follow-up review, and the convention and both user
       guides use the terms they contain with the glossary's meanings.
 - [ ] AC-10: The replay harness runs a case end to end, reuses a stored old-brief set only when its
-      recorded identity matches the current old brief and refuses otherwise, keeps every finished pass when
-      it assembles results from stored runs, starts a fresh stored set for each run of a brief, refuses a case whose approval line is missing or
+      recorded identity matches the current old brief and refuses otherwise, keeps every finished pass when it assembles results from stored runs, starts a fresh stored set for each
+      part a run executes while keeping the other part, counts a set stored before T25 only through a
+      matching launch record entry that lists its files, refuses a case whose approval line is missing or
       whose digests do not match, stops on a case term in the public tree or the companion diff, counts a
       run only on the route and model under test, records each run's plugin commit, docs revision and
       model, writes nothing but counts and identities to the results file, records failed executions
@@ -639,8 +643,8 @@ for the old-pin controls.
 | AC-07 | Scenario `S17.nits`, with scripted reviewer records: an earlier clean pass has reviewed a free-text pattern row; the new pass has no blocking or should-fix finding and eight nits, six citation slips in the normative baseline that the seeded project procedure says need no owner attention and two free-text widening nits on that row. Pass: the summary part of the final reply shows the two and a count of six, and its `All unapplied nits` section lists all eight. |
 | AC-08 | Old-pin controls of `S17.scoped`, `S17.questions`, `S17.nits`, `S17.profile` (single-user profile), `S17.deferred`, `S17.cut` and `S17.followup` on a fixture pinned to `0c983f67`. Pass: the unchanged gap is raised, both judgement findings become Open Questions, the summary lists all eight nits, the lock gap is raised at should-fix or blocking despite the profile, no `## Deferred` section or `Cut check:` line is written, and neither ship nor resume runs or names a follow-up review. `S16.oldpin-reviewer` and `bun test tests/vh-adlc/review-convergence.test.ts` at `0c983f67` still pass. |
 | AC-09 | `bun test tests/vh-adlc/proportional-review.test.ts`: `AGENTS.md` has the section and the companion pin, `knowledge.md` names the same SHA, and the convention uses each glossary term except Cut check and Follow-up review; plus a manual read of the convention and both guides against the glossary definitions. |
-| AC-10 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and scripted reviewers: the results file holds counts, label IDs and run identities and no line of the fixture document; a forced execution failure is recorded and not counted; a run reporting another route or model is not counted; a new-brief-only run reuses a stored old-brief set whose recorded identity matches and refuses a mismatched one; a second run of a brief moves its earlier stored set aside; a `--only loops` rerun keeps the stored first passes; a pre-T25 set is counted through a matching launch record, refused through a mismatched one, and refused when it holds a file the record does not list; results assembled after an interrupted first-pass set keep its finished passes; copies of the case with no approval line, an edited label and an edited `case.yaml` are refused before any run; a planted term in the tree or the companion diff stops the run; a term inside a `### R-<n>` record passes while the same term in Design stops it. |
-| AC-11 | Replay of the enterprise case: three old-brief and six new-brief first passes per route, with confirmation runs where the rule calls for them. Pass: the results file shows no failing label on either route. The implementation reviewer opens the case directory, checks that the approval line matches `labels.md` and `case.yaml` and predates the first rule-editing commit in both repositories, and spot-checks the matcher's verdicts against the stored records, citing case material only by label ID, count and digest. It also checks each pre-T25 set in `runs/launch-record.json` against the launch's log and the stored files' times, and that the reviewer, the spec skill, `references/review-protocol.md`, `references/loop.md` and `scripts/loop/` differ between the first new brief `5e94e593` and the new brief in the results file only by `ef685da1`'s reviewer change (`git diff 5e94e593 <new brief> -- <those paths>`); the harness's terms check on this document and the results file passes before the review is stored. |
+| AC-10 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and scripted reviewers: the results file holds counts, label IDs and run identities and no line of the fixture document; a forced execution failure is recorded and not counted; a run reporting another route or model is not counted; a new-brief-only run reuses a stored old-brief set whose recorded identity matches and refuses a mismatched one; a second run of a brief moves its earlier stored set aside; a `--only loops` rerun keeps the stored first passes; a pre-T25 set is counted through a matching launch record entry, refused through a mismatched one, and refused when it holds a file the entry does not list; pre-T25 first passes followed by a post-T25 `--only loops` run keep each part's own identity; results assembled after an interrupted first-pass set keep its finished passes; copies of the case with no approval line, an edited label and an edited `case.yaml` are refused before any run; a planted term in the tree or the companion diff stops the run; a term inside a `### R-<n>` record passes while the same term in Design stops it. |
+| AC-11 | Replay of the enterprise case: three old-brief and six new-brief first passes per route, with confirmation runs where the rule calls for them. Pass: the results file shows no failing label on either route. The implementation reviewer opens the case directory, checks that the approval line matches `labels.md` and `case.yaml` and predates the first rule-editing commit in both repositories, and spot-checks the matcher's verdicts against the stored records, citing case material only by label ID, count and digest. It also checks each pre-T25 set in `runs/launch-record.json` against the recorded command line (its plugin commits and docs revisions) and the stored files' times, and that the reviewer, the spec skill, `references/review-protocol.md`, `references/loop.md` and `scripts/loop/` differ between the first new brief `5e94e593` and the new brief in the results file only by `ef685da1`'s reviewer change (`git diff 5e94e593 <new brief> -- <those paths>`); the harness's terms check on this document and the results file passes before the review is stored. |
 | AC-12 | Replay of the small application case, same procedure, brief check and pass condition. |
 | AC-13 | The same replays' full loops, one per brief per case and route. Pass: the results file shows the new total of spec reviews at most half the old total. |
 | AC-14 | Scenario `S17.deferred`, with scripted reviewer records and a scripted owner: the owner says "answer R-1 F-01 with a stated limit"; the author also cuts an extra the scripted R-1 flags as added beyond any criterion; scripted R-2 returns no blocking finding and one should-fix finding; the owner accepts R-2 while "deferring R-2 F-01"; later, default-branch drift brings re-review R-3 whose finding asks for extra work, and the owner answers "defer it". Pass: four entries reading `From: R-1 F-01, stated limit.`, `From: author cut.`, `From: R-2 F-01, deferred at acceptance.` and `From: drift re-review R-3.`; the Scope line beside the first; a `Cut check:` line in the replies after the acceptance deferral and the drift deferral; and `vh-adlc fresh` still fresh after the acceptance and drift entries. Scenario `S17.deferred-review`, with the real reviewer, on a document whose Deferred section holds a deferred retry sampler and a deferred session check on a delete endpoint. Pass: no finding names the sampler, and a blocking finding against Scope quotes the delete entry. `bun test tests/vh-adlc/proportional-review.test.ts` pins the convention's section definition and source list. |
@@ -721,6 +725,7 @@ None.
 - D-13: Ask one approval for the docs branch, push and PR even when every entry is a drop or every filing is declined. From: R-9 F-03, deferred at acceptance. Verdict: pending.
 - D-14: Run the private-terms check on newly returned implementation review records before storing them. From: R-9 F-04, deferred at acceptance. Verdict: pending.
 - D-15: Count the Open Questions the author raises in the replay loops. From: owner cut on 2026-11-23. Verdict: pending.
+- D-16: Resume a set stored before T25 with `--only loops`. From: R-15 F-01, stated limit. Verdict: pending.
 
 ## Review Log
 
