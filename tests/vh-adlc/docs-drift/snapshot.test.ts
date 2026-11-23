@@ -1,8 +1,8 @@
-import { afterAll, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync, utimesSync } from "node:fs";
+import { afterAll, expect, spyOn, test } from "bun:test";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { captureBareSnapshot, captureRepositoryState, captureCallerState, matchesCallerState, matchesRepositoryState, captureSnapshot, checkFreshness, createOwnedObjectStore, readCommittedTree } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { assertCallerUnchanged, captureBareSnapshot, captureRepositoryState, captureCallerState, externalArtifactDirectory, matchesCallerState, matchesRepositoryState, captureSnapshot, checkFreshness, createOwnedObjectStore, readCommittedTree } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { currentRuntimeValidation, withRuntimeValidation } from "../../../plugins/vh-adlc/scripts/docs-drift/runtime-validation";
 import { canonicalDigest, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
@@ -330,4 +330,39 @@ test("nested caller checks reuse only their ordinary invocation while standalone
   expect(captureCallerState(repo)).not.toEqual(before);
   expect(matchesCallerState(repo, digest)).toBe(false);
   withRuntimeValidation(() => expect(matchesCallerState(repo, digest)).toBe(false));
+});
+
+test("one command reads the caller's worktree scope once and rechecks its artifacts before it finishes", () => {
+  const { repo, commit } = fixture(), parent = realpathSync(temporary()), artifacts = join(parent, "artifacts");
+  mkdirSync(artifacts, { mode: 0o700 });
+  const spawn = spyOn(Bun, "spawnSync");
+  const worktreeReads = () => spawn.mock.calls.filter(([argv]) => Array.isArray(argv) && argv.includes("worktree") && argv.includes("list")).length;
+  try {
+    // Standalone checks stay live: each call reads the worktree list.
+    expect(externalArtifactDirectory(artifacts, repo)).toBe(artifacts);
+    expect(externalArtifactDirectory(artifacts, repo)).toBe(artifacts);
+    expect(worktreeReads()).toBe(2);
+    spawn.mockClear();
+    withRuntimeValidation(() => {
+      expect(externalArtifactDirectory(artifacts, repo)).toBe(artifacts);
+      expect(externalArtifactDirectory(artifacts, repo)).toBe(artifacts);
+      expect(worktreeReads()).toBe(1);
+      // A sibling worktree that holds no artifact leaves the command able to finish.
+      git(repo, "worktree", "add", "--detach", join(parent, "sibling"), commit);
+      assertCallerUnchanged();
+      expect(worktreeReads()).toBe(2);
+    });
+    spawn.mockClear();
+    withRuntimeValidation(() => {
+      // Each command starts cold and reads the list again.
+      expect(externalArtifactDirectory(artifacts, repo)).toBe(artifacts);
+      expect(worktreeReads()).toBe(1);
+      // A worktree added during the command around an artifact it used refuses the final step.
+      rmSync(artifacts, { recursive: true });
+      git(repo, "worktree", "add", "--detach", parent + "/artifacts", commit);
+      expect(() => assertCallerUnchanged()).toThrow("owned resource overlaps a caller checkout or Git directory");
+    });
+  } finally {
+    spawn.mockRestore();
+  }
 });
