@@ -232,6 +232,32 @@ describe("runs that do not count", () => {
   });
 });
 
+describe("loops that fail", () => {
+  test("a loop that fails once is recorded, rerun and counted", () => {
+    const o = healthy();
+    o.loops!["new/command"] = [{ fail: "session error" }, { docs: [loopDoc(""), loopDoc("")], questions: 0 }];
+    const f = fixture(o);
+    const r = f.run();
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    const data = JSON.parse(/```replay-data\n([\s\S]*?)\n```/.exec(f.resultsText())![1]);
+    expect(data.loops["new/command"]).toMatchObject({ executed: true, failed: 1, reviews: 1 });
+    expect(f.calls().filter((c) => c.kind === "loop" && c.key === "new/command").length).toBe(2);
+  });
+
+  test("a loop that keeps failing stops the run after writing every first pass", () => {
+    const o = healthy();
+    o.loops!["new/command"] = { fail: "session error" };
+    const f = fixture(o);
+    const r = f.run();
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr.toString()).toContain("--only loops");
+    const data = JSON.parse(/```replay-data\n([\s\S]*?)\n```/.exec(f.resultsText())![1]);
+    expect(data.firstPasses["new/command"].counted).toBe(6);
+    expect(data.loops["new/command"]).toMatchObject({ executed: false, failed: 3 });
+    expect(data.firstPasses["old/host"]).toBeUndefined();
+  });
+});
+
 describe("retention", () => {
   test("a label the old brief raised twice and the new brief never raises fails after twelve runs", () => {
     const o = healthy();

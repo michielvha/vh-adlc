@@ -2,7 +2,7 @@
 // the Codex command route and the Claude host route, a scripted owner for full loops, and an independent
 // Claude matcher. Not part of `bun test`: every call here is a real model run. The harness hands each run
 // a throwaway clone at X' whose origin is a throwaway bare repository.
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { claude, profile } from "../scenarios/host";
@@ -56,10 +56,20 @@ anything, take the option you recommend as the owner's answer without waiting: a
 recommendation, and answer a proportionality question with "keep going". Follow the procedure otherwise.
 Never ask the owner to accept the document; stop when a spec review is clean and Open Questions is empty.`;
 
+/** Keeps each session's outcome in the private case directory, so a failed run can be diagnosed. */
+function keep(r: RunRequest, turn: ReturnType<typeof claude>) {
+  const dir = join(r.caseDir, "runs", "sessions");
+  mkdirSync(dir, { recursive: true });
+  const name = `${new Date().toISOString().replace(/[:.]/g, "-")}-${r.brief.name}-${r.route}-${r.kind}.json`;
+  writeFileSync(join(dir, name), `${JSON.stringify({ isError: turn.isError, turns: turn.turns, model: turn.model, result: turn.result.slice(-4000), raw: turn.isError ? turn.raw.slice(-4000) : "" }, null, 2)}\n`);
+}
+
 function session(r: RunRequest, prompt: string) {
   const p = profile(homedir());
   try {
-    return claude(p, prompt, { cwd: r.clone, pluginDirs: [r.brief.pluginDir], model: r.authorModel, maxTurns: 200, timeoutMs: 2 * HOUR });
+    const turn = claude(p, prompt, { cwd: r.clone, pluginDirs: [r.brief.pluginDir], model: r.authorModel, maxTurns: 200, timeoutMs: 2 * HOUR });
+    keep(r, turn);
+    return turn;
   } finally { p.dispose(); }
 }
 

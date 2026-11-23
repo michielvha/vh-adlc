@@ -47,6 +47,7 @@ const SEVERITIES: Severity[] = ["nit", "should-fix", "blocking"];
 const ROUTES: Route[] = ["command", "host"];
 const FIRST_PASSES = { old: 3, new: 6, confirm: 6 };
 const MAX_REVIEWS = 60;
+const LOOP_ATTEMPTS = 3;
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
 
 function git(root: string, ...args: string[]): string {
@@ -244,7 +245,7 @@ type CaseData = {
   briefs: Record<"old" | "new", { plugin: string; docs: string }>;
   firstPasses: Record<string, { counted: number; failed: number; excluded: number; runs: RunEntry[] }>;
   retention: Record<string, Record<string, { old: number; new: number; runs: number; verdict: "pass" | "fail" | "not raised by old" }>>;
-  loops: Record<string, { executed: boolean; reviews: number; questions: number; bodySizes: number[]; growth: number; clean: boolean; model?: string; plugin: string; docs: string }>;
+  loops: Record<string, { executed: boolean; failed?: number; reviews: number; questions: number; bodySizes: number[]; growth: number; clean: boolean; model?: string; plugin: string; docs: string }>;
 };
 
 const short = (s: string) => s.slice(0, 12);
@@ -324,6 +325,7 @@ async function runCase(o: Record<string, string | undefined>) {
     old: { name: "old", plugin: git(tree, "rev-parse", need(o, "old-plugin")).trim(), pluginDir: plugins.old.dir, docs: git(docs, "rev-parse", base).trim() },
     new: { name: "new", plugin: git(tree, "rev-parse", need(o, "new-plugin")).trim(), pluginDir: plugins.new.dir, docs: git(docs, "rev-parse", head).trim() },
   };
+  let stopped = "";
   const data: CaseData = { case: config.case, approvedAt: approval.at, terms: "pass", briefs: { old: { plugin: briefs.old.plugin, docs: briefs.old.docs }, new: { plugin: briefs.new.plugin, docs: briefs.new.docs } }, firstPasses: {}, retention: {}, loops: {} };
   try {
     for (const route of ROUTES.filter((r) => underTest.includes(r))) {
@@ -354,16 +356,25 @@ async function runCase(o: Record<string, string | undefined>) {
       }
       if (only !== "first-passes") {
         for (const name of ["old", "new"] as const) {
-          const result = await once(briefs[name], "loop");
-          const identityOk = result.executed && result.route === route && result.model === model && result.plugin === briefs[name].plugin && result.docs === briefs[name].docs;
-          const documents = result.documents ?? [];
+          // A loop that fails to execute or reports another identity is recorded and rerun, never counted.
+          let failed = 0, result: RunResult | undefined, identityOk = false;
+          while (failed < LOOP_ATTEMPTS) {
+            result = await once(briefs[name], "loop");
+            identityOk = result.executed && result.route === route && result.model === model && result.plugin === briefs[name].plugin && result.docs === briefs[name].docs;
+            if (identityOk) break;
+            failed++;
+            writeFileSync(join(privateRuns, `${name}-${route}-loop-failed-${failed}.txt`), result.executed ? `reported ${result.route} ${result.model}` : `FAILED: ${result.failure ?? "unknown"}`);
+          }
+          const documents = identityOk ? result!.documents ?? [] : [];
           documents.forEach((doc, i) => writeFileSync(join(privateRuns, `${name}-${route}-loop-${i}.md`), doc));
           const sizes = documents.map(bodySize);
-          data.loops[`${name}/${route}`] = { executed: identityOk, reviews: Math.min(Math.max(documents.length - 1, 0), MAX_REVIEWS), questions: result.questions ?? 0,
-            bodySizes: sizes, growth: sizes.length ? sizes.at(-1)! - sizes[0] : 0, clean: result.clean ?? documents.length - 1 <= MAX_REVIEWS, model: result.model, plugin: result.plugin, docs: result.docs };
-          if (!identityOk) throw new Error(`stopped: the ${name} loop on the ${route} route ${result.executed ? "reported another route, model or brief" : "failed to execute"}; rerun it`);
+          data.loops[`${name}/${route}`] = { executed: identityOk, failed, reviews: Math.min(Math.max(documents.length - 1, 0), MAX_REVIEWS), questions: identityOk ? result!.questions ?? 0 : 0,
+            bodySizes: sizes, growth: sizes.length ? sizes.at(-1)! - sizes[0] : 0, clean: identityOk && (result!.clean ?? documents.length - 1 <= MAX_REVIEWS), model: result!.model, plugin: result!.plugin, docs: result!.docs };
+          if (!identityOk) stopped = `stopped: the ${name} loop on the ${route} route failed ${failed} times; its first passes are recorded, rerun its loops with --only loops`;
+          if (stopped) break;
         }
       }
+      if (stopped) break;
     }
   } finally {
     plugins.old.dispose(); plugins.new.dispose();
@@ -372,6 +383,7 @@ async function runCase(o: Record<string, string | undefined>) {
   writeResults(results, data);
   const after = termsCheck(config.terms, { files: [results] });
   if (after.length || resultHits.length) throw new Error("stopped: the terms check found a case term in the results file");
+  if (stopped) throw new Error(stopped);
   console.log(JSON.stringify({ case: config.case, results, retention: data.retention, loops: Object.fromEntries(Object.entries(data.loops).map(([k, l]) => [k, { reviews: l.reviews, questions: l.questions, growth: l.growth }])) }));
 }
 

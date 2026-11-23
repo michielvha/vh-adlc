@@ -5,7 +5,7 @@ import { appendFileSync, readFileSync } from "node:fs";
 import type { Executor, Match, RunRequest, RunResult } from "./run";
 
 type Scripted = { fail?: string; route?: string; model?: string; records?: string; docs?: string[]; questions?: number };
-type Script = { log: string; runs: Record<string, Scripted[]>; loops?: Record<string, Scripted> };
+type Script = { log: string; runs: Record<string, Scripted[]>; loops?: Record<string, Scripted | Scripted[]> };
 
 const script = (): Script => JSON.parse(readFileSync(process.env.REPLAY_SCRIPT!, "utf8"));
 const used = new Map<string, number>();
@@ -19,7 +19,11 @@ export const execute: Executor = async (request: RunRequest): Promise<RunResult>
     agents: at("show", "HEAD:AGENTS.md"), loop: at("show", "HEAD:.vh-adlc/loop.yaml") }) + "\n");
   const identity = { plugin: request.brief.plugin, docs: request.brief.docs };
   if (request.kind === "loop") {
-    const loop = s.loops?.[key];
+    // A list scripts each attempt in turn; a single entry answers every attempt.
+    const scripted = s.loops?.[key];
+    const attempt = used.get(`loop/${key}`) ?? 0;
+    used.set(`loop/${key}`, attempt + 1);
+    const loop = Array.isArray(scripted) ? scripted[attempt] ?? scripted.at(-1) : scripted;
     if (!loop || loop.fail) return { executed: false, failure: loop?.fail ?? "no scripted loop", ...identity };
     return { executed: true, route: loop.route ?? request.route, model: loop.model ?? request.model, ...identity, documents: loop.docs ?? [], questions: loop.questions ?? 0 };
   }
