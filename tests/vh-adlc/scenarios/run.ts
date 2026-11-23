@@ -1745,6 +1745,109 @@ const SCOPED_COMMAND: Scenario = {
   },
 };
 
+// ---- S17.questions ----
+
+const QUESTIONS_PROFILE = "greet is a shell script in this repository. It runs only on Linux, under POSIX `sh`; nobody who uses it has Windows or macOS. It is at alpha.";
+
+// A caller another team owns that parses the greeting, so whether the output is a public contract is open.
+const REPORT_SH = '#!/bin/sh\n# Owned by the reporting team: counts the people greeted today.\n./greet.sh "$1" | sed -n "s/^Hello, \\(.*\\)\\.$/\\1/p" >> greeted.txt\n';
+
+const QUESTION_TOPIC = (x: string) => /output|format|contract|parse|stable|interface/i.test(x);
+const PLATFORM = /linux|posix|windows|macos|platform/i;
+
+function questionsScenario(id: string, title: string, pin: "companion" | "convergence"): Scenario {
+  return {
+    id,
+    title,
+    phase: 4,
+    run: async (f) => {
+      writeAgents(f, pin === "companion" ? f.revisionCompanion : f.revisionConvergence, QUESTIONS_PROFILE);
+      commitFiles(f, { "tools/report.sh": REPORT_SH }, "fixture: a caller that parses the greeting");
+      writeDoc(f, featureDoc({ design: "`greet.sh <name>` prints `Hello, <name>.`; `greet.sh` with no argument keeps printing `Hello, world.`" }));
+      const plugin = scriptedPlugin(f, "questions", PROPORTIONAL_CANNED);
+      // Review step 4 applies the settled choice together with the owner's answers, in one commit, so at the
+      // companion pin the owner answers the one question in a second turn and Design is read after it.
+      const prompts = [`/vh-adlc-spec review ${FEATURE_PATH}`, ...(pin === "companion" ? ["The owner here: on the output format, take your recommendation. Do not run a new review in this turn."] : [])];
+      let afterReview = "";
+      const turns = session(f, [plugin], prompts, { env: { PATH: SCENARIO_PATH }, after: (i) => { if (i === 0) afterReview = readFileSync(join(f.project, FEATURE_PATH), "utf8"); } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const questions = section(afterReview, "Open Questions").split(/^(?=### Q\d+)/m).filter((q) => /^### Q\d+/.test(q));
+          const design = section(doc, "Design");
+          const checks: Check[] = [{ name: "the scripted review R-1 was stored", ok: /### R-1\b/.test(doc) && passRecords(doc, "R-1").includes("F-02") }];
+          if (pin === "companion") {
+            checks.push({ name: "after the review, exactly one Open Question, about the output contract", ok: questions.length === 1 && QUESTION_TOPIC(questions[0]) && !PLATFORM.test(questions[0].split("\n")[0]), detail: questions.map((q) => q.split("\n")[0]).join(" | ") || "none" });
+            checks.push({ name: "after the owner's answer, Design records the platform choice the profile settles, and no question about it was raised", ok: turns.length === 2 && PLATFORM.test(design) && !/^### Q\d+/m.test(section(doc, "Open Questions")), detail: design.slice(0, 400) });
+          } else {
+            checks.push({ name: "both judgement findings became Open Questions", ok: questions.length === 2 && questions.some((q) => PLATFORM.test(q)) && questions.some((q) => QUESTION_TOPIC(q)), detail: questions.map((q) => q.split("\n")[0]).join(" | ") || "none" });
+          }
+          checks.push(unrelatedIntact(c));
+          return checks;
+        },
+      };
+    },
+  };
+}
+
+// ---- S17.nits ----
+
+const NITS_PROCEDURE =
+  "# Project procedure\n\nA citation slip, a wrong line number, file name or quotation in a citation, needs no owner attention: the author fixes it with the next revision that touches its section, and an owner-facing summary leaves it out of the nits it shows the owner.\n";
+
+const NITS_DOC = featureDoc({
+  goal: "greet prints a greeting for the name it is given and a usage line on request.",
+  scope: "In scope: one name argument for `greet.sh` and a `--help` flag, as `README.md:4` describes running it. Out of scope: more than one argument.",
+  design:
+    "`greet.sh <name>` prints `Hello, <name>.`, replacing the fixed echo (greet.sh:3); `greet.sh` with no argument keeps printing `Hello, world.`, which `test.sh:5` already checks for Ada. `greet.sh --help` prints exactly one line, `usage: greet.sh <name>`.",
+  criteria: `${BASE_CRITERIA}- [ ] AC-04: \`./greet.sh --help\` prints the usage line (greet.sh:7).\n`,
+  plan: "| AC-01 | `./test.sh` (test.sh:3) |\n| AC-02 | `./test.sh` |\n| AC-03 | `./test.sh` (test.sh:7) |\n| AC-04 | `./greet.sh --help | grep -Eq '^usage: greet\\.sh <name>$'`. Must pass: `usage: greet.sh <name>`. Must fail: `Usage greet`, `usage: greet.sh` |\n",
+});
+
+const NIT_IDS = ["F-01", "F-02", "F-03", "F-04", "F-05", "F-06", "F-07", "F-08"];
+
+function nitsScenario(id: string, title: string, pin: "companion" | "convergence"): Scenario {
+  return {
+    id,
+    title,
+    phase: 4,
+    run: async (f) => {
+      writeAgents(f, pin === "companion" ? f.revisionCompanion : f.revisionConvergence, QUESTIONS_PROFILE);
+      commitFiles(f, { ".vh-adlc/loop.yaml": "schema_version: 1\nproject_procedure: agents/loop-project.md\n", "agents/loop-project.md": NITS_PROCEDURE }, "fixture: project procedure");
+      // An earlier clean pass reviewed the document, free-text pattern row included.
+      const x0 = writeDoc(f, NITS_DOC);
+      recordReview(f, "R-1", x0, "NO FINDINGS", "Clean.");
+      const plugin = scriptedPlugin(f, "nits", PROPORTIONAL_CANNED);
+      const turns = session(f, [plugin], [`/vh-adlc-spec review ${FEATURE_PATH}`], { env: { PATH: SCENARIO_PATH } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const reply = turns.at(-1)?.result ?? "";
+          const heading = reply.search(/^#{0,4}\s*\**All unapplied nits\**/im);
+          const summary = heading >= 0 ? reply.slice(0, heading) : reply;
+          const full = heading >= 0 ? reply.slice(heading) : "";
+          const ids = (text: string) => NIT_IDS.filter((x) => new RegExp(`\\b${x}\\b`).test(text));
+          const checks: Check[] = [{ name: "the scripted review R-2 was stored", ok: /### R-2\b/.test(doc) && passRecords(doc, "R-2").includes("F-08") }];
+          if (pin === "companion") {
+            // The owner-facing summary keeps finding IDs with the review details, so it is read by content: the
+            // two widening nits by what they ask, the six citation slips only as a count, none of their citations.
+            const widening = /trailing (space|whitespace)/i.test(summary) && /(twice|duplicat|more than once|two lines)/i.test(summary);
+            const slips = ["greet.sh:3", "test.sh:5", "README.md:4", "greet.sh:7", "test.sh:3", "test.sh:7"].filter((x) => summary.includes(x));
+            checks.push({ name: "the summary shows the two widening nits and a count of six", ok: widening && /\b(six|6)\b/i.test(summary) && slips.length === 0 && ids(summary).filter((x) => !["F-07", "F-08"].includes(x)).length === 0, detail: `widening shown: ${widening}; citation slips shown: ${slips.join(", ") || "none"}; IDs: ${ids(summary).join(", ") || "none"}` });
+            checks.push({ name: "the All unapplied nits section lists all eight", ok: heading >= 0 && ids(full).length === 8, detail: heading >= 0 ? `section names ${ids(full).join(", ")}` : "no All unapplied nits section" });
+          } else {
+            checks.push({ name: "the summary lists all eight nits", ok: ids(reply).length === 8, detail: `reply names ${ids(reply).join(", ")}` });
+          }
+          checks.push(unrelatedIntact(c));
+          return checks;
+        },
+      };
+    },
+  };
+}
+
 const PROPORTIONAL_SCENARIOS: Scenario[] = [
   profileScenario("S17.profile.single", "A single-person profile lowers the lock gap to a nit or less", "single", "companion"),
   profileScenario("S17.profile.hosted", "A hosted multi-tenant profile keeps the lock gap at should-fix or blocking", "hosted", "companion"),
@@ -1754,6 +1857,8 @@ const PROPORTIONAL_SCENARIOS: Scenario[] = [
   limitScenario("S17.limit.security", "Control: a stated limit that leaves a security defect is blocking", "security"),
   scopedScenario("S17.scoped", "A scoped re-review on the host route covers only the change and blocking findings", "companion"),
   SCOPED_COMMAND,
+  questionsScenario("S17.questions", "Only a judgement finding the owner could answer differently becomes an Open Question", "companion"),
+  nitsScenario("S17.nits", "The owner summary shows only the nits the recorded rules do not settle", "companion"),
 ];
 SCENARIOS.push(...PROPORTIONAL_SCENARIOS);
 
