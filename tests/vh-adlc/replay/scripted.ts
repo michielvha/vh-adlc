@@ -15,7 +15,7 @@ export const execute: Executor = async (request: RunRequest): Promise<RunResult>
   const key = `${request.brief.name}/${request.route}`;
   const at = (...args: string[]) => Bun.spawnSync(["git", "-C", request.clone, ...args], { stdout: "pipe" }).stdout.toString().trim();
   appendFileSync(s.log, JSON.stringify({ kind: request.kind, key, plugin: request.brief.plugin, docs: request.brief.docs,
-    origin: at("remote", "get-url", "origin"), branch: at("branch", "--show-current"), head: at("rev-parse", "HEAD"), commit: request.commit,
+    clone: request.clone, origin: at("remote", "get-url", "origin"), branch: at("branch", "--show-current"), head: at("rev-parse", "HEAD"), commit: request.commit,
     agents: at("show", "HEAD:AGENTS.md"), loop: at("show", "HEAD:.vh-adlc/loop.yaml") }) + "\n");
   const identity = { plugin: request.brief.plugin, docs: request.brief.docs };
   if (request.kind === "loop") {

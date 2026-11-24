@@ -12,7 +12,7 @@
 // The executor module exports `execute` (one first pass or one full loop) and `match` (an independent
 // matcher that maps a run's findings to labels). The default is ./live.ts; the tests pass ./scripted.ts.
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -164,8 +164,9 @@ function loopSettings(existing: string | null, route: Route, routes: Routes): st
  * Its `origin` is a throwaway bare repository that borrows the case repository's objects, so a session
  * that fetches or pushes never reaches the case repository itself.
  */
-export function prepareClone(config: CaseConfig, brief: Brief, route: Route, routes: Routes): { clone: string; commit: string; dispose: () => void } {
-  const root = mkdtempSync(join(tmpdir(), "vh-replay-clone-"));
+export function prepareClone(config: CaseConfig, brief: Brief, route: Route, routes: Routes, at?: string): { clone: string; commit: string; dispose: () => void } {
+  const root = at ?? mkdtempSync(join(tmpdir(), "vh-replay-clone-"));
+  if (at) mkdirSync(at, { recursive: true });
   const clone = join(root, "work"), bare = join(root, "origin.git");
   const dispose = () => rmSync(root, { recursive: true, force: true });
   try {
@@ -206,8 +207,9 @@ type PassSet = { counted: number; failed: number; excluded: number; runs: RunEnt
 const rank = (severity: string) => SEVERITIES.indexOf(severity as Severity);
 
 async function firstPasses(want: number, set: PassSet, run: () => Promise<RunResult>, expected: { route: Route; model: string; plugin: string; docs: string }, labels: Label[], match: Match, caseDir: string, store: (n: number, text: string, verdicts?: unknown) => void) {
-  const limit = set.runs.length + want * 3;
-  let target = set.counted + want;
+  // want is the number of counted passes the set must reach; a continued set keeps its earlier passes.
+  const limit = set.runs.length + Math.max(want - set.counted, 0) * 3;
+  const target = want;
   while (set.counted < target) {
     if (set.runs.length >= limit) throw new Error(`stopped: too many failed or wrong-route runs for ${expected.route}`);
     const n = set.runs.length + 1;
@@ -238,6 +240,152 @@ export function retention(label: Label, old: Severity[], fresh: Severity[]): { o
   return { old: old.length, new: fresh.filter((severity) => rank(severity) >= rank(label.minimum)).length };
 }
 
+// ---- Stored runs ----
+
+type Identity = { plugin: string; docs: string; model: string };
+type Part = "pass" | "loop";
+const identityPath = (dir: string, brief: "old" | "new", route: Route, part: Part) => join(dir, `${brief}-${route}-${part}.identity.json`);
+
+/** Records which brief, docs revision and model a stored set (one part of a brief on a route) comes from. */
+export function recordIdentity(dir: string, brief: "old" | "new", route: Route, part: Part, identity: Identity) {
+  writeFileSync(identityPath(dir, brief, route, part), `${JSON.stringify(identity, null, 2)}\n`);
+}
+
+/**
+ * Starts a fresh stored set for a brief on a route: earlier files of the kinds this run produces move to
+ * runs-superseded, so a set never mixes two invocations. A loops-only run keeps the first passes.
+ */
+export function freshSet(dir: string, brief: "old" | "new", route: Route, kinds: Part[], identity: Identity) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const moved = existsSync(dir) ? readdirSync(dir).filter((f) => kinds.some((kind) => f.startsWith(`${brief}-${route}-${kind}-`) || f === `${brief}-${route}-${kind}.identity.json`)) : [];
+  if (moved.length) {
+    const aside = join(dir, "..", "runs-superseded", `${stamp}-${brief}-${route}`);
+    mkdirSync(aside, { recursive: true });
+    for (const f of moved) renameSync(join(dir, f), join(aside, f));
+  }
+  // A kept loop clone belongs to its set and moves aside with it.
+  const clone = join(dir, "..", "loop-clones", `${brief}-${route}`);
+  if (kinds.includes("loop") && existsSync(clone)) {
+    const aside = join(dir, "..", "runs-superseded", `${stamp}-${brief}-${route}`);
+    mkdirSync(aside, { recursive: true });
+    renameSync(clone, join(aside, "loop-clone"));
+  }
+  const recordPath = launchRecordPath(dir);
+  if (existsSync(recordPath)) {
+    const record = JSON.parse(readFileSync(recordPath, "utf8")) as { launches: LaunchEntry[] };
+    record.launches = record.launches.filter((e) => !(e.brief === brief && e.route === route && kinds.includes(e.part)));
+    writeFileSync(recordPath, `${JSON.stringify(record, null, 2)}\n`);
+  }
+  for (const kind of kinds) recordIdentity(dir, brief, route, kind, identity);
+}
+
+type LaunchEntry = Identity & { brief: string; route: string; part: Part; files: string[]; pid?: number; command?: string; log?: string; note?: string };
+const launchRecordPath = (dir: string) => join(dir, "launch-record.json");
+
+/** The launch record entry for a stored set made before the harness recorded identity; one launch wrote each. */
+function launchEntry(dir: string, brief: "old" | "new", route: Route, part: Part): LaunchEntry | undefined {
+  const path = launchRecordPath(dir);
+  if (!existsSync(path)) return undefined;
+  const entries = (JSON.parse(readFileSync(path, "utf8")).launches as LaunchEntry[]).filter((e) => e.brief === brief && e.route === route && e.part === part);
+  if (entries.length > 1) throw new Error(`refused: the launch record names ${entries.length} launches for the ${brief}-brief ${part} set on the ${route} route`);
+  return entries[0];
+}
+
+/** Files of a stored set its launch record entry lists, or null when no entry covers it. */
+function listedFiles(dir: string, brief: "old" | "new", route: Route, part: Part): Set<string> | null {
+  const entry = launchEntry(dir, brief, route, part);
+  return entry ? new Set(entry.files) : null;
+}
+
+/** Refuses stored runs whose recorded identity is missing or differs from the expected brief. */
+export function checkIdentity(dir: string, brief: "old" | "new", route: Route, part: Part, expected: Identity) {
+  const path = identityPath(dir, brief, route, part), entry = launchEntry(dir, brief, route, part);
+  if (!existsSync(path) && entry) {
+    if (entry.plugin !== expected.plugin || entry.docs !== expected.docs || entry.model !== expected.model)
+      throw new Error(`refused: the launch record for the ${brief}-brief ${part} set on the ${route} route names another brief, docs revision or model`);
+    const listed = new Set(entry.files);
+    const unlisted = existsSync(dir) ? readdirSync(dir).filter((f) => f.startsWith(`${brief}-${route}-${part}-`) && !listed.has(f)) : [];
+    if (unlisted.length) throw new Error(`refused: ${unlisted.length} stored ${brief}-brief ${part} file(s) on the ${route} route are not in the launch record`);
+    return;
+  }
+  if (!existsSync(path)) throw new Error(`refused: the stored ${brief}-brief ${part} set on the ${route} route records no brief identity`);
+  const recorded = JSON.parse(readFileSync(path, "utf8")) as Identity;
+  if (recorded.plugin !== expected.plugin || recorded.docs !== expected.docs || recorded.model !== expected.model)
+    throw new Error(`refused: the stored ${brief}-brief ${part} set on the ${route} route comes from another brief, docs revision or model`);
+}
+
+/** The passes a brief stored on a route: a .txt with its .verdicts.json was counted, FAILED text failed to execute. */
+export function storedPasses(dir: string, brief: "old" | "new", route: Route, expected: { model: string; plugin: string; docs: string }): PassSet {
+  const set: PassSet = { counted: 0, failed: 0, excluded: 0, runs: [], hits: new Map() };
+  if (!existsSync(dir)) return set;
+  const prefix = `${brief}-${route}-pass-`, listed = existsSync(identityPath(dir, brief, route, "pass")) ? null : listedFiles(dir, brief, route, "pass");
+  const numbers = readdirSync(dir).filter((f) => f.startsWith(prefix) && f.endsWith(".txt") && (!listed || listed.has(f))).map((f) => Number(f.slice(prefix.length, -4))).filter(Number.isInteger).sort((a, b) => a - b);
+  for (const n of numbers) {
+    const text = readFileSync(join(dir, `${prefix}${n}.txt`), "utf8"), verdictsPath = join(dir, `${prefix}${n}.verdicts.json`);
+    const base = { n, plugin: expected.plugin, docs: expected.docs, labels: [] as string[] };
+    if (existsSync(verdictsPath)) {
+      const raised = new Map<string, Severity>();
+      for (const v of JSON.parse(readFileSync(verdictsPath, "utf8")) as { label: string; severity: string }[]) {
+        if (rank(v.severity) < 0) continue;
+        const before = raised.get(v.label);
+        if (before === undefined || rank(v.severity) > rank(before)) raised.set(v.label, v.severity as Severity);
+      }
+      for (const [label, severity] of raised) set.hits.set(label, [...(set.hits.get(label) ?? []), severity]);
+      set.counted++;
+      set.runs.push({ ...base, model: expected.model, status: "counted", labels: [...raised].map(([label, severity]) => `${label}:${severity}`) });
+    } else if (text.startsWith("FAILED")) { set.failed++; set.runs.push({ ...base, status: "failed", reason: "execution failed" }); }
+    else { set.excluded++; set.runs.push({ ...base, status: "not counted", reason: "reported another identity" }); }
+  }
+  return set;
+}
+
+/** A brief's finished loop on a route, from its stored documents. */
+export function storedLoop(dir: string, brief: "old" | "new", route: Route, expected: { model: string; plugin: string; docs: string }): CaseData["loops"][string] | undefined {
+  if (!existsSync(dir)) return undefined;
+  const prefix = `${brief}-${route}-loop-`, listed = existsSync(identityPath(dir, brief, route, "loop")) ? null : listedFiles(dir, brief, route, "loop");
+  const numbers = readdirSync(dir).filter((f) => f.startsWith(prefix) && /^\d+\.md$/.test(f.slice(prefix.length)) && (!listed || listed.has(f))).map((f) => Number(f.slice(prefix.length, -3))).sort((a, b) => a - b);
+  const failed = readdirSync(dir).filter((f) => f.startsWith(`${prefix}failed-`)).length;
+  const boundPath = join(dir, `${brief}-${route}-loop.bound.json`);
+  if (!numbers.length && existsSync(boundPath)) {
+    // A loop that stopped before a clean pass and lost its documents counts its recorded reviews as a lower bound.
+    const bound = JSON.parse(readFileSync(boundPath, "utf8")) as { reviews_at_least: number };
+    return { executed: true, failed, reviews: Math.min(bound.reviews_at_least, MAX_REVIEWS), questions: 0, bodySizes: [], growth: 0, clean: false, bound: true, ...expected };
+  }
+  if (!numbers.length) return failed ? { executed: false, failed, reviews: 0, questions: 0, bodySizes: [], growth: 0, clean: false, ...expected } : undefined;
+  const sizes = numbers.map((n) => bodySize(readFileSync(join(dir, `${prefix}${n}.md`), "utf8")));
+  const reviews = Math.min(numbers.length - 1, MAX_REVIEWS);
+  return { executed: true, failed, reviews, questions: 0, bodySizes: sizes, growth: sizes.at(-1)! - sizes[0], clean: reviews < MAX_REVIEWS, ...expected };
+}
+
+/** Rebuilds a case's results from its stored runs alone. */
+export function assembleCase(caseDir: string, o: { oldPlugin: string; newPlugin: string; oldDocs: string; newDocs: string; routes: Routes; approvedAt: string; name: string; labels: Label[] }): CaseData {
+  const dir = join(caseDir, "runs");
+  const briefs = { old: { plugin: o.oldPlugin, docs: o.oldDocs }, new: { plugin: o.newPlugin, docs: o.newDocs } };
+  const data: CaseData = { case: o.name, approvedAt: o.approvedAt, terms: "pass", briefs, firstPasses: {}, retention: {}, loops: {} };
+  for (const route of ROUTES) {
+    const model = o.routes[route].model;
+    for (const name of ["old", "new"] as const) for (const part of ["pass", "loop"] as const) {
+      const stored = existsSync(dir) && readdirSync(dir).some((f) => f.startsWith(`${name}-${route}-${part}-`));
+      if (stored) checkIdentity(dir, name, route, part, { model, ...briefs[name] });
+    }
+    const sets = { old: storedPasses(dir, "old", route, { model, ...briefs.old }), new: storedPasses(dir, "new", route, { model, ...briefs.new }) };
+    if (sets.old.runs.length || sets.new.runs.length) {
+      for (const name of ["old", "new"] as const) data.firstPasses[`${name}/${route}`] = { counted: sets[name].counted, failed: sets[name].failed, excluded: sets[name].excluded, runs: sets[name].runs };
+      if (sets.old.counted && sets.new.counted) {
+        data.retention[route] = Object.fromEntries(o.labels.map((label) => {
+          const r = retention(label, sets.old.hits.get(label.id) ?? [], sets.new.hits.get(label.id) ?? []);
+          return [label.id, { ...r, runs: sets.new.counted, verdict: r.old === 0 ? "not raised by old" : r.old >= 2 && r.new === 0 ? "fail" : "pass" }];
+        }));
+      }
+    }
+    for (const name of ["old", "new"] as const) {
+      const loop = storedLoop(dir, name, route, { model, ...briefs[name] });
+      if (loop) data.loops[`${name}/${route}`] = loop;
+    }
+  }
+  return data;
+}
+
 // ---- Results: counts and identities only ----
 
 type CaseData = {
@@ -245,7 +393,7 @@ type CaseData = {
   briefs: Record<"old" | "new", { plugin: string; docs: string }>;
   firstPasses: Record<string, { counted: number; failed: number; excluded: number; runs: RunEntry[] }>;
   retention: Record<string, Record<string, { old: number; new: number; runs: number; verdict: "pass" | "fail" | "not raised by old" }>>;
-  loops: Record<string, { executed: boolean; failed?: number; reviews: number; questions: number; bodySizes: number[]; growth: number; clean: boolean; model?: string; plugin: string; docs: string }>;
+  loops: Record<string, { executed: boolean; failed?: number; bound?: boolean; reviews: number; questions: number; bodySizes: number[]; growth: number; clean: boolean; model?: string; plugin: string; docs: string }>;
 };
 
 const short = (s: string) => s.slice(0, 12);
@@ -260,10 +408,10 @@ function renderCase(d: CaseData): string {
   }
   lines.push("", "### Retention", "", "| Route | Label | Old passes raising it | New passes at its minimum | New runs | Verdict |", "| --- | --- | --- | --- | --- | --- |");
   for (const [route, labels] of Object.entries(d.retention)) for (const [label, r] of Object.entries(labels)) lines.push(`| ${route} | ${label} | ${r.old}/3 | ${r.new}/${r.runs} | ${r.runs} | ${r.verdict} |`);
-  lines.push("", "### Full loops", "", "| Brief | Route | Plugin | Docs | Model | Spec reviews | Open Questions | Body size per pass | Growth |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  lines.push("", "### Full loops", "", "| Brief | Route | Plugin | Docs | Model | Spec reviews | Body size per pass | Growth |", "| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const [key, l] of Object.entries(d.loops)) {
     const [brief, route] = key.split("/");
-    lines.push(`| ${brief} | ${route} | \`${short(l.plugin)}\` | \`${short(l.docs)}\` | ${l.model ?? "unknown"} | ${l.executed ? `${l.reviews}${l.clean ? "" : " (cap)"}` : "failed"} | ${l.questions} | ${l.bodySizes.join(", ")} | ${l.growth} |`);
+    lines.push(`| ${brief} | ${route} | \`${short(l.plugin)}\` | \`${short(l.docs)}\` | ${l.model ?? "unknown"} | ${l.executed ? `${l.bound ? "at least " : ""}${l.reviews}${l.clean ? "" : l.bound ? ", not clean" : " (cap)"}` : "failed"} | ${l.bodySizes.join(", ") || "not stored"} | ${l.bodySizes.length ? l.growth : "unknown"} |`);
   }
   lines.push("", "```replay-data", JSON.stringify(d), "```", "");
   return lines.join("\n");
@@ -273,13 +421,16 @@ function totals(cases: CaseData[]): string {
   const sum = (brief: "old" | "new", field: "reviews" | "questions" | "growth") => cases.reduce((total, c) =>
     total + Object.entries(c.loops).filter(([key]) => key.startsWith(`${brief}/`)).reduce((t, [, l]) => t + l[field], 0), 0);
   const failing = cases.flatMap((c) => Object.entries(c.retention).flatMap(([route, labels]) => Object.entries(labels).filter(([, r]) => r.verdict === "fail").map(([label]) => `${c.case} ${route} ${label}`)));
-  const [oldReviews, newReviews, oldQ, newQ, oldG, newG] = [sum("old", "reviews"), sum("new", "reviews"), sum("old", "questions"), sum("new", "questions"), sum("old", "growth"), sum("new", "growth")];
-  const growthOk = oldG <= 0 ? newG <= oldG : newG * 2 <= oldG;
+  const [oldReviews, newReviews] = [sum("old", "reviews"), sum("new", "reviews")];
+  // Growth compares only the pairs whose old-brief loop stored its documents.
+  const pairs = cases.flatMap((c) => Object.keys(c.loops).filter((k) => k.startsWith("old/") && c.loops[k].clean && !c.loops[k].bound && c.loops[k].bodySizes.length && c.loops[`new/${k.slice(4)}`]?.bodySizes.length).map((k) => [c, k.slice(4)] as const));
+  const oldG = pairs.reduce((t, [c, r]) => t + c.loops[`old/${r}`].growth, 0), newG = pairs.reduce((t, [c, r]) => t + c.loops[`new/${r}`].growth, 0);
+  // Growth needs at least one pair whose old loop reached a clean pass with stored documents.
+  const growthOk = pairs.length > 0 && (oldG <= 0 ? newG <= oldG : newG * 2 <= oldG);
   return ["## Totals", "", `Cases: ${cases.map((c) => c.case).join(", ")}.`, "",
     "| Measure | Old | New | Condition | Met |", "| --- | --- | --- | --- | --- |",
-    `| Spec reviews | ${oldReviews} | ${newReviews} | new at most half of old | ${newReviews * 2 <= oldReviews ? "yes" : "no"} |`,
-    `| Open Questions | ${oldQ} | ${newQ} | new fewer than old | ${newQ < oldQ ? "yes" : "no"} |`,
-    `| Body growth | ${oldG} | ${newG} | new at most half of old, or no larger when old is zero or less | ${growthOk ? "yes" : "no"} |`,
+    `| Spec reviews | ${cases.some((c) => Object.values(c.loops).some((l) => l.bound)) ? "at least " : ""}${oldReviews} | ${newReviews} | new at most half of old | ${newReviews * 2 <= oldReviews ? "yes" : "no"} |`,
+    `| Body growth (${pairs.length} pairs with stored old documents) | ${oldG} | ${newG} | new at most half of old, or no larger when old is zero or less | ${growthOk ? "yes" : "no"} |`,
     `| Failing labels | | ${failing.length} | none | ${failing.length ? "no" : "yes"} |`, ""].join("\n");
 }
 
@@ -316,6 +467,8 @@ async function runCase(o: Record<string, string | undefined>) {
   const { execute, match } = await import(executorPath) as { execute: Executor; match: Match };
   const underTest = (o["routes-under-test"] ?? "command,host").split(",") as Route[];
   const only = o.only;
+  const selected = (o.briefs ?? "old,new").split(",");
+  if (selected.some((name) => name !== "old" && name !== "new") || !selected.length) throw new Error("--briefs takes old, new or old,new");
   const results = resolve(o.results ?? join(import.meta.dir, "..", "evidence", "proportional-review", "results.md"));
   const privateRuns = join(caseDir, "runs");
   mkdirSync(privateRuns, { recursive: true });
@@ -330,10 +483,34 @@ async function runCase(o: Record<string, string | undefined>) {
   try {
     for (const route of ROUTES.filter((r) => underTest.includes(r))) {
       const model = routes[route].model;
+      const kinds: ("pass" | "loop")[] = only === "loops" ? ["loop"] : only === "first-passes" ? ["pass"] : ["pass", "loop"];
+      // A run continues a stored set made with the same identity and starts a fresh one when it differs.
+      for (const name of selected as ("old" | "new")[]) {
+        const identity = { model, plugin: briefs[name].plugin, docs: briefs[name].docs };
+        for (const part of kinds) {
+          let same = false;
+          try { checkIdentity(privateRuns, name, route, part, identity); same = true; } catch { same = false; }
+          if (same) recordIdentity(privateRuns, name, route, part, identity);
+          else freshSet(privateRuns, name, route, [part], identity);
+        }
+      }
       const once = async (brief: Brief, kind: RunRequest["kind"]) => {
-        const prepared = prepareClone(config, brief, route, routes);
-        try { return await execute({ kind, route, model, brief, clone: prepared.clone, commit: prepared.commit, document: config.document, caseDir, maxReviews: MAX_REVIEWS, ...(routes.author ? { authorModel: routes.author.model } : {}) }); }
-        finally { prepared.dispose(); }
+        // A loop works in a clone kept in the case directory: it survives a failure, and the next attempt
+        // resumes it, so no finished review is lost. A first pass uses a throwaway clone.
+        const kept = kind === "loop" ? join(caseDir, "loop-clones", `${brief.name}-${route}`) : undefined;
+        const marker = kept ? join(kept, "replay-clone.json") : undefined;
+        let prepared: { clone: string; commit: string; dispose: () => void };
+        if (kept && marker && existsSync(marker)) {
+          const m = JSON.parse(readFileSync(marker, "utf8")) as { commit: string; plugin: string; docs: string };
+          if (m.plugin !== brief.plugin || m.docs !== brief.docs) throw new Error(`refused: the kept ${brief.name} loop clone on the ${route} route belongs to another brief`);
+          prepared = { clone: join(kept, "work"), commit: m.commit, dispose: () => rmSync(kept, { recursive: true, force: true }) };
+        } else {
+          prepared = prepareClone(config, brief, route, routes, kept);
+          if (marker) writeFileSync(marker, `${JSON.stringify({ commit: prepared.commit, plugin: brief.plugin, docs: brief.docs })}\n`);
+        }
+        let result: RunResult | undefined;
+        try { result = await execute({ kind, route, model, brief, clone: prepared.clone, commit: prepared.commit, document: config.document, caseDir, maxReviews: MAX_REVIEWS, ...(routes.author ? { authorModel: routes.author.model } : {}) }); return result; }
+        finally { if (!kept || result?.executed) prepared.dispose(); }
       };
       if (only !== "loops") {
         const sets: Record<"old" | "new", PassSet> = { old: { counted: 0, failed: 0, excluded: 0, runs: [], hits: new Map() }, new: { counted: 0, failed: 0, excluded: 0, runs: [], hits: new Map() } };
@@ -342,11 +519,16 @@ async function runCase(o: Record<string, string | undefined>) {
             writeFileSync(join(privateRuns, `${name}-${route}-pass-${n}.txt`), text);
             if (verdicts !== undefined) writeFileSync(join(privateRuns, `${name}-${route}-pass-${n}.verdicts.json`), `${JSON.stringify(verdicts, null, 2)}\n`);
           });
-        await pass("old", FIRST_PASSES.old);
-        await pass("new", FIRST_PASSES.new);
+        // A brief that is not run takes its counted passes from the stored runs, so a rerun of the new brief
+        // compares against the old passes already stored.
+        for (const name of ["old", "new"] as const) {
+          const identity = { model, plugin: briefs[name].plugin, docs: briefs[name].docs };
+          if (selected.includes(name)) { sets[name] = storedPasses(privateRuns, name, route, identity); await pass(name, FIRST_PASSES[name]); }
+          else { checkIdentity(privateRuns, name, route, "pass", identity); sets[name] = storedPasses(privateRuns, name, route, identity); }
+        }
         const verdicts: CaseData["retention"][string] = {};
         const failing = () => labels.filter((label) => { const r = retention(label, sets.old.hits.get(label.id) ?? [], sets.new.hits.get(label.id) ?? []); return r.old >= 2 && r.new === 0; });
-        if (failing().length) await pass("new", FIRST_PASSES.confirm);
+        if (failing().length && selected.includes("new")) await pass("new", FIRST_PASSES.new + FIRST_PASSES.confirm);
         for (const label of labels) {
           const r = retention(label, sets.old.hits.get(label.id) ?? [], sets.new.hits.get(label.id) ?? []);
           verdicts[label.id] = { ...r, runs: sets.new.counted, verdict: r.old === 0 ? "not raised by old" : r.old >= 2 && r.new === 0 ? "fail" : "pass" };
@@ -356,6 +538,17 @@ async function runCase(o: Record<string, string | undefined>) {
       }
       if (only !== "first-passes") {
         for (const name of ["old", "new"] as const) {
+          const identity = { model, plugin: briefs[name].plugin, docs: briefs[name].docs };
+          if (!selected.includes(name)) {
+            const hasLoop = existsSync(privateRuns) && readdirSync(privateRuns).some((f) => f.startsWith(`${name}-${route}-loop-`));
+            if (hasLoop) checkIdentity(privateRuns, name, route, "loop", identity);
+            const stored = storedLoop(privateRuns, name, route, identity);
+            if (stored) data.loops[`${name}/${route}`] = stored;
+            continue;
+          }
+          // A continued loop set that already finished is used as stored, never run again.
+          const finished = storedLoop(privateRuns, name, route, identity);
+          if (finished?.executed && finished.bodySizes.length) { data.loops[`${name}/${route}`] = finished; continue; }
           // A loop that fails to execute or reports another identity is recorded and rerun, never counted.
           let failed = 0, result: RunResult | undefined, identityOk = false;
           while (failed < LOOP_ATTEMPTS) {
@@ -398,10 +591,57 @@ async function main(argv: string[]): Promise<number> {
     case: { type: "string" }, tree: { type: "string" }, "old-plugin": { type: "string" }, "new-plugin": { type: "string" },
     docs: { type: "string" }, "companion-base": { type: "string" }, "companion-head": { type: "string" }, routes: { type: "string" },
     results: { type: "string" }, executor: { type: "string" }, only: { type: "string" }, "routes-under-test": { type: "string" },
-    file: { type: "string", multiple: true },
+    file: { type: "string", multiple: true }, briefs: { type: "string" }, "old-docs": { type: "string" }, "new-docs": { type: "string" },
+    brief: { type: "string" }, sessions: { type: "string" }, since: { type: "string" }, until: { type: "string" }, "first-passes": { type: "string" },
   } });
   const command = positionals[0];
   if (command === "run") { await runCase(values as Record<string, string | undefined>); return 0; }
+  if (command === "bound") {
+    // Counts the reviews a lost loop ran from the reviewer's session logs: distinct reviewed commits for this
+    // document and docs revision, less the first passes, which each reviewed their own X'.
+    const v = values as Record<string, string | undefined>;
+    const caseDir = resolve(need(v, "case"));
+    const { config } = loadCase(caseDir);
+    const brief = need(v, "brief") as "old" | "new", route = need(v, "routes-under-test") as Route;
+    const sessions = need(v, "sessions"), docs = need(v, "old-docs"), since = Date.parse(need(v, "since")), until = Date.parse(need(v, "until"));
+    const seen: { at: number; commit: string }[] = [];
+    const walk = (dir: string) => { for (const name of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, name.name);
+      if (name.isDirectory()) walk(path);
+      else if (name.name.endsWith(".jsonl")) {
+        const t = statSync(path).mtimeMs;
+        if (t < since || t > until) continue;
+        const text = readFileSync(path, "utf8");
+        if (!text.includes(config.document) || !text.includes(docs)) continue;
+        const m = /Commit: ([0-9a-f]{40})/.exec(text);
+        if (m) seen.push({ at: t, commit: m[1] });
+      }
+    } };
+    walk(sessions);
+    // Distinct commits in the order they were first reviewed; the launch's first-pass executions came first,
+    // each on its own X', so the first ones belong to them and are set aside.
+    const ordered: string[] = [];
+    for (const { commit } of seen.sort((a, b) => a.at - b.at)) if (!ordered.includes(commit)) ordered.push(commit);
+    const firstPasses = Number(need(v, "first-passes"));
+    const counted = ordered.slice(firstPasses);
+    const record = { reviews_at_least: Math.min(counted.length, MAX_REVIEWS), clean: false, window: { since: v.since, until: v.until }, first_pass_executions: firstPasses,
+      set_aside: ordered.slice(0, firstPasses), counted_commits: counted, source: `reviewer session logs under ${sessions} for ${config.document} at docs ${docs}` };
+    writeFileSync(join(caseDir, "runs", `${brief}-${route}-loop.bound.json`), `${JSON.stringify(record, null, 2)}\n`);
+    console.log(JSON.stringify(record));
+    return 0;
+  }
+  if (command === "assemble") {
+    const v = values as Record<string, string | undefined>;
+    const caseDir = resolve(need(v, "case"));
+    const { config, labels, approval } = loadCase(caseDir);
+    const routes = JSON.parse(readFileSync(need(v, "routes"), "utf8")) as Routes;
+    const results = resolve(v.results ?? join(import.meta.dir, "..", "evidence", "proportional-review", "results.md"));
+    const data = assembleCase(caseDir, { oldPlugin: need(v, "old-plugin"), newPlugin: need(v, "new-plugin"), oldDocs: need(v, "old-docs"), newDocs: need(v, "new-docs"), routes, approvedAt: approval.at, name: config.case, labels });
+    writeResults(results, data);
+    if (termsCheck(config.terms, { files: [results] }).length) throw new Error("stopped: the terms check found a case term in the results file");
+    console.log(JSON.stringify({ case: config.case, results, retention: data.retention, loops: Object.fromEntries(Object.entries(data.loops).map(([k, l]) => [k, { reviews: l.reviews, growth: l.growth, clean: l.clean }])) }));
+    return 0;
+  }
   if (command === "terms") {
     const caseDir = resolve(need(values as Record<string, string>, "case"));
     const { config } = loadCase(caseDir);

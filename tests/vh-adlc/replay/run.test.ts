@@ -2,7 +2,7 @@
 // scripted executor and matcher, so no model is called. The fixture case has one seeded defect, L-01.
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
@@ -155,6 +155,17 @@ describe("a healthy fixture case", () => {
     expect(f.calls().filter((c) => c.kind === "first-pass" && c.key === "new/command").length).toBe(6);
   });
 
+  test("the totals table carries the spec review, growth and label conditions and no question condition", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    const totals = f.resultsText().split("## Totals")[1];
+    expect(totals).toContain("| Spec reviews |");
+    expect(totals).toContain("| Body growth");
+    expect(totals).toContain("| Failing labels |");
+    expect(totals).not.toContain("Open Questions");
+    expect(f.resultsText()).not.toContain("Open Questions");
+  });
+
   test("records body size per pass without the Deferred section", () => {
     const o = healthy();
     o.loops!["new/host"] = { docs: [loopDoc(""), loopDoc("", "- D-01: A deferred item. From: author cut. Verdict: pending.\n- D-02: Another. From: author cut. Verdict: pending.")], questions: 0 };
@@ -255,6 +266,231 @@ describe("loops that fail", () => {
     expect(data.firstPasses["new/command"].counted).toBe(6);
     expect(data.loops["new/command"]).toMatchObject({ executed: false, failed: 3 });
     expect(data.firstPasses["old/host"]).toBeUndefined();
+  });
+});
+
+describe("stored runs", () => {
+  const data = (text: string) => JSON.parse(/```replay-data\n([\s\S]*?)\n```/.exec(text)![1]);
+
+  test("assemble rebuilds the run's counts from the stored runs alone", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    const ran = data(f.resultsText());
+    const assembled = join(f.dir, "assembled.md");
+    const r = Bun.spawnSync([process.execPath, RUN, "assemble", "--case", f.dir, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--old-docs", f.base, "--new-docs", f.head,
+      "--routes", f.routes, "--results", assembled], { stdout: "pipe", stderr: "pipe" });
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    const built = data(readFileSync(assembled, "utf8"));
+    for (const key of Object.keys(ran.firstPasses)) expect([key, built.firstPasses[key].counted]).toEqual([key, ran.firstPasses[key].counted]);
+    expect(built.retention).toEqual(ran.retention);
+    for (const key of Object.keys(ran.loops)) expect([key, built.loops[key].reviews, built.loops[key].growth]).toEqual([key, ran.loops[key].reviews, ran.loops[key].growth]);
+  });
+
+  test("a rerun of the new brief compares against the stored old passes without running them", () => {
+    const o = healthy();
+    o.runs!["old/command"] = [{ records: RAISES }, { records: RAISES }, { records: OTHER }];
+    const f = fixture(o);
+    expect(f.run().exitCode).toBe(0);
+    writeFileSync(join(f.dir, "calls.log"), "");
+    const r = Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--docs", f.docs,
+      "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--briefs", "new"],
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    expect(f.calls().filter((c) => c.key.startsWith("old/")).length).toBe(0);
+    // The new-brief passes stored under the same identity are continued, so none runs again.
+    expect(f.calls().filter((c) => c.key === "new/command" && c.kind === "first-pass").length).toBe(0);
+    const after = data(f.resultsText());
+    expect(after.retention.command["L-01"]).toMatchObject({ old: 2, verdict: "pass" });
+    expect(after.loops["old/command"].reviews).toBe(1);
+  });
+});
+
+describe("stored brief identity", () => {
+  const newOnly = (f: ReturnType<typeof fixture>) => Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin,
+    "--docs", f.docs, "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--briefs", "new"],
+  { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
+
+  test("a new-brief-only run refuses a stored old-brief set from another brief", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    const path = join(f.dir, "runs", "old-command-pass.identity.json");
+    writeFileSync(path, readFileSync(path, "utf8").replace(f.oldPlugin, f.newPlugin));
+    writeFileSync(join(f.dir, "calls.log"), "");
+    const r = newOnly(f);
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr.toString()).toContain("from another brief");
+  });
+
+  test("a run under another identity moves the earlier stored set aside", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    const r = Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin, "--new-plugin", f.oldPlugin, "--docs", f.docs,
+      "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--briefs", "new"],
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    const sets = readdirSync(join(f.dir, "runs-superseded"));
+    expect(readdirSync(join(f.dir, "runs-superseded", sets.find((d) => d.endsWith("-new-host"))!)).filter((n) => n.endsWith(".txt")).length).toBe(6);
+    expect(sets.some((d) => d.includes("-old-"))).toBe(false);
+  });
+
+  test("a run under the same identity continues a stored set and runs only the missing passes", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    for (const n of [5, 6]) for (const ext of [".txt", ".verdicts.json"]) rmSync(join(f.dir, "runs", `new-command-pass-${n}${ext}`));
+    writeFileSync(join(f.dir, "calls.log"), "");
+    const r = Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--docs", f.docs,
+      "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--briefs", "new", "--only", "first-passes", "--routes-under-test", "command"],
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    expect(f.calls().filter((c) => c.key === "new/command" && c.kind === "first-pass").length).toBe(2);
+  });
+
+  test("a failed loop keeps its clone and the next attempt resumes it", () => {
+    const o = healthy();
+    o.loops!["new/command"] = [{ fail: "session error" }, { docs: [loopDoc(""), loopDoc("")], questions: 0 }];
+    const f = fixture(o);
+    expect(f.run().exitCode).toBe(0);
+    const loops = f.calls().filter((c) => c.kind === "loop" && c.key === "new/command");
+    expect(loops.length).toBe(2);
+    expect(loops[1].clone).toBe(loops[0].clone);
+    expect(loops[0].clone).toContain(join(f.dir, "loop-clones"));
+    expect(readdirSync(join(f.dir, "loop-clones"))).not.toContain("new-command");
+  });
+
+  test("a loop that lost its documents counts a recorded lower bound and is left out of growth", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    for (const n of readdirSync(join(f.dir, "runs")).filter((n) => n.startsWith("old-command-loop-"))) rmSync(join(f.dir, "runs", n));
+    writeFileSync(join(f.dir, "runs", "old-command-loop.bound.json"), JSON.stringify({ reviews_at_least: 30, clean: false }));
+    const assembled = join(f.dir, "assembled.md");
+    const r = Bun.spawnSync([process.execPath, RUN, "assemble", "--case", f.dir, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--old-docs", f.base, "--new-docs", f.head,
+      "--routes", f.routes, "--results", assembled], { stdout: "pipe", stderr: "pipe" });
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    const text = readFileSync(assembled, "utf8");
+    expect(text).toContain("| Spec reviews | at least 31 |");
+    expect(text).toContain("| Body growth (1 pairs with stored old documents)");
+  });
+
+  test("a pre-T25 set counts through a matching launch record and is refused through a mismatched or incomplete one", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    const runs = join(f.dir, "runs");
+    rmSync(join(runs, "old-command-pass.identity.json"));
+    const files = readdirSync(runs).filter((n) => n.startsWith("old-command-pass-"));
+    const record = (plugin: string, listed: string[]) => writeFileSync(join(runs, "launch-record.json"), JSON.stringify({ launches: [{ brief: "old", route: "command", part: "pass", plugin, docs: f.base, model: "gpt-test", command: "run.ts run ...", files: listed }] }));
+    const assemble = () => Bun.spawnSync([process.execPath, RUN, "assemble", "--case", f.dir, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--old-docs", f.base, "--new-docs", f.head,
+      "--routes", f.routes, "--results", join(f.dir, "assembled.md")], { stdout: "pipe", stderr: "pipe" });
+    record(f.oldPlugin, files);
+    expect(assemble().exitCode).toBe(0);
+    record(f.newPlugin, files);
+    expect(assemble().stderr.toString()).toContain("launch record");
+    record(f.oldPlugin, files.filter((n) => n !== "old-command-pass-3.txt"));
+    const r = assemble();
+    expect(r.exitCode).not.toBe(0);
+    expect(r.stderr.toString()).toContain("not in the launch record");
+  });
+
+  test("pre-T25 first passes followed by a post-T25 loops-only run keep each part's own identity", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    const runs = join(f.dir, "runs");
+    rmSync(join(runs, "old-command-pass.identity.json"));
+    writeFileSync(join(runs, "launch-record.json"), JSON.stringify({ launches: [{ brief: "old", route: "command", part: "pass", plugin: f.oldPlugin, docs: f.base, model: "gpt-test", command: "run.ts run ...",
+      files: readdirSync(runs).filter((n) => n.startsWith("old-command-pass-")) }] }));
+    const loops = Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--docs", f.docs,
+      "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--only", "loops"],
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
+    expect(loops.exitCode, loops.stderr.toString()).toBe(0);
+    expect(readdirSync(runs)).toContain("old-command-loop.identity.json");
+    expect(readdirSync(runs)).not.toContain("old-command-pass.identity.json");
+    const r = Bun.spawnSync([process.execPath, RUN, "assemble", "--case", f.dir, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--old-docs", f.base, "--new-docs", f.head,
+      "--routes", f.routes, "--results", join(f.dir, "assembled.md")], { stdout: "pipe", stderr: "pipe" });
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+  });
+
+  test("a loops-only rerun keeps the stored first passes", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    const r = Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--docs", f.docs,
+      "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--only", "loops"],
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    expect(readdirSync(join(f.dir, "runs")).filter((n) => n.startsWith("new-command-pass-") && n.endsWith(".txt")).length).toBe(6);
+  });
+
+  const assembleTo = (f: ReturnType<typeof fixture>, out: string) => Bun.spawnSync([process.execPath, RUN, "assemble", "--case", f.dir, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin,
+    "--old-docs", f.base, "--new-docs", f.head, "--routes", f.routes, "--results", out], { stdout: "pipe", stderr: "pipe" });
+  const newOnlyRun = (f: ReturnType<typeof fixture>, ...extra: string[]) => Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin,
+    "--new-plugin", f.newPlugin, "--docs", f.docs, "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--briefs", "new", ...extra],
+  { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
+
+  test("a pre-T25 lost loop set with a launch-record entry and a bound counts its bound and stays finished", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    const runs = join(f.dir, "runs");
+    for (const n of readdirSync(runs).filter((n) => n.startsWith("old-command-loop"))) rmSync(join(runs, n));
+    writeFileSync(join(runs, "launch-record.json"), JSON.stringify({ launches: [{ brief: "old", route: "command", part: "loop", plugin: f.oldPlugin, docs: f.base, model: "gpt-test", command: "run.ts run ...", files: [] }] }));
+    writeFileSync(join(runs, "old-command-loop.bound.json"), JSON.stringify({ reviews_at_least: 40, clean: false }));
+    writeFileSync(join(f.dir, "calls.log"), "");
+    expect(newOnlyRun(f).exitCode).toBe(0);
+    expect(f.calls().filter((c) => c.key.startsWith("old/")).length).toBe(0);
+    expect(existsSync(join(runs, "old-command-loop.bound.json"))).toBe(true);
+    const r = assembleTo(f, join(f.dir, "a.md"));
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    expect(readFileSync(join(f.dir, "a.md"), "utf8")).toContain("at least 40, not clean");
+  });
+
+  test("a fresh set moves its kept loop clone aside", () => {
+    const o = healthy();
+    o.loops!["new/command"] = { fail: "session error" };
+    const f = fixture(o);
+    expect(f.run().exitCode).not.toBe(0);
+    expect(readdirSync(join(f.dir, "loop-clones"))).toContain("new-command");
+    // The loop part under another new brief starts a fresh set, which takes the kept clone with it.
+    Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin, "--new-plugin", f.oldPlugin, "--docs", f.docs,
+      "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--briefs", "new", "--routes-under-test", "command", "--only", "loops"],
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
+    const aside = readdirSync(join(f.dir, "runs-superseded"));
+    expect(aside.some((d) => d.endsWith("-new-command") && readdirSync(join(f.dir, "runs-superseded", d)).includes("loop-clone"))).toBe(true);
+  });
+
+  test("a pre-T25 set holding an unlisted run file starts a fresh set", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    const runs = join(f.dir, "runs");
+    rmSync(join(runs, "new-command-pass.identity.json"));
+    writeFileSync(join(runs, "launch-record.json"), JSON.stringify({ launches: [{ brief: "new", route: "command", part: "pass", plugin: f.newPlugin, docs: f.head, model: "gpt-test", command: "run.ts run ...",
+      files: readdirSync(runs).filter((n) => n.startsWith("new-command-pass-") && !n.startsWith("new-command-pass-6")) }] }));
+    writeFileSync(join(f.dir, "calls.log"), "");
+    expect(newOnlyRun(f, "--routes-under-test", "command", "--only", "first-passes").exitCode).toBe(0);
+    expect(f.calls().filter((c) => c.key === "new/command" && c.kind === "first-pass").length).toBe(6);
+    expect(readdirSync(join(f.dir, "runs-superseded")).some((d) => d.endsWith("-new-command"))).toBe(true);
+  });
+
+  test("an old loop that stored documents but never reached a clean pass stays out of growth", () => {
+    const f = fixture(healthy());
+    expect(f.run().exitCode).toBe(0);
+    const runs = join(f.dir, "runs");
+    for (let i = 2; i <= 61; i++) writeFileSync(join(runs, `old-command-loop-${i}.md`), loopDoc("## Extra\n\nMore.\n\n"));
+    const r = assembleTo(f, join(f.dir, "a.md"));
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    const text = readFileSync(join(f.dir, "a.md"), "utf8");
+    expect(text).toContain("60 (cap)");
+    expect(text).toContain("| Body growth (1 pairs with stored old documents)");
+  });
+
+  test("assembly after an interrupted first-pass set keeps its finished passes", () => {
+    const o = healthy();
+    o.runs!["old/command"] = [{ records: RAISES }, { records: RAISES }, { fail: "crash" }];
+    const f = fixture(o);
+    expect(f.run().exitCode).not.toBe(0);
+    const assembled = join(f.dir, "assembled.md");
+    const r = Bun.spawnSync([process.execPath, RUN, "assemble", "--case", f.dir, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--old-docs", f.base, "--new-docs", f.head,
+      "--routes", f.routes, "--results", assembled], { stdout: "pipe", stderr: "pipe" });
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    const built = JSON.parse(/```replay-data\n([\s\S]*?)\n```/.exec(readFileSync(assembled, "utf8"))![1]);
+    expect(built.firstPasses["old/command"].counted).toBe(2);
+    expect(built.firstPasses["old/command"].failed).toBeGreaterThan(0);
   });
 });
 
