@@ -328,3 +328,98 @@ describe("visual reading article checks", async () => {
     expect(visual.withoutTreatments(article)).not.toMatch(/\n{3,}/);
   });
 });
+
+describe("visual reading rollout analysis", async () => {
+  const visual = await import("./blog/visual.ts");
+  const { mkdtempSync, mkdirSync: mkdir, writeFileSync: write, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+
+  const fixture = () => {
+    const dir = mkdtempSync(join(tmpdir(), "bvr-rollout-"));
+    const project = join(dir, "project"), pkgDir = join(dir, "pkg"), sessions = join(dir, "sessions");
+    for (const d of [project, join(pkgDir, "agents"), sessions]) mkdir(d, { recursive: true });
+    write(join(project, "candidate-1.md"), "x");
+    write(join(project, "chart-1.png"), "png");
+    write(join(pkgDir, "agents/vh-adlc-blog-editor.agent.md"), "x");
+    return { dir, project, pkgDir, sessions };
+  };
+  const row = (type: string, payload: object) => JSON.stringify({ type, payload });
+  const call = (turn: string, id: string, name: string, args: object) => row("response_item", { type: "function_call", name, call_id: id, arguments: JSON.stringify(args), internal_chat_message_metadata_passthrough: { turn_id: turn } });
+  const exec = (turn: string, id: string, input: string) => row("response_item", { type: "custom_tool_call", name: "exec", call_id: id, input, internal_chat_message_metadata_passthrough: { turn_id: turn } });
+  const output = (id: string, output: unknown) => row("response_item", { type: "function_call_output", call_id: id, output });
+  const task = (turn: string, root: string, message?: string) => [
+    row("event_msg", { type: "task_started", turn_id: turn, root_turn_id: root }),
+    ...(message === undefined ? [] : [row("event_msg", { type: "task_complete", turn_id: turn, root_turn_id: root, last_agent_message: message })]),
+  ];
+
+  test("links children, finds the editor's reads and view, and checks the spawn", () => {
+    const f = fixture();
+    try {
+      write(join(f.sessions, "parent.jsonl"), [
+        row("session_meta", { id: "P", cwd: f.project, source: "exec" }),
+        ...task("pt", "pt"),
+        row("turn_context", { turn_id: "pt", cwd: f.project }),
+        call("pt", "c1", "spawn_agent", { task_name: "editor", fork_turns: "none", message: "enc" }),
+        call("pt", "c2", "exec_command", { cmd: "ls -la && cat candidate-1.md 2>/dev/null | head -5" }),
+        ...task("pt", "pt", "Verdict: Needs revision"),
+      ].join("\n"));
+      write(join(f.sessions, "child.jsonl"), [
+        row("session_meta", { id: "C", cwd: f.project, source: { subagent: { thread_spawn: { parent_thread_id: "P" } } } }),
+        ...task("ct", "pt"),
+        row("turn_context", { turn_id: "ct", cwd: f.project }),
+        call("ct", "d1", "exec_command", { cmd: `sed -n 1,80p ${f.pkgDir}/agents/vh-adlc-blog-editor.agent.md` }),
+        call("ct", "d2", "view_image", { path: "chart-1.png" }),
+        output("d2", [{ type: "input_image", image_url: "data:image/png;base64,AA" }]),
+        exec("ct", "d3", `const r = await tools.exec_command({cmd:"curl -s https://example.invalid/x"}); text(r);`),
+        ...task("ct", "pt", "Verdict: Needs revision\nCopy repairs: None\nPresentation repairs: None.\nExceptions: None"),
+      ].join("\n"));
+      const all = visual.loadRollouts(f.sessions);
+      const { parent, children } = visual.linkedRollouts(all, "P");
+      expect(parent?.id).toBe("P");
+      expect(children.map((c) => c.id)).toEqual(["C"]);
+      const child = children[0];
+      expect([...visual.rootTurns(child)]).toEqual(["pt"]);
+      expect(visual.spawnCalls(parent!, visual.rootTurns(child)).every((s) => s.noHistory)).toBe(true);
+      const analysis = visual.analyze([parent!, child], { png: join(f.project, "chart-1.png"), allowedUrl: visual.docsUrl("abc") });
+      const childReads = analysis.reads.filter((r) => r.thread === "C").map((r) => r.path);
+      expect(childReads.some((p) => p.endsWith("agents/vh-adlc-blog-editor.agent.md"))).toBe(true);
+      expect(analysis.reads.some((r) => r.thread === "P" && r.path.endsWith("candidate-1.md"))).toBe(true);
+      expect(analysis.reads.some((r) => r.path === "/dev/null")).toBe(false);
+      expect(analysis.views).toEqual([{ thread: "C", turn: "ct", path: expect.stringMatching(/chart-1\.png$/), carriesImage: true }]);
+      expect(analysis.fetches.map((x) => x.what)).toEqual(["url: https://example.invalid/x"]);
+      expect(analysis.mentions.map((m) => m.thread)).toEqual(["C"]);
+    } finally { rmSync(f.dir, { recursive: true, force: true }); }
+  });
+
+  test("flags forked spawns, code-mode views, searches, gh and git fetches, and outside reads", () => {
+    const f = fixture();
+    try {
+      write(join(f.sessions, "parent.jsonl"), [
+        row("session_meta", { id: "P", cwd: f.project, source: "exec" }),
+        ...task("pt", "pt"),
+        exec("pt", "e1", `await tools.spawn_agent({task_name:"editor", fork_turns:"all", message:"go"}); const v = await tools.view_image({path:"chart-1.png"}); image(v);`),
+        row("response_item", { type: "custom_tool_call_output", call_id: "e1", output: [{ type: "input_image" }] }),
+        call("pt", "e2", "exec_command", { cmd: "gh api repos/x/y; git -C . fetch origin; cat ../" }),
+        row("response_item", { type: "web_search_call", id: "w1", action: { type: "search", query: "chart topic" }, internal_chat_message_metadata_passthrough: { turn_id: "pt" } }),
+        call("pt", "e3", "exec_command", { cmd: "ls chart-1.png" }),
+        call("pt", "e4", "exec_command", { cmd: "curl https://raw.githubusercontent.com/vhco-pro/docs/abc/AGENTS.md" }),
+      ].join("\n"));
+      const { parent } = visual.linkedRollouts(visual.loadRollouts(f.sessions), "P");
+      expect(visual.spawnCalls(parent!, new Set(["pt"])).map((s) => s.noHistory)).toEqual([false]);
+      const a = visual.analyze([parent!], { png: join(f.project, "chart-1.png"), allowedUrl: visual.docsUrl("abc") });
+      expect(a.views.map((v) => v.carriesImage)).toEqual([true]);
+      const what = a.fetches.map((x) => x.what.split(":")[0]);
+      expect(what).toContain("gh");
+      expect(what).toContain("git");
+      expect(what).toContain("search");
+      expect(a.fetches.some((x) => x.what.includes("raw.githubusercontent.com"))).toBe(false);
+      expect(a.reads.some((r) => r.path === f.dir || !visual.inside(r.path, [f.project, f.pkgDir]))).toBe(true);
+      expect(a.mentions.map((m) => m.listingOnly)).toEqual([false, true]);
+    } finally { rmSync(f.dir, { recursive: true, force: true }); }
+  });
+
+  test("shell splitting finds command names and skips redirection targets", () => {
+    expect(visual.simpleCommands("A=1 cat 'a b' && echo \"$(ls x)\" | grep -q y; tail z").map((w) => visual.commandWords(w).name).sort()).toEqual(["cat", "echo", "grep", "ls", "tail"]);
+    expect(visual.commandWords(["cat", "a", ">", "out", "2>/dev/null", "b"]).args).toEqual(["a", "b"]);
+  });
+});
