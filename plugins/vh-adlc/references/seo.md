@@ -40,7 +40,7 @@ The Semrush helper records these outcomes:
 ## Adapter
 
 Read the SEO adapter named by the adopter's committed repository instructions,
-such as `agents/seo.md`. It holds these keys:
+such as agents/seo.md in the adopter's repository. It holds these keys:
 
 - official origin;
 - owned aliases and previous hosts;
