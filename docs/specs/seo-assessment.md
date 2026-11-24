@@ -352,6 +352,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-24 | R-41 | spec | `c5d7db7` | claude-opus-5-5 | procedural | Scoped review of the R-40 fix: no blocking; 1 should-fix (directories in the execute-bit scan) |
 | 2026-11-24 | R-42 | spec | `f6c767d` | claude-opus-5-5 | procedural | No findings |
 | 2026-11-24 | R-42 | spec | `f6c767d` | n/a | n/a | accepted by owner |
+| 2026-11-25 | R-43 | spec | `4853dd5` | claude-opus-5-5 | procedural | Full review of the Claude Code runner switch: no blocking; 4 should-fix (ancestor instructions, tool flags, unconfined writes, owner summary), 1 nit |
 
 ### R-1
 
@@ -1730,6 +1731,43 @@ PROPOSAL: Say "no new regular file that is an ELF binary or has an execute bit; 
 ### R-42
 
 NO FINDINGS
+
+### R-43
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan preamble (line 256), the Test Plan AC-11 row (`no-browser` premise, line 270), Tasks T14 (line 294)
+EVIDENCE: The preamble says the flags it lists mean "no user plugin, hook, MCP server, browser tool or user memory reaches the run". That does not cover instruction files in the run directory's ancestors. On Claude Code 2.1.330 with `--setting-sources project,local --strict-mcp-config --no-chrome --no-session-persistence`, I made a session in a fresh git repository `<tmp>/p/w`. A canary word in `<tmp>/p/CLAUDE.md`, outside the git root, reached the session: the result quoted `ZEBRA-4471`. In a second run, a canary in `<tmp>/p/AGENTS.md` and one in the repository's own `AGENTS.md` both reached the session (`OTTER-9182`, `HERON-5530`), with no tool call made; the built-in `cc-plugin-agents-md` plugin appears in the start event. The harness builds its fixture repositories inside the `<empty dir>` the caller passes (T9 to T12). If that directory sits inside a repository or home folder holding `AGENTS.md` or `CLAUDE.md`, for example inside this checkout, those instructions join the run. A parent file that names a browser driver breaks the `no-browser` premise "whose fixture `AGENTS.md` names no browser driver". Other parent instructions can change the agent's behaviour in the permission scenarios. This gap is new in this revision: under `codex exec` the fixture's git root bounded `AGENTS.md` discovery. The preamble's evidence for leaving out user memory is the session's own statement ("the session said its instructions did not mention..."), which is not an observed check.
+PROPOSAL: Make the harness refuse a run directory that has any ancestor `AGENTS.md`, `CLAUDE.md`, `CLAUDE.local.md` or `.claude/`, or create every fixture under a fresh `mktemp -d`. Prove leaving out user and ancestor memory with a canary the runner plants, not with the model's self-report. Name this in the preamble and in T14's done condition.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan preamble (line 256), the Test Plan AC-04 row ("no `semrush.com` host in any transcript tool call"), Tasks T14 (line 294)
+EVIDENCE: The preamble says the session "allows the Bash, Read, Write, Glob, Grep, Skill and WebFetch tools", and the assertions read "its Bash commands, its WebFetch URLs and its final result". Claude Code has two different flags for this. With `--allowedTools Bash Read Write Glob Grep Skill WebFetch`, the observed start event offered `Task, Bash, CronCreate, ..., Edit, ..., NotebookEdit, RemoteTrigger, ..., WebSearch, Workflow, Write` and no `WebFetch`. With `--tools "Bash,Read,Write,Glob,Grep,Skill,WebFetch"`, it offered exactly `Bash, Glob, Grep, Read, Skill, WebFetch, Write`. However, `--tools` only makes tools available, so in `-p` default permission mode the Bash calls still need approval. One implementer would get extra tools (Edit, Task subagents, WebSearch) whose calls the assertions never read. Another would get a session whose Bash calls are denied and whose scenarios fail on a correct package.
+PROPOSAL: Name both mechanisms: `--tools` set to exactly the listed tools, and `--allowedTools` (or a named permission mode) approving them. Have the AC-04 transcript check scan every `tool_use` input in the stream, subagent events included, not only Bash commands and WebFetch URLs.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-08 row (line 267), Test Plan preamble (line 256), Tasks T14 (line 294)
+EVIDENCE: AC-08 requires that an assessment "writes only inside the adapter's report and export locations". Its proof compares only "the fixture tree before and after". Under the replaced runner, Codex's workspace-write sandbox kept writes outside the workspace and temporary directories from happening. The new preamble names no sandbox: `claude -p` runs Bash pre-approved and unconfined on the operator's machine, with the operator's real home, repositories and credentials. A wrong implementation that writes to the plugin copy, `$HOME` or another repository passes the AC-08 proof. In the product profile the user's repositories and credentials are what is at stake, so an unsandboxed agent with pre-approved Bash is also a larger blast radius than before. This gap traces to this revision's runner change.
+PROPOSAL: Run each session under Claude Code's sandbox with writes limited to the fixture repository, passed through `--settings`, and keep loopback network. Alternatively, add an assertion that every Write path and Bash command in the transcript stays within the adapter's locations. Or state the limit as a Scope `Not handled:` line.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (lines 64 and 66)
+EVIDENCE: Line 66 says "Proof will come from static tests, helper unit tests ... and offline scenarios ... None has run yet." Tasks T1 to T8 hold observed evidence, for example T7: "79 pass, 0 fail on `sw-dev` ... 76 pass, 3 skip on macOS", and T8: "100 pass, 0 fail". Line 64 still says the owner's cut left "a plain scenario that watches Codex's process tree", but the AC-11 row now watches the Claude Code process tree. The summary also leaves out the trade-off of this revision. Consumers also install through `.agents/plugins/marketplace.json` (Codex), yet the forward scenarios will no longer exercise the package under Codex at all. The standard asks the summary to tell planned checks from observed proof and to explain material changes before acceptance.
+PROPOSAL: Say which proofs have run and where, and which forward scenarios are still planned. Correct the process-tree wording. Add one sentence that the forward evidence will cover Claude Code only, and that the compatibility section will say so.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-11 row (line 270)
+EVIDENCE: The owner summary now says the forward scenarios "need no Linux host". The `no-browser` fixture scan still judges "an ELF binary or has an execute bit". On macOS a dropped browser binary is Mach-O, so there only the execute-bit half of the scan applies.
+PROPOSAL: Judge "an ELF or Mach-O binary or a file with an execute bit", or record which host the scan was meant for.
 
 ## Sources
 
