@@ -71,48 +71,111 @@ without review.
 
 ## Compose the reading experience
 
-Every long-form article needs a visual reading pass before handoff, including
-founder stories and opinion pieces without a technical diagram to explain.
-Compose the article as a page: break sustained prose at useful points with
-story-specific illustrations, relevant product images, an exact author pull
-quote or another supported editorial treatment. Headings and short paragraphs
-alone do not complete this pass. Choose placement for the story, not a fixed
-image quota or the same template in every article. Short pieces may need no image;
-record a deliberate exception rather than adding filler.
+A long-form article is one whose body prose is 800 words or more. Body prose is
+paragraph and list text; it excludes front matter, headings, code blocks and all
+treatment markup, including captions, alt text and pull quotes. A treatment is a
+placed illustration, product image, pull quote or other component the destination
+supports, tied to a named point in the passage. A diagram code block the site
+renders as a drawing is a treatment; "code block" elsewhere in this section means
+one that is not.
 
-Use existing assets when they fit. Create original editorial artwork within the
-authorized destination when useful; use the host's appropriate image skill for
-raster generation or editing. Never present a conceptual illustration as product
-UI, and never invent a customer quote, usage chart or benchmark. Pull quotes must
-come from the author's supplied notes or article, preserve their qualifications
-and carry clear attribution. Keep essential information in selectable text.
+Every new long-form article gets a visual reading pass before handoff, including
+founder stories and opinion pieces with no technical diagram. Compose the page:
+place at least one treatment, more where the length calls for it, inside the body
+between paragraphs, at points that break sustained prose. A treatment before the
+first paragraph or after the last does not count. Headings and short paragraphs
+alone do not complete the pass. Place treatments for the story, without a fixed
+image count or one template for every article.
 
-For each visual treatment, identify the specific point it helps the reader grasp
-or remember. Inspect the actual image before selecting it: a launch dialog does
-not show a workspace overview, execution result or plan review. Match the visible
-screen, state and controls to the nearby passage. Changing a caption does not
-make an irrelevant screenshot useful. Describe illustrative/demo captures
-accurately without claiming they prove a live customer outcome.
+A new article below 800 words either places a treatment or records a no-visual
+exception on the handoff's `No-visual exception:` line. When a new long-form
+article has no permitted treatment, because the notes hold no quotable line, no
+supplied asset fits, no image permission exists and no other supported treatment
+that draws nothing fits, the writer places none and never adds filler; the handoff
+names the missing quote, asset or permission as a presentation gap. The lack of a
+technical diagram is never a reason, and neither are missing assets while the
+author's notes contain a quotable point.
 
-A pull quote highlights an important article-specific takeaway, not any sentence
-that can fill a styled box. Compare the current batch or relevant adjacent
-articles for repeated wording and repeated meaning. Rephrasing the same thought
-does not make a distinct quote. Select another supported point, or leave the
-passage as ordinary prose when emphasis adds nothing. Never invent an author
-quote to fill a layout, and preserve the selected source's qualifications.
+Revisions fall into three kinds:
 
-Inspect the destination's rendering support. Use its existing image, caption,
-quote and code components; keep article presentation outside reusable renderer
-internals. Supply descriptive alt text, captions and asset provenance. Follow
-the site's theme policy, and check readability and contrast in each supported
-theme. Inspect the rendered page on desktop and phone for spacing, legible image
-text, image loading and overflow. Exercise existing zoom and navigation when
-used. If rendering is unavailable, report presentation as unverified and identify
-missing assets; do not call a Markdown-only inspection a rendered review.
+- A wording-only revision, including one whose only request is exact wording, may
+  reword prose, headings and front matter, split or merge paragraphs, make the
+  structural edits and corrections the request names, such as adding a section or
+  fixing a code block, and fix an identifiable defect in a code block, such as a
+  stale command flag. It changes no treatment and otherwise adds or removes no
+  heading and changes no heading level or code block. It reports presentation gaps
+  as findings.
+- A review-only run changes no file and reports presentation gaps as findings.
+- A presentation revision adds, moves, removes or replaces treatments, corrects the
+  caption or alt text of a treatment, or edits a diagram treatment, as the request
+  names, and leaves every prose line, heading, front matter field, code block and
+  exact-wording span byte-identical.
 
-Supply the editor with the visual placements, asset descriptions and provenance,
-quote sources, and rendered evidence alongside the prose inputs. The editor
-checks the reading experience as well as wording before the owner sees the draft.
+A request for both wording changes and treatment changes runs as a wording-only
+revision followed by a presentation revision over the revised prose, each under
+its own rule. A revision request that names no treatment change is a wording-only
+revision. In every run, an exact-wording span keeps its wording; the pass places
+treatments around it.
+
+### Asset and quote integrity
+
+Use supplied assets when they fit; copying a supplied asset unchanged into the
+destination is not creating an image. Creating or editing any image file, raster
+or vector including SVG, needs permission in the owner's request or the adopter's
+instructions. So does embedding image data as a `data:` URI, adding inline `<svg>`
+or `<canvas>` markup, or adding or editing a diagram code block that the site
+renders as a drawing, such as Mermaid, PlantUML, dot or Graphviz, or D2. With
+permission, use the host's image capability inside the authorized destination.
+Without it, use supplied assets, pull quotes and other supported treatments that
+draw nothing, and report any missing asset.
+
+Every image reference the writer places points to a project file, never to a
+remote URL. Without permission that file is a supplied or pre-existing asset, and
+an asset supplied only as a remote URL is reported as missing.
+
+For treatments that draw nothing, any text presented as a quote follows the
+pull-quote rule below, and such a treatment adds no claim the notes do not support.
+
+A conceptual illustration's caption or alt text identifies it as an illustration
+and never presents it as product UI. Never invent a customer quote, usage chart
+or benchmark. Before selecting an image, open it and match its visible screen,
+state and controls to the nearby passage: a launch dialog does not show a
+workspace overview, execution result or plan review, and a new caption does not
+make an unrelated screenshot relevant. Describe demo captures as demos.
+
+A pull quote in a new article comes word for word from the author's notes, never
+from the writer's own draft. In a presentation revision it may also come from the
+article as it stood before that presentation step, which in a combined request is
+the article after its wording changes. It keeps its qualifications, is attributed
+to the author and highlights an article-specific point. Compare it with the
+current batch and related articles for the same meaning as well as the same
+words; pick another supported point, or leave ordinary prose when emphasis adds
+nothing. Keep essential information in selectable text. Every image has alt text
+and a caption.
+
+### Presentation inputs
+
+The writer supplies the editor with:
+
+- each placement and the point it serves;
+- each asset's file path, description and provenance;
+- quote sources;
+- the quote inventory of the current batch or related articles;
+- rendered evidence for each viewport and supported theme, or a statement of what is missing.
+
+### Rendering checks
+
+Inspect the destination's existing image, caption, quote and code components and
+keep article presentation out of reusable renderer internals. Check the rendered
+page on desktop and phone in each theme the site supports: spacing, contrast,
+legible image text, loading and overflow, plus existing zoom and navigation when
+used. After applying editor repairs, render the final article again before the
+handoff, so the reported checks cover what is handed off. A screenshot taken as
+rendered evidence is not an article image and needs no image permission: save it
+only under the system temporary directory (`TMPDIR`), never in the article
+destination or elsewhere in the project. When rendering is unavailable, the
+`Rendered checks:` line says `unverified` with the reason, and the handoff names
+the missing assets. A Markdown-only inspection is never called a rendered review.
 
 ## Promote mode
 
@@ -139,17 +202,23 @@ Implementation tests alone do not prove that the article or social copy is sound
 
 ## Independent edit
 
-Dispatch `agents/vh-adlc-blog-editor.agent.md` in a separate context with the
-original and candidate, source-position inventory, edit reasons, source evidence,
-voice references and protected spans. For a new article, supply the brief and
-notes instead of an original. Include social copy in a promotion run. Reuse a
-site-specific critic if the adopter explicitly requires it, but run one editorial
-procedure rather than two competing rewrites. Keep the shared editor as the
-default when the adopter has no additional critic contract.
+Dispatch the editor in a separate context without parent history, so it never
+inherits the writer's own reading of an image; on Codex that means `spawn_agent`
+with `fork_turns` set to `none`. Tell it to read
+`agents/vh-adlc-blog-editor.agent.md` from the installed package itself rather
+than pasting its text. Supply the original and candidate, source-position
+inventory, edit reasons, source evidence, voice references, protected spans and
+the Presentation inputs. For a new article, supply the brief and notes instead of
+an original. Include social copy in a promotion run. Reuse a site-specific critic
+if the adopter explicitly requires it, but run one editorial procedure rather than
+two competing rewrites. Keep the shared editor as the default when the adopter has
+no additional critic contract.
 
 Apply justified minimal repairs and revert unnecessary paraphrases. Never treat
 a replacement article as an editor's verdict. Resolve factual findings against
 their evidence and expose changed recommendations or unknowns to the owner.
+List every entry of the editor's last `Presentation repairs` line in the handoff
+in the editor's own words, each marked `applied` or `open`.
 When independent dispatch is unavailable, do a self-edit and identify that limit;
 do not claim an independent review or certify prose with an AI-detector score.
 
@@ -160,7 +229,23 @@ available. State the inspected project revision, checks actually executed,
 canonical public URL and release/publication dependencies. For revisions, summarize
 routine repairs and surface factual corrections, meaning changes and unresolved
 questions with the affected passages. Group batch exceptions in one report.
-Report the visual changes and rendered checks, or their limits.
+Report the treatments placed, no-visual exceptions, presentation gaps and
+rendered checks, or their limits, including every unverified check the editor
+named. Two of these are fixed lines, each at most once, at the start of a handoff
+line or after a `- ` or `* ` list marker:
+
+- `No-visual exception: <category>: <explanation>`. The category is `short-read`
+  (the piece reads in one sitting), `format` (the destination format cannot hold a
+  treatment) or `owner-request` (the owner asked for no visuals). A missing diagram
+  or missing assets is never a category.
+- `Rendered checks: <entries>`. Entries are separated by semicolons, and each is
+  `<viewport> <theme>: <result>`. The viewport is `desktop` or `phone`; the theme
+  is a theme name the site supports, with spaces written as hyphens, or `default`
+  for a site with one theme; the result is `pass`, `unverified, <reason>` or the
+  problem found, without a semicolon. When nothing was rendered, the line is
+  `Rendered checks: unverified, <reason>`. Every new article and presentation
+  revision handoff has this line, and rendered checks are recorded only there.
+
 For new work, identify remaining placeholders. A handoff with no such exceptions
 may say so without manufacturing findings.
 
