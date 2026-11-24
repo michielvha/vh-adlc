@@ -39,6 +39,31 @@ progress path only after entry preflight succeeds, disclosing every assessment
 gap and making no completion, closure or migration claim; all other gates remain.
 This section grants no publication authority.
 
+## Loop routes
+
+Before starting feature changes or delivery, follow
+[feature writer entry](../../references/authority.md#feature-writer-entry) in the owning checkout.
+A reservation does not grant permission to publish the feature.
+
+This operation's loop role and route come from `.vh-adlc/loop.yaml` through
+`bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
+host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
+files and its project procedure, whose local rules apply alongside this procedure. If its `plugin.stale` is true, stop before any write and report its `warning`: the session runs an older plugin than the host has installed. If it reports `plugin.binary_warning`, run only the binary `scripts/ensure-vh-adlc.sh` prints, never a `vh-adlc` found on PATH. With declared verification rungs, these instructions replace Verify: ship performs every applicable
+written-procedure rung, then runs
+`bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage completion --run true`, passing each
+performed procedure rung's result with `--record <rung>=passed|failed:<what was observed>`, and sets `complete`
+and pushes only when that run may advance. The Gate step's completion commit changes only the feature
+document; ship pushes it without a second run when it is the only commit after the verified one and the push
+happens in the same ship run that observed the completion stage advance. Before a retried or resumed push, or
+after any other commit, ship runs the completion stage again at the head. A blocked run pushes nothing and
+sets no status. After the merge, the delivery check performs every applicable procedure rung again and runs
+`bun scripts/loop/cli.ts rungs --repo <dir> --merge <merge commit> --stage completion --run true` with their
+`--record` results, from a checkout of that merge commit; results from any other commit block. The feature
+lands by merge commit only. Always run `bun scripts/loop/cli.ts ci` and pass on any
+`warning` it returns in the report, without blocking. With `ci_trigger: manual`, report CI from it and dispatch nothing; decide the skip marker with `cli.ts skip`, and after the
+merge report delivery with `cli.ts delivery` (`references/loop-settings.md`, Delivery). A `host` route that names a model runs with it as a requested model. When loop settings exist, `cli.ts skip` replaces the documentation-only skip-marker rule in Deliver,
+including its report when the resolved convention does not support declared paths.
+
 ## Start
 
 1. Get the binary and run `vh-adlc knowledge` with `conventions/feature-documents.md`,
@@ -103,10 +128,14 @@ branch's lifetime, and the merge is not finished until that branch is gone.
 Merge without `--delete-branch`, then run `after-merge` for that PR as
 `references/branches.md` describes. It removes the remote branch, its stale
 tracking ref and the local branch, but only while their tips are contained in
-the merged PR head. A branch with commits pushed after the merge is kept.
+the merged PR head. A branch with commits pushed after the merge is kept. It
+also removes the branch's clean worktree, the one with no changed tracked or
+untracked files, and keeps it with a reason when it holds ignored files, is
+locked, or is the worktree `after-merge` runs from. Approving the merge is the
+request for that removal.
 
-Report every outcome and kept reason. A branch kept because a worktree holds it
-stays until the owner asks for worktree cleanup. When GitHub's
+Report every outcome and kept reason. A feature shipped from its owning
+worktree is removed, with its branch, by the next sweep. When GitHub's
 `delete_branch_on_merge` setting is off, say so and suggest a branch-hygiene
 plan, which proposes enabling it. A ship request alone does not authorize a
 merge or repository-setting changes.

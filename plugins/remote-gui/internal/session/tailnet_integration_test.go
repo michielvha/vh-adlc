@@ -259,3 +259,42 @@ func TestFailedForwardRemovalKeepsDeniedPortReserved(t *testing.T) {
 		})
 	}
 }
+
+// A supervisor that outlives its guard keeps retrying a failed forward removal
+// until its record is gone, then exits without recreating the state root.
+func TestPendingSupervisorExitsWithoutItsRecord(t *testing.T) {
+	home := root(t)
+	deny := fakeTailnet(t, home)
+	app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "preserved-app") }))
+	defer app.Close()
+	c := options(t, home, app.URL, "1m")
+	c.Transport = "tailscale"
+	v, err := Start(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := state.Load(home, v.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deny.Store(true)
+	if err = state.Signal(r.Guard, syscall.SIGKILL); err != nil {
+		t.Fatal(err)
+	}
+	if end := waitEnd(t, home, v.ID); end.State != "cleanup-pending" || !state.Alive(r.Supervisor) {
+		t.Fatal("supervisor did not keep the failed removal pending")
+	}
+	if err = os.RemoveAll(home); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for state.Alive(r.Supervisor) && time.Now().Before(deadline) {
+		time.Sleep(25 * time.Millisecond)
+	}
+	if state.Alive(r.Supervisor) {
+		t.Fatal("cleanup-pending supervisor kept running after its record was removed")
+	}
+	if _, err = os.Lstat(home); !os.IsNotExist(err) {
+		t.Fatal("supervisor recreated the removed state root")
+	}
+}

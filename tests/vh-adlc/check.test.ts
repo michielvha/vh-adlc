@@ -6,7 +6,7 @@
 // the checker runs the full v1 selection.
 
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -20,10 +20,12 @@ const SCHEDULE: Record<number, string[]> = {
   7: ["ship", "triage", "maintenance", "audit", "projects"],
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
-const CONTENT_OPERATIONS = ["blog", "docs-impact"];
+const CONTENT_OPERATIONS = ["blog", "diagram", "docs-impact", "docs-drift", "docs-truth"];
 // Host operations call the vh-adlc binary on PATH, unverified and without
 // knowledge, as references/loop.md's exception allows.
 const HOST_OPERATIONS = ["clean"];
+// Coordination operations steer other sessions and change no feature status.
+const COORDINATION_OPERATIONS = ["orchestrate"];
 
 function selectedPhase(): number {
   const raw = process.env.VH_ADLC_PHASE;
@@ -237,7 +239,7 @@ describe("skills", () => {
 
     const dirs = existsSync(join(PKG, "skills")) ? readdirSync(join(PKG, "skills")).sort() : [];
     expect(dirs).toContain("vh-adlc");
-    for (const d of dirs) expect(["vh-adlc",...[...ALL_OPERATIONS, ...CONTENT_OPERATIONS, ...HOST_OPERATIONS].map((op) => `vh-adlc-${op}`)]).toContain(d);
+    for (const d of dirs) expect(["vh-adlc",...[...ALL_OPERATIONS, ...CONTENT_OPERATIONS, ...HOST_OPERATIONS, ...COORDINATION_OPERATIONS].map((op) => `vh-adlc-${op}`)]).toContain(d);
     for (const op of CONTENT_OPERATIONS) {
       expect(dirs).toContain(`vh-adlc-${op}`);
       const fm = frontmatter(read(skillPath(op)));
@@ -376,6 +378,12 @@ describe("review model eligibility", () => {
     expect(text).toContain("leave the review visibly pending");
   });
 
+  test("reports name hosted items as labelled Markdown links", () => {
+    const text = read(join(PKG, "references", "loop.md")).replace(/\s+/g, " ");
+    for (const phrase of ["repository or document hosted online", "Markdown link with a short readable label", "never paste a raw URL as plain text", "A local file keeps its path", "Markdown does not render, gives the full URL"]) expect(text).toContain(phrase);
+    for (const skill of ["vh-adlc-blog", "vh-adlc-diagram"]) expect(read(join(PKG, "skills", skill, "SKILL.md"))).toContain("`references/loop.md` step 5");
+  });
+
   test("installer invocation does not depend on extracted executable bits", () => {
     const text = read(join(PKG, "references", "loop.md"));
     expect(text).toContain('VH_ADLC=$(bash "<plugin directory>/scripts/ensure-vh-adlc.sh")');
@@ -488,5 +496,205 @@ describe("README", () => {
         expect(guide).toMatch(new RegExp(`^#+ .*${heading}`, "mi"));
       }
     }
+  });
+});
+
+// Workstream orchestration (docs/specs/workstream-orchestration.md). The tests read the
+// required sentences and the glossary from the accepted feature document, so the reference
+// cannot drift from it without a test failing.
+const ORCHESTRATION_SPEC = join(ROOT, "docs", "specs", "workstream-orchestration.md");
+const ORCHESTRATE = join(PKG, "references", "orchestrate.md");
+const ORCHESTRATION_FIELDS = [
+  "Ledger location",
+  "Tracking issues",
+  "Exclusive resources",
+  "Heavy jobs",
+  "Worktree provisioning",
+  "Batch limit",
+  "Live-session limit",
+  "Status pass interval",
+];
+// Terms from known adopters that must never appear in the plugin (AC-14).
+const ADOPTER_TERMS = ["stackweaver", "sw-e2e", "agent-slot", "worktree-dev.sh", "iac_platform"];
+
+type RequiredSentence = { id: string; section: string; text: string };
+
+function specSection(text: string, heading: string): string {
+  const start = text.indexOf(`\n${heading}\n`);
+  if (start < 0) throw new Error(`feature document has no ${heading}`);
+  const rest = text.slice(start + heading.length + 2);
+  const end = rest.search(/\n#{2,3} /);
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+function requiredSentences(): RequiredSentence[] {
+  const block = specSection(read(ORCHESTRATION_SPEC), "### Required sentences");
+  const out: RequiredSentence[] = [];
+  let section = "";
+  for (const line of block.split("\n")) {
+    const heading = line.match(/^\*\*[^*]+\*\* \(`(## [^`]+)`\):$/);
+    if (heading) section = heading[1];
+    const sentence = line.match(/^- (S-\d{2}): (.+)$/);
+    if (sentence) {
+      if (section === "") throw new Error(`${sentence[1]} has no section`);
+      out.push({ id: sentence[1], section, text: sentence[2] });
+    }
+  }
+  return out;
+}
+
+function referenceSection(reference: string, heading: string): string {
+  const lines = reference.split("\n");
+  const start = lines.indexOf(heading);
+  if (start < 0) return "";
+  const end = lines.findIndex((l, i) => i > start && /^## /.test(l));
+  return lines.slice(start + 1, end < 0 ? undefined : end).join("\n");
+}
+
+// missingSentences lists every required sentence the reference lacks under its section.
+function missingSentences(reference: string, sentences: RequiredSentence[]): string[] {
+  return sentences
+    .filter((s) => !normalise(referenceSection(reference, s.section)).includes(normalise(s.text)))
+    .map((s) => s.id);
+}
+
+function glossaryRows(): string[] {
+  return specSection(read(ORCHESTRATION_SPEC), "### Glossary")
+    .split("\n")
+    .filter((l) => /^\| [^-]/.test(l) && !l.startsWith("| Term |"));
+}
+
+function incidentRows(reference: string): { n: number; ids: string[] }[] {
+  return referenceSection(reference, "## Incidents")
+    .split("\n")
+    .map((l) => l.match(/^\| (\d+) \|(.*)\|$/))
+    .filter((m): m is RegExpMatchArray => m !== null)
+    .map((m) => ({ n: Number(m[1]), ids: m[2].match(/S-\d{2}/g) ?? [] }));
+}
+
+function adopterHits(files: string[]): string[] {
+  const hits: string[] = [];
+  for (const f of files) {
+    const text = read(f).toLowerCase();
+    for (const term of ADOPTER_TERMS) if (text.includes(term)) hits.push(`${relative(ROOT, f)}: ${term}`);
+  }
+  return hits;
+}
+
+describe("workstream orchestration reference", () => {
+  const reference = existsSync(ORCHESTRATE) ? read(ORCHESTRATE) : "";
+  const sentences = requiredSentences();
+
+  test("the feature document lists the required sentences with unique IDs", () => {
+    expect(sentences.length).toBeGreaterThanOrEqual(53);
+    expect(new Set(sentences.map((s) => s.id)).size).toBe(sentences.length);
+  });
+
+  test("states every required sentence under the section its heading names (AC-02 to AC-13)", () => {
+    expect(existsSync(ORCHESTRATE)).toBe(true);
+    expect(missingSentences(reference, sentences)).toEqual([]);
+  });
+
+  test("the sentence check fails when one sentence is reworded", () => {
+    const changed = reference.replace("Start at most three new sub-sessions", "Start at most five new sub-sessions");
+    expect(changed).not.toBe(reference);
+    expect(missingSentences(changed, sentences)).toEqual(["S-09"]);
+  });
+
+  test("carries the feature document's glossary table verbatim (AC-16)", () => {
+    const rows = glossaryRows();
+    expect(rows.length).toBe(9);
+    for (const row of rows) expect(reference).toContain(row);
+  });
+
+  test("defines the project procedure's Orchestration section and its eight fields (AC-14)", () => {
+    expect(reference).toContain("## Orchestration");
+    for (const field of ORCHESTRATION_FIELDS) expect(reference).toContain(`\`${field}\``);
+  });
+
+  test("maps each of the sixteen incidents to sentence IDs that exist (AC-15)", () => {
+    const ids = new Set(sentences.map((s) => s.id));
+    const rows = incidentRows(reference);
+    expect(rows.map((r) => r.n)).toEqual(Array.from({ length: 16 }, (_, i) => i + 1));
+    for (const row of rows) {
+      expect(row.ids.length).toBeGreaterThan(0);
+      for (const id of row.ids) expect(ids.has(id)).toBe(true);
+    }
+  });
+
+  test("no file in the plugin names a known adopter (AC-14)", () => {
+    expect(adopterHits(walk(PKG))).toEqual([]);
+  });
+
+  test("the adopter scan fails on a file holding each term", () => {
+    const dir = join(ROOT, "tests", "vh-adlc", ".tmp-adopter-scan");
+    mkdirSync(dir, { recursive: true });
+    try {
+      for (const term of ADOPTER_TERMS) {
+        const file = join(dir, "fixture.md");
+        writeFileSync(file, `A procedure that mentions ${term.toUpperCase()} by name.\n`);
+        expect(adopterHits([file])).toEqual([`${relative(ROOT, file)}: ${term}`]);
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// The four writes S-02 grants, each of which the authority row must name (AC-02).
+const ORCHESTRATION_GRANT = [
+  "workstream ledger",
+  "owner-answer comments on work-item issues",
+  "harm statements and handoffs",
+  "archiving",
+];
+
+function orchestrationRows(authority: string): string[] {
+  return authority.split("\n").filter((l) => l.startsWith("|") && l.includes("skills/vh-adlc-orchestrate/SKILL.md"));
+}
+
+function missingGrants(row: string): string[] {
+  const text = normalise(row);
+  return ORCHESTRATION_GRANT.filter((w) => !text.includes(normalise(w)));
+}
+
+describe("workstream orchestration authority", () => {
+  const authority = read(join(PKG, "references", "authority.md"));
+
+  test("one authority row names the orchestrate skill and each write S-02 grants (AC-02)", () => {
+    const rows = orchestrationRows(authority);
+    expect(rows.length).toBe(1);
+    expect(missingGrants(rows[0])).toEqual([]);
+  });
+
+  test("the row check fails when any one write is removed", () => {
+    const row = orchestrationRows(authority)[0] ?? "";
+    for (const write of ORCHESTRATION_GRANT) {
+      const without = row.split(new RegExp(write.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i")).join("");
+      expect(missingGrants(without)).toContain(write);
+    }
+  });
+});
+
+describe("coordination operations", () => {
+  for (const op of COORDINATION_OPERATIONS) {
+    test(`vh-adlc-${op} exists, names its directory, has a description and no model (AC-01)`, () => {
+      expect(existsSync(skillPath(op))).toBe(true);
+      const fm = frontmatter(read(skillPath(op)));
+      expect(fm?.name).toBe(`vh-adlc-${op}`);
+      expect(typeof fm?.description).toBe("string");
+      expect(fm).not.toHaveProperty("model");
+    });
+
+    test(`vh-adlc-${op} resolves knowledge, names the humanize guide and reads the loop context (AC-01)`, () => {
+      const text = existsSync(skillPath(op)) ? read(skillPath(op)) : "";
+      for (const phrase of ["vh-adlc knowledge", "guides/humanize-prose.md", "scripts/loop/cli.ts context", `references/${op}.md`]) {
+        expect(text).toContain(phrase);
+      }
+    });
+  }
+
+  test("lifecycle intake routes to the orchestrate skill (AC-01)", () => {
+    expect(read(join(PKG, "references", "lifecycle.md"))).toContain("skills/vh-adlc-orchestrate/SKILL.md");
   });
 });

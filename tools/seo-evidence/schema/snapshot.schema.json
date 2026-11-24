@@ -1,0 +1,590 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "number",
+      "const": 1
+    },
+    "tool_version": {
+      "type": "string"
+    },
+    "extraction_version": {
+      "type": "string",
+      "const": "1"
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "origins": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "entry_urls": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "sitemap_urls": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "groups": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "properties": {
+        "main_selector": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "main_selector"
+      ],
+      "additionalProperties": false
+    },
+    "input_digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "observations": {
+      "minItems": 1,
+      "maxItems": 10000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "requested_url": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "initial",
+                      "rendered"
+                    ]
+                  },
+                  "observed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "const": "captured"
+                  },
+                  "final_url": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 599
+                  },
+                  "content_type": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "headers": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "body_file": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "redirects": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "integer",
+                          "minimum": 300,
+                          "maximum": 399
+                        }
+                      },
+                      "required": [
+                        "from",
+                        "to",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "requested_url",
+                  "mode",
+                  "observed_at",
+                  "outcome",
+                  "final_url",
+                  "status",
+                  "content_type",
+                  "headers",
+                  "body_file"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "requested_url": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "initial",
+                      "rendered"
+                    ]
+                  },
+                  "observed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "const": "failed"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "requested_url",
+                  "mode",
+                  "observed_at",
+                  "outcome",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "requested_url": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "initial",
+                      "rendered"
+                    ]
+                  },
+                  "observed_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "outcome": {
+                    "type": "string",
+                    "const": "not_collected"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "requested_url",
+                  "mode",
+                  "observed_at",
+                  "outcome",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                },
+                "required": [
+                  "path",
+                  "sha256"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "facts": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "titles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "descriptions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "h1": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "language": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "base_url": {
+                    "type": "string"
+                  },
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "named_anchors": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "anchors": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "href": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "uri"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "fragment": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "main": {
+                          "type": "boolean"
+                        },
+                        "index": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "href",
+                        "target",
+                        "fragment",
+                        "main",
+                        "index"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "main_hash": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "main_reason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "jsonld": {
+                    "type": "object",
+                    "properties": {
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "valid": {
+                        "type": "boolean"
+                      },
+                      "hashes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "count",
+                      "valid",
+                      "hashes"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "controls": {
+                    "type": "object",
+                    "properties": {
+                      "generic_tokens": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "generic_blocked": {
+                        "type": [
+                          "boolean",
+                          "null"
+                        ]
+                      },
+                      "sources": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "html",
+                                "header"
+                              ]
+                            },
+                            "scope": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "raw": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "scope",
+                            "raw"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "canonical_sources": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "source": {
+                              "type": "string",
+                              "enum": [
+                                "html",
+                                "header"
+                              ]
+                            },
+                            "raw": {
+                              "type": "string"
+                            },
+                            "target": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "format": "uri"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "raw",
+                            "target"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "canonical_state": {
+                        "type": "string",
+                        "enum": [
+                          "valid",
+                          "absent",
+                          "unavailable"
+                        ]
+                      },
+                      "canonical": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "issues": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "rule": {
+                              "type": "string"
+                            },
+                            "detail": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "rule",
+                            "detail"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "generic_tokens",
+                      "generic_blocked",
+                      "sources",
+                      "canonical_sources",
+                      "canonical_state",
+                      "canonical",
+                      "issues"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "titles",
+                  "descriptions",
+                  "h1",
+                  "language",
+                  "base_url",
+                  "ids",
+                  "named_anchors",
+                  "anchors",
+                  "main_hash",
+                  "main_reason",
+                  "jsonld",
+                  "controls"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "page",
+          "evidence",
+          "facts"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "analysis_status": {
+      "type": "string",
+      "enum": [
+        "complete",
+        "partial"
+      ]
+    },
+    "partial_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "schema_version",
+    "tool_version",
+    "extraction_version",
+    "captured_at",
+    "origins",
+    "entry_urls",
+    "sitemap_urls",
+    "groups",
+    "extraction",
+    "input_digest",
+    "observations",
+    "analysis_status",
+    "partial_reasons"
+  ],
+  "additionalProperties": false
+}

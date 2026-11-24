@@ -95,7 +95,7 @@ func TestCIWorkflow(t *testing.T) {
 	if len(verify.Steps) != 2 || !strings.HasPrefix(verify.Steps[1].Uses, "michielvha/go-ci-action@") {
 		t.Error("CI-only verification is checkout plus the Go CI action, nothing else")
 	}
-	if !slices.Contains(runs(w), "bun test tests/vh-adlc --timeout 60000") {
+	if !slices.Contains(runs(w), "bun test tests/vh-adlc --parallel --timeout 60000") {
 		t.Error("CI must retain the existing plugin checker")
 	}
 	if _, ok := w.Jobs["release-gate"]; ok {
@@ -103,7 +103,7 @@ func TestCIWorkflow(t *testing.T) {
 	}
 	version := w.Jobs["version"]
 	if !strings.HasPrefix(version.Uses, "vhco-pro/version-workflow/.github/workflows/version.yml@") ||
-		!slices.Equal(dependencies(t, version.Needs), []string{"verify", "checker", "checker-macos", "remote-gui"}) {
+		!slices.Equal(dependencies(t, version.Needs), []string{"verify", "checker", "checker-macos", "remote-gui", "paseo-hosts"}) {
 		t.Error("versioning must call the shared version workflow after every check, through native needs")
 	}
 	if _, ok := version.With["dry-run"]; ok {

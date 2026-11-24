@@ -1,0 +1,24 @@
+# Settings for the shared vh-adlc triage operation on vh-adlc itself.
+# plugins/vh-adlc/references/triage-settings.md documents every field.
+schema_version: 1
+repository: michielvha/vh-adlc
+hostname: github.com
+
+# Source the triage verifies claims against.
+source_roots:
+  - cmd
+  - internal
+  - plugins
+  - schema
+  - tests
+
+# Feature documents are the roadmap.
+plan_roots:
+  - docs/specs
+
+report_dir: docs/internal/triage
+
+# Dependency bots belong to the maintenance operation.
+bot_authors:
+  - renovate[bot]
+  - dependabot[bot]

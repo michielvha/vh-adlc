@@ -44,4 +44,18 @@ Plugin versions live in their manifests. The binary release version has its own
 sequence; changing a plugin manifest does not update the binary
 [lock file](../../plugins/vh-adlc/vh-adlc.lock.json).
 
+After each release, the [lock workflow](../../.github/workflows/lock.yml) runs
+`scripts/release/lock-binary.sh` with the new tag. Every merge to `main` is released, so most releases
+rebuild an unchanged binary, and the script does nothing unless `cmd/`, `internal/`, `go.mod` or `go.sum`
+changed since the locked version. When they did, it requires `checksums.txt` to be signed by the
+release key, checks every archive against it, writes the lock with each archive's and binary's digest,
+and bumps the plugin's patch version. The workflow then opens a `chore` PR with the release App's token,
+waits for its CI and merges it when every check passes. A failed check leaves the PR open for a
+maintainer. Some plugin tests run the locked binary, so that CI run is where a binary change that alters
+their results shows up. Run the script locally with a tag to do the same by hand.
+
+Test fixtures must not rely on the machine: CI runners have no global Git identity and, on Ubuntu,
+restrict unprivileged user namespaces. Fixture repositories set their own `user.name` and `user.email`,
+and the checker job allows the namespace that command-route reviews need.
+
 For downloads and signature checks, see [verifying releases](../security/verifying-releases.md).

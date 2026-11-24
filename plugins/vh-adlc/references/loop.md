@@ -9,6 +9,47 @@ uses the verified binary and knowledge. Clean calls `vh-adlc` from `PATH` withou
 its allow rule matches, and it skips `knowledge`, because `clean` and `env` read no conventions. The
 binary it runs is therefore not checked against the lock.
 
+## Link the work you refer to
+
+In updates, approval requests and handoffs, name the kind of artifact and link it the first time
+you refer to it. Use a Markdown link with the official URL for a published document, issue, pull
+request, project board, release or CI run. For example, call a roadmap a Markdown file and link
+directly to the file or relevant section. Link commits and review evidence at the exact revision when
+it matters. For unpublished work, label it local and link the actual file using its absolute path.
+When a link is unavailable, give the repository and exact path or identifier. Use links the reader is
+authorized to open.
+
+## Weigh the harm before building machinery
+
+Machinery is any new mechanism a fix adds: code, a workflow, a credential or account, a gate, or
+signalling between systems. Before you recommend, file or specify it, write the harm statement:
+
+- The harm: who is affected, how often, how bad it is, and whether it heals on its own.
+- The simplest alternative without machinery: a process rule, a manual step, documentation, or
+  waiting for a later milestone.
+
+Recommend machinery only when it clearly beats that alternative, and say why. Otherwise recommend
+the alternative. The same check comes first when one feature would become a prerequisite of another,
+before it gates any work or any fan-out waits on it: a prerequisite that loses to its alternative
+gates nothing, and the dependent work goes ahead with the alternative.
+
+## Check host capacity before any fan-out
+
+Before you create a worktree, start another session or sub-agent, or launch parallel or long local
+work (independent reviews, test suites, cluster runs), run the capacity check on the checkout and the
+temp directory and read its last line:
+
+```sh
+bash "<plugin directory>/scripts/host/capacity.sh" "<checkout>" "${TMPDIR:-/tmp}"
+```
+
+On `capacity: blocked`, start nothing new. Report each blocked line to the owner and wait for them to
+free space or load. Do not delete shared host data to make room, and do not retry on another path of
+the same filesystem. Run the check again before every later wave of fan-out, and as soon as a command
+stalls or fails with no space left on device. Count what you are about to add: several sessions that
+each check out the repository and build images need far more room than one. A btrfs host can report
+free space while its metadata is full, which the check catches and `df` alone does not.
+
 ## 1. Get the binary
 
 Audit entry overrides this section's online bootstrap, including when selected through lifecycle
@@ -61,7 +102,7 @@ Stop and report when the result is `invalid-pin`, `missing-page` (recommend the 
 fewer pages to see which ones resolve, and do not read any page from that revision.
 
 When `source` is `plugin`, the repository has no pin yet. `vh-adlc-investigate`, `vh-adlc-resume` and
-`vh-adlc-review` and `vh-adlc-docs-impact` add none: they work with the plugin pin and report the missing pin, and onboarding waits
+`vh-adlc-review`, `vh-adlc-docs-impact` and `vh-adlc-docs-drift` add none: they work with the plugin pin and report the missing pin, and onboarding waits
 for the next operation that writes. A review that committed onboarding first would move its own target.
 `vh-adlc-spec`, `vh-adlc-tasks`, `vh-adlc-implement` and `vh-adlc-ship` call `knowledge` again with the
 same pages plus `guides/onboard-a-repository.md`, and read it. Their first change then adds the pinned
@@ -85,6 +126,11 @@ checklist item as pending the owner's choice. Never run the guide's manual comma
 
 Every page the loop needs is requested on every call, so a pin older than the plugin's pages stops with
 `missing-page`: always include `conventions/feature-documents.md` and `guides/humanize-prose.md`.
+
+A repository may declare loop settings in `.vh-adlc/loop.yaml` (`references/loop-settings.md`). The
+SDD operations (spec, tasks, implement, review, ship, investigate and resume) then read their loop role's
+route with `bun scripts/loop/cli.ts route`, and before acting read the instruction files and project
+procedure that `bun scripts/loop/cli.ts context` lists.
 
 ## 3. Decide with the binary
 
@@ -110,6 +156,10 @@ A `malformed` result means the document must be fixed, never bypassed. `local-fo
 repository keeps its own format: run the gate procedurally, as that repository does, and say the binary
 did not decide it.
 
+Read-only checks can run before writer entry. When the chosen operation writes a
+feature, follow [feature writer entry](authority.md#feature-writer-entry) once in the
+owning checkout. The standalone claim command checks entry itself in adopted repositories.
+
 ## 4. Write prose a reader sees
 
 Before committing or posting any prose a reader will see (document sections, commit messages, PR and
@@ -128,11 +178,44 @@ Code, commands and file contents stay exact, in code spans.
 End every operation by reporting what changed, what was verified, every binary result acted on, and what
 is left.
 
-Name every issue, pull request, commit, release or workflow run in a report, question or summary by
-its full URL, such as `https://github.com/OWNER/REPO/pull/8`, never as a bare `#8` or `OWNER/REPO#8`.
-The same holds in documents, commit messages and PR and issue bodies you write. Quoted records stay
-as returned.
+Name every issue, pull request, commit, release, workflow run, repository or document hosted online in
+a report, question or summary as a Markdown link with a short readable label where it is first
+mentioned, such as `[OWNER/REPO#8](https://github.com/OWNER/REPO/pull/8)`,
+`[OWNER/REPO](https://github.com/OWNER/REPO)` or, for a commit,
+`[abc1234](https://github.com/OWNER/REPO/commit/abc1234)`. Never give only a bare `#8`, `OWNER/REPO#8`
+or `OWNER/REPO`, and never paste a raw URL as plain text. A local file keeps its path. The same holds in
+documents and PR and issue bodies you write. A commit message, or other text where Markdown does not
+render, gives the full URL instead. Quoted records stay as returned.
 
 When reporting finished spec work to the owner or requesting spec acceptance, including through resume,
 present the owner-facing summary from `skills/vh-adlc-spec/SKILL.md` in the conversation before the
 acceptance question. Keep the full document and review status available as supporting detail.
+
+## Clean up when the session's work is done
+
+Clean up once, when the work this session was started for is finished and the session is about to be
+archived or handed back: a feature merged and its branch removed, a maintenance or audit batch delivered,
+an investigation or review reported with nothing left to run. Do not clean up between operations of the
+same work, because the next step would have to check out, build and download everything again.
+
+A failed run is not the end of the work when a retry is planned. While you or the owner still intend to
+retry, keep what the retry reuses (pulled images, build and dependency caches, a kept cluster, a
+restore target) and say in the report that you kept it and for which retry. Remove it as soon as no
+retry is planned or wanted, and at the latest when the session's work is done. Never let leftovers of
+failed runs pile up across retries: a retry reuses the earlier run's kept state or removes it first.
+
+A script or tool you write that creates per-run scratch (a temporary container engine, a restore target,
+a fixture checkout) removes that scratch on every exit, success or failure, through a trap or `finally`,
+unless the run was started with an explicit keep-for-retry option. It pulls images and dependencies into
+a reusable cache it can find again, not into a fresh per-run directory, so a retry does not download the
+same gigabytes again.
+
+1. Remove what this session created and no longer needs: scratch directories, temporary worktrees and
+   their branches, worktree slots, Compose projects and clusters it started for itself, and background
+   processes it launched. Keep what open work still depends on, and never touch what another session
+   created.
+2. Run `vh-adlc clean --dry-run --compose --kind` from the repository. When it answers with no failing
+   finding, run `vh-adlc clean --compose --kind`. The binary removes only what its built-in rules and
+   the repository's cleanup manifest declare, and only Compose projects and clusters whose runs have
+   ended, so this needs no separate permission. Follow `references/clean.md` for its findings.
+3. Name what you removed and the space it freed in the final report, and list anything you kept.

@@ -112,6 +112,74 @@ func TestChangedPrivateSocketPathIsPreserved(t *testing.T) {
 	_ = response.Body.Close()
 }
 
+// A cleanup-pending guard retries until its record says it is done. Once the
+// record is gone, or names another guard, nothing is left that the guard can
+// prove is its own, so it exits without recreating the private state root.
+func TestCleanupPendingGuardExitsWithoutItsRecord(t *testing.T) {
+	for _, change := range []string{"removed", "replaced"} {
+		t.Run(change, func(t *testing.T) {
+			home := root(t)
+			_ = fakeTailnet(t, home)
+			app := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "keep-app") }))
+			defer app.Close()
+			c := options(t, home, app.URL, "1m")
+			c.Transport = "tailscale"
+			v, err := Start(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, err := state.Load(home, v.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = os.Remove(record.ProxyAddress); err != nil {
+				t.Fatal(err)
+			}
+			foreign, err := net.ListenUnix("unix", &net.UnixAddr{Name: record.ProxyAddress, Net: "unix"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			foreign.SetUnlinkOnClose(false)
+			defer func() { _ = foreign.Close() }()
+			if _, err = Stop(home, v.ID); err != nil {
+				t.Fatal(err)
+			}
+			if end := waitEnd(t, home, v.ID); end.State != "cleanup-pending" || !state.Alive(record.Guard) {
+				t.Fatal("session did not stay cleanup-pending under its guard")
+			}
+			if change == "removed" {
+				err = os.RemoveAll(home)
+			} else {
+				self, e := state.Inspect(os.Getpid())
+				if e != nil {
+					t.Fatal(e)
+				}
+				err = state.Update(context.Background(), home, v.ID, func(r *state.Record) { r.Guard = self })
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			deadline := time.Now().Add(5 * time.Second)
+			for state.Alive(record.Guard) && time.Now().Before(deadline) {
+				time.Sleep(25 * time.Millisecond)
+			}
+			if state.Alive(record.Guard) {
+				t.Fatalf("cleanup-pending guard kept running after its record was %s", change)
+			}
+			if _, err = os.Lstat(home); change == "removed" && !os.IsNotExist(err) {
+				t.Fatal("guard recreated the removed state root")
+			}
+			// The replaced record names this test process; nothing may stop it.
+			_ = os.RemoveAll(filepath.Join(home, v.ID))
+			response, err := app.Client().Get(app.URL)
+			if err != nil {
+				t.Fatal("upstream app was stopped")
+			}
+			_ = response.Body.Close()
+		})
+	}
+}
+
 func TestDaemonProcessFixture(t *testing.T) {
 	home := os.Getenv("REMOTE_GUI_TEST_DAEMON_HOME")
 	if home == "" {
@@ -145,7 +213,8 @@ func TestDaemonReplacementRevokesTheSession(t *testing.T) {
 			t.Fatal(e)
 		}
 		t.Cleanup(func() { _ = state.Signal(identity, syscall.SIGKILL); _ = child.Wait() })
-		deadline := time.Now().Add(3 * time.Second)
+		// Setup only: a re-executed race binary can take seconds to start on a loaded host.
+		deadline := time.Now().Add(20 * time.Second)
 		for time.Now().Before(deadline) {
 			if _, e = os.Stat(filepath.Join(parent, "daemon-ready")); e == nil {
 				return child, identity
@@ -182,12 +251,18 @@ func TestDaemonReplacementRevokesTheSession(t *testing.T) {
 		return (&net.Dialer{}).DialContext(ctx, "unix", record.ProxyAddress)
 	}}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: time.Second}
+	// The guard records cleanup-pending before it serves its denial on the
+	// reserved listener, so the request can wait in the listener's backlog
+	// until the guard is scheduled. The bound only keeps a hang from stalling
+	// the test; what it proves is that no answer grants access.
+	client := &http.Client{Transport: transport, Timeout: 15 * time.Second}
+	asked := time.Now()
 	response, err := client.Get("http://localhost/")
 	if err != nil {
 		t.Fatal(err)
 	}
 	_ = response.Body.Close()
+	t.Logf("the proxy listener answered %d %v after the request", response.StatusCode, time.Since(asked))
 	if response.StatusCode == 200 {
 		t.Fatal("replaced daemon retained application access")
 	}
@@ -198,7 +273,9 @@ func TestDaemonReplacementRevokesTheSession(t *testing.T) {
 	if _, err = Cleanup(context.Background(), home); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	// Cleanup only wakes the cleanup-pending guard; its retry, which a loaded
+	// host can take seconds to schedule and run, does the reconciling.
+	deadline := time.Now().Add(20 * time.Second)
 	for time.Now().Before(deadline) {
 		record, err = state.Load(home, v.ID)
 		if err == nil && record.Forward == nil && record.State == "failed" {
@@ -207,7 +284,7 @@ func TestDaemonReplacementRevokesTheSession(t *testing.T) {
 		time.Sleep(25 * time.Millisecond)
 	}
 	if record.Forward != nil || record.Diagnostic != "tailscale-daemon-identity-changed" {
-		t.Fatal("daemon replacement did not reconcile accurately")
+		t.Fatalf("daemon replacement did not reconcile accurately: state %q, diagnostic %q, forward kept %v", record.State, record.Diagnostic, record.Forward != nil)
 	}
 	response, err = app.Client().Get(app.URL)
 	if err != nil {

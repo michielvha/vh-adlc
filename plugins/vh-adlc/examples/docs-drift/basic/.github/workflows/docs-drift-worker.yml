@@ -1,0 +1,77 @@
+name: Staged documentation collection
+
+on:
+  workflow_call:
+    inputs:
+      component_source:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require an immutable component selection
+        env:
+          COMPONENT_SOURCE: ${{ inputs.component_source }}
+        run: |
+          [[ "$COMPONENT_SOURCE" =~ ^[a-f0-9]{40}([a-f0-9]{24})?$ ]]
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: consumer
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: michielvha/vh-adlc
+          ref: ${{ inputs.component_source }}
+          path: component
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.5
+      # The operator verifies the immutable release first. Its installer/modules
+      # run below to check pin consistency. A credentialed adaptation verifies
+      # payload identity with already trusted tooling before loading it.
+      - name: Prepare the locked reader
+        run: bash component/plugins/vh-adlc/scripts/ensure-vh-adlc.sh
+      - name: Match the committed component binding
+        env:
+          BUN_RUNTIME_TRANSPILER_CACHE_PATH: '0'
+          DOCS_DRIFT_PLUGIN_DIR: ${{ github.workspace }}/component/plugins/vh-adlc
+          COMPONENT_SOURCE: ${{ inputs.component_source }}
+          CONSUMER_SOURCE: ${{ github.sha }}
+        run: |
+          bun consumer/scripts/check-component.ts --repo consumer --source "$CONSUMER_SOURCE" \
+            --component-repo component --component-source "$COMPONENT_SOURCE"
+      - name: Collect without provider credentials
+        id: collection
+        env:
+          BUN_RUNTIME_TRANSPILER_CACHE_PATH: '0'
+          DOCS_DRIFT_PLUGIN_DIR: ${{ github.workspace }}/component/plugins/vh-adlc
+          CONSUMER_SOURCE: ${{ github.sha }}
+        run: |
+          mkdir -m 700 "$RUNNER_TEMP/docs-drift-output"
+          collection_exit=0
+          bun consumer/scripts/docs-drift-entry.ts scan --repo consumer --source "$CONSUMER_SOURCE" \
+            --run-dir "$RUNNER_TEMP/docs-drift-collection" --entry hosted \
+            > "$RUNNER_TEMP/docs-drift-output/scan-envelope.json" || collection_exit=$?
+          printf 'exit_code=%s\n' "$collection_exit" >> "$GITHUB_OUTPUT"
+      - name: Save the bounded collection diagnostic
+        if: ${{ always() && steps.collection.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: docs-drift-collection-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/docs-drift-output/scan-envelope.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Preserve collection failure status
+        if: ${{ always() && steps.collection.outcome == 'success' }}
+        env:
+          COLLECTION_EXIT: ${{ steps.collection.outputs.exit_code }}
+        run: exit "$COLLECTION_EXIT"

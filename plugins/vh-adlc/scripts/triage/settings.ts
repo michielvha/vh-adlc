@@ -1,6 +1,6 @@
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
-import type { Settings } from "./types";
+import type { EffectiveLabel, Settings, StandardLabel } from "./types";
 import { settingsFile } from "../settings-file";
 import {createHash} from "node:crypto";
 
@@ -59,17 +59,35 @@ export function resolveInside(root: string, path: string): string {
   return completed;
 }
 
+const GITHUB_LOGIN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
+
 export function origin(root: string): { repository: string; hostname: string } {
   let remote = git(root, "remote", "get-url", "origin");
   const scp = remote.match(/^git@([A-Za-z0-9.-]+):([^?#]+)$/);
   if (scp) remote = `ssh://git@${scp[1]}/${scp[2]}`;
   let url: URL;
   try { url = new URL(remote); } catch { fail("origin must identify a GitHub repository"); }
+  // An HTTPS username shaped like a GitHub login selects a credential-helper account and is read past.
+  // Anything else in that position could be a token (GitHub tokens contain underscores or exceed 39
+  // characters), so it is refused. The username is never stored or printed.
   if (!["https:", "ssh:"].includes(url.protocol) || url.password || url.search || url.hash || url.port ||
-      (url.protocol === "https:" && url.username) || (url.protocol === "ssh:" && url.username !== "git")) fail("origin URL");
+      (url.protocol === "https:" && url.username && !GITHUB_LOGIN.test(url.username)) ||
+      (url.protocol === "ssh:" && url.username !== "git")) fail("origin URL");
   const repository = url.pathname.replace(/^\//, "").replace(/\.git$/, "");
   if (!/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/.test(repository) || repository.split("/").some((part) => [".", ".."].includes(part))) fail("origin repository");
   return { repository, hostname: url.hostname.toLowerCase() };
+}
+
+/** The standard label set from the plugin's vocabulary file. */
+export function standardLabels(): StandardLabel[] {
+  const input = JSON.parse(readFileSync(resolve(import.meta.dir, "../labels/vocabulary.json"), "utf8")) as { schema_version: number; labels: StandardLabel[] };
+  if (input.schema_version !== 1 || !Array.isArray(input.labels)) throw new Error("invalid label vocabulary");
+  return input.labels;
+}
+
+/** Each standard label under the name this repository uses; entries keyed by other names have no effect. */
+export function effectiveLabels(config: Pick<Settings, "label_map">): EffectiveLabel[] {
+  return standardLabels().map((label) => ({ ...label, standard: label.name, name: config.label_map[label.name] ?? label.name }));
 }
 
 export function loadSettings(root: string, options: { settingsPath?: string } = {}): Settings {
@@ -92,6 +110,8 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
   const labels = input.label_map === undefined ? {} : object(input.label_map, "label_map");
   const label_map: Record<string, string> = {};
   for (const [name, value] of Object.entries(labels)) label_map[name] = string(value, "label_map");
+  const effective = standardLabels().map((label) => (label_map[label.name] ?? label.name).toLowerCase());
+  if (new Set(effective).size !== effective.length) fail("label_map maps two standard labels to one repository label");
   if(input.workstreams!==undefined&&!Array.isArray(input.workstreams))fail("workstreams");
   const workstreams=(input.workstreams as unknown[]??[]).map(value=>{
     const rule=object(value,"workstreams");keys(rule,["owner","plan_roots","reference_files"],"workstreams");

@@ -26,6 +26,7 @@ The agent runs the workflow; you accept the feature scope and decide when to shi
 ## Why use it?
 
 - Find docs affected by selected code changes with [shared documentation impact](plugins/vh-adlc/examples/docs-impact/README.md).
+- Audit accumulated documentation drift and resolve selected stale audit PRs with the released `vh-adlc-docs-drift` operation. Start with its [greenfield example](plugins/vh-adlc/examples/docs-drift/README.md) and check [migration acceptance](docs/reference/compatibility.md#shared-documentation-drift).
 - Keep a feature's requirements, tasks, and evidence together in Git.
 - Check review freshness and completion with deterministic commands.
 - Get independent spec and implementation reviews before completing a feature.
@@ -84,6 +85,7 @@ This repository hosts the **vhco-tools** marketplace. Each plugin installs separ
 | --- | --- |
 | `vh-adlc` | Development workflows, feature gates, and independent reviews. |
 | `remote-gui` | Share local apps through private tailnet links and hand a fresh browser to the human. |
+| `paseo-hosts` | Onboard Linux servers as SSH-only Paseo daemons and link the Paseo desktop app to them. |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes. |
 | `github-app-registration` | Register GitHub Apps and save their credentials locally. |
 | `codex-qr-pairing` | Generate a fresh QR code for pairing with this Codex host. |
@@ -93,8 +95,7 @@ See the [marketplace guide](docs/reference/marketplace.md) for availability and 
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and local checks.
-Run `bun test tests/vh-adlc` for the full plugin suite. Tests that create Git
-repositories or invoke compilers use bounded setup timeouts.
+Run `bun test tests/vh-adlc --parallel --timeout 60000` for the full plugin suite.
 Report bugs and suggest improvements in [GitHub Issues](https://github.com/michielvha/vh-adlc/issues).
 
 Maintained by [VH & Co](https://vhco.pro).

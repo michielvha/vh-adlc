@@ -41,7 +41,7 @@ function sh(cwd: string, ...cmd: string[]) {
 
 function wrapperPath(plugin: string): string {
   const r = Bun.spawnSync(["bash", join(plugin, "scripts", "ensure-vh-adlc.sh")], {
-    env: { HOME: f.home, XDG_CACHE_HOME: join(f.home, ".cache"), PATH: "/usr/local/bin:/usr/bin:/bin", LC_ALL: "C" },
+    env: { HOME: f.home, XDG_CACHE_HOME: join(f.home, ".cache"), PATH: "/usr/bin:/bin", LC_ALL: "C" },
     stdout: "pipe",
     stderr: "pipe",
   });

@@ -18,6 +18,7 @@ Input is the owner's article brief, existing article, editorial request, or
 `promote <project or article>`. Read the adopter's instructions before writing.
 Complete the visual reading pass in `references/blog.md`, including for
 nontechnical stories. Publication remains subject to `references/authority.md`.
+Name hosted items in your report to the owner as `references/loop.md` step 5 says.
 
 For an independent prose pass, dispatch the editor at
 `agents/vh-adlc-blog-editor.agent.md` with the original or source notes, candidate,

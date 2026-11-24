@@ -1,0 +1,54 @@
+=== turn 1
+I applied both R-1 findings in a single commit. Neither one needed an owner decision, so I didn't add any Open Questions. R-1 is now stale, and the next step is a new spec review, which I didn't start because the trial rules say not to.
+
+Conventions: vhco-pro/docs@1ccf8f3 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md
+
+**Commit**
+- `a977867` spec: apply R-1 to the probe timeout
+
+There is no remote, so nothing was pushed, which is what the trial rules require.
+
+**What changed in `docs/specs/feature.md`**
+- **F-01** (factual, blocking): the timeout went from 5 to 10 seconds everywhere the document states it:
+  - the Owner summary
+  - Design (`--max-time 10`)
+  - AC-01
+
+  Background now says the 8-second warm-up figure comes from R-1 F-01. I couldn't check that figure myself: `probe.sh:2` only shows the curl call, not how long warm-up takes.
+- **F-02** (factual, should-fix): I removed the `--legacy` flag from Design instead of explaining why it stays. It behaved exactly like running with no flag, and the skill says to remove a mechanism in that case.
+- **Owner summary**: rewritten to cover the 10-second limit, exit status 2, no `--legacy` flag, and the planned proof. It says the proof hasn't been run yet.
+- **Nit rule**: the resolved `conventions/feature-documents.md` states it (Review log section). R-1 had no nits, so no nits were left unapplied.
+- **Open Questions**: none added. Both findings are factual and come with a single proposal that is clearly right.
+
+**Behaviors walked**
+- **Timeout length:** 5 → 10 seconds.
+- **Exit status 2 on timeout:** unchanged.
+- **`--legacy` flag:** removed, and no other section mentions it.
+- **Healthy start with an 8-second warm-up:** 10 seconds covers it.
+
+**Checks walked**
+- **`tests/check-timeout.sh`:** I re-read it before editing. It compares the first `--max-time N` in the document with the seconds in AC-01, so Design and AC-01 had to change in the same commit. The stored R-1 records contain no `--max-time`, so they can't confuse it. Run after the edit, it printed `PASS`.
+- **Test Plan scenario for AC-01:** a stub endpoint that sleeps 12 seconds should make probe.sh exit 2. Twelve is still above the new 10-second limit, so the row stays valid without changes. This is a planned check; nothing is implemented to run it against.
+
+**vh-adlc results I acted on**
+- `knowledge`: `"result":"answered"` at revision `1ccf8f3…`, source `repository`.
+- `find --slug feature`: `"result":"answered"`, returning only `docs/specs/feature.md`, so I extended that document.
+- `lint`: `"result":"pass"`, no findings, checked before committing.
+- `fresh` after the commit: R-1 has `"stale":true`, reason `baseline-changed`. This is expected because the normative baseline changed.
+- `next`: `"action":"spec review"`, because the status is draft and `spec_review_fresh` does not hold.
+- `bun scripts/loop/cli.ts context` listed no extra files or lenses, since there is no `.vh-adlc/loop.yaml`.
+
+**What's left**
+- review pending: R-1 was a blocking pass and only a new independent spec review at `a977867` can clear it. The trial rules say not to dispatch one.
+- The document stays in draft with no acceptance requested, because no clean review exists yet.
+
+**Owner summary of the spec**
+- **Behavior:** probe.sh will stop waiting for the health endpoint after 10 seconds and exit 2. Today it can hang forever.
+- **Scope:** only the timeout. Retries are out of scope, and there is no `--legacy` flag.
+- **Trade-off:** 10 seconds instead of 5, so a slow but healthy warm-up isn't reported as a failure.
+- **Validation:** planned but not run:
+  - `tests/check-timeout.sh` keeps Design and AC-01 in agreement.
+  - A stub endpoint that sleeps 12 seconds should make probe.sh exit 2.
+
+  Nothing is implemented yet.
+- **Approval:** a fresh independent review is needed before you can be asked to accept. Acceptance would only move the document to planned; implementation and any push still need separate approval.

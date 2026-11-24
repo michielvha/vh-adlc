@@ -1,0 +1,6 @@
+{
+  "name": "paseo-hosts",
+  "version": "0.1.0",
+  "description": "Onboard Linux servers as SSH-only Paseo daemons and link the macOS and Windows Paseo desktop apps to them.",
+  "author": { "name": "Michiel VH" }
+}

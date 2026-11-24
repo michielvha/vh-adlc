@@ -10,7 +10,7 @@ test("generic framework discovery resolves the existing canonical lifecycle and 
   expect(metadata.name).toBe("vh-adlc");expect(typeof metadata.description).toBe("string");expect(metadata).not.toHaveProperty("model");expect(metadata).not.toHaveProperty("allowed-tools");
   const links=[...skill.matchAll(/\]\(([^)]+)\)/g)].map(match=>resolve(dirname(path),match[1]));
   for(const name of["lifecycle.md","authority.md","loop.md"]){const target=resolve(plugin,"references",name);expect(links).toContain(target);expect(readFileSync(target,"utf8").length).toBeGreaterThan(0);}
-  expect(readdirSync(resolve(plugin,"skills"))).toHaveLength(15);
+  expect(readdirSync(resolve(plugin,"skills"))).toHaveLength(19);
 });
 
 test("native skill discovery exposes triage with one harness-neutral canonical procedure", () => {
@@ -19,7 +19,8 @@ test("native skill discovery exposes triage with one harness-neutral canonical p
   const metadata = Bun.YAML.parse(match![1]) as Record<string, unknown>;
   expect(metadata.name).toBe("vh-adlc-triage"); expect(metadata).not.toHaveProperty("model"); expect(metadata).not.toHaveProperty("allowed-tools");
   expect(skill).toContain("references/triage.md"); expect(skill).toContain("references/lifecycle.md");
-  const names = readdirSync(resolve(plugin, "skills")).filter((path) => path.startsWith("vh-adlc-") && path !== "vh-adlc-blog" && path !== "vh-adlc-docs-impact" && path !== "vh-adlc-clean");
+  const nonEngineering = ["blog", "diagram", "docs-impact", "docs-drift", "docs-truth", "clean", "orchestrate"].map((name) => `vh-adlc-${name}`);
+  const names = readdirSync(resolve(plugin, "skills")).filter((path) => path.startsWith("vh-adlc-") && !nonEngineering.includes(path));
   expect(names).toHaveLength(11);
 
   expect(skill.length).toBeLessThan(5000);
@@ -47,9 +48,9 @@ test("public guides agree on engineering and content operations, runtime needs a
   const guide = readFileSync(resolve(root, "docs/user-guides/workflows.md"), "utf8");
   const install = readFileSync(resolve(root, "docs/get-started/installation.md"), "utf8");
   const compatibility = readFileSync(resolve(root, "docs/reference/compatibility.md"), "utf8");
-  expect(guide).toContain("fifteen skills"); expect(guide).toContain("`vh-adlc-clean`");expect(guide).toContain("eleven engineering operations"); expect(guide).toContain("`vh-adlc-triage`"); expect(guide).toContain("`vh-adlc-blog`"); expect(guide).toMatch(/exact.*batch/i);
+  expect(guide).toContain("nineteen skills"); expect(guide).toContain("one coordination operation"); expect(guide).toMatch(/\| [^|]+ \| `vh-adlc-orchestrate` \|/); expect(guide).toContain("`vh-adlc-clean`");expect(guide).toContain("eleven engineering operations"); expect(guide).toContain("`vh-adlc-triage`"); expect(guide).toContain("`vh-adlc-blog`"); expect(guide).toContain("five content operations"); expect(guide).toMatch(/\| Architecture diagram \| `vh-adlc-diagram` \|/); expect(guide).toMatch(/exact.*batch/i);
 
-  expect(install).toContain("fifteen skills"); expect(install).toContain("vh-adlc clean"); expect(install).toMatch(/(?:Bun[^\n]*triage|triage[^\n]*Bun)/i); expect(install).toContain("GitHub CLI");
-  expect(compatibility).toContain("Shared triage"); expect(compatibility).toMatch(/triage[\s\S]*unverified/i);
+  expect(install).toContain("nineteen skills"); expect(install).toContain("eleven engineering operations"); expect(install).toContain("one coordination operation"); expect(install).toContain("vh-adlc clean"); expect(install).toMatch(/(?:Bun[^\n]*triage|triage[^\n]*Bun)/i); expect(install).toContain("GitHub CLI");
+  expect(compatibility).toContain("Shared triage"); expect(compatibility).toMatch(/[^\n]*vh-adlc-orchestrate[^\n]*unverified|[^\n]*unverified[^\n]*vh-adlc-orchestrate/i); expect(compatibility).toMatch(/triage[\s\S]*unverified/i);
   expect(readFileSync(resolve(root, "README.md"), "utf8")).toMatch(/triage/i);
 });

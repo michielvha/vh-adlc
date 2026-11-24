@@ -7,14 +7,14 @@ import type { Output } from "../../../plugins/vh-adlc/scripts/security-settings/
 afterEach(dispose);
 const dependabot = { ".github/dependabot.yml": "version: 2\n" };
 const bot = (login: string) => ({ login, type: "Bot" });
-const allOn = { alerts: true, updates: { enabled: true, paused: false }, secret_scanning: true, push_protection: true };
+const allOn = { alerts: true, updates: { enabled: true, paused: false }, secret_scanning: true, push_protection: true, private_vulnerability_reporting: true };
 const states = (output: Output) => Object.fromEntries(output.entries.map(item => [item.setting, [item.state, item.reason ?? null]]));
-const writable = ["dependabot_alerts", "dependabot_security_updates", "secret_scanning", "secret_scanning_push_protection"];
+const writable = ["dependabot_alerts", "dependabot_security_updates", "secret_scanning", "secret_scanning_push_protection", "private_vulnerability_reporting"];
 
 test("apply on a public admin repository with dependabot.yml and no Renovate enables each setting once", () => {
   const f = setup({ files: dependabot }), { output, exit_code } = f.helper("apply");
-  expect(states(output)).toEqual({ dependabot_alerts: ["enabled", null], dependabot_security_updates: ["enabled", null], secret_scanning: ["enabled", null], secret_scanning_push_protection: ["enabled", null] });
-  expect(writes(f.calls).map(call => `${call.method} ${call.endpoint}`)).toEqual(["PUT repos/example/project/vulnerability-alerts", "PUT repos/example/project/automated-security-fixes", "PATCH repos/example/project"]);
+  expect(states(output)).toEqual({ dependabot_alerts: ["enabled", null], dependabot_security_updates: ["enabled", null], secret_scanning: ["enabled", null], secret_scanning_push_protection: ["enabled", null], private_vulnerability_reporting: ["enabled", null] });
+  expect(writes(f.calls).map(call => `${call.method} ${call.endpoint}`)).toEqual(["PUT repos/example/project/vulnerability-alerts", "PUT repos/example/project/automated-security-fixes", "PATCH repos/example/project", "PUT repos/example/project/private-vulnerability-reporting"]);
   expect(JSON.parse(writes(f.calls)[2]!.body!)).toEqual({ security_and_analysis: { secret_scanning: { status: "enabled" }, secret_scanning_push_protection: { status: "enabled" } } });
   expect(f.calls.some(call => call.endpoint.includes("code-scanning"))).toBe(false);
   expect(output.entries.some(item => item.setting === "code_scanning")).toBe(false);
@@ -64,7 +64,7 @@ test("look-alike Renovate signals do not match", () => {
 test.each(["private", "internal"] as const)("a %s repository enables alerts only and lists the paid features as not-free-on-private", visibility => {
   const f = setup({ visibility, analysis_null: true, files: dependabot }), { output } = f.helper("apply");
   expect(states(output)).toEqual({ dependabot_alerts: ["enabled", null], dependabot_security_updates: ["enabled", null], secret_scanning: ["unavailable", "not-free-on-private"],
-    secret_scanning_push_protection: ["unavailable", "not-free-on-private"], code_scanning: ["unavailable", "not-free-on-private"] });
+    secret_scanning_push_protection: ["unavailable", "not-free-on-private"], private_vulnerability_reporting: ["unavailable", "not-available-on-private"], code_scanning: ["unavailable", "not-free-on-private"] });
   expect(writes(f.calls).map(call => `${call.method} ${call.endpoint}`)).toEqual(["PUT repos/example/project/vulnerability-alerts", "PUT repos/example/project/automated-security-fixes"]);
 });
 
@@ -191,12 +191,12 @@ test("rule order decides archived, private and non-admin combinations", () => {
   expect(entry(kept.helper("apply").output, "secret_scanning")).toMatchObject({ state: "unavailable", reason: "not-free-on-private" });
   const viewer = setup({ visibility: "private", admin: false }), { output } = viewer.helper("apply");
   expect(states(output)).toEqual({ dependabot_alerts: ["unknown", "needs-admin"], dependabot_security_updates: ["unknown", "needs-admin"], secret_scanning: ["unavailable", "not-free-on-private"],
-    secret_scanning_push_protection: ["unavailable", "not-free-on-private"], code_scanning: ["unknown", "needs-admin"] });
+    secret_scanning_push_protection: ["unavailable", "not-free-on-private"], private_vulnerability_reporting: ["unavailable", "not-available-on-private"], code_scanning: ["unknown", "needs-admin"] });
   expect(entry(setup({ files: dependabot }).helper("check").output, "dependabot_security_updates")).toMatchObject({ state: "not-changed", reason: "check-only" });
 });
 
 test("keep-off rows for alerts and for secret scanning also hold their dependent settings", () => {
-  const alerts = setup({ files: dependabot, secret_scanning: true, push_protection: true }, { settings: { security_settings: "apply", security_settings_keep_off: [{ repository: "example/project", settings: ["dependabot_alerts"], reason: "Owner choice" }] } });
+  const alerts = setup({ files: dependabot, secret_scanning: true, push_protection: true, private_vulnerability_reporting: true }, { settings: { security_settings: "apply", security_settings_keep_off: [{ repository: "example/project", settings: ["dependabot_alerts"], reason: "Owner choice" }] } });
   const first = alerts.helper("apply");
   expect(states(first.output)).toMatchObject({ dependabot_alerts: ["left-off", "owner-choice"], dependabot_security_updates: ["left-off", "owner-choice"] });
   expect(entry(first.output, "dependabot_alerts")!.detail).toBe("Owner choice");
@@ -227,8 +227,48 @@ test.each([
 test("the CLI prints JSON or markdown and exits 0 or 1 by the entries", () => {
   const f = setup({ files: dependabot });
   const checked = cliRun(f, ["check", "--repo", f.root, "--default-branch", "main", "--default-commit", f.commit]);
-  expect(checked.code).toBe(1); expect((JSON.parse(checked.stdout) as Output).entries.length).toBe(4);
+  expect(checked.code).toBe(1); expect((JSON.parse(checked.stdout) as Output).entries.length).toBe(5);
   const applied = cliRun(f, ["apply", "--repo", f.root, "--default-branch", "main", "--default-commit", f.commit, "--format", "markdown"]);
   expect(applied.code, applied.stderr).toBe(0); expect(applied.stdout).toStartWith("## Repository security settings\n");
   expect(applied.calls.every(call => call.hostname === "github.com")).toBe(true);
+});
+
+const reporting = "private_vulnerability_reporting";
+const reportingPath = "repos/example/project/private-vulnerability-reporting";
+const onlyReporting = { settings: { security_settings: "apply", security_settings_apply_only: [reporting] } };
+
+test("the committed apply filter permits only private vulnerability reporting", () => {
+  const f = setup({ files: dependabot }, onlyReporting);
+  const { output, exit_code } = f.helper("apply");
+  expect(entry(output, reporting)?.state).toBe("enabled");
+  expect(writes(f.calls).map(call => [call.method, call.endpoint])).toEqual([["PUT", reportingPath]]);
+  expect(f.calls.filter(call => call.endpoint === reportingPath).map(call => call.method)).toEqual(["GET", "PUT", "GET"]);
+  expect(exit_code).toBe(0);
+});
+
+test("reporting must read back as enabled after the write", () => {
+  const f = setup({ noop: ["PUT private-vulnerability-reporting"] }, onlyReporting);
+  const { output, exit_code } = f.helper("apply");
+  expect(entry(output, reporting)).toMatchObject({ state: "not-changed", reason: "api-error", detail: "HTTP 204; not on after write" });
+  expect(exit_code).toBe(1);
+});
+
+test.each([403, 404])("a reporting read returning HTTP %s is unknown and causes no write", status => {
+  const f = setup({ fail: [{ method: "GET", path: reportingPath, status }] }, onlyReporting);
+  expect(entry(f.helper("apply").output, reporting)).toMatchObject({ state: "unknown", reason: "api-error" });
+  expect(writes(f.calls)).toEqual([]);
+});
+
+test("an uncommitted apply filter cannot broaden committed authority", () => {
+  const f = setup({ files: dependabot }, onlyReporting);
+  f.settings({ schema_version: 1, security_settings: "apply" });
+  f.helper("apply");
+  expect(writes(f.calls).map(call => call.endpoint)).toEqual([reportingPath]);
+});
+
+test("a committed keep-off decision prevents a reporting write", () => {
+  const f = setup({}, { settings: { ...onlyReporting.settings,
+    security_settings_keep_off: [{ repository: "example/project", settings: [reporting], reason: "Owner choice" }] } });
+  expect(entry(f.helper("apply").output, reporting)).toMatchObject({ state: "left-off", reason: "owner-choice" });
+  expect(writes(f.calls)).toEqual([]);
 });

@@ -207,6 +207,12 @@ The collector also records the complete repository label vocabulary. Missing or 
 blocks label assignment and labeled issue creation. A missing name requires its exact approved
 color/description creation action to complete first; never rely on GitHub to create it implicitly.
 
+Triage verdicts use the standard state labels from `references/issues.md`: `ready`, `blocked`,
+`partial` and `needs-decision`, under the names `label_map` gives them in this repository. Applying or
+removing one is a published verdict and needs current proof, as below. Prefer the labels helper's
+approved plan to bring missing standard labels into a repository; a `create-label` action still covers
+other vocabulary.
+
 The collected GitHub actor is part of the sealed batch and must match on every write and retry.
 Only a previously attempted action may reconcile a remote receipt. A changed state alone is not
 proof of this batch: closure/label receipts need a recent event from the approved actor.

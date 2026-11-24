@@ -24,7 +24,7 @@ test("implement and ship preflight before writes and retain explicit per-task sc
 });
 test("procedure preserves evidence and authority boundaries and minimal mapping upkeep", () => {
   const procedure = read("references/docs-impact.md");
-  for (const phrase of ["--offline", "--base", "--path", "--metadata-path", "roots --repo", "Accurate", "Stale", "Incomplete", "Unknown", "literal", "new visible behavior", "never edits", "vh-adlc-spec", "local procedure", "historical", "source and document", "report-only", "publication", "untrusted", "missing-page"]) expect(procedure).toContain(phrase);
+  for (const phrase of ["--offline", "--base", "--path", "--metadata-path", "roots --repo", "Accurate", "Stale", "Incomplete", "Unknown", "literal", "old spelling", "new visible behavior", "never edits", "vh-adlc-spec", "local procedure", "historical", "source and document", "report-only", "publication", "untrusted", "missing-page"]) expect(procedure).toContain(phrase);
   expect(procedure).not.toMatch(/\b(?:AskUserQuestion|TodoWrite|mcp__|model:|opus)\b/u);
   for (const path of ["examples/docs-impact/README.md", "examples/docs-impact/AGENTS.md", "examples/docs-impact/docs/deployment.md", "examples/docs-impact/deploy/values.yaml"]) expect(existsSync(resolve(plugin, path))).toBe(true);
 });

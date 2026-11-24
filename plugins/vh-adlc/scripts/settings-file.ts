@@ -2,10 +2,12 @@
 // `vh-adlc settings read`, the strict reader in the verified binary. The callers'
 // validators decide what the value means; this file only decides which bytes are
 // read and how. A missing file needs no binary.
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 type Fail = (reason: string) => never;
+export type YAMLReaderOptions = { offline?: boolean; environment?: Record<string, string | undefined> };
 
 export type SettingsFile = { path: string; configured: boolean; value: unknown };
 
@@ -30,21 +32,46 @@ export function settingsFile(options: { root: string; name: string; settingsPath
 }
 
 /** Returns the value `vh-adlc settings read` gives for `bytes`, or fails with its fixed reason. */
-export function readYAML(bytes: Uint8Array, fail: Fail, options: { offline?: boolean } = {}): unknown {
+export function readYAML(bytes: Uint8Array, fail: Fail, options: YAMLReaderOptions = {}): unknown {
   return createYAMLReader(fail, options)(bytes);
 }
 
 /** Resolve the verified reader once; every call still parses a separate document strictly. */
-export function createYAMLReader(fail: Fail, options: { offline?: boolean } = {}): (bytes: Uint8Array) => unknown {
-  const installer = Bun.spawnSync(["bash", join(import.meta.dir, "ensure-vh-adlc.sh"), ...(options.offline ? ["--offline"] : [])], { stdout: "pipe", stderr: "pipe" });
-  if (installer.exitCode !== 0) fail("binary unavailable: the verified vh-adlc binary could not be obtained");
-  const binary = installer.stdout.toString().trim();
+export function createYAMLReader(fail: Fail, options: YAMLReaderOptions = {}): (bytes: Uint8Array) => unknown {
+  const binary = verifiedBinary(options);
   if (!binary) fail("binary unavailable: the verified vh-adlc binary could not be obtained");
-  return bytes => readVerifiedYAML(binary, bytes, fail);
+  return bytes => readVerifiedYAML(binary, bytes, fail, options.environment);
 }
 
-function readVerifiedYAML(binary: string, bytes: Uint8Array, fail: Fail): unknown {
-  const run = Bun.spawnSync([binary, "settings", "read", "--stdin"], { stdin: bytes, stdout: "pipe", stderr: "pipe" });
+// Installer results for this process, keyed by mode, lock and environment. A hit is
+// used only while the binary still has the bytes the installer verified.
+const verified = new Map<string, { binary: string; sha256: string }>();
+
+function verifiedBinary(options: YAMLReaderOptions): string | undefined {
+  const key = installerKey(options), known = key === undefined ? undefined : verified.get(key);
+  if (known && fileDigest(known.binary) === known.sha256) return known.binary;
+  if (key !== undefined) verified.delete(key);
+  const installer = Bun.spawnSync(["bash", join(import.meta.dir, "ensure-vh-adlc.sh"), ...(options.offline ? ["--offline"] : [])], { env: options.environment, stdout: "pipe", stderr: "pipe" });
+  const binary = installer.exitCode === 0 ? installer.stdout.toString().trim() : "";
+  if (!binary) return undefined;
+  const digest = fileDigest(binary);
+  if (key !== undefined && digest !== undefined) verified.set(key, { binary, sha256: digest });
+  return binary;
+}
+
+function installerKey(options: YAMLReaderOptions): string | undefined {
+  let lock: Buffer;
+  try { lock = readFileSync(join(import.meta.dir, "..", "vh-adlc.lock.json")); } catch { return undefined; }
+  const environment = Object.entries(options.environment ?? process.env).filter(([, value]) => value !== undefined).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+  return JSON.stringify([options.offline === true, createHash("sha256").update(lock).digest("hex"), environment]);
+}
+
+function fileDigest(path: string): string | undefined {
+  try { return createHash("sha256").update(readFileSync(path)).digest("hex"); } catch { return undefined; }
+}
+
+function readVerifiedYAML(binary: string, bytes: Uint8Array, fail: Fail, environment?: Record<string, string | undefined>): unknown {
+  const run = Bun.spawnSync([binary, "settings", "read", "--stdin"], { env: environment, stdin: bytes, stdout: "pipe", stderr: "pipe" });
   let parsed: unknown;
   try { parsed = JSON.parse(run.stdout.toString()); } catch { fail("the settings reader returned no report"); }
   const report = record(parsed);

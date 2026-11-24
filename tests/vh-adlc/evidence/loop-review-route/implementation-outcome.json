@@ -1,0 +1,9 @@
+{
+  "role": "implementation_reviewer",
+  "status": "ready",
+  "model": "gpt-6.1-sol",
+  "target": "196d98c7e3769a2d36b59d6944963e23a6c64fe6",
+  "records": "CRITERION: AC-01 `add(2, 3)` returns 5.\nVERDICT: met\nEVIDENCE: Ran `bun test` at 196d98c7e3769a2d36b59d6944963e23a6c64fe6. Observed 1 pass, 0 failures, and 1 assertion. Inspected `math.test.ts:3`, which asserts `add(2, 3)` equals 5. The working tree remained clean.\n",
+  "isolation": "procedural",
+  "reply": "MODEL: unknown\nTARGET: 196d98c7e3769a2d36b59d6944963e23a6c64fe6\n\nCRITERION: AC-01 `add(2, 3)` returns 5.\nVERDICT: met\nEVIDENCE: Ran `bun test` at 196d98c7e3769a2d36b59d6944963e23a6c64fe6. Observed 1 pass, 0 failures, and 1 assertion. Inspected `math.test.ts:3`, which asserts `add(2, 3)` equals 5. The working tree remained clean."
+}

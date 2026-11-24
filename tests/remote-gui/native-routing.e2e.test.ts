@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 const enabled=process.env.REMOTE_GUI_ROUTING_E2E==='1';
 const repo=resolve(import.meta.dir,'../..');
 const plugin=join(repo,'plugins/remote-gui');
-const allCases=['first-link','reuse','asset-failure','redirect-failure','origin-failure','ws-failure','browser-unavailable','transport-failure','external','internal','ssh','configured-sso','owned-challenge','unknown-login','nonlogin','provider-rejected','unconfirmed-login','navigation-transient','navigation-failure','identity-chromium','identity-firefox'];
+const allCases=['first-link','reuse','asset-failure','redirect-failure','origin-failure','ws-failure','browser-unavailable','transport-failure','external','internal','ssh','configured-sso','owned-challenge','unknown-login','nonlogin','provider-rejected','unconfirmed-login','navigation-transient','navigation-failure','identity-chromium','identity-firefox','profile-named','profile-unnamed','profile-unapproved','profile-approved','profile-challenge'];
 const cases=process.env.REMOTE_GUI_ROUTING_CASES?.split(',')||allCases;
 const check=(ok:unknown,message:string)=>{if(!ok)throw Error(message)};
 const digest=(directory:string)=>{
@@ -46,7 +46,7 @@ for(const scenario of cases)test.skipIf(!enabled)(`native real-runtime routing: 
   const toolchain=Bun.spawnSync(['go','env','GOROOT'],{cwd:plugin}).stdout.toString().trim();
   const settings={scenario,activation,bun:process.execPath,helper:join(root,'plugin/scripts/remote-gui.sh'),key,cert,ca,playwright:process.env.REMOTE_GUI_PLAYWRIGHT_MODULE,chromium:process.env.REMOTE_GUI_CHROMIUM,firefox:process.env.REMOTE_GUI_FIREFOX,browserType:scenario==='identity-firefox'?'firefox':'chromium',nativeCLI:process.env.REMOTE_GUI_NATIVE_CLI};
   writeFileSync(join(root,'capabilities.json'),JSON.stringify(settings));
-  const child=Bun.spawn(['/usr/bin/bwrap','--unshare-pid','--new-session','--die-with-parent','--ro-bind','/','/','--proc','/proc','--dev-bind','/dev','/dev','--bind',root,root,'--bind',build,build,'--ro-bind',join(root,'hosts'),'/etc/hosts','--ro-bind','/dev/null','/run/tailscale/tailscaled.sock','--chdir',root,'--',process.execPath,join(import.meta.dir,'fixtures/native-routing.ts')],{env:{...process.env,COPILOT_HOME:join(root,'n'),TMPDIR:join(root,'tmp'),GOTMPDIR:join(root,'tmp'),REMOTE_GUI_HOME:join(root,'s'),REMOTE_GUI_BUILD_CACHE:build,REMOTE_GUI_GO:join(toolchain,'bin/go'),GOCACHE:join(build,'go-cache'),REMOTE_GUI_TAILSCALE_SOCKET:join(root,'api.sock'),SSL_CERT_FILE:trust,NODE_EXTRA_CA_CERTS:trust},stdout:'pipe',stderr:'pipe'});
+  const child=Bun.spawn(['/usr/bin/bwrap','--unshare-pid','--new-session','--die-with-parent','--ro-bind','/','/','--proc','/proc','--dev-bind','/dev','/dev','--bind',root,root,'--bind',build,build,'--ro-bind',join(root,'hosts'),'/etc/hosts','--ro-bind','/dev/null','/run/tailscale/tailscaled.sock','--chdir',root,'--',process.execPath,join(import.meta.dir,'fixtures/native-routing.ts')],{env:{...process.env,COPILOT_HOME:join(root,'n'),TMPDIR:join(root,'tmp'),GOTMPDIR:join(root,'tmp'),REMOTE_GUI_HOME:join(root,'s'),REMOTE_GUI_PROFILE_HOME:join(root,'profiles'),REMOTE_GUI_BUILD_CACHE:build,REMOTE_GUI_GO:join(toolchain,'bin/go'),GOCACHE:join(build,'go-cache'),REMOTE_GUI_TAILSCALE_SOCKET:join(root,'api.sock'),SSL_CERT_FILE:trust,NODE_EXTRA_CA_CERTS:trust},stdout:'pipe',stderr:'pipe'});
   const timer=setTimeout(()=>child.kill('SIGTERM'),210000);
   let exit:number;
   try{[exit]=await Promise.all([child.exited,new Response(child.stdout).text(),new Response(child.stderr).text()])}finally{clearTimeout(timer)}

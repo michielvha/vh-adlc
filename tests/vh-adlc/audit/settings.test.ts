@@ -69,11 +69,11 @@ test("invalid input and credential-bearing origins never echo their values", () 
   expect(failure).toBeInstanceOf(Error);
   expect(String(failure)).not.toContain("do-not-echo-this-secret");
   f.settings(baseSettings());
-  git(f.root, "remote", "set-url", "origin", "https://do-not-echo-this-secret@github.com/example/project.git");
+  git(f.root, "remote", "set-url", "origin", "https://ghp_donotechothissecret0123456789abcdef0123@github.com/example/project.git");
   failure = undefined;
   try { loadSettings(f.root); } catch (error) { failure = error; }
   expect(failure).toBeInstanceOf(Error);
-  expect(String(failure)).not.toContain("do-not-echo-this-secret");
+  expect(String(failure)).not.toContain("donotechothissecret");
 });
 
 test("SSH and explicitly configured enterprise origin retain their actual identity", () => {
@@ -84,14 +84,14 @@ test("SSH and explicitly configured enterprise origin retain their actual identi
   expect(loadSettings(f.root).hostname).toBe("git.example.test");
 });
 
-test("a public owner-login HTTPS prefix identifies the same repository without changing the configured transport or neutral helpers", () => {
-  const f = project(), remote = "https://example@github.com/example/project.git";
+test("a public login HTTPS prefix identifies the same repository without changing the configured transport or neutral helpers", () => {
+  const f = project(), remote = "https://other-login@github.com/example/project.git";
   git(f.root, "remote", "set-url", "origin", remote);
   const config = loadSettings(f.root);
   expect(config.repository).toBe("example/project"); expect(config.hostname).toBe("github.com");
   expect(git(f.root, "remote", "get-url", "origin")).toBe(remote);
 });
-test.each(["https://other-login@github.com/example/project.git", "https://example:private-value@github.com/example/project.git", "https://example@github.com/example/project.git?token=private-value"])("userinfo outside the public owner-login exception is refused without disclosure", remote => {
+test.each(["https://ghp_0123456789abcdef0123456789abcdef0123@github.com/example/project.git", "https://example:private-value@github.com/example/project.git", "https://example@github.com/example/project.git?token=private-value"])("userinfo outside the public owner-login exception is refused without disclosure", remote => {
   const f = project(); git(f.root, "remote", "set-url", "origin", remote);
   let failure: unknown; try { loadSettings(f.root); } catch (error) { failure = error; }
   expect(failure).toBeInstanceOf(Error); expect(String(failure)).not.toContain(remote); expect(String(failure)).not.toContain("private-value");

@@ -1,0 +1,79 @@
+/** Owned native read fixture with real local Git objects and synthetic GitHub responses. */
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import type { PullRequestInput } from "../../../plugins/vh-adlc/scripts/github-read";
+import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { closureFixture } from "./closure-fixture";
+import { commitAll, git, put } from "./repository-fixture";
+import { gitStub } from "./git-stub";
+
+function nativePull(proposal: PullRequestInput) {
+  return { id: 1000 + proposal.number, number: proposal.number, state: proposal.state, merged_at: proposal.merged_at, body: proposal.body, draft: proposal.draft,
+    user: { login: proposal.actor, id: proposal.actor_id, type: proposal.actor_type },
+    head: { sha: proposal.head_sha, ref: proposal.head_ref, repo: proposal.head_repository },
+    base: { sha: proposal.base_sha, ref: proposal.base_ref, repo: proposal.base_repository } };
+}
+
+export async function nativeClosureFixture(roots: string[], method: "merge" | "squash" | "rebase", fault = "none", adoptedRepo?: string, configure?: Parameters<typeof closureFixture>[3],
+  publisher = { actor: "fixture-bot", actor_id: 20 }) {
+  const f = await closureFixture(roots, method, false, configure ?? (fault === "required-input" ? selected => ({ ...selected.options,
+    collection: { ...selected.collection, snapshot: { ...selected.snapshot,
+      required_inputs: [{ id: "current-date", kind: "time", sha256: sha256(Buffer.from("synthetic recorded date")) }] } } }) : undefined), adoptedRepo), artifacts = dirname(f.collection.store.record_path), bin = join(artifacts, "native-bin");
+  mkdirSync(bin, { mode: 0o700 });
+  if (fault === "oversized-target") {
+    const path = join(f.repo, ".vh-adlc/docs-drift.yaml"), settings = JSON.parse(readFileSync(path, "utf8"));
+    settings.reports.max_entry_bytes = f.recordBytes.length + 100;
+    put(f.repo, ".vh-adlc/docs-drift.yaml", JSON.stringify(settings));
+  }
+  if (fault === "changed-source-bytes") put(f.repo, "src/app.ts", "export const value = 2;\n");
+  put(f.repo, "later-unrelated.txt", "Later default commit\n"); const source = commitAll(f.repo);
+  git(f.repo, "update-ref", "refs/pull/20/head", f.head);
+  for (const proposal of f.proposals.values()) git(f.repo, "update-ref", "refs/pull/" + proposal.number + "/head", proposal.head_sha);
+  if (fault === "missing-original-ref") git(f.repo, "update-ref", "-d", "refs/pull/1/head");
+  const original = f.proposals.get(1); if (!original) throw Error("missing fixture original");
+  const repository = original.base_repository;
+  const merged = fault !== "unmerged" && fault !== "open";
+  const consolidation = { ...nativePull(f.consolidation), merged, merge_commit_sha: merged ? f.merged : null,
+    merged_at: merged ? f.consolidation.merged_at : null, state: fault === "open" ? "open" : "closed" };
+  const proposal = { ...nativePull(original), body: fault === "changed-original" ? "Changed original body" : original.body };
+  const responses = { "repos/fixture/docs": repository,
+    "repos/fixture/docs/git/ref/heads/main": { ref: "refs/heads/main", object: { type: "commit", sha: source } },
+    ["repos/fixture/docs/git/commits/" + source]: { sha: source, tree: { sha: "a".repeat(40) }, parents: [], message: "Fixture" },
+    "repos/fixture/docs/pulls/20": consolidation, "repos/fixture/docs/pulls/1": proposal,
+    "repos/fixture/docs/issues/1/comments?per_page=100&page=1": fault === "missing-comments" ? null : [] };
+  const calls = join(artifacts, "native-closure-calls.jsonl"), responses_file = join(artifacts, "native-closure-responses.json");
+  writeFileSync(responses_file, JSON.stringify(responses), { mode: 0o600 });
+  const realGit = Bun.which("git"); if (!realGit) throw Error("fixture requires Git");
+  writeFileSync(join(bin, "git"), gitStub({ git: realGit, origin: f.repo, log: calls }), { mode: 0o700 });
+  writeFileSync(join(bin, "gh"), `#!${process.execPath}
+const args = process.argv.slice(2);
+require("node:fs").appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ program: "gh", args }) + "\\n", { mode: 0o600 });
+if (args.includes("graphql")) {
+  const reads = require("node:fs").readFileSync(${JSON.stringify(calls)}, "utf8").trim().split("\\n").map(line => JSON.parse(line));
+  const changed = ${JSON.stringify(fault === "changed-actor")} && reads.filter(call => call.program === "gh" && call.args.includes("graphql")).length >= 6;
+  const values = JSON.parse(require("node:fs").readFileSync(${JSON.stringify(responses_file)}, "utf8"));
+  const count = reads.filter(call => call.program === "gh" && call.args.includes("graphql")).length;
+  if (values.__mutation_after && count >= values.__mutation_after.at) {
+    values[values.__mutation_after.endpoint] = values.__mutation_after.value;
+    require("node:fs").writeFileSync(${JSON.stringify(responses_file)}, JSON.stringify(values));
+  }
+  const viewer = values.__viewer_after && count >= values.__viewer_after.at ? values.__viewer_after.viewer
+    : values.__viewer ?? { login: changed ? "other-fixture-actor" : ${JSON.stringify(publisher.actor)}, databaseId: changed ? ${publisher.actor_id + 1} : ${publisher.actor_id} };
+  console.log(JSON.stringify({ data: { viewer } })); process.exit(0);
+}
+if (args[args.indexOf("--method") + 1] !== "GET") process.exit(91);
+const values = JSON.parse(require("node:fs").readFileSync(${JSON.stringify(responses_file)}, "utf8"));
+const reads = require("node:fs").readFileSync(${JSON.stringify(calls)}, "utf8").trim().split("\\n").map(line => JSON.parse(line));
+const count = reads.filter(call => call.program === "gh" && call.args.includes("graphql")).length;
+const changed = ${JSON.stringify(fault === "changed-actor")} && count >= 6;
+const viewer = values.__viewer_after && count >= values.__viewer_after.at ? values.__viewer_after.viewer
+  : values.__viewer ?? { login: changed ? "other-fixture-actor" : ${JSON.stringify(publisher.actor)}, databaseId: changed ? ${publisher.actor_id + 1} : ${publisher.actor_id} };
+const endpoint = args.at(-1);
+const value = endpoint === "user/" + viewer.databaseId ? { login: viewer.login, id: viewer.databaseId } : values[endpoint];
+if (!value) { console.log("HTTP/2.0 404 Not Found\\r\\n\\r\\n{}"); process.exit(1); }
+console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
+`, { mode: 0o700 });
+  const selection = canonicalJSON({ schema_version: 1, source_commit: source, consolidation: 20 });
+  writeFileSync(join(artifacts, "closure-selection.json"), selection, { mode: 0o600 });
+  return { ...f, source, artifacts, selection, calls, responses_file, environment: { ...process.env, PATH: bin + ":" + process.env.PATH, GH_TOKEN: "synthetic-read-token" } };
+}

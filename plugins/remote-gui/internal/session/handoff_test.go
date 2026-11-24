@@ -2,8 +2,11 @@ package session
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -234,5 +237,92 @@ func TestLegacyBrowserViewDefaultsToAgent(t *testing.T) {
 	got, err := Read(control.home, control.id)
 	if err != nil || got.BrowserMode != "agent" || got.CDPAddress == "" {
 		t.Fatalf("legacy browser changed: %+v %v", got, err)
+	}
+}
+
+const fakeHandoffEnv = "REMOTE_GUI_TEST_FAKE_FAILED_HANDOFF"
+
+// The supervisor runs in a re-executed test binary, so the fake launcher is
+// installed there from the environment. Test files never reach the shipped binary.
+func init() {
+	if os.Getenv(fakeHandoffEnv) == "1" {
+		BrowserLauncher = fakeFailingLauncher
+	}
+}
+
+// fakeFailingLauncher serves a viewer upstream and hands off like a runtime whose
+// first clipboard clear fails: an error and a still-healthy handle without a browser.
+func fakeFailingLauncher(_ context.Context, c config.Config, id string) (BrowserHandle, error) {
+	assets := filepath.Join(c.Home, id, "fake-assets")
+	if err := os.Mkdir(assets, 0o700); err != nil {
+		return BrowserHandle{}, err
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return BrowserHandle{}, err
+	}
+	server := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/websockify" {
+			w.WriteHeader(200)
+			return
+		}
+		conn, rw, e := w.(http.Hijacker).Hijack()
+		if e != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		hash := sha1.Sum([]byte(r.Header.Get("Sec-WebSocket-Key") + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"))
+		_, _ = rw.WriteString("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: " + base64.StdEncoding.EncodeToString(hash[:]) + "\r\n\r\n")
+		_ = rw.Flush()
+		_, _ = io.Copy(io.Discard, rw)
+	})}
+	go func() { _ = server.Serve(listener) }()
+	var attempts atomic.Int32
+	handle := BrowserHandle{
+		BrowserMode: c.Mode(), Target: "http://" + listener.Addr().String() + "/vnc.html",
+		Marker: "fake-marker", MarkerURL: "http://127.0.0.1:1/", Assets: assets, Password: "fake-password",
+		Alive: func() bool { return true }, Stop: func() { _ = server.Close() },
+	}
+	handle.Handoff = func(_ context.Context, mode string) (BrowserHandle, error) {
+		if attempts.Add(1) == 1 {
+			return handle, errors.New("clipboard-clear-unverified")
+		}
+		next := handle
+		next.BrowserMode, next.CDPAddress = mode, "http://127.0.0.1:2"
+		return next, nil
+	}
+	return handle, nil
+}
+
+func TestFailedClearHandoffSurvivesSupervisorHealthTicks(t *testing.T) {
+	t.Setenv(fakeHandoffEnv, "1")
+	previous := BrowserLauncher
+	BrowserLauncher = fakeFailingLauncher
+	t.Cleanup(func() { BrowserLauncher = previous })
+	home := root(t)
+	c, err := config.Parse([]string{"start", "--home", home, "--transport", "loopback", "--browser-mode", "human", "--ttl", "1m"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := Start(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = Stop(home, v.ID) })
+	if _, err = Handoff(home, v.ID, "agent"); err == nil || err.Error() != "clipboard-clear-unverified" {
+		t.Fatalf("failed clear handoff: %v", err)
+	}
+	// The supervisor checks health every 150 ms; several ticks pass here.
+	time.Sleep(time.Second)
+	record, err := state.Load(home, v.ID)
+	if err != nil || record.State != "handoff-failed" || record.Diagnostic != "clipboard-clear-unverified" || record.CDPAddress != "" || record.Config.Mode() != "human" {
+		t.Fatalf("failed handoff after health ticks: %s %s %v", record.State, record.Diagnostic, err)
+	}
+	if !state.Alive(record.Supervisor) || !state.Alive(record.Guard) {
+		t.Fatal("supervisor stopped after a failed clear")
+	}
+	recovered, err := Handoff(home, v.ID, "agent")
+	if err != nil || recovered.State != "ready" || recovered.BrowserMode != "agent" {
+		t.Fatalf("retried handoff: %+v %v", recovered, err)
 	}
 }

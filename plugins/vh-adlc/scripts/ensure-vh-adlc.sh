@@ -4,13 +4,21 @@
 # Sources, in order: a vh-adlc on PATH whose digest and version match the lock,
 # then the user cache entry for the locked version, verified on every reuse,
 # then the release asset, verified before extraction and again before it runs
-# or is cached. Online mode rejects a matching-version PATH entry with a wrong
-# digest; a missing lock digest always fails closed.
-# Offline mode never executes an unverified PATH entry; it tries the verified
-# cache instead. The script writes only below the user cache directory.
+# or is cached. A missing lock digest always fails closed.
+# A PATH entry whose digest does not match the lock is never executed, in either
+# mode: it is ignored with a note and the verified cache or download is used. A
+# wrapper named vh-adlc that calls this script would otherwise recurse without end.
+# A nested run, marked by VH_ADLC_ENSURE_ACTIVE, fails at once for the same reason.
+# The script writes only below the user cache directory.
 #
 # Usage: ensure-vh-adlc.sh [--offline]
 set -euo pipefail
+
+if [[ -n "${VH_ADLC_ENSURE_ACTIVE:-}" ]]; then
+  echo "vh-adlc: ensure-vh-adlc.sh is already running in a parent process (VH_ADLC_ENSURE_ACTIVE is set); a wrapper on PATH that calls this script is the likely cause, so it stops instead of recursing" >&2
+  exit 1
+fi
+export VH_ADLC_ENSURE_ACTIVE=1
 
 offline=false
 for arg in "$@"; do
@@ -82,21 +90,14 @@ fi
 cache_dir="$cache_base/vh-adlc/bin/$version/$platform"
 cached="$cache_dir/vh-adlc"
 
-# 1. A vh-adlc on PATH.
+# 1. A vh-adlc on PATH, executed only once its digest matches the lock.
 if candidate=$(command -v vh-adlc 2>/dev/null) && [[ -n "$candidate" ]]; then
   if [[ "$(sha256 "$candidate")" == "$binary_sha" ]]; then
     reports_version "$candidate" || die "$candidate matches the locked digest but reports a version other than $version"
     echo "$candidate"
     exit 0
   fi
-  if [[ "$offline" == true ]]; then
-    echo "vh-adlc: ignoring unverified PATH entry $candidate in offline mode" >&2
-  else
-    if reports_version "$candidate"; then
-      die "$candidate reports vh-adlc $version but its digest does not match the lock; remove it or fix PATH"
-    fi
-    echo "vh-adlc: ignoring $candidate, which is not vh-adlc $version" >&2
-  fi
+  echo "vh-adlc: ignoring unverified PATH entry $candidate, whose digest does not match the lock for vh-adlc $version" >&2
 fi
 
 # 2. The user cache entry, verified before every reuse.
@@ -114,7 +115,50 @@ if [[ "$offline" == true ]]; then
 fi
 work=$(mktemp -d "${TMPDIR:-/tmp}/vh-adlc-ensure.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-curl -fsSL --retry 2 -o "$work/asset.tar.gz" "$url" || die "binary unavailable: downloading $url failed"
+if ! curl -q -fsSL --connect-timeout 5 --max-time 25 --retry 0 -o "$work/asset.tar.gz" "$url" || [[ ! -s "$work/asset.tar.gz" ]]; then
+  asset_name=$(field name)
+  [[ "$asset_name" == "vh-adlc_${version}_${platform}.tar.gz" &&
+     "$url" == "https://github.com/michielvha/vh-adlc/releases/download/v${version}/${asset_name}" ]] ||
+    die "binary unavailable: downloading $url failed"
+  command -v python3 >/dev/null 2>&1 || die "binary unavailable: the release API fallback requires python3"
+  repo_api=https://api.github.com/repos/michielvha/vh-adlc
+  echo "vh-adlc: trying the locked release through the GitHub asset API" >&2
+  if ! curl -q -fsSL --connect-timeout 5 --max-time 10 --retry 0 --max-filesize 1048576 -o "$work/release.json" "$repo_api/releases/tags/v$version" || [[ ! -s "$work/release.json" ]]; then
+    die "binary unavailable: reading the locked release metadata failed"
+  fi
+  # Bind the API object to the canonical lock URL, asset name and release tag.
+  api_asset_url=$(python3 -I - "$work/release.json" "$version" "$asset_name" "$url" "$repo_api" 2>/dev/null <<'PY'
+import json
+import sys
+with open(sys.argv[1], "rb") as source:
+    data = source.read(1048577)
+if len(data) > 1048576:
+    sys.exit(1)
+release = json.loads(data)
+if not isinstance(release, dict) or release.get("tag_name") != "v" + sys.argv[2]:
+    sys.exit(1)
+assets = release.get("assets")
+if not isinstance(assets, list) or len(assets) > 1000:
+    sys.exit(1)
+matches = [asset for asset in assets if isinstance(asset, dict)
+           and asset.get("name") == sys.argv[3] and asset.get("browser_download_url") == sys.argv[4]]
+if len(matches) != 1:
+    sys.exit(1)
+asset = matches[0]
+identifier = asset.get("id")
+if type(identifier) is not int or not 0 < identifier < 2**63:
+    sys.exit(1)
+expected = sys.argv[5] + "/releases/assets/" + str(identifier)
+if asset.get("url") != expected:
+    sys.exit(1)
+print(expected)
+PY
+  ) || die "binary unavailable: the release API did not identify the locked asset"
+  rm -f "$work/asset.tar.gz"
+  if ! curl -q -fsSL --connect-timeout 5 --max-time 25 --retry 0 -H 'Accept: application/octet-stream' -o "$work/asset.tar.gz" "$api_asset_url" || [[ ! -s "$work/asset.tar.gz" ]]; then
+    die "binary unavailable: downloading the locked API asset failed"
+  fi
+fi
 [[ "$(sha256 "$work/asset.tar.gz")" == "$asset_sha" ]] ||
   die "the downloaded asset's digest does not match the lock; nothing was installed"
 mkdir "$work/extract"

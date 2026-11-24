@@ -35,13 +35,39 @@ plugin pin. If any of these is missing, return a single finding saying which, an
 ## A spec review
 
 Verify every factual claim in the document against the tree, the cited sources and the pinned
-conventions. Check any Owner summary against the detailed scope, defaults, permission limits, decisions and proof.
+conventions. When the dispatch lists repository instructions, read them too: a document that
+contradicts them gets a finding, and a needed change to them is raised as a judgement finding for an
+Open Question, never assumed. Apply each declared lens the dispatch lists as a check at its severity. Check any Owner summary against the detailed scope, defaults, permission limits, decisions and proof.
 Return a finding for a material contradiction, omission or unsupported result. A historical document
 without that subsection stays eligible; its absence alone is not a format failure.
 Then attack the design and the criteria: what does the artifact look like when every box is
 ticked, and does the original problem survive? Look for contradictions, unobservable criteria, missing
-Test Plan rows and anything the binary would read differently from the author. Return complete finding
-records, or exactly the single line the standard gives for a review with no findings.
+Test Plan rows and anything the binary would read differently from the author.
+
+Weigh the design against its harm statement in Context: who is harmed, how often, how badly, whether it
+heals on its own, and the simplest alternative without machinery it rejected, with the reason. A missing
+harm statement or rejected alternative is a factual finding. Machinery out of proportion to the stated
+harm is a judgement finding: name the alternative that would cover it. Rate both should-fix, or nit in a
+document whose status is past `draft`.
+
+Where the design changes state, runs concurrently, or crosses a process or network boundary, ask what
+happens under concurrent requests, partial failure, retry or replay, and upgrade or rollback from the
+previous version. A path the document leaves undefined is a finding. A design that changes no state and
+crosses no boundary gets no such finding.
+
+Return every finding you can establish in this pass; do not hold any back for a later pass. For each
+finding about a rule, limit or default, search the document for every other place that states it and
+name every location in that finding's `WHERE`. When a finding traces to a change the previous revision
+made, say so in its `EVIDENCE`. When a nit only widens a free-text pattern row that has passed review,
+say so in its `EVIDENCE` too.
+
+Rate each finding with the severity definitions in the resolved `conventions/feature-documents.md`. The harm
+statement findings above keep the severity given there. When the
+dispatch declares a lens, rate the findings that lens raises at its declared severity instead. When the resolved page only
+lists the severity names without defining them, rate as before.
+
+Return complete finding records, or exactly the single line the standard gives for a review with no
+findings.
 
 ## An implementation review
 
@@ -54,6 +80,7 @@ Then add finding records for any defect you found.
 
 Start with one line, `MODEL: <id>`, giving the exact model ID your system prompt says you run on, or
 `MODEL: unknown` if it names none. The dispatching session cannot see which model ran, so it records this
-line. After it, return only records, in the standard's formats and nothing else. Write their text plainly,
+line. When the dispatch asks for a TARGET line, give `TARGET: <commit>` on the next line, with the exact
+commit you reviewed. After that, return only records, in the standard's formats and nothing else. Write their text plainly,
 as `guides/humanize-prose.md` at the revision asks, with no em dashes or en dashes; your records are
 stored exactly as you return them.

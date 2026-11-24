@@ -1,0 +1,31 @@
+schema_version: 1
+captured_at: 2026-11-18T10:00:00Z
+origins: [https://example.test]
+entry_urls: [https://example.test/]
+sitemap_urls: [https://example.test/, https://example.test/guide]
+groups:
+  documentation: [https://example.test/guide]
+pages:
+  - requested_url: https://example.test/
+    final_url: https://example.test/
+    outcome: captured
+    mode: initial
+    observed_at: 2026-11-18T10:00:00Z
+    status: 200
+    content_type: text/html
+    headers: {}
+    body_file: index.html
+  - requested_url: https://example.test/guide
+    final_url: https://example.test/guide
+    outcome: captured
+    mode: initial
+    observed_at: 2026-11-18T10:00:00Z
+    status: 200
+    content_type: text/html
+    headers: {}
+    body_file: guide.html
+files:
+  - path: index.html
+    sha256: 3c5a8b4c9436cac93fc11aa08eadd3770924cbf2116131f25d413c438eb9bba1
+  - path: guide.html
+    sha256: aaae9a08e0a8dfc6c4d0c4e13dd3ba0ada75a0217271da4ddac971a43522b096

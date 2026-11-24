@@ -1,0 +1,56 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria (AC-01); Context, Owner summary
+EVIDENCE: Design says "release.sh appends the version to releases.log and then overwrites latest.txt with it." Nothing says what happens when the append succeeds and the overwrite of latest.txt then fails, or when the process is killed between the two writes or partway through the overwrite. In those cases releases.log names a version that latest.txt does not hold, or latest.txt is truncated or empty. The document also does not say what exit status release.sh returns, or whether it rolls back the releases.log line. AC-01 and the Owner summary describe only the success path.
+PROPOSAL: Define the partial failure path: write latest.txt atomically (temp file in the same directory, then rename), say which file is the source of truth when the two disagree, and say the exit status. Add a criterion and a Test Plan row that force the overwrite to fail and check both files and the exit code.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria (AC-01); Test Plan (AC-01 row)
+EVIDENCE: Design says "A failed append is retried once." It does not say what counts as a failure (a short write, a non-zero exit from the shell redirection), whether a partly written line is removed before the retry, or what happens when the retry also fails (exit non-zero and skip latest.txt, or continue). A retry after a write that landed but reported an error appends the version twice. Replay is also undefined: running release.sh 1.2.0 twice appends a second 1.2.0 line, and the document does not say whether that is allowed or rejected. AC-01 ("releases.log ends with the version") passes with a duplicated or corrupted earlier line.
+PROPOSAL: State the failure condition, the cleanup before a retry, the behaviour after a second failure, and whether a repeated version is appended, skipped or refused. Add criteria and proofs for the retry outcome and for a repeated run with the same version.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: Design says "Only one release.sh runs at a time, guarded by flock." It names no lock file path and does not say whether a second run waits for the lock, fails at once, or times out, or what exit status and message it gives. release.sh:1 is "#!/bin/sh"; flock(1) is a util-linux tool, not part of POSIX sh, and is absent on macOS by default, so the document does not say what happens on a host without it.
+PROPOSAL: Name the lock file, choose wait or fail fast (with its exit status), and state the supported hosts or the behaviour when flock is missing. Raise the wait versus fail-fast choice as an Open Question if it is the owner's call.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-01); Test Plan (AC-01 row); Design
+EVIDENCE: The only criterion is AC-01, the success path. The flock guard, the single retry, and the format and migration claims in Design have no criterion and no proof, so an implementation with no lock and no retry ticks every box. The Test Plan row "Run release.sh 1.2.0 and read both files" gives no pass condition: it does not say what content each file must hold (for example, last line of releases.log equals "1.2.0", latest.txt contains exactly "1.2.0" with one trailing newline), and it does not start from an existing releases.log, so "ends with" and "overwrites" are never exercised against prior content.
+PROPOSAL: Add criteria for concurrent runs, retry and failure behaviour, each with a Test Plan row. Rewrite the AC-01 row as a scenario with a precondition (releases.log already holding an earlier version, latest.txt holding that version) and an exact expected content for both files.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design; Context, Background
+EVIDENCE: Design says "Both files keep the previous version's plain-text format, so upgrade and rollback need no migration." release.sh at 7458aca is two lines, "#!/bin/sh" and echo "$1"; it writes no file, so there is no previous format to keep. The format of each file (one version per line, trailing newline, any timestamp) is therefore unspecified. Rollback is also not migration free in effect: after rolling back to the current release.sh, releases.log and latest.txt silently stop updating while still showing the last version. The document also does not say where the two files are written (current directory or the script's directory).
+PROPOSAL: Replace the claim with the actual format of each file and their location, and state what a rollback leaves behind and whether that is acceptable.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Design
+EVIDENCE: Open Questions says "None.", which the standard reads as every question having been answered, but the Review Log is empty and the Design settles several trade-offs without raising them: append before overwrite, exactly one retry, flock as the concurrency guard. The standard says "Every trade-off the document settles is an open question, including one the author would answer the same way the owner would."
+PROPOSAL: Raise the settled trade-offs (write order, retry count, lock wait or fail) as Open Questions in the standard format with a recommendation each, or record where the owner already answered them.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary
+EVIDENCE: The Owner summary is one sentence, "Write each release to releases.log and latest.txt." It omits the out-of-scope item, the flock guard, the retry, the upgrade and rollback claim, and the validation state (nothing has run; the AC-01 proof is planned, not observed). The standard asks the summary to cover approach, defaults, trade-offs and validation state and to distinguish planned checks from observed proof.
+PROPOSAL: Expand the summary to a few short paragraphs covering scope, approach, concurrency and failure handling, and state that no proof has been observed yet.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background
+EVIDENCE: Background cites "release.sh prints the version and exits today (release.sh:1)". release.sh:1 is the shebang "#!/bin/sh"; the echo "$1" line is release.sh:2.
+PROPOSAL: Cite release.sh:2.

@@ -39,7 +39,7 @@ func RunWith(args []string, out io.Writer, execute Executor) int {
 		return 2
 	}
 	if c.Command == "help" {
-		_, _ = fmt.Fprintln(out, "remote-gui: doctor | share <local-http-url> | start | handoff <id> --browser-mode human|agent | status [id] | access <id> [--reveal] | stop <id> | cleanup\nOptions: --transport tailscale|loopback --ttl 2h --home <private-directory> --kind share|browser --owner-login <tailscale-login> --browser-mode human|agent")
+		_, _ = fmt.Fprintln(out, "remote-gui: doctor | share <local-http-url> | start [--profile <name>] | handoff <id> --browser-mode human|agent | status [id] | access <id> [--reveal] | stop <id> | cleanup | profile list | profile delete <name>\nOptions: --transport tailscale|loopback --ttl 2h --home <private-directory> --kind share|browser --owner-login <tailscale-login> --browser-mode human|agent --profile-home <private-directory> --agent-start-approved")
 		return 0
 	}
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {

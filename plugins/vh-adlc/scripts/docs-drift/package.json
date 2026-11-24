@@ -1,0 +1,16 @@
+{
+  "name": "vh-adlc-docs-drift",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.5",
+  "scripts": {
+    "build": "bun build-zip.ts",
+    "check:bundle": "bun build-zip.ts --check",
+    "typecheck": "bash typecheck.sh"
+  },
+  "dependencies": { "yauzl": "3.4.0" },
+  "devDependencies": {
+    "@types/bun": "1.4.5",
+    "typescript": "7.0.2"
+  }
+}

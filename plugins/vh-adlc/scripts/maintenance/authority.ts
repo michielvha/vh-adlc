@@ -99,8 +99,7 @@ export function resolveStanding(config: Settings, observed: { default_branch: st
   try {
     const raw = source(".vh-adlc/maintenance.yaml"); if (raw === null) return result;
     const settings = object(readYAML(Buffer.from(raw), fail));
-    const known = ["schema_version", "repository", "hostname", "repositories", "discovery_organizations", "excluded_repositories", "bot_authors", "bot_inventory_terms", "dashboards", "generated_mirrors", "source_references", "backlog_references", "report_dir", "history_dir", "project_procedure", "surface_expectations", "security_settings", "security_settings_keep_off"];
-    if (settings.schema_version !== 1 || Object.keys(settings).some(key => !known.includes(key))) fail("invalid committed settings");
+    if (settings.schema_version !== 1 || Object.keys(settings).some(key => !SETTINGS_KEYS.includes(key))) fail("invalid committed settings");
     if (settings.repository !== undefined && settings.repository !== config.repository || settings.hostname !== undefined && settings.hostname !== config.hostname) fail("committed settings identity mismatch");
     if (settings.project_procedure === undefined) return result;
     const procedure = repositoryPath(settings.project_procedure), text = source(procedure); if (text === null) return result;
@@ -148,7 +147,7 @@ export function reportPermission(config: Settings, standing: Standing, rawReques
   return { ...data, binding: digest(canonicalJSON(data)) };
 }
 
-export type CommittedSecuritySettings = { linked: boolean; default_commit: string; security_settings: "apply" | "check"; keep_off: SecurityKeepOff[]; repositories: string[] };
+export type CommittedSecuritySettings = { linked: boolean; default_commit: string; security_settings: "apply" | "check"; keep_off: SecurityKeepOff[]; repositories: string[]; apply_only?: Settings["security_settings_apply_only"] };
 /** Reads the security settings from the committed, linked default-branch settings; throws when the binding or the settings are invalid. */
 export function committedSecuritySettings(config: Settings, observed: { default_branch: string; default_commit: string }): CommittedSecuritySettings {
   branch(config.root, observed.default_branch);
@@ -170,7 +169,8 @@ export function committedSecuritySettings(config: Settings, observed: { default_
   const repositories = [...new Set([config.repository, ...named])];
   let security: ReturnType<typeof securitySettings>;
   try { security = securitySettings(input, repositories); } catch (error) { invalid(String((error as Error).message).replace(/^invalid maintenance settings: /, "")); }
-  return { linked: true, default_commit: commit, security_settings: security.security_settings ?? "check", keep_off: security.security_settings_keep_off ?? [], repositories };
+  return { linked: true, default_commit: commit, security_settings: security.security_settings ?? "check", keep_off: security.security_settings_keep_off ?? [],
+    repositories, ...(security.security_settings_apply_only ? { apply_only: security.security_settings_apply_only } : {}) };
 }
 
 export type SecurityMode = { repository: string; mode: "apply" | "check"; reason: string; detail?: string };

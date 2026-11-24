@@ -87,11 +87,36 @@ Inside a Claude Code session, the equivalents are:
 
 Type `/vh-adlc` and choose an operation from the suggestions.
 
+## Feature reservations
+
+Repository owners can opt in to a shared Git reservation for feature writing after preparing
+their remote. See [reserve a feature while you work](../user-guides/workflows.md#reserve-a-feature-while-you-work)
+for the start, resume and handoff behavior, and the
+[setup procedure](../../plugins/vh-adlc/references/authority.md#reservation-adoption)
+for adoption and rollback.
+
+## Antigravity
+
+With the [Antigravity CLI](https://antigravity.google/docs/cli/install/) (`agy`) installed, run:
+
+```sh
+agy plugin install https://github.com/michielvha/vh-adlc/tree/main/plugins/vh-adlc
+```
+
+The command installs the package from `main` globally. Antigravity is unsupported for vh-adlc
+workflows. Only installation and skill discovery have been checked, on plugin 0.3.1 with CLI 1.4.7 and
+the language server from IDE 2.5.5 run headless; no skill or workflow ran, and current versions are
+untested. Antigravity also skipped the reviewer agent because it expects the agent's `tools`
+frontmatter as a YAML list, so operations that dispatch the reviewer or the blog editor are not
+expected to work there. See [compatibility](../reference/compatibility.md#support-matrix).
+
 ## What the plugin installs
 
-The package contains fifteen skills: the generic `vh-adlc` entry, eleven engineering
-operations, `vh-adlc-blog` for article and promotion drafts, `vh-adlc-docs-impact` for
-documentation review and `vh-adlc-clean` for host cleanup. It includes
+The package's nineteen skills include the generic `vh-adlc` entry,
+eleven engineering operations, one coordination operation (`vh-adlc-orchestrate`,
+for a session that drives a workstream of sub-sessions), `vh-adlc-blog` for article and promotion drafts, `vh-adlc-diagram` for architecture diagrams, `vh-adlc-docs-impact` for
+selected-change documentation review, `vh-adlc-docs-drift` for corpus drift and
+stale audit proposals, `vh-adlc-docs-truth` for factual claim review, and `vh-adlc-clean` for host cleanup. It includes
 separate feature-reviewer and prose-editor definitions. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
@@ -121,6 +146,10 @@ local agent.
 Maintenance uses an agent procedure with observed evidence, rather than triage's
 managed publication controller. The other feature operations continue to use the
 verified binary without requiring Bun.
+
+When you adopt vh-adlc in a repository, bring it to the standard issue labels with the labels helper
+from plugin 0.19.0: run its `plan`, review the writes and approve the digest before `apply`. The helper
+needs Bun and an authenticated `gh`; see [Issue labels](../user-guides/workflows.md#issue-labels).
 
 Persistent codebase audit requires plugin 0.8.0+, Bun and Git. Create the
 [audit settings and project procedure](../../plugins/vh-adlc/references/audit-settings.md) in the
@@ -188,3 +217,40 @@ there is no cache-path guessing. Existing callers retain their path/stdin argume
 
 Projects coordination also uses Bun, Git and your authenticated GitHub CLI. It needs separate Projects
 scope and an explicit board/repository configuration; see the [Projects reference](../../plugins/vh-adlc/references/projects.md).
+
+<a name="standalone-documentation-drift-candidate"></a>
+
+## Standalone documentation drift
+
+Verify that the selected installed payload contains `vh-adlc-docs-drift` and
+its packaged helpers. Resolve its actual plugin directory and check the
+[current acceptance record](../reference/compatibility.md#shared-documentation-drift)
+before migration. The shared procedure works from consumer-owned settings and
+source. Create those new files through the [greenfield example](../../plugins/vh-adlc/examples/docs-drift/README.md)
+and [settings reference](../../plugins/vh-adlc/references/docs-drift-settings.md).
+
+Use Bun 1.4.4, Git and Bash, plus the configured scanner's runtime. The included
+example scanner requires Node. Prepare the locked verified binary through the
+installed plugin's `scripts/ensure-vh-adlc.sh`, resolve the required knowledge
+pages, and select a clean committed source. Choose a fresh external run
+directory outside all checkouts and Git directories. The helper creates and owns it.
+
+```text
+bun <installed-plugin>/scripts/docs-drift/cli.ts scan --repo <project> \
+  --source <full-commit> --run-dir <new-private-external-directory>
+```
+
+`scan` returns its collection result. Findings still need source-based assessment.
+Missing prerequisites or incomplete collection return `incomplete` and exit 2.
+Full audit and resolution use the shared skill and their independently reviewed
+bound inputs. Configure ordinary installed client commands, full worker/reviewer models and
+observed native identities during authorized runtime setup. Keep
+credentials in the consumer's normal provisioning system.
+
+Keep the original run directory and its recorded evidence through pending delivery.
+Recovery effects use an explicitly selected ordinary install or released-source
+checkout matching the original component binding. After an upgrade, the current
+helper can inspect the pending record and report its original-release handoff.
+Follow [recovery](../../plugins/vh-adlc/references/docs-drift-review.md) for exact
+resume, acknowledgement and lease rules. Each host needs its own installation
+and required native checks before replacing its legacy publishing route.
