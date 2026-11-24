@@ -638,10 +638,11 @@ for the old-pin controls.
 - [x] AC-07: The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules
       do not settle, with a count of the rest and where the full list is.
       Evidence: established by the observed verification recorded on T7, T14 in Tasks.
-- [x] AC-08: On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary,
+- [ ] AC-08: On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary,
       ship and resume behave as before this feature: no Deferred section, no cut check and no follow-up
       review.
       Evidence: established by the observed verification recorded on T6, T7, T11, T12, T17, T18 in Tasks.
+      Evidence: R-29 returned not verified: the old-pin control transcripts ran on plugin 2639661, before ef685da1 changed the reviewer; T29 and T30 address it.
 - [x] AC-09: vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, the convention
       uses every glossary term except Cut check and Follow-up review, and the convention and both user
       guides use the terms they contain with the glossary's meanings.
@@ -837,6 +838,7 @@ None.
 | 2026-11-24 | R-27 | spec | `7c41f1a2` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix |
 | 2026-11-24 | R-28 | spec | `87a2ba87` | claude-opus-5-5 | procedural | scoped: no findings |
 | 2026-11-24 | R-28 | spec | `87a2ba87` | n/a | n/a | accepted by owner |
+| 2026-11-24 | R-29 | implementation | `644da0c0` | claude-opus-5-5 | procedural | 16 met, AC-08 not verified; 1 should-fix, 1 nit |
 
 ### R-1
 
@@ -1914,3 +1916,87 @@ PROPOSAL: In the new-brief bound paragraph, say the bound is part of its set's r
 ### R-28
 
 NO FINDINGS
+
+### R-29
+
+CRITERION: AC-01 The convention at the companion `vhco-pro/docs` revision defines blocking, should-fix and nit by consequence for the profiled product as Design states, with always-blocking defects blocking on every product.
+VERDICT: met
+EVIDENCE: Read conventions/feature-documents.md at e79eaa6a (byte-identical to the binary's cache and, as a whole tree, to companion head 0fa68d68), Review log section: "This is severity by consequence", the product profile as context with a production default, blocking/should-fix/nit defined as Design states, and the three always-blocking classes "blocking on every product, whatever its profile". `bun test` over 29 files including tests/vh-adlc/proportional-review.test.ts (convention resolved at the repository pin through the binary), private clone at 644da0c0: 412 pass, 0 fail. Limitations: none.
+
+CRITERION: AC-02 That convention raises an Open Question only where the owner could plausibly choose differently, has the author record every other choice in Design, and offers only options that meet the goal in full.
+VERDICT: met
+EVIDENCE: Open questions section at e79eaa6a states the plausible-choice rule, "records every other choice in Design with a one-line reason" and "Each option offered meets the goal in full", and drops the "every trade-off" sentence; the proportional-review.test.ts "raises open questions only under the plausible-choice rule" case passed in the 412-pass run at 644da0c0. Limitations: none.
+
+CRITERION: AC-03 That convention and the reviewer accept a stated limit as an answer to a finding, and the reviewer raises its substance again only for an always-blocking defect, an unmeetable criterion or an unsolved problem.
+VERDICT: met
+EVIDENCE: Convention Review log at e79eaa6a defines the `Not handled:` stated limit and the three re-raise conditions; reviewer agent at 644da0c0 carries the matching paragraph; proportional-review.test.ts passed (412 pass). Committed transcripts S17.limit.stated (no names.log concurrency finding), S17.limit.nolimit (gap raised without the line) and S17.limit.security (blocking finding quoting the delete-endpoint limit), each Result: pass on plugin 3acff49, which holds ef685da1; no reviewer, skill, protocol or loop script change between 3acff49 and 644da0c0 (git diff empty). Limitations: one model sample per scenario; scenarios read from committed transcripts, not rerun.
+
+CRITERION: AC-04 The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure paths by it, rates a failure path it is unsure about at should-fix or above, and without a profile judges as for production software with users.
+VERDICT: met
+EVIDENCE: Reviewer agent at 644da0c0 reads `## Product profile` at the reviewed commit, rates by it, has the unsure-path rule and the production default; references/loop.md states the profile once (test passed). Committed transcripts on plugin 3acff49: S17.profile.single (lock gap at nit: pass), S17.profile.hosted (blocking: pass), S17.profile.none (blocking: pass), S17.profile.unsure (should-fix: pass); the LOCK_GAP classifier in tests/vh-adlc/scenarios/run.ts matches whole words. Limitations: one model sample per variant; transcripts read, not rerun.
+
+CRITERION: AC-05 On both routes, a spec review after the first receives the scope from `review-scope`, covers only the document diff and every section that states a rule, ID or term the diff changes, and reports only blocking findings outside that; the pass is full when there is no previous spec review or a covered path or a docs pin bridge file changed.
+VERDICT: met
+EVIDENCE: tests/vh-adlc/loop/review-scope.test.ts and lenses.test.ts passed in the 412-pass run; review-scope.ts PIN_BRIDGES equals internal/knowledge/knowledge.go `bridges`; cli.ts `review` passes reviewScope into reviewPrompt for spec reviews; review-protocol.md and the spec skill carry the command and the Independence exception. Committed transcripts S17.scoped (host) and S17.scoped-command (Codex review command, attested gpt-6.2-sol, scoped since the clean pass), both Result: pass on 3acff49: non-blocking findings only on the changed paragraph or its terms, unchanged names.log gap not named, unchanged secret exposure blocking. Limitations: one changed paragraph observed, one sample per route.
+
+CRITERION: AC-06 The spec skill raises judgement calls and judgement findings as Open Questions only under the plausible-choice rule, judged against the product profile and the files loop context lists.
+VERDICT: met
+EVIDENCE: Spec skill at 644da0c0, "Under severity by consequence" section and author-mode and step 4 references; proportional-review.test.ts spec skill cases passed. Committed S17.questions (scripted reviewer) Result: pass on 2b59a97: exactly one Open Question, about the contract, and Design records the profile-settled choice; the spec skill is unchanged between 2b59a97 and 644da0c0. Limitations: one sample; reviewer scripted.
+
+CRITERION: AC-07 The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules do not settle, with a count of the rest and where the full list is.
+VERDICT: met
+EVIDENCE: Spec skill "Owner-list triage" bullet at 644da0c0; committed S17.nits Result: pass on 5e94e59 (summary shows the two widening nits and a count of six; `All unapplied nits` lists all eight); spec skill unchanged since 5e94e59. Limitations: one sample, scripted reviewer.
+
+CRITERION: AC-08 On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary, ship and resume behave as before this feature: no Deferred section, no cut check and no follow-up review.
+VERDICT: not verified
+EVIDENCE: Committed old-pin transcripts S17.oldpin.scoped, .questions, .nits, .profile, .deferred, .cut, .followup and S16.oldpin-reviewer all Result: pass, but all on plugin 2639661, before ef685da1 changed the reviewer's failure-mode paragraph (reviewer agent lines 60-66). git diff 2639661..644da0c0 over the reviewer, skills, references and loop scripts shows that reviewer change plus unrelated authority and plugin-version edits; spec, ship and resume are unchanged. review-convergence.test.ts at 0c983f67 passed (412-pass run). The real-reviewer old-pin controls (S17.oldpin.scoped, S17.oldpin.profile, S16.oldpin-reviewer) were never run on the current reviewer text. Limitations: the spec skill, ship and resume parts are established; the reviewer part is not.
+
+CRITERION: AC-09 vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, the convention uses every glossary term except Cut check and Follow-up review, and the convention and both user guides use the terms they contain with the glossary's meanings.
+VERDICT: met
+EVIDENCE: AGENTS.md at 644da0c0 has `## Product profile` and pins e79eaa6a, the merged companion (#59) whose tree equals 0fa68d68; knowledge.md names the same SHA; `vh-adlc lint` and `fresh` resolve e79eaa6a. Term grep on the convention finds all twelve required terms ("owner-list triage" across a line break) and neither Cut check nor Follow-up review; proportional-review.test.ts AC-09 cases passed. Manual read of docs/user-guides/workflows.md (Reviews) and docs/get-started/first-feature.md step 1: each term matches the glossary meaning. Limitations: none.
+
+CRITERION: AC-10 The replay harness runs a case end to end, reuses a stored old-brief set only when its recorded identity matches the current old brief and refuses otherwise, keeps every finished pass when it assembles results from stored runs, continues a stored set of the same identity and starts a fresh one for a different identity, resumes a failed loop from its kept clone, counts a lost loop's recorded lower bound, counts a set stored before T25 only through a matching launch record entry that lists its files, refuses a case whose approval line is missing or whose digests do not match, stops on a case term in the public tree or the companion diff, counts a run only on the route and model under test, records each run's plugin commit, docs revision and model, writes nothing but counts and identities to the results file, records failed executions without counting them as passes, and runs on a public fixture case in the test suite.
+VERDICT: met
+EVIDENCE: `bun test tests/vh-adlc/replay ...` in the targeted run at 644da0c0: all 41 harness cases pass (part of 412 pass, 0 fail), covering each clause, including the launch-record match, mismatch and unlisted-file refusals, kept-clone resume, both bound kinds, the approval refusals and the term stops. Read run.ts storedPasses, storedLoop, checkIdentity and freshSet: consistent with the tests. On the real cases `run.ts assemble` was read-only (case-directory file listing unchanged). Limitations: live.ts is exercised only by the real runs.
+
+CRITERION: AC-11 On the enterprise case, with labels and case approved before the first rule-editing commit, no label fails the retention rule on either route, apart from label L-08 on the Claude host route and label L-10 on the Codex command route, known losses the owner deferred as D-17 and D-18.
+VERDICT: met
+EVIDENCE: Approval line recomputed: labels sha256 c810c9ca...7e9a and case.yaml sha256 b2940ee8...b619 match; approved 2026-11-22T20:27:08Z, before companion 0fa68d6 (2026-11-23T07:43:21Z) and reviewer 06ab1add (07:45:28Z). `run.ts assemble` for both cases into a scratch file, then diff with the committed results.md: identical. Results: 3 old and 12 new counted passes per route (one command run excluded, 14 host runs failed and not counted); 100 label-route rows, 2 fail (command L-10: old 2/3, new 0/12; host L-08: old 2/3, new 0/12). Matcher spot check: old host passes 1 and 3 map L-08 at should-fix; no new host record of 12 raises the L-08 subject. Launch record: every old entry names old plugin 0c9fee77 and docs 30c38c8d with times consistent with one launch per set; session-log bound recomputed from the logs (36 distinct commits, 3 set aside, 33 counted, lists equal); kept-clone bound: clone head 5350c6d, 25 spec rows since X'. `git diff 5e94e593 ef685da1` over the five brief paths: only the reviewer fix. `run.ts terms` on the tree, companion diff, this document and results.md: pass. Limitations: matcher verdicts spot-checked, not exhaustively.
+
+CRITERION: AC-12 On the small application case, with labels and case approved before the first rule-editing commit, no label fails the retention rule on either route.
+VERDICT: met
+EVIDENCE: Approval line recomputed: labels sha256 88b8f774...ecd5 and case.yaml sha256 31907b51...380c match; approved 2026-11-23T07:40:57Z, before 0fa68d6 (07:43:21Z) and 06ab1add (07:45:28Z). Reassembled results identical to the committed file: 2 labels, all four label-route rows pass (command L-01 old 2/3, new 2/6 at minimum; host L-01 old 2/3, new 1/8 at minimum and 6/8 at any). Matcher spot check on three new host passes agrees with the label's match line. Old host pass and loop sets each map to one launch entry with consistent times (the duplicate run's files are set aside); session-log bound recomputed: 22 distinct, 3 set aside, 19 counted, lists equal. Terms check: pass. Limitations: host retention rests on one new pass at minimum severity.
+
+CRITERION: AC-13 Over the case and route pairs where both briefs' loops reach a clean pass, of which there must be at least one, the new-brief loops need at most half the old-brief loops' total spec reviews; the other pairs are reported as measured.
+VERDICT: met
+EVIDENCE: Reassembled results identical to committed: 2 pairs where both loops reached a clean pass (enterprise host 35 old and 8 new; small-application host 9 old and 2 new), totals 44 and 10, met; enterprise command (at least 33, at least 25) and small-application command (at least 19, 15) listed. Stored loop document counts match (36, 9, 10, 3, 16 files). live.ts returns documents only on a clean gate or at the 60 cap, unchanged since its first commit. Limitations: the clean pass itself is shown by the harness gate check at run time, not re-observed.
+
+CRITERION: AC-14 The convention defines the optional Deferred section outside the normative baseline; the spec skill writes an entry with the exact source text for every stated limit, finding deferred at acceptance, owner-directed cut, author cut and drift re-review deferral; and the reviewer does not raise an entry's substance again unless it leaves an always-blocking defect, makes a criterion unmeetable or leaves the stated problem unsolved.
+VERDICT: met
+EVIDENCE: Convention Sections and Deferred sections at e79eaa6a define the optional section and five sources; spec skill and reviewer carry them; proportional-review.test.ts passed. Committed S17.deferred (5e94e59, spec skill unchanged since): four entries with the exact sources, Scope line, Cut check lines, `vh-adlc fresh` fresh after the entries; S17.cut.both: `From: owner cut on 2026-11-23.`; S17.deferred-review (3acff49, real reviewer): sampler not raised, blocking finding against Scope quotes the delete entry. All pass. Limitations: one sample each.
+
+CRITERION: AC-15 After every owner-directed deferral, the author's reply carries the cut check line, and an item that is an always-blocking defect or that the goal or a criterion names becomes an Open Question instead of a Deferred entry.
+VERDICT: met
+EVIDENCE: Committed S17.cut.both (Open Question for the session check, Scope keeps it, Cut check line names a security defect), S17.cut.control (`nothing important lost`), and S17.deferred's acceptance and drift Cut check lines, all pass on 5e94e59; the spec skill "Cut check" bullet is unchanged since. Limitations: the proportionality "narrow" answer, which the Test Plan does not name, was not exercised; one sample each.
+
+CRITERION: AC-16 Once a feature's PR is merged, the follow-up review gives every pending Deferred entry a verdict of drop, follow-up or gap with one line of reason; shows gaps and follow-ups with issue previews and drops one line each; files only what the owner approves, through the labels helper's `follow-up` mode, never twice for one entry; records every verdict, including declined filings, in a docs PR without touching the default branch; runs only for a merged feature, without a writer handoff; and the ship report and resume flag a merged complete document with pending entries.
+VERDICT: met
+EVIDENCE: tests/vh-adlc/labels including follow-up.test.ts and issue-authority.test.ts passed (412-pass run). Committed S17.followup.merged (0fcd4c4; ship and resume unchanged since, authority changed only by an unrelated orchestrate row): resume names the four entries and the step; ship shows gap, follow-ups, drop with no writer handoff; partial run after the stubbed failure; rerun files only the missing issue on the same branch; final verdicts drop, follow-up link, follow-up not filed (owner declined), gap link; one follow-up PR; default branch unchanged; nothing merged. S17.followup.unmerged: no follow-up review, normal delivery. Both pass. Limitations: gh stubbed; one sample.
+
+CRITERION: AC-17 Over the case and route pairs whose old-brief loop reached a clean pass and stored its documents, the new-brief loops' total body growth is at most half the old-brief loops' total, or no larger than it when the old total is zero or negative, with body size recorded per pass and the Deferred section left out of it.
+VERDICT: met
+EVIDENCE: run.test.ts "records body size per pass without the Deferred section" and the growth-exclusion cases passed; run.ts bodySize drops the Deferred section. Reassembled results identical to committed: body size listed per pass; growth over 2 pairs with stored old documents 972 old (945 plus 27), 343 new (410 minus 67), met. Limitations: none.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-08); Tasks (T17, T26); plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md failure-mode paragraph
+EVIDENCE: Every old-pin control transcript (S17.oldpin.* and S16.oldpin-reviewer) records plugin 2639661. ef685da1, committed later, added two sentences to the reviewer at lines 60-66 ("Before you settle any finding's severity, check it against the always-blocking classes ..." and "When you are unsure ... rate it should-fix ..."). They are separate sentences after the "When the resolved ... names the product profile" clause and before "On a revision that does not", so a reviewer on an older pin may read them as unconditional. T26 reran only the new-pin scenarios. Consumers on older pins (for example docs 56cd70fa, which lacks the severity-by-consequence text) get this reviewer.
+PROPOSAL: Make both sentences explicitly conditional on the severity-by-consequence convention, then rerun S16.oldpin-reviewer, S17.oldpin.scoped and S17.oldpin.profile on the current reviewer (host route, no Codex needed) and commit the transcripts as AC-08 evidence.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary, validation paragraph)
+EVIDENCE: The Owner summary says "The remaining work is T28 (the totals ... and the kept-clone bound) and the results (T23, T24)", but T23, T24 and T28 are ticked with evidence and status_description says "every task done with evidence (T1 to T28)".
+PROPOSAL: Replace that sentence with the current state: all tasks done, implementation review next.
