@@ -78,6 +78,7 @@ PROPOSAL: Fix it.
 const finding = (severity: string, evidence: string) => `FINDING: F-01\nKIND: judgement\nSEVERITY: ${severity}\nWHERE: Design\nEVIDENCE: ${evidence}\nPROPOSAL: Add a lock.`;
 const RAISES = finding("should-fix", "L-01 concurrent appends to the log interleave");
 const OTHER = finding("nit", "a wording slip in Scope");
+const BELOW = finding("nit", "L-01 concurrent appends to the log interleave");
 
 type Options = {
   approval?: "valid" | "missing" | "edit-label" | "edit-case";
@@ -300,7 +301,7 @@ describe("stored runs", () => {
     // The new-brief passes stored under the same identity are continued, so none runs again.
     expect(f.calls().filter((c) => c.key === "new/command" && c.kind === "first-pass").length).toBe(0);
     const after = data(f.resultsText());
-    expect(after.retention.command["L-01"]).toMatchObject({ old: 2, verdict: "pass" });
+    expect(after.retention.command["L-01"]).toMatchObject({ oldMin: 2, verdict: "pass" });
     expect(after.loops["old/command"].reviews).toBe(1);
   });
 });
@@ -526,9 +527,48 @@ describe("retention", () => {
     const f = fixture(o);
     expect(f.run().exitCode).toBe(0);
     const data = JSON.parse(/```replay-data\n([\s\S]*?)\n```/.exec(f.resultsText())![1]);
-    expect(data.retention.command["L-01"]).toEqual({ old: 2, new: 0, runs: 12, verdict: "fail" });
+    expect(data.retention.command["L-01"]).toEqual({ oldMin: 2, oldAny: 2, newMin: 0, newAny: 0, runs: 12, verdict: "fail" });
     expect(data.retention.host["L-01"].verdict).toBe("pass");
     expect(f.calls().filter((c) => c.key === "new/command" && c.kind === "first-pass").length).toBe(12);
+  });
+
+  const retentionOf = (old: string[], fresh: string[]) => {
+    const o = healthy();
+    o.runs!["old/command"] = old.map((records) => ({ records }));
+    o.runs!["new/command"] = fresh.map((records) => ({ records }));
+    const f = fixture(o);
+    expect(f.run().exitCode).toBe(0);
+    return { f, r: JSON.parse(/```replay-data\n([\s\S]*?)\n```/.exec(f.resultsText())![1]).retention.command["L-01"] };
+  };
+
+  test("a label the old brief raised at its minimum fails after twelve new passes that raise it only below", () => {
+    const { f, r } = retentionOf([RAISES, RAISES, OTHER], [BELOW]);
+    expect(r).toEqual({ oldMin: 2, oldAny: 2, newMin: 0, newAny: 12, runs: 12, verdict: "fail" });
+    expect(f.calls().filter((c) => c.key === "new/command" && c.kind === "first-pass").length).toBe(12);
+  });
+
+  test("a label the old brief raised only below its minimum passes when a new pass raises it at any severity", () => {
+    const { f, r } = retentionOf([BELOW, BELOW, OTHER], [OTHER, BELOW, OTHER]);
+    expect(r).toEqual({ oldMin: 0, oldAny: 2, newMin: 0, newAny: 1, runs: 6, verdict: "pass" });
+    expect(f.calls().filter((c) => c.key === "new/command" && c.kind === "first-pass").length).toBe(6);
+  });
+
+  test("a label the old brief raised only below its minimum fails after twelve new passes that never raise it", () => {
+    const { f, r } = retentionOf([BELOW, BELOW, OTHER], [OTHER]);
+    expect(r).toEqual({ oldMin: 0, oldAny: 2, newMin: 0, newAny: 0, runs: 12, verdict: "fail" });
+    expect(f.calls().filter((c) => c.key === "new/command" && c.kind === "first-pass").length).toBe(12);
+  });
+
+  test("a label one old pass raises at its minimum and one below fails after twelve new passes that never raise it", () => {
+    const { f, r } = retentionOf([RAISES, BELOW, OTHER], [OTHER]);
+    expect(r).toEqual({ oldMin: 1, oldAny: 2, newMin: 0, newAny: 0, runs: 12, verdict: "fail" });
+    expect(f.calls().filter((c) => c.key === "new/command" && c.kind === "first-pass").length).toBe(12);
+  });
+
+  test("the results table shows the four counts per label", () => {
+    const { f } = retentionOf([BELOW, BELOW, OTHER], [OTHER, BELOW, OTHER]);
+    expect(f.resultsText()).toContain("| Route | Label | Old at its minimum | Old at any severity | New at its minimum | New at any severity | New runs | Verdict |");
+    expect(f.resultsText()).toContain("| command | L-01 | 0/3 | 2/3 | 0/6 | 1/6 | 6 | pass |");
   });
 });
 

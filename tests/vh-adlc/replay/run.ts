@@ -252,8 +252,25 @@ async function firstPasses(want: number, set: PassSet, run: () => Promise<RunRes
 }
 
 /** The retention rule: fail when two of three old passes raise a label and none of the new passes does at its minimum. */
-export function retention(label: Label, old: Severity[], fresh: Severity[]): { old: number; new: number } {
-  return { old: old.length, new: fresh.filter((severity) => rank(severity) >= rank(label.minimum)).length };
+export type Retention = { oldMin: number; oldAny: number; newMin: number; newAny: number };
+
+/** Counts the passes of each brief that raise a label at its minimum severity and at any severity. */
+export function retention(label: Label, old: Severity[], fresh: Severity[]): Retention {
+  const atMin = (list: Severity[]) => list.filter((severity) => rank(severity) >= rank(label.minimum)).length;
+  return { oldMin: atMin(old), oldAny: old.length, newMin: atMin(fresh), newAny: fresh.length };
+}
+
+/**
+ * Both briefs meet the same bar: a label the old brief raised at its minimum in two passes fails when no
+ * new pass raises it at its minimum; one the old brief raised only below its minimum in two passes fails
+ * when no new pass raises it at all, because then the new rules dropped it.
+ */
+export function retentionFails(r: Retention): boolean {
+  return r.oldMin >= 2 ? r.newMin === 0 : r.oldAny >= 2 && r.newAny === 0;
+}
+
+function retentionVerdict(r: Retention): "pass" | "fail" | "not raised by old" {
+  return r.oldAny === 0 ? "not raised by old" : retentionFails(r) ? "fail" : "pass";
 }
 
 // ---- Stored runs ----
@@ -390,7 +407,7 @@ export function assembleCase(caseDir: string, o: { oldPlugin: string; newPlugin:
       if (sets.old.counted && sets.new.counted) {
         data.retention[route] = Object.fromEntries(o.labels.map((label) => {
           const r = retention(label, sets.old.hits.get(label.id) ?? [], sets.new.hits.get(label.id) ?? []);
-          return [label.id, { ...r, runs: sets.new.counted, verdict: r.old === 0 ? "not raised by old" : r.old >= 2 && r.new === 0 ? "fail" : "pass" }];
+          return [label.id, { ...r, runs: sets.new.counted, verdict: retentionVerdict(r) }];
         }));
       }
     }
@@ -408,7 +425,7 @@ type CaseData = {
   case: string; approvedAt: string; terms: "pass";
   briefs: Record<"old" | "new", { plugin: string; docs: string }>;
   firstPasses: Record<string, { counted: number; failed: number; excluded: number; runs: RunEntry[] }>;
-  retention: Record<string, Record<string, { old: number; new: number; runs: number; verdict: "pass" | "fail" | "not raised by old" }>>;
+  retention: Record<string, Record<string, Retention & { runs: number; verdict: "pass" | "fail" | "not raised by old" }>>;
   loops: Record<string, { executed: boolean; failed?: number; bound?: boolean; reviews: number; questions: number; bodySizes: number[]; growth: number; clean: boolean; model?: string; plugin: string; docs: string }>;
 };
 
@@ -422,8 +439,8 @@ function renderCase(d: CaseData): string {
     const [brief, route] = key.split("/");
     for (const r of set.runs) lines.push(`| ${brief} | ${route} | ${r.n} | \`${short(r.plugin)}\` | \`${short(r.docs)}\` | ${r.model ?? "unknown"} | ${r.status}${r.reason ? ` (${r.reason})` : ""} | ${r.labels.join(", ") || "none"} |`);
   }
-  lines.push("", "### Retention", "", "| Route | Label | Old passes raising it | New passes at its minimum | New runs | Verdict |", "| --- | --- | --- | --- | --- | --- |");
-  for (const [route, labels] of Object.entries(d.retention)) for (const [label, r] of Object.entries(labels)) lines.push(`| ${route} | ${label} | ${r.old}/3 | ${r.new}/${r.runs} | ${r.runs} | ${r.verdict} |`);
+  lines.push("", "### Retention", "", "| Route | Label | Old at its minimum | Old at any severity | New at its minimum | New at any severity | New runs | Verdict |", "| --- | --- | --- | --- | --- | --- | --- | --- |");
+  for (const [route, labels] of Object.entries(d.retention)) for (const [label, r] of Object.entries(labels)) lines.push(`| ${route} | ${label} | ${r.oldMin}/3 | ${r.oldAny}/3 | ${r.newMin}/${r.runs} | ${r.newAny}/${r.runs} | ${r.runs} | ${r.verdict} |`);
   lines.push("", "### Full loops", "", "| Brief | Route | Plugin | Docs | Model | Spec reviews | Body size per pass | Growth |", "| --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const [key, l] of Object.entries(d.loops)) {
     const [brief, route] = key.split("/");
@@ -544,11 +561,11 @@ async function runCase(o: Record<string, string | undefined>) {
           else { checkIdentity(privateRuns, name, route, "pass", identity); sets[name] = storedPasses(privateRuns, name, route, identity); }
         }
         const verdicts: CaseData["retention"][string] = {};
-        const failing = () => labels.filter((label) => { const r = retention(label, sets.old.hits.get(label.id) ?? [], sets.new.hits.get(label.id) ?? []); return r.old >= 2 && r.new === 0; });
+        const failing = () => labels.filter((label) => { const r = retention(label, sets.old.hits.get(label.id) ?? [], sets.new.hits.get(label.id) ?? []); return retentionFails(r); });
         if (failing().length && selected.includes("new")) await pass("new", FIRST_PASSES.new + FIRST_PASSES.confirm);
         for (const label of labels) {
           const r = retention(label, sets.old.hits.get(label.id) ?? [], sets.new.hits.get(label.id) ?? []);
-          verdicts[label.id] = { ...r, runs: sets.new.counted, verdict: r.old === 0 ? "not raised by old" : r.old >= 2 && r.new === 0 ? "fail" : "pass" };
+          verdicts[label.id] = { ...r, runs: sets.new.counted, verdict: retentionVerdict(r) };
         }
         for (const name of ["old", "new"] as const) data.firstPasses[`${name}/${route}`] = { counted: sets[name].counted, failed: sets[name].failed, excluded: sets[name].excluded, runs: sets[name].runs };
         data.retention[route] = verdicts;
