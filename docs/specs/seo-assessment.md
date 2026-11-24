@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Claimed on feat/seo-agent; implementing the tasks test-first."
+status: draft
+status_description: "Revising after drift re-review R-38: skill count, version and Linux host; awaits a follow-up review and renewed acceptance."
 branch: feat/seo-agent
 issue: null
 goal: "An adopter can run a free-first website SEO assessment through vh-adlc that spends paid API units only when allowed and within a limit, and leaves exports usable after access ends."
