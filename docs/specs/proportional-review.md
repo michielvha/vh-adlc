@@ -773,6 +773,7 @@ None.
 | 2026-11-24 | R-19 | spec | `e96864df` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
 | 2026-11-24 | R-20 | spec | `8424fb75` | claude-opus-5-5 | procedural | scoped: no blocking, no should-fix; 2 nit |
 | 2026-11-24 | R-21 | spec | `00752fea` | claude-opus-5-5 | procedural | drift re-review after merging main c6268708, full pass: no blocking; 1 should-fix |
+| 2026-11-24 | R-22 | spec | `a3ae263a` | claude-opus-5-5 | procedural | scoped: no findings |
 
 ### R-1
 
@@ -1762,3 +1763,7 @@ SEVERITY: should-fix
 WHERE: Test Plan AC-11 row ("that the reviewer, the spec skill, `references/review-protocol.md`, `references/loop.md` and `scripts/loop/` differ between the first new brief `5e94e593` and the new brief in the results file only by `ef685da1`'s reviewer change (`git diff 5e94e593 <new brief> -- <those paths>`)"); Test Plan AC-12 row ("same procedure, brief check and pass condition"); Design (Replay harness, "new is the feature head at that moment" and "The new brief then moves to the fixed plugin and every new-brief run repeats"); Context Owner summary ("every new-rules run repeats on the fixed plugin")
 EVIDENCE: `git diff --stat 5e94e593 00752fea -- plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md plugins/vh-adlc/references/review-protocol.md plugins/vh-adlc/references/loop.md plugins/vh-adlc/scripts/loop/` lists two files: the reviewer (10 lines, ef685da1) and `plugins/vh-adlc/scripts/loop/plugin-version.ts` (22 lines). `git log 5e94e593..00752fea -- plugins/vh-adlc/scripts/loop/plugin-version.ts` gives 2c116422, "fix(loop): identify the PATH vh-adlc by its digest instead of running it", a default-branch commit. The drift merge dfdd422d (R-17) brought it in at 2026-11-23 22:15, after ef685da1 (21:39). This pass's merge f886f91b changes none of those paths, so the gap dates from the R-17 merge, which that pass did not raise. The document never names the new brief's commit. It says only that the new brief moves "to the fixed plugin". T23 and T24 are still open and "continue after acceptance". So an author who launches the reruns from the current feature head, which Design's "the feature head at that moment" allows, gets a new brief that also differs from 5e94e593 in `scripts/loop/`. The implementation reviewer's check as written then fails AC-11 and AC-12, even though the extra change only affects how the context command identifies the PATH binary, not review behaviour. An author who uses ef685da1, or a commit before dfdd422d, as the new brief passes. Two careful implementers would pick different briefs, and one choice fails the proof on a correct replay.
 PROPOSAL: Name the new brief's commit in Design and in the AC-11 row (for example ef685da1, or the commit the stored new-brief sets record). Alternatively, let the check also allow changes the default branch merged in that leave the reviewer's inputs and the review-scope result unchanged, and list 2c116422's `plugin-version.ts` change as one of them.
+
+### R-22
+
+NO FINDINGS
