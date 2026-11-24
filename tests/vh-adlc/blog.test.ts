@@ -272,3 +272,59 @@ describe("visual reading pass parsers", async () => {
     expect(visual.coversPairs(unverifiedEntry, pairs)).toBe(false);
   });
 });
+
+describe("visual reading article checks", async () => {
+  const visual = await import("./blog/visual.ts");
+  const figure = (src: string, alt = "A screen", caption = "The plan screen") =>
+    `<figure>\n<img src="${src}" alt="${alt}">\n<figcaption>${caption}</figcaption>\n</figure>`;
+  const quote = (text: string, cite = "Fixture writer") => `<blockquote class="pull-quote">\n<p>${text}</p>\n<cite>${cite}</cite>\n</blockquote>`;
+  const article = [
+    "---", "status: draft", "author: Fixture writer", "---", "",
+    "# Title", "", "First paragraph has five words.", "", figure("asset-1.png"), "",
+    "Second paragraph here.", "", "```sh", "cedar docs --format html", "```", "",
+    quote("I keep my notes."), "", "Last words.", "",
+  ].join("\n");
+
+  test("body prose excludes front matter, headings, code and treatments", () => {
+    expect(visual.bodyWords(article)).toBe(5 + 3 + 2);
+    expect(visual.hasBodyTreatment(article)).toBe(true);
+    expect(visual.hasBodyTreatment(`# T\n\nOnly prose.\n\n${figure("a.png")}\n`)).toBe(false);
+  });
+
+  test("image tokens cover declared sources, srcset and stray paths, and resolve against the public root", () => {
+    const text = `${figure("/img/a.PNG?x=1")}\n\n<figure>\n<img src="b.webp" srcset="c.png 2x, https://x.invalid/d.jpg 640w" alt="b">\n<figcaption>b</figcaption>\n</figure>\n\nSee e.svg#top.`;
+    const tokens = visual.imageTokens(text);
+    for (const t of ["/img/a.PNG", "b.webp", "c.png", "https://x.invalid/d.jpg", "e.svg"]) expect(tokens).toContain(t);
+    expect(visual.resolveToken("/img/a.png", "/p/site/article.md", "/p/public")).toBe("/p/public/img/a.png");
+    expect(visual.resolveToken("b.png", "/p/site/article.md", "/p/public")).toBe("/p/site/b.png");
+    expect(visual.resolveToken("//cdn.invalid/b.png", "/p/article.md", "/p")).toBeNull();
+    expect(visual.strayImages(text)).toEqual(["e.svg"]);
+    expect(visual.strayImages("![x][ref]\n\n<IMG src=x>").length).toBe(2);
+  });
+
+  test("drawing markup is found in every listed form", () => {
+    for (const bad of ["data:image/png;base64,AA", "<SVG viewBox='0 0 1 1'>", "<canvas id=c>", '<div class="mermaid">', "```Mermaid\ngraph TD\n```", "~~~d2\na -> b\n~~~"]) {
+      expect(`${bad}: ${visual.drawingMarkup(bad).length > 0}`).toBe(`${bad}: true`);
+    }
+    expect(visual.drawingMarkup("```sh\ndot -V\n```")).toEqual([]);
+  });
+
+  test("quotes, figures and undeclared quote markup are read from declared markup", () => {
+    expect(visual.pullQuotes(article)).toEqual([{ text: "I keep my notes.", cite: "Fixture writer" }]);
+    expect(visual.figures(article)).toEqual([{ sources: ["asset-1.png"], alt: "A screen", caption: "The plan screen" }]);
+    expect(visual.addedQuotes(article, `${article}\n${quote("New one.")}\n`).map((q) => q.text)).toEqual(["New one."]);
+    expect(visual.quoteFrom({ text: "I keep my notes.", cite: "" }, ["Yes,\nI keep my   notes. Always."])).toBe(true);
+    expect(visual.undeclaredQuotes(`${article}\n> quoted\n<q>x</q> <aside>y</aside>\n`)).toBe(3);
+  });
+
+  test("the skeleton keeps structure and folds prose runs", () => {
+    const reworded = article.replace("First paragraph has five words.", "One.\n\nTwo new paragraphs.").replace("# Title", "# Another title");
+    expect(visual.skeleton(reworded)).toBe(visual.skeleton(article));
+    expect(visual.skeleton(article.replace("# Title", "## Title"))).not.toBe(visual.skeleton(article));
+    expect(visual.skeleton(article.replace("cedar docs", "cedar doc"))).not.toBe(visual.skeleton(article));
+    const moved = article.replace(`${figure("asset-1.png")}\n\nSecond paragraph here.`, `Second paragraph here.\n\n${figure("asset-1.png")}`);
+    expect(visual.skeleton(moved)).not.toBe(visual.skeleton(article));
+    expect(visual.withoutTreatments(article)).not.toContain("<figure>");
+    expect(visual.withoutTreatments(article)).not.toMatch(/\n{3,}/);
+  });
+});
