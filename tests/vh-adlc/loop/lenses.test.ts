@@ -24,6 +24,8 @@ function repo(files: Record<string, string>) {
   return { root, commit: git(root, "rev-parse", "HEAD") };
 }
 
+// A first spec review: no previous pass, so the scope is full.
+const FULL = { previous: "", diff: "", full: true, reason: "no previous spec review" };
 const settings = `schema_version: 1
 project_procedure: agents/loop-project.md
 instruction_files: [CLAUDE.md, AGENTS.md]
@@ -75,9 +77,10 @@ describe("loop context", () => {
 describe("the reviewer receives the lenses", () => {
   test("the review prompt carries each declared lens and the instruction files to read", () => {
     const loaded = loadLoopSettings(repo(base).root, { overridePath: null });
-    const prompt = reviewPrompt({ repository: "r", document: "d", commit: "c", kind: "spec", docsRevision: "x", binary: "b", pluginPin: "p" }, loopContext(loaded));
+    const prompt = reviewPrompt({ repository: "r", document: "d", commit: "c", kind: "spec", docsRevision: "x", binary: "b", pluginPin: "p", scope: FULL }, loopContext(loaded));
     expect(prompt).toContain("Repository instructions to check the document against: CLAUDE.md, AGENTS.md, agents/loop-project.md");
     expect(prompt).toContain("satellite (blocking): A new deployable component names its satellite repository.");
+    expect(prompt).toContain("Scope: full pass (no previous spec review)");
   });
 
   test("a stub reviewer that only flags what reaches it returns a finding for a lens-breaking spec and none for a compliant one", async () => {
@@ -90,7 +93,7 @@ describe("the reviewer receives the lenses", () => {
     for (const [doc, expected] of [["# F\nAdds a new deployable launcher image.\n", "FINDING: F-01"], ["# F\nAdds a new deployable image, published by its satellite.\n", "NO FINDINGS"]] as const) {
       const { root, commit } = repo({ ...base, "docs/specs/f.md": doc });
       const loaded = loadLoopSettings(root, { overridePath: null });
-      const prompt = reviewPrompt({ repository: "export", document: "docs/specs/f.md", commit, kind: "spec", docsRevision: "x", binary: "b", pluginPin: "p" }, loopContext(loaded));
+      const prompt = reviewPrompt({ repository: "export", document: "docs/specs/f.md", commit, kind: "spec", docsRevision: "x", binary: "b", pluginPin: "p", scope: FULL }, loopContext(loaded));
       const outcome = await runReviewRoute({ repo: root, commit, kind: "spec", document: "docs/specs/f.md", route: { model: "m", argv: [stub, "{prompt}"] }, prompt, timeoutMs: 10_000 });
       expect(outcome.status).toBe("ready");
       if (outcome.status === "ready") expect(outcome.records).toContain(expected);

@@ -470,9 +470,12 @@ describe("Bun runs the checker", () => {
     expect(ci).toMatch(/oven-sh\/setup-bun@[0-9a-f]{40}/);
   });
 
-  test("the pinned coding convention names Bun for new tooling and tests", async () => {
-    const coding = await docsPage(pin(), "conventions/coding.md");
-    expect(coding).toContain("New JavaScript tooling\nand tests use Bun");
+  test("the pinned coding convention keeps this repository's Bun runtime for new tooling and tests", async () => {
+    // Since vhco-pro/docs dc96a24 the convention keeps a repository's established runtime and defaults to Bun
+    // only where there is none; this repository's tooling and tests run on Bun.
+    const coding = (await docsPage(pin(), "conventions/coding.md")).replace(/\s+/g, " ");
+    expect(coding).toContain("Keep the scripting runtime already used by the repository");
+    expect(coding).toContain("Bun is the default only in a repository with no established JavaScript runtime");
     expect(coding).not.toContain("Node 24");
   });
 });

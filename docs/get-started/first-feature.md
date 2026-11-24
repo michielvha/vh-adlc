@@ -39,13 +39,16 @@ That is an illustration, not evidence that the example feature exists. The autho
 when scope, proof or decisions change. The detailed sections remain authoritative, and old specs stay
 valid without a bulk rewrite.
 
-Run `vh-adlc-spec review <path>` for an independent spec review. The reviewer rates
-each finding blocking, should-fix or nit, by what it would change in the build or
-in a proof, and returns every finding it can find in one pass. The agent applies a
-pass's findings as one revision: it asks you about judgement findings first, then
-makes the fixes and your answers in one commit. It removes an extra it added on its own,
-which nothing you decided needs, without asking. A nit never causes a revision on its
-own; it is fixed alongside other fixes or listed for you. If two passes in a row are blocking
+Run `vh-adlc-spec review <path>` for an independent spec review. The reviewer rates each finding
+blocking, should-fix or nit by its consequence for the product your `AGENTS.md` describes in its
+`## Product profile` section; security, data-loss and tenant-isolation defects are always blocking. After
+the first pass, a review covers what changed since the previous one and reports only blocking findings
+elsewhere. The agent applies a pass's findings as one revision: it asks you only about choices you could
+plausibly make differently, settles the rest in Design, then makes the fixes and your answers in one
+commit. It may answer a finding with a stated limit, a `Not handled:` line in Scope, and records every
+deferred item in the spec's `## Deferred` section. It removes an extra it added on its own, which nothing
+you decided needs, without asking. A nit never causes a revision on its own; it is fixed alongside other
+fixes or listed for you. If two passes in a row are blocking
 and the blocking count does not fall, the agent stops and asks whether the feature is still worth its
 machinery. Before asking you to accept, the agent summarizes the proposed behavior,
 scope, significant permissions and side effects, migration, and validation status
