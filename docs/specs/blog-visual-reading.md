@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Claimed on feat/blog-visual-reading; implementing the tasks test-first."
+status: draft
+status_description: "Revising after drift re-review R-48: package version above main and the local-suite clause."
 branch: feat/blog-visual-reading
 issue: null
 goal: "Long-form articles reach the owner with a checked visual reading pass, and the editor reviews presentation as well as prose."
