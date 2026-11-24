@@ -339,6 +339,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-24 | R-39 | spec | `c556233` | claude-opus-5-5 | procedural | Follow-up to R-38: no blocking; 2 should-fix (sw-dev observation, harm statement), 2 nits |
 | 2026-11-24 | R-40 | spec | `bc793eb` | claude-opus-5-5 | procedural | Scoped review of the owner's no-browser cut: no blocking; 1 should-fix (fixture name scan), 1 nit |
 | 2026-11-24 | R-41 | spec | `c5d7db7` | claude-opus-5-5 | procedural | Scoped review of the R-40 fix: no blocking; 1 should-fix (directories in the execute-bit scan) |
+| 2026-11-24 | R-42 | spec | `f6c767d` | claude-opus-5-5 | procedural | No findings |
 
 ### R-1
 
@@ -1713,6 +1714,10 @@ SEVERITY: should-fix
 WHERE: Test Plan row AC-11 (line 270); Tasks T10 (line 283) and T12 (line 285)
 EVIDENCE: The rewritten `no-browser` scan fails the scenario when "the fixture tree gains no ELF binary and no file with an execute bit, scanning without following symlinks". The row does not say whether a directory counts as a "file". Directories carry execute bits (mode 755 under the usual umask). The Design requires a correct run to create new directories inside the fixture tree: "the procedure creates one new `--output` directory per run ... a directory under the adapter's raw export location named with the run's date and time to the second" (Design, line 193). The AC-05 row also expects "a dated directory under the adapter's raw export location". A correct assessment that saves raw HTTP responses or reports in a new subdirectory therefore gains an entry with an execute bit. A runner that checks `mode & 0o111` on every new `lstat` entry would fail a correct run. A runner that checks only regular files would pass it. Two careful implementers of T10 would build different runners, and one of them fails a correct implementation whenever the agent creates a directory. This traces to the fix for R-40 F-01 in this revision, which replaced the name scan with the execute-bit scan. I rate it should-fix rather than blocking because the plainest reading of "file" is a regular file.
 PROPOSAL: Say "no new regular file that is an ELF binary or has an execute bit; directories and symlinks are not judged", or name the check (`lstat` regular files only, `mode & 0o111`).
+
+### R-42
+
+NO FINDINGS
 
 ## Sources
 
