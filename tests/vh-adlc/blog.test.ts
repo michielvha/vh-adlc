@@ -423,3 +423,22 @@ describe("visual reading rollout analysis", async () => {
     expect(visual.commandWords(["cat", "a", ">", "out", "2>/dev/null", "b"]).args).toEqual(["a", "b"]);
   });
 });
+
+describe("visual reading handoff checks", async () => {
+  const visual = await import("./blog/visual.ts");
+  test("the editor return, listed entries, treatment lines and the gap line", () => {
+    expect(visual.fourReturnLines("Verdict: Pass\nCopy repairs: None\nPresentation repairs: None.\nExceptions: None")).toBe(true);
+    expect(visual.fourReturnLines("Verdict: Pass\nCopy repairs: None")).toBe(false);
+    const split = visual.splitRepairs("irrelevant image: replace the chart; no body treatment: add one");
+    const entries = split.ok ? split.entries : [];
+    expect(visual.unlistedEntries(entries, "- `irrelevant image: replace the chart` (applied)\n- no body treatment: add one: open")).toEqual([]);
+    expect(visual.unlistedEntries(entries, "- irrelevant image: replace the chart\n- no body treatment: add one: open").map((e) => e.label)).toEqual(["irrelevant image"]);
+    expect(visual.treatmentKey('<figure>\n<img src="img/asset-1.png?v=2" alt="a">\n</figure>')).toBe("asset-1.png");
+    expect(visual.treatmentKey('<blockquote class="pull-quote">\n<p>I would rather ship a boring migration.</p>\n<cite>F</cite>\n</blockquote>')).toBe("I would rather ship a");
+    expect(visual.handoffNamesTreatment("- asset-1.png: shows the plan review screen", "asset-1.png")).toBe(true);
+    expect(visual.handoffNamesTreatment("- asset-1.png placed", "asset-1.png")).toBe(false);
+    expect(visual.namesGap("The ledger cutover section runs long without a break.", "The ledger cutover")).toBe(true);
+    expect(visual.namesGap("The ledger cutover is a long-form section.", "The ledger cutover")).toBe(false);
+    expect(visual.namesGap("The ledger cutover needs a pull quote.", "The ledger cutover")).toBe(true);
+  });
+});

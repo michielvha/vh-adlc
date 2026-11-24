@@ -36,7 +36,8 @@ const pin = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
 const original = "---\nstatus: draft\nauthor: Fixture writer\n---\n\n# Cedar reference\n\nI prefer the management cluster for shared controllers.\nThe workload cluster runs the application.\n\n```sh\ncedar docs --format html\n```\n";
 const protectedCopy = "i use Cedar with customers and it is the only tool that can document this stuff…";
 const classic = ["new", "keep", "repair", "promotion", "denied-site", "fallback", "editor", "ship-public", "ship-internal"];
-const visualCases = ["visual-editor", "visual-editor-pass"];
+const writerCases = ["visual-new", "visual-short", "visual-illustration", "visual-presentation", "visual-backport", "visual-revision", "visual-review"];
+const visualCases = [...writerCases, "visual-editor", "visual-editor-pass"];
 const cases = [...classic, ...visualCases];
 const requested = process.argv[3]?.split(",");
 if (requested?.some(c => !cases.includes(c))) throw new Error("unknown case");
@@ -151,7 +152,7 @@ const figure = (src: string, alt: string, caption: string) => `<figure>\n<img sr
 const quoteBlock = (text: string) => `<blockquote class="pull-quote">\n<p>${text}</p>\n<cite>Fixture writer</cite>\n</blockquote>`;
 const front = (title: string) => `---\nstatus: draft\nauthor: Fixture writer\n---\n\n# ${title}\n\n`;
 
-type VisualFixture = { prompt: string; png?: string; wordFreeCheck?: boolean };
+type VisualFixture = { prompt: string; png?: string; wordFreeCheck?: boolean; original?: string; fixed?: string; protectedSpan?: string; assets?: string[]; imagePermission?: boolean };
 
 function asset(name: string, html: string, width: number, height: number): Buffer {
   const path = join(out, "assets", name);
@@ -163,6 +164,7 @@ function visualFixture(id: string, project: string, write: (path: string, conten
   write("AGENTS.md", agentsMd());
   write("voice.md", voice);
   write("batch-quotes.md", batchQuotes);
+  if (writerCases.includes(id)) return writerFixture(id, project, write);
   if (id === "visual-editor") {
     write("chart-1.png", asset("chart-1.png", chartHtml(), 900, 520));
     const one = paragraphs(prose(1200, "I started reviewing every plan by hand after a quiet migration went wrong.", 0), 110);
@@ -236,6 +238,178 @@ Notes from the author:
   return { prompt: "Use vh-adlc-blog editorial review mode only. Dispatch the packaged prose and presentation editor on candidate.md, a new article written from notes.md, with the presentation inputs in inputs.md and batch-quotes.md as the batch quote inventory. Report the editor's verdict and every Presentation repairs entry in your handoff. Change no files. No publication or commits." };
 }
 
+// ---- Writer scenarios (AC-01 to AC-05, AC-08) ----
+
+const SPAN = "I would rather ship a boring migration than a clever one.";
+const notesFor = (topic: string, quotable: string[], words: number, seed: number) => `Author: Fixture writer
+Brief: ${topic}
+
+Lines I would be happy to see quoted, word for word:
+${quotable.map(q => `- "${q}"`).join("\n")}
+
+Notes:
+${paragraphs(prose(words, "We moved the payments ledger to Keelson over one quarter, and the plan review screen became the part of the work I trust most.", seed), 90).join("\n\n")}
+`;
+const QUOTABLE = ["The plan review is the only meeting I never cancel.", "Nobody on the team approves their own change, including me."];
+
+function longArticle(title: string, seed: number, extra = ""): string {
+  const body = paragraphs(prose(1000, "This is how we moved the payments ledger without a single late invoice.", seed), 100);
+  return `${front(title)}${body.slice(0, 2).join("\n\n")}\n\n${SPAN} ${extra}\n\n## How we checked each step\n\n${body.slice(2, 5).join("\n\n")}\n\n\`\`\`sh\nkeelson plan --target payments-ledger\n\`\`\`\n\n${body.slice(5).join("\n\n")}\n`;
+}
+
+function writerFixture(id: string, project: string, write: (path: string, content: string | Buffer) => void): VisualFixture {
+  const screen = asset("screen-1.png", screenHtml(), 1000, 560);
+  const chart = asset("chart-1.png", chartHtml(), 900, 520);
+  const noPermission = "You have no permission to create or edit images: do not create, draw or edit any image, SVG, canvas or diagram.";
+  if (id === "visual-new" || id === "visual-short") {
+    write("asset-1.png", screen);
+    if (id === "visual-new") write("asset-2.png", chart);
+    const long = id === "visual-new";
+    write("notes.md", notesFor(long ? "a founder story about moving our payments ledger to Keelson and why every plan gets a review. Keep this sentence exactly as written: \"" + SPAN + "\"" : "a short post of about 400 words on why nobody approves their own change.", QUOTABLE, long ? 1200 : 300, long ? 1 : 7) + (long ? `\nThe screen the notes describe: Keelson's plan review for payments-ledger, listing what a change will create, update and destroy, with an Approve button.\n` : ""));
+    return {
+      prompt: long
+        ? `Use vh-adlc-blog to draft article.md from notes.md, a founder story of about 1,100 words in my voice. Keep this sentence exactly as written: "${SPAN}". Supplied assets: asset-1.png and asset-2.png in this directory. ${noPermission} No renderer is available. Finish without publishing or committing.`
+        : `Use vh-adlc-blog to draft article.md from notes.md, a short post of about 400 words in my voice. Supplied asset: asset-1.png in this directory. ${noPermission} No renderer is available. Finish without publishing or committing.`,
+      protectedSpan: long ? SPAN : undefined, assets: long ? ["asset-1.png", "asset-2.png"] : ["asset-1.png"],
+    };
+  }
+  if (id === "visual-illustration") {
+    write("notes.md", notesFor("a founder story about our change workflow: a change is written, its plan is reviewed by someone else, then it applies. The reader should see that workflow as a conceptual illustration.", QUOTABLE, 900, 11));
+    return { prompt: "Use vh-adlc-blog to draft article.md from notes.md, about 900 words in my voice. You have permission to create one new image file in this directory: a conceptual illustration of the change workflow the notes describe. No asset is supplied for it. No renderer is available. Finish without publishing or committing.", assets: [], imagePermission: true };
+  }
+  if (id === "visual-presentation" || id === "visual-backport") {
+    write("asset-1.png", screen);
+    const articleText = longArticle(id === "visual-backport" ? "Moving the ledger without late invoices" : "How the plan review saved our ledger move", id === "visual-backport" ? 2 : 5, id === "visual-presentation" ? "We recieve every plan before it applies." : "");
+    write("article.md", articleText);
+    write("notes.md", notesFor("the notes behind article.md.", QUOTABLE, 400, 3));
+    write("AGENTS.md", agentsMd(`In article.md, the sentence "${SPAN}" is exact wording and must never change.\n`));
+    const fixed = articleText.replace("We recieve every plan", "We receive every plan");
+    return id === "visual-backport"
+      ? { prompt: "add visuals to article.md", original: articleText, protectedSpan: SPAN, assets: ["asset-1.png"] }
+      : { prompt: `Use vh-adlc-blog on article.md: fix the spelling of "recieve" to "receive", and add visuals. Supplied asset: asset-1.png. ${noPermission} No renderer is available. No publication or commits.`, original: articleText, fixed, protectedSpan: SPAN, assets: ["asset-1.png"] };
+  }
+  // visual-revision and visual-review share an article with one treatment under a heading and a long unbroken run.
+  write("screen-1.png", screen);
+  write("notes.md", notesFor("the notes behind article.md.", QUOTABLE, 300, 9));
+  const gap = paragraphs(prose(1600, "The ledger cutover took three weekends, and each one followed the same script.", 13), 120).join("\n\n");
+  const articleText = `${front("The weekend we cut over the ledger")}We planned the move for months, and the plan review screen was where every step started.
+
+## What we moved
+
+${figure("screen-1.png", "Keelson plan review for payments-ledger with two additions and one update", "The plan review we approved before the first cutover weekend")}
+
+The first step was the smallest one: create the new database and the event queue, and change one worker role.
+
+\`\`\`sh
+keelson plan --target payments-ledger
+keelson apply --plan payments-ledger.plan
+\`\`\`
+
+## The cutover
+
+${gap}
+
+## What I would keep
+
+I would keep the review, the script and the rule that nobody approves their own change.
+`;
+  write("article.md", articleText);
+  return id === "visual-revision"
+    ? { prompt: "revise article.md", original: articleText }
+    : { prompt: "Use vh-adlc-blog to review article.md and report what you find. This is a review only: change no files. No publication or commits.", original: articleText };
+}
+
+const IMAGE_EXT = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
+const sha = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
+
+function writerChecks(id: string, project: string, thread: string, response: string, fixture: VisualFixture, before: Record<string, string>): Record<string, boolean> {
+  const checks: Record<string, boolean> = {};
+  const articlePath = join(project, "article.md");
+  const article = existsSync(articlePath) ? readFileSync(articlePath, "utf8") : "";
+  const originalArticle = fixture.original ?? "";
+  const changed = [git(project, "diff", "--name-only"), git(project, "ls-files", "--others", "--exclude-standard")].flatMap(v => v.split("\n")).filter(Boolean);
+  const scratch = join(project, ".scratch");
+  if (id === "visual-review") {
+    checks.allFilesUnchanged = JSON.stringify(tree(project)) === JSON.stringify(before);
+    checks.namesGap = visual.namesGap(response, "The ledger cutover");
+    return checks;
+  }
+  checks.onlyAuthorizedPaths = changed.every(p => p === "article.md" || id !== "visual-revision" && !(p in before) && IMAGE_EXT.test(p));
+  checks.articleExists = article.length > 0;
+  const tokens = visual.imageTokens(article);
+  const declaredNew = visual.declaredSources(article).filter(src => !visual.declaredSources(originalArticle).includes(src));
+  const resolved = tokens.map(t => visual.resolveToken(t.replace(/[?#].*$/, ""), articlePath, project));
+  checks.noImageInScratch = resolved.every(p => p === null || !visual.inside(p, [scratch]));
+  checks.noStrayImages = visual.strayImages(article).length === 0;
+  checks.noAddedQuoteMarkup = visual.undeclaredQuotes(article) <= visual.undeclaredQuotes(originalArticle);
+  const noPermission = !fixture.imagePermission;
+  if (id !== "visual-revision") {
+    // AC-03: image files and token targets match supplied or pre-existing assets; no drawing markup without permission.
+    const supplied = new Set(Object.entries(before).filter(([p]) => IMAGE_EXT.test(p)).map(([, h]) => h));
+    if (noPermission) {
+      const imageFiles = files(project, [".scratch"]).filter(p => IMAGE_EXT.test(p));
+      const targets = resolved.filter((p): p is string => p !== null && existsSync(p));
+      checks.imagesAreSuppliedAssets = [...imageFiles, ...targets].every(p => supplied.has(sha(p)));
+      checks.newDeclaredImagesResolve = declaredNew.every(src => !/^data:/i.test(src) && visual.resolvesToFile(src.replace(/[?#].*$/, ""), articlePath, project) !== null);
+      checks.noDrawingMarkup = visual.drawingMarkup(article).length === 0;
+    }
+    // AC-03 quotes: verbatim from the notes (or the original article for a presentation revision) and attributed.
+    const notes = readFileSync(join(project, "notes.md"), "utf8");
+    const sources = id === "visual-backport" ? [notes, originalArticle] : id === "visual-presentation" ? [notes, fixture.fixed ?? ""] : [notes];
+    const added = visual.addedQuotes(originalArticle, article);
+    checks.quotesVerbatimAndAttributed = added.every(q => visual.quoteFrom(q, sources) && /Fixture writer/.test(q.cite));
+    // AC-05: every image any run adds has alt text and a caption.
+    const originalFigures = visual.figures(originalArticle).map(f => JSON.stringify(f));
+    checks.addedImagesHaveAltAndCaption = visual.figures(article).filter(f => !originalFigures.includes(JSON.stringify(f))).every(f => !!f.alt?.trim() && !!f.caption?.trim());
+    // AC-08: exactly one valid Rendered checks line, in the unverified form, since no renderer is available.
+    const rendered = visual.fixedLine(response, "Rendered checks");
+    checks.renderedChecksUnverified = rendered.ok && visual.parseRenderedChecks(rendered.value).kind === "unverified";
+  }
+  if (fixture.protectedSpan) checks.protectedSpanUnchanged = article.includes(fixture.protectedSpan);
+  if (id === "visual-new") {
+    checks.longForm = visual.bodyWords(article) >= 800;
+    checks.bodyTreatment = visual.hasBodyTreatment(article);
+    checks.handoffNamesEachTreatment = visual.treatments(article).every(t => visual.handoffNamesTreatment(response, visual.treatmentKey(t)));
+    const decoy = sha(join(project, "asset-2.png"));
+    checks.declaredImagesResolve = visual.declaredSources(article).every(src => visual.resolvesToFile(src.replace(/[?#].*$/, ""), articlePath, project) !== null);
+    checks.noDecoyImage = resolved.every(p => p === null || !existsSync(p) || sha(p) !== decoy);
+    const { parent, editors, analysis } = editorRun(thread, join(project, "asset-2.png"));
+    const roots = new Set(editors.flatMap(e => [...visual.rootTurns(e)]));
+    const spawns = parent ? visual.spawnCalls(parent, roots) : [];
+    checks.editorDispatchedWithoutHistory = editors.length > 0 && spawns.length > 0 && spawns.every(s => s.noHistory);
+    checks.editorReadArticle = editors.some(e => analysis.reads.some(r => r.thread === e.id && e.turns.has(r.turn) && r.path.endsWith("/article.md")));
+    const last = [...editors].sort((a, b) => a.finishedAt.localeCompare(b.finishedAt)).at(-1);
+    checks.editorFourLines = !!last && visual.fourReturnLines(last.final);
+    const line = last ? visual.repairsLine(last.final) : null;
+    const split = line === null ? null : visual.splitRepairs(line);
+    checks.handoffListsRepairs = !!split?.ok && visual.unlistedEntries(split.entries, response).length === 0;
+  }
+  if (id === "visual-short") {
+    checks.short = visual.bodyWords(article) < 800;
+    const exception = visual.fixedLine(response, "No-visual exception");
+    checks.treatmentOrShortReadException = visual.treatments(article).length > 0 || exception.ok && /^short-read: \S/.test(exception.value);
+  }
+  if (id === "visual-illustration") {
+    const added = visual.figures(article).filter(f => f.sources.some(src => { const p = visual.resolvesToFile(src, articlePath, project); return p !== null && !(relative(project, p) in before); }));
+    checks.illustrationAdded = added.some(f => /illustrat/i.test(`${f.alt ?? ""} ${f.caption ?? ""}`) && !!f.alt?.trim() && !!f.caption?.trim());
+    checks.tokensResolve = tokens.every(t => visual.resolvesToFile(t, articlePath, project) !== null);
+  }
+  if (id === "visual-backport" || id === "visual-presentation") {
+    const base = id === "visual-presentation" ? fixture.fixed ?? "" : originalArticle;
+    checks.treatmentAdded = visual.treatments(article).length > visual.treatments(originalArticle).length;
+    checks.bodyProseUnchanged = visual.bodyProse(article) === visual.bodyProse(base);
+    checks.restUnchanged = visual.withoutTreatments(article) === visual.withoutTreatments(base);
+    if (id === "visual-presentation") checks.wordingFixApplied = article.includes("We receive every plan") && !article.includes("recieve");
+  }
+  if (id === "visual-revision") {
+    checks.treatmentMarkupUnchanged = JSON.stringify(visual.treatments(article)) === JSON.stringify(visual.treatments(originalArticle));
+    checks.skeletonUnchanged = visual.skeleton(article) === visual.skeleton(originalArticle);
+    checks.noDrawingMarkup = visual.drawingMarkup(article).length === 0;
+    checks.namesGap = visual.namesGap(response, "The ledger cutover");
+  }
+  return checks;
+}
+
 const editorAgent = (path: string) => path.endsWith("agents/vh-adlc-blog-editor.agent.md") && visual.inside(path, [installed.installedPath]);
 
 /** The run's rollouts and its editor children: own turns read the installed editor agent, final message starts with Verdict:. */
@@ -263,6 +437,7 @@ function preflightVisual(project: string, fixture: VisualFixture): Record<string
 }
 
 function visualChecks(id: string, project: string, thread: string, response: string, fixture: VisualFixture, before: Record<string, string>): Record<string, boolean> {
+  if (writerCases.includes(id)) return writerChecks(id, project, thread, response, fixture, before);
   const checks: Record<string, boolean> = {};
   checks.allFilesUnchanged = JSON.stringify(tree(project)) === JSON.stringify(before);
   const png = fixture.png ?? join(project, "screen-1.png");

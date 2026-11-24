@@ -290,7 +290,7 @@ export function undeclaredQuotes(article: string): number {
 
 // Rollout rows are external JSON with many shapes; `any` stays at this one boundary and each use narrows it.
 type Row = { type?: string; payload?: any };
-export type Rollout = { path: string; rows: Row[]; id: string; parent: string | null; cwd: string; turns: Set<string>; final: string };
+export type Rollout = { path: string; rows: Row[]; id: string; parent: string | null; cwd: string; turns: Set<string>; final: string; finishedAt: string };
 
 function jsonl(path: string): Row[] {
   return readFileSync(path, "utf8").split("\n").flatMap((line) => {
@@ -310,8 +310,9 @@ export function loadRollouts(sessions: string): Rollout[] {
     const meta = rows.find((r) => r.type === "session_meta")?.payload ?? {};
     const parent = meta.source?.subagent?.thread_spawn?.parent_thread_id;
     const turns = new Set<string>(rows.filter((r) => r.type === "event_msg" && ["task_started", "task_complete"].includes(r.payload?.type)).map((r) => String(r.payload.turn_id)));
-    const final = rows.filter((r) => r.type === "event_msg" && r.payload?.type === "task_complete").at(-1)?.payload?.last_agent_message ?? "";
-    return { path, rows, id: String(meta.id ?? ""), parent: typeof parent === "string" ? parent : null, cwd: String(meta.cwd ?? ""), turns, final: String(final) };
+    const done = (rows as (Row & { timestamp?: string })[]).filter((r) => r.type === "event_msg" && r.payload?.type === "task_complete").at(-1);
+    const final = done?.payload?.last_agent_message ?? "";
+    return { path, rows, id: String(meta.id ?? ""), parent: typeof parent === "string" ? parent : null, cwd: String(meta.cwd ?? ""), turns, final: String(final), finishedAt: String(done?.timestamp ?? "") };
   });
 }
 
@@ -568,3 +569,36 @@ export const inside = (path: string, roots: string[]) => roots.some((root) => { 
 /** URLs of the allowed docs at the pin: github.com or raw.githubusercontent.com under vhco-pro/docs. */
 export const docsUrl = (pin: string) => (url: string) =>
   new RegExp(`^https://(github\\.com/vhco-pro/docs/(blob|raw|tree)/${pin}/|raw\\.githubusercontent\\.com/vhco-pro/docs/${pin}/)`).test(url);
+
+// ---- Handoff checks ----
+
+const plain = (line: string) => fold(line.replace(/[`*]/g, "")).toLowerCase();
+
+/** True when the message has the editor's four return lines. */
+export const fourReturnLines = (message: string) =>
+  ["Verdict:", "Copy repairs:", "Presentation repairs:", "Exceptions:"].every((head) => message.split("\n").some((l) => l.replace(/^[\s*`-]+/, "").startsWith(head)));
+
+/** Entries of a repairs line the handoff does not list on a line that also says applied or open. */
+export function unlistedEntries(entries: Entry[], handoff: string): Entry[] {
+  const lines = handoff.split("\n").map(plain).filter((l) => /\b(applied|open)\b/.test(l));
+  return entries.filter((e) => !lines.some((l) => l.includes(plain(e.text))));
+}
+
+/** True when some handoff line names the treatment and at least four other words. */
+export function handoffNamesTreatment(handoff: string, key: string): boolean {
+  const needle = plain(key);
+  return handoff.split("\n").map(plain).some((l) => l.includes(needle) && l.replace(needle, " ").split(/\s+/).filter((w) => /\w/.test(w)).length >= 4);
+}
+
+/** The key the handoff must name for a treatment block: its image basename or its quote's first five words. */
+export function treatmentKey(block: string): string {
+  const src = declaredSources(block)[0];
+  if (src) return strip(src).split("/").at(-1) ?? src;
+  const quote = pullQuotes(block)[0];
+  return quote ? quote.text.split(/\s+/).slice(0, 5).join(" ") : "";
+}
+
+export const GAP = /\b(breaks?|unbroken|uninterrupted|walls?|long(er)?(?!-)|dense|sustained|stretch(es)?|(without|no|lacks?( any)?|needs?( an?)?) (a |an )?(\w+ )?(visuals?|treatments?|images?|pictures?|quotes?))\b/i;
+
+/** True when a handoff line names the gap by its opening words and describes it as a missing break. */
+export const namesGap = (handoff: string, opening: string) => handoff.split("\n").some((l) => l.toLowerCase().includes(opening.toLowerCase()) && GAP.test(l));
