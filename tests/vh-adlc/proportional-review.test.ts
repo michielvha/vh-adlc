@@ -155,6 +155,14 @@ describe("reviewer (AC-03, AC-04, AC-05, AC-08, AC-14)", () => {
     expect(reviewer).toContain("When you are unsure whether people using the product would hit a failure path, rate it should-fix rather than nit or dropping it");
   });
 
+  test("keeps the old-revision check after the profile gate and both checks in the profile-only paragraph", () => {
+    expect(reviewer).toContain("a path nobody using the product would plausibly hit is a nit. On a revision that does not, a path the document leaves undefined is a finding");
+    const profileOnly = reviewer.indexOf("This paragraph applies only under a convention that names the product profile");
+    expect(profileOnly).toBeGreaterThan(-1);
+    expect(reviewer.indexOf("Before you settle any finding's severity")).toBeGreaterThan(profileOnly);
+    expect(reviewer.indexOf("When you are unsure whether people using the product would hit a failure path")).toBeGreaterThan(profileOnly);
+  });
+
   test("honours stated limits and Deferred entries", () => {
     expect(reviewer).toContain("Do not raise the substance of a stated limit or a `## Deferred` entry again");
     expect(reviewer).toContain("leaves an always-blocking defect, makes a criterion unmeetable or leaves the stated problem unsolved");

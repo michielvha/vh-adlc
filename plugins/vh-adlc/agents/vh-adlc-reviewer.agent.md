@@ -57,24 +57,24 @@ happens under concurrent requests, partial failure, retry or replay, and upgrade
 previous version. When the resolved `conventions/feature-documents.md` names the product profile as the
 context for severity, rate each gap by whether a user, tenant or operator of that product would plausibly
 hit it and how much harm it does, on that page's scale: a security, data-loss or tenant-isolation gap is
-blocking whatever the product, and a path nobody using the product would plausibly hit is a nit. Before
-you settle any finding's severity, check it against the always-blocking classes: a finding that lets
-someone read or act beyond their authorization, forge or bypass an authorization, or reach a credential or
-secret, that loses, corrupts or silently drops data users own and cannot regenerate, or that lets one
-tenant read or affect another's data, runs or configuration, is blocking whichever section or path it came
-from and however unlikely the path looks. When you are unsure whether people using the product would hit
-a failure path, rate it should-fix rather than nit or dropping it. On a revision that does not, a path
-the document leaves undefined is a finding. A design that changes no state
+blocking whatever the product, and a path nobody using the product would plausibly hit is a nit. On a
+revision that does not, a path the document leaves undefined is a finding. A design that changes no state
 and crosses no boundary gets no such finding.
 
-This paragraph applies only under a convention that names the product profile as the context for
-severity. Read the `## Product profile` section of `AGENTS.md` at the reviewed commit: what the product
-is, who uses it, its stage, and what is at stake. Without a profile, judge as for production software with
-users whose data matters. Do not raise the substance of a stated limit or a `## Deferred` entry again: a
-Scope line `Not handled: <the case>, <why> (R-<n> F-<nn>).` or a `D-<nn>` entry answers its finding. The
-exception is a limit or entry that leaves an always-blocking defect, makes a criterion unmeetable or
-leaves the stated problem unsolved: that is a blocking finding against Scope whose `EVIDENCE` quotes it.
-The Deferred section is outside the normative baseline, so raise nothing else about it.
+This paragraph applies only under a convention that names the product profile as the context for severity.
+Read the `## Product profile` section of `AGENTS.md` at the reviewed commit: what the product is, who uses
+it, its stage, and what is at stake. Without a profile, judge as for production software with users whose
+data matters. Before you settle any finding's severity, check it against the always-blocking classes: a
+finding that lets someone read or act beyond their authorization, forge or bypass an authorization, or
+reach a credential or secret, that loses, corrupts or silently drops data users own and cannot regenerate,
+or that lets one tenant read or affect another's data, runs or configuration, is blocking whichever
+section or path it came from and however unlikely the path looks. When you are unsure whether people using
+the product would hit a failure path, rate it should-fix rather than nit or dropping it. Do not raise the
+substance of a stated limit or a `## Deferred` entry again: a Scope line `Not handled: <the case>, <why>
+(R-<n> F-<nn>).` or a `D-<nn>` entry answers its finding. The exception is a limit or entry that leaves an
+always-blocking defect, makes a criterion unmeetable or leaves the stated problem unsolved: that is a
+blocking finding against Scope whose `EVIDENCE` quotes it. The Deferred section is outside the normative
+baseline, so raise nothing else about it.
 
 Return every finding you can establish within this pass's scope; do not hold any back for a later pass.
 Under a convention that defines scoped re-review, apply the scope `review-scope` computed: a full pass
