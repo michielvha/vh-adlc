@@ -152,7 +152,7 @@ describe("paid API authority and the SEO procedure (AC-07)", () => {
       .find((line) => line.startsWith("| Spend a paid SEO provider's API units"));
     expect(row).toBeDefined();
     const text = flat(row!);
-    expect(text).toContain("the owner's current request");
+    expect(text).toMatch(/the owner's current request, or a unit permission with a per-run limit/i);
     expect(text).toContain("refs/remotes/origin/HEAD");
     expect(text).toContain("last fetched");
     expect(text).toMatch(/number the request states, else the committed limit, else 500 units/);
@@ -202,9 +202,9 @@ describe("paid API authority and the SEO procedure (AC-07)", () => {
 
 describe("onboarding (AC-09)", () => {
   test("loop.md lists vh-adlc-seo among the operations that add no onboarding files", () => {
-    const loop = read("plugins/vh-adlc/references/loop.md");
-    const sentence = loop.match(/When `source` is `plugin`[^.]*\./)?.[0] ?? "";
-    expect(sentence).toContain("`vh-adlc-seo`");
+    const paragraph = flat(paragraphStarting(raw("plugins/vh-adlc/references/loop.md"), "When `source` is `plugin`"));
+    const list = paragraph.match(/`vh-adlc-investigate`[^:]*add none:/)?.[0] ?? "";
+    expect(list).toContain("`vh-adlc-seo`");
   });
 });
 

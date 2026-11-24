@@ -85,6 +85,7 @@ another route. Dependency/bot/advisory security sweeps stay maintenance, one-off
 stays investigation and backlog ranking stays triage, even with audit settings. Ambiguous "audit security"
 or "audit the code for security issues" needs one focused persistent/full/dependency/diagnosis scope
 question before dependent work. Never silently invoke full mode. Continue independent reads while waiting.
+A request to audit a website's SEO or search visibility routes to `vh-adlc-seo` and is not persistent source-audit intent.
 
 Feature intake and read-only review can identify a work item without acquiring it. When
 routing into feature writing, the selected operation follows the
