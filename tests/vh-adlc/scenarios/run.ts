@@ -1429,7 +1429,9 @@ function findings(records: string): Finding[] {
 const SEVERITY_RANK: Record<string, number> = { nit: 1, "should-fix": 2, blocking: 3 };
 
 // The lock gap: a finding about concurrent writers to names.log.
-const LOCK_GAP = (x: Finding) => /names\.log/.test(x.text) && /(lock|concurren|parallel|simultaneous|interleav|race|atomic|at the same time|same time|two runs|torn)/i.test(x.text);
+// Whole words only: a bare substring matched "race" in "traces" and "lock" in "blocking".
+const LOCK_GAP = (x: Finding) =>
+  /names\.log/.test(x.text) && /\b(lock\w*|unlock\w*|flock|concurren\w*|parallel\w*|simultaneous\w*|interleav\w*|races?|racing|atomic\w*|same time|two runs|torn)\b/i.test(x.text);
 
 // RAISES_LOCK_GAP is stricter: the finding's proposal asks for something about concurrent writers to
 // names.log. A clause of the proposal that names a limit (quoting the stated limit, or offering to state one)
@@ -1473,10 +1475,12 @@ const PROFILE_DOC = featureDoc({
 
 const PROFILES: Record<string, string> = {
   single: "greet is a small shell script that one person runs by hand on their own laptop, one run at a time; no other program calls it. It is a personal tool at alpha. At stake: only that person's own list of greeted names, which they can rebuild from memory.",
+  // Says nothing about whether runs overlap, so the reviewer cannot be sure users avoid concurrent writes.
+  unsure: "greet is a small command-line tool that a few people on one team use from a shared machine. It is a team tool at alpha. At stake: the team's list of greeted names.",
   hosted: "greet runs inside a hosted greeting service: the service runs `greet.sh` for many tenants at once on shared hosts, with many runs in parallel. It is in production with paying tenants. At stake: each tenant's greeting history and the service's availability.",
 };
 
-function profileScenario(id: string, title: string, variant: "single" | "hosted" | "none", pin: "companion" | "convergence"): Scenario {
+function profileScenario(id: string, title: string, variant: "single" | "unsure" | "hosted" | "none", pin: "companion" | "convergence"): Scenario {
   return {
     id,
     title,
@@ -1501,7 +1505,7 @@ function profileScenario(id: string, title: string, variant: "single" | "hosted"
             { name: "a review pass was stored with records", ok: pass.records.trim() !== "", detail: pass.id },
             lowered
               ? { name: "the lock gap on names.log is nit or absent under the single-person profile", ok: gap === "nit" || gap === "absent", detail: `${gap}: ${describeFindings(all)}` }
-              : { name: `the lock gap on names.log is should-fix or blocking (${variant === "none" ? "no profile" : variant === "hosted" ? "hosted multi-tenant profile" : "old pin, despite the profile"})`, ok: gap === "should-fix" || gap === "blocking", detail: `${gap}: ${describeFindings(all)}` },
+              : { name: `the lock gap on names.log is should-fix or blocking (${variant === "none" ? "no profile" : variant === "hosted" ? "hosted multi-tenant profile" : variant === "unsure" ? "a profile that leaves overlap open" : "old pin, despite the profile"})`, ok: gap === "should-fix" || gap === "blocking", detail: `${gap}: ${describeFindings(all)}` },
             unrelatedIntact(c),
           ];
         },
@@ -2248,6 +2252,7 @@ const PROPORTIONAL_SCENARIOS: Scenario[] = [
   profileScenario("S17.profile.single", "A single-person profile lowers the lock gap to a nit or less", "single", "companion"),
   profileScenario("S17.profile.hosted", "A hosted multi-tenant profile keeps the lock gap at should-fix or blocking", "hosted", "companion"),
   profileScenario("S17.profile.none", "Without a profile the lock gap is rated as for production software", "none", "companion"),
+  profileScenario("S17.profile.unsure", "A profile that leaves overlap open keeps the lock gap at should-fix or above", "unsure", "companion"),
   limitScenario("S17.limit.stated", "A stated limit answers its finding on a full pass", "limit"),
   limitScenario("S17.limit.nolimit", "Control: without the stated limit the names.log gap is raised", "nolimit"),
   limitScenario("S17.limit.security", "Control: a stated limit that leaves a security defect is blocking", "security"),
