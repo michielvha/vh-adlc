@@ -404,7 +404,7 @@ describe("stored brief identity", () => {
     expect(f.run().exitCode).not.toBe(0);
     const clone = join(f.dir, "loop-clones", "new-command", "work");
     const doc = join(clone, "docs", "specs", "greeting.md");
-    const g = (...a: string[]) => Bun.spawnSync(["git", "-C", clone, ...a], { stdout: "pipe", stderr: "pipe" });
+    const g = (...a: string[]) => Bun.spawnSync(["git", "-C", clone, "-c", "user.name=Replay Test", "-c", "user.email=replay@example.invalid", ...a], { stdout: "pipe", stderr: "pipe" });
     for (const n of [1, 2]) {
       writeFileSync(doc, `${readFileSync(doc, "utf8").trimEnd()}\n| 2026-11-24 | R-${n} | spec | \`abc1234\` | gpt-test | procedural | 1 blocking |\n`);
       expect(g("commit", "-qam", `record review R-${n}`).exitCode).toBe(0);
