@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted again at R-50 after the drift re-review; ready to implement on feat/blog-visual-reading."
+status: in-progress
+status_description: "Re-entered after the R-50 acceptance; implementing the tasks test-first."
 branch: feat/blog-visual-reading
 issue: null
 goal: "Long-form articles reach the owner with a checked visual reading pass, and the editor reviews presentation as well as prose."
