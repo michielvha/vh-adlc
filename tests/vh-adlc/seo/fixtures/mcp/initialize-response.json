@@ -1,0 +1,23 @@
+{
+ "jsonrpc": "2.0",
+ "id": 1,
+ "result": {
+  "protocolVersion": "2025-03-26",
+  "capabilities": {
+   "logging": {},
+   "prompts": {},
+   "resources": {
+    "subscribe": true,
+    "listChanged": true
+   },
+   "tools": {
+    "listChanged": true
+   }
+  },
+  "serverInfo": {
+   "name": "mcp",
+   "version": "v2"
+  },
+  "instructions": "Semrush MCP provides SEO, traffic, and competitive intelligence data sourced directly from Semrush analytics APIs. This data is available only through these tools, not from general knowledge, and requests can usually be served with parameters inferred from the request itself.\n\nThe tools form a three-step flow, and each step's response is plain data describing what is available:\n- A discovery tool (for example domain_overview or backlinks_research) returns the reports in a toolkit. Each report carries a name, a description, and a usage note describing when it fits.\n- get_report_schema(report) returns that report's parameters. Its report argument is a report name taken verbatim from a discovery list, with no toolkit prefix (for example 'geo', not 'audience.geo').\n- execute_report(report, params) returns the report's data, using the parameters described by get_report_schema.\n\nThe data that answers a request is the execute_report output; the earlier steps describe what to request and how to shape it. A single request may draw on execute_report more than once with different parameters, or combine reports from several toolkits. When a region is unspecified, the \"database\" parameter is \"us\" by default, and display_limit values of 30-50 suit exploratory queries.\n\nError format: a failed tool call returns a JSON error object instead of plain text data. Its fields:\n  - code: stable error category, e.g. \"validation_failed\", \"no_subscription\", \"no_api_units\", \"no_data\", \"rate_limit\", \"internal\".\n  - message: what happened, in plain language; relay it to the user concisely and factually.\n  - retryable: true \u2014 the call may be retried with a corrected request; false \u2014 do not retry until the cause is resolved.\n  - hint: what to change in the request before retrying, or when a retry may succeed.\n  - url: page the user (not the agent) should visit to resolve the problem; show it to the user verbatim.\n  - trace_id: request identifier the user can quote when contacting Semrush support.\n  Fields other than code and message are present only when applicable.\nA \"no_data\" object is not a failure: Semrush holds no data for these parameters, and that is the final answer for them \u2014 nothing to retry, no other tool or report to try instead."
+ }
+}

@@ -1,0 +1,24 @@
+{
+ "jsonrpc": "2.0",
+ "id": 40,
+ "method": "tools/call",
+ "params": {
+  "name": "execute_report",
+  "arguments": {
+   "report": "domain_ranks",
+   "params": {
+    "target": "fixture.example",
+    "display_limit": 1,
+    "display_sort": "organic_keywords_desc",
+    "export_columns": [
+     "database",
+     "date",
+     "domain",
+     "rank",
+     "organic_keywords",
+     "organic_traffic"
+    ]
+   }
+  }
+ }
+}
