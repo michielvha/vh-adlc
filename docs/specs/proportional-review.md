@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Retention revision accepted at R-25 on 2026-11-24: both briefs at one severity bar, a dropped below-minimum label fails, and enterprise labels L-08 (Claude route) and L-10 (Codex route) deferred as D-17 and D-18. T1 to T22, T25 and T26 done; next: T27, then T23 and T24."
+status: in-progress
+status_description: "In progress on feat/proportional-review after the R-25 acceptance. T1 to T22, T25 and T26 done; next: T27, then T23 and T24 when the enterprise Codex loop finishes."
 branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised, apart from any the owner defers as a known loss, and every deferred item is judged once the feature is merged."
