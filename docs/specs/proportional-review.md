@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Revision accepted at R-22 on 2026-11-24 (AC-13 without the Open Question count, the launch record, lower bounds for the lost old loops, and new-brief reruns on the fixed reviewer ef685da1). T1 to T22 done; next: T25, T26, then T23 and T24."
+status: in-progress
+status_description: "Re-entered implementation on feat/proportional-review after the R-22 acceptance. T1 to T22 done; next: T25, T26, then T23 and T24 when the replays on the fixed reviewer finish."
 branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
