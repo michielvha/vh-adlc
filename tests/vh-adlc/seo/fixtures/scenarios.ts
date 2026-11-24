@@ -22,6 +22,8 @@ export type Scenario = {
   maxUnits?: number;
   targets?: (log: Logged[], origin: string, text: string, check: CheckFn) => void;
   startupHandoff?: boolean;
+  // no-browser: watch Codex's process tree for browsers and scan for new executables.
+  watchBrowsers?: boolean;
 };
 
 const TARGETS = "first-target.example, second-target.example";
@@ -223,6 +225,10 @@ export const scenarios: Record<string, Scenario> = {
     adapterOptions: { permission: 5 },
     maxUnits: 5,
     expect: "limit",
+  }),
+  "no-browser": noPermission({
+    browser: false,
+    watchBrowsers: true,
   }),
   expired: permitted({
     stub: { answer: () => "data", expired: true },

@@ -161,7 +161,19 @@ for (const id of selected) {
     timedOut = true;
     child.kill();
   }, EXEC_TIMEOUT_MS);
+  const browsersSeen: string[] = [];
+  let listings = 0;
+  let watching = !!scenario.watchBrowsers;
+  const watcher = (async () => {
+    while (watching) {
+      browsersSeen.push(...browserDescendants(child.pid));
+      listings++;
+      await Bun.sleep(1_000);
+    }
+  })();
   const exitCode = await child.exited;
+  watching = false;
+  await watcher;
   clearTimeout(timer);
   const rawText = readFileSync(raw, "utf8");
   const parsed = events(rawText);
@@ -169,6 +181,11 @@ for (const id of selected) {
   check("the run completed", exitCode === 0 && !timedOut && !parsed.failed, `exit ${exitCode}${timedOut ? ", timed out" : ""}`);
 
   assertCommon(scenario, project, before, adapterHash, parsed, check);
+  if (scenario.watchBrowsers) {
+    check("AC-11: no browser ran in Codex's process tree", listings > 0 && browsersSeen.length === 0, `${listings} listings; ${[...new Set(browsersSeen)].join(", ")}`);
+    const executables = newExecutables(project, before);
+    check("AC-11: the fixture tree gained no ELF or executable regular file", executables.length === 0, executables.join(", "));
+  }
   assertScenario(scenario, project, exportRoot, runDirsBefore, rawText, parsed, stub, site.origin, check);
 
   const result = {
@@ -226,6 +243,56 @@ function buildFixture(scenario: Scenario, project: string, keyFile: string, orig
   git(project, "remote", "set-head", "origin", "main");
   scenario.refs?.(project, (path, content) => write(path, content), git);
   if (scenario.uncommitted) write("agents/seo.md", scenario.uncommitted(readFileSync(join(project, "agents/seo.md"), "utf8")));
+}
+
+// The browser names the no-browser scenario watches for, matched against the
+// basename of the first word of each process's arguments.
+const BROWSER = /chrom|firefox|msedge|headless_shell|minibrowser|brave|vivaldi|opera|epiphany|falkon|librewolf/i;
+
+function browserDescendants(rootPid: number): string[] {
+  const p = Bun.spawnSync(["ps", "-eo", "pid=,ppid=,args="], { stdout: "pipe", stderr: "pipe" });
+  const rows = p.stdout
+    .toString()
+    .split("\n")
+    .map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(.*)$/))
+    .filter((m): m is RegExpMatchArray => m !== null)
+    .map((m) => ({ pid: Number(m[1]), ppid: Number(m[2]), args: m[3] }));
+  const tree = new Set([rootPid]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const row of rows) {
+      if (!tree.has(row.pid) && tree.has(row.ppid)) {
+        tree.add(row.pid);
+        grew = true;
+      }
+    }
+  }
+  return rows
+    .filter((row) => row.pid !== rootPid && tree.has(row.pid))
+    .map((row) => row.args)
+    .filter((args) => BROWSER.test((args.split(/\s+/)[0] ?? "").split("/").pop() ?? ""));
+}
+
+// New regular files that are ELF binaries or carry an execute bit. Directories and
+// symlinks are not judged, and file names are the agent's choice.
+function newExecutables(root: string, before: Snapshot): string[] {
+  const found: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      if (name === ".git") continue;
+      const path = join(dir, name);
+      const stat = lstatSync(path);
+      if (stat.isDirectory()) walk(path);
+      else if (stat.isFile() && !before.has(relative(root, path))) {
+        const head = readFileSync(path).subarray(0, 4);
+        const elf = head.length === 4 && head[0] === 0x7f && head.toString("latin1", 1, 4) === "ELF";
+        if (elf || (stat.mode & 0o111) !== 0) found.push(relative(root, path));
+      }
+    }
+  };
+  walk(root);
+  return found;
 }
 
 type Snapshot = Map<string, string>;
