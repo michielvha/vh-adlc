@@ -1,0 +1,56 @@
+MODEL: scripted-reviewer
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design
+EVIDENCE: Design cites `greet.sh:3` for the echo line; `greet.sh` has the echo on line 2.
+PROPOSAL: Cite `greet.sh:2`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design
+EVIDENCE: Design cites `test.sh:5` for the check of Ada; that check is on line 4.
+PROPOSAL: Cite `test.sh:4`.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Scope
+EVIDENCE: Scope cites `README.md:4` for the usage instructions; `README.md` has three lines and the instruction is on line 3.
+PROPOSAL: Cite `README.md:3`.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria
+EVIDENCE: AC-04 cites `greet.sh:7` for the usage line; the script has two lines today, so the citation names a line the change will add, not one that exists.
+PROPOSAL: Drop the line number from AC-04.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan
+EVIDENCE: The AC-01 row cites `test.sh:3` for the Ada check; it is on line 4.
+PROPOSAL: Cite `test.sh:4`.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan
+EVIDENCE: The AC-03 row cites `test.sh:7` for the no-argument check; it is on line 6.
+PROPOSAL: Cite `test.sh:6`.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, AC-04 row
+EVIDENCE: The AC-04 pattern also accepts `usage: greet.sh` followed by trailing spaces. This only widens the free-text pattern row for AC-04, which passed review in R-1.
+PROPOSAL: Add `usage: greet.sh <name>   ` (trailing spaces) to the must-fail examples and anchor the pattern against trailing whitespace.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, AC-04 row
+EVIDENCE: The AC-04 proof does not reject a usage line printed twice. This only widens the free-text pattern row for AC-04, which passed review in R-1.
+PROPOSAL: Add a duplicated usage line to the must-fail examples and check that exactly one line is printed.

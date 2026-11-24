@@ -1,0 +1,7 @@
+MODEL: scripted-reviewer
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: Design does not say what `greet.sh` prints or returns when `names.log` cannot be written, for example in a read-only working directory; two implementers would differ.
+PROPOSAL: State the exit status and message when the append fails.

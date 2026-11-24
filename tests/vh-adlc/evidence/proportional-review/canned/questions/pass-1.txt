@@ -1,0 +1,14 @@
+MODEL: scripted-reviewer
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: Design does not say which shells and platforms `greet.sh` must run on: POSIX `sh` on Linux only, or also macOS and Windows PowerShell. Two implementers could choose differently.
+PROPOSAL: Settle the supported platforms in Design.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: `tools/report.sh`, which another team owns, parses the greeting line (tools/report.sh:3). Design does not say whether `Hello, <name>.` becomes a public contract that `greet.sh` keeps stable for callers like it, or a message `greet.sh` may change in any release, with callers told not to parse it. Both meet the goal; they differ in what `greet.sh` promises other teams.
+PROPOSAL: Decide whether the output format is a public contract and state it in Design.
