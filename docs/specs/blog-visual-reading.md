@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised after drift reviews R-48 and R-49 with the owner's approved fix; awaiting review and renewed acceptance."
+status: planned
+status_description: "Accepted again at R-50 after the drift re-review; ready to implement on feat/blog-visual-reading."
 branch: feat/blog-visual-reading
 issue: null
 goal: "Long-form articles reach the owner with a checked visual reading pass, and the editor reviews presentation as well as prose."
@@ -49,7 +49,7 @@ These defaults were set under the owner's standing instruction to take the recom
 - A request for both wording changes and new visuals does the wording first, then a presentation revision over the revised prose.
 - Both manifests carry a version above `origin/main`'s when the feature ships: 0.34.0 while main is at 0.33.0, raised again if main moves first.
 
-Proof will come from static contract tests, ten new native Codex scenarios in the existing blog runner, one of which renders the article in a headless browser against a local preview, and a rerun of its nine existing scenarios against the changed package, recorded in the blog evidence README. None has run yet. Acceptance authorizes implementing this and committing on `feat/blog-visual-reading`. Pushing to update PR #75 needs a ship request, and merging needs the owner's separate approval. CI, which runs the Linux-only tests this macOS host cannot pass, is checked at ship on the pushed head and must pass before a merge; it is not part of the implementation review.
+Proof will come from static contract tests, ten new native Codex scenarios in the existing blog runner, one of which renders the article in a headless browser against a local preview, and a rerun of its nine existing scenarios against the changed package, recorded in the blog evidence README. None has run yet. Acceptance authorizes implementing this and committing on `feat/blog-visual-reading`. Pushing to update PR #75 needs a ship request. Under the owner's standing rule for vh-adlc, the session merges PR #75 itself with a merge commit once every CI job is green on the exact head, pinned with `--match-head-commit`. CI, which runs the Linux-only tests this macOS host cannot pass, is checked at ship on the pushed head and must pass before a merge; it is not part of the implementation review.
 
 Since the acceptance at R-47, drift re-review R-48 found two rules out of date after main moved on, and the owner approved their replacements on 2026-11-24. The fixed version 0.17.0 would have been a downgrade from main's 0.33.0, so the version is now any version above main's. The local test exception for the fixture-lock error no longer applies, so the local suite is now compared with an `origin/main` worktree on the same macOS host.
 
@@ -307,6 +307,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-24 | R-48 | spec | `71e415c` | claude-opus-5-5 | procedural | Drift re-review: 1 blocking, 1 should-fix, 1 nit: package version below main, stale local-suite clause, blog-authoring branch note |
 | 2026-11-24 | R-49 | spec | `5f43917` | claude-opus-5-5 | procedural | Drift follow-up: 2 blocking, 1 should-fix, 3 nits from the R-48 revision: unconditional version assertion, Linux CI clause unobservable at review, failure comparison undefined; stopped for the owner |
 | 2026-11-24 | R-50 | spec | `92d2b0c` | claude-opus-5-5 | procedural | No blocking finding: 1 should-fix, 1 nit outside the baseline: add the version-bump task, trim an uncited Background claim; both applied |
+| 2026-11-24 | R-50 | spec | `92d2b0c` | n/a | n/a | accepted by owner |
 
 ### R-1
 
