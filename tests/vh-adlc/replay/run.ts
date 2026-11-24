@@ -191,6 +191,22 @@ export function prepareClone(config: CaseConfig, brief: Brief, route: Route, rou
   } catch (error) { dispose(); throw error; }
 }
 
+/**
+ * A resumed loop clone takes the case's current route settings, so a change to how the route starts
+ * its reviewer reaches a resumed loop the way it reaches a new one. The change is a commit on the
+ * clone's own origin, because the command route reads its settings from the reviewed commit.
+ */
+function refreshRoute(clone: string, route: Route, routes: Routes): void {
+  const settings = join(clone, ".vh-adlc", "loop.yaml");
+  const current = existsSync(settings) ? readFileSync(settings, "utf8") : null;
+  const wanted = loopSettings(current, route, routes);
+  if (current === wanted) return;
+  writeFileSync(settings, wanted);
+  git(clone, "add", ".vh-adlc/loop.yaml");
+  git(clone, "commit", "-q", "-m", `replay: current ${route} route settings`, "--", ".vh-adlc/loop.yaml");
+  git(clone, "push", "-q", "origin", "HEAD:main");
+}
+
 function extractPlugin(tree: string, commit: string): { dir: string; dispose: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "vh-replay-plugin-"));
   const archive = Bun.spawnSync(["git", "-C", tree, "archive", "--format=tar", commit, "plugins/vh-adlc"], { stdout: "pipe", stderr: "pipe" });
@@ -504,6 +520,7 @@ async function runCase(o: Record<string, string | undefined>) {
           const m = JSON.parse(readFileSync(marker, "utf8")) as { commit: string; plugin: string; docs: string };
           if (m.plugin !== brief.plugin || m.docs !== brief.docs) throw new Error(`refused: the kept ${brief.name} loop clone on the ${route} route belongs to another brief`);
           prepared = { clone: join(kept, "work"), commit: m.commit, dispose: () => rmSync(kept, { recursive: true, force: true }) };
+          refreshRoute(prepared.clone, route, routes);
         } else {
           prepared = prepareClone(config, brief, route, routes, kept);
           if (marker) writeFileSync(marker, `${JSON.stringify({ commit: prepared.commit, plugin: brief.plugin, docs: brief.docs })}\n`);

@@ -357,6 +357,30 @@ describe("stored brief identity", () => {
     expect(readdirSync(join(f.dir, "loop-clones"))).not.toContain("new-command");
   });
 
+  test("a resumed loop clone takes changed route settings in a new commit and keeps unchanged ones", () => {
+    const o = healthy();
+    o.loops!["new/command"] = [{ fail: "session error" }, { fail: "session error" }, { fail: "session error" }];
+    const f = fixture(o);
+    expect(f.run().exitCode).not.toBe(0);
+    const first = f.calls().filter((c) => c.kind === "loop" && c.key === "new/command");
+    expect(first.length).toBe(3);
+    expect(new Set(first.map((c) => c.head)).size).toBe(1);
+    const script = JSON.parse(readFileSync(f.script, "utf8"));
+    script.loops["new/command"] = { docs: [loopDoc(""), loopDoc("")], questions: 0 };
+    writeFileSync(f.script, JSON.stringify(script));
+    writeFileSync(f.routes, JSON.stringify({ command: { model: "gpt-test", argv: ["sh", "-c", 'f=$1; shift; exec "$@" - < "$f"', "sh", "{prompt_file}", "codex", "exec", "--json"] }, host: { model: "claude-test" } }));
+    const r = Bun.spawnSync([process.execPath, RUN, "run", "--case", f.dir, "--tree", f.tree, "--old-plugin", f.oldPlugin, "--new-plugin", f.newPlugin, "--docs", f.docs,
+      "--companion-base", f.base, "--companion-head", f.head, "--routes", f.routes, "--results", f.results, "--executor", SCRIPTED, "--briefs", "new", "--only", "loops", "--routes-under-test", "command"],
+    { stdout: "pipe", stderr: "pipe", env: { ...process.env, REPLAY_SCRIPT: f.script } });
+    expect(r.exitCode, r.stderr.toString()).toBe(0);
+    const resumed = f.calls().filter((c) => c.kind === "loop" && c.key === "new/command").at(-1);
+    expect(resumed.clone).toBe(first[0].clone);
+    expect(resumed.loop).toContain("{prompt_file}");
+    expect(resumed.loop).not.toContain("{prompt}");
+    expect(resumed.head).not.toBe(first[0].head);
+    expect(resumed.origin).toBe(first[0].origin);
+  });
+
   test("a loop that lost its documents counts a recorded lower bound and is left out of growth", () => {
     const f = fixture(healthy());
     expect(f.run().exitCode).toBe(0);
