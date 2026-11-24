@@ -335,6 +335,11 @@ type Reservation =
   | { kind: "limit" }
   | { kind: "reserved"; entry: Entry; balance: boolean };
 
+// Requested parameters compared without display_limit, which is not part of Params.
+function sameParams(a: Params, b: Params): boolean {
+  return a.target === b.target && a.database === b.database && a.display_date === b.display_date;
+}
+
 function reserve(options: Options, maxUnits: number): Reservation {
   const ledger: Ledger = loadLedger(options.output) ?? {
     version: 1,
@@ -349,6 +354,10 @@ function reserve(options: Options, maxUnits: number): Reservation {
   mergePending(options.output, ledger);
   if (ledger.route !== options.route) return { kind: "refused", reason: `this run uses --route ${ledger.route}` };
   if (ledger.max_units !== maxUnits) return { kind: "refused", reason: `this run's --max-units is ${ledger.max_units}` };
+  if (ledger.terminal) return { kind: "refused", reason: `the run stopped on ${ledger.terminal.outcome}` };
+  if (ledger.disabled_reports.includes(options.report)) return { kind: "refused", reason: `Semrush disabled ${options.report} in this run` };
+  const failed = ledger.failures.find((failure) => failure.report === options.report && sameParams(failure.params, options.params));
+  if (failed) return { kind: "refused", reason: `the same request already failed in this run with ${failed.outcome}` };
   const spec = REPORTS[options.report];
   const price = options.params.display_date ? spec.historicalPrice : spec.price;
   const requested = options.displayLimit === null || options.displayLimit === 0 ? MAX_ROWS : Math.min(options.displayLimit, MAX_ROWS);
@@ -428,6 +437,37 @@ async function balanceRequest(options: Options, endpoints: Urls, key: string): P
 
 type Result = { outcome: Outcome; units: number; basis: Entry["basis"]; state: Entry["state"]; detail?: string };
 
+// Outcomes that stop the run. report_disabled stops only its report type.
+const TERMINAL: Outcome[] = ["authentication", "access_denied", "quota", "rate_limited", "price_mismatch"];
+
+// A v3 body that starts with `ERROR <n> ::`, classified by its code whatever the HTTP status.
+function v3Outcome(body: string): Outcome | null {
+  const match = body.match(/^ERROR (\d+) :: ([^\r\n]*)/);
+  if (!match) return null;
+  const code = Number(match[1]);
+  if ([110, 120, 122].includes(code)) return "authentication";
+  if (code === 402) return match[2].trim() === "Request param not valid" ? "authentication" : "provider_error";
+  if ([130, 133].includes(code)) return "access_denied";
+  if ([131, 132, 134].includes(code)) return "quota";
+  if (code === 429) return "rate_limited";
+  if (code === 135) return "report_disabled";
+  if (code === 50) return "no_data";
+  return "provider_error";
+}
+
+const MCP_CODES: Record<string, Outcome> = {
+  no_subscription: "access_denied",
+  no_api_units: "quota",
+  rate_limit: "rate_limited",
+  no_data: "no_data",
+};
+
+function httpOutcome(status: number, route: Route): Outcome {
+  if (route === "mcp" && (status === 401 || status === 403)) return "authentication";
+  if (status === 429) return "rate_limited";
+  return "provider_error";
+}
+
 async function v3Report(options: Options, endpoints: Urls, key: string, entry: Entry): Promise<Result> {
   const spec = REPORTS[options.report];
   const query = new URLSearchParams({ type: spec.v3, key, domain: options.params.target });
@@ -444,12 +484,108 @@ async function v3Report(options: Options, endpoints: Urls, key: string, entry: E
   if (result.status >= 300 && result.status < 400) {
     return { outcome: "provider_error", units: 0, basis: "estimated", state: "reconciled", detail: `redirect ${result.status}` };
   }
-  if (result.status >= 200 && result.status < 300 && !/^ERROR \d+ ::/.test(result.body)) {
+  const coded = v3Outcome(result.body);
+  if (coded) return { outcome: coded, units: 0, basis: "estimated", state: "reconciled", detail: result.body.slice(0, 200) };
+  if (result.status >= 200 && result.status < 300) {
     const rows = result.body.split(/\r?\n/).filter((line) => line.trim() !== "").length - 1;
     const units = Math.max(rows, 0) * entry.price;
     return { outcome: "success", units, basis: "estimated", state: "reconciled" };
   }
-  return { outcome: "provider_error", units: 0, basis: "estimated", state: "reconciled", detail: result.body.slice(0, 200) };
+  return { outcome: httpOutcome(result.status, "v3"), units: 0, basis: "estimated", state: "reconciled", detail: `HTTP ${result.status}` };
+}
+
+// The JSON-RPC message in a reply that is either a JSON body or an event stream,
+// whose last `data:` event carries it.
+function rpcMessage(sent: Sent): Record<string, unknown> | null {
+  let text = sent.body;
+  if ((sent.headers.get("content-type") ?? "").includes("text/event-stream")) {
+    const data = text.split(/\r?\n/).filter((line) => line.startsWith("data:"));
+    text = data.length ? data[data.length - 1].slice(5).trim() : "";
+  }
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function field(value: unknown, name: string): unknown {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>)[name] : undefined;
+}
+
+// The execute_report reply: an object with `code` is an error, one with `data` and
+// `metadata` is a success; anything else, a JSON-RPC error or isError is a provider error.
+function mcpCallResult(message: Record<string, unknown> | null, entry: Entry): Result {
+  const kept = { units: entry.reserved, basis: "estimated" as const, state: "reconciled" as const };
+  const result = message ? field(message, "result") : undefined;
+  if (!message || message.error !== undefined || result === undefined || field(result, "isError") === true) {
+    return { outcome: "provider_error", ...kept, detail: "not an execute_report result" };
+  }
+  const content = field(result, "content");
+  const text = Array.isArray(content) ? field(content[0], "text") : undefined;
+  let payload: unknown;
+  try {
+    payload = typeof text === "string" ? JSON.parse(text) : undefined;
+  } catch {
+    payload = undefined;
+  }
+  const code = field(payload, "code");
+  if (typeof code === "string") return { outcome: MCP_CODES[code] ?? "provider_error", ...kept, detail: code };
+  if (field(payload, "data") !== undefined && field(payload, "metadata") !== undefined) {
+    const units = field(field(field(payload, "metadata"), "usage"), "api_units");
+    if (typeof units !== "number" || !Number.isFinite(units) || units < 0) return { outcome: "success", ...kept };
+    if (units > entry.reserved) return { outcome: "price_mismatch", units, basis: "reported", state: "reconciled", detail: `reported ${units} units for a ${entry.reserved}-unit reservation` };
+    return { outcome: "success", units, basis: "reported", state: "reconciled" };
+  }
+  return { outcome: "provider_error", ...kept, detail: "unrecognised execute_report payload" };
+}
+
+async function mcpReport(options: Options, endpoints: Urls, key: string, entry: Entry): Promise<Result> {
+  const spec = REPORTS[options.report];
+  const headers: Record<string, string> = {
+    Authorization: `Apikey ${key}`,
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  };
+  const post = async (kind: string, body: unknown) => {
+    const text = JSON.stringify(body);
+    const result = await send(endpoints.mcp, { method: "POST", headers, body: text });
+    save(options.output, kind, { method: "POST", url: endpoints.mcp, headers, body: text }, isFailed(result) ? { error: result.error } : { status: result.status, body: result.body }, key);
+    return result;
+  };
+  // A handshake that fails never sent the report call, so its reservation is released.
+  const handshakeFailed = (result: Sent | Failed): Result => {
+    if (isFailed(result)) return { outcome: "transport_error", units: 0, basis: "estimated", state: "released", detail: result.error };
+    return { outcome: httpOutcome(result.status, "mcp"), units: 0, basis: "estimated", state: "released", detail: `handshake HTTP ${result.status}` };
+  };
+  const init = await post("initialize", {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "initialize",
+    params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "vh-adlc-seo", version: "1" } },
+  });
+  if (isFailed(init) || init.status < 200 || init.status >= 300) return handshakeFailed(init);
+  if (!field(rpcMessage(init), "result")) return { outcome: "provider_error", units: 0, basis: "estimated", state: "released", detail: "no initialize result" };
+  const session = init.headers.get("mcp-session-id");
+  if (session) headers["Mcp-Session-Id"] = session;
+  const initialized = await post("initialized", { jsonrpc: "2.0", method: "notifications/initialized" });
+  if (isFailed(initialized) || initialized.status < 200 || initialized.status >= 300) return handshakeFailed(initialized);
+
+  const params: Record<string, unknown> = { target: options.params.target };
+  if (options.params.database) params.database = options.params.database;
+  params.display_limit = entry.display_limit;
+  const date = options.params.display_date;
+  if (date) params.display_date = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+  const call = await post("report", { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "execute_report", arguments: { report: spec.mcp, params } } });
+  if (isFailed(call)) {
+    if (!call.sent) return { outcome: "transport_error", units: 0, basis: "estimated", state: "released", detail: call.error };
+    return { outcome: "transport_error", units: entry.reserved, basis: "estimated", state: "reconciled", detail: call.error };
+  }
+  if (call.status < 200 || call.status >= 300) {
+    return { outcome: httpOutcome(call.status, "mcp"), units: entry.reserved, basis: "estimated", state: "reconciled", detail: `HTTP ${call.status}` };
+  }
+  return mcpCallResult(rpcMessage(call), entry);
 }
 
 function print(result: Record<string, unknown>) {
@@ -464,7 +600,6 @@ async function main(argv: string[]): Promise<number> {
     options = parseArgs(argv);
     endpoints = urls();
     key = readKey(options);
-    if (options.route === "mcp") throw new Refusal("the mcp route is not available yet");
   } catch (error) {
     if (error instanceof Refusal) {
       print({ outcome: "refused", reason: error.message });
@@ -491,7 +626,10 @@ async function main(argv: string[]): Promise<number> {
   const { entry } = reservation;
   let balance: Balance | undefined;
   if (reservation.balance) balance = await balanceRequest(options, endpoints, key);
-  const result = await v3Report(options, endpoints, key, entry);
+  const result = options.route === "mcp" ? await mcpReport(options, endpoints, key, entry) : await v3Report(options, endpoints, key, entry);
+  // A request that reached Semrush and failed is never sent again in this run; one
+  // that never left the machine (a released reservation) may be.
+  const failedRequest = result.outcome !== "success" && result.state !== "released";
   await commit(options.output, {
     entry: entry.id,
     units: result.units,
@@ -499,6 +637,9 @@ async function main(argv: string[]): Promise<number> {
     state: result.state,
     outcome: result.outcome,
     balance,
+    failure: failedRequest ? { report: options.report, params: options.params, outcome: result.outcome, terminal: TERMINAL.includes(result.outcome) } : undefined,
+    terminal: TERMINAL.includes(result.outcome) ? result.outcome : undefined,
+    disabled_report: result.outcome === "report_disabled" ? options.report : undefined,
   });
   print({
     outcome: result.outcome,
