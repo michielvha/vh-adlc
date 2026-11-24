@@ -205,3 +205,70 @@ describe("visual reading pass contract", () => {
     expect(context).toMatch(/three-line|`Presentation repairs`/);
   });
 });
+
+describe("visual reading pass parsers", async () => {
+  const visual = await import("./blog/visual.ts");
+
+  test("the Presentation repairs splitter returns labelled entries", () => {
+    const first = visual.splitRepairs(
+      "irrelevant image: the PNG shows monthly rainfall (mm), but the caption calls it a plan review; replace it; no body treatment: the only image follows the last paragraph",
+    );
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(first.entries.map((e) => e.label)).toEqual(["irrelevant image", "no body treatment"]);
+    expect(first.entries[0].text).toContain("; replace it");
+
+    const marked = visual.splitRepairs("`Irrelevant image`: the chart is off topic; **No body treatment:** add one");
+    expect(marked.ok && marked.entries.map((e) => e.label)).toEqual(["irrelevant image", "no body treatment"]);
+
+    const none = visual.splitRepairs("None.");
+    expect(none.ok && none.entries).toEqual([]);
+
+    expect(visual.splitRepairs("the image is off topic; irrelevant image: replace it").ok).toBe(false);
+    expect(visual.repairsLine("Verdict: Pass\nCopy repairs: None\nPresentation repairs: None.\nExceptions: None")).toBe("None.");
+  });
+
+  test("the No-visual exception line takes only the three categories", () => {
+    for (const line of ["No-visual exception: short-read: the piece reads in one sitting.", "- No-visual exception: owner-request: the owner asked for text only."]) {
+      const found = visual.fixedLine(line, "No-visual exception");
+      expect(found.ok).toBe(true);
+      expect(found.ok && visual.noVisualCategory(found.value)).not.toBeNull();
+    }
+    for (const line of ["No-visual exception: no-assets: no picture was supplied.", "No-visual exception: short-read", "No-visual exception: the piece is short."]) {
+      const found = visual.fixedLine(line, "No-visual exception");
+      expect(found.ok && visual.noVisualCategory(found.value)).toBeFalsy();
+    }
+    expect(visual.fixedLine("No-visual exception: short-read: a\nNo-visual exception: format: b", "No-visual exception").ok).toBe(false);
+    expect(visual.fixedLine("nothing here", "No-visual exception").ok).toBe(false);
+  });
+
+  test("the Rendered checks parser accepts the unverified and entries forms only", () => {
+    const parse = (line: string) => {
+      const found = visual.fixedLine(line, "Rendered checks");
+      return found.ok ? visual.parseRenderedChecks(found.value) : { kind: "invalid" as const };
+    };
+    expect(parse("Rendered checks: unverified, no renderer was available").kind).toBe("unverified");
+    const four = parse("- Rendered checks: desktop light: pass; desktop dark: pass; phone light: pass; phone dark: code block overflows");
+    expect(four.kind).toBe("entries");
+    expect(four.kind === "entries" && four.entries).toHaveLength(4);
+    for (const line of [
+      "Rendered checks: unverified",
+      "Rendered checks:",
+      "Rendered checks: desktop: pass",
+      "Rendered checks: tablet light: pass",
+      "Rendered checks: desktop light: pass; phone dark: no overflow; caption clipped",
+    ]) {
+      expect(`${line} => ${parse(line).kind}`).toBe(`${line} => invalid`);
+    }
+  });
+
+  test("the coverage check needs a verified entry for every viewport and theme pair", () => {
+    const pairs = ["desktop light", "desktop dark", "phone light", "phone dark"];
+    const four = visual.parseRenderedChecks("desktop light: pass; desktop dark: pass; phone light: pass; phone dark: code block overflows");
+    expect(visual.coversPairs(four, pairs)).toBe(true);
+    const two = visual.parseRenderedChecks("desktop light: pass; phone light: pass");
+    expect(visual.coversPairs(two, pairs)).toBe(false);
+    const unverifiedEntry = visual.parseRenderedChecks("desktop light: pass; desktop dark: pass; phone light: pass; phone dark: unverified, no dark theme");
+    expect(visual.coversPairs(unverifiedEntry, pairs)).toBe(false);
+  });
+});
