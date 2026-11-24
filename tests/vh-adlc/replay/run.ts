@@ -290,7 +290,7 @@ export function recordIdentity(dir: string, brief: "old" | "new", route: Route, 
  */
 export function freshSet(dir: string, brief: "old" | "new", route: Route, kinds: Part[], identity: Identity) {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const moved = existsSync(dir) ? readdirSync(dir).filter((f) => kinds.some((kind) => f.startsWith(`${brief}-${route}-${kind}-`) || f === `${brief}-${route}-${kind}.identity.json`)) : [];
+  const moved = existsSync(dir) ? readdirSync(dir).filter((f) => kinds.some((kind) => f.startsWith(`${brief}-${route}-${kind}-`) || f === `${brief}-${route}-${kind}.identity.json` || f === `${brief}-${route}-${kind}.bound.json`)) : [];
   if (moved.length) {
     const aside = join(dir, "..", "runs-superseded", `${stamp}-${brief}-${route}`);
     mkdirSync(aside, { recursive: true });
@@ -373,6 +373,12 @@ export function storedPasses(dir: string, brief: "old" | "new", route: Route, ex
 }
 
 /** A brief's finished loop on a route, from its stored documents. */
+/** A bound counted from a kept loop clone, which a later run resumes, unlike one counted from session logs. */
+function keptCloneBound(dir: string, brief: "old" | "new", route: Route): boolean {
+  const path = join(dir, `${brief}-${route}-loop.bound.json`);
+  return existsSync(path) && String((JSON.parse(readFileSync(path, "utf8")) as { source?: string }).source ?? "").startsWith("kept loop clone");
+}
+
 export function storedLoop(dir: string, brief: "old" | "new", route: Route, expected: { model: string; plugin: string; docs: string }): CaseData["loops"][string] | undefined {
   if (!existsSync(dir)) return undefined;
   const prefix = `${brief}-${route}-loop-`, listed = existsSync(identityPath(dir, brief, route, "loop")) ? null : listedFiles(dir, brief, route, "loop");
@@ -454,7 +460,13 @@ function totals(cases: CaseData[]): string {
   const sum = (brief: "old" | "new", field: "reviews" | "questions" | "growth") => cases.reduce((total, c) =>
     total + Object.entries(c.loops).filter(([key]) => key.startsWith(`${brief}/`)).reduce((t, [, l]) => t + l[field], 0), 0);
   const failing = cases.flatMap((c) => Object.entries(c.retention).flatMap(([route, labels]) => Object.entries(labels).filter(([, r]) => r.verdict === "fail").map(([label]) => `${c.case} ${route} ${label}`)));
-  const [oldReviews, newReviews] = [sum("old", "reviews"), sum("new", "reviews")];
+  // The halving bar covers the pairs where both loops reached a clean pass; every other pair is listed.
+  const converged = cases.flatMap((c) => Object.keys(c.loops).filter((k) => k.startsWith("old/")).map((k) => [c, k.slice(4)] as const))
+    .filter(([c, r]) => c.loops[`old/${r}`].clean && c.loops[`new/${r}`]?.clean);
+  const others = cases.flatMap((c) => Object.keys(c.loops).filter((k) => k.startsWith("old/")).map((k) => [c, k.slice(4)] as const))
+    .filter(([c, r]) => !(c.loops[`old/${r}`].clean && c.loops[`new/${r}`]?.clean));
+  const oldReviews = converged.reduce((t, [c, r]) => t + c.loops[`old/${r}`].reviews, 0), newReviews = converged.reduce((t, [c, r]) => t + c.loops[`new/${r}`].reviews, 0);
+  const count = (l: CaseData["loops"][string] | undefined) => !l ? "not run" : !l.executed ? "failed" : `${l.bound ? "at least " : ""}${l.reviews}${l.clean ? "" : l.bound ? "" : " (cap)"}`;
   // Growth compares only the pairs whose old-brief loop stored its documents.
   const pairs = cases.flatMap((c) => Object.keys(c.loops).filter((k) => k.startsWith("old/") && c.loops[k].clean && !c.loops[k].bound && c.loops[k].bodySizes.length && c.loops[`new/${k.slice(4)}`]?.bodySizes.length).map((k) => [c, k.slice(4)] as const));
   const oldG = pairs.reduce((t, [c, r]) => t + c.loops[`old/${r}`].growth, 0), newG = pairs.reduce((t, [c, r]) => t + c.loops[`new/${r}`].growth, 0);
@@ -462,9 +474,10 @@ function totals(cases: CaseData[]): string {
   const growthOk = pairs.length > 0 && (oldG <= 0 ? newG <= oldG : newG * 2 <= oldG);
   return ["## Totals", "", `Cases: ${cases.map((c) => c.case).join(", ")}.`, "",
     "| Measure | Old | New | Condition | Met |", "| --- | --- | --- | --- | --- |",
-    `| Spec reviews | ${cases.some((c) => Object.values(c.loops).some((l) => l.bound)) ? "at least " : ""}${oldReviews} | ${newReviews} | new at most half of old | ${newReviews * 2 <= oldReviews ? "yes" : "no"} |`,
+    `| Spec reviews (${converged.length} pairs where both loops reached a clean pass) | ${oldReviews} | ${newReviews} | new at most half of old, over at least one pair | ${converged.length && newReviews * 2 <= oldReviews ? "yes" : "no"} |`,
+    ...others.map(([c, r]) => `| Spec reviews, ${c.case} ${r} (not both clean) | ${count(c.loops[`old/${r}`])} | ${count(c.loops[`new/${r}`])} | reported | |`),
     `| Body growth (${pairs.length} pairs with stored old documents) | ${oldG} | ${newG} | new at most half of old, or no larger when old is zero or less | ${growthOk ? "yes" : "no"} |`,
-    `| Failing labels | | ${failing.length} | none | ${failing.length ? "no" : "yes"} |`, ""].join("\n");
+    `| Failing labels | | ${failing.length}${failing.length ? `: ${failing.join(", ")}` : ""} | none | ${failing.length ? "no" : "yes"} |`, ""].join("\n");
 }
 
 /**
@@ -580,9 +593,10 @@ async function runCase(o: Record<string, string | undefined>) {
             if (stored) data.loops[`${name}/${route}`] = stored;
             continue;
           }
-          // A continued loop set that already finished is used as stored, never run again.
+          // A continued loop set that already finished is used as stored, never run again. So is a lost loop's
+          // session-log bound; a kept-clone bound is resumed from its clone.
           const finished = storedLoop(privateRuns, name, route, identity);
-          if (finished?.executed && finished.bodySizes.length) { data.loops[`${name}/${route}`] = finished; continue; }
+          if (finished?.executed && (finished.bodySizes.length || (finished.bound && !keptCloneBound(privateRuns, name, route)))) { data.loops[`${name}/${route}`] = finished; continue; }
           // A loop that fails to execute or reports another identity is recorded and rerun, never counted.
           let failed = 0, result: RunResult | undefined, identityOk = false;
           while (failed < LOOP_ATTEMPTS) {
@@ -594,6 +608,13 @@ async function runCase(o: Record<string, string | undefined>) {
           }
           const documents = identityOk ? result!.documents ?? [] : [];
           documents.forEach((doc, i) => writeFileSync(join(privateRuns, `${name}-${route}-loop-${i}.md`), doc));
+          // Once the resumed loop stores its documents, its kept-clone bound moves aside.
+          const bound = join(privateRuns, `${name}-${route}-loop.bound.json`);
+          if (documents.length && existsSync(bound)) {
+            const aside = join(privateRuns, "..", "runs-superseded", `${new Date().toISOString().replace(/[:.]/g, "-")}-${name}-${route}`);
+            mkdirSync(aside, { recursive: true });
+            renameSync(bound, join(aside, `${name}-${route}-loop.bound.json`));
+          }
           const sizes = documents.map(bodySize);
           data.loops[`${name}/${route}`] = { executed: identityOk, failed, reviews: Math.min(Math.max(documents.length - 1, 0), MAX_REVIEWS), questions: identityOk ? result!.questions ?? 0 : 0,
             bodySizes: sizes, growth: sizes.length ? sizes.at(-1)! - sizes[0] : 0, clean: identityOk && (result!.clean ?? documents.length - 1 <= MAX_REVIEWS), model: result!.model, plugin: result!.plugin, docs: result!.docs };
@@ -627,6 +648,7 @@ async function main(argv: string[]): Promise<number> {
     results: { type: "string" }, executor: { type: "string" }, only: { type: "string" }, "routes-under-test": { type: "string" },
     file: { type: "string", multiple: true }, briefs: { type: "string" }, "old-docs": { type: "string" }, "new-docs": { type: "string" },
     brief: { type: "string" }, sessions: { type: "string" }, since: { type: "string" }, until: { type: "string" }, "first-passes": { type: "string" },
+    "from-clone": { type: "boolean" },
   } });
   const command = positionals[0];
   if (command === "run") { await runCase(values as Record<string, string | undefined>); return 0; }
@@ -637,6 +659,24 @@ async function main(argv: string[]): Promise<number> {
     const caseDir = resolve(need(v, "case"));
     const { config } = loadCase(caseDir);
     const brief = need(v, "brief") as "old" | "new", route = need(v, "routes-under-test") as Route;
+    if ((values as Record<string, unknown>)["from-clone"]) {
+      // A loop stopped by its route's usage limit keeps its clone: its spec reviews are the Review Log's spec
+      // rows, acceptances aside, added since the clone's X'.
+      const kept = join(caseDir, "loop-clones", `${brief}-${route}`);
+      const marker = JSON.parse(readFileSync(join(kept, "replay-clone.json"), "utf8")) as { commit: string };
+      const clone = join(kept, "work");
+      const rows = (at: string) => {
+        const text = git(clone, "show", `${at}:${config.document}`);
+        const log = text.slice(Math.max(0, text.search(/^## Review Log\s*$/m)));
+        return log.split("\n").filter((l) => /^\| [0-9-]+ \| R-[0-9]+ \| spec \|/.test(l) && !l.includes("accepted by owner")).length;
+      };
+      const head = git(clone, "rev-parse", "HEAD").trim();
+      const reviews = rows(head) - rows(marker.commit);
+      const record = { reviews_at_least: Math.min(reviews, MAX_REVIEWS), clean: false, head, since: marker.commit, source: `kept loop clone loop-clones/${brief}-${route}: spec rows in the Review Log of ${config.document} added since X'` };
+      writeFileSync(join(caseDir, "runs", `${brief}-${route}-loop.bound.json`), `${JSON.stringify(record, null, 2)}\n`);
+      console.log(JSON.stringify(record));
+      return 0;
+    }
     const sessions = need(v, "sessions"), docs = need(v, "old-docs"), since = Date.parse(need(v, "since")), until = Date.parse(need(v, "until"));
     const seen: { at: number; commit: string }[] = [];
     const walk = (dir: string) => { for (const name of readdirSync(dir, { withFileTypes: true })) {
