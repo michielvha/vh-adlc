@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "In draft on feat/proportional-review for an owner-requested revision (2026-11-23): AC-13 drops its Open Question count and the revision records the reviewer fix the owner allowed after the enterprise replay. T1 to T22 stay done; T25, T26, T23 and T24 continue after acceptance."
+status: planned
+status_description: "Revision accepted at R-22 on 2026-11-24 (AC-13 without the Open Question count, the launch record, lower bounds for the lost old loops, and new-brief reruns on the fixed reviewer ef685da1). T1 to T22 done; next: T25, T26, then T23 and T24."
 branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
@@ -774,6 +774,7 @@ None.
 | 2026-11-24 | R-20 | spec | `8424fb75` | claude-opus-5-5 | procedural | scoped: no blocking, no should-fix; 2 nit |
 | 2026-11-24 | R-21 | spec | `00752fea` | claude-opus-5-5 | procedural | drift re-review after merging main c6268708, full pass: no blocking; 1 should-fix |
 | 2026-11-24 | R-22 | spec | `a3ae263a` | claude-opus-5-5 | procedural | scoped: no findings |
+| 2026-11-24 | R-22 | spec | `a3ae263a` | n/a | n/a | accepted by owner |
 
 ### R-1
 
