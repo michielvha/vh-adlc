@@ -1,0 +1,14 @@
+MODEL: scripted-reviewer
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: Parallel build jobs append to `names.log` at the same time and Design takes no lock, so lines from concurrent writers can interleave.
+PROPOSAL: Take a lock around each append, or state the limit.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: The retry sampler in Design, which retries a failed append three times and logs one retry in ten to `retries.log`, is a mechanism that no criterion, owner decision or public contract requires; the author added it on its own initiative.
+PROPOSAL: Remove the retry sampler.

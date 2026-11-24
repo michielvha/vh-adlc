@@ -6,8 +6,9 @@ const root = join(import.meta.dir, "../..");
 const baseline = "b313327b134bc5ecfa7167856d4b567f8701ba06";
 // Keep the owner summary, finding rules, drift re-review limit, the proportionality gate
 // (michielvha/vh-adlc#148: harm statement and convergence trigger) and the author-added extras
-// exception (michielvha/vh-adlc#141) in the spec baseline.
-const specBaseline = "41355739d55e1d60f5c1839fa1c59a57089b96e0";
+// exception (michielvha/vh-adlc#141) in the spec baseline, and the rules under severity by consequence
+// (docs/specs/proportional-review.md).
+const specBaseline = "c2eff1d0300af93f8aed228dcff68e6c55714ecf";
 // The proportionality gate (michielvha/vh-adlc#148) adds the harm statement step to investigate.
 const investigateBaseline = "e53fe39e7461b95c27b7481514688ee998970e18";
 // The owner approved the rule that an agent-behavior proof needs a committed script that reruns it
@@ -65,6 +66,16 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
     else for (const phrase of ["owner-authorized", "preflight succeeds", "no completion", "review-refresh"]) expect(section).toContain(phrase);
     current = current.slice(0, start) + current.slice(end);
   }
+  // Proportional review (docs/specs/proportional-review.md) adds the follow-up review after merge to ship and resume.
+  if (name === "ship" || name === "resume") {
+    const start = current.indexOf("## Follow-up review after merge\n");
+    expect(start).toBeGreaterThan(0);
+    const next = current.indexOf("\n## ", start + 1), end = next < 0 ? current.length : next + 1;
+    const section = current.slice(start, end).replace(/\s+/g, " ");
+    for (const phrase of ["names the product profile as the context for severity", "pending Deferred entries", "On an older revision"]) expect(section).toContain(phrase);
+    if (name === "ship") for (const phrase of ["drop, follow-up or gap", "--operation follow-up", "gh issue list --state all", "`docs/follow-up-<slug>`", "Never merge it", "needs no feature writer entry or handoff"]) expect(section).toContain(phrase);
+    current = (current.slice(0, start) + current.slice(end)).replace(/\n+$/, "\n");
+  } else expect(current).not.toContain("## Follow-up review after merge\n");
   if (name === "ship") {
     const promotionStart = current.indexOf("## Article and promotion handoff\n");
     const promotionEnd = current.indexOf("## After an authorized merge\n", promotionStart);

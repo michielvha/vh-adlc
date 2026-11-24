@@ -140,6 +140,54 @@ worktree is removed, with its branch, by the next sweep. When GitHub's
 plan, which proposes enabling it. A ship request alone does not authorize a
 merge or repository-setting changes.
 
+## Follow-up review after merge
+
+This step applies when the resolved `conventions/feature-documents.md` names the product profile as the
+context for severity, which its Review log section does when it rates findings by consequence. On an
+older revision, skip this whole section: run nothing from it, and do not mention a follow-up review,
+Deferred verdicts or a pin change in any reply or report.
+
+It judges what the feature deferred against what was built, so it runs once the feature's PR is merged,
+whatever `bun scripts/loop/cli.ts delivery` reports. A document is `complete` before its PR merges, so
+the trigger is the merge itself: the feature's PR is merged, or the `complete` document is on the
+default branch. Ship runs it right after an authorized merge it performed. Invoked on a merged
+`complete` document, ship runs only this step. On a `complete` document whose PR is not merged, it keeps
+the normal delivery path above and says nothing about this step. The feature's writing is over: this step edits only the document's `## Deferred`
+section, on its own branch, and needs no feature writer entry or handoff.
+
+1. **Verdicts.** For each entry whose `Verdict:` is `pending`, inspect the tree at the merge commit and
+   give one of drop, follow-up or gap, with one line of reason:
+   - drop: no user of the merged feature needs it now or later, or the merged feature already covers it;
+   - follow-up: a user would benefit from it later, and the merged feature works without it;
+   - gap: a user of the merged feature hits its absence now.
+2. **Ask once.** Show the gaps first, then the follow-ups, each with an issue preview (title, body and
+   labels), then the drops, one line each. Drops are recorded without approval. Ask the owner, in one
+   answer, which follow-ups and gaps to file. That approval covers creating those issues, the
+   `docs/follow-up-<slug>` branch, its push and its PR, as `references/authority.md` says.
+3. **No duplicates.** Before filing an entry, list the repository's issues with
+   `gh issue list --state all`, not the search index, and record an existing issue whose body ends with
+   that entry's `Deferred:` line instead of filing again.
+4. **File.** File each approved item with
+   `bun scripts/labels/cli.ts file --operation follow-up --repo <checkout> --type <type label>`: the
+   feature type for a follow-up and the bug type for a gap, as `references/issues.md` describes. Each
+   body ends with `Deferred: <document path> D-<nn>`.
+5. **Record.** Make one temporary worktree on a new branch `docs/follow-up-<slug>` from the remote
+   default branch, or on that branch when a rerun finds it. Write every verdict into the document's
+   Deferred section there, and each issue link right after that issue is created. A `Verdict:` reads
+   `drop, <reason>`, `follow-up <issue link>`, `gap <issue link>`, `follow-up, not filed (owner declined)`
+   or `gap, not filed (owner declined)`. Make one documentation-only commit, push the branch, open its PR
+   or update the existing one, and remove the temporary worktree. Never merge it, and never push to the
+   default branch.
+6. **Partial runs.** If an issue creation fails, still commit and push what was recorded, report the step
+   as partial, and stop. A rerun asks the owner again for the entries still pending and adds its commit to
+   the same branch and PR; matching through the issue list files only what is missing.
+
+Two sessions running this step on one feature at the same time can file an issue twice; that limit is
+accepted.
+
+The report on a merged feature ends with the number of pending Deferred entries, and names this step
+while any remain, including when the merge happened elsewhere.
+
 ## Report
 
 The knowledge line; the gate result, quoted; the branch, the pushed commit, the PR and its linkage, the
