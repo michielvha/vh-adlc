@@ -301,6 +301,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-11 | R-46 | spec | `8598997` | claude-opus-4.8 | procedural | 2 should-fix, 1 nit: label case and Markdown, label overlap, splitter defined once; fixed |
 | 2026-11-11 | R-47 | spec | `0ad847c` | unknown | procedural | No findings |
 | 2026-11-11 | R-47 | spec | `0ad847c` | n/a | n/a | accepted by owner |
+| 2026-11-24 | R-48 | spec | `71e415c` | claude-opus-5-5 | procedural | Drift re-review: 1 blocking, 1 should-fix, 1 nit: package version below main, stale local-suite clause, blog-authoring branch note |
 
 ### R-1
 
@@ -1586,6 +1587,29 @@ PROPOSAL: Define the splitter once, including that `None` yields no entries, and
 ### R-47
 
 NO FINDINGS
+
+### R-48
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context Owner summary (line 50), Design "Packaging" (line 199), Acceptance Criteria AC-09, Test Plan AC-09, Tasks T10 and T11
+EVIDENCE: Line 199 says "Both package manifests move to 0.17.0, the version PR #75 already carries", and line 50 says "The version is 0.17.0, landing before the SEO change at 0.18.0". At X, `git show HEAD:plugins/vh-adlc/plugin.json` and `git show HEAD:plugins/vh-adlc/.claude-plugin/plugin.json` both read "version": "0.33.0", the same as origin/main (718b1d30, last moved by 00752fea "move proportional review to 0.33.0"). PR #75's own commit 8205531 bumped 0.5.0 to 0.5.1, not 0.17.0, and the merge at X resolved the manifests to main's 0.33.0. This traces to the default-branch drift that X merges. Running `bun test tests/vh-adlc/blog.test.ts tests/vh-adlc/check.test.ts --timeout 60000` at X gave 82 pass and 1 fail: "manifest and marketplace > a package change comes with a version change". AC-09, the AC-09 Test Plan row ("both read 0.17.0") and T10/T11 ("installed 0.17.0 package") would have the implementer set 0.17.0, a downgrade from the 0.33.0 that consumers already have. check.test.ts:224-232 only checks that the version differs from main, so it would pass. A marketplace update from 0.33.0 to 0.17.0 is a version regression, and "before the SEO change at 0.18.0" no longer describes any real ordering.
+PROPOSAL: Set the target version to the next version above main at implementation time, for example 0.34.0, or state the rule "the next minor version above origin/main". Update line 50, line 199, AC-09, its Test Plan row and T10/T11 to match, and drop the claim that PR #75 carries 0.17.0 and the 0.18.0 sequencing.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Background (line 64), Context Owner summary (line 52), Acceptance Criteria AC-09, Test Plan AC-09, Tasks T4
+EVIDENCE: AC-09 says "`bun test tests/vh-adlc` passes locally, except that `tests/vh-adlc/fixtures.test.ts` may fail only with the fixture-lock digest error quoted in Background", and T4 repeats this. Background quotes "/usr/local/bin/vh-adlc reports vh-adlc 0.19.0 but its digest does not match the lock" and cites `plugins/vh-adlc/scripts/ensure-vh-adlc.sh:4-7`. At X, ensure-vh-adlc.sh:8-9 says "A PATH entry whose digest does not match the lock is never executed ... it is ignored with a note", and line 100 only prints "ignoring unverified PATH entry". `/usr/local/bin/vh-adlc` does not exist on this host. `bun test tests/vh-adlc/fixtures.test.ts --timeout 60000` at X gave 15 pass, 0 fail. So the exception covers a failure that can no longer happen, and the owner summary's "the fixture test this host cannot pass" is now false. The repository instruction changed at X as well. AGENTS.md now says "`bun test tests/vh-adlc --parallel --timeout 60000`, with `go` on PATH and network access to GitHub", while the document runs `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 bun test tests/vh-adlc --timeout 60000`. The development host is now macOS. The owner's recorded host notes say about 22 files fail there, with the same counts as on origin/main (Linux-only Bubblewrap, /proc and GNU sed cases, long paths, bun 1.4.2 YAML tests). I did not observe those failures in this pass. If they hold, a correct implementation cannot meet AC-09's local clause as written.
+PROPOSAL: Restate the local-suite clause against the current host and the AGENTS.md command, for example "every failure also fails identically on an origin/main worktree at the same host", with Linux CI as the authority. Correct the Background and owner summary sentences about the fixture test.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context Background (line 58), Design "Relationship to blog-authoring" (line 113)
+EVIDENCE: Line 58 says `git branch --list feat/blog-authoring` "return[s] nothing", and line 113 says "blog-authoring's own branch no longer exists". At X, `git branch --list feat/blog-authoring` prints "+ feat/blog-authoring". `git worktree list` shows it checked out at /Users/michielvh/code/vh-adlc-wt/blog-authoring, at c6268708, with no commits beyond origin/main. `git ls-remote --heads origin feat/blog-authoring` still returns nothing. Placing the Context pointer on this branch is still sound, but the stated reason is out of date, and a parallel blog-authoring session on the same covered files is now possible.
+PROPOSAL: Say that the remote branch is gone and a local worktree branch with no commits of its own exists, and keep the pointer edit on feat/blog-visual-reading.
 
 ## Sources
 
