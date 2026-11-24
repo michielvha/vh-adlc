@@ -364,7 +364,8 @@ describe("row fitting and the unit limit", () => {
 });
 
 for (const mode of ["plain", "pid-namespace"] as const) {
-  const wrap = mode === "pid-namespace" ? ["bwrap", "--unshare-pid", "--dev-bind", "/", "/", "--"] : [];
+  // --die-with-parent: killing the bwrap process must kill the holder inside the namespace.
+  const wrap = mode === "pid-namespace" ? ["bwrap", "--unshare-pid", "--die-with-parent", "--dev-bind", "/", "/", "--"] : [];
   const skip = mode === "pid-namespace" && !hasBwrap;
   if (skip) console.log("skipping the PID-namespace lock cases: bwrap is not available on this host");
   describe.skipIf(skip)(`the ledger lock (${mode})`, () => {
