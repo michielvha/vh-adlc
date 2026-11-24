@@ -36,7 +36,7 @@ const pin = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
 const original = "---\nstatus: draft\nauthor: Fixture writer\n---\n\n# Cedar reference\n\nI prefer the management cluster for shared controllers.\nThe workload cluster runs the application.\n\n```sh\ncedar docs --format html\n```\n";
 const protectedCopy = "i use Cedar with customers and it is the only tool that can document this stuff…";
 const classic = ["new", "keep", "repair", "promotion", "denied-site", "fallback", "editor", "ship-public", "ship-internal"];
-const writerCases = ["visual-new", "visual-short", "visual-illustration", "visual-presentation", "visual-backport", "visual-revision", "visual-review"];
+const writerCases = ["visual-new", "visual-short", "visual-illustration", "visual-presentation", "visual-backport", "visual-revision", "visual-review", "visual-rendered"];
 const visualCases = [...writerCases, "visual-editor", "visual-editor-pass"];
 const cases = [...classic, ...visualCases];
 const requested = process.argv[3]?.split(",");
@@ -152,7 +152,7 @@ const figure = (src: string, alt: string, caption: string) => `<figure>\n<img sr
 const quoteBlock = (text: string) => `<blockquote class="pull-quote">\n<p>${text}</p>\n<cite>Fixture writer</cite>\n</blockquote>`;
 const front = (title: string) => `---\nstatus: draft\nauthor: Fixture writer\n---\n\n# ${title}\n\n`;
 
-type VisualFixture = { prompt: string; png?: string; wordFreeCheck?: boolean; original?: string; fixed?: string; protectedSpan?: string; assets?: string[]; imagePermission?: boolean };
+type VisualFixture = { prompt: string; png?: string; wordFreeCheck?: boolean; original?: string; fixed?: string; protectedSpan?: string; assets?: string[]; imagePermission?: boolean; rendered?: boolean };
 
 function asset(name: string, html: string, width: number, height: number): Buffer {
   const path = join(out, "assets", name);
@@ -261,14 +261,20 @@ function writerFixture(id: string, project: string, write: (path: string, conten
   const screen = asset("screen-1.png", screenHtml(), 1000, 560);
   const chart = asset("chart-1.png", chartHtml(), 900, 520);
   const noPermission = "You have no permission to create or edit images: do not create, draw or edit any image, SVG, canvas or diagram.";
-  if (id === "visual-new" || id === "visual-short") {
+  if (id === "visual-new" || id === "visual-short" || id === "visual-rendered") {
     write("asset-1.png", screen);
-    if (id === "visual-new") write("asset-2.png", chart);
-    const long = id === "visual-new";
+    if (id !== "visual-short") write("asset-2.png", chart);
+    const long = id !== "visual-short";
+    if (id === "visual-rendered") write("AGENTS.md", agentsMd(`A preview of article.md is served at ${preview().url}; it re-reads the file on every request.
+The site's themes are light and dark, chosen by prefers-color-scheme.
+For rendered checks, a browser driver is installed outside this project: require playwright-core from ${playwrightDir()}/node_modules/playwright-core and launch chromium with executablePath ${headlessShell()}. Do not install anything.
+`));
     write("notes.md", notesFor(long ? "a founder story about moving our payments ledger to Keelson and why every plan gets a review. Keep this sentence exactly as written: \"" + SPAN + "\"" : "a short post of about 400 words on why nobody approves their own change.", QUOTABLE, long ? 1200 : 300, long ? 1 : 7) + (long ? `\nThe screen the notes describe: Keelson's plan review for payments-ledger, listing what a change will create, update and destroy, with an Approve button.\n` : ""));
+    const renderer = id === "visual-rendered" ? "A renderer is available: AGENTS.md names the preview and the browser driver." : "No renderer is available.";
     return {
+      rendered: id === "visual-rendered",
       prompt: long
-        ? `Use vh-adlc-blog to draft article.md from notes.md, a founder story of about 1,100 words in my voice. Keep this sentence exactly as written: "${SPAN}". Supplied assets: asset-1.png and asset-2.png in this directory. ${noPermission} No renderer is available. Finish without publishing or committing.`
+        ? `Use vh-adlc-blog to draft article.md from notes.md, a founder story of about 1,100 words in my voice. Keep this sentence exactly as written: "${SPAN}". Supplied assets: asset-1.png and asset-2.png in this directory. ${noPermission} ${renderer} Finish without publishing or committing.`
         : `Use vh-adlc-blog to draft article.md from notes.md, a short post of about 400 words in my voice. Supplied asset: asset-1.png in this directory. ${noPermission} No renderer is available. Finish without publishing or committing.`,
       protectedSpan: long ? SPAN : undefined, assets: long ? ["asset-1.png", "asset-2.png"] : ["asset-1.png"],
     };
@@ -363,16 +369,23 @@ function writerChecks(id: string, project: string, thread: string, response: str
     checks.addedImagesHaveAltAndCaption = visual.figures(article).filter(f => !originalFigures.includes(JSON.stringify(f))).every(f => !!f.alt?.trim() && !!f.caption?.trim());
     // AC-08: exactly one valid Rendered checks line, in the unverified form, since no renderer is available.
     const rendered = visual.fixedLine(response, "Rendered checks");
-    checks.renderedChecksUnverified = rendered.ok && visual.parseRenderedChecks(rendered.value).kind === "unverified";
+    if (fixture.rendered) {
+      checks.renderedChecksCoverEveryPair = rendered.ok && visual.coversPairs(visual.parseRenderedChecks(rendered.value), ["desktop light", "desktop dark", "phone light", "phone dark"]);
+      const hash = createHash("sha256").update(article).digest("hex");
+      const final = preview().beacons.filter(b => b.hash === hash);
+      checks.finalPageRenderedEverywhere = ["light", "dark"].every(theme => final.some(b => b.theme === theme && b.width >= 1024) && final.some(b => b.theme === theme && b.width <= 480));
+    } else checks.renderedChecksUnverified = rendered.ok && visual.parseRenderedChecks(rendered.value).kind === "unverified";
   }
   if (fixture.protectedSpan) checks.protectedSpanUnchanged = article.includes(fixture.protectedSpan);
+  if (id === "visual-new" || id === "visual-rendered") {
+    const decoy = sha(join(project, "asset-2.png"));
+    checks.declaredImagesResolve = visual.declaredSources(article).every(src => visual.resolvesToFile(src.replace(/[?#].*$/, ""), articlePath, project) !== null);
+    checks.noDecoyImage = resolved.every(p => p === null || !existsSync(p) || sha(p) !== decoy);
+  }
   if (id === "visual-new") {
     checks.longForm = visual.bodyWords(article) >= 800;
     checks.bodyTreatment = visual.hasBodyTreatment(article);
     checks.handoffNamesEachTreatment = visual.treatments(article).every(t => visual.handoffNamesTreatment(response, visual.treatmentKey(t)));
-    const decoy = sha(join(project, "asset-2.png"));
-    checks.declaredImagesResolve = visual.declaredSources(article).every(src => visual.resolvesToFile(src.replace(/[?#].*$/, ""), articlePath, project) !== null);
-    checks.noDecoyImage = resolved.every(p => p === null || !existsSync(p) || sha(p) !== decoy);
     const { parent, editors, analysis } = editorRun(thread, join(project, "asset-2.png"));
     const roots = new Set(editors.flatMap(e => [...visual.rootTurns(e)]));
     const spawns = parent ? visual.spawnCalls(parent, roots) : [];
@@ -408,6 +421,95 @@ function writerChecks(id: string, project: string, thread: string, response: str
     checks.namesGap = visual.namesGap(response, "The ledger cutover");
   }
   return checks;
+}
+
+// ---- Preview for visual-rendered (AC-08) ----
+
+type Beacon = { hash: string; width: number; theme: string };
+let previewState: { url: string; beacons: Beacon[]; project: string } | null = null;
+const escapeHtml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/** Renders the article: headings and paragraphs, declared markup passed through, code escaped. */
+function renderArticle(markdown: string): string {
+  return visual.blocks(markdown).map(b => {
+    if (b.kind === "frontmatter" || b.kind === "blank") return "";
+    if (b.kind === "heading") { const level = b.lines[0].match(/^#+/)?.[0].length ?? 1; return `<h${level}>${escapeHtml(b.lines[0].replace(/^#+\s*/, ""))}</h${level}>`; }
+    if (b.kind === "code") return `<pre><code>${escapeHtml(b.lines.slice(1, -1).join("\n"))}</code></pre>`;
+    if (b.kind === "prose") return `<p>${escapeHtml(b.lines.join(" "))}</p>`;
+    return b.lines.join("\n");
+  }).join("\n");
+}
+
+/** Starts the loopback preview once: it re-reads article.md per request and logs beacons. */
+function preview(project?: string) {
+  if (previewState) { if (project) previewState.project = project; return previewState; }
+  const state = { url: "", beacons: [] as Beacon[], project: project ?? "" };
+  const server = Bun.serve({
+    hostname: "127.0.0.1", port: 0,
+    fetch(req) {
+      const url = new URL(req.url);
+      if (url.pathname === "/beacon") {
+        state.beacons.push({ hash: url.searchParams.get("hash") ?? "", width: Number(url.searchParams.get("w")), theme: url.searchParams.get("theme") ?? "" });
+        return new Response("ok");
+      }
+      if (url.pathname === "/" || url.pathname === "/article.md" || url.pathname === "/index.html") {
+        const path = join(state.project, "article.md");
+        const bytes = existsSync(path) ? readFileSync(path) : Buffer.from("");
+        const hash = createHash("sha256").update(bytes).digest("hex");
+        const body = bytes.length ? renderArticle(bytes.toString("utf8")) : "";
+        const page = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Preview</title><style>
+body{font-family:Georgia,serif;max-width:760px;margin:0 auto;padding:24px;line-height:1.6;background:#fff;color:#1d1d1f}
+img{max-width:100%}figure{margin:24px 0}figcaption{font-size:14px;color:#555}blockquote.pull-quote{font-size:22px;border-left:4px solid #3b78c4;padding-left:16px}
+pre{overflow:auto;background:#f3f3f3;padding:12px}
+@media (prefers-color-scheme: dark){body{background:#16181d;color:#e6e6e6}figcaption{color:#aaa}pre{background:#24272e}}
+</style></head><body data-article-sha256="${hash}">${body}<script>
+const theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+fetch("/beacon?hash=${hash}&w=" + innerWidth + "&theme=" + theme);
+</script></body></html>`;
+        return new Response(page, { headers: { "content-type": "text/html; charset=utf-8" } });
+      }
+      const file = resolve(state.project, `.${decodeURIComponent(url.pathname)}`);
+      if (visual.inside(file, [state.project]) && existsSync(file) && lstatSync(file).isFile()) return new Response(Bun.file(file));
+      return new Response("not found", { status: 404 });
+    },
+  });
+  state.url = `http://127.0.0.1:${server.port}/`;
+  previewState = state;
+  return state;
+}
+
+let playwrightPath = "";
+/** A runner-owned playwright-core install outside every fixture tree. */
+function playwrightDir(): string {
+  if (playwrightPath) return playwrightPath;
+  const dir = join(out, "playwright");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "blog-trials-driver", private: true }));
+  const p = Bun.spawnSync(["npm", "install", "--no-audit", "--no-fund", "playwright-core@1.65.0"], { cwd: dir, stdout: "pipe", stderr: "pipe" });
+  if (p.exitCode) throw new Error(`precondition: installing playwright-core failed: ${p.stderr.toString()}`);
+  return playwrightPath = dir;
+}
+
+/** Inside codex sandbox with the run's network setting: curl the preview and load it once through the driver. */
+// The preview runs in this process, so these commands are spawned asynchronously to keep it answering.
+async function sandboxed(args: string[], project: string, runEnv: Record<string, string | undefined>) {
+  const p = Bun.spawn(["codex", "sandbox", "-c", 'sandbox_mode="workspace-write"', "-c", "sandbox_workspace_write.network_access=true", "--", ...args], { cwd: project, env: runEnv, stdout: "pipe", stderr: "pipe" });
+  const timer = setTimeout(() => p.kill(), 120_000);
+  const [stdout, exitCode] = await Promise.all([new Response(p.stdout).text(), p.exited]);
+  clearTimeout(timer);
+  return { stdout, exitCode };
+}
+
+async function renderedPreflight(project: string, runEnv: Record<string, string | undefined>): Promise<Record<string, boolean>> {
+  const curl = await sandboxed(["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", preview().url], project, runEnv);
+  const script = join(playwrightDir(), "load.cjs");
+  writeFileSync(script, `const { chromium } = require(${JSON.stringify(join(playwrightDir(), "node_modules/playwright-core"))});
+(async () => { const b = await chromium.launch({ executablePath: process.argv[2] }); const p = await b.newPage(); await p.goto(process.argv[3]); console.log(await p.title()); await b.close(); })().catch(e => { console.error(e); process.exit(1); });
+`);
+  const load = await sandboxed(["node", script, headlessShell(), preview().url], project, runEnv);
+  const pre = { sandboxCurl: curl.exitCode === 0 && curl.stdout.trim() === "200", sandboxDriverLoad: load.exitCode === 0 && load.stdout.includes("Preview") };
+  preview().beacons.length = 0;
+  return pre;
 }
 
 const editorAgent = (path: string) => path.endsWith("agents/vh-adlc-blog-editor.agent.md") && visual.inside(path, [installed.installedPath]);
@@ -485,6 +587,7 @@ for (const id of selected) {
   const write = (path: string, content: string | Buffer) => { mkdirSync(join(project, path, ".."), { recursive: true }); writeFileSync(join(project, path), content); };
   const isVisual = visualCases.includes(id);
   let fixture: VisualFixture | null = null;
+  if (id === "visual-rendered") preview(project);
   if (isVisual) fixture = visualFixture(id, project, write);
   else {
     write("AGENTS.md", `Read https://github.com/vhco-pro/docs/blob/${pin}/AGENTS.md.\nFor articles use the installed vh-adlc-blog operation and voice.md.\nSite articles have frontmatter status: draft and author: Fixture writer, followed by a descriptive H1.\nPreserve an existing status and identifier. Only the exact requested article/social destinations may change.\nDo not commit, push, create issues or publish. No software feature document is required for article prose.\n`);
@@ -524,13 +627,14 @@ for (const id of selected) {
     "ship-internal": "Read the installed vh-adlc-ship skill, Article and promotion handoff section. This is a read-only exercise of that handoff only; do not ship, run feature gates, create records, commit or write files. Assume authorized internal-only CI cleanup shipped successfully. Give the handoff without proposing a public promotion workflow or invoking the writer. Do not draft article or social files.",
   };
   const prompt = fixture?.prompt ?? prompts[id];
-  const pre = fixture ? preflightVisual(project, fixture) : {};
+  const pre = fixture ? { ...preflightVisual(project, fixture), ...(fixture.rendered ? await renderedPreflight(project, runEnv) : {}) } : {};
   const raw = join(out, `${id}.events.jsonl`), errors = join(out, `${id}.stderr`);
   const started = Date.now();
   let exitCode: number | null = null, timedOut = false;
   let parsed: ReturnType<typeof events> = { response: "", commands: [], failed: true, threadId: "" };
   if (Object.values(pre).every(Boolean)) {
-    const args = ["codex", "exec", "--json", "--approve-for-me", id === "fallback" ? "--disable" : "--enable", "multi_agent", "-C", project, prompt];
+    const network = fixture?.rendered ? ["-c", "sandbox_workspace_write.network_access=true"] : [];
+    const args = ["codex", "exec", "--json", "--approve-for-me", ...network, id === "fallback" ? "--disable" : "--enable", "multi_agent", "-C", project, prompt];
     const child = Bun.spawn(args, { cwd: project, env: runEnv, stdout: Bun.file(raw), stderr: Bun.file(errors) });
     const timer = setTimeout(() => { timedOut = true; child.kill(); }, isVisual ? 1_200_000 : 480_000);
     exitCode = await child.exited; clearTimeout(timer);
@@ -583,3 +687,4 @@ for (const id of selected) {
   if (exitCode !== 0 || timedOut) break;
 }
 if (results.some(r => r.status !== "pass")) process.exitCode = 1;
+process.exit();
