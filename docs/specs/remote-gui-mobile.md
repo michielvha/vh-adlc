@@ -220,6 +220,7 @@ None. The owner approved the reported-focus option after the warm-cache overlay 
 | 2026-11-19 | R-14 | spec | `06f91bd54a0adb348f68fd27ac36928326df1894` | unknown | procedural | No findings. Model identity was not attested. |
 | 2026-11-19 | R-14 | spec | `06f91bd54a0adb348f68fd27ac36928326df1894` | n/a | n/a | accepted by owner |
 | 2026-11-21 | R-15 | spec | `cb08d97a3c436b8c4ea9f61f0120e3acb2544781` | unknown | procedural | Covered drift review found one factual nit in test evidence. Model identity was not attested. |
+| 2026-11-24 | R-16 | spec | `ee6ac65605a4c8ca44ef5b8610472f7eb6c05c87` | claude-opus-5-5 | procedural | Covered drift review found three nits and nothing blocking; acceptance kept. |
 
 ### R-1
 
@@ -617,3 +618,26 @@ SEVERITY: nit
 WHERE: Context / Packaged implementation checks (line 57)
 EVIDENCE: The post-R-14 evidence describes a single HTTP 503 from the phase route. `git show d607a7b1 -- tests/remote-gui/mobile.e2e.test.js` adds a phase-route 503 immediately after an existing focus-route 503 before the same field tap. Both one-shot failures remain at `tests/remote-gui/mobile.e2e.test.js:161-163` in the reviewed commit.
 PROPOSAL: Say that the tracked browser test injects one 503 on each route before the same tap. If a separate phase-only reproduction was run, identify that procedure separately.
+
+### R-16
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Packaged implementation checks (line 41 and line 49); Tasks T8 partial evidence (line 195)
+EVIDENCE: I rated this pass under docs e79eaa6a0126f2e8ddca2cf14e3db3067b244cc7, the revision AGENTS.md pins at ee6ac65605a4c8ca44ef5b8610472f7eb6c05c87 and the one `vh-adlc lint` reports with source "repository". The dispatch named 0c983f6 instead, and its short SHA ee6ac6567 does not resolve to HEAD. The convention makes this a full pass because AGENTS.md, a bridge file, changed. On the finding itself: line 41 says "The mobile helper now rechecks the last verified field without rescanning the tree", and line 49 says "Raising the limit to 384 kept the same lookup deadline." Commit 86ae7838, made after R-15, took out both. `git show 86ae7838` deletes the `hint`/`hintEpoch` fields from mobile.go and the hint path, MAX_NODES = 384 and the tree walk from mobile_focus.py. The helper is now a persistent worker that calls `Collection.GetMatches` with a limit of 2. Line 195 describes the new approach, so lines 41 and 49 now contradict it about how the helper works today.
+PROPOSAL: Put lines 41 and 49 in the past tense, or add one line saying the focused-state match query in T8 replaced the hint recheck and the node limit.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context / Owner summary (fourth paragraph, line 29); Context / Packaged implementation checks (lines 45 and 55); Tasks T8 partial evidence (line 196)
+EVIDENCE: For observed proof, the Owner summary names only "The earlier physical fixtures ... Their cooperative pages did not prove this implementation." The detailed sections record three things it leaves out. Line 45 has packaged iPhone Safari passes against `492c2f9e`. Line 55 has the owner's 2026-11-20 approval to ship after using the preview. Line 196 has a physical Safari pass on the repaired package f01a8253... with exactly one `z` edit. The standard asks for the summary to be refreshed when proof changes and to separate planned checks from observed proof.
+PROPOSAL: Give the summary one or two sentences on validation state: packaged iPhone Safari passed the ordinary text case, the owner approved shipping, and Android plus the rest of the physical matrix are still open.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context (opening paragraph, line 17, and Owner summary); Context / Existing mobile viewers (lines 113-115); Scope (line 139)
+EVIDENCE: Line 17 states the goal ("Make the shared browser usable from a phone"). Context never says who is harmed without the feature, how often, how badly, or whether it heals on its own. Scope line 139 excludes "an extra toolbar keyboard button", the simplest alternative with no new machinery. Lines 113-115 show noVNC 1.7.0, Kasm and n.eko already ship that button. No line gives the reason it was rejected. The design adds a private AT-SPI bus, a worker process, a separate phase route and leases, which is a lot for a single-user alpha. The document is past draft, so this is a nit.
+PROPOSAL: Add a short harm statement to Context and one line saying why the owner rejected the stock noVNC keyboard button, so the proportionality of the helper and phase machinery can be checked against it.
