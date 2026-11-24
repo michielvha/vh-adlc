@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "In progress on feat/proportional-review: every task done (T1 to T30); AC-08 re-established after R-29 by T29 and T30. Next: a scoped implementation re-review and the complete gate."
+status: complete
+status_description: "Complete on feat/proportional-review: all 17 criteria met at implementation review R-30. Where both rule sets converge (the Claude route) spec reviews fell from 44 to 10 and body growth from 972 to 343 lines; the Codex question (D-19) and two known losses (D-17, D-18) wait for the follow-up review after merge."
 branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds where both rule sets converge, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised, apart from any the owner defers as a known loss, and every deferred item is judged once the feature is merged."
