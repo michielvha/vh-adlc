@@ -841,6 +841,7 @@ None.
 | 2026-11-24 | R-28 | spec | `87a2ba87` | claude-opus-5-5 | procedural | scoped: no findings |
 | 2026-11-24 | R-28 | spec | `87a2ba87` | n/a | n/a | accepted by owner |
 | 2026-11-24 | R-29 | implementation | `644da0c0` | claude-opus-5-5 | procedural | 16 met, AC-08 not verified; 1 should-fix, 1 nit |
+| 2026-11-24 | R-30 | implementation | `9daf9622` | claude-opus-5-5 | procedural | all 17 criteria met; 2 nit |
 
 ### R-1
 
@@ -2002,3 +2003,87 @@ SEVERITY: nit
 WHERE: Context (Owner summary, validation paragraph)
 EVIDENCE: The Owner summary says "The remaining work is T28 (the totals ... and the kept-clone bound) and the results (T23, T24)", but T23, T24 and T28 are ticked with evidence and status_description says "every task done with evidence (T1 to T28)".
 PROPOSAL: Replace that sentence with the current state: all tasks done, implementation review next.
+
+### R-30
+
+CRITERION: AC-01 The convention at the companion `vhco-pro/docs` revision defines blocking, should-fix and nit by consequence for the profiled product as Design states, with always-blocking defects blocking on every product.
+VERDICT: met
+EVIDENCE: Read conventions/feature-documents.md at e79eaa6a from the binary's cache, Review log section: "This is severity by consequence", the product profile as context with a production default, blocking, should-fix and nit as Design states, and the three always-blocking classes "blocking on every product, whatever its profile". `git diff --stat 644da0c0..9daf9622` touches no convention input, AGENTS.md or knowledge.md. `bun test tests/vh-adlc/proportional-review.test.ts tests/vh-adlc/proportionality.test.ts tests/vh-adlc/loop tests/vh-adlc/review-convergence.test.ts tests/vh-adlc/replay tests/vh-adlc/labels --timeout 60000` in a private clone at 9daf9622: 306 pass, 0 fail across 24 files. Limitations: none.
+
+CRITERION: AC-02 That convention raises an Open Question only where the owner could plausibly choose differently, has the author record every other choice in Design, and offers only options that meet the goal in full.
+VERDICT: met
+EVIDENCE: The convention at e79eaa6a is unchanged since R-29 and the diff since R-29 touches nothing this criterion rests on; the proportional-review.test.ts plausible-choice case passed in the 306-pass run at 9daf9622. Limitations: none.
+
+CRITERION: AC-03 That convention and the reviewer accept a stated limit as an answer to a finding, and the reviewer raises its substance again only for an always-blocking defect, an unmeetable criterion or an unsolved problem.
+VERDICT: met
+EVIDENCE: Reviewer at 9daf9622 keeps the stated-limit and Deferred paragraph, now in the profile-only paragraph with the moved always-blocking check; reviewer text is identical between 57b33e73 and 9daf9622 (`git diff --stat` empty). proportional-review.test.ts reviewer cases passed (306-pass run). Committed transcripts on the current reviewer text: S17.limit.stated (ba0acde, no finding raises names.log concurrency) and S17.limit.nolimit (ba0acde, the gap raised), S17.limit.security (087f403, a blocking finding quoting the delete-endpoint limit), all Result: pass. I checked the ba0acdec matcher change against the kept failing first run of S17.limit.nolimit in /tmp: its F-01 proposes "a per-build log ... how each append stays one whole line"; the old RAISES_LOCK_GAP misses it and the new one matches it, and no other finding matches either way. The widening only makes S17.limit.stated stricter. Limitations: one model sample per scenario; transcripts read, not rerun.
+
+CRITERION: AC-04 The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure paths by it, rates a failure path it is unsure about at should-fix or above, and without a profile judges as for production software with users.
+VERDICT: met
+EVIDENCE: Reviewer at 9daf9622: the profile-only paragraph reads `## Product profile` at the reviewed commit, keeps the production default, and now holds the uncertain-path rule and the always-blocking check; the new proportional-review.test.ts case pins both after the profile gate and failed when I swapped in the 644da0c0 reviewer (0 pass, 1 fail), passing on the head reviewer. Committed transcripts on ba0acde (current reviewer text): S17.profile.single (lock gap at nit), .hosted (blocking), .none (should-fix), .unsure (should-fix), all Result: pass. On the kept failing first run of S17.profile.single, the old LOCK_GAP matched F-04 ("two runs leave both names in order", sequential runs) and the new one does not, while the real lock-gap finding F-06 is a nit under both, so the matcher fix corrects a false match and does not hide reviewer behavior. Limitations: one sample per variant; transcripts read, not rerun.
+
+CRITERION: AC-05 On both routes, a spec review after the first receives the scope from `review-scope`, covers only the document diff and every section that states a rule, ID or term the diff changes, and reports only blocking findings outside that; the pass is full when there is no previous spec review or a covered path or a docs pin bridge file changed.
+VERDICT: met
+EVIDENCE: review-scope.test.ts, lenses.test.ts and cli.test.ts passed in the 306-pass run; the scoped re-review paragraph of the reviewer and the scope handling in cli.ts and review-protocol.md are unchanged since R-29. Host route: committed S17.scoped on ba0acde (current reviewer text), Result: pass; non-blocking findings only on the changed Greeting paragraph or its terms, no finding on the unchanged names.log gap, the unchanged secret exposure blocking. Codex route: committed S17.scoped-command on 3acff49, Result: pass, attested gpt-6.2-sol, scoped since the clean pass. cli.ts:57 builds the command-route prompt from the same reviewer body, and the only change since 3acff49 in agents, scripts, review-protocol.md and the spec skill is T29's move of two sentences into the profile-only paragraph, which applies under the companion convention the scenario pins, so the Codex prompt carries the same instructions. Limitations: the Codex route was not observed on the moved text; one changed paragraph and one sample per route.
+
+CRITERION: AC-06 The spec skill raises judgement calls and judgement findings as Open Questions only under the plausible-choice rule, judged against the product profile and the files loop context lists.
+VERDICT: met
+EVIDENCE: The spec skill is unchanged between 2b59a97 and 9daf9622 (no skill change in `git diff --stat 2639661..9daf9622` other than the new orchestrate skill). Committed S17.questions (scripted reviewer, 2b59a97) Result: pass; proportional-review.test.ts spec skill cases passed at 9daf9622. Limitations: one sample; reviewer scripted.
+
+CRITERION: AC-07 The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules do not settle, with a count of the rest and where the full list is.
+VERDICT: met
+EVIDENCE: Spec skill unchanged since 5e94e59; committed S17.nits Result: pass (summary shows the two widening nits and a count of six; `All unapplied nits` lists all eight). The diff since R-29 does not touch this evidence. Limitations: one sample, scripted reviewer.
+
+CRITERION: AC-08 On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary, ship and resume behave as before this feature: no Deferred section, no cut check and no follow-up review.
+VERDICT: met
+EVIDENCE: `git diff 2639661..9daf9622 -- plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` changes only the profile-only paragraph (rewrapped, plus the always-blocking check and uncertain-path rule); the failure-mode paragraph an older pin reads is byte-identical to the text the 2639661 controls ran on, which resolves R-29's gap. Real-reviewer old-pin controls on the current reviewer text: S17.oldpin.scoped (087f403, the unchanged names.log gap raised as should-fix F-02, whose text "Parallel jobs ... at the same time" matches LOCK_GAP before and after ba0acdec), S17.oldpin.profile (ba0acde, lock gap at should-fix despite the single-person profile), S16.oldpin-reviewer (087f403), all Result: pass. The scripted-reviewer and no-reviewer controls S17.oldpin.questions, .nits, .deferred, .cut and .followup (2639661) rest on the spec skill, ship and resume, which have no change from 2639661 to 9daf9622; the other plugin changes in that range (authority and lifecycle rows for orchestrate, loop-settings wording, plugin-version.ts digest check, the knowledge.md pin, which fixtures override with their own pin) do not affect old-pin behavior. review-convergence.test.ts passed (306-pass run). Limitations: one model sample per control; S16.oldpin-reviewer's own matcher is weak (see F-01), so the reviewer part rests mainly on the two S17 old-pin controls.
+
+CRITERION: AC-09 vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, the convention uses every glossary term except Cut check and Follow-up review, and the convention and both user guides use the terms they contain with the glossary's meanings.
+VERDICT: met
+EVIDENCE: AGENTS.md, knowledge.md, the convention and both guides are unchanged since R-29. `vh-adlc lint docs/specs/proportional-review.md --repo <clone> --plugin-pin e79eaa6a...` at 9daf9622: pass, knowledge revision e79eaa6a from the repository pin. The proportional-review.test.ts AC-09 cases passed in the 306-pass run. R-29's manual read of the guides stands, since the diff does not touch them. Limitations: none.
+
+CRITERION: AC-10 The replay harness runs a case end to end, reuses a stored old-brief set only when its recorded identity matches the current old brief and refuses otherwise, keeps every finished pass when it assembles results from stored runs, continues a stored set of the same identity and starts a fresh one for a different identity, resumes a failed loop from its kept clone, counts a lost loop's recorded lower bound, counts a set stored before T25 only through a matching launch record entry that lists its files, refuses a case whose approval line is missing or whose digests do not match, stops on a case term in the public tree or the companion diff, counts a run only on the route and model under test, records each run's plugin commit, docs revision and model, writes nothing but counts and identities to the results file, records failed executions without counting them as passes, and runs on a public fixture case in the test suite.
+VERDICT: met
+EVIDENCE: tests/vh-adlc/replay is unchanged since R-29 (`git diff --stat 644da0c0..9daf9622 -- tests/vh-adlc/replay` empty); the replay suites passed in the 306-pass run at 9daf9622. Limitations: live.ts is exercised only by the real runs.
+
+CRITERION: AC-11 On the enterprise case, with labels and case approved before the first rule-editing commit, no label fails the retention rule on either route, apart from label L-08 on the Claude host route and label L-10 on the Codex command route, known losses the owner deferred as D-17 and D-18.
+VERDICT: met
+EVIDENCE: results.md, the harness and the private case are untouched since R-29, whose recomputation of the approval line, reassembly, matcher spot checks, bounds and brief diff stands. results.md still names the new brief ef685da1 with docs 0fa68d68, and `git diff --stat 5e94e593 ef685da1` over the five brief paths shows only the reviewer. `run.ts terms --case <enterprise> --tree <clone at 9daf9622> --file docs/specs/proportional-review.md --file tests/vh-adlc/evidence/proportional-review/results.md`: {"terms":"pass"}. Limitations: matcher verdicts spot-checked by R-29, not rechecked here; the shipped reviewer differs from the replayed brief ef685da1 by T29's move (see F-02).
+
+CRITERION: AC-12 On the small application case, with labels and case approved before the first rule-editing commit, no label fails the retention rule on either route.
+VERDICT: met
+EVIDENCE: Evidence unchanged since R-29 (results.md, harness and case untouched); terms check for the small-application case on the tree, this document and results.md at 9daf9622: {"terms":"pass"}. Limitations: host retention rests on one new pass at minimum severity; the replayed brief predates T29's move.
+
+CRITERION: AC-13 Over the case and route pairs where both briefs' loops reach a clean pass, of which there must be at least one, the new-brief loops need at most half the old-brief loops' total spec reviews; the other pairs are reported as measured.
+VERDICT: met
+EVIDENCE: results.md unchanged since R-29: two pairs where both loops reached a clean pass, totals 44 old and 10 new, the two command pairs listed with their bounds. No file this rests on changed in 644da0c0..9daf9622. Limitations: the clean passes were shown by the harness gate at run time, not re-observed; the replayed brief predates T29's move.
+
+CRITERION: AC-14 The convention defines the optional Deferred section outside the normative baseline; the spec skill writes an entry with the exact source text for every stated limit, finding deferred at acceptance, owner-directed cut, author cut and drift re-review deferral; and the reviewer does not raise an entry's substance again unless it leaves an always-blocking defect, makes a criterion unmeetable or leaves the stated problem unsolved.
+VERDICT: met
+EVIDENCE: Convention and spec skill unchanged; committed S17.deferred and S17.cut.both (5e94e59, spec skill unchanged since) Result: pass. Reviewer part on the current reviewer text: committed S17.deferred-review (087f403), Result: pass, no finding on the sampler, and a blocking F-01 against Scope quoting D-02 on the delete endpoint. proportional-review.test.ts Deferred cases passed (306-pass run). Limitations: one sample each.
+
+CRITERION: AC-15 After every owner-directed deferral, the author's reply carries the cut check line, and an item that is an always-blocking defect or that the goal or a criterion names becomes an Open Question instead of a Deferred entry.
+VERDICT: met
+EVIDENCE: Spec skill unchanged since 5e94e59; committed S17.cut.both, S17.cut.control and S17.deferred's acceptance and drift Cut check lines, all Result: pass. The diff since R-29 does not touch this evidence. Limitations: one sample each.
+
+CRITERION: AC-16 Once a feature's PR is merged, the follow-up review gives every pending Deferred entry a verdict of drop, follow-up or gap with one line of reason; shows gaps and follow-ups with issue previews and drops one line each; files only what the owner approves, through the labels helper's `follow-up` mode, never twice for one entry; records every verdict, including declined filings, in a docs PR without touching the default branch; runs only for a merged feature, without a writer handoff; and the ship report and resume flag a merged complete document with pending entries.
+VERDICT: met
+EVIDENCE: tests/vh-adlc/labels including follow-up mode passed in the 306-pass run; ship, resume and the labels helper are unchanged since R-29, so the committed S17.followup.merged and .unmerged transcripts (0fcd4c4) still apply, both Result: pass. Limitations: gh stubbed; one sample.
+
+CRITERION: AC-17 Over the case and route pairs whose old-brief loop reached a clean pass and stored its documents, the new-brief loops' total body growth is at most half the old-brief loops' total, or no larger than it when the old total is zero or negative, with body size recorded per pass and the Deferred section left out of it.
+VERDICT: met
+EVIDENCE: run.test.ts body-size and growth cases passed in the 306-pass run; results.md unchanged since R-29 (growth 972 old, 343 new over 2 pairs). Limitations: the replayed brief predates T29's move.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/scenarios/run.ts (S16.oldpin-reviewer check); Test Plan (AC-08 row); Tasks (T30)
+EVIDENCE: S16.oldpin-reviewer passes when `/names\.log/.test(records) && /(concurren|parallel|lock|interleav|simultaneous)/i.test(records)` over the whole R-1 record block. `/(...|lock|...)/i.test("SEVERITY: blocking")` is true, and the seeded Design sentence contains "parallel CI runs", so any record set that mentions names.log and has one blocking finding, or quotes that sentence, passes without raising the gap. This is the same "lock" in "blocking" false match T26 fixed in LOCK_GAP, which S16 does not use. AC-08's reviewer part also rests on S17.oldpin.scoped and S17.oldpin.profile, which use the whole-word LOCK_GAP per finding, so the verdict does not change. Separately, T30 says "all eight scenarios that use them were rerun", but S17.oldpin.scoped also uses LOCK_GAP and was last run at 087f403; its stored F-02 text matches LOCK_GAP before and after ba0acdec, so it still holds.
+PROPOSAL: Have S16.oldpin-reviewer apply LOCK_GAP to each parsed finding, and name S17.oldpin.scoped in T30's evidence as checked against the new matcher from its stored records.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary, validation paragraph: "The replays on the fixed reviewer are complete"); Tasks (T30 "Untested on this reviewer text")
+EVIDENCE: T30 names only S17.scoped-command as untested on the moved reviewer text. The replays behind AC-11, AC-12, AC-13 and AC-17 ran on brief ef685da1, whose reviewer still holds the two sentences in the failure-mode paragraph (`git diff ef685da1 9daf9622 -- plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` shows T29's move). The Test Plan deliberately fixes the brief at ef685da1, and under the companion convention the move changes no instruction, but a reader of "the fixed reviewer" could take the replays to have run on the reviewer that ships.
+PROPOSAL: Add one line to T30's untested note, or to the Owner summary, saying that the replays' brief ef685da1 predates T29's move and that the move changes no instruction under the companion convention.
