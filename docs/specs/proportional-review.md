@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "In draft on feat/proportional-review for owner-decided revisions (2026-11-24): retention counts both briefs at one severity bar and fails a label the old brief raised in two passes but fewer than two at its minimum when the new brief drops it entirely, and enterprise labels L-08 (Claude route) and L-10 (Codex route) are deferred known losses (D-17, D-18). T1 to T22, T25 and T26 done; T27, T23 and T24 continue after acceptance."
+status: planned
+status_description: "Retention revision accepted at R-25 on 2026-11-24: both briefs at one severity bar, a dropped below-minimum label fails, and enterprise labels L-08 (Claude route) and L-10 (Codex route) deferred as D-17 and D-18. T1 to T22, T25 and T26 done; next: T27, then T23 and T24."
 branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised, apart from any the owner defers as a known loss, and every deferred item is judged once the feature is merged."
@@ -792,6 +792,7 @@ None.
 | 2026-11-24 | R-23 | spec | `c93e20eb` | claude-opus-5-5 | procedural | full pass after implementation commits: no blocking; 2 should-fix, 2 nit |
 | 2026-11-24 | R-24 | spec | `daf697d1` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix |
 | 2026-11-24 | R-25 | spec | `af2d805f` | claude-opus-5-5 | procedural | scoped: no blocking, no should-fix; 1 nit |
+| 2026-11-24 | R-25 | spec | `af2d805f` | n/a | n/a | accepted by owner |
 
 ### R-1
 
