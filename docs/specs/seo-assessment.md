@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted again at R-42 after the drift re-review and the owner's no-browser cut; ready to implement on feat/seo-agent."
+status: in-progress
+status_description: "Re-entered on feat/seo-agent after the R-42 acceptance; implementing the tasks test-first."
 branch: feat/seo-agent
 issue: null
 goal: "An adopter can run a free-first website SEO assessment through vh-adlc that spends paid API units only when allowed and within a limit, and leaves exports usable after access ends."
