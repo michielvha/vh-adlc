@@ -1429,15 +1429,16 @@ function findings(records: string): Finding[] {
 const SEVERITY_RANK: Record<string, number> = { nit: 1, "should-fix": 2, blocking: 3 };
 
 // The lock gap: a finding about concurrent writers to names.log.
-// Whole words only: a bare substring matched "race" in "traces" and "lock" in "blocking".
+// Whole words only: a bare substring matched "race" in "traces" and "lock" in "blocking". "Two runs" alone
+// also names runs one after another, so it counts only with "at once" or "at the same time".
 const LOCK_GAP = (x: Finding) =>
-  /names\.log/.test(x.text) && /\b(lock\w*|unlock\w*|flock|concurren\w*|parallel\w*|simultaneous\w*|interleav\w*|races?|racing|atomic\w*|same time|two runs|torn)\b/i.test(x.text);
+  /names\.log/.test(x.text) && /\b(lock\w*|unlock\w*|flock|concurren\w*|parallel\w*|simultaneous\w*|interleav\w*|races?|racing|atomic\w*|same time|two runs at once|torn)\b/i.test(x.text);
 
 // RAISES_LOCK_GAP is stricter: the finding's proposal asks for something about concurrent writers to
 // names.log. A clause of the proposal that names a limit (quoting the stated limit, or offering to state one)
 // does not count, so a finding that only refers to the stated limit is not one that raises the gap.
 const RAISES_LOCK_GAP = (x: Finding) =>
-  /names\.log/.test(x.text) && /(lock|serializ|atomic|concurren|parallel|interleav|flock|O_APPEND|one writer|single writer|per-job|separate (log|file))/i.test(x.proposal.replace(/[^.;,]*\blimit\b[^.;,]*/gi, ""));
+  /names\.log/.test(x.text) && /(lock|serializ|atomic|concurren|parallel|interleav|flock|O_APPEND|one writer|single writer|per-(job|build|run)|separate (log|file)|whole line)/i.test(x.proposal.replace(/[^.;,]*\blimit\b[^.;,]*/gi, ""));
 
 function strongest(list: Finding[]): string {
   return list.reduce((best, x) => ((SEVERITY_RANK[x.severity] ?? 0) > (SEVERITY_RANK[best] ?? 0) ? x.severity : best), "absent");
