@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised after drift re-review R-38 and the owner's no-browser cut; awaits a scoped review of the R-41 fix and renewed acceptance."
+status: planned
+status_description: "Accepted again at R-42 after the drift re-review and the owner's no-browser cut; ready to implement on feat/seo-agent."
 branch: feat/seo-agent
 issue: null
 goal: "An adopter can run a free-first website SEO assessment through vh-adlc that spends paid API units only when allowed and within a limit, and leaves exports usable after access ends."
@@ -340,6 +340,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-24 | R-40 | spec | `bc793eb` | claude-opus-5-5 | procedural | Scoped review of the owner's no-browser cut: no blocking; 1 should-fix (fixture name scan), 1 nit |
 | 2026-11-24 | R-41 | spec | `c5d7db7` | claude-opus-5-5 | procedural | Scoped review of the R-40 fix: no blocking; 1 should-fix (directories in the execute-bit scan) |
 | 2026-11-24 | R-42 | spec | `f6c767d` | claude-opus-5-5 | procedural | No findings |
+| 2026-11-24 | R-42 | spec | `f6c767d` | n/a | n/a | accepted by owner |
 
 ### R-1
 
