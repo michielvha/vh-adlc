@@ -1,5 +1,28 @@
 # Review protocol
 
+## Routes
+
+Before dispatching, read the reviewer role's route:
+`bun scripts/loop/cli.ts route --repo <dir> --operation "spec review"` for a spec review, or
+`--operation review` for an implementation review. Its JSON names the role, the route and any model.
+
+- A `host` route uses the procedure below. A model the route names counts as a requested model.
+- A `command` route runs `bun scripts/loop/cli.ts review --repo <dir> --document <doc> --commit <X>
+  --kind <spec|implementation> --docs-revision <sha> --binary <path> --plugin-pin <pin>`. It runs the
+  configured CLI with the canonical reviewer instructions and the dispatch identity, as
+  `references/loop-settings.md` describes. First it caches, at the dispatched docs revision, every
+  convention page the reviewer will read: the revision's own `AGENTS.md`, `conventions/feature-documents.md`
+  and each page that
+  `AGENTS.md` at X or at the revision routes to. A page that cannot be cached leaves the review pending
+  before the CLI starts, because a command-route reviewer often cannot fetch one itself. Then: a spec review reads a read-only export of X and is launched
+  from it; an implementation review runs in a private clone of X. Afterwards the clone, and the owning
+  worktree's files, index, HEAD and branch, must be unchanged outside `review_scratch`. A route with `model_attestation: codex-session` takes the served model from
+  Codex's own session log, so a `MODEL: unknown` self-report is accepted only when that attested model
+  matches the request. Its JSON `status` is `ready` or `pending`. On `ready`, store its `records`
+  under `### R-<n>` with a Review Log row naming its `model` and isolation `procedural`, then run
+  `review check` against the same text. On `pending`, store nothing and report a line that starts with
+  `review pending`, followed by its `reason`, with the raw `reply` in the handoff.
+
 ## Independence
 
 A review runs in a separate context. Prefer the registered `vh-adlc-reviewer` agent. If the host does not
@@ -10,7 +33,8 @@ access where the host supports it. Do not copy or translate the reviewer into a 
 If that canonical file cannot be read, leave the review pending rather than invent its instructions.
 
 Both routes receive the repository directory, document path, exact commit, review kind, resolved docs
-revision, verified binary path and plugin pin. Neither route creates or switches a worktree. If the
+revision, verified binary path and plugin pin. A dispatch never tells the reviewer to skip a check or to
+judge from stored results instead of running it. Neither route creates or switches a worktree. If the
 host has neither independent route, or dispatch fails, write a self-contained
 handoff the owner runs elsewhere and leave the review visibly pending: whenever no review is stored, the
 report has a line that starts with the exact words `review pending`, followed by why. Self-review is never labelled
@@ -59,6 +83,25 @@ must match exactly, and `MODEL: unknown` never matches a requested model.
   identity and the available models in the handoff. An unknown identity never satisfies a named-model
   requirement.
 
+## Documentation drift role review
+
+Docs-drift's runtime worker and reviewer use the selected consumer entry's
+bound client and full model identities and their original native captures.
+Follow `references/docs-drift-review.md` for assessment, candidate and fresh
+post-merge closure targets. A separate independent reviewer context inspects
+the entire immutable target. Validate native identity, exact artifact digests,
+source/payload freshness and returned records through the production collectors.
+Unavailable or mismatched identity/capability leaves `review pending`.
+
+This operation's preflight checklist and scoped authority record owner/reviewer
+attestations.
+Its ordinary cache/journal hashes establish retained-byte integrity and linkage.
+Keep those limits visible. A docs-drift role review supplies its selected
+operation evidence. The formal feature implementation review still uses the
+exact committed feature target, canonical criterion records and lifecycle
+gates described in this protocol. A source diagnostic retains its narrower
+scope and cannot complete an untested migration criterion.
+
 ## Isolation
 
 Record isolation as `structural`, `procedural` or `unknown` on every review row. A tool allow-list counts as
@@ -74,7 +117,7 @@ review. Store what it returned after that line, byte for byte, under `### R-<n>`
 it, then confirm with `review check` against the same text. Review IDs continue from the highest one in
 the document.
 
-After a spec review, apply factual findings, turn judgement findings into Open Questions for the owner
-without answering them, and never relabel a blocking pass as clean: only a new independent pass clears it.
+After a spec review, follow the [spec skill's review mode](../skills/vh-adlc-spec/SKILL.md#review-mode)
+to decide whether to revise, ask the owner or stop. Only a new independent pass clears a blocking pass.
 After an implementation review, untick every criterion it did not return as `met` and add an evidence line
 naming the review and its verdict.

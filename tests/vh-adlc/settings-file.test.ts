@@ -49,6 +49,42 @@ describe("an offline reader session", () => {
     expect(readFileSync(counter, "utf8")).toBe("resolve\n");
   });
 
+  test("later readers in one process reuse the verified binary until its bytes change", () => {
+    const probe = checkout(), bin = join(probe, "bin"), counter = join(probe, "resolutions"), sentinel = join(probe, "replacement-ran");
+    mkdirSync(bin);
+    writeFileSync(join(bin, "bash"), '#!/bin/bash\nprintf "resolve\\n" >> "$VH_DOCS_READER_COUNTER"\nexec /bin/bash "$@"\n');
+    chmodSync(join(bin, "bash"), 0o700);
+    // A private cache holding a copy of the verified binary, so the test can replace it.
+    const real = Bun.spawnSync(["bash", resolve(dirname(LOADER), "ensure-vh-adlc.sh"), "--offline"], { stdout: "pipe", stderr: "pipe" });
+    expect(real.exitCode).toBe(0);
+    const version = JSON.parse(readFileSync(resolve(dirname(LOADER), "../vh-adlc.lock.json"), "utf8")).version;
+    const platform = `${process.platform}_${process.arch === "x64" ? "amd64" : process.arch}`;
+    const home = join(probe, "home"), cacheBase = process.platform === "darwin" ? join(home, "Library", "Caches") : join(probe, "cache");
+    const cached = join(cacheBase, "vh-adlc", "bin", version, platform, "vh-adlc");
+    mkdirSync(dirname(cached), { recursive: true });
+    writeFileSync(cached, readFileSync(real.stdout.toString().trim()));
+    chmodSync(cached, 0o755);
+    const source = `import { writeFileSync } from "node:fs";
+      import { createYAMLReader } from ${JSON.stringify(LOADER)};
+      const bytes = new TextEncoder().encode("covers: [src/**]\\n"), fail = reason => { throw Error(reason); };
+      const values = [createYAMLReader(fail, { offline: true })(bytes), createYAMLReader(fail, { offline: true })(bytes)];
+      writeFileSync(${JSON.stringify(cached)}, "#!/bin/sh\\nprintf ran > ${sentinel}\\nprintf '{}'\\n");
+      let refusal = "accepted";
+      try { createYAMLReader(fail, { offline: true })(bytes); } catch (error) { refusal = String(error); }
+      console.log(JSON.stringify({ values, refusal }));`;
+    const run = Bun.spawnSync([process.execPath, "-e", source], {
+      env: { ...process.env, HOME: home, XDG_CACHE_HOME: join(probe, "cache"), PATH: `${bin}${delimiter}/usr/bin${delimiter}/bin`, VH_DOCS_READER_COUNTER: counter },
+      stdout: "pipe", stderr: "pipe", timeout: 30_000,
+    });
+    expect(run.exitCode).toBe(0);
+    const result = JSON.parse(run.stdout.toString());
+    expect(result.values).toEqual([{ covers: ["src/**"] }, { covers: ["src/**"] }]);
+    // The replaced binary sends the third reader back to the installer, which refuses it.
+    expect(result.refusal).toContain("binary unavailable");
+    expect(readFileSync(counter, "utf8")).toBe("resolve\nresolve\n");
+    expect(existsSync(sentinel)).toBe(false);
+  });
+
   test("a refused document exposes no YAML values and does not poison the next read", () => {
     const read = createYAMLReader(fail, { offline: true }), bytes = (text: string) => new TextEncoder().encode(text);
     expect(refusal(() => read(bytes("private-value: 1\nprivate-value: 2\n")))).toContain("duplicate mapping key");
@@ -67,11 +103,12 @@ describe("an offline reader session", () => {
     writeFileSync(join(probe, "plugin", "vh-adlc.lock.json"), JSON.stringify(lock, null, 2) + "\n");
     writeFileSync(join(bin, "curl"), '#!/bin/bash\nprintf "unexpected download\\n" > "$VH_DOCS_NETWORK_SENTINEL"\nexit 90\n');
     chmodSync(join(bin, "curl"), 0o700);
+    // Disable Bun's import cache to isolate verified-binary cache behavior.
     const source = `import { createYAMLReader } from ${JSON.stringify(join(scripts, "settings-file.ts"))};
       try { createYAMLReader(reason => { throw Error(reason); }, { offline: true }); process.exit(3); }
       catch (error) { console.error(String(error)); process.exit(2); }`;
     const run = Bun.spawnSync([process.execPath, "-e", source], {
-      env: { ...process.env, XDG_CACHE_HOME: join(probe, "cache"), PATH: `${bin}${delimiter}/usr/bin${delimiter}/bin`, VH_DOCS_NETWORK_SENTINEL: network },
+      env: { ...process.env, XDG_CACHE_HOME: join(probe, "cache"), BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", PATH: `${bin}${delimiter}/usr/bin${delimiter}/bin`, VH_DOCS_NETWORK_SENTINEL: network },
       stdout: "pipe", stderr: "pipe", timeout: 30_000,
     });
     expect(run.exitCode).toBe(2);
@@ -86,6 +123,13 @@ describe("the file the loader reads", () => {
     const root = checkout({ ".vh-adlc/triage.yaml": yaml });
     expect(load(root)).toEqual({ path: ".vh-adlc/triage.yaml", configured: true,
       value: { schema_version: 1, source_roots: ["src"], label_map: { bug: "defect" } } });
+  });
+
+  test("Stackweaver's triage settings read with every label_map entry intact", () => {
+    const copy = readFileSync(resolve(import.meta.dir, "triage/stackweaver-triage.yaml"), "utf8");
+    const value = load(checkout({ ".vh-adlc/triage.yaml": copy })).value as { label_map: Record<string, string> };
+    expect(value.label_map).toEqual({ bug: "bug", enhancement: "enhancement", documentation: "documentation",
+      refactor: "refactor", security: "security", "major-upgrade": "major-upgrade" });
   });
 
   test("an explicit .yaml path is read in place of the default", () => {

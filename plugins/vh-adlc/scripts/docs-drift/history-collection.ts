@@ -1,0 +1,183 @@
+import { realpathSync } from "node:fs";
+import type { WorkflowRunInput } from "../github-read";
+import { ArtifactChanged } from "./evidence-input";
+import { createAdoptedProducerVerifier } from "./history-producer";
+import { createLocalInvocationReader, type LocalHistoryContext } from "./local-history";
+import { OUTPUT_LIMIT } from "./owned-process";
+import { canonicalDigest, freezeJSON } from "./protocol";
+import { PublicationScopeChanged } from "./publish";
+import { collectWorkerInputs, type WorkerCollectionOptions } from "./publication-worker";
+import { collectActionsHistory, collectLocalHistory, createActionsEnvelope, createProducerSource, type HistoryContext, type OwnedInvocation } from "./report-history";
+import type { HistorySnapshot } from "./report";
+import { loadCommittedSettings } from "./settings";
+import { captureCallerState, matchesCallerState } from "./snapshot";
+import { readNativeContext } from "./transport";
+import { readAdoptionInput } from "./git";
+import { readHistoryWorkflowEvents } from "./history-workflow";
+
+type Options = WorkerCollectionOptions & {
+  hosted_run_attempt?: number;
+  /** Original registry supplied by the local execution controller, never a CLI approval flag. */
+  owned_local_invocations?: OwnedInvocation[];
+};
+type Result = {
+  schema_version: 1; kind: "docs-drift-history-collection"; authority: "none"; source_commit: string;
+  complete: boolean; scope_changed: boolean; mode: "actions" | "local-attestation" | "none" | null; captured_at: string;
+  context: HistoryContext | null; hosted_run_attempt: number | null; worker_input_sha256: string | null; current_default: string | null;
+  history: Array<{ kind: "report"; locator: string; sha256: string; expires_at: string }>; receipts: unknown[];
+  diagnostics: string[]; details_omitted: boolean;
+};
+const originalSnapshots = new WeakMap<object, HistorySnapshot>();
+const hostedEnvelopes = new WeakMap<object, (bytes: Uint8Array) => Buffer>();
+const localContexts = new WeakMap<object, LocalHistoryContext>();
+function readNativeRun(repository: ReturnType<typeof readNativeContext>["repository"], id: number, attempt?: number): WorkflowRunInput {
+  try { return repository.run(id, attempt); }
+  catch (error) {
+    if (error instanceof Error && ["github-read-repository-changed", "github-read-run-changed"].includes(error.message))
+      throw new PublicationScopeChanged("Current native scheduled run identity changed");
+    throw error;
+  }
+}
+function copySnapshot(snapshot: HistorySnapshot): HistorySnapshot {
+  return { captured_at: snapshot.captured_at, diagnostics: [...snapshot.diagnostics],
+    records: snapshot.records.map(record => ({ ...record, bytes: Buffer.from(record.bytes) })) };
+}
+export function historyCollectionOutput(result: Result) {
+  return { schema_version: 1 as const, command: "collect-report-history", source_commit: result.source_commit,
+    outcome: result.complete ? "collected" as const : "incomplete" as const, history_collection: result,
+    diagnostics: result.diagnostics.map(message => ({ code: "report-history", message })) };
+}
+
+/** Collect the starting history view from current native policy, never from a report's provenance claims. */
+export async function collectNativeReportHistory(input: Options): Promise<Result> {
+  const options = { ...input, path: input.path ?? process.env.PATH, source_verification: structuredClone(input.source_verification),
+    decisions: structuredClone(input.decisions), owned_local_invocations: structuredClone(input.owned_local_invocations) };
+  const repo = realpathSync(options.repo), before = canonicalDigest(captureCallerState(repo)), captured_at = new Date().toISOString();
+  const result: Result = { schema_version: 1, kind: "docs-drift-history-collection", authority: "none", source_commit: options.source,
+    complete: false, scope_changed: false, mode: null, captured_at, context: null, hosted_run_attempt: null, worker_input_sha256: null, current_default: null,
+    history: [], receipts: [], diagnostics: [], details_omitted: false };
+  let snapshot: HistorySnapshot | null = null, limit = OUTPUT_LIMIT, envelope: ((bytes: Uint8Array) => Buffer) | null = null;
+  let localContext: LocalHistoryContext | null = null;
+  try {
+    const { settings } = loadCommittedSettings(repo, options.source);
+    limit = Math.min(limit, settings.reports.max_entry_bytes);
+    const hosted = settings.schema_version === 1 ? options.entry === "hosted" : options.hosted_run_attempt !== undefined;
+    result.mode = hosted ? settings.reports.hosted : settings.reports.interactive;
+    if (hosted && (!/^[1-9][0-9]*$/u.test(options.run) || !Number.isSafeInteger(Number(options.run))
+      || !Number.isSafeInteger(options.hosted_run_attempt) || typeof options.hosted_run_attempt !== "number" || options.hosted_run_attempt < 1))
+      throw Error("Current native scheduled run identity required");
+    const current = await collectWorkerInputs(options);
+    result.scope_changed = current.scope_changed;
+    if (!current.complete || !current.inputs || !current.worker_input_sha256 || !current.facts?.store || !current.facts.identity || !current.facts.current_default) {
+      result.diagnostics.push(...current.diagnostics); throw Error("Complete original native inputs required for report history");
+    }
+    const facts = current.facts, identity = facts.identity, store = facts.store, currentDefault = facts.current_default;
+    if (!identity || !store || !currentDefault) throw Error("Current native history source required");
+    result.worker_input_sha256 = current.worker_input_sha256; result.current_default = currentDefault;
+    const context: HistoryContext = { repository: settings.repository, scope_sha256: current.inputs.scope_sha256, run_id: options.run, started_at: captured_at };
+    result.context = context;
+    const freshNative = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path, observation: options.observation });
+    const initial = native();
+    if (initial.default_commit !== currentDefault || canonicalDigest(initial.identity) !== canonicalDigest(identity))
+      throw new PublicationScopeChanged("Native history source or actor changed before collection");
+    const run = hosted ? readNativeRun(initial.repository, Number(options.run)) : null;
+    const caller = run && settings.schema_version === 2 ? readAdoptionInput(repo, options.source, settings.reports.workflow_path) : null;
+    const events = caller ? readHistoryWorkflowEvents(caller.bytes) : ["schedule"];
+    if (run && settings.schema_version === 2 && !caller) throw Error("Committed hosted workflow required");
+    const runBinding = (selected: NonNullable<typeof run>) => {
+      const { updated_at: _updated, ...binding } = selected;
+      return canonicalDigest(binding);
+    };
+    if (run && (run.repository.id !== identity.repository_id || run.head_repository?.id !== identity.repository_id
+      || run.run_attempt !== options.hosted_run_attempt || run.head_sha !== options.source || run.head_branch !== settings.default_branch || !events.includes(run.event) || run.status !== "in_progress"
+      || run.workflow_id !== settings.reports.workflow_id || ![settings.reports.workflow_path, settings.reports.workflow_path + "@" + settings.default_branch,
+        settings.reports.workflow_path + "@refs/heads/" + settings.default_branch, settings.reports.workflow_path + "@" + options.source].includes(run.path)))
+      throw new PublicationScopeChanged("Current native scheduled run identity changed");
+    result.hosted_run_attempt = run?.run_attempt ?? null;
+    if (result.mode === "actions") {
+      const collected = await collectActionsHistory({ repo, artifact_root: options.artifact_root, settings, context, reader: initial.repository,
+        environment: { PATH: options.path, ...(settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com")
+          ? { GH_TOKEN: options.credential } : { GH_ENTERPRISE_TOKEN: options.credential }) },
+        verifyProducer: createAdoptedProducerVerifier({ store, current_default: currentDefault, identity }) });
+      snapshot = collected; result.receipts = collected.receipts;
+      if (!collected.complete) { result.diagnostics.push(...collected.diagnostics); throw Error("Required native report history collection incomplete"); }
+    } else if (result.mode === "local-attestation") {
+      if (!options.cache_directory || !facts.runtime?.component.component_sha256) throw Error("Original retained component required for local history");
+      localContext = { repo, cache_directory: options.cache_directory, settings, identity, store, current_default: currentDefault, entry: options.entry,
+        source: options.source, component_sha256: facts.runtime.component.component_sha256, run_id: options.run,
+        scope_sha256: context.scope_sha256, started_at: captured_at, recheck() {
+          const observed = freshNative();
+          if (observed.default_commit !== currentDefault || canonicalDigest(observed.identity) !== canonicalDigest(identity))
+            throw new PublicationScopeChanged("Native local history source or actor changed");
+        } };
+      const recorded = createLocalInvocationReader(localContext);
+      snapshot = collectLocalHistory({ repo, settings, context, ...(options.owned_local_invocations
+        ? { invocations: options.owned_local_invocations } : { readInvocation: recorded.read }) });
+      snapshot.diagnostics.unshift(...recorded.diagnostics);
+    } else snapshot = { captured_at, records: [], diagnostics: ["Report history is disabled by the adopted interactive policy; no earlier attention can be carried"] };
+    const final = native();
+    if (final.default_commit !== currentDefault || canonicalDigest(final.identity) !== canonicalDigest(identity)
+      || (run && runBinding(readNativeRun(final.repository, run.id, run.run_attempt)) !== runBinding(run)))
+      throw new PublicationScopeChanged("Native history source, actor or invocation changed during collection");
+    if (run) envelope = bytes => {
+      const beforeOutput = canonicalDigest(captureCallerState(repo)), observed = freshNative();
+      if (observed.default_commit !== currentDefault || canonicalDigest(observed.identity) !== canonicalDigest(identity))
+        throw new PublicationScopeChanged("Native history source or actor changed before output");
+      const currentRun = readNativeRun(observed.repository, run.id, run.run_attempt);
+      if (runBinding(currentRun) !== runBinding(run)) throw new PublicationScopeChanged("Current native scheduled run changed before output");
+      const producer = createAdoptedProducerVerifier({ store, current_default: currentDefault, identity })(
+        createProducerSource(observed.repository, run.head_sha), currentRun);
+      if (!producer) throw Error("Adopted native history producer required for hosted output");
+      const report = JSON.parse(Buffer.from(bytes).toString("utf8"));
+      if (report.scope_sha256 !== context.scope_sha256 || report.started_at !== context.started_at)
+        throw new PublicationScopeChanged("Original hosted report context changed");
+      const output = createActionsEnvelope(bytes, { settings, run: currentRun, producer });
+      const after = freshNative();
+      if (after.default_commit !== currentDefault || canonicalDigest(after.identity) !== canonicalDigest(identity)
+        || runBinding(readNativeRun(after.repository, run.id, run.run_attempt)) !== runBinding(run))
+        throw new PublicationScopeChanged("Native history source, actor or invocation changed during output");
+      if (!matchesCallerState(repo, beforeOutput)) throw new PublicationScopeChanged("Caller changed during hosted history output");
+      return output;
+    };
+    result.history = snapshot.records.map(({ bytes: _bytes, ...record }) => record);
+    result.diagnostics.push(...snapshot.diagnostics); result.complete = true;
+  } catch (error) {
+    result.scope_changed ||= error instanceof ArtifactChanged || error instanceof PublicationScopeChanged;
+    result.diagnostics.push(error instanceof Error ? error.message : "Original native report history unavailable");
+  }
+  if (!matchesCallerState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during report history collection"); }
+  result.diagnostics = [...new Set(result.diagnostics)];
+  if (Buffer.byteLength(JSON.stringify(historyCollectionOutput(result)) + "\n") > limit) {
+    result.complete = false; result.details_omitted = true; result.history = []; result.receipts = [];
+    result.diagnostics = ["Native history details exceed the retained entry bound; inspect the original history artifacts"];
+    if (Buffer.byteLength(JSON.stringify(historyCollectionOutput(result)) + "\n") > limit) throw Error("Configured output bound cannot hold an incomplete native history result");
+  }
+  const completed = freezeJSON(result);
+  if (completed.complete && snapshot) originalSnapshots.set(completed, copySnapshot(snapshot));
+  if (completed.complete && envelope) hostedEnvelopes.set(completed, envelope);
+  if (completed.complete && localContext) localContexts.set(completed, localContext);
+  return completed;
+}
+
+/** Same-controller handoff only. Serialized metadata cannot mint eligible history. */
+export function readCollectedReportHistory(result: Result): HistorySnapshot {
+  const snapshot = originalSnapshots.get(result);
+  if (!snapshot || !result.complete) throw Error("Original native history collection required");
+  return copySnapshot(snapshot);
+}
+
+/** Prepare upload input through an original hosted collection and freshly observed native bindings. */
+export function createCollectedActionsEnvelope(result: Result, bytes: Uint8Array): Buffer {
+  const envelope = hostedEnvelopes.get(result);
+  if (!result.complete || !envelope) throw Error("Original hosted history collection required");
+  return envelope(bytes);
+}
+
+/** Keep credentials inside the original native recheck closure. Serialized history cannot reproduce it. */
+export function readCollectedLocalHistoryContext(result: Result): LocalHistoryContext {
+  const context = localContexts.get(result);
+  if (!result.complete || !context) throw Error("Original local history collection required");
+  return Object.freeze({ ...context, settings: freezeJSON(structuredClone(context.settings)),
+    identity: freezeJSON({ ...context.identity }), store: freezeJSON({ ...context.store }) });
+}

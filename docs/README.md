@@ -11,6 +11,7 @@
 
 - [Workflows](user-guides/workflows.md): describe a task, choose an operation, or resume work.
 - [Managing plugins](user-guides/managing-plugins.md): update, reinstall, and uninstall.
+- [Remote Control host](user-guides/remote-control-host.md): keep `claude remote-control` running as a service on macOS or Linux.
 
 ## Reference
 

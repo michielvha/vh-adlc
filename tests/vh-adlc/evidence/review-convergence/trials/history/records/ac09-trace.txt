@@ -1,0 +1,28 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design; Context (Owner summary); Acceptance Criteria (AC-01); Test Plan (AC-01 row)
+EVIDENCE: docs/specs/feature.md:30 says "probe.sh passes `--max-time 10` to curl", but docs/specs/feature.md:18 says "Stop waiting for a slow health check after 5 seconds", AC-01 at docs/specs/feature.md:34 requires exit 2 for "longer than 5 seconds", and the Test Plan row at docs/specs/feature.md:40 expects exit 2 "after about 5 seconds" from a stub that sleeps 7 seconds. If an implementer follows the Design, curl waits up to 10 seconds, the 7 second stub answers in time, and probe.sh does not exit 2, so AC-01 fails and the proof fails the implementation the Design describes. This comes from the change the previous revision made: `git diff 6eb608f ab71369 -- docs/specs/feature.md` shows that applying R-1 F-01 changed only the Design line from `--max-time 5` to `--max-time 10` and left the Owner summary, AC-01 and the Test Plan row at 5 seconds. `vh-adlc fresh` reports R-1 stale with reason baseline-changed.
+PROPOSAL: Pick one timeout value and state it in the Owner summary, Design, AC-01 and the Test Plan row. Then size the stub's sleep so it is longer than that timeout and give the expected exit time.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Design; Review Log (R-1 F-01)
+EVIDENCE: Choosing 5 or 10 seconds trades fast failure against tolerating a slow warm-up. That is a trade-off the document settles, so it belongs in Open Questions, which says "None." (docs/specs/feature.md:48). The 10 second value rests only on R-1 F-01's claim that the endpoint has a "documented warm-up" (docs/specs/feature.md:62). Neither the tree nor a Sources section supports that claim: the repository contains only AGENTS.md, docs/specs/feature.md and probe.sh. The previous revision applied this value to the Design without asking the owner.
+PROPOSAL: Add a Q1 asking the owner to choose the timeout, with a recommendation and an options table. Cite the warm-up documentation if it exists, or drop that rationale.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria (AC-01)
+EVIDENCE: docs/specs/feature.md:30 says probe.sh "exits 2 when the check times out" but does not say what happens on any other failure. probe.sh:2 is the script's last command and it has no exit handling, so the script returns curl's own status: 28 on a timeout, 22 on an HTTP error under -f, and 7 on a refused connection. One implementer would map only status 28 to 2. Another would map every failure to 2. Both meet AC-01 but behave differently for callers.
+PROPOSAL: State the exit status for a timeout, for other failures and for success. Add a criterion and a Test Plan row for each one that is kept.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan (AC-01 row); Acceptance Criteria; Design
+EVIDENCE: The only proof (docs/specs/feature.md:40) checks that a slow stub produces exit 2 "after about 5 seconds". A script that runs `sleep 5; exit 2` unconditionally passes it, and so does one that breaks the healthy path, because no criterion or row checks that a fast, healthy endpoint still exits 0. "About 5 seconds" has no tolerance either, so the pass condition is not defined. The proof also cannot be run as the document stands: probe.sh:2 hard-codes http://localhost/health on port 80, and neither the Design nor the proof says how the stub is put in its place, whether by binding privileged port 80 or by making the URL configurable.
+PROPOSAL: Add a criterion and row showing that a healthy endpoint answering in under a second makes probe.sh exit 0. Give the timing check an explicit bound. State in the Design how the test points probe.sh at the stub.

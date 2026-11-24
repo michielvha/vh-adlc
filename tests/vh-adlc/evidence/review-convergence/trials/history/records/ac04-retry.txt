@@ -1,0 +1,63 @@
+MODEL: claude-opus-5-5
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Scope; Acceptance Criteria (AC-01); Test Plan (AC-01 row); Open Questions
+EVIDENCE: Design (docs/specs/feature.md:30) says only "If the POST fails, notify.sh exits 1 and the build is marked unreported." It never says whether notify.sh retries, how often, with what backoff or timeout, or whether a later rerun of notify.sh for the same build is allowed. It also leaves partial failure open: a timeout after the server already accepted the POST gives exit 1 and "unreported" while the server holds the result, and any retry or rerun then sends a second POST for the same build, which breaks "one POST per build" (Scope, docs/specs/feature.md:26) and "one POST with its build ID" (AC-01, docs/specs/feature.md:34). Nothing says whether the status API deduplicates on build ID. One implementer will build no retry and another will build retries, and only one of them meets AC-01 under a transient failure. Under the no-retry reading, any transient network error loses that build's report for good, which works against the Owner summary's "Report each build result" (docs/specs/feature.md:18).
+PROPOSAL: Define the retry policy (count, timeout, backoff) and the replay rule: either the POST is idempotent on build ID and the API ignores duplicates, or retries and reruns are forbidden. Add a criterion and a Test Plan row for a stub that fails or times out once, then check the resulting POST count and exit status. Because the document settles a trade-off here, raise the choice as an Open Question.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: blocking
+WHERE: Frontmatter goal; title line (docs/specs/feature.md:12); Context, Owner summary; Scope; Design; Acceptance Criteria (AC-01); Test Plan (AC-01 row)
+EVIDENCE: The goal is "notify.sh posts a build result to a remote status API" (docs/specs/feature.md:5, repeated at :12), and the Owner summary says "Report each build result to the status service" (:18). Design says the POST carries only "the build ID" (:30), with no result field. AC-01 covers only "A successful build" (:34), and the Test Plan checks only that a POST arrives with the build ID (:40). With every box ticked, a failed build may send nothing, and no POST says whether the build passed or failed. So the stated problem, reporting the build result, is not solved.
+PROPOSAL: Put the result (for example pass or fail) in the request body in Design, and add criteria and Test Plan rows covering both a successful and a failed build, each checking for exactly one POST with the build ID and the correct result.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Scope; Context, Background
+EVIDENCE: Design (docs/specs/feature.md:30) names no endpoint URL or where it is configured, no authentication, no body format, no HTTP success condition (which status codes count as success) and no request timeout. Background (:22) says only "a remote HTTPS service". At f1ed76c, notify.sh is two lines, "#!/bin/sh" and "true" (notify.sh:1-2), so the tree defines none of these either. Two careful implementers would send different requests and treat different responses as failure, and the AC-01 stub could pass either one.
+PROPOSAL: State the endpoint and how it is configured, the authentication, the body fields and encoding, the response codes that count as success, and the timeout. Make the Test Plan stub check the method, path and body against that definition.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: Design (docs/specs/feature.md:30) says "Builds never overlap, a lock file in /run serializes notify.sh runs, so concurrent requests cannot happen." No citation is given for "Builds never overlap". notify.sh at f1ed76c is "#!/bin/sh" then "true" (notify.sh:1-2), so it takes no lock, and nothing else in the tree (AGENTS.md, notify.sh, the document) creates one. If the lock is meant to be built, Scope, the criteria, the Test Plan and Tasks never mention it. The two halves also conflict: if builds never overlap, a lock is not needed, and if a lock is needed, overlap is possible. The lock's partial failure path is undefined too: a notify.sh run that crashes or is killed leaves the lock file behind, and the document does not say whether the next run waits forever, fails, or removes a stale lock. It also does not say what happens when the lock is busy.
+PROPOSAL: Either cite evidence that builds cannot overlap and drop the lock, or make the lock part of scope with its path, its wait or fail behaviour, and stale lock recovery, plus a criterion and a Test Plan row that run two notify.sh invocations at once and one that starts with a leftover lock file.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design
+EVIDENCE: Design (docs/specs/feature.md:30) says "The request body keeps the previous version's fields, so upgrade and rollback need no migration." The previous version at f1ed76c is notify.sh "#!/bin/sh" then "true" (notify.sh:1-2), which sends no request, so there are no previous fields to keep. The document never lists the fields, so the upgrade and rollback claim has nothing to rest on. If a status API consumer already expects a body, the document does not say which.
+PROPOSAL: Cite the existing request format if one exists elsewhere, or state that this is the first version, list the body fields, and say what a rollback to the current no-op notify.sh means for builds already reported.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria; Test Plan
+EVIDENCE: Design (docs/specs/feature.md:30) defines behaviour that no criterion or proof covers: exit status 1 on a failed POST, the build being "marked unreported", and the lock. It also leaves open who marks the build unreported (notify.sh, the build system or the status API) and where that mark is stored. AC-01 (:34) and its single Test Plan row (:40) cover only the successful path. A careless implementation that exits 0 on failure, or never records "unreported", passes every current proof.
+PROPOSAL: Say which component records "unreported" and where, and add criteria and Test Plan rows for the failure path (stub returns an error: notify.sh exits 1 and the build shows as unreported).
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Design
+EVIDENCE: Open Questions says "None." (docs/specs/feature.md:48), but Design (:30) settles at least two trade-offs: failing without retry and leaving the build unreported, and serializing runs with a lock file in /run instead of handling concurrent posts. conventions/feature-documents.md (Open questions) says "Every trade-off the document settles is an open question" and that "None." means every question has been answered. No owner answer is recorded, so the binary reads no_open_questions as holding when the owner has decided nothing.
+PROPOSAL: Raise the retry policy and the concurrency approach as Open Questions in the standard format, with a recommendation and options, and fold them in only after the owner answers.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background
+EVIDENCE: Background (docs/specs/feature.md:22) cites notify.sh:1 for "notify.sh runs once per build; the status API is a remote HTTPS service". notify.sh:1 is "#!/bin/sh" and line 2 is "true". Neither line shows how often notify.sh runs or anything about a status API.
+PROPOSAL: Cite the build configuration that invokes notify.sh and a source for the status API, or mark these as design intent instead of citing notify.sh.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Owner summary
+EVIDENCE: The Owner summary is one sentence, "Report each build result to the status service." (docs/specs/feature.md:18). It leaves out decisions the detailed sections make and the owner would accept with them: scope is limited to one POST and AC-01 covers only successful builds, a failed POST leaves the build unreported with no retry, runs are serialized by a lock file, and nothing has been validated yet (no proof was observed). conventions/feature-documents.md (Owner summary in Context) asks for scope, approach, defaults, trade-offs and validation state, with planned checks kept separate from observed proof.
+PROPOSAL: Expand the summary to a few short paragraphs covering scope, the failure and retry behaviour, the concurrency approach and the fact that no proof has been observed, consistent with the revised Design.

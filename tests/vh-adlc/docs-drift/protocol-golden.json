@@ -1,0 +1,408 @@
+{
+  "note": "Synthetic fixtures. Expected canonical bytes and hashes generated independently with Python hashlib and json.",
+  "source_commit": "1111111111111111111111111111111111111111",
+  "settings": {
+    "schema_version": 1,
+    "protocol_version": 1,
+    "repository": "fixture/docs",
+    "hostname": "github.com",
+    "default_branch": "main",
+    "roots": [
+      "docs"
+    ],
+    "exclusions": [
+      "docs/generated"
+    ],
+    "suffixes": [
+      ".md"
+    ],
+    "required_detectors": [
+      "links",
+      "claims"
+    ],
+    "detector_inputs": {
+      "links": {
+        "all_inventory": true
+      },
+      "claims": {
+        "roots": [
+          "docs"
+        ],
+        "exclusions": [
+          "docs/\ud83d\ude80.md"
+        ],
+        "suffixes": [
+          ".md"
+        ]
+      }
+    },
+    "detector_options": {
+      "links": {
+        "2": "two",
+        "10": "ten",
+        "check_history": true,
+        "Z": 1,
+        "\u00e9": 2,
+        "\ud83d\ude80": 3,
+        "\ue000": 4
+      },
+      "claims": {
+        "max_age": 90,
+        "contexts": [
+          "source"
+        ]
+      }
+    },
+    "feedback_files": [
+      "docs/suppressions.yaml"
+    ],
+    "scanner": {
+      "argv": [
+        "node",
+        "scripts/scan.js"
+      ],
+      "script": "scripts/scan.js",
+      "adapter": null,
+      "timeout_seconds": 120
+    },
+    "project_procedure": "docs/docs-procedure.md",
+    "verification_commands": [
+      [
+        "bun",
+        "test",
+        "tests/docs"
+      ]
+    ],
+    "generation_commands": [],
+    "read_set": {
+      "source_roots": null,
+      "reference_roots": null
+    },
+    "component_pin": null,
+    "pr_discovery": {
+      "repository": "fixture/docs",
+      "base": "main",
+      "authors": [
+        "fixture-bot"
+      ],
+      "branch_prefixes": [
+        "docs-drift/"
+      ]
+    },
+    "publication": {
+      "repository": "fixture/docs",
+      "base": "main",
+      "actor": "fixture-bot",
+      "branch_prefix": "docs-drift/",
+      "lease_ref": "refs/heads/docs-drift-lease",
+      "receipt_ref_prefix": "refs/heads/docs-drift-receipts/",
+      "resolution_root": ".vh-adlc/docs-drift/resolutions",
+      "closure": "after-merge",
+      "merge_methods": [
+        "merge",
+        "squash",
+        "rebase"
+      ],
+      "mode": "staged",
+      "adoption_record": ".vh-adlc/docs-drift-adoptions/fixture.yaml",
+      "pr_state": {
+        "advisory": "ready",
+        "resolve": "ready"
+      }
+    },
+    "reports": {
+      "hosted": "actions",
+      "interactive": "none",
+      "workflow_path": ".github/workflows/docs-drift.yml",
+      "workflow_id": null,
+      "artifact_name_template": "docs-drift-{run_id}-{run_attempt}",
+      "max_age_seconds": 604800,
+      "max_runs": 30,
+      "max_archive_bytes": 1048576,
+      "max_entry_bytes": 524288,
+      "local_history_roots": [],
+      "schema_version": 1,
+      "attention_version": 1,
+      "history_reader_argv": [
+        "bun",
+        "report-history.ts"
+      ]
+    },
+    "runtime_loader": {
+      "launcher": "scripts/docs-drift-entry.ts",
+      "provider": "copilot",
+      "argv": [
+        "--plugin-dir",
+        "{plugin_dir}"
+      ],
+      "plugin_directory_template": "{plugin_dir}",
+      "profile_root_template": "{profile_root}",
+      "automatic_updates": false,
+      "ambient_discovery": false,
+      "credential_references": [
+        "COPILOT_GITHUB_TOKEN"
+      ]
+    },
+    "clients": {
+      "copilot-linux": {
+        "provider": "copilot",
+        "version": "fixture-1.0.0",
+        "platform": "linux-x64",
+        "distribution_url": "https://example.invalid/fixture-client.tgz",
+        "distribution_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "execution": {
+      "worker_workflow": ".github/workflows/docs-drift-worker.yml",
+      "scheduled_workflow": ".github/workflows/docs-drift.yml",
+      "claude_command": ".claude/commands/docs-drift.md",
+      "runner": "ubuntu-latest",
+      "permissions": {
+        "contents": "write",
+        "pull-requests": "write",
+        "actions": "read"
+      },
+      "secret_mappings": {
+        "COPILOT_GITHUB_TOKEN": "COPILOT_GITHUB_TOKEN"
+      },
+      "entries": {
+        "hosted": {
+          "worker": {
+            "client": "copilot-linux",
+            "model": "fixture-model",
+            "argv": [
+              "--fixture-role"
+            ]
+          },
+          "reviewer": {
+            "client": "copilot-linux",
+            "model": "fixture-model",
+            "argv": [
+              "--fixture-role"
+            ]
+          },
+          "publisher": {
+            "argv": [
+              "bun",
+              "publisher.ts"
+            ]
+          }
+        },
+        "copilot": {
+          "worker": {
+            "client": "copilot-linux",
+            "model": "fixture-model",
+            "argv": [
+              "--fixture-role"
+            ]
+          },
+          "reviewer": {
+            "client": "copilot-linux",
+            "model": "fixture-model",
+            "argv": [
+              "--fixture-role"
+            ]
+          },
+          "publisher": {
+            "argv": [
+              "bun",
+              "publisher.ts"
+            ]
+          }
+        },
+        "claude": {
+          "worker": {
+            "client": "copilot-linux",
+            "model": "fixture-model",
+            "argv": [
+              "--fixture-role"
+            ]
+          },
+          "reviewer": {
+            "client": "copilot-linux",
+            "model": "fixture-model",
+            "argv": [
+              "--fixture-role"
+            ]
+          },
+          "publisher": {
+            "argv": [
+              "bun",
+              "publisher.ts"
+            ]
+          }
+        }
+      }
+    },
+    "legacy_proposals": {
+      "authors": [
+        "legacy-bot"
+      ],
+      "branch_prefixes": [
+        "docs-audit/"
+      ],
+      "ids": []
+    },
+    "knowledge_pages": []
+  },
+  "settings_base64": "IyBTeW50aGV0aWMgY29tbWl0dGVkIHNldHRpbmdzDQp7DQogICJzY2hlbWFfdmVyc2lvbiI6IDEsDQogICJwcm90b2NvbF92ZXJzaW9uIjogMSwNCiAgInJlcG9zaXRvcnkiOiAiZml4dHVyZS9kb2NzIiwNCiAgImhvc3RuYW1lIjogImdpdGh1Yi5jb20iLA0KICAiZGVmYXVsdF9icmFuY2giOiAibWFpbiIsDQogICJyb290cyI6IFsNCiAgICAiZG9jcyINCiAgXSwNCiAgImV4Y2x1c2lvbnMiOiBbDQogICAgImRvY3MvZ2VuZXJhdGVkIg0KICBdLA0KICAic3VmZml4ZXMiOiBbDQogICAgIi5tZCINCiAgXSwNCiAgInJlcXVpcmVkX2RldGVjdG9ycyI6IFsNCiAgICAibGlua3MiLA0KICAgICJjbGFpbXMiDQogIF0sDQogICJkZXRlY3Rvcl9pbnB1dHMiOiB7DQogICAgImxpbmtzIjogew0KICAgICAgImFsbF9pbnZlbnRvcnkiOiB0cnVlDQogICAgfSwNCiAgICAiY2xhaW1zIjogew0KICAgICAgInJvb3RzIjogWw0KICAgICAgICAiZG9jcyINCiAgICAgIF0sDQogICAgICAiZXhjbHVzaW9ucyI6IFsNCiAgICAgICAgImRvY3Mv8J+agC5tZCINCiAgICAgIF0sDQogICAgICAic3VmZml4ZXMiOiBbDQogICAgICAgICIubWQiDQogICAgICBdDQogICAgfQ0KICB9LA0KICAiZGV0ZWN0b3Jfb3B0aW9ucyI6IHsNCiAgICAibGlua3MiOiB7DQogICAgICAiMiI6ICJ0d28iLA0KICAgICAgIjEwIjogInRlbiIsDQogICAgICAiY2hlY2tfaGlzdG9yeSI6IHRydWUsDQogICAgICAiWiI6IDEsDQogICAgICAiw6kiOiAyLA0KICAgICAgIvCfmoAiOiAzLA0KICAgICAgIu6AgCI6IDQNCiAgICB9LA0KICAgICJjbGFpbXMiOiB7DQogICAgICAibWF4X2FnZSI6IDkwLA0KICAgICAgImNvbnRleHRzIjogWw0KICAgICAgICAic291cmNlIg0KICAgICAgXQ0KICAgIH0NCiAgfSwNCiAgImZlZWRiYWNrX2ZpbGVzIjogWw0KICAgICJkb2NzL3N1cHByZXNzaW9ucy55YW1sIg0KICBdLA0KICAic2Nhbm5lciI6IHsNCiAgICAiYXJndiI6IFsNCiAgICAgICJub2RlIiwNCiAgICAgICJzY3JpcHRzL3NjYW4uanMiDQogICAgXSwNCiAgICAic2NyaXB0IjogInNjcmlwdHMvc2Nhbi5qcyIsDQogICAgImFkYXB0ZXIiOiBudWxsLA0KICAgICJ0aW1lb3V0X3NlY29uZHMiOiAxMjANCiAgfSwNCiAgInByb2plY3RfcHJvY2VkdXJlIjogImRvY3MvZG9jcy1wcm9jZWR1cmUubWQiLA0KICAidmVyaWZpY2F0aW9uX2NvbW1hbmRzIjogWw0KICAgIFsNCiAgICAgICJidW4iLA0KICAgICAgInRlc3QiLA0KICAgICAgInRlc3RzL2RvY3MiDQogICAgXQ0KICBdLA0KICAiZ2VuZXJhdGlvbl9jb21tYW5kcyI6IFtdLA0KICAicmVhZF9zZXQiOiB7DQogICAgInNvdXJjZV9yb290cyI6IG51bGwsDQogICAgInJlZmVyZW5jZV9yb290cyI6IG51bGwNCiAgfSwNCiAgImNvbXBvbmVudF9waW4iOiBudWxsLA0KICAicHJfZGlzY292ZXJ5Ijogew0KICAgICJyZXBvc2l0b3J5IjogImZpeHR1cmUvZG9jcyIsDQogICAgImJhc2UiOiAibWFpbiIsDQogICAgImF1dGhvcnMiOiBbDQogICAgICAiZml4dHVyZS1ib3QiDQogICAgXSwNCiAgICAiYnJhbmNoX3ByZWZpeGVzIjogWw0KICAgICAgImRvY3MtZHJpZnQvIg0KICAgIF0NCiAgfSwNCiAgInB1YmxpY2F0aW9uIjogew0KICAgICJyZXBvc2l0b3J5IjogImZpeHR1cmUvZG9jcyIsDQogICAgImJhc2UiOiAibWFpbiIsDQogICAgImFjdG9yIjogImZpeHR1cmUtYm90IiwNCiAgICAiYnJhbmNoX3ByZWZpeCI6ICJkb2NzLWRyaWZ0LyIsDQogICAgImxlYXNlX3JlZiI6ICJyZWZzL2hlYWRzL2RvY3MtZHJpZnQtbGVhc2UiLA0KICAgICJyZWNlaXB0X3JlZl9wcmVmaXgiOiAicmVmcy9oZWFkcy9kb2NzLWRyaWZ0LXJlY2VpcHRzLyIsDQogICAgInJlc29sdXRpb25fcm9vdCI6ICIudmgtYWRsYy9kb2NzLWRyaWZ0L3Jlc29sdXRpb25zIiwNCiAgICAiY2xvc3VyZSI6ICJhZnRlci1tZXJnZSIsDQogICAgIm1lcmdlX21ldGhvZHMiOiBbDQogICAgICAibWVyZ2UiLA0KICAgICAgInNxdWFzaCIsDQogICAgICAicmViYXNlIg0KICAgIF0sDQogICAgIm1vZGUiOiAic3RhZ2VkIiwNCiAgICAiYWRvcHRpb25fcmVjb3JkIjogIi52aC1hZGxjL2RvY3MtZHJpZnQtYWRvcHRpb25zL2ZpeHR1cmUueWFtbCIsDQogICAgInByX3N0YXRlIjogew0KICAgICAgImFkdmlzb3J5IjogInJlYWR5IiwNCiAgICAgICJyZXNvbHZlIjogInJlYWR5Ig0KICAgIH0NCiAgfSwNCiAgInJlcG9ydHMiOiB7DQogICAgImhvc3RlZCI6ICJhY3Rpb25zIiwNCiAgICAiaW50ZXJhY3RpdmUiOiAibm9uZSIsDQogICAgIndvcmtmbG93X3BhdGgiOiAiLmdpdGh1Yi93b3JrZmxvd3MvZG9jcy1kcmlmdC55bWwiLA0KICAgICJ3b3JrZmxvd19pZCI6IG51bGwsDQogICAgImFydGlmYWN0X25hbWVfdGVtcGxhdGUiOiAiZG9jcy1kcmlmdC17cnVuX2lkfS17cnVuX2F0dGVtcHR9IiwNCiAgICAibWF4X2FnZV9zZWNvbmRzIjogNjA0ODAwLA0KICAgICJtYXhfcnVucyI6IDMwLA0KICAgICJtYXhfYXJjaGl2ZV9ieXRlcyI6IDEwNDg1NzYsDQogICAgIm1heF9lbnRyeV9ieXRlcyI6IDUyNDI4OCwNCiAgICAibG9jYWxfaGlzdG9yeV9yb290cyI6IFtdLA0KICAgICJzY2hlbWFfdmVyc2lvbiI6IDEsDQogICAgImF0dGVudGlvbl92ZXJzaW9uIjogMSwNCiAgICAiaGlzdG9yeV9yZWFkZXJfYXJndiI6IFsNCiAgICAgICJidW4iLA0KICAgICAgInJlcG9ydC1oaXN0b3J5LnRzIg0KICAgIF0NCiAgfSwNCiAgInJ1bnRpbWVfbG9hZGVyIjogew0KICAgICJsYXVuY2hlciI6ICJzY3JpcHRzL2RvY3MtZHJpZnQtZW50cnkudHMiLA0KICAgICJwcm92aWRlciI6ICJjb3BpbG90IiwNCiAgICAiYXJndiI6IFsNCiAgICAgICItLXBsdWdpbi1kaXIiLA0KICAgICAgIntwbHVnaW5fZGlyfSINCiAgICBdLA0KICAgICJwbHVnaW5fZGlyZWN0b3J5X3RlbXBsYXRlIjogIntwbHVnaW5fZGlyfSIsDQogICAgInByb2ZpbGVfcm9vdF90ZW1wbGF0ZSI6ICJ7cHJvZmlsZV9yb290fSIsDQogICAgImF1dG9tYXRpY191cGRhdGVzIjogZmFsc2UsDQogICAgImFtYmllbnRfZGlzY292ZXJ5IjogZmFsc2UsDQogICAgImNyZWRlbnRpYWxfcmVmZXJlbmNlcyI6IFsNCiAgICAgICJDT1BJTE9UX0dJVEhVQl9UT0tFTiINCiAgICBdDQogIH0sDQogICJjbGllbnRzIjogew0KICAgICJjb3BpbG90LWxpbnV4Ijogew0KICAgICAgInByb3ZpZGVyIjogImNvcGlsb3QiLA0KICAgICAgInZlcnNpb24iOiAiZml4dHVyZS0xLjAuMCIsDQogICAgICAicGxhdGZvcm0iOiAibGludXgteDY0IiwNCiAgICAgICJkaXN0cmlidXRpb25fdXJsIjogImh0dHBzOi8vZXhhbXBsZS5pbnZhbGlkL2ZpeHR1cmUtY2xpZW50LnRneiIsDQogICAgICAiZGlzdHJpYnV0aW9uX3NoYTI1NiI6ICJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIg0KICAgIH0NCiAgfSwNCiAgImV4ZWN1dGlvbiI6IHsNCiAgICAid29ya2VyX3dvcmtmbG93IjogIi5naXRodWIvd29ya2Zsb3dzL2RvY3MtZHJpZnQtd29ya2VyLnltbCIsDQogICAgInNjaGVkdWxlZF93b3JrZmxvdyI6ICIuZ2l0aHViL3dvcmtmbG93cy9kb2NzLWRyaWZ0LnltbCIsDQogICAgImNsYXVkZV9jb21tYW5kIjogIi5jbGF1ZGUvY29tbWFuZHMvZG9jcy1kcmlmdC5tZCIsDQogICAgInJ1bm5lciI6ICJ1YnVudHUtbGF0ZXN0IiwNCiAgICAicGVybWlzc2lvbnMiOiB7DQogICAgICAiY29udGVudHMiOiAid3JpdGUiLA0KICAgICAgInB1bGwtcmVxdWVzdHMiOiAid3JpdGUiLA0KICAgICAgImFjdGlvbnMiOiAicmVhZCINCiAgICB9LA0KICAgICJzZWNyZXRfbWFwcGluZ3MiOiB7DQogICAgICAiQ09QSUxPVF9HSVRIVUJfVE9LRU4iOiAiQ09QSUxPVF9HSVRIVUJfVE9LRU4iDQogICAgfSwNCiAgICAiZW50cmllcyI6IHsNCiAgICAgICJob3N0ZWQiOiB7DQogICAgICAgICJ3b3JrZXIiOiB7DQogICAgICAgICAgImNsaWVudCI6ICJjb3BpbG90LWxpbnV4IiwNCiAgICAgICAgICAibW9kZWwiOiAiZml4dHVyZS1tb2RlbCIsDQogICAgICAgICAgImFyZ3YiOiBbDQogICAgICAgICAgICAiLS1maXh0dXJlLXJvbGUiDQogICAgICAgICAgXQ0KICAgICAgICB9LA0KICAgICAgICAicmV2aWV3ZXIiOiB7DQogICAgICAgICAgImNsaWVudCI6ICJjb3BpbG90LWxpbnV4IiwNCiAgICAgICAgICAibW9kZWwiOiAiZml4dHVyZS1tb2RlbCIsDQogICAgICAgICAgImFyZ3YiOiBbDQogICAgICAgICAgICAiLS1maXh0dXJlLXJvbGUiDQogICAgICAgICAgXQ0KICAgICAgICB9LA0KICAgICAgICAicHVibGlzaGVyIjogew0KICAgICAgICAgICJhcmd2IjogWw0KICAgICAgICAgICAgImJ1biIsDQogICAgICAgICAgICAicHVibGlzaGVyLnRzIg0KICAgICAgICAgIF0NCiAgICAgICAgfQ0KICAgICAgfSwNCiAgICAgICJjb3BpbG90Ijogew0KICAgICAgICAid29ya2VyIjogew0KICAgICAgICAgICJjbGllbnQiOiAiY29waWxvdC1saW51eCIsDQogICAgICAgICAgIm1vZGVsIjogImZpeHR1cmUtbW9kZWwiLA0KICAgICAgICAgICJhcmd2IjogWw0KICAgICAgICAgICAgIi0tZml4dHVyZS1yb2xlIg0KICAgICAgICAgIF0NCiAgICAgICAgfSwNCiAgICAgICAgInJldmlld2VyIjogew0KICAgICAgICAgICJjbGllbnQiOiAiY29waWxvdC1saW51eCIsDQogICAgICAgICAgIm1vZGVsIjogImZpeHR1cmUtbW9kZWwiLA0KICAgICAgICAgICJhcmd2IjogWw0KICAgICAgICAgICAgIi0tZml4dHVyZS1yb2xlIg0KICAgICAgICAgIF0NCiAgICAgICAgfSwNCiAgICAgICAgInB1Ymxpc2hlciI6IHsNCiAgICAgICAgICAiYXJndiI6IFsNCiAgICAgICAgICAgICJidW4iLA0KICAgICAgICAgICAgInB1Ymxpc2hlci50cyINCiAgICAgICAgICBdDQogICAgICAgIH0NCiAgICAgIH0sDQogICAgICAiY2xhdWRlIjogew0KICAgICAgICAid29ya2VyIjogew0KICAgICAgICAgICJjbGllbnQiOiAiY29waWxvdC1saW51eCIsDQogICAgICAgICAgIm1vZGVsIjogImZpeHR1cmUtbW9kZWwiLA0KICAgICAgICAgICJhcmd2IjogWw0KICAgICAgICAgICAgIi0tZml4dHVyZS1yb2xlIg0KICAgICAgICAgIF0NCiAgICAgICAgfSwNCiAgICAgICAgInJldmlld2VyIjogew0KICAgICAgICAgICJjbGllbnQiOiAiY29waWxvdC1saW51eCIsDQogICAgICAgICAgIm1vZGVsIjogImZpeHR1cmUtbW9kZWwiLA0KICAgICAgICAgICJhcmd2IjogWw0KICAgICAgICAgICAgIi0tZml4dHVyZS1yb2xlIg0KICAgICAgICAgIF0NCiAgICAgICAgfSwNCiAgICAgICAgInB1Ymxpc2hlciI6IHsNCiAgICAgICAgICAiYXJndiI6IFsNCiAgICAgICAgICAgICJidW4iLA0KICAgICAgICAgICAgInB1Ymxpc2hlci50cyINCiAgICAgICAgICBdDQogICAgICAgIH0NCiAgICAgIH0NCiAgICB9DQogIH0sDQogICJsZWdhY3lfcHJvcG9zYWxzIjogew0KICAgICJhdXRob3JzIjogWw0KICAgICAgImxlZ2FjeS1ib3QiDQogICAgXSwNCiAgICAiYnJhbmNoX3ByZWZpeGVzIjogWw0KICAgICAgImRvY3MtYXVkaXQvIg0KICAgIF0sDQogICAgImlkcyI6IFtdDQogIH0sDQogICJrbm93bGVkZ2VfcGFnZXMiOiBbXQ0KfQ0K",
+  "blobs": [
+    {
+      "path": "docs/A.md",
+      "mode": "100644",
+      "content_base64": "77u/IyBBDQrDqQo="
+    },
+    {
+      "path": "docs/\u00e9.md",
+      "mode": "100644",
+      "content_base64": "IyDDqQo="
+    },
+    {
+      "path": "docs/\ud83d\ude80.md",
+      "mode": "100644",
+      "content_base64": "IyDwn5qACg=="
+    },
+    {
+      "path": "docs/generated/skip.md",
+      "mode": "100644",
+      "content_base64": "IyBleGNsdWRlZAo="
+    },
+    {
+      "path": "outside/README.md",
+      "mode": "100644",
+      "content_base64": "IyBvdXRzaWRlCg=="
+    },
+    {
+      "path": "docs/suppressions.yaml",
+      "mode": "100644",
+      "content_base64": "c3VwcHJlc3Npb25zOiBbXQ0K"
+    }
+  ],
+  "expected_bindings": {
+    "schema_version": 1,
+    "source_commit": "1111111111111111111111111111111111111111",
+    "settings_sha256": "e69c9b0a804220133d512a98ba20f7fbb460334e1ea12980a4532f0822bd5f4a",
+    "scope": {
+      "roots": [
+        "docs"
+      ],
+      "exclusions": [
+        "docs/generated"
+      ],
+      "suffixes": [
+        ".md"
+      ],
+      "required_detectors": [
+        "claims",
+        "links"
+      ],
+      "read_set": {
+        "source_roots": null,
+        "reference_roots": null
+      },
+      "detector_inputs": {
+        "claims": {
+          "roots": [
+            "docs"
+          ],
+          "exclusions": [
+            "docs/\ud83d\ude80.md"
+          ],
+          "suffixes": [
+            ".md"
+          ]
+        },
+        "links": {
+          "all_inventory": true
+        }
+      }
+    },
+    "scope_sha256": "5a19697d9d5325d43d23563df62d38a9ce979e5c1b33838cca5cbcc17f8ebe72",
+    "feedback": [
+      [
+        "docs/suppressions.yaml",
+        "f0775c0f3b2a317161d099c06521efeda35b0c27603e313318ebb2dc786bd0b2"
+      ]
+    ],
+    "feedback_sha256": "1f2fc7d30c0980e3983aabf66c2bee75b0c3ce007fa6671be3446bd25b60b612",
+    "documents": [
+      [
+        "docs/A.md",
+        "b08211ceb9d139ab77dbc466330ed6e3ed8d431aab15796aa43952c4b923dabf"
+      ],
+      [
+        "docs/\u00e9.md",
+        "d09ff7567c702b23a7d5d761755c0a5ef509a08d5917d7005371e3df19a3a040"
+      ],
+      [
+        "docs/\ud83d\ude80.md",
+        "aadbf138d1672f2e08ab60aa3bc21c9e3db2dd8f1ed53e69c694c1b96b948195"
+      ]
+    ],
+    "detectors": [
+      {
+        "id": "claims",
+        "selector": {
+          "roots": [
+            "docs"
+          ],
+          "exclusions": [
+            "docs/\ud83d\ude80.md"
+          ],
+          "suffixes": [
+            ".md"
+          ]
+        },
+        "options": {
+          "max_age": 90,
+          "contexts": [
+            "source"
+          ]
+        },
+        "documents": [
+          [
+            "docs/A.md",
+            "b08211ceb9d139ab77dbc466330ed6e3ed8d431aab15796aa43952c4b923dabf"
+          ],
+          [
+            "docs/\u00e9.md",
+            "d09ff7567c702b23a7d5d761755c0a5ef509a08d5917d7005371e3df19a3a040"
+          ]
+        ],
+        "input_sha256": "0a8c4d1f9a2eeca09a109e0cd72aa13f0c9fe457fa57dc9155e69c25a91ea867"
+      },
+      {
+        "id": "links",
+        "selector": {
+          "all_inventory": true
+        },
+        "options": {
+          "2": "two",
+          "10": "ten",
+          "check_history": true,
+          "Z": 1,
+          "\u00e9": 2,
+          "\ud83d\ude80": 3,
+          "\ue000": 4
+        },
+        "documents": [
+          [
+            "docs/A.md",
+            "b08211ceb9d139ab77dbc466330ed6e3ed8d431aab15796aa43952c4b923dabf"
+          ],
+          [
+            "docs/\u00e9.md",
+            "d09ff7567c702b23a7d5d761755c0a5ef509a08d5917d7005371e3df19a3a040"
+          ],
+          [
+            "docs/\ud83d\ude80.md",
+            "aadbf138d1672f2e08ab60aa3bc21c9e3db2dd8f1ed53e69c694c1b96b948195"
+          ]
+        ],
+        "input_sha256": "564feae976c7dc1a80750e600081cc54160eacde449fccea24eb7ca54dbb5558"
+      }
+    ]
+  },
+  "expected_canonical_base64": "eyJkZXRlY3RvcnMiOlt7ImRvY3VtZW50cyI6W1siZG9jcy9BLm1kIiwiYjA4MjExY2ViOWQxMzlhYjc3ZGJjNDY2MzMwZWQ2ZTNlZDhkNDMxYWFiMTU3OTZhYTQzOTUyYzRiOTIzZGFiZiJdLFsiZG9jcy/DqS5tZCIsImQwOWZmNzU2N2M3MDJiMjNhN2Q1ZDc2MTc1NWMwYTVlZjUwOWEwOGQ1OTE3ZDcwMDUzNzFlM2RmMTlhM2EwNDAiXV0sImlkIjoiY2xhaW1zIiwiaW5wdXRfc2hhMjU2IjoiMGE4YzRkMWY5YTJlZWNhMDlhMTA5ZTBjZDcyYWExM2YwYzlmZTQ1N2ZhNTdkYzkxNTVlNjljMjVhOTFlYTg2NyIsIm9wdGlvbnMiOnsiY29udGV4dHMiOlsic291cmNlIl0sIm1heF9hZ2UiOjkwfSwic2VsZWN0b3IiOnsiZXhjbHVzaW9ucyI6WyJkb2NzL/CfmoAubWQiXSwicm9vdHMiOlsiZG9jcyJdLCJzdWZmaXhlcyI6WyIubWQiXX19LHsiZG9jdW1lbnRzIjpbWyJkb2NzL0EubWQiLCJiMDgyMTFjZWI5ZDEzOWFiNzdkYmM0NjYzMzBlZDZlM2VkOGQ0MzFhYWIxNTc5NmFhNDM5NTJjNGI5MjNkYWJmIl0sWyJkb2NzL8OpLm1kIiwiZDA5ZmY3NTY3YzcwMmIyM2E3ZDVkNzYxNzU1YzBhNWVmNTA5YTA4ZDU5MTdkNzAwNTM3MWUzZGYxOWEzYTA0MCJdLFsiZG9jcy/wn5qALm1kIiwiYWFkYmYxMzhkMTY3MmYyZTA4YWI2MGFhM2JjMjFjOWUzZGIyZGQ4ZjFlZDUzZTY5YzY5NGMxYjk2Yjk0ODE5NSJdXSwiaWQiOiJsaW5rcyIsImlucHV0X3NoYTI1NiI6IjU2NGZlYWU5NzZjN2RjMWE4MDc1MGU2MDAwODFjYzU0MTYwZWFjZGU0NDlmY2NlYTI0ZWI3Y2E1NGRiYjU1NTgiLCJvcHRpb25zIjp7IjEwIjoidGVuIiwiMiI6InR3byIsIloiOjEsImNoZWNrX2hpc3RvcnkiOnRydWUsIsOpIjoyLCLugIAiOjQsIvCfmoAiOjN9LCJzZWxlY3RvciI6eyJhbGxfaW52ZW50b3J5Ijp0cnVlfX1dLCJkb2N1bWVudHMiOltbImRvY3MvQS5tZCIsImIwODIxMWNlYjlkMTM5YWI3N2RiYzQ2NjMzMGVkNmUzZWQ4ZDQzMWFhYjE1Nzk2YWE0Mzk1MmM0YjkyM2RhYmYiXSxbImRvY3Mvw6kubWQiLCJkMDlmZjc1NjdjNzAyYjIzYTdkNWQ3NjE3NTVjMGE1ZWY1MDlhMDhkNTkxN2Q3MDA1MzcxZTNkZjE5YTNhMDQwIl0sWyJkb2NzL/CfmoAubWQiLCJhYWRiZjEzOGQxNjcyZjJlMDhhYjYwYWEzYmMyMWM5ZTNkYjJkZDhmMWVkNTNlNjljNjk0YzFiOTZiOTQ4MTk1Il1dLCJmZWVkYmFjayI6W1siZG9jcy9zdXBwcmVzc2lvbnMueWFtbCIsImYwNzc1YzBmM2IyYTMxNzE2MWQwOTljMDY1MjFlZmVkYTM1YjBjMjc2MDNlMzEzMzE4ZWJiMmRjNzg2YmQwYjIiXV0sImZlZWRiYWNrX3NoYTI1NiI6IjFmMmZjN2QzMGMwOTgwZTM5ODNhYWJmNjZjMmJlZTc1YjBjM2NlMDA3ZmE2NjcxYmUzNDQ2YmQyNWI2MGI2MTIiLCJzY2hlbWFfdmVyc2lvbiI6MSwic2NvcGUiOnsiZGV0ZWN0b3JfaW5wdXRzIjp7ImNsYWltcyI6eyJleGNsdXNpb25zIjpbImRvY3Mv8J+agC5tZCJdLCJyb290cyI6WyJkb2NzIl0sInN1ZmZpeGVzIjpbIi5tZCJdfSwibGlua3MiOnsiYWxsX2ludmVudG9yeSI6dHJ1ZX19LCJleGNsdXNpb25zIjpbImRvY3MvZ2VuZXJhdGVkIl0sInJlYWRfc2V0Ijp7InJlZmVyZW5jZV9yb290cyI6bnVsbCwic291cmNlX3Jvb3RzIjpudWxsfSwicmVxdWlyZWRfZGV0ZWN0b3JzIjpbImNsYWltcyIsImxpbmtzIl0sInJvb3RzIjpbImRvY3MiXSwic3VmZml4ZXMiOlsiLm1kIl19LCJzY29wZV9zaGEyNTYiOiI1YTE5Njk3ZDlkNTMyNWQ0M2QyMzU2M2RmNjJkMzhhOWNlOTc5ZTVjMWIzMzgzOGNjYTVjYmNjMTdmOGViZTcyIiwic2V0dGluZ3Nfc2hhMjU2IjoiZTY5YzliMGE4MDQyMjAxMzNkNTEyYTk4YmEyMGY3ZmJiNDYwMzM0ZTFlYTEyOTgwYTQ1MzJmMDgyMmJkNWY0YSIsInNvdXJjZV9jb21taXQiOiIxMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExIn0=",
+  "expected_sha256": "4eb8510464a8f7b9a63ad23dab3cce01ee7875f53b8df2516671ab26a82e8f6c"
+}

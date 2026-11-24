@@ -36,6 +36,34 @@ minimal doc corrections join that task's checks and commit. An incomplete
 assessment stops before ticking/committing; preserve edits and resolve its gap
 within scope or hand it off. Undeclared repositories retain their existing flow.
 
+## Loop routes
+
+Follow [feature writer entry](../../references/authority.md#feature-writer-entry) in the selected writing checkout
+after checking worktree ownership and before the first feature write. The standalone
+claim command performs the check itself. Pass the native client on an adopted claim
+and use its result for that entry.
+
+This operation's loop role and route come from `.vh-adlc/loop.yaml` through
+`bun scripts/loop/cli.ts route` (`references/loop-settings.md`); without the file, every role keeps the
+host default. Before acting, read every file `bun scripts/loop/cli.ts context` lists: the repository's instruction
+files and its project procedure, whose local rules apply alongside this procedure. If its `plugin.stale` is true, stop before any write and report its `warning`: the session runs an older plugin than the host has installed. If it reports `plugin.binary_warning`, run only the binary `scripts/ensure-vh-adlc.sh` prints, never a `vh-adlc` found on PATH. With declared verification rungs, each task's verification step first performs every applicable
+written-procedure rung of the task stage, then runs
+`bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task --run true` in place of the `AGENTS.md`
+command lookup, passing each performed procedure rung's result with `--record <rung>=passed|failed:<what was observed>`;
+a task is not ticked unless every task-stage rung passed at its commit. These instructions also replace Finish:
+before `vh-adlc gate complete`, run `bun scripts/loop/cli.ts rungs --repo <dir> --base <default branch> --stage task`
+without `--run` and read only its `deferred` list; its exit 3 and its verdict are not a check failure. When
+`deferred` is not empty, do not run the gate or set `complete`: report the deferred rungs, say that the
+completion stage runs in ship, and report the step `vh-adlc next` returns. With an empty `deferred`, Finish
+is unchanged. A `host` route that names a model runs with it as a requested model. To claim, first run `bun scripts/loop/cli.ts isolation --repo <dir> --host-worktree-tool <true|false>`:
+on `enter-host-worktree`, enter a worktree with the host's own worktree tool and continue there; on `stop`,
+report its reason and stop. A planned feature may then be claimed from a worktree at the default-branch
+tip that is detached or on a branch this session created or was handed, with
+`bun scripts/loop/cli.ts claim` (`references/loop-settings.md`, Claiming and isolation); it refuses an
+unrelated branch, a stale tip or a stray change before writing, and a rejected push leaves the claim
+pending with no feature branch. When loop settings exist, these instructions replace Enter steps 1 and 6: the claim may be made from a host
+worktree at the default-branch tip through `cli.ts claim`, and that worktree becomes the owning worktree.
+
 ## Start
 
 1. Get the binary and run `vh-adlc knowledge` with `conventions/feature-documents.md`,
@@ -92,8 +120,10 @@ Take the first unchecked task. For each:
 2. Make the change. Re-run the test and watch it pass, then run the repository's own verification commands
    (its `AGENTS.md` lists them; ask if none is listed).
 3. Tick the task with an evidence line naming the command and what you observed. Tick a criterion only
-   when verification you observed in this run establishes it, with its own evidence line. Record what stays
-   untested.
+   when verification you observed in this run establishes it, with its own evidence line. When a
+   criterion's proof is what an agent does in a session, prove it with a committed script that reruns
+   that session and keeps its transcript, so the reviewer can run it too; a subagent's own report is not
+   evidence. Record what stays untested.
 4. Stage only the paths this task changed, plus the document, and commit once. Edit the message with
    `guides/humanize-prose.md` at the resolved revision. These commits change code, so they never carry the
    skip-CI marker. Do not push.

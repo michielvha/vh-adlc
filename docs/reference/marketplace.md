@@ -11,7 +11,8 @@ want separately.
 | Plugin | Purpose | Availability |
 | --- | --- | --- |
 | `vh-adlc` | Lifecycle intake, persistent codebase audit, dependency/security maintenance, article/promotion drafts and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
-| `remote-gui` | Private tailnet links, human-controlled sign-in and confirmed hand-back to an agent. | Codex and Claude catalogs; Linux amd64 runtime. See [setup and remote activation](../../plugins/remote-gui/README.md). Native-host and second-device acceptance remain separate checks. |
+| `remote-gui` | Private tailnet links, human-controlled sign-in, confirmed hand-back to an agent, owner-initiated clipboard controls and opt-in reusable browser profiles. | Codex and Claude catalogs; Linux amd64 runtime. See [setup and remote activation](../../plugins/remote-gui/README.md). Native-host and second-device acceptance remain separate checks. |
+| `paseo-hosts` | Onboard Linux servers as SSH-only Paseo daemons, link the Paseo desktop app on Macs and Windows PCs to them, and unlink or remove them again. | Codex and Claude catalogs; the operator host needs Go, Node and npm. See [setup and terms](../../plugins/paseo-hosts/README.md). |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes, with Claude Remote Control phone notifications. | Codex and Claude catalogs; source lives in [auth-refresh](https://github.com/michielvha/auth-refresh). |
 | `github-app-registration` | Register a GitHub App through its manifest flow, save credentials locally with mode 0600, and export them to project files. | Claude catalog. The scripts require [Bun](https://bun.sh). |
 | `codex-qr-pairing` | Generate a fresh QR code for pairing with this Codex host. | Codex and Claude catalogs. Requires a signed-in Codex host with Remote Control running and `qrencode`. |
@@ -19,6 +20,16 @@ want separately.
 The [Codex catalog](../../.agents/plugins/marketplace.json) and
 [Claude catalog](../../.claude-plugin/marketplace.json) define package sources.
 Both pin auth-refresh to the same component commit.
+
+## Documentation truth review
+
+`vh-adlc-docs-truth` is included in vh-adlc 0.27.0. Install or update
+`vh-adlc@vhco-tools` through your client's ordinary marketplace commands.
+Check that the installed version exposes the skill before replacing an existing
+project command. Start with the [runnable example](../../plugins/vh-adlc/examples/docs-truth/README.md)
+and [workflow guide](../user-guides/workflows.md#documentation-truth-review).
+Project selection, verification history and approval for local changes belong
+to the repository using the skill.
 
 ## Persistent audit
 
@@ -110,3 +121,23 @@ A consumer compatibility wrapper can use `VH_ADLC_PLUGIN_ROOT` exported before
 sessions start. Point it to the actual installed plugin directory and refresh it
 when the installer changes the location. A local source copy is not marketplace
 installation evidence.
+
+## Documentation drift
+
+`vh-adlc-docs-drift` is part of the shared vh-adlc package from plugin version 0.26.0. Install or
+upgrade **vh-adlc** through the client you use, then verify that installation's
+source/version, skill discovery and packaged helpers before adoption. Its
+[greenfield example](../../plugins/vh-adlc/examples/docs-drift/README.md) creates a
+new staged consumer with actual credential-free local collection.
+
+Keep scanner policy, documentation rules, feedback, generators, schedules and
+publication permissions in the consumer. A staged collection result supplies
+its observed local evidence. Published marketplace installation, installed
+worker/reviewer/forwarded entry, hosted advisory/history, paired migration and
+cutover/rollback results remain separate acceptance steps. Follow the
+[setup reference](../../plugins/vh-adlc/references/docs-drift-settings.md) and
+[current capability record](compatibility.md#shared-documentation-drift).
+
+## Architecture diagram skill
+
+`vh-adlc-diagram` is included in the shared marketplace package from plugin version 0.23.0. The [workflow](../user-guides/workflows.md#architecture-diagrams) lists the local renderer and asset prerequisites.

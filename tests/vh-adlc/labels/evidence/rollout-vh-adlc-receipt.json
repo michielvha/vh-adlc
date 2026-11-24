@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "plan_digest": "5a12f2748cef242142635a70ff0c3691dca23babee11a9fbcdaf32fb9797e5d4",
+  "repository": "michielvha/vh-adlc",
+  "actor": "michielvha",
+  "outcomes": [
+    {
+      "action": "create",
+      "name": "refactor",
+      "status": "succeeded"
+    },
+    {
+      "action": "create",
+      "name": "security",
+      "status": "succeeded"
+    },
+    {
+      "action": "create",
+      "name": "ready",
+      "status": "succeeded"
+    },
+    {
+      "action": "create",
+      "name": "blocked",
+      "status": "succeeded"
+    },
+    {
+      "action": "create",
+      "name": "partial",
+      "status": "succeeded"
+    },
+    {
+      "action": "create",
+      "name": "needs-decision",
+      "status": "succeeded"
+    }
+  ],
+  "complete": true,
+  "remaining": []
+}

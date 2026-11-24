@@ -21,6 +21,8 @@ function context(mode: "reverify" | "full" = "reverify") {
   return { f, config, snap, document, candidate, options, base };
 }
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
+/** The `locked` line `git worktree list --porcelain` prints for `path`, or "" when it is not locked. */
+const lockOf = (root: string, path: string) => git(root, "worktree", "list", "--porcelain").split("\n\n").find(block => block.startsWith(`worktree ${path}\n`))?.split("\n").find(line => line.startsWith("locked")) ?? "";
 
 test("a deterministic candidate changes only selected status plus dated evidence and preserves existing findings/history", () => {
   const c = context(), before = git(c.f.root, "status", "--porcelain"), candidate = c.candidate();
@@ -60,8 +62,18 @@ test("ledger-update without ledger-commit leaves only the owned candidate uncomm
 test("ordinary cleanup removes a clean owned worktree only after its commit and evidence are retained in default history", () => {
   const c = context(), applied = applyLedgerCandidate(c.config, c.snap, c.candidate(), c.document, c.options);
   git(c.f.root, "merge", "--ff-only", applied.commit!); git(c.f.root, "update-ref", "refs/remotes/origin/main", applied.commit!);
+  expect(lockOf(c.f.root, applied.path)).toBe("locked vh-adlc test-ledger");
   expect(cleanupOwnedLedger(c.config, applied, { retained: true }).removed).toBe(true);
   expect(git(c.f.root, "worktree", "list", "--porcelain")).not.toContain(applied.path);
+});
+test("the owned ledger worktree is locked with its run's reason, fresh and when a resumed one is not locked yet", () => {
+  const c = context(), candidate = c.candidate(), applied = applyLedgerCandidate(c.config, c.snap, candidate, c.document, c.options);
+  expect(lockOf(c.f.root, applied.path)).toBe("locked vh-adlc test-ledger");
+  expect(applyLedgerCandidate(c.config, c.snap, candidate, c.document, c.options).commit).toBe(applied.commit);
+  expect(lockOf(c.f.root, applied.path)).toBe("locked vh-adlc test-ledger");
+  git(c.f.root, "worktree", "unlock", applied.path);
+  expect(applyLedgerCandidate(c.config, c.snap, candidate, c.document, c.options).commit).toBe(applied.commit);
+  expect(lockOf(c.f.root, applied.path)).toBe("locked vh-adlc test-ledger");
 });
 test.each(["feature", "dirty", "advanced", "no-permission", "no-commit"])("%s cannot bypass the assessed default source or permission boundary", kind => {
   const c = context();

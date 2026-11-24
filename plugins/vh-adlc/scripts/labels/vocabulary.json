@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "labels": [
+    { "name": "bug", "kind": "type", "color": "d73a4a", "description": "Something isn't working" },
+    { "name": "enhancement", "kind": "type", "color": "a2eeef", "description": "New feature or request" },
+    { "name": "documentation", "kind": "type", "color": "0075ca", "description": "Improvements or additions to documentation" },
+    { "name": "refactor", "kind": "type", "color": "2f6dc8", "description": "Code change that keeps behavior the same" },
+    { "name": "security", "kind": "type", "color": "d93f0b", "description": "Security weakness or hardening" },
+    { "name": "ready", "kind": "state", "color": "0e8a16", "description": "Verified unblocked, scope understood - safe to pick up" },
+    { "name": "blocked", "kind": "state", "color": "b60205", "description": "Named prerequisite missing; the issue or its document names it" },
+    { "name": "partial", "kind": "state", "color": "fbca04", "description": "Some phases shipped; the issue or its document names what remains" },
+    { "name": "needs-decision", "kind": "state", "color": "5319e7", "description": "Needs a product or architecture call before work starts" }
+  ]
+}

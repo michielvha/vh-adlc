@@ -12,8 +12,9 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
-repository and selects a procedure. The package has sixteen skills: this entry,
-eleven engineering operations, three content operations and one host-cleanup operation. Check
+repository and selects a procedure. The candidate package combines this entry,
+eleven engineering operations, six content operations, one host-cleanup
+operation and one coordination operation, giving twenty skills. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -26,6 +27,8 @@ on your host.
 | Persistent codebase audit | Keep stable findings in a ledger, distinguish historical status from current verification, and select repairs under local policy. |
 | Diagnosis | Investigate and report. A report-only request does not authorize a fix. |
 | Documentation | Edit the requested document and check it. A prose edit does not need a feature spec. |
+| Accumulated documentation drift | Assess the configured corpus and selected stale documentation-audit proposals through the released docs-drift operation. |
+| Documentation truth review | Check claims in a bounded batch against source and record the evidence in the report. |
 | Article or social draft | Read the project's evidence and the site's voice rules, draft or revise the requested prose, and obtain a source-comparing editorial pass. Publication is separate. |
 | Small maintenance | Preserve the public contract, keep a short task record, run appropriate checks, and obtain an independent review. |
 | A new feature or a wider change | Use a feature document with acceptance, tests, reviews, and binary status gates. |
@@ -51,9 +54,14 @@ see [installation](../get-started/installation.md).
 | Review | `vh-adlc-review` | Dispatch an independent implementation review of an exact commit. |
 | Ship | `vh-adlc-ship` | On an explicit request, push the branch, open or update the PR, and update the issue. Never merges. |
 | Resume | `vh-adlc-resume` | Reconstruct the state and continue the next safe step. |
+| Architecture diagram | `vh-adlc-diagram` | Create and verify repository-grounded draw.io architecture diagrams. |
 | Documentation impact | `vh-adlc-docs-impact` | Find and review docs affected by selected code changes. |
+| Documentation drift | `vh-adlc-docs-drift` | Audit the configured corpus, resolve selected stale docs-audit PRs and freshly review selected post-merge closures. |
+| Documentation truth review | `vh-adlc-docs-truth` | Review factual claims in selected docs or agent instructions, or show recorded verification freshness. |
 | Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
+| Website SEO | `vh-adlc-seo` | Assess technical search readiness, measured visibility and content opportunities from free sources and saved evidence. |
 | Clean | `vh-adlc-clean` | Plan and remove what killed runs left in `/tmp` and the project's temp root; Compose projects and kind clusters only on request. |
+| Orchestrate | `vh-adlc-orchestrate` | Drive a workstream of sub-sessions: admit work the host can carry, keep a ledger and status passes, route owner decisions and close sessions without losing work. Changes no feature status. |
 
 Triage reports stay uncommitted unless requested. Every GitHub change, including comments and
 labels, waits for the report and approval of the exact batch. Local plan patches and their commit
@@ -155,14 +163,45 @@ settings from a template repository, so check new repositories too.
 A merged PR branch is removed as part of the merge. When you approve a merge, the
 agent runs `after-merge` for that PR. It removes the remote branch, its tracking ref
 and the local branch, as long as their tips are inside the merged PR head. That also
-covers squash merges, which plain `git branch -d` refuses.
+covers squash merges, which plain `git branch -d` refuses. It also removes the
+branch's clean worktree, unless that worktree holds ignored files or the agent runs
+from it; the next sweep removes those.
 
 Every maintenance sweep also lists stale branches left by earlier merges and shows
 a plan with a digest. Ask `Use vh-adlc-maintenance to sweep and remove stale branches`
 to apply that plan in the same run. Open PR branches, protected branches, unmerged work
-and branches in use by a worktree are kept, each with its reason. Clean worktrees
-are removed only when you ask for worktree cleanup. See the
+and branches whose worktree stays are kept, each with its reason. A clean
+worktree, one with no changed tracked files and no untracked files, is removed with its
+merged branch; ignored files such as `node_modules/` go with it. The plan lists those
+ignored paths with their file counts and sizes, and gives each worktree it keeps a
+`worktree` kept record with its path, its branch and the reason. Approving the plan, or
+the merge, is all the asking needed. When the plan lists ignored paths, the agent waits
+for you to approve its digest even if you asked for removal up front. A locked worktree
+stays, and so does the one the agent runs from. See the
 [branch hygiene guide](../../plugins/vh-adlc/references/branches.md).
+
+## Issue labels
+
+Every repository that uses vh-adlc carries the same standard label set: the type labels `bug`,
+`enhancement`, `documentation`, `refactor` and `security`, and the state labels `ready`, `blocked`,
+`partial` and `needs-decision`. Investigate gives an issue it files on request one type label and the
+state its verdict names. Spec gives the issues it files a type label only. After filing, a state
+change is a triage verdict. The
+[issue labels reference](../../plugins/vh-adlc/references/issues.md) (`references/issues.md`) lists
+each label's color and description.
+
+Bring a repository to the set with the labels helper:
+
+```bash
+bun plugins/vh-adlc/scripts/labels/cli.ts plan --repo . --output labels-plan.json
+```
+
+The label plan shows each standard label as present, missing or different, every write with its
+before and after values, and a digest. Nothing changes until you approve that exact digest and the
+agent runs `apply` with it. Apply refuses if the account, repository, label set, mapping or labels
+changed since the plan. It never deletes or renames a label, and labels outside the set stay as they
+are. A repository that keeps its own name for a standard label maps it with `label_map` in
+`.vh-adlc/triage.yaml`.
 
 ## Repository security settings
 
@@ -267,6 +306,27 @@ See the [SEO procedure](../../plugins/vh-adlc/references/seo.md). Its instructio
 and scenario checks do not certify authenticated Google, Bing or Ahrefs access
 on every host; report the integrations actually exercised.
 
+## Reserve a feature while you work
+
+A repository that enables feature reservations uses its Git remote to remember who is
+working on each issue or spec. Start or resume through vh-adlc in an ordinary Codex or
+Claude Code session. If another session has the item, vh-adlc shows the writer's host and
+branch or spec. Ask to continue in the existing session or arrange a handoff. The same
+session can move into its usual isolated worktree without asking for a handoff.
+
+Edits, builds and tests run without further reservation checks. Read-only review and
+independent work on other issues can continue. An idle session or one that runs out of
+quota keeps its reservation.
+
+For a handoff, stop the old writer and keep it stopped until the transfer is verified.
+Use the existing checkout when possible. If the work moves, preserve the commits, index
+and unfinished files first. The old session sees the current writer when it next tries
+to resume through vh-adlc. The workflow relies on agents entering through vh-adlc and
+on the owner's stop confirmation.
+
+The [setup and handoff procedure](../../plugins/vh-adlc/references/authority.md#reservation-adoption)
+covers adoption, rollback and the exact commands.
+
 ## Reviews
 
 Reviews use an independent agent context. A host may register the reviewer
@@ -280,6 +340,56 @@ model does not satisfy that request.
 
 Review isolation is procedural: the reviewer has a shell that can still write.
 See the [compatibility details](../reference/compatibility.md).
+
+A spec review rates each finding blocking, should-fix or nit, using the definitions in
+the pinned feature-document convention; a lens your repository declares keeps its own
+severity. A nit never causes a revision on its own: when a pass's blocking or
+should-fix findings change the document, the same commit fixes that pass's nits, and
+the rest are listed in the conversation. The agent applies each pass's findings as one
+revision, after asking you about any judgement finding, so one pass's fixes do not
+seed the next pass's findings. An extra the agent added on its own, which no criterion,
+decision of yours or public contract needs, is removed without asking you and noted in
+the Review Log.
+
+Every investigation and spec states the harm a fix prevents and the simplest
+alternative without new machinery, such as a process rule or a manual step. The
+reviewer flags a missing harm statement, and machinery out of proportion to the
+harm. When two spec reviews in a row are blocking and the blocking count does not
+fall, the agent stops revising. It asks whether to keep going, narrow the scope,
+replace the feature with the simpler alternative, or park it.
+
+An implementation review never skips a check it is able to run. When a criterion depends on what an
+agent does in a session, the implementer proves it with a committed script that reruns that session and
+keeps its transcript, so the reviewer can rerun it; a subagent's own report does not count as evidence.
+
+A reviewer role can also run through an external command, such as the Codex CLI on
+a model from another vendor. A spec review then reads a read-only export of the
+commit; an implementation review runs in a private clone, where it may run checks.
+The review is stored only when the reply names the requested model and commit and
+the checkout is unchanged afterwards. Otherwise it stays pending.
+
+The command runs in its own PID namespace, created with `unshare --user --pid`, so no
+reviewer process outlives the review. On a host where that fails, command-route reviews
+stay pending. Ubuntu 23.10 and later restrict unprivileged user namespaces through
+AppArmor; allow them, for example with
+`sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`, to use these routes.
+
+## Loop settings
+
+A repository may commit `.vh-adlc/loop.yaml` to tune the feature loop. It can:
+
+- route each role (author, implementer, spec reviewer, implementation reviewer) to the
+  host, optionally with a model, or route a reviewer role to an external command;
+- name a project procedure, instruction files and review lenses every operation reads;
+- declare verification rungs that must pass before push, completion and delivery, and limit an
+  expensive rung to the completion stage so it runs once per feature instead of at every task;
+- set manual CI, a post-merge watch and extra skip-CI paths for delivery;
+- have implement continue in an isolated worktree, and have investigate always write
+  a findings document.
+
+Without the file, the loop runs as described above. A per-user file may replace only
+an external command's executable path. See the
+[loop settings reference](../../plugins/vh-adlc/references/loop-settings.md).
 
 ## Authority and publication
 
@@ -296,7 +406,8 @@ publication, including when a sweep is selected through generic intake. It grant
 no dependency delivery permission.
 
 Merging, tagging, releasing, deploying, and destructive operations need separate
-approval. See the [authority reference](../../plugins/vh-adlc/references/authority.md)
+approval. No approval allows rewriting a commit that a Review Log row names: the
+agent brings in default-branch work by merge, so every review stays reachable. See the [authority reference](../../plugins/vh-adlc/references/authority.md)
 for the full contracts.
 
 ## Engineering conventions
@@ -326,3 +437,92 @@ from source paths. Ordinary mapping upkeep stays here; standard feature-spec
 coverage revisions go through the spec operation. Project generators and visual
 checks remain local. See the [procedure](../../plugins/vh-adlc/references/docs-impact.md)
 and [complete runnable example](../../plugins/vh-adlc/examples/docs-impact/README.md).
+
+## Documentation truth review
+
+Ask to verify claims in the next batch of documents or name the docs or sections to check.
+Use `vh-adlc-docs-truth` with no arguments for the project's default batch, `sweep` for
+specific paths, `meta` for repository instructions, or `report` for recorded freshness.
+The shared skill returns evidence and proposed corrections in the session. Repositories
+declare their own sources, selection and exemptions. See the
+[procedure](../../plugins/vh-adlc/references/docs-truth.md).
+
+The 0.27.0 skill was verified on fresh installs and upgrades from 0.26.1 in
+Codex CLI and Claude Code. Both passed the synthetic claim review and freshness
+report. [Compatibility and test evidence](../reference/compatibility.md#documentation-truth-review)
+
+In Stackweaver, continue to use `/docs-truth` for the next 15 documents or
+`/docs-truth report` for recorded freshness. The repository still owns its
+selection, ledger and rules for applying and publishing verified fixes.
+[Stackweaver migration #1162](https://github.com/michielvha/stackweaver/pull/1162)
+
+## Documentation drift
+
+The released `vh-adlc-docs-drift` operation handles accumulated documentation
+problems and selected stale documentation-audit proposals. Select the intended
+work explicitly, for example with one of these requests.
+
+```text
+Use vh-adlc-docs-drift to audit our configured documentation corpus; report only.
+Use vh-adlc-docs-drift to recheck docs-audit PRs #11 and #12 and propose a consolidation.
+Use vh-adlc-docs-drift to review the remaining original-PR closures for merged consolidation #13; report first.
+```
+
+The local scanner accounts for document reads and required detectors. The
+workflow then checks candidates against the documents and supporting source,
+recording confirmed drift, still accurate or unknown with recommendations.
+The report starts with a short summary and decisions. Collection counts and
+finding counts retain their technical meaning. Accuracy and missing verification
+remain explicit in the assessment.
+
+Create the consumer's own settings, scanner protocol and companion procedure
+from its actual source and rules. Keep detector exceptions, feedback history,
+generators, schedules and delivery policy local. The shared operation uses
+ordinary verified-binary setup and pinned knowledge. Missing configuration
+gets a setup handoff. Start with the [settings reference](../../plugins/vh-adlc/references/docs-drift-settings.md)
+and [complete collection example](../../plugins/vh-adlc/examples/docs-drift/README.md).
+
+Report-only work saves its output at the selected private external location.
+Selected corrections use an owned preparation branch, project checks and
+independent review. Standard feature-document requirements and historical proof
+stay protected. Claimed documents and overlapping active work receive their
+writer handoff or an explicitly coordinated owner selection. Commits, pushes,
+issue/PR publication and merge retain their actual current or adopted consumer
+permissions. Each publication effect has its own scope.
+
+Resolve reads the complete selected original PR diffs and gives every hunk a
+current disposition. A reviewed consolidation includes its immutable resolution
+record, corrections, delivered feedback and carried decisions. Originals stay
+open through consolidation review. After observed merge, fresh full-diff and
+per-hunk review establishes the proposed explanation and closure batch.
+Explanation comments and closures each require their selected authority.
+The canonical [procedure](../../plugins/vh-adlc/references/docs-drift.md) describes
+zero-correction resolution and the fresh post-merge entry.
+
+Interrupted publication resumes through the original operation's exact approved
+retained controller, journal, artifacts and selected authority. Metadata recovery
+uses the original retained plugin across upgrades. Missing original proof or
+ownership, unknown requests and partial application stay pending. A fully
+applied delivery that was later edited can receive non-success acknowledgement
+only after native evidence and the owner's current approval of the exact lookup
+and evidence digests. Retain its immutable receipt and explain the remaining
+work. Follow the [review and recovery guide](../../plugins/vh-adlc/references/docs-drift-review.md).
+
+Unchanged unresolved attention can finish green when eligible prior evidence
+matches. A complete first-discovery report marked `new-attention` can be carried
+from its verified red run. Incomplete scans, failed reviews and blocked delivery
+retain failure status. Local completed and interrupted history metadata stays in
+the selected private cache until explicit owned cleanup. Age/count limits bound
+eligibility and inspection.
+
+Consumer migration needs published marketplace installation checks, installed
+role/forwarding tests, paired review, hosted advisory/history observations and
+verified cutover/rollback. The example's staged collection diagnostic preserves
+those later obligations. Current [acceptance and deferred surfaces](../reference/compatibility.md#shared-documentation-drift)
+remain visible until their own tests pass.
+
+## Architecture diagrams
+
+Ask for `vh-adlc-diagram` with a diagram question, the repository files or design brief to use, and a new output directory. The skill writes a source brief, an editable draw.io file and an SVG. It renders in the same request when the sources support a useful view. Proposed connections are marked, and unresolved connections stay in the brief.
+
+Configure a local draw.io Desktop executable and graphical environment, Bun, `xmllint` and GNU `mv` with no-replace support. Provide the local XML schema and provider shape assets with their expected SHA-256 digests. The [diagram procedure](../../plugins/vh-adlc/references/diagram.md) details the inputs and export command.

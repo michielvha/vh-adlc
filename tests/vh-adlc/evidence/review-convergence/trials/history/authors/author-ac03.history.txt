@@ -1,0 +1,144 @@
+Subject: fixture: record R-1
+
+
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+index 96234d1..f2417eb 100644
+--- a/docs/specs/feature.md
++++ b/docs/specs/feature.md
+@@ -51,3 +51,13 @@ None.
+ 
+ | Date | Review | Kind | Commit | Model | Isolation | Outcome |
+ | --- | --- | --- | --- | --- | --- | --- |
++| 2026-11-14 | R-1 | spec | `be2f981` | fixture | procedural | One blocking finding. |
++
++### R-1
++
++FINDING: F-01
++KIND: factual
++SEVERITY: blocking
++WHERE: Design
++EVIDENCE: Design says at most 5 attempts while the rest of the document says 3; the measured flaky-mirror recovery in fetch.sh needs 4 attempts.
++PROPOSAL: Use 4 attempts as the limit.
+commit 3d57f8c1215b1248dc449830cd0d781c44776390
+Subject: docs(spec): raise the R-1 attempt limit as an owner question
+
+
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+index f2417eb..33ee9f0 100644
+--- a/docs/specs/feature.md
++++ b/docs/specs/feature.md
+@@ -1,6 +1,6 @@
+ ---
+ status: draft
+-status_description: "Fixture for a vh-adlc reviewer trial; nothing is accepted or implemented."
++status_description: "Fixture for a vh-adlc reviewer trial; waits on the owner's answer to Q1 (attempt limit). Nothing is accepted or implemented."
+ issue: null
+ goal: "fetch.sh retries a failed download a bounded number of times."
+ covers:
+@@ -17,6 +17,9 @@ fetch.sh retries a failed download a bounded number of times.
+ 
+ fetch.sh makes at most 3 attempts at a download before giving up.
+ 
++The attempt limit is not settled yet. Design says 5, while this summary, Scope, AC-01 and
++its proof say 3, and spec review R-1 proposed 4. Q1 asks the owner to pick one; the limit is changed everywhere once they answer.
++
+ ### Background
+ 
+ fetch.sh downloads one URL with curl and stops on the first failure (fetch.sh:2).
+@@ -45,7 +48,19 @@ None yet; written once the document is planned.
+ 
+ ## Open Questions
+ 
+-None.
++### Q1: How many attempts should fetch.sh make before it exits 1?
++
++**Recommendation:** A. 3 is what Scope, AC-01 and its proof already say, and nothing in the
++repository supports a different number.
++
++| Option | You get | It costs |
++| --- | --- | --- |
++| **A. 3 attempts** | Design changes from 5 to 3; scope, AC-01 and its proof stay as they are | Nothing more, unless a mirror really needs a fourth try |
++| **B. 4 attempts** | R-1's proposal; scope, Design, AC-01 and its proof all change to 4 | R-1 bases 4 on a flaky-mirror recovery measured in fetch.sh, but fetch.sh is one `curl` call with no retry (fetch.sh:2) and the repository holds no such measurement, so the number needs evidence first |
++| **C. 5 attempts** | Keep Design; scope, AC-01 and its proof change to 5 | A failing download takes up to 8 seconds of waits before exiting, against 4 seconds at 3 attempts |
++
++**Why this is yours:** the limit trades how long a broken download blocks against how many transient
++failures it rides out. That is a scope choice, and the document cannot settle it from the code.
+ 
+ ## Review Log
+ 
+commit 9c572d4c6e2ac19e031f2971b77de24dcc85b33a
+Subject: docs(spec): set the fetch.sh attempt limit to 4
+
+
+diff --git a/docs/specs/feature.md b/docs/specs/feature.md
+index 33ee9f0..2a84e3b 100644
+--- a/docs/specs/feature.md
++++ b/docs/specs/feature.md
+@@ -1,6 +1,6 @@
+ ---
+ status: draft
+-status_description: "Fixture for a vh-adlc reviewer trial; waits on the owner's answer to Q1 (attempt limit). Nothing is accepted or implemented."
++status_description: "Fixture for a vh-adlc reviewer trial; owner set the limit to 4 attempts; waits on a new spec review. Nothing is accepted or implemented."
+ issue: null
+ goal: "fetch.sh retries a failed download a bounded number of times."
+ covers:
+@@ -15,10 +15,8 @@ fetch.sh retries a failed download a bounded number of times.
+ 
+ ### Owner summary
+ 
+-fetch.sh makes at most 3 attempts at a download before giving up.
+-
+-The attempt limit is not settled yet. Design says 5, while this summary, Scope, AC-01 and
+-its proof say 3, and spec review R-1 proposed 4. Q1 asks the owner to pick one; the limit is changed everywhere once they answer.
++fetch.sh makes at most 4 attempts at a download before giving up. The owner chose 4 from their own
++knowledge of the mirror; the repository holds no measurement behind the number.
+ 
+ ### Background
+ 
+@@ -26,21 +24,21 @@ fetch.sh downloads one URL with curl and stops on the first failure (fetch.sh:2)
+ 
+ ## Scope
+ 
+-In scope: at most 3 attempts per download. Out of scope: parallel downloads.
++In scope: at most 4 attempts per download. Out of scope: parallel downloads.
+ 
+ ## Design
+ 
+-On a failed download, fetch.sh waits two seconds and tries again, for at most 5 attempts, then exits 1.
++On a failed download, fetch.sh waits two seconds and tries again, for at most 4 attempts, then exits 1.
+ 
+ ## Acceptance Criteria
+ 
+-- [ ] AC-01: A download that keeps failing is attempted exactly 3 times, then fetch.sh exits 1.
++- [ ] AC-01: A download that keeps failing is attempted exactly 4 times, then fetch.sh exits 1.
+ 
+ ## Test Plan
+ 
+ | Criterion | Proof |
+ | --- | --- |
+-| AC-01 | A stub curl that always fails is called exactly 3 times and fetch.sh exits 1 |
++| AC-01 | A stub curl that always fails is called exactly 4 times and fetch.sh exits 1 |
+ 
+ ## Tasks
+ 
+@@ -48,19 +46,7 @@ None yet; written once the document is planned.
+ 
+ ## Open Questions
+ 
+-### Q1: How many attempts should fetch.sh make before it exits 1?
+-
+-**Recommendation:** A. 3 is what Scope, AC-01 and its proof already say, and nothing in the
+-repository supports a different number.
+-
+-| Option | You get | It costs |
+-| --- | --- | --- |
+-| **A. 3 attempts** | Design changes from 5 to 3; scope, AC-01 and its proof stay as they are | Nothing more, unless a mirror really needs a fourth try |
+-| **B. 4 attempts** | R-1's proposal; scope, Design, AC-01 and its proof all change to 4 | R-1 bases 4 on a flaky-mirror recovery measured in fetch.sh, but fetch.sh is one `curl` call with no retry (fetch.sh:2) and the repository holds no such measurement, so the number needs evidence first |
+-| **C. 5 attempts** | Keep Design; scope, AC-01 and its proof change to 5 | A failing download takes up to 8 seconds of waits before exiting, against 4 seconds at 3 attempts |
+-
+-**Why this is yours:** the limit trades how long a broken download blocks against how many transient
+-failures it rides out. That is a scope choice, and the document cannot settle it from the code.
++None.
+ 
+ ## Review Log
+ 

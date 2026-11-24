@@ -8,6 +8,11 @@ const plugin = join(repo, 'plugins/remote-gui');
 const read = (path: string) => readFileSync(join(repo, path), 'utf8');
 
 describe('independent remote-gui package', () => {
+ test('adaptive sizing is packaged as remote-gui 0.4.0', () => {
+  for (const path of ['plugins/remote-gui/plugin.json', 'plugins/remote-gui/.claude-plugin/plugin.json']) {
+   expect(JSON.parse(read(path)).version).toBe('0.4.0');
+  }
+ });
  test('both catalogs install the same independent source and manifests agree', () => {
   const agents = JSON.parse(read('.agents/plugins/marketplace.json')).plugins.find((p: any) => p.name === 'remote-gui');
   const claude = JSON.parse(read('.claude-plugin/marketplace.json')).plugins.find((p: any) => p.name === 'remote-gui');
@@ -33,8 +38,9 @@ describe('independent remote-gui package', () => {
  },120000);
  test('version publication depends on the plugin checks', () => {
   const ci=read('.github/workflows/ci.yml');
-  expect(ci).toContain('remote-gui:');
-  expect(ci.match(/  version:\n\s+needs: \[([^\]]+)\]/)?.[1]).toContain('remote-gui');
+  const workflow = Bun.YAML.parse(ci);
+  expect(workflow).toHaveProperty('jobs.remote-gui');
+  expect(workflow).toHaveProperty('jobs.version.needs', expect.arrayContaining(['remote-gui']));
   expect(ci).toContain('bun test tests/remote-gui');
  });
  test('documents persistent remote activation and authentication ownership', () => {

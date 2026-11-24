@@ -17,10 +17,10 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
 
-func browserArgs(profile, marker, mode string) []string {
+func browserArgs(profile, marker, mode string, restore bool) []string {
 	args := []string{
 		"--user-data-dir=" + profile,
-		"--no-first-run", "--no-default-browser-check", "--restore-last-session",
+		"--no-first-run", "--no-default-browser-check",
 		"--disable-search-engine-choice-screen", "--disable-default-apps",
 		"--disable-background-networking", "--disable-component-update",
 		"--disable-extensions", "--disable-sync",
@@ -29,6 +29,9 @@ func browserArgs(profile, marker, mode string) []string {
 		"--disable-breakpad", "--disable-crash-reporter", "--disable-dev-shm-usage",
 		"--disable-gpu", "--disable-renderer-backgrounding", "--disable-background-timer-throttling",
 		"--ozone-platform=x11", "--window-position=0,0", "--window-size=1440,900",
+	}
+	if restore {
+		args = append(args, "--restore-last-session")
 	}
 	if mode == "agent" {
 		args = append(args, "--enable-automation", "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=0")
@@ -65,7 +68,66 @@ func (r *runtime) snapshot() session.BrowserHandle {
 		handle.Owned = append(handle.Owned, state.Process{Role: process.role, Identity: process.identity})
 	}
 	handle.Stop, handle.Handoff, handle.Alive = r.stop, r.handoff, r.healthy
+	handle.Clipboard = r.clipboard()
+	handle.Resize = r.resize
 	return handle
+}
+
+var (
+	errClipboardBusy        = errors.New("clipboard-busy")
+	errClipboardUnavailable = errors.New("clipboard-unavailable")
+)
+
+// clipboard serves the viewer's clipboard routes for this runtime.
+type clipboard struct{ r *runtime }
+
+func (r *runtime) clipboard() clipboard { return clipboard{r} }
+
+// Set refuses a send while a switch is marked or when the owner saw another mode,
+// so no send can land between the handoff's clear and the agent launch.
+func (c clipboard) Set(ctx context.Context, text, expectedMode string) (string, error) {
+	c.r.clipMu.Lock()
+	defer c.r.clipMu.Unlock()
+	mode := c.r.clipMode
+	if c.r.clipSwitching || expectedMode != mode {
+		return mode, errClipboardBusy
+	}
+	if c.r.clip == nil {
+		return mode, errClipboardUnavailable
+	}
+	return mode, c.r.clip.Set(ctx, text)
+}
+
+func (c clipboard) Get(ctx context.Context) (string, string, error) {
+	c.r.clipMu.Lock()
+	defer c.r.clipMu.Unlock()
+	if c.r.clip == nil {
+		return "", c.r.clipMode, errClipboardUnavailable
+	}
+	text, err := c.r.clip.Get(ctx)
+	return text, c.r.clipMode, err
+}
+
+func (c clipboard) Clear(ctx context.Context) (string, error) {
+	c.r.clipMu.Lock()
+	defer c.r.clipMu.Unlock()
+	if c.r.clip == nil {
+		return c.r.clipMode, errClipboardUnavailable
+	}
+	return c.r.clipMode, c.r.clip.Clear(ctx)
+}
+
+// endClipboardSwitch unmarks a switch. The clipboard then follows the browser
+// that is running: the new one once a launch was attempted, otherwise the old mode.
+func (r *runtime) endClipboardSwitch(original *child, mode string) {
+	r.clipMu.Lock()
+	defer r.clipMu.Unlock()
+	r.clipSwitching = false
+	if r.chrome != nil && r.chrome != original {
+		r.clipMode = mode
+	} else {
+		r.clipMode = r.current.BrowserMode
+	}
 }
 
 func (r *runtime) healthy() bool {
@@ -113,6 +175,10 @@ func (r *runtime) handoff(ctx context.Context, mode string) (session.BrowserHand
 	if r.modeReady && r.current.BrowserMode == mode && r.alive() {
 		return r.snapshot(), nil
 	}
+	r.clipMu.Lock()
+	r.clipSwitching = true
+	r.clipMu.Unlock()
+	defer r.endClipboardSwitch(r.chrome, mode)
 	// A later owner-completed close is expected after a failed transition.
 	// Keep the viewer/profile available until retry, explicit stop or expiry.
 	r.modeReady = false
@@ -144,6 +210,15 @@ func (r *runtime) handoff(ctx context.Context, mode string) (session.BrowserHand
 	}
 	if _, err = os.Lstat(filepath.Join(r.profile, "SingletonLock")); !os.IsNotExist(err) {
 		return r.snapshot(), errors.New("browser-profile-still-locked")
+	}
+	// Text pasted for the human must not be left for the agent's browser.
+	if mode == "agent" {
+		if r.clip == nil {
+			return r.snapshot(), errClipboardUnavailable
+		}
+		if err = r.clip.Clear(ctx); err != nil {
+			return r.snapshot(), err
+		}
 	}
 	handle, err := r.launch(ctx, mode)
 	if err != nil {

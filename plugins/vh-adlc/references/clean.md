@@ -11,10 +11,12 @@ entry points can point `TMPDIR` and `GOTMPDIR` at.
 
 1. Run `vh-adlc clean --dry-run` from the repository, or with `--repo <dir>`. Report what it would
    remove, what it keeps and why, and what needs a flag.
-2. When the user asked for cleanup, or the session cannot work because `/tmp` is full, and the dry run
-   answered with no failing finding, run `vh-adlc clean`. Report what it removed and the space freed.
-3. Pass `--compose` or `--kind` only when the user asks for them. A dry run without them still lists an
-   abandoned Compose project or kind cluster under `needs_flag`, so you can tell the user it exists.
+2. When the user asked for cleanup, the session cannot work because `/tmp` is full, or the session's
+   work is done (see "Clean up when the session's work is done" in `references/loop.md`), and the dry
+   run answered with no failing finding, run `vh-adlc clean`. Report what it removed and the space freed.
+3. Pass `--compose` or `--kind` when the user asks for them, and at the end of a session's work, where
+   `references/loop.md` runs both. Otherwise a dry run without them still lists an abandoned Compose
+   project or kind cluster under `needs_flag`, so you can tell the user it exists.
 4. If the session is still blocked, list the kept entries and the `unmatched` count and size for the
    user. Remove nothing by hand.
 

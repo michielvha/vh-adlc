@@ -2,7 +2,7 @@
 
 GitHub offers free security settings that a repository has to switch on itself. Which of them a
 repository should have, by its visibility, is decided by
-[Repository security](https://github.com/vhco-pro/docs/blob/d8f07c9dd69038375a535af8ad586086688f85ab/conventions/repository-security.md)
+[Repository security](https://github.com/vhco-pro/docs/blob/1ccf8f314575ece1f3fcc8e48c4fd804a1ca88ff/conventions/repository-security.md)
 at the plugin's docs pin; this page does not restate it. It covers how vh-adlc checks those settings
 and, when the consumer has opted in, turns them on. Maintenance sweeps and onboarding both use it.
 The plugin root is two directories above a skill's own directory.
@@ -26,8 +26,8 @@ the reason `security-settings-mode` printed, or the one the skill chose, as `--m
 The JSON names the repository, its visibility, whether it is archived, the caller's admin
 permission, the Renovate and Dependabot detection results with their evidence, the mode and mode
 reason, and one entry for each of `dependabot_alerts`, `dependabot_security_updates`,
-`secret_scanning` and `secret_scanning_push_protection`. The alerts entry covers the dependency
-graph, which GitHub generates once alerts are on. A private or internal repository on github.com
+`secret_scanning`, `secret_scanning_push_protection` and `private_vulnerability_reporting`.
+The alerts entry covers the dependency graph, which GitHub generates once alerts are on. A private or internal repository on github.com
 also gets a read-only `code_scanning` entry. `--format markdown` prints the same data as a
 `## Repository security settings` section, one table row per entry, followed by "Owner decisions".
 
@@ -80,6 +80,11 @@ its binding does not resolve, the committed settings are invalid, or the run can
 Nothing grants turning a setting off. No command writes a value that disables a setting, and the
 helper never unpauses paused security updates.
 
+A committed `security_settings_apply_only` list narrows apply mode to the named settings.
+The helper reads the list from the same default-branch configuration as apply authority.
+Check mode still reports all settings. In apply mode, an off setting outside the list is
+left off with `outside-apply-scope`.
+
 ## Reads and writes
 
 Every call goes through `gh api --hostname` with the host of the validated origin.
@@ -89,6 +94,11 @@ Every call goes through `gh api --hostname` with the host of the validated origi
 | Dependabot alerts | `GET repos/{r}/vulnerability-alerts` | 204 | 404 | `PUT` the same path |
 | Dependabot security updates | `GET repos/{r}/automated-security-fixes` | 200 with `enabled` true | 404, or 200 with `enabled` false | `PUT` the same path |
 | Secret scanning, push protection | `GET repos/{r}`, `security_and_analysis` | status `enabled` | any other status | `PATCH repos/{r}` with `security_and_analysis` |
+| Private vulnerability reporting | `GET repos/{r}/private-vulnerability-reporting` | 200 with `enabled` true | 200 with `enabled` false | `PUT` the same path on eligible public repositories on github.com |
+
+Private vulnerability reporting is unavailable on private, internal and archived
+repositories and on hosts other than github.com. An HTTP error or a missing
+`enabled` boolean on the public read leaves the state unknown.
 
 An HTTP success alone never means on. Alerts are written and read back first, and security updates
 are tried only once alerts read back as on. The helper calls no `code-scanning` endpoint.
@@ -99,7 +109,7 @@ are tried only once alerts read back as on. The helper calls no `code-scanning` 
 | --- | --- |
 | `already-on` | On before any write. Reason `renovate-overlap` for security updates beside Renovate, `owner-choice-conflict` when the keep-off list names it, or `paused` when security updates read `paused` true |
 | `enabled` | Off before, written, and read back as on |
-| `left-off` | Deliberately not enabled: `renovate-present`, `renovate-unknown`, `renovate-detection-failed`, `dependabot-detection-failed` or `owner-choice` |
+| `left-off` | Deliberately not enabled: `renovate-present`, `renovate-unknown`, `renovate-detection-failed`, `dependabot-detection-failed`, `owner-choice` or `outside-apply-scope` |
 | `unavailable` | Not free for this repository: `not-free-on-private` or `archived` |
 | `not-changed` | Off and free, but not written or not read back as on: `check-only`, `alerts-off`, or `api-error` with the HTTP status |
 | `unknown` | Not read: `needs-admin`, or `api-error` with the status or error |
@@ -109,7 +119,7 @@ lists them under "Owner decisions", or "None.". The helper changes none of them.
 
 ## Rules, in order
 
-The helper first reads `repos/{r}`. When that fails, all four entries are `unknown` with
+The helper first reads `repos/{r}`. When that fails, all writable entries are `unknown` with
 `api-error`, it makes no other call, and it exits 1. Otherwise each entry takes the state of the
 first rule that applies:
 

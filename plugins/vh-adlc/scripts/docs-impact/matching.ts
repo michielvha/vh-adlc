@@ -1,4 +1,4 @@
-/** Coverage matching is separate from the feature gate's path.Match semantics. */
+/** Documentation globs and feature-gate patterns share one bounded matching engine. */
 type Token =
   | { kind: "literal"; value: string }
   | { kind: "one" }
@@ -9,9 +9,17 @@ type Token =
 function malformed(): never { throw new Error("invalid coverage pattern"); }
 
 /** Compile once per declaration; matching uses bounded dynamic programming, not backtracking. */
-export function compileCoverage(pattern: string): (source: string) => boolean {
-  const normalized = pattern.replace(/^(?:\.\/)+/u, "");
+export function compileCoverage(pattern: string, dialect: "documentation" | "feature" = "documentation"): (source: string) => boolean {
+  const feature = dialect === "feature";
+  // The gate uses documentation glob semantics for every raw double-star declaration.
+  if (feature && pattern.includes("**")) return compileCoverage(pattern, "documentation");
+  const normalized = feature ? pattern : pattern.replace(/^(?:\.\/)+/u, "");
   if (!normalized || normalized.startsWith("/") || normalized.includes("\0") || normalized.includes("//") || normalized.split("/").includes("..")) malformed();
+  if (feature) {
+    // MatchCovers checks directory prefixes and ordinary literals before path.Match.
+    if (normalized.endsWith("/")) return source => source.startsWith(normalized);
+    if (!/[*?\[]/u.test(normalized)) return source => source === normalized;
+  }
   const chars = Array.from(normalized), tokens: Token[] = [];
   let at = 0;
   while (at < chars.length) {
@@ -58,7 +66,18 @@ export function compileCoverage(pattern: string): (source: string) => boolean {
   if (!directory && remainder.length === 1 && remainder[0].kind === "star" && remainder[0].separators) return source => source.startsWith(prefix);
   return source => {
     if (prefix && !((directory ? source + "/" : source).startsWith(prefix))) return false;
-    const input = Array.from(directory ? source + "/" : source);
+    const value = directory ? source + "/" : source;
+    const bytes = Buffer.from(value);
+    const input = feature ? Array.from(bytes, byte => String.fromCharCode(byte)) : Array.from(value);
+    // Go's star advances by bytes. Its question mark and character classes decode a rune
+    // at that byte position, including a one-byte replacement rune inside a UTF-8 sequence.
+    const runes = feature ? Array.from(bytes, (_byte, index) => {
+      const point = bytes.subarray(index, index + 4).toString("utf8").codePointAt(0);
+      if (point === undefined) throw new Error("missing UTF-8 code point");
+      const encoded = Buffer.from(String.fromCodePoint(point));
+      const width = bytes.subarray(index, index + encoded.length).equals(encoded) ? encoded.length : 1;
+      return { point, width };
+    }) : null;
     let states = new Uint8Array(input.length + 1); states[0] = 1;
     for (const token of tokens) {
       const next = new Uint8Array(input.length + 1);
@@ -72,17 +91,25 @@ export function compileCoverage(pattern: string): (source: string) => boolean {
           if (reachable && input[i] === "/") next[i + 1] = 1;
         }
       } else {
+        const literal = token.kind === "literal"
+          ? (feature ? Array.from(Buffer.from(token.value), byte => String.fromCharCode(byte)) : [token.value])
+          : [];
         for (let i = 0; i < input.length; i++) {
           if (!states[i]) continue;
-          const char = input[i]; let matches = false;
-          if (token.kind === "literal") matches = char === token.value;
-          else if (token.kind === "one") matches = char !== "/";
-          else {
-            const point = char.codePointAt(0);
+          const char = input[i];
+          let width = runes?.[i].width ?? 1;
+          let matches: boolean;
+          if (token.kind === "literal") {
+            width = literal.length;
+            matches = literal.every((value, offset) => input[i + offset] === value);
+          } else if (token.kind === "one") {
+            matches = char !== "/";
+          } else {
+            const point = runes?.[i].point ?? char.codePointAt(0);
             const member = point !== undefined && token.ranges.some(([low, high]) => low <= point && point <= high);
-            matches = char !== "/" && member !== token.negated;
+            matches = (feature || char !== "/") && member !== token.negated;
           }
-          if (matches) next[i + 1] = 1;
+          if (matches) next[i + width] = 1;
         }
       }
       states = next;
