@@ -45,6 +45,13 @@ GitHub's other default labels (`duplicate`, `good first issue`, `help wanted`, `
 
 - Spec gives an issue it files under acceptance or request one type label and no state label. The
   feature document carries the state.
+- Ship's follow-up review files, after a feature's PR merges, the deferred items the owner approved:
+  a follow-up with the repository's feature type (`enhancement`) and a gap with its bug type (`bug`),
+  no state label, and no change to any feature's ownership or issue aliases. Run
+  `bun scripts/labels/cli.ts file --repo <checkout> --operation follow-up --type <type label>` with
+  `--title`, `--body-file` and a new `--output` file. The body ends with the line
+  `Deferred: <document path> D-<nn>`, naming the feature document and its entry; the helper refuses
+  any other ending. Create each approved issue with `--preview <that file> --approved-digest <digest>`.
 - Triage owns every state change after filing. A state label it applies is a triage verdict and
   follows `references/triage.md`, including its confined-controller proof. Triage's neutral
   `create-request` issues carry no labels.

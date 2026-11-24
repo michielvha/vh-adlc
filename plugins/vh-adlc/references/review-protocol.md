@@ -23,6 +23,12 @@ Before dispatching, read the reviewer role's route:
   `review check` against the same text. On `pending`, store nothing and report a line that starts with
   `review pending`, followed by its `reason`, with the raw `reply` in the handoff.
 
+For a spec review, both routes take its scope from one computation:
+`bun scripts/loop/cli.ts review-scope --repo <dir> --document <doc> --commit <X>` prints the previous spec
+review, the document diff since it without the Review Log, and whether the pass is full and why. A host
+dispatch passes that JSON to the reviewer. The `review` command computes it itself and puts it in the
+command route's prompt, because that route's export has no Git history.
+
 ## Independence
 
 A review runs in a separate context. Prefer the registered `vh-adlc-reviewer` agent. If the host does not
@@ -33,8 +39,10 @@ access where the host supports it. Do not copy or translate the reviewer into a 
 If that canonical file cannot be read, leave the review pending rather than invent its instructions.
 
 Both routes receive the repository directory, document path, exact commit, review kind, resolved docs
-revision, verified binary path and plugin pin. A dispatch never tells the reviewer to skip a check or to
-judge from stored results instead of running it. Neither route creates or switches a worktree. If the
+revision, verified binary path and plugin pin, and a spec review also receives its scope. A dispatch never
+tells the reviewer to skip a check, except the scope `review-scope` computes, which the reviewer applies
+only when the resolved convention defines scoped re-review; nor does it tell the reviewer to judge from
+stored results instead of running it. Neither route creates or switches a worktree. If the
 host has neither independent route, or dispatch fails, write a self-contained
 handoff the owner runs elsewhere and leave the review visibly pending: whenever no review is stored, the
 report has a line that starts with the exact words `review pending`, followed by why. Self-review is never labelled

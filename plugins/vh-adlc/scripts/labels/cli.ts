@@ -12,7 +12,7 @@ import { fileIssue, filingPreview, type FilingRequest } from "./issue";
 import { LabelsGitHub } from "./github";
 import { buildPlan } from "./plan";
 
-const USAGE = "usage: cli.ts plan --repo PATH --output FILE | apply --repo PATH --plan FILE --approved-digest SHA256 | file --repo PATH --operation investigate|spec --type TYPE [--verdict V] [--waiting-on prerequisite|decision] --title T --body-file F --output FILE | file --repo PATH --preview FILE --approved-digest SHA256";
+const USAGE = "usage: cli.ts plan --repo PATH --output FILE | apply --repo PATH --plan FILE --approved-digest SHA256 | file --repo PATH --operation investigate|spec|follow-up --type TYPE [--verdict V] [--waiting-on prerequisite|decision] --title T --body-file F --output FILE | file --repo PATH --preview FILE --approved-digest SHA256";
 try {
   const parsed = parseArgs({ args: process.argv.slice(2), allowPositionals: true, strict: true, options: {
     repo: { type: "string", default: "." }, output: { type: "string" }, plan: { type: "string" }, "approved-digest": { type: "string" },
@@ -33,6 +33,7 @@ try {
     const spec = v["ownership-spec"];
     let prepared = false;
     const created = fileIssue(checkout, gh, text, v["approved-digest"], approved => {
+      if (approved.operation === "follow-up" && (spec !== undefined || v["ownership-no-push"])) throw Error("follow-up filing changes no feature ownership; drop the ownership options");
       if (approved.operation !== "spec") return;
       const view = snapshot(new OwnershipGit(checkout), false);
       if (view === "legacy") return;
@@ -54,7 +55,7 @@ try {
   } else if (mode === "file") {
     if (v["approved-digest"] || !v.output || !v.operation || !v.type || !v.title || !v["body-file"]) throw new Error(USAGE);
     if (existsSync(v.output)) throw new Error("preview output already exists; choose a new file");
-    if (!["investigate", "spec"].includes(v.operation)) throw new Error(USAGE);
+    if (!["investigate", "spec", "follow-up"].includes(v.operation)) throw new Error(USAGE);
     const request = { operation: v.operation, type: v.type, title: v.title, body: readFileSync(v["body-file"], "utf8"),
       ...(v.verdict === undefined ? {} : { verdict: v.verdict }), ...(v["waiting-on"] === undefined ? {} : { waiting_on: v["waiting-on"] }) } as FilingRequest;
     const { preview, text, digest } = filingPreview(checkout, gh, request);

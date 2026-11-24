@@ -3,8 +3,8 @@
 // vhco-pro/docs change and the plugin edits are tested against one wording.
 
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const repo = resolve(import.meta.dir, "../..");
@@ -12,21 +12,26 @@ const setup = Bun.spawnSync(["bash", join(repo, "plugins/vh-adlc/scripts/ensure-
 if (setup.exitCode !== 0) throw new Error("verified cached binary required for review convergence checks");
 const binary = setup.stdout.toString().trim();
 
-function pluginPin(): string {
-  const match = readFileSync(join(repo, "plugins/vh-adlc/knowledge.md"), "utf8").match(/Pass `([0-9a-f]{40})` as `--plugin-pin`/);
-  if (!match) throw new Error("plugin pin not found in knowledge.md");
-  return match[1];
-}
+// The complete docs/specs/spec-review-convergence.md proved its convention text at this revision. Later
+// features change that text (docs/specs/proportional-review.md), so the pages resolve here explicitly,
+// whatever the repository pin names.
+const CONVERGENCE_REVISION = "0c983f6793bfe35eb96ae95ad0c361c6200af44f";
 
-// resolvedPage asks the binary which docs revision applies to this repository, so the repository pin
-// in AGENTS.md wins over the plugin pin exactly as every operation sees it, then reads the cached page.
+// resolvedPage resolves the page at CONVERGENCE_REVISION: a throwaway repository with no pin of its own
+// takes the plugin pin it is given, then the page is read from the binary's cache.
 function resolvedPage(page: string): string {
-  const run = Bun.spawnSync([binary, "knowledge", "--repo", repo, "--plugin-pin", pluginPin(), "--page", page], { stdout: "pipe", stderr: "pipe" });
-  const report = JSON.parse(run.stdout.toString());
-  if (report.result !== "answered") throw new Error(`knowledge did not answer: ${run.stdout.toString()}`);
-  // The binary caches under ~/Library/Caches on macOS and the XDG cache directory elsewhere.
-  const cache = process.platform === "darwin" ? join(homedir(), "Library", "Caches") : process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
-  return readFileSync(join(cache, "vh-adlc", "docs", report.knowledge.revision, page), "utf8");
+  const scratch = mkdtempSync(join(tmpdir(), "vh-convergence-"));
+  try {
+    Bun.spawnSync(["git", "-C", scratch, "init", "-q"], { stdout: "pipe", stderr: "pipe" });
+    const run = Bun.spawnSync([binary, "knowledge", "--repo", scratch, "--plugin-pin", CONVERGENCE_REVISION, "--page", page], { stdout: "pipe", stderr: "pipe" });
+    const report = JSON.parse(run.stdout.toString());
+    if (report.result !== "answered" || report.knowledge.revision !== CONVERGENCE_REVISION) throw new Error(`knowledge did not answer at ${CONVERGENCE_REVISION}: ${run.stdout.toString()}`);
+    // The binary caches under ~/Library/Caches on macOS and the XDG cache directory elsewhere.
+    const cache = process.platform === "darwin" ? join(homedir(), "Library", "Caches") : process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
+    return readFileSync(join(cache, "vh-adlc", "docs", report.knowledge.revision, page), "utf8");
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 }
 
 function section(text: string, heading: string): string {

@@ -1,9 +1,9 @@
 ---
-status: in-progress
-status_description: "Claimed for implementation on feat/proportional-review. Next: T1, then owner approval of the replay labels and cases before the first rule-editing commit (T2)."
+status: complete
+status_description: "Complete on feat/proportional-review: all 17 criteria met at implementation review R-30. Where both rule sets converge (the Claude route) spec reviews fell from 44 to 10 and body growth from 972 to 343 lines; the Codex question (D-19) and two known losses (D-17, D-18) wait for the follow-up review after merge."
 branch: feat/proportional-review
 issue: null
-goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised and every deferred item is judged once the feature is merged."
+goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds where both rule sets converge, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised, apart from any the owner defers as a known loss, and every deferred item is judged once the feature is merged."
 covers:
   - plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md
   - plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md
@@ -16,6 +16,7 @@ covers:
   - plugins/vh-adlc/references/loop.md
   - plugins/vh-adlc/references/review-protocol.md
   - plugins/vh-adlc/scripts/loop/cli.ts
+  - plugins/vh-adlc/scripts/loop/review-scope.ts
   - plugins/vh-adlc/knowledge.md
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
@@ -32,6 +33,12 @@ covers:
   - tests/vh-adlc/proportionality.test.ts
   - tests/vh-adlc/review-convergence.test.ts
   - tests/vh-adlc/direct-operation-compatibility.test.ts
+  - tests/vh-adlc/author-extras.test.ts
+  - tests/vh-adlc/check.test.ts
+  - tests/vh-adlc/fixtures.test.ts
+  - tests/vh-adlc/scenarios/gh-stub.ts
+  - tests/vh-adlc/evidence/claude-code/S17.*
+  - tests/vh-adlc/evidence/claude-code/S16.oldpin-reviewer.md
 ---
 
 # Plan: Proportional review
@@ -53,8 +60,8 @@ The feature changes the rules at their source, in the shared convention, the rev
 ship and resume skills:
 
 - Each project states a `## Product profile` in `AGENTS.md`. A false fact, an unmeetable criterion or a
-  broken proof keeps its severity; a failure path is blocking or should-fix only when someone using that
-  product would plausibly hit it. Security, data-loss and tenant-isolation defects stay blocking always.
+  broken proof keeps its severity; a failure path is blocking or should-fix only when someone using that product would plausibly hit it,
+and one the reviewer is unsure about is rated should-fix rather than dropped. Security, data-loss and tenant-isolation defects stay blocking always.
 - The author may answer a finding with a stated limit in Scope, unless it excludes a case the goal, a
   criterion or Scope names. Later passes do not raise it again unless it leaves one of those three
   defects, an unmeetable criterion or an unsolved problem.
@@ -82,21 +89,40 @@ today's behavior, pinless ones take the new rules with the plugin upgrade. It bu
 
 Product quality is a hard constraint, proved by replay on one enterprise and one small application
 document, on the Codex and Claude routes. The owner approves the labels, profile and case before the
-first rule-editing commit. A labelled defect fails if the old rules raised it in two of three runs and the
-new rules miss it in all twelve at the owner's minimum severity. Full loops under a scripted owner must
-then need at most half the old total of reviews and body growth, with fewer questions. Case material
+first rule-editing commit. A labelled defect fails if the old rules raised it at or above the owner's minimum severity in
+two of three runs and the new rules miss it in all twelve at that severity, or if the old rules raised it in
+two of three runs but fewer than two at that severity and the new rules miss it in all twelve at any severity. Full loops under a scripted owner must
+then need at most half the old total of reviews over the pairs where both loops reached a clean pass, with
+every other pair reported as measured, and at most half the old total of body growth over the pairs whose old loop
+reached a clean pass with stored documents (expected to be the two Claude-route pairs, since both Codex-route old loops lost their documents; with no
+qualifying pair, AC-17 is not met); the question rule is proved by scenario,
+not counted in the loops (owner, 2026-11-23). After the first complete enterprise result, the owner allowed
+one generic reviewer fix, and every new-rules run repeats on the fixed plugin. Case material
 stays private. The owner's repository name is public, and the owner accepts that stored review records
 name its candidate documents with counts; the second user's repository name stays private unless they
 agree.
-Nothing has run yet.
+Validation so far: every task is done with observed evidence (unit tests, the S17 scenarios, including the rerun on the fixed reviewer, and the pin bump). The replays on the fixed reviewer are complete apart from the enterprise case's Codex loop. On that case two real defects are lost, each on one route: label L-08 on the Claude route, a should-fix gap the old brief raised in two of three passes and the new brief in none of twelve, and that the Codex route raises under neither brief; and label L-10 on the Codex route, a should-fix gap the old brief raised in two of three passes and the new brief in none of twelve, and that the new brief still raises on the Claude route. The owner deferred them as D-17 and D-18 (2026-11-24). On the Claude route both rule sets' loops reached a clean pass on both cases, and the new rules needed 10 spec reviews against 44. On the Codex route the new rules reached a clean pass on the small application case in 15, where the old loop was lost unclean at 19 or more, and the enterprise loop stopped at Codex's usage limit after 25, unclean, with as many blocking findings per round as the old loop had over the same rounds. The owner deferred the Codex question as D-19 (2026-11-24). Every task is done (T1 to T30) and every criterion met at implementation review R-31. The replays ran on brief `ef685da1`, before T29 moved its two sentences into the profile-only paragraph, which changes no instruction under the companion convention. The Codex question and the two known losses wait for the follow-up review after merge, tracked in #172.
 
-Since the acceptance at R-5, the owner added the Deferred section, the cut check, the follow-up review
-(judged after merge, because the spec rests on assumptions the built feature tests) and scope growth as a
-pass condition. R-5's deferred findings are this document's first Deferred entries. Acceptance authorizes
-the plugin edits, the replay harness and the companion convention PR on a feature branch; shipping and
-the pin bump need the usual approvals.
+The R-9 acceptance covered what the owner added after R-5: the Deferred section, the cut check, the
+follow-up review (judged after merge, because the spec rests on assumptions the built feature tests) and
+scope growth as a pass condition. R-5's deferred findings are this document's first Deferred entries. This
+revision, after that acceptance, drops the Open Question count from the replay loops, records the one
+owner-allowed reviewer fix and the new-brief reruns it needs, builds the replay results from the stored private runs continuing same-identity sets, keeping loop clones so a crash resumes, a launch record for the sets stored before that (owner decision, 2026-11-23), and lower bounds for the two old loops lost to an expired login (owner decision, 2026-11-24), adds a scenario for an uncertain
+failure path, counts both briefs at the same severity bar for retention, records L-08 and L-10 as deferred known losses, applies the halving bar for spec reviews to the pairs where both loops reached a clean pass, and counts a new loop stopped by its route's usage limit from its kept clone (owner decisions, 2026-11-24). The companion convention is merged and the
+pin bump is done (T21); shipping still needs the usual approvals.
 
 ### Background
+
+**Harm and simplest alternative.** The harm: every vh-adlc user pays for each spec in owner attention and
+elapsed time, on every feature, and it does not heal; dozens of rounds per document are common in the counts below. The simplest alternative without machinery is a process rule alone ("prefer removing",
+"revisit the previous change"), which `spec-review-convergence` added (`SKILL.md:114-117` at `915441e8`; `SKILL.md:129-137` now); 69 and 15
+review rounds after its merge show it did not stop the churn. This feature is mostly rule text too. Its
+machinery is the `review-scope` command, a `follow-up` mode of the labels helper, the follow-up review's
+issue filing and verdict commit, and the replay harness with its growth measure. The replay exists
+because a wording test cannot show the rules keep quality. Filing an issue at each deferral is the simpler
+alternative to the follow-up review, and it loses: it judges usefulness on the spec's assumptions and
+files issues for items the built feature turns out not to need, which is why the owner chose to judge
+after merge.
 
 Measured on `main` at `915441e8` with the conventions at `vhco-pro/docs` `0c983f67`, the pin in
 `AGENTS.md:4`.
@@ -146,17 +172,6 @@ findings, keep product quality, prove it by replaying real documents (one enterp
 application), and cite only public evidence because the investigation behind it summarizes private
 sessions.
 
-**Harm and simplest alternative.** The harm: every vh-adlc user pays for each spec in owner attention and
-elapsed time, on every feature, and it does not heal; dozens of rounds per document are common in the
-counts above. The simplest alternative without machinery is a process rule alone ("prefer removing",
-"revisit the previous change"), which `spec-review-convergence` added (`SKILL.md:114-117`); 69 and 15
-review rounds after its merge show it did not stop the churn. This feature is mostly rule text too. Its
-machinery is the `review-scope` command, a `follow-up` mode of the labels helper, the follow-up review's
-issue filing and verdict commit, and the replay harness with its growth measure. The replay exists
-because a wording test cannot show the rules keep quality. Filing an issue at each deferral is the simpler
-alternative to the follow-up review, and it loses: it judges usefulness on the spec's assumptions and
-files issues for items the built feature turns out not to need, which is why the owner chose to judge
-after merge.
 
 ## Scope
 
@@ -211,6 +226,12 @@ Out of scope, by name:
 - Changing the complete `docs/specs/spec-review-convergence.md`: it stays complete, and its test keeps
   proving its text at `0c983f67`.
 - Calibrating the reviewer's precision over time.
+- Not handled: a set stored before T25 that two launches wrote, because none was and a run that continues
+  such a set records its identity first (R-15 F-01).
+- Counting the Open Questions the author raises in the replay loops: a headless session settles a question
+  before it commits, so a commit-based count reads zero, and rerunning every old-brief loop to count them
+  another way costs about a day. The plausible-choice rule is proved by `S17.questions` (owner cut on
+  2026-11-23).
 - A binary step for the follow-up review: the rules block and `vh-adlc next` do not change, so the review
   runs from ship, not from `next`.
 - Filing follow-up issues without the owner's approval; a standing authority for that is part of the
@@ -247,7 +268,7 @@ consequence: its Review log section names the product profile as the context for
 (such as `0c983f67`) the reviewer and the spec skill keep today's behavior: full passes, today's
 severity, every unapplied nit in the owner summary, judgement findings to Open Questions, no Deferred
 section, no cut check, and no follow-up review in ship or resume. This is the pattern the nit rule uses
-today (`SKILL.md:120-128`). The scope fields are passed on every pin; on an
+today (`SKILL.md:140-149`). The scope fields are passed on every pin; on an
 older pin the reviewer ignores them.
 
 A repository without its own pin resolves the plugin pin (`internal/knowledge/knowledge.go:178-179`), so
@@ -284,9 +305,14 @@ The convention's definitions change as follows; record formats and names stay.
   pass on a wrong implementation. The free-text widening exception stays.
 - nit: as today, plus an undefined path that nobody using the profiled product would plausibly hit.
 
-The reviewer's failure-mode paragraph (`vh-adlc-reviewer.agent.md:47-50`) keeps asking the same four
-questions and rates each gap on this scale, replacing "A path the document leaves undefined is a
-finding". The harm-statement findings from PR #152 keep their severity.
+The reviewer's failure-mode paragraph (`vh-adlc-reviewer.agent.md:55-68`) keeps asking the same four
+questions and rates each gap on this scale, replacing "A path the document leaves undefined is a finding".
+Two reviewer rules apply the scale. Before settling any finding's severity, the reviewer checks it against
+the always-blocking classes, and a finding in one of them is blocking whichever section or path it came
+from. The reviewer's restatement names cases inside the glossary classes: forging or bypassing an
+authorization is acting beyond it, reaching a credential is exposing it, and silently dropping data is
+losing it. When the reviewer is unsure whether people using the product would hit a failure path, it rates
+it should-fix rather than nit or dropping it. The harm-statement findings from PR #152 keep their severity.
 
 ### Stated limit
 
@@ -312,7 +338,7 @@ command route, whose export has no Git history.
 
 With a scope, the reviewer covers the diff plus every section that states a rule, ID or term the diff
 changes. Outside that scope it reports only blocking findings. The sentence "Return every finding you can
-establish in this pass" (`vh-adlc-reviewer.agent.md:52`) becomes "within this pass's scope". The
+establish in this pass" becomes "within this pass's scope" (`vh-adlc-reviewer.agent.md:79`). The
 protocol's "A dispatch never tells the reviewer to skip a check" (`references/review-protocol.md`,
 Independence) gains one exception: the scope `review-scope` computes, on a resolved convention that
 defines scoped re-review.
@@ -328,8 +354,8 @@ cheaper-now partial option or a lock to one dependency version is not offered. T
 (`:167-168`, "A section that weighs options and keeps one ... raises that choice here") applies only
 under the same rule. With no recorded rules, every judgement call the goal does not decide is a question.
 
-The spec skill follows. Author mode (`SKILL.md:81-82`) raises a judgement call only under that rule.
-Review mode step 4 (`:112-116`) resolves a judgement finding within the recorded rules and raises a
+The spec skill follows. Author mode (`SKILL.md:84-87`) raises a judgement call only under that rule.
+Review mode step 4 (`:125-133`) resolves a judgement finding within the recorded rules and raises a
 question only under the same rule, including the remove-or-add choice ("where they behave differently,
 the choice is an Open Question recommending removal"). #141 lands first and lets the author cut an extra
 it added without a question; that exception stays, and this rule covers the rest of step 4.
@@ -349,8 +375,9 @@ one line, `- D-<nn>: <the item>. From: <source>. Verdict: pending.`, where the s
   statement);
 - `R-<n> F-<nn>, deferred at acceptance` for a finding the owner defers when accepting;
 - `owner cut on <date>` for an item an owner-directed cut removes;
-- `author cut` for an extra the author removes under #141;
-- `drift re-review R-<n>` for extra work the owner defers in a drift re-review (`SKILL.md:141-144`).
+- `author cut` for an extra the author removes under #141, whose Outcome-cell record (`removed author
+  extra: ...`) stays in that pass's Review Log row beside the entry;
+- `drift re-review R-<n>` for extra work the owner defers in a drift re-review (`SKILL.md:203-206`).
 
 IDs are never reused. An entry answers its finding the way a stated limit does: the reviewer reads the
 section and does not raise the entry's substance again, unless it leaves an always-blocking defect, makes
@@ -432,7 +459,11 @@ Each entry's `Verdict:` reads `drop, <reason>`, `follow-up <issue link>`, `gap <
 The labels are approved before the first commit that edits the reviewer, the spec skill or the companion
 convention, in either repository, so the rules cannot be fitted to them. The implementation review checks
 that order by hand; the harness only refuses a case whose approval line is missing or whose digests do
-not match.
+not match. The one exception is the owner's decision of 2026-11-23: after the first complete replay result, the
+enterprise case on the Claude route, showed three always-blocking defects raised only at should-fix and one
+plausible failure path dropped, the owner allowed one generic reviewer fix, commit `ef685da1` (check every
+finding against the always-blocking classes, and never drop an uncertain failure path). The new brief then moves to the fixed plugin, plugin commit `ef685da1` with the companion head, and every
+new-brief run repeats on it; the old-brief runs stay valid because the old brief does not change.
 
 Before any new-brief run, the harness greps the whole vh-adlc tree at the feature head and the companion
 branch's diff (from a local `vhco-pro/docs` checkout passed as an option) for every entry in `terms` and
@@ -442,7 +473,7 @@ documents with counts, and no document content. The implementation review dispat
 cite case material only by label ID, count and digest, and the harness runs the terms check again on this
 document and the results file before an implementation review is stored and before ship.
 
-Both briefs are fixed before the first run: old is the plugin at the feature branch's merge base at that
+Both briefs are fixed before the first run, apart from that one owner-allowed move of the new brief: old is the plugin at the feature branch's merge base at that
 moment, with the companion PR's parent docs revision; new is the feature head at that moment, with the
 companion head. The harness records both plugin commits, both docs revisions and the model of every run
 in the results. Before the pin bump, it checks that every page the reviewer and the spec skill read is
@@ -450,7 +481,7 @@ byte-identical at the companion head and at the commit the pin will name; if not
 repeated at the pinned commit. For each brief, the harness makes a throwaway
 clone at X and commits X' on top, holding the profile in `AGENTS.md`, the brief's docs pin and the
 `.vh-adlc/loop.yaml` route settings for the route under test, because the command route reads its policy
-and its export from the reviewed commit (`scripts/loop/cli.ts:161-162`). Before counting a run it checks
+and its export from the reviewed commit (`scripts/loop/cli.ts:181-182`). Before counting a run it checks
 that the route and model the run reports are the ones under test. It runs:
 
 1. First passes: a spec review on each route, three times with the old brief and six with the new, the Codex command route
@@ -460,28 +491,77 @@ that the route and model the run reports are the ones under test. It runs:
    Question's recommendation and answers the convergence trigger with "keep going". A clean pass is a
    spec review with no blocking finding whose handling leaves the normative baseline unchanged and no
    Open Question, so `vh-adlc gate planned` at that commit fails only on `accepted`. The loop counts spec
-   reviews up to and including that pass and the Open Questions the author raised. A loop stops at 60
+   reviews up to and including that pass. A loop stops at 60
    spec reviews and then counts as 60.
 
-Both briefs use the same route settings and models. A run that fails to execute is recorded as failed and
+Both briefs use the same route settings and models. The one change allowed during the replay is how the
+command route hands Codex its prompt: from 2026-11-24 it reads the same prompt bytes from the prompt file on
+standard input instead of from one argument, because a scoped re-review's diff passed Linux's 128 KiB limit on
+one argument; a resumed loop clone takes that change as a commit. A run that fails to execute is recorded as failed and
 rerun; it never counts as a pass. An independent agent matches findings to labels from `labels.md` and the
-stored records, and its verdicts are stored beside each run.
+stored records, and its verdicts are stored beside each run. Every counted pass, its verdicts and every
+loop's documents are stored in the case directory as they finish, and the results are assembled from those
+stored runs, so a run that stops loses no finished pass. A stored set is one part (first passes or loop) of one brief on one route, and it records its plugin
+commit, docs revision and model in `runs/<brief>-<route>-<part>.identity.json`. A run continues a stored
+set whose identity matches its own, running only the passes the set still lacks, and starts a fresh set
+when the identity differs: the earlier files of that part, with its identity, move to `runs-superseded/`,
+so a set never mixes two briefs. A loop works in a clone kept in the case directory, which belongs to its set: a loop that fails is resumed
+from that clone by the next attempt under the same identity and loses no finished review, the clone is
+removed once the loop finishes, and it moves aside with its set when a fresh set starts. A new-brief-only run and `assemble` use a stored set only when its identity matches the
+current brief, route and model, and refuse otherwise; `assemble` reads only current sets, never
+`runs-superseded/`. Sets stored before T25 have no identity file: `runs/launch-record.json` in the case
+directory gives each such set one entry with its brief, route, part, plugin commit, docs revision, model,
+the launching process ID and command line, and the files it wrote, and the harness counts only the listed
+files and refuses any other run file of that set. A run continues such a set only when it holds no unlisted run
+file; otherwise the run starts a fresh set. Once a part's identity file is written, it alone governs that
+part. Each listed
+set was written by one launch; the owner accepted this record on 2026-11-23. Moving the new brief therefore
+reruns only the new brief.
+
+An old-brief loop that stopped before a clean pass counts the spec reviews it recorded as a lower bound on
+its total, marked as not clean. When such a loop lost its documents, its reviews are counted from the reviewer's session logs within its
+launch's window, for the document and the old docs revision: the reviewed commits in time order, less the
+first ones that belong to the launch's old-brief first-pass executions (every execution that reached the
+reviewer, not only the counted ones), with each remaining distinct commit counted once and the total capped
+at 60. The launch record and the logs show that each such launch ran its loop once, so no restarted attempt
+is summed in. The bound is recorded in `runs/old-<route>-loop.bound.json`, part of its set's record like the identity
+file and never a run file a launch-record entry lists, with the window, the first-pass
+executions it set aside and the commits it counted (owner decision, 2026-11-24, for the two Codex-route old
+loops lost when the session's login expired). A loop set that holds such a bound counts as finished: runs and
+`assemble` keep it and never run that loop again.
+
+A new-brief loop stopped by its route's usage limit keeps its clone, so its bound is counted from the clone
+instead: the spec rows in the document's Review Log, acceptance rows aside, at the clone's head less those at
+its X', capped at 60 (owner decision, 2026-11-24). `run.ts bound --from-clone` records the count, the clone's
+head and X' and the source in `runs/new-<route>-loop.bound.json`. Such a bound does not finish its set: a
+later run under the same identity resumes the kept clone, and once the loop stores its documents, the bound
+moves to `runs-superseded/`. Either kind of bound is part of its set's record like the identity file, so it
+moves aside with its set when a fresh set starts.
 
 Retention, per label and route: a label fails when at least two of the three old-brief first passes raise
-it, at any severity, and none of the six new-brief first passes raises it at or above its minimum
-severity. A failing label gets six more new-brief first passes and fails only if none of the twelve raises it at
-or above its minimum severity. For a reviewer whose hit rate is unchanged, a label fails with probability at most 0.9 percent (at a
-per-run hit rate near 0.14; computed exactly over the binomial outcomes). Labels no old-brief pass raises
-cannot fail and are reported.
+it at or above its minimum severity, and none of the six new-brief first passes raises it at or above its
+minimum severity. Both briefs meet the same bar (owner decision, 2026-11-24): a reviewer that rates a
+defect below its minimum under both briefs has not lost it to the new rules. A label that at least two of
+the three old-brief passes raise at any severity, but fewer than two at or above its minimum, fails instead
+when none of the six new-brief first passes raises it at any severity, because then the new rules dropped it. A failing label gets six more new-brief first passes and fails only if none of the twelve meets the bar it
+failed: its minimum severity under the first condition, any severity under the second. For a reviewer whose hit rate is unchanged, a label fails with probability at most 0.9 percent (at a
+per-run hit rate near 0.14; computed exactly over the binomial outcomes). A label that fewer than two
+old-brief passes raise at any severity cannot fail and is reported.
+The results show each label's old-brief and new-brief counts at its minimum severity and at any severity.
 
-Rounds: over the four case and route pairs, the new-brief loops' total spec reviews must be at most half
-the old-brief loops' total, and their total Open Questions fewer.
+Rounds: over the case and route pairs where both briefs' loops reached a clean pass, the new-brief loops'
+total spec reviews must be at most half the old-brief loops' total (owner decision, 2026-11-24). Every
+other pair is reported with its counts, a loop that did not reach a clean pass as a lower bound: an old loop
+lost to the expired login by its recorded bound, and a new loop stopped by its route's usage limit by its
+kept-clone bound. There must be at least one pair where both loops reached a clean pass. The
+totals name each failing label with its case and route.
 
 Growth: at every pass the harness records the body size, the line count above `## Review Log` without the
 `## Deferred` section, so deferring an item is not counted as growth. A loop's growth is the body size at
-its clean pass minus the size at X'. Over the four pairs, the new-brief loops' total growth must be at
-most half the old-brief loops' total; when the old total is zero or negative, the new total must be no
-larger than it.
+its clean pass minus the size at X'. Over the case and route pairs whose old-brief loop reached a clean pass and stored its documents, of which
+there must be at least one, the new-brief loops' total growth
+must be at most half the old-brief loops' total; when the old total is zero or negative, the new total must
+be no larger than it.
 
 Private material (case files, labels, records, matcher verdicts, clean documents, transcripts) stays in
 the case directory, a private directory on the owner's host outside every public repository. The second
@@ -489,8 +569,7 @@ user's document and repository at X are copied there with their consent, so both
 verified on one host and stay in the replay set for later changes. The implementation review dispatch
 names the case directories so the reviewer can inspect them. The harness writes only counts to
 `tests/vh-adlc/evidence/proportional-review/results.md`: per case, route and brief, the plugin commit,
-docs revision and model of each run, labels raised per run by ID and severity, rounds to clean, questions
-raised, body size per pass, execution failures and the terms check.
+docs revision and model of each run, labels raised per run by ID and severity, rounds to clean, body size per pass, execution failures and the terms check.
 Cases are named "enterprise" and "small application", with no repository or product names.
 
 The cases:
@@ -520,6 +599,9 @@ new docs revision moves its pin back to restore today's severity text.
 The spec baseline in `tests/vh-adlc/direct-operation-compatibility.test.ts`,
 `tests/vh-adlc/proportionality.test.ts` from PR #152 (it pins reviewer severity text) and the
 `reviewPrompt` calls in `tests/vh-adlc/loop/lenses.test.ts:78`, `:93` move to the new text and input.
+`tests/vh-adlc/author-extras.test.ts` keeps proving #141's exception and its Review Log record,
+`tests/vh-adlc/check.test.ts` moves its Bun-convention check to the wording at the bumped pin, and
+`tests/vh-adlc/fixtures.test.ts` checks the fixture's convergence and companion docs revisions.
 `S16.oldpin-reviewer` stays: on the old pin the reviewer keeps today's failure-mode check. The S17 canned
 records live in `tests/vh-adlc/evidence/proportional-review/canned/`, so `scriptedPlugin`
 (`tests/vh-adlc/scenarios/run.ts:1114-1122`) takes the canned directory as a parameter, and
@@ -528,108 +610,172 @@ for the old-pin controls.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: The convention at the companion `vhco-pro/docs` revision defines blocking, should-fix and nit
+- [x] AC-01: The convention at the companion `vhco-pro/docs` revision defines blocking, should-fix and nit
       by consequence for the profiled product as Design states, with always-blocking defects blocking on
       every product.
-- [ ] AC-02: That convention raises an Open Question only where the owner could plausibly choose
+      Evidence: established by the observed verification recorded on T1, T2 in Tasks.
+- [x] AC-02: That convention raises an Open Question only where the owner could plausibly choose
       differently, has the author record every other choice in Design, and offers only options that meet
       the goal in full.
-- [ ] AC-03: That convention and the reviewer accept a stated limit as an answer to a finding, and the
+      Evidence: established by the observed verification recorded on T1, T2 in Tasks.
+- [x] AC-03: That convention and the reviewer accept a stated limit as an answer to a finding, and the
       reviewer raises its substance again only for an always-blocking defect, an unmeetable criterion or
       an unsolved problem.
-- [ ] AC-04: The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure
-      paths by it, and without one judges as for production software with users.
-- [ ] AC-05: On both routes, a spec review after the first receives the scope from `review-scope`, covers
+      Evidence: established by the observed verification recorded on T1, T2, T6, T13, T26 in Tasks.
+- [x] AC-04: The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure
+      paths by it, rates a failure path it is unsure about at should-fix or above, and without a profile
+      judges as for production software with users.
+      Evidence: established by the observed verification recorded on T6, T8, T13, T26 in Tasks.
+- [x] AC-05: On both routes, a spec review after the first receives the scope from `review-scope`, covers
       only the document diff and every section that states a rule, ID or term the diff changes, and
       reports only blocking findings outside
       that; the pass is full when there is no previous spec review or a covered path or a docs pin bridge
       file changed.
-- [ ] AC-06: The spec skill raises judgement calls and judgement findings as Open Questions only under the
+      Evidence: established by the observed verification recorded on T3, T4, T5, T6, T13, T26 in Tasks.
+- [x] AC-06: The spec skill raises judgement calls and judgement findings as Open Questions only under the
       plausible-choice rule, judged against the product profile and the files loop context lists.
-- [ ] AC-07: The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules
+      Evidence: established by the observed verification recorded on T7, T14 in Tasks.
+- [x] AC-07: The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules
       do not settle, with a count of the rest and where the full list is.
-- [ ] AC-08: On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary,
+      Evidence: established by the observed verification recorded on T7, T14 in Tasks.
+- [x] AC-08: On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary,
       ship and resume behave as before this feature: no Deferred section, no cut check and no follow-up
       review.
-- [ ] AC-09: vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, the convention
+      Evidence: established by the observed verification recorded on T6, T7, T11, T12, T17, T18 in Tasks.
+      Evidence: R-29 returned not verified: the old-pin control transcripts ran on plugin 2639661, before ef685da1 changed the reviewer; T29 and T30 address it.
+      Evidence: after R-29, T29 moved the reviewer fix into the profile-only paragraph and T30 reran the old-pin controls on that reviewer: all pass.
+- [x] AC-09: vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, the convention
       uses every glossary term except Cut check and Follow-up review, and the convention and both user
       guides use the terms they contain with the glossary's meanings.
-- [ ] AC-10: The replay harness runs a case end to end, refuses a case whose approval line is missing or
+      Evidence: established by the observed verification recorded on T1, T8, T21, T22 in Tasks.
+- [x] AC-10: The replay harness runs a case end to end, reuses a stored old-brief set only when its
+      recorded identity matches the current old brief and refuses otherwise, keeps every finished pass when it assembles results from stored runs, continues a stored set of the same
+      identity and starts a fresh one for a different identity, resumes a failed loop from its kept clone,
+      counts a lost loop's recorded lower bound, counts a set stored before T25 only through a matching
+      launch record entry that lists its files, refuses a case whose approval line is missing or
       whose digests do not match, stops on a case term in the public tree or the companion diff, counts a
       run only on the route and model under test, records each run's plugin commit, docs revision and
       model, writes nothing but counts and identities to the results file, records failed executions
       without counting them as passes, and runs on a public fixture case in the test suite.
-- [ ] AC-11: On the enterprise case, with labels and case approved before the first rule-editing commit, no
-      label fails the retention rule on either route.
-- [ ] AC-12: On the small application case, with labels and case approved before the first rule-editing
+      Evidence: established by the observed verification recorded on T19, T20, T25, T27, T28 in Tasks.
+- [x] AC-11: On the enterprise case, with labels and case approved before the first rule-editing commit, no
+      label fails the retention rule on either route, apart from label L-08 on the Claude host route and
+      label L-10 on the Codex command route, known losses the owner deferred as D-17 and D-18.
+      Evidence: established by the observed verification recorded on T23, T27 in Tasks.
+- [x] AC-12: On the small application case, with labels and case approved before the first rule-editing
       commit, no label fails the retention rule on either route.
-- [ ] AC-13: Over both cases and both routes, the new-brief loops need at most half the old-brief loops'
-      total spec reviews, with fewer Open Questions in total.
-- [ ] AC-14: The convention defines the optional Deferred section outside the normative baseline; the spec
+      Evidence: established by the observed verification recorded on T24, T27 in Tasks.
+- [x] AC-13: Over the case and route pairs where both briefs' loops reach a clean pass, of which there must be
+      at least one, the new-brief loops need at most half the old-brief loops' total spec reviews; the other
+      pairs are reported as measured.
+      Evidence: established by the observed verification recorded on T23, T24, T25, T28 in Tasks.
+- [x] AC-14: The convention defines the optional Deferred section outside the normative baseline; the spec
       skill writes an entry with the exact source text for every stated limit, finding deferred at
       acceptance, owner-directed cut, author cut and drift re-review deferral; and the reviewer does not
       raise an entry's substance again unless it leaves an always-blocking defect, makes a criterion
       unmeetable or leaves the stated problem unsolved.
-- [ ] AC-15: After every owner-directed deferral, the author's reply carries the cut check line, and an item
+      Evidence: established by the observed verification recorded on T1, T2, T6, T7, T15, T26 in Tasks.
+- [x] AC-15: After every owner-directed deferral, the author's reply carries the cut check line, and an item
       that is an always-blocking defect or that the goal or a criterion names becomes an Open Question
       instead of a Deferred entry.
-- [ ] AC-16: Once a feature's PR is merged, the follow-up review gives every pending Deferred entry a verdict
+      Evidence: established by the observed verification recorded on T7, T15 in Tasks.
+- [x] AC-16: Once a feature's PR is merged, the follow-up review gives every pending Deferred entry a verdict
       of drop, follow-up or gap with one line of reason; shows gaps and follow-ups with issue previews and
       drops one line each; files only what the owner approves, through the labels helper's `follow-up`
       mode, never twice for one entry; records every verdict, including declined filings, in a docs PR
       without touching the default branch; runs only for a merged feature, without a writer handoff; and
       the ship report and resume flag a merged complete document with pending entries.
-- [ ] AC-17: Over both cases and both routes, the new-brief loops' total body growth is at most half the
-      old-brief loops' total, or no larger than it when the old total is zero or negative, with body size
+      Evidence: established by the observed verification recorded on T9, T10, T11, T16 in Tasks.
+- [x] AC-17: Over the case and route pairs whose old-brief loop reached a clean pass and stored its
+      documents, the new-brief loops'
+      total body growth is at most half the old-brief loops' total, or no larger than it when the old total is zero or negative, with body size
       recorded per pass and the Deferred section left out of it.
+      Evidence: established by the observed verification recorded on T19, T20, T23, T24, T25 in Tasks.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
 | AC-01, AC-02, AC-03 | Manual procedure: read the convention at the companion revision and confirm each Design rule and glossary definition, including the three always-blocking classes, then run `bun test tests/vh-adlc/proportional-review.test.ts`, which pins the new definitions, the plausible-choice sentence and the stated-limit line at that revision. |
-| AC-04 | Scenario `S17.profile`: a seeded document, silent about users and deployment, where a command a person runs appends its result to a shared file without a lock, reviewed by the real reviewer three times: with a profile saying one person runs it by hand on their own machine, one run at a time; with a profile saying a hosted service runs it for many tenants at once; and with no profile. Pass: the lock gap is nit or absent with the first, and should-fix or blocking with the second and with the third. |
+| AC-04 | Scenario `S17.profile`: a seeded document, silent about users and deployment, where a command a person runs appends its result to a shared file without a lock, reviewed by the real reviewer three times: with a profile saying one person runs it by hand on their own machine, one run at a time; with a profile saying a hosted service runs it for many tenants at once; and with no profile. Pass: the lock gap is nit or absent with the first, and should-fix or blocking with the second and with the third. A fourth run, `S17.profile.unsure`, uses a profile of a small team's shared tool that says nothing about whether runs overlap. Pass: the lock gap is should-fix or blocking. |
 | AC-03 | Scenario `S17.limit`, run as a full pass (the R-1 row's commit is not an ancestor of X) under a profile of a shared build host where parallel jobs run the command: the document says `names.log` is a diagnostic log rebuilt on every run, has an R-1 record F-01 about concurrent writers to it, and has a Scope line `Not handled: concurrent writers to names.log, accepted for this version (R-1 F-01).` Pass: no finding names `names.log` concurrency. Control 1: the same document without that line raises the `names.log` gap. Control 2: an R-1 F-02 about the delete endpoint with `Not handled: callers without a session on the delete endpoint, internal tool (R-1 F-02).` still yields a blocking finding quoting that line. |
 | AC-05 | `bun test tests/vh-adlc/loop/review-scope.test.ts`: `review-scope` picks the right previous review with an acceptance row after it, skips a non-ancestor row, reports full with no row, with a changed `covers` path and with each changed bridge file, leaves the Review Log out of the diff, and `reviewPrompt` from the `review` command carries the result. Scenario `S17.scoped` on the host route and `S17.scoped-command` through the `review` command with a Codex command route: a reviewed document gets one changed Design paragraph and keeps a seeded should-fix gap in an unchanged section. Pass on each: apart from blocking findings, findings name only the changed paragraph or sections that state its terms; none names the unchanged gap; and an unchanged seeded security defect is still raised as blocking. |
 | AC-06 | Scenario `S17.questions`, with scripted reviewer records (`scriptedPlugin`): one judgement finding the seeded product profile settles and one about a public contract. Pass at the companion pin: one Open Question, about the contract, and Design records the other choice. |
 | AC-07 | Scenario `S17.nits`, with scripted reviewer records: an earlier clean pass has reviewed a free-text pattern row; the new pass has no blocking or should-fix finding and eight nits, six citation slips in the normative baseline that the seeded project procedure says need no owner attention and two free-text widening nits on that row. Pass: the summary part of the final reply shows the two and a count of six, and its `All unapplied nits` section lists all eight. |
 | AC-08 | Old-pin controls of `S17.scoped`, `S17.questions`, `S17.nits`, `S17.profile` (single-user profile), `S17.deferred`, `S17.cut` and `S17.followup` on a fixture pinned to `0c983f67`. Pass: the unchanged gap is raised, both judgement findings become Open Questions, the summary lists all eight nits, the lock gap is raised at should-fix or blocking despite the profile, no `## Deferred` section or `Cut check:` line is written, and neither ship nor resume runs or names a follow-up review. `S16.oldpin-reviewer` and `bun test tests/vh-adlc/review-convergence.test.ts` at `0c983f67` still pass. |
 | AC-09 | `bun test tests/vh-adlc/proportional-review.test.ts`: `AGENTS.md` has the section and the companion pin, `knowledge.md` names the same SHA, and the convention uses each glossary term except Cut check and Follow-up review; plus a manual read of the convention and both guides against the glossary definitions. |
-| AC-10 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and scripted reviewers: the results file holds counts, label IDs and run identities and no line of the fixture document; a forced execution failure is recorded and not counted; a run reporting another route or model is not counted; copies of the case with no approval line, an edited label and an edited `case.yaml` are refused before any run; a planted term in the tree or the companion diff stops the run; a term inside a `### R-<n>` record passes while the same term in Design stops it. |
-| AC-11 | Replay of the enterprise case: three old-brief and six new-brief first passes per route, with confirmation runs where the rule calls for them. Pass: the results file shows no failing label on either route. The implementation reviewer opens the case directory, checks that the approval line matches `labels.md` and `case.yaml` and predates the first rule-editing commit in both repositories, and spot-checks the matcher's verdicts against the stored records, citing case material only by label ID, count and digest; the harness's terms check on this document and the results file passes before the review is stored. |
-| AC-12 | Replay of the small application case, same procedure and pass condition. |
-| AC-13 | The same replays' full loops, one per brief per case and route. Pass: the results file shows the new total of spec reviews at most half the old total and fewer Open Questions in total. |
+| AC-10 | `bun test tests/vh-adlc/replay/run.test.ts` on a fixture case built from the scenario fixture with one seeded defect and scripted reviewers: the results file holds counts, label IDs and run identities and no line of the fixture document; a forced execution failure is recorded and not counted; a run reporting another route or model is not counted; a new-brief-only run reuses a stored old-brief set whose recorded identity matches and refuses a mismatched one; a run under another identity moves the earlier stored set aside; a run under the same identity runs only the missing passes; a failed loop's next attempt resumes its kept clone; a pre-T25 lost loop set with a launch-record entry and a bound counts its bound, stays finished and stays out of growth; a kept clone moves aside when a fresh set starts; a pre-T25 set holding an unlisted run file starts fresh; an unclean old loop with stored documents stays out of growth; a `--only loops` rerun keeps the stored first passes; a pre-T25 set is counted through a matching launch record entry, refused through a mismatched one, and refused when it holds a file the entry does not list; pre-T25 first passes followed by a post-T25 `--only loops` run keep each part's own identity; results assembled after an interrupted first-pass set keep its finished passes; copies of the case with no approval line, an edited label and an edited `case.yaml` are refused before any run; a planted term in the tree or the companion diff stops the run; a term inside a `### R-<n>` record passes while the same term in Design stops it; for retention, a label the old brief raises at its minimum passes when a new pass raises it at its minimum and fails after twelve new passes that raise it only below, a label the old brief raises only below its minimum passes when a new pass raises it at any severity and fails after twelve new passes that never raise it, a label one old pass raises at its minimum and one below fails after twelve new passes that never raise it, a failing label gets the six confirmation passes, and the results show the four counts per label; for the totals, a pair with an unclean loop is left out of the halving total and listed with its counts, failing labels are named with case and route, a bound read from a kept clone counts the clone's spec rows since X', a later same-identity run resumes that clone and the bound moves aside once its documents are stored, a bound moves aside with a fresh set, and a session-log bound is never run again. |
+| AC-11 | Replay of the enterprise case: three old-brief and six new-brief first passes per route, with confirmation runs where the rule calls for them. Pass: the results file shows no failing label on either route apart from L-08 on the host route (D-17) and L-10 on the command route (D-18). The implementation reviewer opens the case directory, checks that the approval line matches `labels.md` and `case.yaml` and predates the first rule-editing commit in both repositories, and spot-checks the matcher's verdicts against the stored records, citing case material only by label ID, count and digest. It also checks each pre-T25 set in `runs/launch-record.json` against the recorded command line (its plugin commits and docs revisions) and the stored files' times, checks each `runs/old-<route>-loop.bound.json` against the session logs it names and each `runs/new-<route>-loop.bound.json` still in effect against the Review Log of the kept clone at the head and X' it records, and that the reviewer, the spec skill, `references/review-protocol.md`, `references/loop.md` and `scripts/loop/` differ between the first new brief `5e94e593` and the new brief in the results file, which must be `ef685da1`, only by `ef685da1`'s reviewer change (`git diff 5e94e593 ef685da1 -- <those paths>`); the harness's terms check on this document and the results file passes before the review is stored. |
+| AC-12 | Replay of the small application case, same procedure, brief check and pass condition. |
+| AC-13 | The same replays' full loops, one per brief per case and route, with a loop that stopped before a clean pass counted by its recorded lower bound. Pass: the results file shows, over the pairs where both loops reached a clean pass (at least one pair), the new total of spec reviews at most half the old total, and lists every other pair with its counts. |
 | AC-14 | Scenario `S17.deferred`, with scripted reviewer records and a scripted owner: the owner says "answer R-1 F-01 with a stated limit"; the author also cuts an extra the scripted R-1 flags as added beyond any criterion; scripted R-2 returns no blocking finding and one should-fix finding; the owner accepts R-2 while "deferring R-2 F-01"; later, default-branch drift brings re-review R-3 whose finding asks for extra work, and the owner answers "defer it". Pass: four entries reading `From: R-1 F-01, stated limit.`, `From: author cut.`, `From: R-2 F-01, deferred at acceptance.` and `From: drift re-review R-3.`; the Scope line beside the first; a `Cut check:` line in the replies after the acceptance deferral and the drift deferral; and `vh-adlc fresh` still fresh after the acceptance and drift entries. Scenario `S17.deferred-review`, with the real reviewer, on a document whose Deferred section holds a deferred retry sampler and a deferred session check on a delete endpoint. Pass: no finding names the sampler, and a blocking finding against Scope quotes the delete entry. `bun test tests/vh-adlc/proportional-review.test.ts` pins the convention's section definition and source list. |
 | AC-15 | Scenario `S17.cut`, with scripted reviewer records: the owner says in session "cut the retry sampler and the session check on delete". Pass: a Deferred entry `From: owner cut on <today>.` for the sampler, an Open Question about the session check, Scope still holding the check, and a reply line starting `Cut check:` that names the session check as a security defect. Control: "cut the retry sampler" alone gives the `nothing important lost` line. The acceptance and drift deferrals of `S17.deferred` check the line for those kinds. |
 | AC-16 | `bun test tests/vh-adlc/labels` gains `follow-up` mode cases: one type label, no state label, no alias change, and the `Deferred:` line at the end of the body. Scenario `S17.followup`, with a `gh` stub on `PATH` that records calls and serves `gh issue list`: a fixture feature, complete and merged outside the session by another session's claim, with four pending entries: one the merged code already covers, two useful extensions, and one whose absence a seeded usage example hits. Pass: `/vh-adlc-resume` reports the four pending entries and names the follow-up review; `/vh-adlc-ship` on the document asks for no writer handoff, gives drop, follow-up, follow-up and gap in entry order, and shows the gap, then the follow-ups with previews, then the drop line; the owner approves filing the gap and the first follow-up and declines the second; the stub fails the second creation; the run reports partial and the fixture remote's `docs/follow-up-<slug>` branch holds a commit with the first link recorded. A rerun, with the owner approving again, files only the missing issue and adds a commit to the same branch. The entries end as `drop, ...`, `follow-up <stub link>`, `follow-up, not filed (owner declined)` and `gap <stub link>`; one PR exists for the branch; the fixture remote's default branch is unchanged. Control: the same fixture with its PR not merged runs ship's normal delivery path and no follow-up review, and resume names no follow-up review. |
-| AC-17 | `bun test tests/vh-adlc/replay/run.test.ts`: on the fixture case the results file records body size per pass and leaves a seeded Deferred section out of it; plus the replays' full loops. Pass: the results file shows the new total growth at most half the old total, or no larger than it when the old total is zero or negative. |
+| AC-17 | `bun test tests/vh-adlc/replay/run.test.ts`: on the fixture case the results file records body size per pass and leaves a seeded Deferred section out of it; plus the replays' full loops. Pass: over the pairs whose old-brief loop reached a clean pass with stored documents, the results file shows the new total growth at most half the old total, or no larger than it when the old total is zero or negative. |
 
 ## Tasks
 
-- [ ] T1 `tests/vh-adlc/proportional-review.test.ts` - failing tests that pin the companion convention's severity definitions, always-blocking classes, stated limit, scoped re-review, plausible-choice rule, owner-list triage, Deferred section and source list, the glossary terms the convention uses, vh-adlc's product profile and the companion pin; fails because none exist yet (AC-01, AC-02, AC-03, AC-09, AC-14)
-- [ ] T2 `vhco-pro/docs: conventions/feature-documents.md` - the companion PR on its own branch with every convention rule Design names; T1's convention assertions pass against the companion head (AC-01, AC-02, AC-03, AC-14)
-- [ ] T3 `tests/vh-adlc/loop/review-scope.test.ts` - failing tests for `review-scope`: previous review after an acceptance row, a non-ancestor row, no row, a changed `covers` path, each changed bridge file, the Review Log left out of the diff, and `reviewPrompt` carrying the result; fails because the command does not exist (AC-05)
-- [ ] T4 `plugins/vh-adlc/scripts/loop/cli.ts`, `tests/vh-adlc/loop/lenses.test.ts` - the `review-scope` command and its result in `reviewPrompt` for the command route; T3 and `lenses.test.ts` pass (AC-05)
-- [ ] T5 `plugins/vh-adlc/references/review-protocol.md` - both routes pass the scope, and the Independence sentence gains the scope exception; T1's protocol assertions pass (AC-05)
-- [ ] T6 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `tests/vh-adlc/proportionality.test.ts` - the reviewer reads the product profile, rates failure paths by consequence, honours stated limits and Deferred entries, and scopes re-reviews, all gated on the resolved convention; T1's reviewer assertions and `proportionality.test.ts` pass (AC-03, AC-04, AC-05, AC-08, AC-14)
-- [ ] T7 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `tests/vh-adlc/direct-operation-compatibility.test.ts` - the plausible-choice rule, the author-side stated limit, Deferred entries with their five sources, the cut check, owner-list triage and the scope in the host dispatch, gated on the resolved convention, keeping #141's author-cut exception and its Review Log record; T1's spec assertions and `tests/vh-adlc/author-extras.test.ts` pass, and the spec baseline moves to this commit (AC-06, AC-07, AC-08, AC-14, AC-15)
-- [ ] T8 `plugins/vh-adlc/references/loop.md` - the product profile, stated once; T1's loop assertion passes (AC-04, AC-09)
-- [ ] T9 `tests/vh-adlc/labels/` - failing `follow-up` mode cases: one type label, no state label, no alias change, the `Deferred:` line at the end of the body; fails because the mode does not exist (AC-16)
-- [ ] T10 `plugins/vh-adlc/scripts/labels/`, `plugins/vh-adlc/references/issues.md` - the `follow-up` filing mode and ship's filing role; T9 passes (AC-16)
-- [ ] T11 `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md`, `plugins/vh-adlc/references/authority.md` - the follow-up review after merge, triggers keyed on the merge, the ship report and resume flags, and its authority, gated on the resolved convention; T1's ship, resume and authority assertions pass (AC-08, AC-16)
-- [ ] T12 `tests/vh-adlc/fixtures/build.ts`, `tests/vh-adlc/scenarios/run.ts` - a fixture docs revision holding the `0c983f67` tree and `scriptedPlugin` taking the canned directory as a parameter; the existing S16 scenarios still pass (AC-08)
-- [ ] T13 `tests/vh-adlc/scenarios/run.ts` - scenarios `S17.profile`, `S17.limit`, `S17.scoped` and `S17.scoped-command`; each passes its Test Plan condition (AC-03, AC-04, AC-05)
-- [ ] T14 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/proportional-review/canned/` - scenarios `S17.questions` and `S17.nits` with scripted records; each passes (AC-06, AC-07)
-- [ ] T15 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/proportional-review/canned/` - scenarios `S17.deferred`, `S17.deferred-review` and `S17.cut`; each passes (AC-14, AC-15)
-- [ ] T16 `tests/vh-adlc/scenarios/run.ts` - scenario `S17.followup` with the `gh` stub, its partial run, rerun and unmerged control; passes (AC-16)
-- [ ] T17 `tests/vh-adlc/scenarios/run.ts` - the old-pin controls of `S17.scoped`, `S17.questions`, `S17.nits`, `S17.profile`, `S17.deferred`, `S17.cut` and `S17.followup`; each passes and `S16.oldpin-reviewer` still passes (AC-08)
-- [ ] T18 `tests/vh-adlc/review-convergence.test.ts` - resolve its pages at `0c983f67` explicitly; passes before and after the pin bump (AC-08)
-- [ ] T19 `tests/vh-adlc/replay/run.test.ts` - failing harness tests on a fixture case: counts and identities only, a failed execution not counted, another route or model not counted, refusal without an approval line or with an edited label or `case.yaml`, the terms check in the tree, the companion diff and a Design section but not a stored record, and body size per pass without the Deferred section; fails because the harness does not exist (AC-10, AC-17)
-- [ ] T20 `tests/vh-adlc/replay/run.ts` - the replay harness; T19 passes (AC-10, AC-17)
-- [ ] T21 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - vh-adlc's product profile, the pin bump to the merged companion revision and the plugin version; T1 passes in full and `bun test tests/vh-adlc` stays green (AC-09)
-- [ ] T22 `docs/user-guides/workflows.md`, `docs/get-started/first-feature.md` - the guides describe the terms they use with the glossary's meanings; manual read against the glossary (AC-09)
-- [ ] T23 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the enterprise case on both routes; the results show no failing label (AC-11, AC-13, AC-17)
-- [ ] T24 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the small application case and the round and growth totals over all four pairs; the results show no failing label, at most half the old total of spec reviews and body growth, and fewer Open Questions (AC-12, AC-13, AC-17)
+- [x] T1 `tests/vh-adlc/proportional-review.test.ts` - failing tests that pin the companion convention's severity definitions, always-blocking classes, stated limit, scoped re-review, plausible-choice rule, owner-list triage, Deferred section and source list, the glossary terms the convention uses, vh-adlc's product profile and the companion pin; fails because none exist yet (AC-01, AC-02, AC-03, AC-09, AC-14)
+      Evidence: `bun test tests/vh-adlc/proportional-review.test.ts`: 0 pass, 27 fail, each on missing text, because neither the companion convention nor the plugin wording exists yet. `bun test tests/vh-adlc` on this state in a scratch clone ran out of its 90-minute limit on a loaded host; its other failures were 5-second timeouts in docs-drift, audit and branches tests: audit, branches, claude-role and closure pass when run alone, and closure-inventory and delivery-ack time out the same way on main without this change.
+- [x] T2 `vhco-pro/docs: conventions/feature-documents.md` - the companion PR on its own branch with every convention rule Design names; T1's convention assertions pass against the companion head (AC-01, AC-02, AC-03, AC-14)
+      Evidence: Companion PR https://github.com/vhco-pro/docs/pull/59 on vhco-pro/docs `docs/proportional-review` at `0fa68d6`, cut from main `30c38c8`; its parent changes no word of `conventions/feature-documents.md` against `0c983f67`. `VH_ADLC_CONVENTION_DOCS=<companion checkout> bun test tests/vh-adlc/proportional-review.test.ts -t "companion convention"`: 9 pass (failed at T1). `npm run check` in the docs repo: 48 files pass and the vh-adlc-rules block parses unchanged. Both replay cases were approved (2026-11-22T20:27Z, 2026-11-23T07:40Z) before this first rule-editing commit (2026-11-23).
+- [x] T3 `tests/vh-adlc/loop/review-scope.test.ts` - failing tests for `review-scope`: previous review after an acceptance row, a non-ancestor row, no row, a changed `covers` path, each changed bridge file, the Review Log left out of the diff, and `reviewPrompt` carrying the result; fails because the command does not exist (AC-05)
+      Evidence: `bun test tests/vh-adlc/loop/review-scope.test.ts`: 0 pass, 10 fail, because `cli.ts review-scope` answers as an unknown command and `reviewPrompt` carries no scope.
+- [x] T4 `plugins/vh-adlc/scripts/loop/cli.ts`, `tests/vh-adlc/loop/lenses.test.ts` - the `review-scope` command and its result in `reviewPrompt` for the command route; T3 and `lenses.test.ts` pass (AC-05)
+      Evidence: `bun test tests/vh-adlc/loop`: 180 pass, 0 fail, with all ten review-scope cases; after the two lenses.test.ts prompts gained a full scope, `bun test tests/vh-adlc/loop/lenses.test.ts tests/vh-adlc/loop/review-scope.test.ts`: 16 pass. The protocol text that tells both routes to pass the scope is T5.
+- [x] T5 `plugins/vh-adlc/references/review-protocol.md` - both routes pass the scope, and the Independence sentence gains the scope exception; T1's protocol assertions pass (AC-05)
+      Evidence: `bun test tests/vh-adlc/proportional-review.test.ts -t "review protocol"`: 1 pass (failed at T1). `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/direct-operation-compatibility.test.ts tests/vh-adlc/docs-drift/authority.test.ts tests/vh-adlc/loop/glossary.test.ts`: 83 pass, 1 fail, the check that a package change comes with a version change; it has failed since T4 first changed the package, and T21 bumps the version.
+- [x] T6 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `tests/vh-adlc/proportionality.test.ts` - the reviewer reads the product profile, rates failure paths by consequence, honours stated limits and Deferred entries, and scopes re-reviews, all gated on the resolved convention; T1's reviewer assertions and `proportionality.test.ts` pass (AC-03, AC-04, AC-05, AC-08, AC-14)
+      Evidence: `bun test tests/vh-adlc/proportional-review.test.ts -t reviewer`: 4 pass (failed at T1). `bun test tests/vh-adlc/proportionality.test.ts tests/vh-adlc/loop/lenses.test.ts tests/vh-adlc/loop/cli.test.ts tests/vh-adlc/loop/review-scope.test.ts`: 39 pass. `bun test tests/vh-adlc/check.test.ts`: 64 pass, 1 fail, the version-change check T21 settles. The old-revision behavior (S16.oldpin-reviewer and the S17 old-pin controls) is proved by T13 and T17.
+- [x] T7 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `tests/vh-adlc/direct-operation-compatibility.test.ts` - the plausible-choice rule, the author-side stated limit, Deferred entries with their five sources, the cut check, owner-list triage and the scope in the host dispatch, gated on the resolved convention, keeping #141's author-cut exception and its Review Log record; T1's spec assertions and `tests/vh-adlc/author-extras.test.ts` pass, and the spec baseline moves to this commit (AC-06, AC-07, AC-08, AC-14, AC-15)
+      Evidence: `bun test tests/vh-adlc/proportional-review.test.ts -t "spec skill"`: 7 pass (failed at T1). The skill change is c2eff1d0; this commit moves the spec baseline in direct-operation-compatibility.test.ts to it, as earlier features did, and then `bun test tests/vh-adlc/direct-operation-compatibility.test.ts tests/vh-adlc/author-extras.test.ts`: all pass. proportionality.test.ts and owner-summary.test.ts pass; check.test.ts keeps only the version-change failure T21 settles. Spec skill behavior is proved by the S17 scenarios in T14 to T17.
+- [x] T8 `plugins/vh-adlc/references/loop.md` - the product profile, stated once; T1's loop assertion passes (AC-04, AC-09)
+      Evidence: `bun test tests/vh-adlc/proportional-review.test.ts -t "loop reference"`: 1 pass (failed at T1; a first draft that also named the heading in prose failed the stated-once check and was reworded). `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/proportionality.test.ts`: 70 pass, 1 fail, the version-change check T21 settles.
+- [x] T9 `tests/vh-adlc/labels/` - failing `follow-up` mode cases: one type label, no state label, no alias change, the `Deferred:` line at the end of the body; fails because the mode does not exist (AC-16)
+      Evidence: `bun test tests/vh-adlc/labels/follow-up.test.ts` before the mode existed: 2 pass, 6 fail. The six fail because `--operation follow-up` is refused as unknown; the two that pass are refusals (another type, a state label), which already hold for that reason.
+- [x] T10 `plugins/vh-adlc/scripts/labels/`, `plugins/vh-adlc/references/issues.md` - the `follow-up` filing mode and ship's filing role; T9 passes (AC-16)
+      Evidence: `bun test tests/vh-adlc/labels tests/vh-adlc/issue-authority.test.ts`: 40 pass, 0 fail, including the labels typecheck and all eight follow-up cases; `bun test tests/vh-adlc/direct-operation-compatibility.test.ts`: 8 pass. The full-suite run on this state (scratch clone, 90-minute limit) showed only the pre-existing 5-second timeouts named under T1. No user guide names the labels modes; references/issues.md is the documented home and gains the role.
+- [x] T11 `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md`, `plugins/vh-adlc/references/authority.md` - the follow-up review after merge, triggers keyed on the merge, the ship report and resume flags, and its authority, gated on the resolved convention; T1's ship, resume and authority assertions pass (AC-08, AC-16)
+      Evidence: `bun test tests/vh-adlc/proportional-review.test.ts -t "follow-up review after merge"`: 3 pass (they failed at T1). `bun test` over the 17 files that read ship, resume or authority, including direct-operation-compatibility (now stripping and checking the new section in ship and resume like its other added sections), proportionality and author-extras: 112 pass, 0 fail. The user guides that describe ship are T22.
+- [x] T12 `tests/vh-adlc/fixtures/build.ts`, `tests/vh-adlc/scenarios/run.ts` - a fixture docs revision holding the `0c983f67` tree and `scriptedPlugin` taking the canned directory as a parameter; the existing S16 scenarios still pass (AC-08)
+      Evidence: `bun test tests/vh-adlc/fixtures.test.ts tests/vh-adlc/scenario-plan.test.ts`: 17 pass; the new convergence-revision case failed first on an undefined revision. `bun tests/vh-adlc/scenarios/run.ts S16` with this change: S16.drift, S16.nits and S16.oldpin-reviewer pass; S16.oldpin-judgement passes in a clean clone; S16.oldpin fails its "knowledge resolved the previous pin" check in three of three runs, and without this change (89b03de8) in two of three, each time because the session agent first called the binary with wrong arguments, which the check counts as an unresolved pin. Every answered knowledge call resolved the previous pin in all runs. That flake predates this task and is reported separately.
+- [x] T13 `tests/vh-adlc/scenarios/run.ts` - scenarios `S17.profile`, `S17.limit`, `S17.scoped` and `S17.scoped-command`; each passes its Test Plan condition (AC-03, AC-04, AC-05)
+      Evidence: Each scenario run alone with `bun tests/vh-adlc/scenarios/run.ts <id>` after the host capacity check: S17.profile.single PASS (1 run), S17.profile.hosted PASS (2 runs, the first stopped at the session capacity check), S17.profile.none PASS (2 runs, the first stopped at the capacity check), S17.scoped PASS (2 runs, the first stopped at the capacity check), S17.scoped-command PASS (1 run, a real Codex review attested as gpt-6.2-sol, scoped since the clean pass), S17.limit.stated PASS (4 runs; the three failures were my classifier counting findings that only quote the stated limit, and a fixture claim about resetting names.log that the tree did not back up, both fixed before the passing run), S17.limit.nolimit PASS (4 runs, 3 passing, the last on the final fixture), S17.limit.security PASS (3 of 3 runs, the last on the final fixture). `bun test tests/vh-adlc/fixtures.test.ts`: 15 pass; the companion revision case failed first on an undefined revision. Untested: each condition rests on one passing model sample, so how a profile moves the lock gap rating can vary between runs, and the scoped re-review was observed on one changed paragraph only.
+- [x] T14 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/proportional-review/canned/` - scenarios `S17.questions` and `S17.nits` with scripted records; each passes (AC-06, AC-07)
+      Evidence: Each scenario run alone with `bun tests/vh-adlc/scenarios/run.ts <id>` after the host capacity check: S17.questions PASS (3 runs; the first failed because my fixture profile also settled the contract question, the second because the author holds the settled choice for the commit that applies the owner's answer, as review step 4 says, so the scenario now has the scripted owner answer the one question in a second turn and reads Design after it), S17.nits PASS (2 runs; the first failed only because my check looked for finding IDs in the owner summary, which the skill keeps out of it, so the summary is now read by content). `bun test tests/vh-adlc/fixtures.test.ts`: 15 pass. Untested: one passing model sample each; the reviewer is scripted, so these prove the spec skill alone.
+- [x] T15 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/proportional-review/canned/` - scenarios `S17.deferred`, `S17.deferred-review` and `S17.cut`; each passes (AC-14, AC-15)
+      Evidence: Each scenario run alone with `bun tests/vh-adlc/scenarios/run.ts <id>` after the host capacity check, plugin at 5e94e59 (no spec skill or reviewer change since): S17.deferred PASS (1 run, six scripted owner turns; four Deferred entries with the exact sources, the Scope line, a Cut check line after the acceptance and the drift deferral, and `vh-adlc fresh` reporting R-2 and then R-3 fresh after those entries), S17.deferred-review PASS (1 run, real reviewer: nothing about the sampler, a blocking finding against Scope quoting D-02), S17.cut.both PASS (1 run), S17.cut.control PASS (1 run). `bun test tests/vh-adlc/fixtures.test.ts`: 15 pass. Untested: one model sample each; the deferral at acceptance and the drift deferral were each seen once, and the cut check was not tried on a proportionality answer of narrow.
+- [x] T16 `tests/vh-adlc/scenarios/run.ts` - scenario `S17.followup` with the `gh` stub, its partial run, rerun and unmerged control; passes (AC-16)
+      Evidence: Each scenario run alone with `bun tests/vh-adlc/scenarios/run.ts <id>` after the host capacity check, with a gh stand-in that records every call and a local SSH command serving the fixture remote under a GitHub URL: S17.followup.merged PASS on the plugin at 3c57fca8 (5 runs; one failed on my check of the order among follow-ups, one passed before 3c57fca8, then on the current plugin one stopped at the session capacity check, one failed only on my exact comparison of a verdict that keeps its trailing full stop, and the last passed: resume named the four entries and the step, ship showed the gap, then the follow-ups, then the drop without a writer handoff, the stub failed the second filing so the run was partial with the gap link on docs/follow-up-greeting-name, the rerun filed only D-02 on the same branch and PR, and main stayed unchanged), S17.followup.unmerged PASS (3 runs; the first two failed because resume named the follow-up review for an unmerged document, which the resume and ship fix in 3c57fca8 removed). `bun test tests/vh-adlc/fixtures.test.ts`: 15 pass. Untested: real GitHub (the stub answers every gh call), two sessions running the review at once (a stated limit), and a failure at any point other than the second issue creation.
+- [x] T17 `tests/vh-adlc/scenarios/run.ts` - the old-pin controls of `S17.scoped`, `S17.questions`, `S17.nits`, `S17.profile`, `S17.deferred`, `S17.cut` and `S17.followup`; each passes and `S16.oldpin-reviewer` still passes (AC-08)
+      Evidence: Each scenario run alone with `bun tests/vh-adlc/scenarios/run.ts <id>` after the host capacity check, on a fixture pinned to the 0c983f67 docs tree: S17.oldpin.scoped PASS (1 run, the unchanged names.log gap raised), S17.oldpin.questions PASS (1 run, both judgement findings became Open Questions), S17.oldpin.nits PASS (2 runs; the first failed only on an extra check of mine that the row does not ask for, since cut), S17.oldpin.profile PASS (1 run, the lock gap at should-fix or blocking despite the single-person profile), S17.oldpin.deferred PASS (1 run, no Deferred section and no Cut check line), S17.oldpin.cut PASS (1 run), S17.oldpin.followup PASS (2 runs; the first failed because resume and ship named the follow-up review on the old pin, which 3c57fca8 removed), S16.oldpin-reviewer PASS (2 runs, the first stopped at the session capacity check). `bun test tests/vh-adlc/review-convergence.test.ts tests/vh-adlc/fixtures.test.ts`: 25 pass. Untested: one passing model sample per control; the pin bump in T21 moves the fixture plugin pin, so these controls should be rerun after it.
+- [x] T18 `tests/vh-adlc/review-convergence.test.ts` - resolve its pages at `0c983f67` explicitly; passes before and after the pin bump (AC-08)
+      Evidence: `bun test tests/vh-adlc/review-convergence.test.ts`: 10 pass at the repository pin, and 10 pass in a copy whose AGENTS.md pin moved to `1ccf8f31`; the pages now resolve through a pinless scratch repository at `0c983f67`. A failing run first was not possible: no docs revision with the changed text exists before the companion PR.
+- [x] T19 `tests/vh-adlc/replay/run.test.ts` - failing harness tests on a fixture case: counts and identities only, a failed execution not counted, another route or model not counted, refusal without an approval line or with an edited label or `case.yaml`, the terms check in the tree, the companion diff and a Design section but not a stored record, and body size per pass without the Deferred section; fails because the harness does not exist (AC-10, AC-17)
+      Evidence: `bun test tests/vh-adlc/replay/run.test.ts` without the harness (scratch clone of main): 1 pass, 12 fail on `Module not found ... replay/run.ts`; the pass is the companion-diff refusal, which holds trivially when nothing can run.
+- [x] T20 `tests/vh-adlc/replay/run.ts` - the replay harness; T19 passes (AC-10, AC-17)
+      Evidence: `bun test tests/vh-adlc/replay tests/vh-adlc/labels tests/vh-adlc/review-convergence.test.ts tests/vh-adlc/direct-operation-compatibility.test.ts tests/vh-adlc/proportionality.test.ts tests/vh-adlc/author-extras.test.ts`: 79 pass, 0 fail, including all 13 harness cases. The full suite was not rerun at this commit (it exceeds 90 minutes on this host). Untested: `tests/vh-adlc/replay/live.ts`, the Codex, Claude and matcher executor, which only real model runs exercise; its first use is T23.
+- [x] T21 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - vh-adlc's product profile, the pin bump to the merged companion revision and the plugin version; T1 passes in full and `bun test tests/vh-adlc` stays green (AC-09)
+      Evidence: `bun test tests/vh-adlc/proportional-review.test.ts`: 27 pass at the repository pin with no override (the two AC-09 checks failed at T1). `vh-adlc knowledge` at `e79eaa6a` answers every page the loop and the spec skill read. `bun test tests/vh-adlc --parallel=4 --timeout 60000` on this state after merging main: 4364 pass, 13 fail in 4517 s: 10 in docs-drift/installed-marker-caller came from the scratch clone holding these changes uncommitted and pass once committed; settings-file "an offline reader session" fails on a fresh clone of main too; docs-drift/evidence-input fails on this host's Bun 1.4.3 (main too, the repository declares 1.4.5); docs-drift/trial-publication passed when rerun alone. check.test.ts's Bun-convention check moved to the convention's current wording, which keeps this repository's Bun runtime. With the fixture base now at the companion revision, `bun tests/vh-adlc/scenarios/run.ts S17.oldpin S16.oldpin-reviewer`: all eight pass.
+- [x] T22 `docs/user-guides/workflows.md`, `docs/get-started/first-feature.md` - the guides describe the terms they use with the glossary's meanings; manual read against the glossary (AC-09)
+      Evidence: Manual read of `docs/user-guides/workflows.md` (Reviews) and `docs/get-started/first-feature.md` (step 1) against the glossary: each guide uses product profile, severity by consequence, always-blocking defect, stated limit and scoped re-review with the glossary meaning, and workflows.md also the owner's recorded rules, the Deferred list, the cut check and the follow-up review. `grep` found no other docs page stating the old rules. `bun test --timeout 60000` over the seven test files that read these guides (author-extras, docs-drift/public-docs, review-convergence, audit/setup-docs, labels/vocabulary, triage/migration, triage/discovery): 46 pass.
+- [x] T27 `tests/vh-adlc/replay/run.ts`, `tests/vh-adlc/replay/run.test.ts` - retention counts old-brief passes at or above the label's minimum severity, fails a label that two old passes raise at any severity but fewer than two at its minimum when no new pass raises it at any severity, and reports the four counts per label; run.test.ts passes the AC-10 retention cases (AC-10, AC-11, AC-12)
+      Evidence: the final run.test.ts against the run.ts committed before this task (a scratch copy of HEAD `b72b9c2a` with only run.test.ts replaced): 31 pass, 7 fail, the six retention cases (old at its minimum and new never; old at its minimum and new only below; old only below and new at any severity; old only below and new never; one old pass at the minimum and one below with new never; the four-count table) and the stored-set rerun that reads the renamed counts. With this task's run.ts: `bun test tests/vh-adlc/replay/run.test.ts --timeout 60000`: 38 pass, 0 fail; `bun test tests/vh-adlc/replay tests/vh-adlc/proportional-review.test.ts tests/vh-adlc/labels --timeout 60000`: 104 pass, 0 fail.
+- [x] T28 `tests/vh-adlc/replay/run.ts`, `tests/vh-adlc/replay/run.test.ts` - the spec review totals over the pairs where both loops reached a clean pass, every other pair listed with its counts, failing labels named with case and route, a `bound --from-clone` mode that counts a stopped loop's reviews from its kept clone, a later run that resumes that clone and moves the bound aside once its documents are stored, a bound that moves aside with a fresh set, and a session-log bound that is never run again; run.test.ts passes the AC-10 totals cases (AC-10, AC-13)
+      Evidence: the final run.test.ts against the run.ts committed before this task (a scratch copy of HEAD `1a9b6794` with only run.test.ts replaced): 35 pass, 7 fail, each a case this task names (the totals over pairs where both loops reached a clean pass, a pair with an unclean loop listed, failing labels named with case and route, a bound read from a kept clone, a resumed clone whose documents move the bound aside, a bound moved aside with a fresh set, a session-log bound never run again). With this task's run.ts: `bun test tests/vh-adlc/replay tests/vh-adlc/proportional-review.test.ts tests/vh-adlc/labels --timeout 60000`: 108 pass, 0 fail. On the real case, `run.ts bound --from-clone` for the enterprise new command loop recorded 25 spec reviews from its kept clone. CI on PR #173 failed the kept-clone bound case because its test commits had no git identity (exit 128); with `HOME` empty and `GIT_CONFIG_NOSYSTEM=1` it failed the same way locally, and after the test passes its own identity to those commits `bun test tests/vh-adlc/replay` under the same conditions: 42 pass, 0 fail.
+- [x] T23 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the enterprise case on both routes; the results show no failing label apart from L-08 on the host route and L-10 on the command route (AC-11, AC-13, AC-17)
+      Evidence: `run.ts assemble` for both cases from the stored private runs (briefs: old plugin `0c9fee77` with docs `30c38c8d`, new plugin `ef685da1` with docs `0fa68d68`), then `run.ts terms` on the results file, this document and the tree for each case: pass, pass. Enterprise: 3 old and 12 new first passes per route (one Codex execution not counted for reporting another identity, rerun); retention fails only L-10 on the command route and L-08 on the host route, the two owner-deferred known losses (D-18, D-17). Loops: host old 35 clean, new 8 clean; command old at least 33 (session-log bound), new at least 25 (kept-clone bound, stopped at Codex's usage limit), both unclean and listed, not in the halving total.
+- [x] T24 `tests/vh-adlc/evidence/proportional-review/results.md` - replay of the small application case and the round totals over the pairs where both loops reached a clean pass, with the other pairs listed, and the growth totals over the pairs whose old loop reached a clean pass with stored documents; the results show no failing label, at most half the old total of spec reviews and body growth (AC-12, AC-13, AC-17)
+      Evidence: `run.ts assemble` for both cases from the stored private runs (briefs: old plugin `0c9fee77` with docs `30c38c8d`, new plugin `ef685da1` with docs `0fa68d68`), then `run.ts terms` on the results file, this document and the tree for each case: pass, pass. Small application: retention passes for both labels on both routes. Loops: host old 9, new 2; command old at least 19 (session-log bound), new 15 clean, listed. Totals: spec reviews over the 2 pairs where both loops reached a clean pass 44 old, 10 new (met); body growth over the 2 pairs with stored old documents 972 old, 343 new (met); failing labels 2, named, both deferred.
+
+- [x] T25 `tests/vh-adlc/replay/run.ts`, `tests/vh-adlc/replay/run.test.ts` - results without an Open Question condition, a recorded identity per brief, route and part, a run of the new brief alone that reuses only a matching stored old-brief set, continuation of a same-identity set and a fresh set otherwise, kept loop clones, lower bounds from session logs, the launch record for pre-T25 sets, and `assemble`, which builds a case's results from its stored runs; run.test.ts passes, including the totals table, a matching and a mismatched stored set, a run under another identity, a same-identity continuation, a resumed loop, a pre-T25 lost loop with its bound, a clone moved aside, a fresh set from a pre-T25 set with an unlisted file, an unclean old loop left out of growth, a `--only loops` rerun, a launch record that matches, mismatches or misses a file, pre-T25 first passes followed by a post-T25 `--only loops` run, and assembly after an interrupted first-pass set (AC-10, AC-13, AC-17)
+      Evidence: the new run.test.ts cases run against the run.ts committed before this task (a scratch copy of HEAD `b54c1040` with only run.test.ts replaced): 17 pass, 15 fail, each failing case being one this task names (the totals table without a question condition, `assemble`, the stored-set reuse, mismatch, fresh set, continuation, resumed clone, lower bound, launch record match/mismatch/missing file, pre-T25 first passes then a loops-only run, a pre-T25 lost loop with its bound, a clone moved aside, a pre-T25 set with an unlisted file, an unclean old loop out of growth, assembly after an interrupted first-pass set). With this task's run.ts: `bun test tests/vh-adlc/replay/run.test.ts --timeout 60000`: 32 pass, 0 fail; `bun test tests/vh-adlc/replay tests/vh-adlc/proportional-review.test.ts tests/vh-adlc/labels --timeout 60000`: 98 pass, 0 fail. The running new-brief replays already use these changes from the working tree; their first finished run, the small application on the host route, reports retention pass for both labels and a clean new loop after 2 spec reviews. Untested here: `assemble` on the real stored runs, which T23 and T24 exercise.
+- [x] T26 `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/evidence/claude-code/` - rerun S17.profile, S17.limit, S17.scoped, S17.scoped-command and S17.deferred-review on the fixed reviewer, and add `S17.profile.unsure`; each passes its Test Plan condition (AC-03, AC-04, AC-05, AC-14)
+      Evidence: each scenario run alone with `bun tests/vh-adlc/scenarios/run.ts <id>` on the plugin at `3acff49`, which holds the reviewer fix `ef685da1`: S17.scoped-command PASS (a real Codex review attested as gpt-6.2-sol, scoped since the clean pass), S17.profile.unsure PASS (the lock gap at should-fix), S17.profile.single PASS (nit or absent), S17.profile.hosted PASS (blocking), S17.profile.none PASS, S17.limit.stated PASS, S17.limit.nolimit PASS, S17.limit.security PASS, S17.deferred-review PASS, one run each. S17.scoped failed its first run on a false match in my check: F-03, about whether `names.log` gets the cut name, matched the lock-gap pattern through "race" in "traces", and the pattern also matched "lock" in each record's own `SEVERITY: blocking` line. The pattern now matches whole words (old pattern true and new false on that F-03 text, "blocking", "clock" and "blocked"; both true on seven lock-gap phrasings). The pattern serves only the S17.scoped checks; the stored S17.oldpin.scoped finding it relied on quotes "The appends take no lock", so that control still holds. S17.scoped then PASS (1 run), and S17.profile.none PASS again on the fixed check.
+- [x] T29 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `tests/vh-adlc/proportional-review.test.ts` - move `ef685da1`'s always-blocking check and uncertain-path rule into the reviewer's profile-only paragraph, so the failure-mode paragraph an older pin reads is the text the old-pin controls ran on; proportional-review.test.ts passes (AC-04, AC-08)
+      Evidence: the new proportional-review.test.ts case "keeps the old-revision check after the profile gate and both checks in the profile-only paragraph" failed on the reviewer at `644da0c0` (0 pass, 1 fail) and passes after the move; `git diff 2639661 -- plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` now shows the failure-mode paragraph unchanged and only the profile-only paragraph gaining the two sentences. `bun test tests/vh-adlc/proportional-review.test.ts tests/vh-adlc/proportionality.test.ts tests/vh-adlc/loop tests/vh-adlc/review-convergence.test.ts tests/vh-adlc/check.test.ts --timeout 60000`: 304 pass, 0 fail.
+- [x] T30 `tests/vh-adlc/evidence/claude-code/` - rerun on the T29 reviewer the old-pin controls S16.oldpin-reviewer, S17.oldpin.scoped and S17.oldpin.profile and the host-route real-reviewer scenarios S17.profile, S17.limit, S17.scoped and S17.deferred-review; each passes its Test Plan condition (AC-03, AC-04, AC-05, AC-08, AC-14)
+      Evidence: each scenario run alone with `bun tests/vh-adlc/scenarios/run.ts <id>` on the T29 reviewer (`57b33e73`): S16.oldpin-reviewer, S17.oldpin.scoped and S17.oldpin.profile PASS on the old pin (the unchanged gap raised, the lock gap at should-fix or above despite the profile); S17.profile.single, .hosted, .none and .unsure, S17.limit.stated, .nolimit and .security, S17.scoped and S17.deferred-review PASS. The first run failed S17.profile.single and S17.limit.nolimit on two matcher errors in my checks, not reviewer behaviour: "two runs" matched a finding about sequential appends while the real lock gap was a nit, and a proposal for a per-build log was not counted as raising the gap. With the matchers fixed (`ba0acdec`), all eight scenarios that use them were rerun and pass. Untested on this reviewer text: S17.scoped-command, the Codex route, whose transcript is from `3acff49`; Codex usage is exhausted until 2026-11-26, and the move changes only where the two sentences sit under the companion convention.
 
 ## Open Questions
 
@@ -651,6 +797,11 @@ None.
 - D-12: Name the `references/authority.md` wording for the follow-up review's temporary worktree and its writer-handoff exception. From: R-9 F-02, deferred at acceptance. Verdict: pending.
 - D-13: Ask one approval for the docs branch, push and PR even when every entry is a drop or every filing is declined. From: R-9 F-03, deferred at acceptance. Verdict: pending.
 - D-14: Run the private-terms check on newly returned implementation review records before storing them. From: R-9 F-04, deferred at acceptance. Verdict: pending.
+- D-15: Count the Open Questions the author raises in the replay loops. From: owner cut on 2026-11-23. Verdict: pending.
+- D-16: A set stored before T25 that two launches wrote. From: R-15 F-01, stated limit. Verdict: pending.
+- D-17: Find why the new brief's Claude host reviewer no longer raises enterprise label L-08 (minimum severity should-fix), and restore it. From: owner cut on 2026-11-24. Verdict: pending.
+- D-18: Find why the new brief's Codex command reviewer no longer raises enterprise label L-10 (minimum severity should-fix), and restore it. From: owner cut on 2026-11-24. Verdict: pending.
+- D-19: Find why the Codex reviewer raises as many blocking findings per round under the new brief as under the old on the enterprise case, and finish that new loop when Codex usage returns. From: owner cut on 2026-11-24. Verdict: pending.
 
 ## Review Log
 
@@ -668,6 +819,30 @@ None.
 | 2026-11-22 | R-9 | spec | `6abdbd3b` | claude-opus-5-5 | procedural | no blocking; 4 should-fix, 1 nit |
 | 2026-11-22 | R-9 | spec | `6abdbd3b` | n/a | n/a | accepted by owner |
 | 2026-11-22 | R-10 | spec | `d3ad7ce2` | claude-opus-5-5 | procedural | drift re-review after PR #152 and PR #155: no blocking; 1 should-fix, 3 nit; acceptance kept |
+| 2026-11-23 | R-11 | spec | `9e9236a0` | claude-opus-5-5 | procedural | no blocking; 7 should-fix, 2 nit |
+| 2026-11-23 | R-12 | spec | `28be40ab` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
+| 2026-11-23 | R-13 | spec | `529d2648` | claude-opus-5-5 | procedural | scoped: no blocking; 2 should-fix, 1 nit |
+| 2026-11-23 | R-14 | spec | `436d91c5` | claude-opus-5-5 | procedural | scoped: no blocking; 2 should-fix, 1 nit |
+| 2026-11-23 | R-15 | spec | `9299b15b` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
+| 2026-11-23 | R-16 | spec | `06bdcac5` | claude-opus-5-5 | procedural | scoped: no blocking, no should-fix; 4 nit |
+| 2026-11-23 | R-17 | spec | `dfdd422d` | claude-opus-5-5 | procedural | drift re-review after merging main 74e7b1d2: no findings |
+| 2026-11-24 | R-18 | spec | `3b81643c` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 4 nit |
+| 2026-11-24 | R-19 | spec | `e96864df` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
+| 2026-11-24 | R-20 | spec | `8424fb75` | claude-opus-5-5 | procedural | scoped: no blocking, no should-fix; 2 nit |
+| 2026-11-24 | R-21 | spec | `00752fea` | claude-opus-5-5 | procedural | drift re-review after merging main c6268708, full pass: no blocking; 1 should-fix |
+| 2026-11-24 | R-22 | spec | `a3ae263a` | claude-opus-5-5 | procedural | scoped: no findings |
+| 2026-11-24 | R-22 | spec | `a3ae263a` | n/a | n/a | accepted by owner |
+| 2026-11-24 | R-23 | spec | `c93e20eb` | claude-opus-5-5 | procedural | full pass after implementation commits: no blocking; 2 should-fix, 2 nit |
+| 2026-11-24 | R-24 | spec | `daf697d1` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix |
+| 2026-11-24 | R-25 | spec | `af2d805f` | claude-opus-5-5 | procedural | scoped: no blocking, no should-fix; 1 nit |
+| 2026-11-24 | R-25 | spec | `af2d805f` | n/a | n/a | accepted by owner |
+| 2026-11-24 | R-26 | spec | `372cc5cb` | claude-opus-5-5 | procedural | full pass after implementation commits: no blocking; 1 should-fix, 2 nit |
+| 2026-11-24 | R-27 | spec | `7c41f1a2` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix |
+| 2026-11-24 | R-28 | spec | `87a2ba87` | claude-opus-5-5 | procedural | scoped: no findings |
+| 2026-11-24 | R-28 | spec | `87a2ba87` | n/a | n/a | accepted by owner |
+| 2026-11-24 | R-29 | implementation | `644da0c0` | claude-opus-5-5 | procedural | 16 met, AC-08 not verified; 1 should-fix, 1 nit |
+| 2026-11-24 | R-30 | implementation | `9daf9622` | claude-opus-5-5 | procedural | all 17 criteria met; 2 nit |
+| 2026-11-24 | R-31 | implementation | `6ada44a9` | claude-opus-5-5 | procedural | all 17 criteria met after the CI test fix; 1 nit |
 
 ### R-1
 
@@ -1381,3 +1556,612 @@ SEVERITY: nit
 WHERE: Context Background ("**Harm and simplest alternative.**" paragraph)
 EVIDENCE: PR #152 added the spec skill rule "Start Background with the harm statement from `references/loop.md`" (vh-adlc-spec/SKILL.md:75-77 at d3ad7ce2). It also added the loop.md alternative "waiting for a later milestone" and the reviewer check "Weigh the design against its harm statement ... the simplest alternative without machinery it rejected" (vh-adlc-reviewer.agent.md:47-51). In this document the harm statement comes at the end of Background, not the start. The alternative it rejects is "a process rule alone", backed by round counts taken before #152's convergence trigger and #141's author-cut exception merged. Both of those are process rules and are now in force. The statement does not weigh waiting to measure their effect before building review-scope, the follow-up review and the replay harness. The replay partly answers this: its old brief is the plugin at the merge base, so it already includes #152 and #141, and AC-13 compares against them. The reviewer rates this check nit because the document is past `draft`.
 PROPOSAL: At the next revision, move the harm statement to the start of Background and add one sentence explaining why the merged convergence trigger and author-cut exception are not enough alone, citing the replay's old brief as the measure.
+
+### R-11
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Replay harness, results paragraph: "labels raised per run by ID and severity, rounds to clean, questions raised, body size per pass"); Scope (Out of scope, "Counting the Open Questions the author raises in the replay loops"); Context Owner summary ("the question rule is proved by scenario, not counted in the loops"); Acceptance Criteria AC-13; Test Plan AC-13 row; Tasks T23, T24; Deferred D-15
+EVIDENCE: This revision drops the Open Question count from AC-13, its Test Plan row, Rounds and T24. The built harness, a covered path, still makes it a pass condition. tests/vh-adlc/replay/run.ts at the commit has `totals()` emit "| Open Questions | ${oldQ} | ${newQ} | new fewer than old | ${newQ < oldQ ? "yes" : "no"} |" next to the spec review and growth conditions. `renderCase` writes an "Open Questions" column per loop, and live.ts:117-122 counts increases between commits. The new Scope line says that count "reads zero", so the published results.md would show "Met: no" for a condition the document no longer has. The Design's results paragraph still lists "questions raised". No unchecked task changes the harness. T23 and T24 write results.md with the harness as it is.
+PROPOSAL: Remove the Open Questions condition and column from the harness totals and results (or keep the count as information only, with no Condition or Met cell), drop "questions raised" from the Design's results paragraph, and add a new task with a run.test.ts case that checks the totals table.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "Every counted pass, its verdicts and every loop's documents are stored in the case directory as they finish, and the results are assembled from those stored runs, so a run that stops loses no finished pass"); Design (Replay harness, approval-order paragraph, "The new brief then moves to the fixed plugin and every new-brief run repeats; the old-brief runs stay valid because the old brief does not change"); Design (Replay harness, "Both briefs are fixed before the first run, apart from that one owner-allowed move of the new brief"); Context Owner summary ("every new-rules run repeats on the fixed plugin"); Acceptance Criteria AC-10; Test Plan AC-10 row
+EVIDENCE: Both sentences were added by this revision, and the built harness does neither. In tests/vh-adlc/replay/run.ts `runCase` always runs `await pass("old", FIRST_PASSES.old)` before the new passes, and old loops too. It writes passes and loop documents to `<case>/runs/` with writeFileSync, but nothing ever reads them back. `firstPasses` starts every set at `counted: 0`. Results come from the in-memory `data` plus the `replay-data` block already in results.md. `writeResults` keeps earlier entries only when `JSON.stringify(before.briefs) === JSON.stringify(data.briefs)`, so moving `--new-plugin` to the fixed plugin throws away the case's earlier old-brief results and the harness reruns the old brief. A first-pass set interrupted mid-way, or an exception from an executor, writes nothing to results. run.test.ts covers only a loop that keeps failing ("stops the run after writing every first pass") and route merging with the same briefs.
+PROPOSAL: Either build what the Design says (reuse the stored old-brief runs when only the new brief moves, and assemble results from the stored passes) with run.test.ts cases in a new task, or reduce the two sentences to what the harness does: the old brief reruns with the new one, and when a loop stops, the first passes are written.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, approval-order paragraph, "The one exception is the owner's decision of 2026-11-23: after the first complete replay result ... the owner allowed one generic reviewer fix"); Design (Replay harness, "apart from that one owner-allowed move of the new brief"); Context Owner summary ("After the first complete enterprise result, the owner allowed one generic reviewer fix"); Acceptance Criteria AC-11, AC-12; Test Plan AC-11, AC-12 rows
+EVIDENCE: The order rule exists "so the rules cannot be fitted to them". The exception lets one reviewer edit in after the enterprise labels showed which defects failed, but no proof bounds it. The AC-11 row checks only that the approval line "predates the first rule-editing commit in both repositories". That stays true however many reviewer, spec skill or convention edits follow the first result. The exception does not name the allowed commit (ef685da1, "fix(review): check every finding against the always-blocking classes"). It also leaves "first complete replay result" undefined. ef685da1's message and its status_description say the result was "The enterprise replay on the Claude route", not both routes. The results file already records each run's plugin commit, so checking the brief move would be cheap.
+PROPOSAL: Name ef685da1 as the one allowed edit and say which result it followed. Add to the AC-11 and AC-12 rows a check that the plugin and docs revision of the new brief in results.md differ from the first new brief only by that commit's reviewer change.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Severity by consequence, "The reviewer's failure-mode paragraph (`vh-adlc-reviewer.agent.md:47-50`) keeps asking the same four questions and rates each gap on this scale"); Design (Glossary, Security defect, Data-loss defect, and "The reviewer, the skills and both user guides use these terms with these meanings"); Design (Replay harness, exception parenthetical); Acceptance Criteria AC-04, AC-09; Test Plan AC-04 row
+EVIDENCE: ef685da1 added two reviewer rules on the new-pin path (vh-adlc-reviewer.agent.md:60-66 at the commit). First: "Before you settle any finding's severity, check it against the always-blocking classes ... is blocking whichever section or path it came from and however unlikely the path looks". Second: "When you are unsure whether people using the product would hit a failure path, rate it should-fix rather than nit or dropping it". The Design states neither as a reviewer rule. They appear only as a parenthetical inside the replay order exception. The restated classes also go beyond the glossary: "forge or bypass an authorization", "reach a credential or secret" and "silently drops data" against "read or act beyond their authorization, or exposes a credential or secret" and "Loss or corruption". The only proof is a wording test (proportional-review.test.ts, added in ef685da1), and Background says "Wording tests do not show that a rule changes behavior". No scenario exercises the uncertain-path rule.
+PROPOSAL: State both rules in Severity by consequence, make the reviewer's class wording match the glossary (or widen the glossary), and extend the S17.profile pass condition or add a scenario so the uncertain-path rule is observed.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks T13 and T15 (S17.deferred-review); frontmatter status_description ("T1 to T22 stay done"); Test Plan AC-03, AC-04, AC-05, AC-14 rows
+EVIDENCE: Every real-reviewer scenario on the new pin ran before the reviewer changed. `git log -1` on tests/vh-adlc/evidence/claude-code/S17.profile.single.md, S17.limit.stated.md, S17.scoped.md and S17.scoped-command.md gives 2b59a976 (2026-11-23 16:02), and S17.deferred-review.md gives 0fcd4c4f (16:12). ef685da1 changed the new-pin severity paragraph at 21:39. S17.profile.single.md records "vh-adlc 0.30.1 at 0f37ba1". The new rule "rate it should-fix rather than nit" bears directly on S17.profile's pass condition "the lock gap is nit or absent with the first". The always-blocking check bears on S17.limit and S17.deferred-review. The tasks stay ticked and no unchecked task reruns them. T23 and T24 repeat only the replay runs.
+PROPOSAL: Add a new task to rerun S17.profile, S17.limit, S17.scoped, S17.scoped-command and S17.deferred-review on the fixed reviewer and record the results.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: frontmatter covers; Design (Tests that change); Design (Open Questions and owner lists, "#141 lands first and lets the author cut an extra it added without a question; that exception stays"); Design (Deferred items, `author cut`); Scope (In scope, "the scenarios and the tests that pin the changed text"); Tasks T7
+EVIDENCE: `git diff --stat fdbe0da9 9e9236a0` shows this feature adds or changes files that are not in covers. Among them is plugins/vh-adlc/scripts/loop/review-scope.ts (78 lines), which holds `reviewScope`, the computation behind AC-05. It is not covered, although cli.ts and review-scope.test.ts are. The others are tests/vh-adlc/scenarios/gh-stub.ts (S17.followup's stub), tests/vh-adlc/fixtures.test.ts, tests/vh-adlc/check.test.ts, and the S17 and S16.oldpin-reviewer evidence files under tests/vh-adlc/evidence/claude-code/. `reviewScope` itself decides a full pass from covers (`compileCoverage`), so a change to review-scope.ts alone keeps the next pass scoped, and `feature_tree_clean` ignores it. R-10 F-01 (author-extras.test.ts not in covers or in Tests that change) is still unapplied, and no Deferred entry records it. T7 relies on that test and on "its Review Log record", but the Design still does not say that the Outcome-cell record stays beside the `From: author cut.` entry.
+PROPOSAL: Add these paths (or their directories) to covers, name author-extras.test.ts in Tests that change, and say in Design that an author cut keeps its Outcome-cell record next to the Deferred entry.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context Owner summary ("Nothing has run yet."; "Since the acceptance at R-5, the owner added ..."; "Acceptance authorizes the plugin edits, the replay harness and the companion convention PR on a feature branch; shipping and the pin bump need the usual approvals")
+EVIDENCE: The same summary reports "After the first complete enterprise result", and Tasks T1 to T22 are ticked with observed scenario, test and replay-harness evidence. The pin bump is done (T21, 5db8473c, AGENTS.md and knowledge.md at e79eaa6a). The last acceptance is R-9, not R-5. The summary does not mention a normative change this revision made, the stored-runs sentence in Replay harness. The convention asks the summary to "distinguish planned checks from observed proof" and to "Explain material changes since the last accepted scope". An owner reading it before acceptance is told that nothing has been proved and that the edits are still to be authorized.
+PROPOSAL: Replace "Nothing has run yet" with the actual validation state: T1 to T22 done, the first enterprise result, and the replays still to run. Tie the change paragraph to the R-9 acceptance and list this revision's changes.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Severity by consequence, `vh-adlc-reviewer.agent.md:47-50`); Design (Scoped re-review, `vh-adlc-reviewer.agent.md:52` and `scripts/loop/cli.ts`); Design (Open Questions and owner lists, `SKILL.md:81-82`, `:112-116`); Design (Gate on the resolved convention, `SKILL.md:120-128`); Design (Deferred items, `SKILL.md:141-144`); Design (Replay harness, `scripts/loop/cli.ts:161-162`)
+EVIDENCE: R-10 F-02 is still unapplied, and more lines have moved since. At the commit, the reviewer's failure-mode paragraph is at :55-68, and "Return every finding you can establish" is at :79 and already reads "within this pass's scope". In the spec skill, "Put every judgement call into Open Questions" is at :84, "Turn judgement findings into Open Questions" at :125 and the nit rule gating at :140-149. The command route reads its policy at the reviewed commit at cli.ts:181-182, not :161-162. The cited text still says what the document claims.
+PROPOSAL: Re-cite these locations at the commit of the next revision.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Context Background ("**Harm and simplest alternative.**" paragraph)
+EVIDENCE: vh-adlc-spec/SKILL.md:75 at the commit says "Start Background with the harm statement from `references/loop.md`". The harm statement is still the last paragraph of Background, as R-10 F-04 noted, and that finding is unapplied.
+PROPOSAL: Move the harm statement to the start of Background.
+
+### R-12
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "A run of the new brief alone reuses the old-brief passes and loops already stored, so moving the new brief reruns only the new brief"; "the results are assembled from those stored runs, so a run that stops loses no finished pass"; approval-order paragraph, "the old-brief runs stay valid because the old brief does not change"); Tasks T25; Test Plan AC-10, AC-13 and AC-17 rows; Acceptance Criteria AC-10; Context Owner summary ("builds the replay results from the stored private runs")
+EVIDENCE: This revision answers R-11 F-02 by building the reuse and the assembly (T25). But neither the Design nor T25 says how the harness decides that stored old-brief runs belong to the current old brief, and no Test Plan row names a check for either behavior. T25's done condition is only "run.test.ts passes, including a check of the totals table", and the AC-10 row does not list a reuse or assembly case. At the commit, tests/vh-adlc/replay/run.ts keeps one `briefs` object per case (line 245) and keeps earlier results only when `JSON.stringify(before.briefs) === JSON.stringify(data.briefs)` (line 295), so T25 has to replace that identity check. Suppose one implementer reuses every stored old-brief run, with no check of its plugin commit and docs revision. The old totals behind AC-11 to AC-13 and AC-17 could then mix briefs, and every proof the document names would still pass. The AC-11 brief check covers only the new brief.
+PROPOSAL: Say that a new-brief-only run reuses only stored runs whose recorded old plugin commit, docs revision, route and model match the current old brief, and refuses otherwise. Add cases to the AC-10 row and T25: a matching stored set is reused, a mismatched one is refused, and results assembled after an interrupted first-pass set keep its finished passes.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context Background ("**Harm and simplest alternative.**" paragraph, `SKILL.md:114-117`)
+EVIDENCE: This revision moved the harm paragraph to the start of Background, ahead of "Measured on `main` at `915441e8`". Its citation `SKILL.md:114-117` was taken at 915441e8, where those lines hold the remove-or-revisit rule. A reader now takes the citation at the reviewed commit. There, vh-adlc-spec/SKILL.md:112-118 is the convergence trigger in step 4, and the remove-or-add rule is at :129-131 and the revisit sentence at :136. This traces to the previous revision's move.
+PROPOSAL: Re-cite the rule at the reviewed commit (`SKILL.md:129-137`), or say the citation is at 915441e8.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary (first bullet, "a failure path is blocking or should-fix only when someone using that product would plausibly hit it"; "Validation so far: ... The replays on the fixed reviewer are still running."); frontmatter status_description ("T1 to T22 stay done; T23 and T24 continue after acceptance")
+EVIDENCE: Severity by consequence and AC-04 now say that a failure path the reviewer is unsure about is rated should-fix rather than nit or dropped (vh-adlc-reviewer.agent.md:66-67). The summary still says should-fix applies "only when someone ... would plausibly hit it". The summary's validation line mentions only the replay reruns. It leaves out that the real-reviewer S17 scenarios ran before ef685da1 and rerun under T26, and that T25 changes the harness before T23 and T24. status_description names only T23 and T24. Neither location is in the normative baseline.
+PROPOSAL: Add the uncertain-path rule to the first bullet. Name T25 and T26 as the remaining work in both the validation line and status_description.
+
+### R-13
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "Each brief records its plugin commit, docs revision and model per route beside its stored runs"; "`assemble` checks every stored set the same way"; "the results are assembled from those stored runs"); Tasks T25; Test Plan AC-10 row; Test Plan AC-11 row (brief check)
+EVIDENCE: This traces to the previous revision's answer to R-12 F-01. The new rule keeps one identity per brief and route, not per stored run. The harness at the commit names its private files `${name}-${route}-pass-${n}.txt` (tests/vh-adlc/replay/run.ts, the `pass` store callback in `runCase`), and n restarts at 1 on every invocation because `firstPasses` starts from a fresh set (`n = set.runs.length + 1`). The first new brief `5e94e593` on the Claude route had failing labels (ef685da1's message: always-blocking defects "only at should-fix"), so it took the six confirmation passes, plus any failed runs, which also take an n. Suppose a rerun on the fixed brief needs no confirmation. It overwrites passes 1 to 6 and leaves the higher-numbered `5e94e593` passes in place. With one identity per brief and route, the directory then reads as the fixed brief, and `assemble` counts those leftovers, so AC-11's retention verdict can mix two new briefs. The AC-11 brief check compares only the brief named in the results file. No AC-10 case covers a set that still holds runs of an earlier brief with the same name.
+PROPOSAL: Store the plugin commit, docs revision and model with each run, as `RunEntry` already does in the results, and have `assemble` and the reuse check count only runs whose own identity matches. Alternatively, clear a brief's stored set when its identity changes. Add that case to the AC-10 row and T25.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "A run of the new brief alone reuses the old-brief passes and loops already stored only when that recorded identity matches the current old brief and route, and refuses otherwise"; "Moving the new brief therefore reruns only the new brief"; approval-order paragraph, "the old-brief runs stay valid because the old brief does not change"); Context Owner summary ("every new-rules run repeats on the fixed plugin"); Tasks T25
+EVIDENCE: The old-brief runs of the first complete enterprise result were stored by the harness as it was before T25. That harness writes only pass text, verdict JSON and loop documents to `<case>/runs/`. Plugin commit, docs revision and model go only into the `replay-data` block of the results file (`writeResults`). The results file is not in the tree at the commit: `git ls-tree -r --name-only 529d2648 tests/vh-adlc/evidence/proportional-review/` lists only `canned/`. So the stored set the Design means to reuse has no identity "beside its stored runs". Under the new rule a new-brief-only run must either refuse it, which reruns the old brief and contradicts "reruns only the new brief" and "the old-brief runs stay valid", or accept an identity someone writes by hand, which the check cannot verify. The Design does not say which. Two implementers would differ in whether the owner waits for a full old-brief rerun.
+PROPOSAL: Say where a set stored before T25 gets its identity, for example the per-run identities in the `replay-data` block that run wrote, checked run by run. Otherwise state that the old brief reruns for every case and route, and change the reuse sentences and the Owner summary to match.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-10; Test Plan AC-10 row; Design (Replay harness, stored-runs paragraph)
+EVIDENCE: The previous revision added reuse of a matching stored old-brief set, refusal of a mismatched one, and assembly after an interrupted first-pass set to the AC-10 row and to T25. AC-10's text still lists only "runs a case end to end, refuses a case whose approval line is missing ... records failed executions without counting them as passes, and runs on a public fixture case". No criterion states the reuse, refusal or assembly end state that the row now proves.
+PROPOSAL: Add to AC-10 that a new-brief-only run reuses only stored old-brief runs whose identity matches and refuses otherwise, and that results assembled from stored runs keep every finished pass.
+
+### R-14
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "Sets stored before T25 take that identity from a launch record written for them, naming each launch's plugin commit, docs revision, route and model; the owner accepted this on 2026-11-23, and the implementation review checks the record against the run logs and file times"; "so a set never mixes two invocations"; "`assemble` checks every stored set the same way"); Tasks T25, T23, T24; Acceptance Criteria AC-10; Test Plan AC-10, AC-11, AC-12, AC-13 and AC-17 rows
+EVIDENCE: This traces to the previous revision's answer to R-13 F-02. The document does not say where the launch record lives, what format it has, who writes it, or whether the harness reads it. No task writes it. T25 and the AC-10 row only cover sets the new harness stores. The implementation review check "against the run logs and file times" is stated only in Design. No criterion or Test Plan row names it, and the AC-11 row's brief check covers only the new brief. Also, the record names an identity per launch, not the files each launch wrote. The pre-T25 harness reuses file names across invocations: `${name}-${route}-pass-${n}.txt` and `${name}-${route}-loop-${i}.md` (tests/vh-adlc/replay/run.ts, `runCase`), and its stop message tells the operator to "rerun its loops with --only loops". If an old-brief loop is rerun and the second loop is shorter than the first, higher-numbered `old-<route>-loop-<i>.md` files from the first launch are left behind. If `assemble` counts the stored documents, which `reviews: documents.length - 1` does today, those leftovers inflate the old total behind AC-13 and AC-17 and make the halving easier. So "a set never mixes two invocations" holds only for sets stored after T25. The pre-T25 harness's only log line (`console.log` at the end of `runCase`) prints case, results, retention and loops, with no plugin commit or docs revision. So whether the "run logs" can confirm an identity depends on what the operator captured, which the document does not name.
+PROPOSAL: Name the launch record's path in the case directory and its fields, including the stored files each launch wrote. Make T25 read the record as the set's identity and refuse a stored file the record does not list. Add AC-10 row cases for a pre-T25 set with a matching record, a mismatched record and an unlisted leftover file, and add the record check to the AC-11 and AC-12 rows.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "A run of a brief on a route starts a fresh stored set: any earlier set for that brief and route is moved aside first, so a set never mixes two invocations"; "the results are assembled from those stored runs, so a run that stops loses no finished pass"); Acceptance Criteria AC-10 ("keeps every finished pass when it assembles results from stored runs, starts a fresh stored set for each run of a brief"); Test Plan AC-10 row; Tasks T25
+EVIDENCE: This revision adds the fresh-set rule. The harness runs first passes and loops separately: `only` takes `loops` or `first-passes` in `runCase`, `writeResults` merges partial runs, and a stopped loop reports "its first passes are recorded, rerun its loops with --only loops". The document does not say whether a `--only loops` run is "a run of a brief". If it is, it moves aside the finished first passes, and those hours of passes have to run again, so the promise that a run that stops loses no finished pass fails in practice. If it is not, the loop joins the first passes of an earlier invocation, against "a set never mixes two invocations". The document also does not say whether `assemble` reads moved-aside sets. AC-10's "keeps every finished pass" can be read as including them, which would bring back the `5e94e593` passes that the rule moves aside. Two careful implementers would build harnesses that differ in rerun cost or in what gets counted, and the owner running the replays would notice the difference.
+PROPOSAL: Define the stored set per brief, route and part (first passes, loop), with a partial run starting fresh only for the part it runs. Say that `assemble` reads only the current sets, and add a `--only loops` rerun case to the AC-10 row and T25.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary ("builds the replay results from the stored private runs"; "every new-rules run repeats on the fixed plugin")
+EVIDENCE: This revision records a new owner decision in Design: sets stored before T25 take their identity from a hand-written launch record, which "the owner accepted ... on 2026-11-23". The Owner summary's list of changes since the R-9 acceptance does not mention this decision or the fresh-set rule. The convention asks the summary to reflect decisions and material changes. The Owner summary is outside the normative baseline.
+PROPOSAL: Add one line to the change paragraph naming the launch record for pre-T25 sets and the fresh stored set per run.
+
+### R-15
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, "A stored set is one part (first passes or loop) of one brief on one route"; "Each brief and route records its plugin commit, docs revision and model in `runs/<brief>-<route>.identity.json`"; "one entry per launch with its brief, route, plugin commit, docs revision, model, process ID, log file and the stored files it wrote. For such a set the harness counts only the files its launch entry lists and refuses any other file of that brief and route"); Acceptance Criteria AC-10; Test Plan AC-10 row; Tasks T25
+EVIDENCE: This traces to the previous revision's answers to R-14 F-01 and F-02. The set is now per part, but the identity file and the launch-record refusal are still keyed per brief and route, and the launch entry per launch. Three cases follow. (1) Every pre-T25 launch ran both briefs: `runCase` calls `pass("old", ...)` then `pass("new", ...)` (tests/vh-adlc/replay/run.ts:345-346) and loops `for (const name of ["old", "new"])` (run.ts:358), across both routes by default (run.ts:331). So one launch used two plugin commits and two docs revisions, and an entry "per launch with its brief, route, plugin commit, docs revision" cannot describe it as written. (2) A pre-T25 loop stop on the new brief, after the old loop has written `old-<route>-loop-<i>.md` (run.ts:369), tells the operator to "rerun its loops with --only loops" (run.ts:373). That rerun repeats the old loop too. If it is shorter, the leftover higher-numbered files are still listed by the first launch's entry. With two entries for one part, "its launch entry" is undefined, and the leftovers count toward the old total behind AC-13 and AC-17. (3) A brief and route whose first passes were stored before T25 and whose loop is rerun after T25 with `--only loops` gets an identity file for its brief and route, while the rule "refuses any other file of that brief and route" refuses the new loop files. Neither rule says which identity governs which part. The same per brief and route key also lets a post-T25 `--only loops` run under another identity overwrite the identity file and relabel the first passes it keeps. The AC-10 row's cases (a matching, a mismatched and an unlisted-file launch record, and a `--only loops` rerun) cover none of these. Two careful implementers would differ in what gets counted or refused, and the owner running the replays would notice: a refusal forces an old-brief rerun, which contradicts "Moving the new brief therefore reruns only the new brief".
+PROPOSAL: Key the identity file and the launch-record entries per set (brief, route and part), let the latest launch that wrote a part govern it and refuse files of that part listed only by an earlier entry, and have a partial run refuse to keep a part whose recorded identity differs from its own. Add AC-10 row and T25 cases for two pre-T25 launches that wrote one loop part, and for pre-T25 first passes followed by a post-T25 `--only loops` run.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-10 ("starts a fresh stored set for each run of a brief"); Context Owner summary ("with a fresh stored set per run"); Design (Replay harness, stored-set paragraph)
+EVIDENCE: This revision defines the set per part and says "a `--only loops` run keeps the stored first passes". AC-10 and the Owner summary still say a fresh set per run of a brief, which reads as moving aside first passes on a `--only loops` run. AC-10 also does not state the launch-record behavior that the AC-10 row now proves: a pre-T25 set counted through a matching record, refused through a mismatched one or one with an unlisted file. The Test Plan row and Design agree with each other, so a wrong implementation still fails the row.
+PROPOSAL: Change AC-10 to "starts a fresh stored set for each part a run executes, keeping the other part", add the launch-record counting and refusal to AC-10, and say "per part" in the Owner summary.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-11 row ("checks each pre-T25 set in `runs/launch-record.json` against the launch's log and the stored files' times"); Design (Replay harness, launch-record fields)
+EVIDENCE: The pre-T25 harness prints one JSON line on success with case, results, retention and loops (tests/vh-adlc/replay/run.ts:387), and on a stop only the stop message to stderr (run.ts:419). Neither names a plugin commit or docs revision. So the launch's log confirms the hand-written identity only if the operator captured the launch's command line (`--old-plugin`, `--new-plugin`, `--companion-base`, `--companion-head`), and neither the record's fields nor the row say so. R-14 F-01 raised this point and the revision added a log file field but not what the log must show. The harm is small because the old brief has only ever been one commit and the pre-T25 new-brief sets are superseded.
+PROPOSAL: Add the launch's command line to the launch-record fields, or name what in the log the implementation reviewer compares with the recorded plugin commit and docs revision.
+
+### R-16
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T25 ("a recorded brief identity per route"; its done-condition case list); Design (Replay harness, "it records its plugin commit, docs revision and model in `runs/<brief>-<route>-<part>.identity.json`"); Test Plan AC-10 row ("pre-T25 first passes followed by a post-T25 `--only loops` run keep each part's own identity")
+EVIDENCE: This traces to this revision's answer to R-15 F-01, which moved the identity file from per brief and route to per part. T25 still says "a recorded brief identity per route", which is the old key. Its done condition lists "a launch record that matches, mismatches or misses a file" and "a `--only loops` rerun" but not the new AC-10 row case where pre-T25 first passes are followed by a post-T25 `--only loops` run, which R-15 F-01 asked to add to both the row and T25. The AC-10 row and Design agree with each other, so the proof still checks the right behavior. Tasks are outside the normative baseline.
+PROPOSAL: Change T25 to "a recorded identity per brief, route and part" and add the mixed pre-T25 and post-T25 case to its done-condition list.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Replay harness, stored-set paragraph: "A new-brief-only run and `assemble` use a stored set only when its identity matches the current brief, route and model, and refuse otherwise"; and the closing sentence "A run of the new brief alone reuses the old-brief passes and loops already stored only when that recorded identity matches the current old brief and route, and refuses otherwise; `assemble` checks every stored set the same way")
+EVIDENCE: This revision added the first sentence and kept the second, so the paragraph states the reuse and assemble rule twice. The two copies differ: the first checks brief, route and model, the second only brief and route. The second's "that recorded identity" used to point at the identity-file sentence; it now follows the launch-record sentence ("the owner accepted this record on 2026-11-23"), so its antecedent reads as the launch record only. AC-10 and its row check the matching and mismatched cases either way.
+PROPOSAL: Delete the closing reuse sentence except "Moving the new brief therefore reruns only the new brief", leaving the new sentence (brief, route and model) as the single statement.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Scope ("Not handled: resuming a set stored before T25 with `--only loops`, because no such set was resumed and a loop rerun on one is made as a fresh set instead (R-15 F-01)."); Deferred D-16 ("Resume a set stored before T25 with `--only loops`."); Test Plan AC-10 row ("pre-T25 first passes followed by a post-T25 `--only loops` run keep each part's own identity")
+EVIDENCE: The limit, added by this revision, answers R-15 F-01 case (2): a pre-T25 loop part written by two pre-T25 launches, which Design now rules out as fact ("Each listed set was written by one launch"). As worded, "resuming a set stored before T25 with `--only loops`" also reads as running `--only loops` on a brief and route whose first passes were stored before T25, which is exactly the case the AC-10 row now proves is handled. Since every post-T25 run starts a fresh set, no post-T25 run resumes anything, so the limit concerns only past launches.
+PROPOSAL: Reword the Scope line and D-16 to name the past case, for example "Not handled: a loop part that two pre-T25 launches wrote, because none did and a post-T25 loop rerun starts a fresh set (R-15 F-01)."
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Replay harness, "earlier files of that part, with its identity, move to `runs-superseded/`"; "Sets stored before T25 have no identity file: `runs/launch-record.json` ... the harness counts only the listed files and refuses any other file of that set"); Scope (the R-15 F-01 limit, "a loop rerun on one is made as a fresh set instead")
+EVIDENCE: When a post-T25 run starts a fresh set for a part stored before T25, its files move aside, but its identity is an entry in the shared `runs/launch-record.json`, which the document does not say is removed or marked. Afterwards the part has both a new identity file and a launch-record entry listing moved files. A careful implementer most likely treats the identity file as governing ("Sets stored before T25 have no identity file"), but one who applies the entry would refuse the new loop files as "any other file of that set", and `assemble` would fail until the record is edited by hand. The failure is a visible refusal, not a wrong count, and it arises only if an old-brief part stored before T25 is rerun.
+PROPOSAL: Add one clause: a part with an identity file is governed by it alone, and starting a fresh set for a pre-T25 part moves its launch-record entry aside with its files.
+
+### R-17
+
+NO FINDINGS
+
+### R-18
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Replay harness, lower-bound paragraph: "the distinct reviewed commits for the document and the old docs revision, less one per old-brief first pass on that route, recorded in `runs/old-<route>-loop.bound.json`"); Design (Rounds, "a lower bound counting as recorded"); Test Plan AC-13 row; Test Plan AC-10 row ("a lost loop counts its bound"); Tasks T25 ("lower bounds from session logs"); Context Owner summary (R-9 paragraph, "lower bounds for the two old loops lost to an expired login")
+EVIDENCE: This revision adds the lower bound. Counting a lost loop's recorded reviews as its total is safe only if the number really is a lower bound: an overcount raises the old total and makes AC-13 easier to pass. The formula as stated can overcount. Every execution, first pass or loop attempt, makes its own clone and commits its own X' with no fixed date (`once` calls `prepareClone` per run, tests/vh-adlc/replay/run.ts:333-334; commit at run.ts:180-181). So every old-brief Codex first pass the pre-T25 launches ever ran shows up as its own reviewed commit in the session logs. That includes failed or "not counted" runs that reached the reviewer, and passes from earlier launches whose files a later launch overwrote under the same names (`old-command-pass-<n>.txt`). R-15 F-01 recorded that every pre-T25 launch without `--only` ran the old first passes again (run.ts:345). A loop also gets up to three attempts per launch (run.ts:50, :361), each from a fresh X', and a stopped launch tells the operator to rerun with `--only loops` (run.ts:373). The reviews of an abandoned attempt are distinct commits too, so summing them counts restarts as one longer loop. "less one per old-brief first pass" does not say whether it means the three counted passes or every first-pass execution in the logs. Nothing caps the bound at the 60-review limit. No row has the implementation reviewer check the bound file against the logs, though AC-11 has that check for the launch record.
+PROPOSAL: Count only the reviews of the lost loop's last attempt, taken from that loop's own session (for example the author session that dispatched the reviews, or review sessions in its launch window after its X'). Subtract every old-brief first-pass execution found in the logs, not three. Cap the bound at 60. Add a check of `runs/old-<route>-loop.bound.json` against the logs to the AC-11 and AC-12 rows.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Growth, "A loop's growth is the body size at its clean pass minus the size at X'. Over the case and route pairs whose old-brief loop stored its documents"); Design (lower-bound paragraph, "An old-brief loop that stopped before a clean pass ... marked as not clean"); Acceptance Criteria AC-17; Test Plan AC-17 row
+EVIDENCE: This revision's lower-bound paragraph covers any old-brief loop that stopped before a clean pass, and treats a lost-documents loop as only one case of it ("When such a loop lost its documents"). Growth is defined only at a clean pass. It leaves out only pairs whose old loop lost its documents. An old loop that stopped before a clean pass but kept its documents is therefore in the growth total and has no defined growth. With kept clones, a stopped loop is normally resumed, so the two lost Codex loops are probably the only unclean ones. That makes this path unlikely in practice.
+PROPOSAL: Leave every pair whose old loop is not clean out of growth, or define its growth at its last stored pass.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary ("Full loops under a scripted owner must then need at most half the old total of reviews and body growth"); Tasks T24 ("the round and growth totals over all four pairs"); Design (Growth); Acceptance Criteria AC-17
+EVIDENCE: This revision limits the growth condition to pairs whose old-brief loop stored its documents. The two lost loops are both Codex-route loops (owner decision, 2026-11-24), so growth is now judged on the two Claude-route pairs only. The Owner summary still states the growth condition without that limit. It mentions the lost loops only as lower bounds, in the R-9 paragraph. T24 still says growth is totalled over all four pairs. AC-17 and its row state the narrowed condition, so the proof checks the right thing.
+PROPOSAL: Say in the Owner summary that growth is judged on the Claude-route pairs only, because the Codex old loops lost their documents. Change T24 to "growth totals over the pairs with stored old-brief documents".
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Replay harness, "A loop works in a clone kept in the case directory, so a loop that fails is resumed from that clone by the next attempt"; "starts a fresh set when the identity differs: the earlier files of that part, with its identity, move to `runs-superseded/`"); Test Plan AC-10 row ("a failed loop's next attempt resumes its kept clone")
+EVIDENCE: This revision adds kept loop clones. The clone lives in the case directory, not under `runs/`, and the fresh-set rule moves only "the earlier files of that part, with its identity". It does not say whether a kept clone counts as part of the set. Suppose a loop fails and the next attempt runs under another identity, for example after another owner-allowed move of the new brief. One implementer discards the clone. Another resumes it, which would mix reviews from two plugin commits in one counted loop, on an X' that holds the earlier brief's docs pin. The new brief has moved once already, but another move needs a new owner decision.
+PROPOSAL: Say that a kept loop clone belongs to its set, is resumed only under the same identity, and moves aside or is removed when a fresh set starts.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Replay harness, "the harness counts only the listed files and refuses any other file of that set until a run continues it under the same identity"); Test Plan AC-10 row ("refused when it holds a file the entry does not list"); Scope ("Not handled: a set stored before T25 that two launches wrote ... (R-15 F-01)")
+EVIDENCE: This revision adds "until a run continues it under the same identity". Read literally, a pre-T25 set that holds a file its launch-record entry does not list can be continued, and after that the refusal no longer applies. The unlisted file then counts, either as a pass the set "already has" or in the totals, though the launch record exists to keep such files out. The Scope limit and "Each listed set was written by one launch" make that set unlikely, but the AC-10 row tests exactly that state, and the document does not say what continuation does with it.
+PROPOSAL: Say that a run refuses to continue a pre-T25 set that holds an unlisted file, or that continuation moves unlisted files to `runs-superseded/` before recording the identity.
+
+### R-19
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Replay harness, stored-set paragraph: "the harness counts only the listed files and refuses any other file of that set. A run continues such a set only when it holds no unlisted file; otherwise the run starts a fresh set"; "Moving the new brief therefore reruns only the new brief"); Design (lower-bound paragraph, "The bound is recorded in `runs/old-<route>-loop.bound.json`"); Acceptance Criteria AC-10 ("counts a lost loop's recorded lower bound, counts a set stored before T25 only through a matching launch record entry that lists its files"); Test Plan AC-10 row ("a lost loop counts its bound"; "refused when it holds a file the entry does not list"); Tasks T25
+EVIDENCE: This traces to this revision's answer to R-18 F-05, which added "otherwise the run starts a fresh set". The two lost Codex-route old loops are sets stored before T25, so their identity is a `runs/launch-record.json` entry that lists "the files it wrote". The bound file is written afterwards, under the owner decision of 2026-11-24, so the launch did not write it and its entry does not list it. Its name, `runs/old-<route>-loop.bound.json`, puts it in the old-brief loop set of that route ("A stored set is one part (first passes or loop) of one brief on one route"). Read literally, `assemble` refuses that set because it holds an unlisted file, and a run starts a fresh set: the bound moves to `runs-superseded/`, which `assemble` never reads, and the old Codex loop runs again. That contradicts "Moving the new brief therefore reruns only the new brief". The document also does not say whether a loop set that holds only a bound counts as finished, so a same-identity continuation "running only the passes the set still lacks" may rerun the loop too. One careful implementer keys the unlisted-file rule on the listed run files only; another applies it to every file of the set. The owner running the replays would notice either a refusal or an unplanned old-loop rerun. The AC-10 row's lost-loop case does not say whether the lost loop is a pre-T25 set with a launch-record entry, so it need not catch this.
+PROPOSAL: State that a loop set's bound file is part of its record, exempt from the launch-record file list (or listed in its entry), and that a loop set with a bound counts as finished, so runs and `assemble` keep it. Add an AC-10 row and T25 case for a pre-T25 lost loop set with a launch-record entry and a bound file.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary ("of body growth over the pairs whose old loop reached a clean pass with stored documents (the two Claude-route pairs, since both Codex-route old loops lost their documents)"); Design (Growth, "Over the case and route pairs whose old-brief loop reached a clean pass and stored its documents"); Acceptance Criteria AC-17; Test Plan AC-17 row; Tasks T24 ("the growth totals over the pairs with stored old-brief documents")
+EVIDENCE: This revision narrows growth to pairs whose old loop reached a clean pass. The Owner summary names the qualifying pairs as fact, but the small application replay (T24) is still open, and the document gives no evidence that its Claude-route old loop ran to a clean pass. A loop that hits the 60-review cap is not clean, so it drops out. In `runCase` (tests/vh-adlc/replay/run.ts), a failed old loop on the command route sets `stopped` and the host route does not run in that launch, so the small application's host-route old loop may not have run yet. If no pair qualifies, both totals are zero and AC-17 holds vacuously ("no larger than it when the old total is zero or negative"). T24 leaves out the new "reached a clean pass" condition. AC-17 and its row state the rule correctly, so the proof checks what Design says.
+PROPOSAL: Present the Claude-route pairs in the Owner summary as the expected pairs, not as fact. State that AC-17 needs at least one qualifying pair, or define a capped old loop's growth at its last stored pass. Add "reached a clean pass" to T24.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-10 row; Tasks T25; Design (Replay harness: "which belongs to its set ... and it moves aside with its set when a fresh set starts"; "A run continues such a set only when it holds no unlisted file; otherwise the run starts a fresh set"; "the earlier files of that part, with its identity, move to `runs-superseded/`"); Design (Growth, the new clean-pass condition)
+EVIDENCE: This revision adds three rules that no AC-10 row or T25 case exercises: a kept loop clone moves aside with its set when a fresh set starts; a run starts a fresh set instead of continuing a pre-T25 set that holds an unlisted file; and an old loop that stored its documents but stopped before a clean pass stays out of growth. The row checks "a lost loop ... stays out of growth" and "refused when it holds a file the entry does not list", but not these. So the row would pass on an implementation that resumes a clone under another identity, or continues a pre-T25 set that holds an unlisted file. On the second rule, when a fresh set replaces a pre-T25 set, the shared launch record still has an entry listing the moved files. The document does not say whether the new identity file governs alone (R-16 F-04, left unapplied), and this revision adds a new way to reach that state. Each path needs either another owner-allowed brief move or a pre-T25 set holding an unlisted file, and Design says neither happened. So the owner is unlikely to hit them.
+PROPOSAL: Add AC-10 row and T25 cases for a clone moved aside when a fresh set starts, a fresh set started from a pre-T25 set that holds an unlisted file, and an unclean old loop with stored documents left out of growth. Say that a part's identity file, once written, governs it alone.
+
+### R-20
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-17 ("Over the case and route pairs whose old-brief loop reached a clean pass and stored its documents, the new-brief loops' total body growth is at most half ..."); Test Plan AC-17 row ("Pass: over the pairs whose old-brief loop reached a clean pass with stored documents, the results file shows ..."); Design (Growth, "of which there must be at least one"); Context Owner summary ("with no qualifying pair, AC-17 is not met"); Test Plan AC-10 row and Tasks T25 (no zero-pair case)
+EVIDENCE: This revision answers R-19 F-02 by adding the at-least-one condition to Design and the Owner summary only. The criterion text and its proof row still read as before. With no qualifying pair, both growth totals are zero, and AC-17's own text ("or no larger than it when the old total is zero or negative") is met, so an implementation reviewer judging the criterion by its text and row would record it met, while Design and the Owner summary say it is not. No AC-10 row or T25 case has the results file show the zero-pair result as failing, so the harness need not report it. The Owner summary expects two Claude-route pairs to qualify, and nothing in the document shows that none will, so the owner is unlikely to reach this state.
+PROPOSAL: Add "of which there must be at least one" to AC-17 and its Test Plan row, and add a fixture case to the AC-10 row and T25 where no old loop qualifies and the results file shows the growth condition as not met.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Replay harness, stored-set paragraph: "the harness counts only the listed files and refuses any other run file of that set. A run continues such a set only when it holds no unlisted run file; otherwise the run starts a fresh set"); Design (lower-bound paragraph: "part of its set's record like the identity file and never a run file a launch-record entry lists"); Test Plan AC-10 row ("a pre-T25 set holding an unlisted run file starts fresh"; "refused when it holds a file the entry does not list"; "a pre-T25 lost loop set with a launch-record entry and a bound counts its bound"); Tasks T25 ("a fresh set from a pre-T25 set with an unlisted file"; "a launch record that matches, mismatches or misses a file"); Acceptance Criteria AC-10 ("counts a set stored before T25 only through a matching launch record entry that lists its files")
+EVIDENCE: This revision introduces "run file" to exempt the bound file, but never defines it, and the AC-10 row and T25 keep the older "a file the entry does not list" and "an unlisted file" beside the new term. Read literally, the row asks that a set holding a file the entry does not list is refused, and in the same row that a pre-T25 loop set holding an unlisted bound file counts its bound. The same state (an unlisted run file) is also "refused" in one clause and "starts fresh" in another; Design ties neither outcome to an operation (assemble or a new-brief-only run versus a full run), and "refuses any other run file" can be read as ignoring the file or as refusing the set. The Design text makes the bound exemption clear, and Design says each listed set was written by one launch, so the owner is unlikely to hit a set with an unlisted run file.
+PROPOSAL: Define a run file once (a pass, verdict, loop document or failure file a launch writes, not the identity or bound file), use "run file" in the AC-10 row and T25, and say that assemble and a new-brief-only run refuse such a set while a full run starts a fresh one.
+
+### R-21
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-11 row ("that the reviewer, the spec skill, `references/review-protocol.md`, `references/loop.md` and `scripts/loop/` differ between the first new brief `5e94e593` and the new brief in the results file only by `ef685da1`'s reviewer change (`git diff 5e94e593 <new brief> -- <those paths>`)"); Test Plan AC-12 row ("same procedure, brief check and pass condition"); Design (Replay harness, "new is the feature head at that moment" and "The new brief then moves to the fixed plugin and every new-brief run repeats"); Context Owner summary ("every new-rules run repeats on the fixed plugin")
+EVIDENCE: `git diff --stat 5e94e593 00752fea -- plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md plugins/vh-adlc/references/review-protocol.md plugins/vh-adlc/references/loop.md plugins/vh-adlc/scripts/loop/` lists two files: the reviewer (10 lines, ef685da1) and `plugins/vh-adlc/scripts/loop/plugin-version.ts` (22 lines). `git log 5e94e593..00752fea -- plugins/vh-adlc/scripts/loop/plugin-version.ts` gives 2c116422, "fix(loop): identify the PATH vh-adlc by its digest instead of running it", a default-branch commit. The drift merge dfdd422d (R-17) brought it in at 2026-11-23 22:15, after ef685da1 (21:39). This pass's merge f886f91b changes none of those paths, so the gap dates from the R-17 merge, which that pass did not raise. The document never names the new brief's commit. It says only that the new brief moves "to the fixed plugin". T23 and T24 are still open and "continue after acceptance". So an author who launches the reruns from the current feature head, which Design's "the feature head at that moment" allows, gets a new brief that also differs from 5e94e593 in `scripts/loop/`. The implementation reviewer's check as written then fails AC-11 and AC-12, even though the extra change only affects how the context command identifies the PATH binary, not review behaviour. An author who uses ef685da1, or a commit before dfdd422d, as the new brief passes. Two careful implementers would pick different briefs, and one choice fails the proof on a correct replay.
+PROPOSAL: Name the new brief's commit in Design and in the AC-11 row (for example ef685da1, or the commit the stored new-brief sets record). Alternatively, let the check also allow changes the default branch merged in that leave the reviewer's inputs and the review-scope result unchanged, and list 2c116422's `plugin-version.ts` change as one of them.
+
+### R-22
+
+NO FINDINGS
+
+### R-23
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, Retention paragraph: "a label fails when at least two of the three old-brief first passes raise it at or above its minimum severity ... Labels no old-brief pass raises at or above its minimum severity cannot fail and are reported, with the old-brief count at any severity beside them"); Context Owner summary ("A labelled defect fails if the old rules raised it in two of three runs and the new rules miss it in all twelve at the owner's minimum severity", "counts both briefs at the same severity bar for retention", "T27 (retention at the same severity bar for both briefs)"); frontmatter status_description; Tasks T27; AC-11 and AC-12, which rest on the rule
+EVIDENCE: This revision changed the old-brief count from "at any severity" to "at or above its minimum severity" (`git diff a3ae263a c93e20eb -- docs/specs/proportional-review.md`). The stated reason is narrower than the rule: "a reviewer that rates a defect below its minimum under both briefs has not lost it to the new rules". The rule also lets a label pass when the old brief raised it below its minimum and the new brief does not raise it at all, which is a loss, and the goal says "every real defect the current review raises is still raised". This path is plausible on these cases. Design says an always-blocking label's minimum is blocking, and it records that the reviewer rated "three always-blocking defects raised only at should-fix" in the first enterprise result. So an always-blocking label that the old brief raised at should-fix in three of three passes, and that the new brief drops in all twelve, "cannot fail". The results table (`tests/vh-adlc/replay/run.ts:425`, column "New passes at its minimum") shows 0 for that label whether the new brief rated it lower or dropped it. Only the per-run label lists tell the two apart, and no criterion reads them.
+PROPOSAL: Keep the shared bar, and add that a label two of three old passes raise only below its minimum fails when none of the twelve new passes raises it at any severity. Report the new brief's any-severity count next to the old one, and give T27's test that case.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-10 row and AC-11 row; Tasks T27 ("(AC-10, AC-11, AC-12)")
+EVIDENCE: T27 changes how the harness computes retention and says run.test.ts covers "a label the old brief raises only below its minimum". No Test Plan row names a retention case. The AC-10 row lists identity, reuse, launch record, bound, terms and growth cases, but not the retention arithmetic, although run.test.ts has a `describe("retention", ...)` block. The AC-11 row checks only that "the results file shows no failing label" and spot-checks the matcher's verdicts. It does not check how the harness turns verdicts into a retention verdict. Under the current proofs, a harness that counts the new brief at any severity, or skips the confirmation runs, passes AC-10 and AC-11 while declaring labels retained that the rule fails. This revision makes the rule more lenient, so the risk now matters.
+PROPOSAL: Add the retention cases to the AC-10 row: a label the old brief raises only below its minimum, a label the new brief raises only below its minimum (which still fails after twelve runs), and the confirmation runs. Alternatively, have the AC-11 row's reviewer recompute retention from the per-run labels in the results file.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter `goal` ("while every real defect the current review raises is still raised"); AC-11 ("apart from label L-08 on the Claude host route, a known loss the owner deferred as D-17"); Deferred D-17
+EVIDENCE: After this revision, AC-11 accepts the loss of one labelled real defect on one route, and the Owner summary says so ("one real defect is lost: label L-08"). The goal still promises that every real defect is still raised. The cut check and the follow-up review judge items against the goal, so the two statements now disagree.
+PROPOSAL: Reword the goal so it allows the recorded known loss, for example "every real defect the current review raises is still raised, apart from those the owner defers as known losses".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Replay harness, "Both briefs use the same route settings and models" and the identity file paragraph, "records its plugin commit, docs revision and model")
+EVIDENCE: Commit 9e977a5e, since R-22, adds `refreshRoute` (`tests/vh-adlc/replay/run.ts:199-208`). It commits the case's current `--routes` settings into a resumed loop clone when they differ, and its message says the command route's reviewer start changed during the replay. The identity file and the results record no route settings, so nothing shows whether old-brief sets ran under the same route settings as the new-brief runs. The change described affects only how the prompt reaches the reviewer, so the consequence is small.
+PROPOSAL: Add a digest of the route settings to each identity file and to the results, or say in Design which route settings changes are allowed between briefs (for example, how the prompt is delivered).
+
+### R-24
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, Retention paragraph: "A label that at least two of the three old-brief passes raise only below its minimum fails instead when none of the six new-brief first passes raises it at any severity"; "fails only if none of the twelve meets the bar it failed: its minimum severity, or any severity for a label the old brief raised only below its minimum"; "Labels no old-brief pass raises at or above its minimum severity, or below it in fewer than two passes, cannot fail and are reported"); Context Owner summary ("A labelled defect fails if the old rules raised it at the owner's minimum severity in two of three runs ... or if the old rules raised it only below that severity in two of three runs and the new rules miss it in all twelve at any severity"); frontmatter status_description ("fails a label the new brief drops entirely"); Test Plan AC-10 row (retention cases); Tasks T27; AC-11 and AC-12, which rest on the rule
+EVIDENCE: This traces to this revision's answer to R-23 F-01. The added condition covers a label that two of three old passes raise only below its minimum, and the first condition covers two of three at or above it. A label that one old pass raises at its minimum and one only below it (two of three at any severity, which the current review raises) meets neither, and the cannot-fail sentence then puts it among the labels that "cannot fail" ("below it in fewer than two passes"). If the new brief drops that label in all twelve passes, AC-11 and AC-12 still pass, so the goal's "every real defect the current review raises is still raised" is not checked for it. Design records that this reviewer's severity varies across runs ("three always-blocking defects raised only at should-fix"), so a split old count is plausible on the open T23 and T24 replays. The current harness counts old passes at any severity (`tests/vh-adlc/replay/run.ts:255-256`, `r.old >= 2 && r.new === 0` at :547 and :551), so it fails such a label today; T27 as specified would stop failing it. The cannot-fail sentence also reads two ways (its "or" can be taken to exempt a label two old passes raise at its minimum and none below), the confirmation clause says "a label the old brief raised only below its minimum" where the condition counts per pass, the Owner summary says "at the owner's minimum severity" where Design says "at or above its minimum severity", and the status_description says any label the new brief drops entirely fails.
+PROPOSAL: State the second condition as: a label that at least two of the three old passes raise at any severity, but fewer than two at or above its minimum, fails when none of the new passes raises it at any severity; reword the cannot-fail sentence, the confirmation clause, the Owner summary and the status_description to match. Add the split case (one old pass at the minimum, one below) to the AC-10 row's retention cases and to T27.
+
+### R-25
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Replay harness, Retention paragraph: "For a reviewer whose hit rate is unchanged, a label fails with probability at most 0.9 percent (at a per-run hit rate near 0.14; computed exactly over the binomial outcomes)")
+EVIDENCE: The diff resolves R-24 F-01. The second condition now covers "at least two of the three old-brief passes raise at any severity, but fewer than two at or above its minimum". The cannot-fail sentence ("fewer than two old-brief passes raise at any severity") completes the partition. The confirmation clause, Owner summary, status_description, the AC-10 split case and T27 all match. The 0.9 percent figure in the same paragraph was computed for one hit rate, P(Binomial(3,p) >= 2) * (1-p)^12, maximum 0.873 percent (R-4, R-5). The rule now has two disjoint conditions with different new-brief bars, so a reviewer whose hits split across severities has two rates: p at or above the minimum and q at any severity. When both rates are unchanged between briefs, the per-label failure probability is the sum over the multinomial old outcomes (at minimum, below only, missed) of the old outcome's probability times (1-p)^12 under the first condition or (1-q)^12 under the second. I computed it exactly in python3 over a 0.005 grid. Under this revision's rule the maximum is 1.32 percent, at p=0.10 and q=0.185. Under R-24's rule, where the second condition needed two below-only passes, it was 0.99 percent, at p=0.12 and q=0.24. So the bound was already slightly over 0.9 before this pass, and this revision's widening of the second condition raised it further. The figure holds only when every hit lands on the same side of the minimum. No criterion computes it, so nothing an implementer builds or a proof checks changes.
+PROPOSAL: Say the figure is for a reviewer whose hits always land on one side of the minimum, and give about 1.3 percent as the maximum when an unchanged reviewer's severity varies between at-minimum and below-minimum hits.
+
+### R-26
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness: the lower-bound paragraph "An old-brief loop that stopped before a clean pass counts ... recorded in `runs/old-<route>-loop.bound.json` ... A loop set that holds a bound counts as finished: runs and `assemble` keep it and never run that loop again"; the Rounds paragraph "a new loop stopped by its route's usage limit by the reviews stored in its kept clone, recorded the same way in `runs/<brief>-<route>-loop.bound.json`"; the kept-clone sentence "the clone is removed once the loop finishes"); Tasks T28; Test Plan AC-10 and AC-11 rows; Deferred D-19
+EVIDENCE: This traces to this revision's Rounds change. "Recorded the same way" points to a paragraph that defines a bound only for an old-brief loop that lost its documents, counted from reviewer session logs, with a window, the first-pass executions set aside and the counted commits. Nothing says what a kept-clone bound records or how reviews are counted from the clone, for example spec review rows added after X' or distinct reviewed commits. At 372cc5cb the `bound` command reads only session logs (`tests/vh-adlc/replay/run.ts:633-663`). `storedLoop` reads a bound only when no loop documents are stored (`run.ts:382`). Loop documents reach `runs/` only after the loop returns (`run.ts:594-595`), so the stopped enterprise Codex loop's reviews exist only in its clone. The lower-bound paragraph also says a set that holds a bound counts as finished and its loop never runs again. D-19 plans to "finish that new loop when Codex usage returns", from the same clone. The document does not say whether a later same-identity run resumes the clone and replaces the bound, or whether the owner must delete the bound first. It also leaves open whether a bound counts as "finishes" for removing the clone. The AC-11 row checks only `runs/old-<route>-loop.bound.json` against session logs. The AC-10 row lists neither of T28's cases: the total over clean pairs with the other pairs listed, and a bound read from a kept clone. A wrong kept-clone bound or clean-pair total can therefore pass AC-10's proof. The harm is limited because the pair stays outside the halving total, but the owner will hit the resume path D-19 names.
+PROPOSAL: In the lower-bound paragraph, define the new-brief bound: what it counts from the kept clone, what the record holds, and that a later run under the same identity resumes the kept clone and replaces the bound once the loop finishes. Add T28's two cases to the AC-10 row, and add a check of the kept-clone bound against the clone to the AC-11 row.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-13; Design (Replay harness, Rounds paragraph); Test Plan AC-13 row
+EVIDENCE: This traces to this revision. The AC-13 row requires "over the pairs where both loops reached a clean pass (at least one pair)", but AC-13 and the Rounds paragraph do not, so with no qualifying pair the criterion holds vacuously while its proof fails. AC-17 and the growth paragraph state the matching requirement ("of which there must be at least one"). A pair where only the old loop reaches a clean pass is also left out of the halving total and only listed, so a convergence regression would not fail AC-13. With the measured loops in the Owner summary (both Claude pairs clean under both briefs, the small application Codex old loop lost unclean, both enterprise Codex loops unclean), no such pair exists, and finishing the loop under D-19 could only make the new loop clean. Neither gap changes the current outcome.
+PROPOSAL: Add "at least one such pair" to AC-13 and the Rounds paragraph. If the owner wants it, also state that a pair where only the old loop reached a clean pass fails AC-13.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary: "Validation so far: T1 to T22, T25 and T26 are done ..."; "The remaining work is T27 (retention at the same severity bar for both briefs) and the results (T23, T24)"; the "This revision, after that acceptance, ..." paragraph)
+EVIDENCE: T27 is ticked with evidence. I reran `bun test tests/vh-adlc/replay/run.test.ts --timeout 60000` on a `git archive` export of 372cc5cb: 38 pass, 0 fail, matching its evidence line. T28 is new in this revision and is not named as remaining work. The frontmatter status_description has it right ("T1 to T22 and T25 to T27 done; T28, T23 and T24 continue after acceptance"). The "This revision" paragraph lists the earlier owner decisions but not this revision's change: the halving bar applies only to pairs where both loops reached a clean pass, and a stopped new loop counts from its kept clone. The rule itself is stated earlier in the summary and in the D-19 sentence.
+PROPOSAL: Update the two sentences to say T27 is done and that T28, T23 and T24 remain, and add this revision's AC-13 change and kept-clone bound to the "This revision" paragraph.
+
+### R-27
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness: the new-brief bound paragraph "Such a bound does not finish its set: a later run under the same identity resumes the kept clone, and once the loop finishes, its stored documents take precedence over the bound"; the kept-clone sentence "the clone is removed once the loop finishes, and it moves aside with its set when a fresh set starts"; the stored-set sentence "the earlier files of that part, with its identity, move to `runs-superseded/`"); Test Plan AC-10 and AC-11 rows; Tasks T28; Deferred D-19
+EVIDENCE: This traces to this revision's new kept-clone bound paragraph, which resolves R-26 F-01's definition gap but leaves the bound file's lifecycle open. Once a resumed loop finishes, its kept clone is removed (`run.ts:539`, `:547`), but nothing says what happens to `runs/new-<route>-loop.bound.json`: the document says only that the stored documents "take precedence". The AC-11 row then has the implementation reviewer check "each `runs/new-<route>-loop.bound.json` against the Review Log of the kept clone at the head and X' it records". When D-19's planned step ("finish that new loop when Codex usage returns") happens before T23, the bound file stays and the clone it names no longer exists, so that check cannot be executed as written. The old-brief bound is "part of its set's record like the identity file", but the new paragraph does not say the same. In the code at this commit, `freshSet` moves only files starting with `<brief>-<route>-<kind>-` and the identity file (`run.ts:293`), so `new-<route>-loop.bound.json` (`loop.`, not `loop-`) would stay behind when a fresh set starts, and a later failed loop with no documents would read a bound from another identity. The AC-10 totals cases check resume and precedence but not that the bound leaves with its set or once documents replace it, so an implementation that leaves a stale bound passes AC-10. The harm is limited: a superseded bound does not enter the halving total. But the owner plans to follow the resume path D-19 names.
+PROPOSAL: In the new-brief bound paragraph, say the bound is part of its set's record like the identity file, so it moves aside with a fresh set, and that it moves aside (or is deleted) once the resumed loop stores its documents. Limit the AC-11 check to a kept-clone bound still in effect, and add "the bound moves aside with a fresh set and once the loop's documents are stored" to the AC-10 totals cases and T28.
+
+### R-28
+
+NO FINDINGS
+
+### R-29
+
+CRITERION: AC-01 The convention at the companion `vhco-pro/docs` revision defines blocking, should-fix and nit by consequence for the profiled product as Design states, with always-blocking defects blocking on every product.
+VERDICT: met
+EVIDENCE: Read conventions/feature-documents.md at e79eaa6a (byte-identical to the binary's cache and, as a whole tree, to companion head 0fa68d68), Review log section: "This is severity by consequence", the product profile as context with a production default, blocking/should-fix/nit defined as Design states, and the three always-blocking classes "blocking on every product, whatever its profile". `bun test` over 29 files including tests/vh-adlc/proportional-review.test.ts (convention resolved at the repository pin through the binary), private clone at 644da0c0: 412 pass, 0 fail. Limitations: none.
+
+CRITERION: AC-02 That convention raises an Open Question only where the owner could plausibly choose differently, has the author record every other choice in Design, and offers only options that meet the goal in full.
+VERDICT: met
+EVIDENCE: Open questions section at e79eaa6a states the plausible-choice rule, "records every other choice in Design with a one-line reason" and "Each option offered meets the goal in full", and drops the "every trade-off" sentence; the proportional-review.test.ts "raises open questions only under the plausible-choice rule" case passed in the 412-pass run at 644da0c0. Limitations: none.
+
+CRITERION: AC-03 That convention and the reviewer accept a stated limit as an answer to a finding, and the reviewer raises its substance again only for an always-blocking defect, an unmeetable criterion or an unsolved problem.
+VERDICT: met
+EVIDENCE: Convention Review log at e79eaa6a defines the `Not handled:` stated limit and the three re-raise conditions; reviewer agent at 644da0c0 carries the matching paragraph; proportional-review.test.ts passed (412 pass). Committed transcripts S17.limit.stated (no names.log concurrency finding), S17.limit.nolimit (gap raised without the line) and S17.limit.security (blocking finding quoting the delete-endpoint limit), each Result: pass on plugin 3acff49, which holds ef685da1; no reviewer, skill, protocol or loop script change between 3acff49 and 644da0c0 (git diff empty). Limitations: one model sample per scenario; scenarios read from committed transcripts, not rerun.
+
+CRITERION: AC-04 The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure paths by it, rates a failure path it is unsure about at should-fix or above, and without a profile judges as for production software with users.
+VERDICT: met
+EVIDENCE: Reviewer agent at 644da0c0 reads `## Product profile` at the reviewed commit, rates by it, has the unsure-path rule and the production default; references/loop.md states the profile once (test passed). Committed transcripts on plugin 3acff49: S17.profile.single (lock gap at nit: pass), S17.profile.hosted (blocking: pass), S17.profile.none (blocking: pass), S17.profile.unsure (should-fix: pass); the LOCK_GAP classifier in tests/vh-adlc/scenarios/run.ts matches whole words. Limitations: one model sample per variant; transcripts read, not rerun.
+
+CRITERION: AC-05 On both routes, a spec review after the first receives the scope from `review-scope`, covers only the document diff and every section that states a rule, ID or term the diff changes, and reports only blocking findings outside that; the pass is full when there is no previous spec review or a covered path or a docs pin bridge file changed.
+VERDICT: met
+EVIDENCE: tests/vh-adlc/loop/review-scope.test.ts and lenses.test.ts passed in the 412-pass run; review-scope.ts PIN_BRIDGES equals internal/knowledge/knowledge.go `bridges`; cli.ts `review` passes reviewScope into reviewPrompt for spec reviews; review-protocol.md and the spec skill carry the command and the Independence exception. Committed transcripts S17.scoped (host) and S17.scoped-command (Codex review command, attested gpt-6.2-sol, scoped since the clean pass), both Result: pass on 3acff49: non-blocking findings only on the changed paragraph or its terms, unchanged names.log gap not named, unchanged secret exposure blocking. Limitations: one changed paragraph observed, one sample per route.
+
+CRITERION: AC-06 The spec skill raises judgement calls and judgement findings as Open Questions only under the plausible-choice rule, judged against the product profile and the files loop context lists.
+VERDICT: met
+EVIDENCE: Spec skill at 644da0c0, "Under severity by consequence" section and author-mode and step 4 references; proportional-review.test.ts spec skill cases passed. Committed S17.questions (scripted reviewer) Result: pass on 2b59a97: exactly one Open Question, about the contract, and Design records the profile-settled choice; the spec skill is unchanged between 2b59a97 and 644da0c0. Limitations: one sample; reviewer scripted.
+
+CRITERION: AC-07 The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules do not settle, with a count of the rest and where the full list is.
+VERDICT: met
+EVIDENCE: Spec skill "Owner-list triage" bullet at 644da0c0; committed S17.nits Result: pass on 5e94e59 (summary shows the two widening nits and a count of six; `All unapplied nits` lists all eight); spec skill unchanged since 5e94e59. Limitations: one sample, scripted reviewer.
+
+CRITERION: AC-08 On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary, ship and resume behave as before this feature: no Deferred section, no cut check and no follow-up review.
+VERDICT: not verified
+EVIDENCE: Committed old-pin transcripts S17.oldpin.scoped, .questions, .nits, .profile, .deferred, .cut, .followup and S16.oldpin-reviewer all Result: pass, but all on plugin 2639661, before ef685da1 changed the reviewer's failure-mode paragraph (reviewer agent lines 60-66). git diff 2639661..644da0c0 over the reviewer, skills, references and loop scripts shows that reviewer change plus unrelated authority and plugin-version edits; spec, ship and resume are unchanged. review-convergence.test.ts at 0c983f67 passed (412-pass run). The real-reviewer old-pin controls (S17.oldpin.scoped, S17.oldpin.profile, S16.oldpin-reviewer) were never run on the current reviewer text. Limitations: the spec skill, ship and resume parts are established; the reviewer part is not.
+
+CRITERION: AC-09 vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, the convention uses every glossary term except Cut check and Follow-up review, and the convention and both user guides use the terms they contain with the glossary's meanings.
+VERDICT: met
+EVIDENCE: AGENTS.md at 644da0c0 has `## Product profile` and pins e79eaa6a, the merged companion (#59) whose tree equals 0fa68d68; knowledge.md names the same SHA; `vh-adlc lint` and `fresh` resolve e79eaa6a. Term grep on the convention finds all twelve required terms ("owner-list triage" across a line break) and neither Cut check nor Follow-up review; proportional-review.test.ts AC-09 cases passed. Manual read of docs/user-guides/workflows.md (Reviews) and docs/get-started/first-feature.md step 1: each term matches the glossary meaning. Limitations: none.
+
+CRITERION: AC-10 The replay harness runs a case end to end, reuses a stored old-brief set only when its recorded identity matches the current old brief and refuses otherwise, keeps every finished pass when it assembles results from stored runs, continues a stored set of the same identity and starts a fresh one for a different identity, resumes a failed loop from its kept clone, counts a lost loop's recorded lower bound, counts a set stored before T25 only through a matching launch record entry that lists its files, refuses a case whose approval line is missing or whose digests do not match, stops on a case term in the public tree or the companion diff, counts a run only on the route and model under test, records each run's plugin commit, docs revision and model, writes nothing but counts and identities to the results file, records failed executions without counting them as passes, and runs on a public fixture case in the test suite.
+VERDICT: met
+EVIDENCE: `bun test tests/vh-adlc/replay ...` in the targeted run at 644da0c0: all 41 harness cases pass (part of 412 pass, 0 fail), covering each clause, including the launch-record match, mismatch and unlisted-file refusals, kept-clone resume, both bound kinds, the approval refusals and the term stops. Read run.ts storedPasses, storedLoop, checkIdentity and freshSet: consistent with the tests. On the real cases `run.ts assemble` was read-only (case-directory file listing unchanged). Limitations: live.ts is exercised only by the real runs.
+
+CRITERION: AC-11 On the enterprise case, with labels and case approved before the first rule-editing commit, no label fails the retention rule on either route, apart from label L-08 on the Claude host route and label L-10 on the Codex command route, known losses the owner deferred as D-17 and D-18.
+VERDICT: met
+EVIDENCE: Approval line recomputed: labels sha256 c810c9ca...7e9a and case.yaml sha256 b2940ee8...b619 match; approved 2026-11-22T20:27:08Z, before companion 0fa68d6 (2026-11-23T07:43:21Z) and reviewer 06ab1add (07:45:28Z). `run.ts assemble` for both cases into a scratch file, then diff with the committed results.md: identical. Results: 3 old and 12 new counted passes per route (one command run excluded, 14 host runs failed and not counted); 100 label-route rows, 2 fail (command L-10: old 2/3, new 0/12; host L-08: old 2/3, new 0/12). Matcher spot check: old host passes 1 and 3 map L-08 at should-fix; no new host record of 12 raises the L-08 subject. Launch record: every old entry names old plugin 0c9fee77 and docs 30c38c8d with times consistent with one launch per set; session-log bound recomputed from the logs (36 distinct commits, 3 set aside, 33 counted, lists equal); kept-clone bound: clone head 5350c6d, 25 spec rows since X'. `git diff 5e94e593 ef685da1` over the five brief paths: only the reviewer fix. `run.ts terms` on the tree, companion diff, this document and results.md: pass. Limitations: matcher verdicts spot-checked, not exhaustively.
+
+CRITERION: AC-12 On the small application case, with labels and case approved before the first rule-editing commit, no label fails the retention rule on either route.
+VERDICT: met
+EVIDENCE: Approval line recomputed: labels sha256 88b8f774...ecd5 and case.yaml sha256 31907b51...380c match; approved 2026-11-23T07:40:57Z, before 0fa68d6 (07:43:21Z) and 06ab1add (07:45:28Z). Reassembled results identical to the committed file: 2 labels, all four label-route rows pass (command L-01 old 2/3, new 2/6 at minimum; host L-01 old 2/3, new 1/8 at minimum and 6/8 at any). Matcher spot check on three new host passes agrees with the label's match line. Old host pass and loop sets each map to one launch entry with consistent times (the duplicate run's files are set aside); session-log bound recomputed: 22 distinct, 3 set aside, 19 counted, lists equal. Terms check: pass. Limitations: host retention rests on one new pass at minimum severity.
+
+CRITERION: AC-13 Over the case and route pairs where both briefs' loops reach a clean pass, of which there must be at least one, the new-brief loops need at most half the old-brief loops' total spec reviews; the other pairs are reported as measured.
+VERDICT: met
+EVIDENCE: Reassembled results identical to committed: 2 pairs where both loops reached a clean pass (enterprise host 35 old and 8 new; small-application host 9 old and 2 new), totals 44 and 10, met; enterprise command (at least 33, at least 25) and small-application command (at least 19, 15) listed. Stored loop document counts match (36, 9, 10, 3, 16 files). live.ts returns documents only on a clean gate or at the 60 cap, unchanged since its first commit. Limitations: the clean pass itself is shown by the harness gate check at run time, not re-observed.
+
+CRITERION: AC-14 The convention defines the optional Deferred section outside the normative baseline; the spec skill writes an entry with the exact source text for every stated limit, finding deferred at acceptance, owner-directed cut, author cut and drift re-review deferral; and the reviewer does not raise an entry's substance again unless it leaves an always-blocking defect, makes a criterion unmeetable or leaves the stated problem unsolved.
+VERDICT: met
+EVIDENCE: Convention Sections and Deferred sections at e79eaa6a define the optional section and five sources; spec skill and reviewer carry them; proportional-review.test.ts passed. Committed S17.deferred (5e94e59, spec skill unchanged since): four entries with the exact sources, Scope line, Cut check lines, `vh-adlc fresh` fresh after the entries; S17.cut.both: `From: owner cut on 2026-11-23.`; S17.deferred-review (3acff49, real reviewer): sampler not raised, blocking finding against Scope quotes the delete entry. All pass. Limitations: one sample each.
+
+CRITERION: AC-15 After every owner-directed deferral, the author's reply carries the cut check line, and an item that is an always-blocking defect or that the goal or a criterion names becomes an Open Question instead of a Deferred entry.
+VERDICT: met
+EVIDENCE: Committed S17.cut.both (Open Question for the session check, Scope keeps it, Cut check line names a security defect), S17.cut.control (`nothing important lost`), and S17.deferred's acceptance and drift Cut check lines, all pass on 5e94e59; the spec skill "Cut check" bullet is unchanged since. Limitations: the proportionality "narrow" answer, which the Test Plan does not name, was not exercised; one sample each.
+
+CRITERION: AC-16 Once a feature's PR is merged, the follow-up review gives every pending Deferred entry a verdict of drop, follow-up or gap with one line of reason; shows gaps and follow-ups with issue previews and drops one line each; files only what the owner approves, through the labels helper's `follow-up` mode, never twice for one entry; records every verdict, including declined filings, in a docs PR without touching the default branch; runs only for a merged feature, without a writer handoff; and the ship report and resume flag a merged complete document with pending entries.
+VERDICT: met
+EVIDENCE: tests/vh-adlc/labels including follow-up.test.ts and issue-authority.test.ts passed (412-pass run). Committed S17.followup.merged (0fcd4c4; ship and resume unchanged since, authority changed only by an unrelated orchestrate row): resume names the four entries and the step; ship shows gap, follow-ups, drop with no writer handoff; partial run after the stubbed failure; rerun files only the missing issue on the same branch; final verdicts drop, follow-up link, follow-up not filed (owner declined), gap link; one follow-up PR; default branch unchanged; nothing merged. S17.followup.unmerged: no follow-up review, normal delivery. Both pass. Limitations: gh stubbed; one sample.
+
+CRITERION: AC-17 Over the case and route pairs whose old-brief loop reached a clean pass and stored its documents, the new-brief loops' total body growth is at most half the old-brief loops' total, or no larger than it when the old total is zero or negative, with body size recorded per pass and the Deferred section left out of it.
+VERDICT: met
+EVIDENCE: run.test.ts "records body size per pass without the Deferred section" and the growth-exclusion cases passed; run.ts bodySize drops the Deferred section. Reassembled results identical to committed: body size listed per pass; growth over 2 pairs with stored old documents 972 old (945 plus 27), 343 new (410 minus 67), met. Limitations: none.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-08); Tasks (T17, T26); plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md failure-mode paragraph
+EVIDENCE: Every old-pin control transcript (S17.oldpin.* and S16.oldpin-reviewer) records plugin 2639661. ef685da1, committed later, added two sentences to the reviewer at lines 60-66 ("Before you settle any finding's severity, check it against the always-blocking classes ..." and "When you are unsure ... rate it should-fix ..."). They are separate sentences after the "When the resolved ... names the product profile" clause and before "On a revision that does not", so a reviewer on an older pin may read them as unconditional. T26 reran only the new-pin scenarios. Consumers on older pins (for example docs 56cd70fa, which lacks the severity-by-consequence text) get this reviewer.
+PROPOSAL: Make both sentences explicitly conditional on the severity-by-consequence convention, then rerun S16.oldpin-reviewer, S17.oldpin.scoped and S17.oldpin.profile on the current reviewer (host route, no Codex needed) and commit the transcripts as AC-08 evidence.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary, validation paragraph)
+EVIDENCE: The Owner summary says "The remaining work is T28 (the totals ... and the kept-clone bound) and the results (T23, T24)", but T23, T24 and T28 are ticked with evidence and status_description says "every task done with evidence (T1 to T28)".
+PROPOSAL: Replace that sentence with the current state: all tasks done, implementation review next.
+
+### R-30
+
+CRITERION: AC-01 The convention at the companion `vhco-pro/docs` revision defines blocking, should-fix and nit by consequence for the profiled product as Design states, with always-blocking defects blocking on every product.
+VERDICT: met
+EVIDENCE: Read conventions/feature-documents.md at e79eaa6a from the binary's cache, Review log section: "This is severity by consequence", the product profile as context with a production default, blocking, should-fix and nit as Design states, and the three always-blocking classes "blocking on every product, whatever its profile". `git diff --stat 644da0c0..9daf9622` touches no convention input, AGENTS.md or knowledge.md. `bun test tests/vh-adlc/proportional-review.test.ts tests/vh-adlc/proportionality.test.ts tests/vh-adlc/loop tests/vh-adlc/review-convergence.test.ts tests/vh-adlc/replay tests/vh-adlc/labels --timeout 60000` in a private clone at 9daf9622: 306 pass, 0 fail across 24 files. Limitations: none.
+
+CRITERION: AC-02 That convention raises an Open Question only where the owner could plausibly choose differently, has the author record every other choice in Design, and offers only options that meet the goal in full.
+VERDICT: met
+EVIDENCE: The convention at e79eaa6a is unchanged since R-29 and the diff since R-29 touches nothing this criterion rests on; the proportional-review.test.ts plausible-choice case passed in the 306-pass run at 9daf9622. Limitations: none.
+
+CRITERION: AC-03 That convention and the reviewer accept a stated limit as an answer to a finding, and the reviewer raises its substance again only for an always-blocking defect, an unmeetable criterion or an unsolved problem.
+VERDICT: met
+EVIDENCE: Reviewer at 9daf9622 keeps the stated-limit and Deferred paragraph, now in the profile-only paragraph with the moved always-blocking check; reviewer text is identical between 57b33e73 and 9daf9622 (`git diff --stat` empty). proportional-review.test.ts reviewer cases passed (306-pass run). Committed transcripts on the current reviewer text: S17.limit.stated (ba0acde, no finding raises names.log concurrency) and S17.limit.nolimit (ba0acde, the gap raised), S17.limit.security (087f403, a blocking finding quoting the delete-endpoint limit), all Result: pass. I checked the ba0acdec matcher change against the kept failing first run of S17.limit.nolimit in /tmp: its F-01 proposes "a per-build log ... how each append stays one whole line"; the old RAISES_LOCK_GAP misses it and the new one matches it, and no other finding matches either way. The widening only makes S17.limit.stated stricter. Limitations: one model sample per scenario; transcripts read, not rerun.
+
+CRITERION: AC-04 The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure paths by it, rates a failure path it is unsure about at should-fix or above, and without a profile judges as for production software with users.
+VERDICT: met
+EVIDENCE: Reviewer at 9daf9622: the profile-only paragraph reads `## Product profile` at the reviewed commit, keeps the production default, and now holds the uncertain-path rule and the always-blocking check; the new proportional-review.test.ts case pins both after the profile gate and failed when I swapped in the 644da0c0 reviewer (0 pass, 1 fail), passing on the head reviewer. Committed transcripts on ba0acde (current reviewer text): S17.profile.single (lock gap at nit), .hosted (blocking), .none (should-fix), .unsure (should-fix), all Result: pass. On the kept failing first run of S17.profile.single, the old LOCK_GAP matched F-04 ("two runs leave both names in order", sequential runs) and the new one does not, while the real lock-gap finding F-06 is a nit under both, so the matcher fix corrects a false match and does not hide reviewer behavior. Limitations: one sample per variant; transcripts read, not rerun.
+
+CRITERION: AC-05 On both routes, a spec review after the first receives the scope from `review-scope`, covers only the document diff and every section that states a rule, ID or term the diff changes, and reports only blocking findings outside that; the pass is full when there is no previous spec review or a covered path or a docs pin bridge file changed.
+VERDICT: met
+EVIDENCE: review-scope.test.ts, lenses.test.ts and cli.test.ts passed in the 306-pass run; the scoped re-review paragraph of the reviewer and the scope handling in cli.ts and review-protocol.md are unchanged since R-29. Host route: committed S17.scoped on ba0acde (current reviewer text), Result: pass; non-blocking findings only on the changed Greeting paragraph or its terms, no finding on the unchanged names.log gap, the unchanged secret exposure blocking. Codex route: committed S17.scoped-command on 3acff49, Result: pass, attested gpt-6.2-sol, scoped since the clean pass. cli.ts:57 builds the command-route prompt from the same reviewer body, and the only change since 3acff49 in agents, scripts, review-protocol.md and the spec skill is T29's move of two sentences into the profile-only paragraph, which applies under the companion convention the scenario pins, so the Codex prompt carries the same instructions. Limitations: the Codex route was not observed on the moved text; one changed paragraph and one sample per route.
+
+CRITERION: AC-06 The spec skill raises judgement calls and judgement findings as Open Questions only under the plausible-choice rule, judged against the product profile and the files loop context lists.
+VERDICT: met
+EVIDENCE: The spec skill is unchanged between 2b59a97 and 9daf9622 (no skill change in `git diff --stat 2639661..9daf9622` other than the new orchestrate skill). Committed S17.questions (scripted reviewer, 2b59a97) Result: pass; proportional-review.test.ts spec skill cases passed at 9daf9622. Limitations: one sample; reviewer scripted.
+
+CRITERION: AC-07 The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules do not settle, with a count of the rest and where the full list is.
+VERDICT: met
+EVIDENCE: Spec skill unchanged since 5e94e59; committed S17.nits Result: pass (summary shows the two widening nits and a count of six; `All unapplied nits` lists all eight). The diff since R-29 does not touch this evidence. Limitations: one sample, scripted reviewer.
+
+CRITERION: AC-08 On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary, ship and resume behave as before this feature: no Deferred section, no cut check and no follow-up review.
+VERDICT: met
+EVIDENCE: `git diff 2639661..9daf9622 -- plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` changes only the profile-only paragraph (rewrapped, plus the always-blocking check and uncertain-path rule); the failure-mode paragraph an older pin reads is byte-identical to the text the 2639661 controls ran on, which resolves R-29's gap. Real-reviewer old-pin controls on the current reviewer text: S17.oldpin.scoped (087f403, the unchanged names.log gap raised as should-fix F-02, whose text "Parallel jobs ... at the same time" matches LOCK_GAP before and after ba0acdec), S17.oldpin.profile (ba0acde, lock gap at should-fix despite the single-person profile), S16.oldpin-reviewer (087f403), all Result: pass. The scripted-reviewer and no-reviewer controls S17.oldpin.questions, .nits, .deferred, .cut and .followup (2639661) rest on the spec skill, ship and resume, which have no change from 2639661 to 9daf9622; the other plugin changes in that range (authority and lifecycle rows for orchestrate, loop-settings wording, plugin-version.ts digest check, the knowledge.md pin, which fixtures override with their own pin) do not affect old-pin behavior. review-convergence.test.ts passed (306-pass run). Limitations: one model sample per control; S16.oldpin-reviewer's own matcher is weak (see F-01), so the reviewer part rests mainly on the two S17 old-pin controls.
+
+CRITERION: AC-09 vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, the convention uses every glossary term except Cut check and Follow-up review, and the convention and both user guides use the terms they contain with the glossary's meanings.
+VERDICT: met
+EVIDENCE: AGENTS.md, knowledge.md, the convention and both guides are unchanged since R-29. `vh-adlc lint docs/specs/proportional-review.md --repo <clone> --plugin-pin e79eaa6a...` at 9daf9622: pass, knowledge revision e79eaa6a from the repository pin. The proportional-review.test.ts AC-09 cases passed in the 306-pass run. R-29's manual read of the guides stands, since the diff does not touch them. Limitations: none.
+
+CRITERION: AC-10 The replay harness runs a case end to end, reuses a stored old-brief set only when its recorded identity matches the current old brief and refuses otherwise, keeps every finished pass when it assembles results from stored runs, continues a stored set of the same identity and starts a fresh one for a different identity, resumes a failed loop from its kept clone, counts a lost loop's recorded lower bound, counts a set stored before T25 only through a matching launch record entry that lists its files, refuses a case whose approval line is missing or whose digests do not match, stops on a case term in the public tree or the companion diff, counts a run only on the route and model under test, records each run's plugin commit, docs revision and model, writes nothing but counts and identities to the results file, records failed executions without counting them as passes, and runs on a public fixture case in the test suite.
+VERDICT: met
+EVIDENCE: tests/vh-adlc/replay is unchanged since R-29 (`git diff --stat 644da0c0..9daf9622 -- tests/vh-adlc/replay` empty); the replay suites passed in the 306-pass run at 9daf9622. Limitations: live.ts is exercised only by the real runs.
+
+CRITERION: AC-11 On the enterprise case, with labels and case approved before the first rule-editing commit, no label fails the retention rule on either route, apart from label L-08 on the Claude host route and label L-10 on the Codex command route, known losses the owner deferred as D-17 and D-18.
+VERDICT: met
+EVIDENCE: results.md, the harness and the private case are untouched since R-29, whose recomputation of the approval line, reassembly, matcher spot checks, bounds and brief diff stands. results.md still names the new brief ef685da1 with docs 0fa68d68, and `git diff --stat 5e94e593 ef685da1` over the five brief paths shows only the reviewer. `run.ts terms --case <enterprise> --tree <clone at 9daf9622> --file docs/specs/proportional-review.md --file tests/vh-adlc/evidence/proportional-review/results.md`: {"terms":"pass"}. Limitations: matcher verdicts spot-checked by R-29, not rechecked here; the shipped reviewer differs from the replayed brief ef685da1 by T29's move (see F-02).
+
+CRITERION: AC-12 On the small application case, with labels and case approved before the first rule-editing commit, no label fails the retention rule on either route.
+VERDICT: met
+EVIDENCE: Evidence unchanged since R-29 (results.md, harness and case untouched); terms check for the small-application case on the tree, this document and results.md at 9daf9622: {"terms":"pass"}. Limitations: host retention rests on one new pass at minimum severity; the replayed brief predates T29's move.
+
+CRITERION: AC-13 Over the case and route pairs where both briefs' loops reach a clean pass, of which there must be at least one, the new-brief loops need at most half the old-brief loops' total spec reviews; the other pairs are reported as measured.
+VERDICT: met
+EVIDENCE: results.md unchanged since R-29: two pairs where both loops reached a clean pass, totals 44 old and 10 new, the two command pairs listed with their bounds. No file this rests on changed in 644da0c0..9daf9622. Limitations: the clean passes were shown by the harness gate at run time, not re-observed; the replayed brief predates T29's move.
+
+CRITERION: AC-14 The convention defines the optional Deferred section outside the normative baseline; the spec skill writes an entry with the exact source text for every stated limit, finding deferred at acceptance, owner-directed cut, author cut and drift re-review deferral; and the reviewer does not raise an entry's substance again unless it leaves an always-blocking defect, makes a criterion unmeetable or leaves the stated problem unsolved.
+VERDICT: met
+EVIDENCE: Convention and spec skill unchanged; committed S17.deferred and S17.cut.both (5e94e59, spec skill unchanged since) Result: pass. Reviewer part on the current reviewer text: committed S17.deferred-review (087f403), Result: pass, no finding on the sampler, and a blocking F-01 against Scope quoting D-02 on the delete endpoint. proportional-review.test.ts Deferred cases passed (306-pass run). Limitations: one sample each.
+
+CRITERION: AC-15 After every owner-directed deferral, the author's reply carries the cut check line, and an item that is an always-blocking defect or that the goal or a criterion names becomes an Open Question instead of a Deferred entry.
+VERDICT: met
+EVIDENCE: Spec skill unchanged since 5e94e59; committed S17.cut.both, S17.cut.control and S17.deferred's acceptance and drift Cut check lines, all Result: pass. The diff since R-29 does not touch this evidence. Limitations: one sample each.
+
+CRITERION: AC-16 Once a feature's PR is merged, the follow-up review gives every pending Deferred entry a verdict of drop, follow-up or gap with one line of reason; shows gaps and follow-ups with issue previews and drops one line each; files only what the owner approves, through the labels helper's `follow-up` mode, never twice for one entry; records every verdict, including declined filings, in a docs PR without touching the default branch; runs only for a merged feature, without a writer handoff; and the ship report and resume flag a merged complete document with pending entries.
+VERDICT: met
+EVIDENCE: tests/vh-adlc/labels including follow-up mode passed in the 306-pass run; ship, resume and the labels helper are unchanged since R-29, so the committed S17.followup.merged and .unmerged transcripts (0fcd4c4) still apply, both Result: pass. Limitations: gh stubbed; one sample.
+
+CRITERION: AC-17 Over the case and route pairs whose old-brief loop reached a clean pass and stored its documents, the new-brief loops' total body growth is at most half the old-brief loops' total, or no larger than it when the old total is zero or negative, with body size recorded per pass and the Deferred section left out of it.
+VERDICT: met
+EVIDENCE: run.test.ts body-size and growth cases passed in the 306-pass run; results.md unchanged since R-29 (growth 972 old, 343 new over 2 pairs). Limitations: the replayed brief predates T29's move.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/scenarios/run.ts (S16.oldpin-reviewer check); Test Plan (AC-08 row); Tasks (T30)
+EVIDENCE: S16.oldpin-reviewer passes when `/names\.log/.test(records) && /(concurren|parallel|lock|interleav|simultaneous)/i.test(records)` over the whole R-1 record block. `/(...|lock|...)/i.test("SEVERITY: blocking")` is true, and the seeded Design sentence contains "parallel CI runs", so any record set that mentions names.log and has one blocking finding, or quotes that sentence, passes without raising the gap. This is the same "lock" in "blocking" false match T26 fixed in LOCK_GAP, which S16 does not use. AC-08's reviewer part also rests on S17.oldpin.scoped and S17.oldpin.profile, which use the whole-word LOCK_GAP per finding, so the verdict does not change. Separately, T30 says "all eight scenarios that use them were rerun", but S17.oldpin.scoped also uses LOCK_GAP and was last run at 087f403; its stored F-02 text matches LOCK_GAP before and after ba0acdec, so it still holds.
+PROPOSAL: Have S16.oldpin-reviewer apply LOCK_GAP to each parsed finding, and name S17.oldpin.scoped in T30's evidence as checked against the new matcher from its stored records.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary, validation paragraph: "The replays on the fixed reviewer are complete"); Tasks (T30 "Untested on this reviewer text")
+EVIDENCE: T30 names only S17.scoped-command as untested on the moved reviewer text. The replays behind AC-11, AC-12, AC-13 and AC-17 ran on brief ef685da1, whose reviewer still holds the two sentences in the failure-mode paragraph (`git diff ef685da1 9daf9622 -- plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` shows T29's move). The Test Plan deliberately fixes the brief at ef685da1, and under the companion convention the move changes no instruction, but a reader of "the fixed reviewer" could take the replays to have run on the reviewer that ships.
+PROPOSAL: Add one line to T30's untested note, or to the Owner summary, saying that the replays' brief ef685da1 predates T29's move and that the move changes no instruction under the companion convention.
+
+### R-31
+
+CRITERION: AC-01 The convention at the companion `vhco-pro/docs` revision defines blocking, should-fix and nit by consequence for the profiled product as Design states, with always-blocking defects blocking on every product.
+VERDICT: met
+EVIDENCE: Read conventions/feature-documents.md at e79eaa6a from the binary's cache, Review log section: "This is severity by consequence", the product profile as context with a production default, blocking, should-fix and nit defined by consequence, and the three always-blocking classes "blocking on every product, whatever its profile". `git diff --stat 9daf9622..6ada44a9` touches only the spec, plugins/vh-adlc/references/loop-settings.md (outside covers, one sentence on `{prompt}` and `{prompt_file}`) and tests/vh-adlc/replay/run.test.ts, none of them a convention input, AGENTS.md or knowledge.md. In a private clone at 6ada44a9, `bun test tests/vh-adlc/proportional-review.test.ts tests/vh-adlc/proportionality.test.ts tests/vh-adlc/loop tests/vh-adlc/review-convergence.test.ts tests/vh-adlc/replay tests/vh-adlc/labels --timeout 60000`: 306 pass, 0 fail across 24 files; the same set with `GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1` (no git identity): 306 pass, 0 fail. `vh-adlc lint` on the document with the plugin pin: pass, knowledge revision e79eaa6a from the repository pin. Limitations: none.
+
+CRITERION: AC-02 That convention raises an Open Question only where the owner could plausibly choose differently, has the author record every other choice in Design, and offers only options that meet the goal in full.
+VERDICT: met
+EVIDENCE: The convention at e79eaa6a is the one R-30 read and nothing this criterion rests on changed in 9daf9622..6ada44a9; the proportional-review.test.ts plausible-choice case passed in the 306-pass run at 6ada44a9. Limitations: none.
+
+CRITERION: AC-03 That convention and the reviewer accept a stated limit as an answer to a finding, and the reviewer raises its substance again only for an always-blocking defect, an unmeetable criterion or an unsolved problem.
+VERDICT: met
+EVIDENCE: The reviewer, scenario runner and evidence transcripts are unchanged since R-30 (`git diff --stat 9daf9622..6ada44a9` over plugins/vh-adlc/agents, skills, scripts, tests/vh-adlc/scenarios and tests/vh-adlc/evidence is empty). Reviewer at 6ada44a9 keeps the stated-limit and Deferred paragraph. proportional-review.test.ts reviewer cases passed in the 306-pass run. Committed transcripts S17.limit.stated, S17.limit.nolimit and S17.limit.security each record Result: pass. Limitations: one model sample per scenario; transcripts read, not rerun, as the dispatch directs; R-30's check of the ba0acdec matcher change stands because nothing it rests on changed.
+
+CRITERION: AC-04 The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure paths by it, rates a failure path it is unsure about at should-fix or above, and without a profile judges as for production software with users.
+VERDICT: met
+EVIDENCE: Reviewer at 6ada44a9 (read in full): the profile-only paragraph reads `## Product profile` from AGENTS.md at the reviewed commit, keeps the production default, holds the uncertain-path should-fix rule and the always-blocking check. The proportional-review.test.ts case that pins both after the profile gate passed in the 306-pass run. Committed S17.profile.single, .hosted, .none and .unsure each record Result: pass and are unchanged since R-30. Limitations: one sample per variant; transcripts read, not rerun.
+
+CRITERION: AC-05 On both routes, a spec review after the first receives the scope from `review-scope`, covers only the document diff and every section that states a rule, ID or term the diff changes, and reports only blocking findings outside that; the pass is full when there is no previous spec review or a covered path or a docs pin bridge file changed.
+VERDICT: met
+EVIDENCE: review-scope.test.ts, lenses.test.ts and cli.test.ts passed in the 306-pass run at 6ada44a9; cli.ts (the scoped prompt at cli.ts:83 carrying the document diff), review-scope.ts, review-protocol.md and the reviewer are unchanged since R-30. Committed S17.scoped (host) and S17.scoped-command (Codex, attested gpt-6.2-sol) both record Result: pass. The new loop-settings.md sentence is documentation only; I checked its claims: one argument is limited to 128 KiB on Linux (MAX_ARG_STRLEN), the scoped prompt does embed the diff, and the `sh -c 'f=$1; shift; exec "$@" - < "$f"' sh {prompt_file} ...` example feeds the prompt file to the CLI's standard input. Limitations: as R-30 found, the Codex route was not observed on the reviewer text after T29's move; one changed paragraph and one sample per route.
+
+CRITERION: AC-06 The spec skill raises judgement calls and judgement findings as Open Questions only under the plausible-choice rule, judged against the product profile and the files loop context lists.
+VERDICT: met
+EVIDENCE: The spec skill is unchanged since R-30; committed S17.questions records Result: pass; proportional-review.test.ts spec skill cases passed in the 306-pass run at 6ada44a9. Limitations: one sample; reviewer scripted.
+
+CRITERION: AC-07 The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules do not settle, with a count of the rest and where the full list is.
+VERDICT: met
+EVIDENCE: Spec skill and S17.nits transcript unchanged since R-30; S17.nits records Result: pass; the diff since R-30 touches nothing this rests on. Limitations: one sample, scripted reviewer.
+
+CRITERION: AC-08 On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary, ship and resume behave as before this feature: no Deferred section, no cut check and no follow-up review.
+VERDICT: met
+EVIDENCE: Reviewer, spec, ship and resume skills, fixtures and old-pin transcripts are unchanged since R-30, so R-30's finding that the failure-mode paragraph an older pin reads is byte-identical to the text the controls ran on stands. Committed S17.oldpin.scoped, .profile, .questions, .nits, .deferred, .cut, .followup and S16.oldpin-reviewer each record Result: pass. review-convergence.test.ts passed in the 306-pass run. Limitations: one model sample per control; S16.oldpin-reviewer's matcher is weak (R-30 F-01, unapplied nit), so the reviewer part rests mainly on the two S17 old-pin controls.
+
+CRITERION: AC-09 vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, the convention uses every glossary term except Cut check and Follow-up review, and the convention and both user guides use the terms they contain with the glossary's meanings.
+VERDICT: met
+EVIDENCE: AGENTS.md, knowledge.md, the convention and both guides are unchanged since R-30. `vh-adlc lint docs/specs/proportional-review.md --repo <clone> --plugin-pin e79eaa6a...` at 6ada44a9: pass, knowledge revision e79eaa6a from AGENTS.md. The proportional-review.test.ts AC-09 cases passed in the 306-pass run. Limitations: the manual read of the guides by earlier reviews stands; the diff does not touch them.
+
+CRITERION: AC-10 The replay harness runs a case end to end, reuses a stored old-brief set only when its recorded identity matches the current old brief and refuses otherwise, keeps every finished pass when it assembles results from stored runs, continues a stored set of the same identity and starts a fresh one for a different identity, resumes a failed loop from its kept clone, counts a lost loop's recorded lower bound, counts a set stored before T25 only through a matching launch record entry that lists its files, refuses a case whose approval line is missing or whose digests do not match, stops on a case term in the public tree or the companion diff, counts a run only on the route and model under test, records each run's plugin commit, docs revision and model, writes nothing but counts and identities to the results file, records failed executions without counting them as passes, and runs on a public fixture case in the test suite.
+VERDICT: met
+EVIDENCE: The only change in tests/vh-adlc/replay since R-30 is the `g` helper of "a stopped loop's lower bound comes from the reviews stored in its kept clone", which now passes `-c user.name=Replay Test -c user.email=replay@example.invalid` to its own commits; every assertion and run.ts are unchanged. `HOME=$(mktemp -d) GIT_CONFIG_NOSYSTEM=1 bun test tests/vh-adlc/replay --timeout 60000` at 6ada44a9: 42 pass, 0 fail. The same command with only run.test.ts replaced by its 9daf9622 version: 41 pass, 1 fail, that case, "Received: 128", reproducing the PR #173 CI failure. The full replay suite also passed in the 306-pass runs with and without a git identity. Limitations: live.ts is exercised only by the real runs; with an empty HOME, proportional-review.test.ts and review-convergence.test.ts cannot find the cached binary, which is an environment precondition unrelated to this diff.
+
+CRITERION: AC-11 On the enterprise case, with labels and case approved before the first rule-editing commit, no label fails the retention rule on either route, apart from label L-08 on the Claude host route and label L-10 on the Codex command route, known losses the owner deferred as D-17 and D-18.
+VERDICT: met
+EVIDENCE: results.md, the harness and the private case are untouched since R-30 (empty diff over tests/vh-adlc/evidence and run.ts), so R-29's recomputation and R-30's checks stand. Because the document changed, I reran `run.ts terms --case <enterprise> --tree <clone at 6ada44a9> --file docs/specs/proportional-review.md --file tests/vh-adlc/evidence/proportional-review/results.md`: {"terms":"pass","where":[]}. Limitations: matcher verdicts not rechecked here; the shipped reviewer differs from the replayed brief ef685da1 by T29's move (R-30 F-02).
+
+CRITERION: AC-12 On the small application case, with labels and case approved before the first rule-editing commit, no label fails the retention rule on either route.
+VERDICT: met
+EVIDENCE: Evidence unchanged since R-30; the terms check for the small application case on the tree, this document and results.md at 6ada44a9: {"terms":"pass","where":[]}. Limitations: host retention rests on one new pass at minimum severity; the replayed brief predates T29's move.
+
+CRITERION: AC-13 Over the case and route pairs where both briefs' loops reach a clean pass, of which there must be at least one, the new-brief loops need at most half the old-brief loops' total spec reviews; the other pairs are reported as measured.
+VERDICT: met
+EVIDENCE: results.md:239 unchanged: "Spec reviews (2 pairs where both loops reached a clean pass) | 44 | 10 | ... | yes", with the two command pairs listed with their bounds. The kept-clone bound case behind the command bound passes at 6ada44a9 without a git identity (42 pass, as in AC-10). The new status_description figures (44 to 10, 972 to 343) match results.md. Limitations: the clean passes were shown by the harness gate at run time, not re-observed; the replayed brief predates T29's move.
+
+CRITERION: AC-14 The convention defines the optional Deferred section outside the normative baseline; the spec skill writes an entry with the exact source text for every stated limit, finding deferred at acceptance, owner-directed cut, author cut and drift re-review deferral; and the reviewer does not raise an entry's substance again unless it leaves an always-blocking defect, makes a criterion unmeetable or leaves the stated problem unsolved.
+VERDICT: met
+EVIDENCE: Convention, spec skill and reviewer unchanged since R-30; committed S17.deferred, S17.cut.both and S17.deferred-review each record Result: pass. proportional-review.test.ts Deferred cases passed in the 306-pass run. Limitations: one sample each.
+
+CRITERION: AC-15 After every owner-directed deferral, the author's reply carries the cut check line, and an item that is an always-blocking defect or that the goal or a criterion names becomes an Open Question instead of a Deferred entry.
+VERDICT: met
+EVIDENCE: Spec skill unchanged since R-30; committed S17.cut.both, S17.cut.control and S17.deferred record Result: pass. The diff since R-30 does not touch this evidence. Limitations: one sample each.
+
+CRITERION: AC-16 Once a feature's PR is merged, the follow-up review gives every pending Deferred entry a verdict of drop, follow-up or gap with one line of reason; shows gaps and follow-ups with issue previews and drops one line each; files only what the owner approves, through the labels helper's `follow-up` mode, never twice for one entry; records every verdict, including declined filings, in a docs PR without touching the default branch; runs only for a merged feature, without a writer handoff; and the ship report and resume flag a merged complete document with pending entries.
+VERDICT: met
+EVIDENCE: tests/vh-adlc/labels including follow-up mode passed in the 306-pass runs; ship, resume and the labels helper unchanged since R-30; committed S17.followup.merged and .unmerged record Result: pass. `vh-adlc next` on the now complete document: action none, "status complete". Limitations: gh stubbed; one sample.
+
+CRITERION: AC-17 Over the case and route pairs whose old-brief loop reached a clean pass and stored its documents, the new-brief loops' total body growth is at most half the old-brief loops' total, or no larger than it when the old total is zero or negative, with body size recorded per pass and the Deferred section left out of it.
+VERDICT: met
+EVIDENCE: run.test.ts body-size and growth cases passed in the 306-pass runs and under the empty-HOME replay run; results.md:242 unchanged: "Body growth (2 pairs with stored old documents) | 972 | 343 | ... | yes". Limitations: the replayed brief predates T29's move.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary, validation paragraph)
+EVIDENCE: The Owner summary ends "Every task is done (T1 to T30), and the implementation review is the remaining step before ship." Commit 9ae1075e set `status: complete` with status_description "all 17 criteria met at implementation review R-30" but left this sentence, so the summary now contradicts the status and the R-30 row. The same paragraph's "The replays on the fixed reviewer are complete" is already R-30 F-02, left unapplied. For context, `vh-adlc gate complete` at 6ada44a9, with origin/HEAD set to main in my clone, fails only impl_review_fresh (covered-changed on run.test.ts), which this review answers.
+PROPOSAL: Replace that sentence with the current state: all 17 criteria met at R-30, ship next, and the Codex question and the two known losses waiting for the follow-up review after merge.
