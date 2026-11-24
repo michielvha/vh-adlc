@@ -326,6 +326,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-11 | R-37 | spec | `70a09ac` | unknown | procedural | No findings |
 | 2026-11-11 | R-37 | spec | `70a09ac` | n/a | n/a | accepted by owner |
 | 2026-11-24 | R-38 | spec | `22bcbb6` | claude-opus-5-5 | procedural | Drift re-review after merging main: 2 blocking (skill count, version), 1 should-fix (Linux host), 3 nits |
+| 2026-11-24 | R-39 | spec | `c556233` | claude-opus-5-5 | procedural | Follow-up to R-38: no blocking; 2 should-fix (sw-dev observation, harm statement), 2 nits |
 
 ### R-1
 
@@ -1643,6 +1644,36 @@ SEVERITY: nit
 WHERE: Test Plan row AC-11 (line 263); Tasks T10 (line 276) and T12 (line 278)
 EVIDENCE: To show that the agent never launches a browser that is not named, the `no-browser` proof uses an outer bwrap wrapper, strace of every exec and namespace call, a bwrap-only trust chain, eight escape preflight cases, a stub-model turn and a launcher list including systemd-run, D-Bus, tmux, crontab, at and SSH. The harm it guards against is a read-only assessment, run by a few developers on their own machines, opening a locally installed browser against a public site. That harm is small and does not persist. The machinery is out of proportion to it and keeps generating review rounds (R-31 through R-36 all concerned it).
 PROPOSAL: Consider a scenario with no browser tool and no driver named, asserting the coverage-gap outcome and no browser process in a plain process listing, together with the procedure rule. State the stronger escape cases as a limit rather than proving them.
+
+### R-39
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan introduction (line 250); Context, Owner summary (lines 64 and 66); Acceptance Criteria AC-10 (line 245); Test Plan rows AC-03 (line 256), AC-10 (line 263) and AC-11 (line 264); Tasks T5 (line 272), T9 (line 276), T10 (line 277), T12 and T13 (line 280)
+EVIDENCE: This revision names the new proof host with no observation behind it: "use a Linux development host with `bwrap`, `strace`, Bun, Go and a signed-in `codex`; at `22bcbb6` that is `sw-dev`, on Ubuntu 24.04". No command or output is cited for the OS or for any of those tools on sw-dev. The tree only shows that sw-dev is an SSH alias; I did not log in to it. The Ubuntu claim matters because Ubuntu 24.04's AppArmor restricts the unprivileged user namespaces that bwrap needs. CI on Ubuntu has to load `/etc/apparmor.d/bwrap-userns-restrict` and set `kernel.apparmor_restrict_unprivileged_userns=0` before its bwrap and unshare probes run (`.github/workflows/ci.yml:35` and `:39`). The document gives no equivalent setup or probe for sw-dev. If that setup is missing, the Bubblewrap cases in `semrush.test.ts` and the outer `bwrap` wrapper of `no-browser` fail their preconditions. T5, T10, T12 and T13 then cannot reach their done conditions, and the AC-10 local run fails on sw-dev. The codex sandbox observations the scenarios rely on (loopback access, Playwright launch, strace traces) are explicitly from the Fedora host, so none of them has been seen on this host. This traces to the R-38 F-03 change.
+PROPOSAL: Cite an observation from sw-dev (`uname`/`lsb_release`, `bwrap --unshare-all --ro-bind / / -- /usr/bin/true`, `strace -V`, `codex --version`), or state the AppArmor user-namespace setup the host needs, matching ci.yml:35-40. Add the same probe as a precondition the runner reports.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary, lines 36-66; Background, lines 68-100)
+EVIDENCE: Context still has no harm statement (who is harmed without the feature, how often, how badly, whether it heals on its own) and names no simpler alternative that was rejected, with its reason. A search of lines 1-125 for "harm", "alternative" or "reject" finds only "free alternatives to Semrush" (line 72) and the fixture-lock error text (line 100). R-38 F-05 raised this as a nit because the document was then past draft. Commit c5562336 applied R-38's blocking and should-fix findings and edited the Owner summary, but it did not add the statement. The document is now `draft`, so this rates should-fix.
+PROPOSAL: Add a short harm statement to Context: unauthorized or unbounded Semrush unit spend and a leaked key, for a few developers on their own machines. Name the simplest rejected alternative, such as instruction-only Semrush rules with no helper, and say why it was rejected.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-10 (line 245); Tasks T13 (line 280); Background (line 100)
+EVIDENCE: AC-10 and T13 still allow `tests/vh-adlc/fixtures.test.ts` to fail "only with the fixture-lock digest error quoted in Background", which is "/usr/local/bin/vh-adlc reports vh-adlc 0.19.0 but its digest does not match the lock". At c5562336 the installer can no longer produce that error. `plugins/vh-adlc/scripts/ensure-vh-adlc.sh:8-10` and `:99-100` ignore a PATH entry whose digest does not match the lock, with the note "ignoring unverified PATH entry", and do not run it. `tests/vh-adlc/fixtures/build.ts:313-316` also leaves `/usr/local/bin` off the installer's PATH. Commit 78266545 made this change; it is an ancestor of 22bcbb63 but not of dbb0485. The Background citations `ensure-vh-adlc.sh:4-7` and `build.ts:271-276` are dated at dbb0485. This revision moved the AC-10 run to a new host but kept the exception. The exception is now dead text, and it invites a reviewer to accept some other "rejected the fixture lock" failure as the one allowed.
+PROPOSAL: Drop the fixture-test exception from AC-10 and T13, or say it applies only to the dated dbb0485 observation. Keep the Background paragraph as history.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T8 (line 278); Context, Owner summary (line 64)
+EVIDENCE: The Owner summary says "`tests/vh-adlc/maintenance/discovery.test.ts` no longer counts skills, so it leaves `covers` and the proof", and the file was removed from `covers`. T8's done condition still reads "`bun test tests/vh-adlc/seo.test.ts tests/vh-adlc/check.test.ts tests/vh-adlc/triage/discovery.test.ts tests/vh-adlc/maintenance/discovery.test.ts` passes". Running the file does no harm, but it contradicts the summary. This traces to the R-38 F-01 change.
+PROPOSAL: Remove `tests/vh-adlc/maintenance/discovery.test.ts` from T8's done condition.
 
 ## Sources
 
