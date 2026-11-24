@@ -203,6 +203,27 @@ prose guide when the humanizer skill is unavailable.
 Continue with [your first feature](../get-started/first-feature.md) or
 [review requirements](../user-guides/workflows.md#reviews).
 
+## SEO assessment
+
+`vh-adlc-seo` is an agent procedure with one packaged helper,
+[`scripts/seo/semrush.ts`](../../plugins/vh-adlc/scripts/seo/semrush.ts), the only way it
+calls Semrush. Semrush use needs Bun on Linux or macOS, the platforms the package's
+release binaries cover; the rest of the assessment needs no Bun.
+
+Observed so far, at `f1565068fe9c`: the helper's tests against a loopback stub passed
+on macOS (arm64, Bun 1.4.2), with the cases that run each process in its own PID
+namespace skipped there because `bwrap` is absent. Those cases, and the forward
+scenarios that install the package into Codex and run assessments against a fixture
+site and a Semrush stub, run on a Linux development host and have not run yet. No
+live Google, Bing, Ahrefs or Semrush integration has been exercised.
+
+Terms follow the [SEO procedure](../../plugins/vh-adlc/references/seo.md): a source
+the run cannot use is a coverage gap with blank values, never zero; units are spent
+only under a unit permission, and never beyond the per-run limit the helper enforces.
+The `no-browser` scenario watches Codex's process tree and the fixture tree only; a
+browser launched through a service manager, D-Bus or another indirect route is outside
+its proof.
+
 ## Shared documentation impact
 
 Plugin 0.9.0 is published through [PR #51](https://github.com/michielvha/vh-adlc/pull/51)

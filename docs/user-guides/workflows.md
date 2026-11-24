@@ -30,6 +30,7 @@ on your host.
 | Accumulated documentation drift | Assess the configured corpus and selected stale documentation-audit proposals through the released docs-drift operation. |
 | Documentation truth review | Check claims in a bounded batch against source and record the evidence in the report. |
 | Article or social draft | Read the project's evidence and the site's voice rules, draft or revise the requested prose, and obtain a source-comparing editorial pass. Publication is separate. |
+| Website SEO assessment | Run `vh-adlc-seo` against the adopter's SEO adapter: free sources first, optional Semrush under a unit permission, and saved exports. It writes a report and exports only. |
 | Small maintenance | Preserve the public contract, keep a short task record, run appropriate checks, and obtain an independent review. |
 | A new feature or a wider change | Use a feature document with acceptance, tests, reviews, and binary status gates. |
 
@@ -290,21 +291,34 @@ The complete procedure is in the [article reference](../../plugins/vh-adlc/refer
 ## Website SEO assessment
 
 Use `vh-adlc-seo <website or brief>` to assess technical search readiness,
-measured visibility and content opportunities. It uses accessible free sources
-and saved evidence; Semrush can supplement them while authorized access works.
-Its absence or expiry does not block the assessment. Missing measurements are
-reported as unknown, with their source coverage, rather than invented zeros.
+measured visibility and content opportunities. It always runs public HTTP checks,
+runs browser checks only with a browser driver your repository instructions name
+or the agent runtime provides, and uses the free sources it can reach. A source it
+cannot use is a coverage gap with an explicit outcome and blank values, never an
+invented zero. Findings are ranked, each with affected URLs, impact, confidence and
+a validation step.
 
 Keep domains, countries, audience and evidence locations in the adopter's SEO
-adapter. The shared procedure reads that adapter and keeps account access,
-publication, DNS and indexing changes outside the assessment. It saves permitted
-exports and hash manifests so results remain usable after temporary API access
-ends. A free plan may still require ownership verification, and free does not
-necessarily include a vendor's API or export feature.
+adapter. The assessment reads it, never edits it, and writes only its report and
+exports, with a SHA-256 manifest, so results stay usable after temporary API access
+ends. It does not publish, change DNS or indexing, create accounts, commit or push;
+a live recheck after a site change comes back as an owner handoff item. A free plan
+may still require ownership verification, and free does not necessarily include a
+vendor's API or export feature.
 
-See the [SEO procedure](../../plugins/vh-adlc/references/seo.md). Its instruction
-and scenario checks do not certify authenticated Google, Bing or Ahrefs access
-on every host; report the integrations actually exercised.
+Semrush is optional and goes only through the packaged helper, which reads the key
+itself and saves requests redacted. It spends units only under a unit permission:
+your request in the run, or a permission with a per-run limit committed in the
+adapter on the default branch as last fetched. The per-run limit is the number you
+state, else the committed limit, else 500 units. An expired token is recorded as an
+authentication failure and the assessment finishes from free sources and dated
+saved exports.
+
+See the [SEO procedure](../../plugins/vh-adlc/references/seo.md) and the
+[SEO assessment compatibility record](../reference/compatibility.md#seo-assessment)
+for what has been observed. The checks do not certify authenticated Google, Bing,
+Ahrefs or Semrush access on every host; each run reports the integrations it
+exercised.
 
 ## Reserve a feature while you work
 

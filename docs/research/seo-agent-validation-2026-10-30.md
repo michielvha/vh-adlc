@@ -1,5 +1,7 @@
 # SEO agent validation: 2026-10-30
 
+> Historical note, added 2026-11-24: this record covers `89e133d` only. The later Search Console, crawler and startup sections were not part of that test, and its version, pin and test-count statements describe that date. The current behaviour and its evidence are in the [SEO assessment feature](../specs/seo-assessment.md) and the [compatibility record](../reference/compatibility.md#seo-assessment).
+
 Conventions: vhco-pro/docs@e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a (repository pin); prose edited with guides/humanize-prose.md.
 
 The owner requested a reusable free-first SEO assessor, optional temporary
