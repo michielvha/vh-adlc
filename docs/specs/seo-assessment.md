@@ -324,6 +324,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-11 | R-36 | spec | `3cf1213` | unknown | procedural | 1 should-fix, 1 nit: HOME scan fails on Codex's own plugin sync, vfork child and snapshot wording; fixed |
 | 2026-11-11 | R-37 | spec | `70a09ac` | unknown | procedural | No findings |
 | 2026-11-11 | R-37 | spec | `70a09ac` | n/a | n/a | accepted by owner |
+| 2026-11-24 | R-38 | spec | `22bcbb6` | claude-opus-5-5 | procedural | Drift re-review after merging main: 2 blocking (skill count, version), 1 should-fix (Linux host), 3 nits |
 
 ### R-1
 
@@ -1597,6 +1598,50 @@ PROPOSAL: Say that a vfork child of a Codex thread makes the call, and that its 
 ### R-37
 
 NO FINDINGS
+
+### R-38
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Acceptance Criteria AC-01 (line 235) and AC-10 (line 244); Design, Documentation and packaging (line 225); Test Plan rows AC-01 (line 253) and AC-10 (line 262); Tasks T1 (line 267), T2 (line 268) and T8 (line 274)
+EVIDENCE: The document requires "`vh-adlc-seo` as a sixteenth skill", "`workflows.md` and `installation.md` count sixteen skills" and "both discovery tests still count sixteen skills". Main has changed since the last review. At 22bcbb63, after the merge of origin/main, `ls plugins/vh-adlc/skills` lists 20 directories, vh-adlc-seo included, and `git ls-tree --name-only origin/main plugins/vh-adlc/skills/` lists 19. `tests/vh-adlc/triage/discovery.test.ts:13` asserts `toHaveLength(20)`, `docs/get-started/installation.md:115` reads "The package's twenty skills" and `docs/user-guides/workflows.md:17` reads "giving twenty skills". Main also replaced the count in `tests/vh-adlc/maintenance/discovery.test.ts:12` with `toContain("vh-adlc-maintenance")`, so that file has no skill count for the AC-01 proof to cite. A correct implementation has 20 skills and cannot meet AC-01 or AC-10 as written. An implementer following T2 and T8 would set the counts back to sixteen and break the merged discovery test. This drift came from the main merge at 22bcbb63. The Background statement about fifteen skills at bda1a87 is dated and still true.
+PROPOSAL: Change the counts in AC-01, AC-10, Design, the Test Plan and T1, T2 and T8 to the count on main plus one (twenty at this merge), or state the rule as "main's count plus one" so later merges do not make it stale. Drop the `maintenance/discovery.test.ts` count from the AC-01 proof.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Context, Owner summary (line 63); Design, Documentation and packaging (line 227); Acceptance Criteria AC-10 (line 244); Test Plan row AC-10 (line 262); Tasks T8 (line 274)
+EVIDENCE: The document says "The version stays 0.18.0, after the blog visual reading change at 0.17.0", AC-10 requires "both manifests carry 0.18.0" and the AC-10 row has `seo.test.ts` assert 0.18.0. At 22bcbb63 both `plugins/vh-adlc/plugin.json:4` and `plugins/vh-adlc/.claude-plugin/plugin.json:3` read `"version": "0.33.0"`, and `git show origin/main:plugins/vh-adlc/plugin.json` also reads 0.33.0 (commit 00752fea, "move proportional review to 0.33.0 after main released 0.32.0"). Running `bun test tests/vh-adlc/check.test.ts` here fails only "a package change comes with a version change", because the branch version equals main's. Following T8 would move the released package down from 0.33.0 to 0.18.0. That passes `check.test.ts:226-233`, which checks only that the version differs, but consumers who installed 0.33.0 would see an older version, and the AC-10 proof would fail a correct bump to 0.34.0. This drift came from the main merge.
+PROPOSAL: Replace 0.18.0 everywhere it is stated as the target with the next version after main's at merge time (0.34.0 at this commit), or have `seo.test.ts` assert a version greater than origin/main's. Drop the "after the blog visual reading change at 0.17.0" rationale.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (line 65); Background (line 99); Test Plan rows AC-03 (line 255), AC-10 (line 262) and AC-11 (line 263); Tasks T5 (line 271), T9 (line 275), T10 (line 276) and T12 (line 278)
+EVIDENCE: The task done conditions and proofs assume "this host" is the Fedora 43 Linux host: "On this Fedora 43 host, `/etc/profile.d/PackageKit.sh` ...", "The scenario needs `bwrap`, `strace` ... and fails as a precondition without them", T9 "passes its preflight for each scenario on this host", and T10 "passes its preconditions and preflight". The worktree at 22bcbb63 is on `Darwin ... arm64`, and `which bwrap strace` finds neither. Run here, the `no-browser` scenario would fail its own preconditions, so T10 and T12 cannot reach their done conditions on this host. The Owner summary's present-tense "the fixture test this host cannot pass" is also no longer true here: `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 bun test tests/vh-adlc/fixtures.test.ts tests/vh-adlc/triage/discovery.test.ts tests/vh-adlc/check.test.ts --timeout 60000` gave 97 pass and 1 fail, and the failure was the version check, not the fixture test. AC-10's local full-suite clause allows only the fixture-lock failure. I did not run the full suite on this host.
+PROPOSAL: Name the Linux host, with bwrap, strace and codex, where T9 through T12 and the AC-10 local run must happen, and date the Fedora observations as made on that host. Alternatively, state which Linux-only cases the AC-10 local run may skip on macOS. Change the Owner summary sentence to describe the fixture test as observed at dbb0485.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan row AC-03 (line 255); Test Plan row AC-10 (line 262)
+EVIDENCE: The AC-03 row cites "`.github/workflows/ci.yml:33-38`" for the bubblewrap install and probe and "(line 52)" for `bun test tests/vh-adlc`. At 22bcbb63 the probe is at `ci.yml:31-36` and the checker step is at line 69, now `bun test tests/vh-adlc --parallel --timeout 60000`. AGENTS.md at this commit gives the same command with `--parallel` as the local checker command, while the AC-10 row's local command omits `--parallel`. Both changes came from the main merge.
+PROPOSAL: Update the line citations and quote the current checker command, or cite the step by name.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context
+EVIDENCE: Context describes the request, the unspecified branch and PR #76's 11 review problems, but it has no harm statement: who is harmed without the feature, how often, how badly and whether the harm heals on its own. It also names no simpler alternative that was considered and rejected. A search of Context for "harm", "alternative" or "reject" finds only the owner's request for "free alternatives to Semrush" and the line saying the owner can reject defaults at acceptance. The document is past draft, so this is a nit.
+PROPOSAL: Add a short harm statement to Context: unbounded or unauthorized Semrush unit spend, and a leaked key, for a few developers. Name the simplest alternative rejected, such as instruction-only Semrush rules without a helper, with the reason.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan row AC-11 (line 263); Tasks T10 (line 276) and T12 (line 278)
+EVIDENCE: To show that the agent never launches a browser that is not named, the `no-browser` proof uses an outer bwrap wrapper, strace of every exec and namespace call, a bwrap-only trust chain, eight escape preflight cases, a stub-model turn and a launcher list including systemd-run, D-Bus, tmux, crontab, at and SSH. The harm it guards against is a read-only assessment, run by a few developers on their own machines, opening a locally installed browser against a public site. That harm is small and does not persist. The machinery is out of proportion to it and keeps generating review rounds (R-31 through R-36 all concerned it).
+PROPOSAL: Consider a scenario with no browser tool and no driver named, asserting the coverage-gap outcome and no browser process in a plain process listing, together with the procedure rule. State the stronger escape cases as a limit rather than proving them.
 
 ## Sources
 
