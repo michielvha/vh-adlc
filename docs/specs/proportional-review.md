@@ -782,6 +782,7 @@ None.
 | 2026-11-24 | R-21 | spec | `00752fea` | claude-opus-5-5 | procedural | drift re-review after merging main c6268708, full pass: no blocking; 1 should-fix |
 | 2026-11-24 | R-22 | spec | `a3ae263a` | claude-opus-5-5 | procedural | scoped: no findings |
 | 2026-11-24 | R-22 | spec | `a3ae263a` | n/a | n/a | accepted by owner |
+| 2026-11-24 | R-23 | spec | `c93e20eb` | claude-opus-5-5 | procedural | full pass after implementation commits: no blocking; 2 should-fix, 2 nit |
 
 ### R-1
 
@@ -1775,3 +1776,33 @@ PROPOSAL: Name the new brief's commit in Design and in the AC-11 row (for exampl
 ### R-22
 
 NO FINDINGS
+
+### R-23
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness, Retention paragraph: "a label fails when at least two of the three old-brief first passes raise it at or above its minimum severity ... Labels no old-brief pass raises at or above its minimum severity cannot fail and are reported, with the old-brief count at any severity beside them"); Context Owner summary ("A labelled defect fails if the old rules raised it in two of three runs and the new rules miss it in all twelve at the owner's minimum severity", "counts both briefs at the same severity bar for retention", "T27 (retention at the same severity bar for both briefs)"); frontmatter status_description; Tasks T27; AC-11 and AC-12, which rest on the rule
+EVIDENCE: This revision changed the old-brief count from "at any severity" to "at or above its minimum severity" (`git diff a3ae263a c93e20eb -- docs/specs/proportional-review.md`). The stated reason is narrower than the rule: "a reviewer that rates a defect below its minimum under both briefs has not lost it to the new rules". The rule also lets a label pass when the old brief raised it below its minimum and the new brief does not raise it at all, which is a loss, and the goal says "every real defect the current review raises is still raised". This path is plausible on these cases. Design says an always-blocking label's minimum is blocking, and it records that the reviewer rated "three always-blocking defects raised only at should-fix" in the first enterprise result. So an always-blocking label that the old brief raised at should-fix in three of three passes, and that the new brief drops in all twelve, "cannot fail". The results table (`tests/vh-adlc/replay/run.ts:425`, column "New passes at its minimum") shows 0 for that label whether the new brief rated it lower or dropped it. Only the per-run label lists tell the two apart, and no criterion reads them.
+PROPOSAL: Keep the shared bar, and add that a label two of three old passes raise only below its minimum fails when none of the twelve new passes raises it at any severity. Report the new brief's any-severity count next to the old one, and give T27's test that case.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-10 row and AC-11 row; Tasks T27 ("(AC-10, AC-11, AC-12)")
+EVIDENCE: T27 changes how the harness computes retention and says run.test.ts covers "a label the old brief raises only below its minimum". No Test Plan row names a retention case. The AC-10 row lists identity, reuse, launch record, bound, terms and growth cases, but not the retention arithmetic, although run.test.ts has a `describe("retention", ...)` block. The AC-11 row checks only that "the results file shows no failing label" and spot-checks the matcher's verdicts. It does not check how the harness turns verdicts into a retention verdict. Under the current proofs, a harness that counts the new brief at any severity, or skips the confirmation runs, passes AC-10 and AC-11 while declaring labels retained that the rule fails. This revision makes the rule more lenient, so the risk now matters.
+PROPOSAL: Add the retention cases to the AC-10 row: a label the old brief raises only below its minimum, a label the new brief raises only below its minimum (which still fails after twelve runs), and the confirmation runs. Alternatively, have the AC-11 row's reviewer recompute retention from the per-run labels in the results file.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter `goal` ("while every real defect the current review raises is still raised"); AC-11 ("apart from label L-08 on the Claude host route, a known loss the owner deferred as D-17"); Deferred D-17
+EVIDENCE: After this revision, AC-11 accepts the loss of one labelled real defect on one route, and the Owner summary says so ("one real defect is lost: label L-08"). The goal still promises that every real defect is still raised. The cut check and the follow-up review judge items against the goal, so the two statements now disagree.
+PROPOSAL: Reword the goal so it allows the recorded known loss, for example "every real defect the current review raises is still raised, apart from those the owner defers as known losses".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Replay harness, "Both briefs use the same route settings and models" and the identity file paragraph, "records its plugin commit, docs revision and model")
+EVIDENCE: Commit 9e977a5e, since R-22, adds `refreshRoute` (`tests/vh-adlc/replay/run.ts:199-208`). It commits the case's current `--routes` settings into a resumed loop clone when they differ, and its message says the command route's reviewer start changed during the replay. The identity file and the results record no route settings, so nothing shows whether old-brief sets ran under the same route settings as the new-brief runs. The change described affects only how the prompt reaches the reviewer, so the consequence is small.
+PROPOSAL: Add a digest of the route settings to each identity file and to the results, or say in Design which route settings changes are allowed between briefs (for example, how the prompt is delivered).
