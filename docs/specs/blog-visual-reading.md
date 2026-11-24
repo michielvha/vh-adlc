@@ -302,6 +302,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-11 | R-47 | spec | `0ad847c` | unknown | procedural | No findings |
 | 2026-11-11 | R-47 | spec | `0ad847c` | n/a | n/a | accepted by owner |
 | 2026-11-24 | R-48 | spec | `71e415c` | claude-opus-5-5 | procedural | Drift re-review: 1 blocking, 1 should-fix, 1 nit: package version below main, stale local-suite clause, blog-authoring branch note |
+| 2026-11-24 | R-49 | spec | `5f43917` | claude-opus-5-5 | procedural | Drift follow-up: 2 blocking, 1 should-fix, 3 nits from the R-48 revision: unconditional version assertion, Linux CI clause unobservable at review, failure comparison undefined; stopped for the owner |
 
 ### R-1
 
@@ -1610,6 +1611,50 @@ SEVERITY: nit
 WHERE: Context Background (line 58), Design "Relationship to blog-authoring" (line 113)
 EVIDENCE: Line 58 says `git branch --list feat/blog-authoring` "return[s] nothing", and line 113 says "blog-authoring's own branch no longer exists". At X, `git branch --list feat/blog-authoring` prints "+ feat/blog-authoring". `git worktree list` shows it checked out at /Users/michielvh/code/vh-adlc-wt/blog-authoring, at c6268708, with no commits beyond origin/main. `git ls-remote --heads origin feat/blog-authoring` still returns nothing. Placing the Context pointer on this branch is still sound, but the stated reason is out of date, and a parallel blog-authoring session on the same covered files is now possible.
 PROPOSAL: Say that the remote branch is gone and a local worktree branch with no commits of its own exists, and keep the pointer edit on feat/blog-visual-reading.
+
+### R-49
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Test Plan AC-09, Acceptance Criteria AC-09, Design "Packaging" (line 199), Context Owner summary (line 50)
+EVIDENCE: The AC-09 Test Plan row now says "Another `blog.test.ts` assertion checks that `plugins/vh-adlc/plugin.json` and `plugins/vh-adlc/.claude-plugin/plugin.json` carry the same version whose minor number is one above that of `origin/main:plugins/vh-adlc/.claude-plugin/plugin.json`". This assertion has no condition, so it stays permanently in blog.test.ts. `.github/workflows/ci.yml:3-5` runs CI on push to every branch, main included. Line 69 runs `bun test tests/vh-adlc --parallel --timeout 60000` on Linux, and lines 97-98 run `tests/vh-adlc/*.test.ts` on macOS, which includes blog.test.ts. Once this merges, origin/main carries the same version as the tree (for example 0.34.0 against 0.34.0), so the assertion fails on main's own CI and on every later branch that does not bump the package. The existing version check at `tests/vh-adlc/check.test.ts:226-234` avoids this because it returns early when `git diff --quiet origin/main -- plugins/vh-adlc` shows no package change. The rule "minor number is one above" also differs from "the next minor version" stated at lines 50 and 199 and in AC-09: it accepts 0.34.3, and it fails a correct major bump. This traces to the R-48 F-01 fix that this revision made.
+PROPOSAL: Drop the new blog.test.ts version assertion and rely on check.test.ts, or make it conditional the way check.test.ts is (assert only while plugins/vh-adlc differs from origin/main). Have it check that the version is greater than origin/main's, and state that exact rule in AC-09, Packaging and the owner summary.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Acceptance Criteria AC-09, Test Plan AC-09, Context Owner summary (line 52)
+EVIDENCE: AC-09 now ends "`bun test tests/vh-adlc --parallel --timeout 60000` passes on Linux CI, and every file that fails it on the macOS development host fails the same way on an `origin/main` worktree on that host." Line 52 of the owner summary says CI "is checked at ship on the pushed head and must pass before a merge; it is not part of the implementation review", and says pushing needs a ship request. The AC-09 Test Plan row says "`gh pr checks 75` after the ship push is reported by ship and is not review evidence". It names local runs only, as the proof. By the standard, the implementation review comes before ship. At that point no Linux CI run exists for the reviewed head, so the reviewer can only return `not verified` for AC-09, and the `complete` gate (all_met, impl_review_clean) cannot pass. The criterion contradicts its own proof row and the owner summary. This traces to the R-48 F-02 fix that this revision made.
+PROPOSAL: Remove the Linux CI clause from AC-09 and keep CI as the ship-time merge condition the owner summary describes. Otherwise, name a Linux run the implementation reviewer can observe, such as a CI run on a pushed review head that the summary authorizes, and put it in the Test Plan row.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-09, Test Plan AC-09, Tasks T4
+EVIDENCE: AC-09 and T4 require each macOS failure to fail "the same way" on an origin/main worktree, but the Test Plan row checks only that the suite runs on both trees "with the failing files compared". A file that already fails on main on macOS, for example one with Bubblewrap or `/proc` cases, can hide a new failure that this change adds, and a file-level comparison passes it. One implementer would compare file names, another the failing test names and counts, and they would reach different verdicts on the same tree. If F-02 removes the Linux CI clause, this comparison is the only full-suite evidence the implementation review has. This traces to the change this revision made.
+PROPOSAL: Define "the same way" in the Test Plan row as the same set of failing test names in each file, compared between the two runs, and use the same wording in AC-09 and T4.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context Background (line 58), Design "Relationship to blog-authoring" (line 113)
+EVIDENCE: Line 58 says "A local worktree branch of that name exists at `origin/main` with no commits of its own." At X, `git log --oneline -1 feat/blog-authoring` gives c6268708, while origin/main is 718b1d30. `git rev-list --count origin/main..feat/blog-authoring` gives 0 and `git rev-list --count feat/blog-authoring..origin/main` gives 95. The branch is an ancestor of origin/main, 95 commits behind it, not at it. Line 113's "has no commits of its own" is correct. This traces to the R-48 F-03 fix.
+PROPOSAL: Say the local branch sits at c6268708, an ancestor of origin/main, with no commits of its own.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context Background (line 64)
+EVIDENCE: Line 64 says that on macOS "some files fail on `origin/main` too: Linux-only Bubblewrap, `/proc` and GNU sed cases, paths longer than macOS allows, and YAML-serializer tests tied to the local bun version". It gives no command, output or file:line for this. The convention says "Context and Design cite their claims: a `file:line`, or a command and its output". I did not observe these failures in this pass. The ci.yml:91-92 comment ("Managed verification and effect recovery require Linux/Bubblewrap/flock") supports only part of the claim.
+PROPOSAL: Cite the origin/main worktree run, with its command, commit and failing file list or count, or cite ci.yml:91-92 for the Linux-only part.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary
+EVIDENCE: The convention says the Owner summary should "Explain material changes since the last accepted scope". R-47 at 0ad847c was accepted with version 0.17.0 and the fixture-lock local exception. This revision changes the version default to "the next minor version above `origin/main`'s" and swaps the local-suite clause for a macOS comparison plus Linux CI. The summary states the new values but never says that they changed since that acceptance, or why.
+PROPOSAL: Add one or two sentences saying that the version rule and the local-suite clause changed after drift re-review R-48, and why.
 
 ## Sources
 
