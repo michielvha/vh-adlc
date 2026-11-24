@@ -63,7 +63,7 @@ The originating request is in the local Codex session `~/.codex/sessions/2026/10
 
 PR #75 (`git diff origin/main...997b63d`) adds a "Compose the reading experience" section and comparator guidance to `references/blog.md`, presentation review and a `Presentation repairs` line to the editor, a visual-pass sentence and extra dispatch inputs to the skill entry, and a paragraph to `docs/user-guides/workflows.md`. An independent review of the PR, run in GitHub Copilot CLI session `b343743f-555d-4d64-89fd-3946722154d6` on this host and not posted to PR #75, so it cannot be checked there, asked for changes. It found the conflict with blog-authoring, an unconditional pass that would also add visuals during wording-only revisions, image generation without a permission rule, inputs listed differently in three places, no rendering fallback in the skill entry, and an editor still described as prose-only.
 
-The repository runs the plugin checker with `bun test tests/vh-adlc --parallel --timeout 60000` (`AGENTS.md`), and Linux CI runs the same command. The development host is now macOS. Some tests need Linux, Bubblewrap and flock, so CI runs every test only on Ubuntu and a portable subset on macOS (`.github/workflows/ci.yml:85-86`); those tests fail on this host on `origin/main` as well. `tests/vh-adlc/fixtures.test.ts` no longer fails locally, because `plugins/vh-adlc/scripts/ensure-vh-adlc.sh:8-9` now ignores a PATH entry whose digest does not match the lock.
+The repository runs the plugin checker with `bun test tests/vh-adlc --parallel --timeout 60000` (`AGENTS.md`), and Linux CI runs the same command. The development host is now macOS. Some tests need Linux, Bubblewrap and flock, so CI runs every test only on Ubuntu and a portable subset on macOS (`.github/workflows/ci.yml:85-86`). `tests/vh-adlc/fixtures.test.ts` no longer fails locally, because `plugins/vh-adlc/scripts/ensure-vh-adlc.sh:8-9` now ignores a PATH entry whose digest does not match the lock.
 
 `tests/vh-adlc/blog/run.ts` runs native Codex scenarios against an installed copy of the package in a disposable profile and checks outputs and authorized destinations. `tests/vh-adlc/evidence/blog/README.md` records nine passing scenarios from 29 October.
 
@@ -237,6 +237,7 @@ Each visual fixture's `AGENTS.md` declares the destination's image-with-caption 
 - [ ] T1 `tests/vh-adlc/blog.test.ts` - static contract assertions from the AC-06 and AC-09 Test Plan rows, plus AC-08's unviewable-image fallback text, alongside the existing checks; `bun test tests/vh-adlc/blog.test.ts` fails at 997b63d because PR #75's text does not meet them yet (AC-06, AC-08, AC-09)
 - [ ] T2 `plugins/vh-adlc/references/blog.md` - rework PR #75's "Compose the reading experience" section and comparator guidance to the Design: 800-word threshold and exception categories, the three revision kinds with the combined-request and default rules, image-permission and local-reference rules, quote integrity, the "Presentation inputs" list, editor dispatch without parent history, rendering checks and the two fixed handoff lines; T1's `references/blog.md` assertions pass (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-08, AC-09)
 - [ ] T3 `plugins/vh-adlc/agents/vh-adlc-blog-editor.agent.md` and `plugins/vh-adlc/skills/vh-adlc-blog/SKILL.md` - rework PR #75's presentation paragraph, editor description and skill dispatch to the Design: prose and presentation editor, "Presentation inputs" named rather than listed, nine flags with their sixteen labels, precedence rule, example line, four-line return, unviewable-image fallback, and the skill's rendering fallback and per-theme check; T1's editor and skill assertions pass (AC-06, AC-07, AC-08, AC-09)
+- [ ] T13 `plugins/vh-adlc/plugin.json` and `plugins/vh-adlc/.claude-plugin/plugin.json` - set both manifests to the same version above `origin/main`'s, 0.34.0 while main is at 0.33.0; `bun test tests/vh-adlc/check.test.ts --timeout 60000` passes (AC-09)
 - [ ] T4 `docs/user-guides/workflows.md` and `docs/specs/blog-authoring.md` - rework the PR #75 user guide paragraph (800-word threshold, batch-or-related quote rule, plain-revision rule) and add the Context pointer naming the two replaced rules; `bun test tests/vh-adlc/blog.test.ts` passes, and `bun test tests/vh-adlc --parallel --timeout 60000` fails only the same failing test names, file by file, as on an `origin/main` worktree on the same host (AC-09)
 - [ ] T5 `tests/vh-adlc/blog.test.ts` - failing unit tests with the Test Plan's cases for the `Presentation repairs` splitter, the `No-visual exception:` and `Rendered checks:` line parsers and the four-entry coverage check; they fail because `tests/vh-adlc/blog/visual.ts` does not exist (AC-02, AC-07, AC-08)
 - [ ] T6 `tests/vh-adlc/blog/visual.ts` - the splitter, line parsers and coverage check, plus the Test Plan's shared run checks (body prose word count, image tokens, drawing markup, added quotes, skeleton); T5 passes (AC-01, AC-02, AC-03, AC-04, AC-05, AC-07, AC-08)
@@ -305,6 +306,7 @@ None. The defaults in the owner summary were set under the owner's standing inst
 | 2026-11-11 | R-47 | spec | `0ad847c` | n/a | n/a | accepted by owner |
 | 2026-11-24 | R-48 | spec | `71e415c` | claude-opus-5-5 | procedural | Drift re-review: 1 blocking, 1 should-fix, 1 nit: package version below main, stale local-suite clause, blog-authoring branch note |
 | 2026-11-24 | R-49 | spec | `5f43917` | claude-opus-5-5 | procedural | Drift follow-up: 2 blocking, 1 should-fix, 3 nits from the R-48 revision: unconditional version assertion, Linux CI clause unobservable at review, failure comparison undefined; stopped for the owner |
+| 2026-11-24 | R-50 | spec | `92d2b0c` | claude-opus-5-5 | procedural | No blocking finding: 1 should-fix, 1 nit outside the baseline: add the version-bump task, trim an uncited Background claim; both applied |
 
 ### R-1
 
@@ -1657,6 +1659,22 @@ SEVERITY: nit
 WHERE: Context Owner summary
 EVIDENCE: The convention says the Owner summary should "Explain material changes since the last accepted scope". R-47 at 0ad847c was accepted with version 0.17.0 and the fixture-lock local exception. This revision changes the version default to "the next minor version above `origin/main`'s" and swaps the local-suite clause for a macOS comparison plus Linux CI. The summary states the new values but never says that they changed since that acceptance, or why.
 PROPOSAL: Add one or two sentences saying that the version rule and the local-suite clause changed after drift re-review R-48, and why.
+
+### R-50
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks (T4, T10, T11), Design "Packaging" (line 201), Scope ("the package version bump", line 81), Context Owner summary (line 50)
+EVIDENCE: Packaging now says "Both package manifests move to a version above `origin/main`'s when the feature ships", but no task among T1 to T12 names `plugins/vh-adlc/plugin.json` or `plugins/vh-adlc/.claude-plugin/plugin.json`. At the accepted R-47 revision (0ad847c) that did not matter, because the document said the manifests already carried 0.17.0. At X both manifests read "version": "0.33.0", the same as `git show origin/main:plugins/vh-adlc/.claude-plugin/plugin.json`. `git diff --stat origin/main 92d2b0cf -- plugins/vh-adlc` shows 3 changed package files. I ran `bun test tests/vh-adlc/check.test.ts --timeout 60000` at X and got 77 pass and 1 fail: "manifest and marketplace > a package change comes with a version change". That failure does not happen on an origin/main worktree, where the test returns early. So T4's done condition ("fails only the same failing test names, file by file, as on an `origin/main` worktree") cannot be met by the files T4 names. T10 and T11 also assume "the installed package at the new version" without any earlier task that sets it. The convention requires each task to name the file it touches. This gap comes from the R-48 F-01 fix, which turned a version the document claimed was already in place into a bump that has to be made.
+PROPOSAL: Add a task, ordered before T4, that sets both manifests to the same version above origin/main's (0.34.0 while main is at 0.33.0). Its done condition is `bun test tests/vh-adlc/check.test.ts --timeout 60000` passing, and it advances AC-09.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context Background (line 64)
+EVIDENCE: Line 64 says "Some tests need Linux, Bubblewrap and flock, so CI runs every test only on Ubuntu and a portable subset on macOS (`.github/workflows/ci.yml:85-86`); those tests fail on this host on `origin/main` as well." At X, ci.yml:85-86 reads "Managed verification and effect recovery require Linux/Bubblewrap/flock. Ubuntu runs every test; macOS checks the portable feature and report inputs." That supports the CI split but not the claim that those tests fail on this host on origin/main. No command or output is given for that, and the convention says Context cites its claims with a file:line or a command and its output. This is what is left of R-49 F-05 after the revision.
+PROPOSAL: Cite an origin/main worktree run on this host, with its command, commit and failing file or test list, or limit the sentence to what ci.yml:85-86 shows.
 
 ## Sources
 
