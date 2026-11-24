@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Re-entered on feat/seo-agent after the R-42 acceptance; implementing the tasks test-first."
+status: draft
+status_description: "Revising the forward scenarios to run through headless Claude Code instead of Codex, at the owner's request; awaits review and renewed acceptance."
 branch: feat/seo-agent
 issue: null
 goal: "An adopter can run a free-first website SEO assessment through vh-adlc that spends paid API units only when allowed and within a limit, and leaves exports usable after access ends."
