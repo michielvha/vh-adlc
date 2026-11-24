@@ -757,6 +757,7 @@ None.
 | 2026-11-23 | R-15 | spec | `9299b15b` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 2 nit |
 | 2026-11-23 | R-16 | spec | `06bdcac5` | claude-opus-5-5 | procedural | scoped: no blocking, no should-fix; 4 nit |
 | 2026-11-23 | R-17 | spec | `dfdd422d` | claude-opus-5-5 | procedural | drift re-review after merging main 74e7b1d2: no findings |
+| 2026-11-24 | R-18 | spec | `3b81643c` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix, 4 nit |
 
 ### R-1
 
@@ -1661,3 +1662,40 @@ PROPOSAL: Add one clause: a part with an identity file is governed by it alone, 
 ### R-17
 
 NO FINDINGS
+
+### R-18
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Replay harness, lower-bound paragraph: "the distinct reviewed commits for the document and the old docs revision, less one per old-brief first pass on that route, recorded in `runs/old-<route>-loop.bound.json`"); Design (Rounds, "a lower bound counting as recorded"); Test Plan AC-13 row; Test Plan AC-10 row ("a lost loop counts its bound"); Tasks T25 ("lower bounds from session logs"); Context Owner summary (R-9 paragraph, "lower bounds for the two old loops lost to an expired login")
+EVIDENCE: This revision adds the lower bound. Counting a lost loop's recorded reviews as its total is safe only if the number really is a lower bound: an overcount raises the old total and makes AC-13 easier to pass. The formula as stated can overcount. Every execution, first pass or loop attempt, makes its own clone and commits its own X' with no fixed date (`once` calls `prepareClone` per run, tests/vh-adlc/replay/run.ts:333-334; commit at run.ts:180-181). So every old-brief Codex first pass the pre-T25 launches ever ran shows up as its own reviewed commit in the session logs. That includes failed or "not counted" runs that reached the reviewer, and passes from earlier launches whose files a later launch overwrote under the same names (`old-command-pass-<n>.txt`). R-15 F-01 recorded that every pre-T25 launch without `--only` ran the old first passes again (run.ts:345). A loop also gets up to three attempts per launch (run.ts:50, :361), each from a fresh X', and a stopped launch tells the operator to rerun with `--only loops` (run.ts:373). The reviews of an abandoned attempt are distinct commits too, so summing them counts restarts as one longer loop. "less one per old-brief first pass" does not say whether it means the three counted passes or every first-pass execution in the logs. Nothing caps the bound at the 60-review limit. No row has the implementation reviewer check the bound file against the logs, though AC-11 has that check for the launch record.
+PROPOSAL: Count only the reviews of the lost loop's last attempt, taken from that loop's own session (for example the author session that dispatched the reviews, or review sessions in its launch window after its X'). Subtract every old-brief first-pass execution found in the logs, not three. Cap the bound at 60. Add a check of `runs/old-<route>-loop.bound.json` against the logs to the AC-11 and AC-12 rows.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Growth, "A loop's growth is the body size at its clean pass minus the size at X'. Over the case and route pairs whose old-brief loop stored its documents"); Design (lower-bound paragraph, "An old-brief loop that stopped before a clean pass ... marked as not clean"); Acceptance Criteria AC-17; Test Plan AC-17 row
+EVIDENCE: This revision's lower-bound paragraph covers any old-brief loop that stopped before a clean pass, and treats a lost-documents loop as only one case of it ("When such a loop lost its documents"). Growth is defined only at a clean pass. It leaves out only pairs whose old loop lost its documents. An old loop that stopped before a clean pass but kept its documents is therefore in the growth total and has no defined growth. With kept clones, a stopped loop is normally resumed, so the two lost Codex loops are probably the only unclean ones. That makes this path unlikely in practice.
+PROPOSAL: Leave every pair whose old loop is not clean out of growth, or define its growth at its last stored pass.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context Owner summary ("Full loops under a scripted owner must then need at most half the old total of reviews and body growth"); Tasks T24 ("the round and growth totals over all four pairs"); Design (Growth); Acceptance Criteria AC-17
+EVIDENCE: This revision limits the growth condition to pairs whose old-brief loop stored its documents. The two lost loops are both Codex-route loops (owner decision, 2026-11-24), so growth is now judged on the two Claude-route pairs only. The Owner summary still states the growth condition without that limit. It mentions the lost loops only as lower bounds, in the R-9 paragraph. T24 still says growth is totalled over all four pairs. AC-17 and its row state the narrowed condition, so the proof checks the right thing.
+PROPOSAL: Say in the Owner summary that growth is judged on the Claude-route pairs only, because the Codex old loops lost their documents. Change T24 to "growth totals over the pairs with stored old-brief documents".
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Replay harness, "A loop works in a clone kept in the case directory, so a loop that fails is resumed from that clone by the next attempt"; "starts a fresh set when the identity differs: the earlier files of that part, with its identity, move to `runs-superseded/`"); Test Plan AC-10 row ("a failed loop's next attempt resumes its kept clone")
+EVIDENCE: This revision adds kept loop clones. The clone lives in the case directory, not under `runs/`, and the fresh-set rule moves only "the earlier files of that part, with its identity". It does not say whether a kept clone counts as part of the set. Suppose a loop fails and the next attempt runs under another identity, for example after another owner-allowed move of the new brief. One implementer discards the clone. Another resumes it, which would mix reviews from two plugin commits in one counted loop, on an X' that holds the earlier brief's docs pin. The new brief has moved once already, but another move needs a new owner decision.
+PROPOSAL: Say that a kept loop clone belongs to its set, is resumed only under the same identity, and moves aside or is removed when a fresh set starts.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Replay harness, "the harness counts only the listed files and refuses any other file of that set until a run continues it under the same identity"); Test Plan AC-10 row ("refused when it holds a file the entry does not list"); Scope ("Not handled: a set stored before T25 that two launches wrote ... (R-15 F-01)")
+EVIDENCE: This revision adds "until a run continues it under the same identity". Read literally, a pre-T25 set that holds a file its launch-record entry does not list can be continued, and after that the refusal no longer applies. The unlisted file then counts, either as a pass the set "already has" or in the totals, though the launch record exists to keep such files out. The Scope limit and "Each listed set was written by one launch" make that set unlikely, but the AC-10 row tests exactly that state, and the document does not say what continuation does with it.
+PROPOSAL: Say that a run refuses to continue a pre-T25 set that holds an unlisted file, or that continuation moves unlisted files to `runs-superseded/` before recording the identity.
