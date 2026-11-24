@@ -337,6 +337,7 @@ None. The defaults listed in the owner summary were set under the owner's standi
 | 2026-11-11 | R-37 | spec | `70a09ac` | n/a | n/a | accepted by owner |
 | 2026-11-24 | R-38 | spec | `22bcbb6` | claude-opus-5-5 | procedural | Drift re-review after merging main: 2 blocking (skill count, version), 1 should-fix (Linux host), 3 nits |
 | 2026-11-24 | R-39 | spec | `c556233` | claude-opus-5-5 | procedural | Follow-up to R-38: no blocking; 2 should-fix (sw-dev observation, harm statement), 2 nits |
+| 2026-11-24 | R-40 | spec | `bc793eb` | claude-opus-5-5 | procedural | Scoped review of the owner's no-browser cut: no blocking; 1 should-fix (fixture name scan), 1 nit |
 
 ### R-1
 
@@ -1684,6 +1685,22 @@ SEVERITY: nit
 WHERE: Tasks T8 (line 278); Context, Owner summary (line 64)
 EVIDENCE: The Owner summary says "`tests/vh-adlc/maintenance/discovery.test.ts` no longer counts skills, so it leaves `covers` and the proof", and the file was removed from `covers`. T8's done condition still reads "`bun test tests/vh-adlc/seo.test.ts tests/vh-adlc/check.test.ts tests/vh-adlc/triage/discovery.test.ts tests/vh-adlc/maintenance/discovery.test.ts` passes". Running the file does no harm, but it contradicts the summary. This traces to the R-38 F-01 change.
 PROPOSAL: Remove `tests/vh-adlc/maintenance/discovery.test.ts` from T8's done condition.
+
+### R-40
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan row AC-11 (line 270); Tasks T10 (line 283) and T12 (line 285)
+EVIDENCE: The rewritten `no-browser` proof fails the scenario when "the fixture tree gains ... no file whose name matches that list", and the list includes the bare substring `opera`, matched case-insensitively. The fixture tree is where a correct assessment writes its report and exports (AC-08: "writes only inside the adapter's report and export locations"). The Design sets no file names for those artifacts, so the agent under test picks them. Ordinary names such as `operations.md`, `operational-findings.md` or `cooperation.csv` contain `opera`, so a correct run can fail the scenario. The runner's pre-run check covers only names already in the fixture, not names the agent creates. The document's own history shows how common these names are: Codex's system-skill install left "88 file names matching `chrom` or `opera`" in its HOME (R-36 era text, now cut from the row). This revision rewrote the row at the owner's cut, but the scan clause and the list carry over unchanged from the previous text. So the risk is not new, but it is in this pass's scope because the row changed. It makes T10 and T12 fail at random rather than every time, which is why I rate it should-fix and not blocking.
+PROPOSAL: Limit the fixture-tree name scan to new ELF or executable files, or match whole basename tokens such as `opera` as a word, `chrome`, `chromium` and `firefox` against the executable's name only. Keep the process-listing check as it is.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary (line 64); frontmatter `status_description` (line 3)
+EVIDENCE: The Owner summary says "At acceptance on 2026-11-24 the owner also cut the `no-browser` escape-case proof". The Review Log's last acceptance row is still R-37 at `70a09ac`, and `vh-adlc next` at bc793ebc answers "spec review ... the latest spec review is stale: baseline-changed". So this revision has not been accepted yet. The cut happened during the acceptance conversation, not at an acceptance. `status_description` still reads "Revising after drift re-review R-38 ... awaits a follow-up review", which predates R-39 and the cut. Both traces to commits 1cfa3915 and bc793ebc.
+PROPOSAL: Say "During the acceptance conversation on 2026-11-24 the owner cut ...", and update `status_description` to say the document awaits this review of the cut and renewed acceptance.
 
 ## Sources
 
