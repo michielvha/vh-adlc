@@ -810,6 +810,7 @@ None.
 | 2026-11-24 | R-25 | spec | `af2d805f` | claude-opus-5-5 | procedural | scoped: no blocking, no should-fix; 1 nit |
 | 2026-11-24 | R-25 | spec | `af2d805f` | n/a | n/a | accepted by owner |
 | 2026-11-24 | R-26 | spec | `372cc5cb` | claude-opus-5-5 | procedural | full pass after implementation commits: no blocking; 1 should-fix, 2 nit |
+| 2026-11-24 | R-27 | spec | `7c41f1a2` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix |
 
 ### R-1
 
@@ -1874,3 +1875,12 @@ SEVERITY: nit
 WHERE: Context (Owner summary: "Validation so far: T1 to T22, T25 and T26 are done ..."; "The remaining work is T27 (retention at the same severity bar for both briefs) and the results (T23, T24)"; the "This revision, after that acceptance, ..." paragraph)
 EVIDENCE: T27 is ticked with evidence. I reran `bun test tests/vh-adlc/replay/run.test.ts --timeout 60000` on a `git archive` export of 372cc5cb: 38 pass, 0 fail, matching its evidence line. T28 is new in this revision and is not named as remaining work. The frontmatter status_description has it right ("T1 to T22 and T25 to T27 done; T28, T23 and T24 continue after acceptance"). The "This revision" paragraph lists the earlier owner decisions but not this revision's change: the halving bar applies only to pairs where both loops reached a clean pass, and a stopped new loop counts from its kept clone. The rule itself is stated earlier in the summary and in the D-19 sentence.
 PROPOSAL: Update the two sentences to say T27 is done and that T28, T23 and T24 remain, and add this revision's AC-13 change and kept-clone bound to the "This revision" paragraph.
+
+### R-27
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Replay harness: the new-brief bound paragraph "Such a bound does not finish its set: a later run under the same identity resumes the kept clone, and once the loop finishes, its stored documents take precedence over the bound"; the kept-clone sentence "the clone is removed once the loop finishes, and it moves aside with its set when a fresh set starts"; the stored-set sentence "the earlier files of that part, with its identity, move to `runs-superseded/`"); Test Plan AC-10 and AC-11 rows; Tasks T28; Deferred D-19
+EVIDENCE: This traces to this revision's new kept-clone bound paragraph, which resolves R-26 F-01's definition gap but leaves the bound file's lifecycle open. Once a resumed loop finishes, its kept clone is removed (`run.ts:539`, `:547`), but nothing says what happens to `runs/new-<route>-loop.bound.json`: the document says only that the stored documents "take precedence". The AC-11 row then has the implementation reviewer check "each `runs/new-<route>-loop.bound.json` against the Review Log of the kept clone at the head and X' it records". When D-19's planned step ("finish that new loop when Codex usage returns") happens before T23, the bound file stays and the clone it names no longer exists, so that check cannot be executed as written. The old-brief bound is "part of its set's record like the identity file", but the new paragraph does not say the same. In the code at this commit, `freshSet` moves only files starting with `<brief>-<route>-<kind>-` and the identity file (`run.ts:293`), so `new-<route>-loop.bound.json` (`loop.`, not `loop-`) would stay behind when a fresh set starts, and a later failed loop with no documents would read a bound from another identity. The AC-10 totals cases check resume and precedence but not that the bound leaves with its set or once documents replace it, so an implementation that leaves a stale bound passes AC-10. The harm is limited: a superseded bound does not enter the halving total. But the owner plans to follow the resume path D-19 names.
+PROPOSAL: In the new-brief bound paragraph, say the bound is part of its set's record like the identity file, so it moves aside with a fresh set, and that it moves aside (or is deleted) once the resumed loop stores its documents. Limit the AC-11 check to a kept-clone bound still in effect, and add "the bound moves aside with a fresh set and once the loop's documents are stored" to the AC-10 totals cases and T28.
