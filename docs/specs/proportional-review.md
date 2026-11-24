@@ -610,34 +610,43 @@ for the old-pin controls.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: The convention at the companion `vhco-pro/docs` revision defines blocking, should-fix and nit
+- [x] AC-01: The convention at the companion `vhco-pro/docs` revision defines blocking, should-fix and nit
       by consequence for the profiled product as Design states, with always-blocking defects blocking on
       every product.
-- [ ] AC-02: That convention raises an Open Question only where the owner could plausibly choose
+      Evidence: established by the observed verification recorded on T1, T2 in Tasks.
+- [x] AC-02: That convention raises an Open Question only where the owner could plausibly choose
       differently, has the author record every other choice in Design, and offers only options that meet
       the goal in full.
-- [ ] AC-03: That convention and the reviewer accept a stated limit as an answer to a finding, and the
+      Evidence: established by the observed verification recorded on T1, T2 in Tasks.
+- [x] AC-03: That convention and the reviewer accept a stated limit as an answer to a finding, and the
       reviewer raises its substance again only for an always-blocking defect, an unmeetable criterion or
       an unsolved problem.
-- [ ] AC-04: The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure
+      Evidence: established by the observed verification recorded on T1, T2, T6, T13, T26 in Tasks.
+- [x] AC-04: The reviewer reads the product profile from `AGENTS.md` at the reviewed commit, rates failure
       paths by it, rates a failure path it is unsure about at should-fix or above, and without a profile
       judges as for production software with users.
-- [ ] AC-05: On both routes, a spec review after the first receives the scope from `review-scope`, covers
+      Evidence: established by the observed verification recorded on T6, T8, T13, T26 in Tasks.
+- [x] AC-05: On both routes, a spec review after the first receives the scope from `review-scope`, covers
       only the document diff and every section that states a rule, ID or term the diff changes, and
       reports only blocking findings outside
       that; the pass is full when there is no previous spec review or a covered path or a docs pin bridge
       file changed.
-- [ ] AC-06: The spec skill raises judgement calls and judgement findings as Open Questions only under the
+      Evidence: established by the observed verification recorded on T3, T4, T5, T6, T13, T26 in Tasks.
+- [x] AC-06: The spec skill raises judgement calls and judgement findings as Open Questions only under the
       plausible-choice rule, judged against the product profile and the files loop context lists.
-- [ ] AC-07: The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules
+      Evidence: established by the observed verification recorded on T7, T14 in Tasks.
+- [x] AC-07: The spec skill's owner-facing summary shows only the unapplied nits the owner's recorded rules
       do not settle, with a count of the rest and where the full list is.
-- [ ] AC-08: On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary,
+      Evidence: established by the observed verification recorded on T7, T14 in Tasks.
+- [x] AC-08: On a repository pinned to `0c983f67`, the reviewer, the spec skill, the owner-facing summary,
       ship and resume behave as before this feature: no Deferred section, no cut check and no follow-up
       review.
-- [ ] AC-09: vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, the convention
+      Evidence: established by the observed verification recorded on T6, T7, T11, T12, T17, T18 in Tasks.
+- [x] AC-09: vh-adlc's `AGENTS.md` has a product profile and pins the companion revision, the convention
       uses every glossary term except Cut check and Follow-up review, and the convention and both user
       guides use the terms they contain with the glossary's meanings.
-- [ ] AC-10: The replay harness runs a case end to end, reuses a stored old-brief set only when its
+      Evidence: established by the observed verification recorded on T1, T8, T21, T22 in Tasks.
+- [x] AC-10: The replay harness runs a case end to end, reuses a stored old-brief set only when its
       recorded identity matches the current old brief and refuses otherwise, keeps every finished pass when it assembles results from stored runs, continues a stored set of the same
       identity and starts a fresh one for a different identity, resumes a failed loop from its kept clone,
       counts a lost loop's recorded lower bound, counts a set stored before T25 only through a matching
@@ -646,32 +655,40 @@ for the old-pin controls.
       run only on the route and model under test, records each run's plugin commit, docs revision and
       model, writes nothing but counts and identities to the results file, records failed executions
       without counting them as passes, and runs on a public fixture case in the test suite.
-- [ ] AC-11: On the enterprise case, with labels and case approved before the first rule-editing commit, no
+      Evidence: established by the observed verification recorded on T19, T20, T25, T27, T28 in Tasks.
+- [x] AC-11: On the enterprise case, with labels and case approved before the first rule-editing commit, no
       label fails the retention rule on either route, apart from label L-08 on the Claude host route and
       label L-10 on the Codex command route, known losses the owner deferred as D-17 and D-18.
-- [ ] AC-12: On the small application case, with labels and case approved before the first rule-editing
+      Evidence: established by the observed verification recorded on T23, T27 in Tasks.
+- [x] AC-12: On the small application case, with labels and case approved before the first rule-editing
       commit, no label fails the retention rule on either route.
-- [ ] AC-13: Over the case and route pairs where both briefs' loops reach a clean pass, of which there must be
+      Evidence: established by the observed verification recorded on T24, T27 in Tasks.
+- [x] AC-13: Over the case and route pairs where both briefs' loops reach a clean pass, of which there must be
       at least one, the new-brief loops need at most half the old-brief loops' total spec reviews; the other
       pairs are reported as measured.
-- [ ] AC-14: The convention defines the optional Deferred section outside the normative baseline; the spec
+      Evidence: established by the observed verification recorded on T23, T24, T25, T28 in Tasks.
+- [x] AC-14: The convention defines the optional Deferred section outside the normative baseline; the spec
       skill writes an entry with the exact source text for every stated limit, finding deferred at
       acceptance, owner-directed cut, author cut and drift re-review deferral; and the reviewer does not
       raise an entry's substance again unless it leaves an always-blocking defect, makes a criterion
       unmeetable or leaves the stated problem unsolved.
-- [ ] AC-15: After every owner-directed deferral, the author's reply carries the cut check line, and an item
+      Evidence: established by the observed verification recorded on T1, T2, T6, T7, T15, T26 in Tasks.
+- [x] AC-15: After every owner-directed deferral, the author's reply carries the cut check line, and an item
       that is an always-blocking defect or that the goal or a criterion names becomes an Open Question
       instead of a Deferred entry.
-- [ ] AC-16: Once a feature's PR is merged, the follow-up review gives every pending Deferred entry a verdict
+      Evidence: established by the observed verification recorded on T7, T15 in Tasks.
+- [x] AC-16: Once a feature's PR is merged, the follow-up review gives every pending Deferred entry a verdict
       of drop, follow-up or gap with one line of reason; shows gaps and follow-ups with issue previews and
       drops one line each; files only what the owner approves, through the labels helper's `follow-up`
       mode, never twice for one entry; records every verdict, including declined filings, in a docs PR
       without touching the default branch; runs only for a merged feature, without a writer handoff; and
       the ship report and resume flag a merged complete document with pending entries.
-- [ ] AC-17: Over the case and route pairs whose old-brief loop reached a clean pass and stored its
+      Evidence: established by the observed verification recorded on T9, T10, T11, T16 in Tasks.
+- [x] AC-17: Over the case and route pairs whose old-brief loop reached a clean pass and stored its
       documents, the new-brief loops'
       total body growth is at most half the old-brief loops' total, or no larger than it when the old total is zero or negative, with body size
       recorded per pass and the Deferred section left out of it.
+      Evidence: established by the observed verification recorded on T19, T20, T23, T24, T25 in Tasks.
 
 ## Test Plan
 
