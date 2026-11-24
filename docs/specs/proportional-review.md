@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "In draft on feat/proportional-review for an owner-decided revision (2026-11-24): the halving bar for spec reviews applies where both loops reached a clean pass, the Codex route is reported as measured, and why Codex does not improve on the enterprise case is D-19. T1 to T22 and T25 to T27 done; T28, T23 and T24 continue after acceptance."
+status: planned
+status_description: "Codex-deferral revision accepted at R-28 on 2026-11-24: the halving bar applies where both loops reached a clean pass, the Codex pairs are reported, and the Codex question is D-19. T1 to T22 and T25 to T27 done; next: T28, then T23 and T24."
 branch: feat/proportional-review
 issue: null
 goal: "Spec review weighs every finding against the product the project describes, so a document reaches a clean pass in far fewer rounds where both rule sets converge, with fewer owner questions and less scope growth, while every real defect the current review raises is still raised, apart from any the owner defers as a known loss, and every deferred item is judged once the feature is merged."
@@ -813,6 +813,7 @@ None.
 | 2026-11-24 | R-26 | spec | `372cc5cb` | claude-opus-5-5 | procedural | full pass after implementation commits: no blocking; 1 should-fix, 2 nit |
 | 2026-11-24 | R-27 | spec | `7c41f1a2` | claude-opus-5-5 | procedural | scoped: no blocking; 1 should-fix |
 | 2026-11-24 | R-28 | spec | `87a2ba87` | claude-opus-5-5 | procedural | scoped: no findings |
+| 2026-11-24 | R-28 | spec | `87a2ba87` | n/a | n/a | accepted by owner |
 
 ### R-1
 
